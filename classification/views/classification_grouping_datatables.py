@@ -447,8 +447,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 extra_columns=[
                     "pk",
                     "latest_allele_info__pk",
-                    "latest_allele_info__grch37__c_hgvs",
-                    "latest_allele_info__grch38__c_hgvs",
+                    "latest_allele_info__grch37__resolved_hgvs",
+                    "latest_allele_info__grch38__resolved_hgvs",
                     "latest_allele_info__grch37__variant_id",
                     "latest_allele_info__grch38__variant_id",
                     'latest_allele_info__id',

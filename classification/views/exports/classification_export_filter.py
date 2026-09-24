@@ -555,9 +555,9 @@ class ClassificationFilter:
         :return: The name of the c.hgvs column to use in a Classification QS
         """
         if self.genome_build == GenomeBuild.grch37():
-            return 'classification__allele_info__grch37__c_hgvs'
+            return 'classification__allele_info__grch37__resolved_hgvs'
         else:
-            return 'classification__allele_info__grch38__c_hgvs'
+            return 'classification__allele_info__grch38__resolved_hgvs'
 
     @cached_property
     def _discordant_classification_ids(self) -> dict[int, DiscordanceReportStatus]:
@@ -720,7 +720,7 @@ class ClassificationFilter:
         ci.withdrawn = cm.classification.withdrawn
         # ci.transcript_version = cm.classification_id in self._transcript_version_classification_ids
         # ci.matching_warning = cm.classification_id in self._variant_matching_classification_ids
-        if not allele_id or not ci.classification.classification.get_c_hgvs(self.genome_build):
+        if not allele_id or not ci.classification.classification.get_resolved_hgvs(self.genome_build):
             ci.not_matched = True
         if (allele_info := cm.classification.allele_info) and (latest_validation := allele_info.latest_validation):
             ci.validation_include = latest_validation.include

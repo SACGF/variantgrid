@@ -22,7 +22,7 @@ class Command(BaseCommand):
         variant disagrees with what current transcript data resolves to, and hard rematch those.
 
         The converter version stamped on an ImportedAlleleInfo isn't evidence of how the variant was
-        matched - update_variant_coordinate/recalc_c_hgvs re-stamp it while leaving the matched variant
+        matched - update_variant_coordinate/recalc_resolved_hgvs re-stamp it while leaving the matched variant
         as it was, so the stored coordinate is compared against a fresh resolution instead.
     """
     category = "one-off"

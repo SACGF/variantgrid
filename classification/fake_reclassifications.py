@@ -367,7 +367,7 @@ class FakeReclassifications:
         variant_infos = ResolvedVariantInfo.objects.bulk_create([
             ResolvedVariantInfo(allele_info=allele_info, genome_build=genome_build,
                                 variant_id=group.variant_id, gene_symbol_id=group.gene_symbol,
-                                c_hgvs=allele_info.imported_c_hgvs)
+                                resolved_hgvs=allele_info.imported_c_hgvs)
             for group, allele_info in zip(groups, allele_infos)], batch_size=BATCH_SIZE)
 
         build_field = "grch38" if genome_build.name == "GRCh38" else "grch37"

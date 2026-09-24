@@ -44,14 +44,14 @@ class CSVNonEvidence(ExportRow):
     def grch37_hgvs(self):
         if allele_info := self.classification_grouping.latest_allele_info:
             if grch := allele_info.grch37:
-                return grch.c_hgvs
+                return grch.resolved_hgvs
         return None
 
     @export_column(label="Resolved GRCh38 c.HGVS", categories={"GRCh38": True})
     def grch38_hgvs(self):
         if allele_info := self.classification_grouping.latest_allele_info:
             if grch := allele_info.grch38:
-                return grch.c_hgvs
+                return grch.resolved_hgvs
         return None
 
     @export_column(label="Resolved ClinGen Allele")

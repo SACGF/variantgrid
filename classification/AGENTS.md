@@ -5,7 +5,7 @@ Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
 - enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
-- models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build c.HGVS cache).
+- models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
 Patterns here:

@@ -177,7 +177,7 @@ class ClassificationGroupingByAllele:
         for cg in self.classification_groupings:
             if allele_info := cg.latest_allele_info:
                 if preferred_build := allele_info[self.genome_build]:
-                    if c_hgvs_obj := preferred_build.c_hgvs_obj:
+                    if c_hgvs_obj := preferred_build.resolved_hgvs_obj:
                         return c_hgvs_obj
         return None
 

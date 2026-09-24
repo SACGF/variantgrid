@@ -256,7 +256,7 @@ class Command(BaseCommand):
                 # RESOLVED
                 try:
                     if variant_info := iai[iai.imported_genome_build]:
-                        resolved.c_hgvs = variant_info.c_hgvs
+                        resolved.c_hgvs = variant_info.resolved_hgvs
                         if variant := variant_info.variant:
                             resolved.variant_coordinate = variant.coordinate
                             if transcript_version := variant_info.transcript_version:

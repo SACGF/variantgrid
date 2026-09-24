@@ -8,7 +8,7 @@
     <div class="card-body">
         {% labelled label="c.HGVS" %}
             <a href="{{ triage.allele.get_absolute_url }}">
-            {% c_hgvs triage.classification_grouping.latest_allele_info.preferred_c_hgvs_obj %}
+            {% c_hgvs triage.classification_grouping.latest_allele_info.preferred_hgvs_obj %}
             </a>
         {% endlabelled %}
         {% labelled label="Value" %}{{ triage.get_value_type_display }} : {{ triage.pretty_value }}{% endlabelled %}

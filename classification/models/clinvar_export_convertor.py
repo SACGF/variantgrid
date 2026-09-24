@@ -487,7 +487,7 @@ class ClinVarExportConverter:
     def variant_set(self) -> ValidatedJson:
         try:
             genome_build = self.classification_based_on.get_genome_build()
-            if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
+            if c_hgvs := self.classification_based_on.classification.get_resolved_hgvs(genome_build):
                 c_hgvs_obj = HGVSComponents(c_hgvs)
                 c_hgvs_no_gene = c_hgvs_obj.without_gene_symbol_str
 

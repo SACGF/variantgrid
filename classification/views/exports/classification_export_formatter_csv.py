@@ -161,7 +161,7 @@ class RowID(ExportRow):
 
     @export_column()
     def target_c_hgvs(self):
-        if c_hgvs := self.vc.get_c_hgvs(self.genome_build):
+        if c_hgvs := self.vc.get_resolved_hgvs(self.genome_build):
             return c_hgvs
 
     @export_column()

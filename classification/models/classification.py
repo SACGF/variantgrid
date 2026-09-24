@@ -762,30 +762,30 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return False
 
     @property
-    def chgvs_grch37(self) -> Optional[str]:
+    def resolved_hgvs_grch37(self) -> Optional[str]:
         try:
-            return self.allele_info.grch37.c_hgvs
+            return self.allele_info.grch37.resolved_hgvs
         except AttributeError:
             return None
 
     @property
-    def chgvs_grch38(self) -> Optional[str]:
+    def resolved_hgvs_grch38(self) -> Optional[str]:
         try:
-            return self.allele_info.grch38.c_hgvs
+            return self.allele_info.grch38.resolved_hgvs
         except AttributeError:
             return None
 
     @property
-    def chgvs_grch37_compat(self) -> Optional[str]:
+    def resolved_hgvs_grch37_compat(self) -> Optional[str]:
         try:
-            return self.allele_info.grch37.c_hgvs_compat
+            return self.allele_info.grch37.resolved_hgvs_compat
         except AttributeError:
             return None
 
     @property
-    def chgvs_grch38_compat(self) -> Optional[str]:
+    def resolved_hgvs_grch38_compat(self) -> Optional[str]:
         try:
-            return self.allele_info.grch38.c_hgvs_compat
+            return self.allele_info.grch38.resolved_hgvs_compat
         except AttributeError:
             return None
 
@@ -864,7 +864,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
         flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
         flag_q = Q(flag_collection_id__in=flag_collections.distinct())
-        missing_chgvs_q = (Q(allele_info__grch37__c_hgvs__isnull=True) | Q(allele_info__grch38__c_hgvs__isnull=True))
+        missing_chgvs_q = (Q(allele_info__grch37__resolved_hgvs__isnull=True) | Q(allele_info__grch38__resolved_hgvs__isnull=True))
         coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
@@ -881,9 +881,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     variant_matching = True
                 coi.add_flag(flag_type)
             if not variant_matching:
-                if not c.chgvs_grch37:
+                if not c.resolved_hgvs_grch37:
                     coi.add_issue("No cached 37 representation")
-                if not c.chgvs_grch38:
+                if not c.resolved_hgvs_grch38:
                     coi.add_issue("No cached 38 representation")
 
             summaries.append(coi)
@@ -2293,22 +2293,22 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def c_hgvs_all(self) -> list[HGVSDisplay]:
         all_chgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
-            if text := self.get_c_hgvs(genome_build):
+            if text := self.get_resolved_hgvs(genome_build):
                 all_chgvs.append(HGVSDisplay.parse(text, genome_build=genome_build, is_normalised=True))
         return all_chgvs
 
     def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
-        if c_hgvs_str := self.get_c_hgvs(preferred_genome_build):
+        if c_hgvs_str := self.get_resolved_hgvs(preferred_genome_build):
             return HGVSDisplay.parse(c_hgvs_str, genome_build=preferred_genome_build,
                                      is_normalised=True, is_desired_build=True)
         for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
             if preferred_genome_build == alt_genome_build:
                 continue
-            if c_hgvs_str := self.get_c_hgvs(alt_genome_build):
+            if c_hgvs_str := self.get_resolved_hgvs(alt_genome_build):
                 return HGVSDisplay.parse(c_hgvs_str, genome_build=alt_genome_build,
                                          is_normalised=True, is_desired_build=False)
         if (allele_info := self.allele_info) and \
-                (matched := allele_info.matched_without_c_hgvs_display(preferred_genome_build)):
+                (matched := allele_info.matched_without_resolved_hgvs_display(preferred_genome_build)):
             return matched
         # nothing resolved, fall back to whichever HGVS the submitter gave us
         imported_genome_build = None
@@ -2320,7 +2320,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                  genome_build=imported_genome_build, is_normalised=False,
                                  is_desired_build=preferred_genome_build == imported_genome_build)
 
-    def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
+    def _generate_resolved_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)
         hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
@@ -2344,17 +2344,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 })
         return c_hgvs
 
-    def get_c_hgvs(self, genome_build: GenomeBuild, use_compat: bool = False) -> Optional[str]:
+    def get_resolved_hgvs(self, genome_build: GenomeBuild, use_compat: bool = False) -> Optional[str]:
         if genome_build == genome_build.grch37():
-            return self.chgvs_grch37 if not use_compat else self.chgvs_grch37_compat
+            return self.resolved_hgvs_grch37 if not use_compat else self.resolved_hgvs_grch37_compat
         if genome_build == genome_build.grch38():
-            return self.chgvs_grch38 if not use_compat else self.chgvs_grch38_compat
-        return self._generate_c_hgvs(genome_build)
+            return self.resolved_hgvs_grch38 if not use_compat else self.resolved_hgvs_grch38_compat
+        return self._generate_resolved_hgvs(genome_build)
 
     def __str__(self) -> str:
         parts = [f"({self.id!s})"]
         genome_build = GenomeBuildManager.get_current_genome_build()
-        cached_c_hgvs = self.get_c_hgvs(genome_build=genome_build)
+        cached_c_hgvs = self.get_resolved_hgvs(genome_build=genome_build)
         if not cached_c_hgvs:
             cached_c_hgvs = self.get(SpecialEKeys.C_HGVS)
         parts.append(cached_c_hgvs or "No c.HGVS")
@@ -2443,7 +2443,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             return ConditionResolved.from_uncounted_terms(terms=[], plain_text_terms=[self.get(SpecialEKeys.CONDITION)])
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'c_hgvs'):
+    def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'resolved_hgvs'):
         return ImportedAlleleInfo.column_name_for_build(genome_build, "classification__allele_info", suffix)
 
     @property

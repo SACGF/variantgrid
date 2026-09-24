@@ -535,7 +535,7 @@ def classification_table(
 def _to_c_hgvs(c_hgvs: Any) -> HGVSDisplay:
     if isinstance(c_hgvs, ClassificationModification):
         genome_build = GenomeBuildManager.get_current_genome_build()
-        if c_hgvs_str := c_hgvs.classification.get_c_hgvs(genome_build):
+        if c_hgvs_str := c_hgvs.classification.get_resolved_hgvs(genome_build):
             return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build)
         # might have got a none c.hgvs from the ClassificationModification
         return HGVSDisplay.parse("")

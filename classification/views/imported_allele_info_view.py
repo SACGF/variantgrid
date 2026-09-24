@@ -35,11 +35,11 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         error: Optional[str] = None
 
         if '37' in data.key:
-            c_hgvs_str = data.get('grch37__c_hgvs')
+            c_hgvs_str = data.get('grch37__resolved_hgvs')
             variant_id = data.get('grch37__variant')
             error = data.get('grch37__error')
         elif '38' in data.key:
-            c_hgvs_str = data.get('grch38__c_hgvs')
+            c_hgvs_str = data.get('grch38__resolved_hgvs')
             variant_id = data.get('grch38__variant')
             error = data.get('grch38__error')
         else:
@@ -103,7 +103,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 extra_columns=['imported_g_hgvs', 'variant_coordinate']
             ),
             RichColumn(
-                key='grch37__c_hgvs',
+                key='grch37__resolved_hgvs',
                 label='Resolved GRCh37<br/>c.HGVS',
                 orderable=True,
                 extra_columns=['grch37__variant', 'grch37__error'],
@@ -111,7 +111,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 client_renderer='VCTable.hgvs'
             ),
             RichColumn(
-                key='grch38__c_hgvs',
+                key='grch38__resolved_hgvs',
                 label='Resolved GRCh38<br/>c.HGVS',
                 orderable=True,
                 extra_columns=['grch38__variant', 'grch38__error'],
@@ -179,8 +179,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         # TODO, make RichColumn's searchable on/off so we can just fall back onto that
         ors = [
             Q(imported_c_hgvs__icontains=search_string),
-            Q(grch37__c_hgvs=search_string),
-            Q(grch38__c_hgvs=search_string)
+            Q(grch37__resolved_hgvs=search_string),
+            Q(grch38__resolved_hgvs=search_string)
         ]
         try:
             id_int = int(search_string)
@@ -211,7 +211,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
 
     FALLBACK_HGVS = re.compile("(?P<all>.*)")
-    use_texts = [text for text in [allele_info.imported_c_hgvs, allele_info.grch37.c_hgvs if allele_info.grch37 else None, allele_info.grch38.c_hgvs if allele_info.grch38 else None] if text]
+    use_texts = [text for text in [allele_info.imported_c_hgvs, allele_info.grch37.resolved_hgvs if allele_info.grch37 else None, allele_info.grch38.resolved_hgvs if allele_info.grch38 else None] if text]
 
     use_regex = FALLBACK_HGVS
     if use_texts:
@@ -257,10 +257,10 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         else:
             label = origin
 
-        parts.append(MultiDiffInput(label, rvi.c_hgvs if rvi else None,
+        parts.append(MultiDiffInput(label, rvi.resolved_hgvs if rvi else None,
                                     is_reference=is_reference))
-        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.c_hgvs_converter_version if rvi else "",
-                                              label + " c.HGVS data version", rvi.c_hgvs_converter_data_version if rvi else ""))
+        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.hgvs_converter_version if rvi else "",
+                                              label + " c.HGVS data version", rvi.hgvs_converter_data_version if rvi else ""))
 
     diff_output = multi_diff.diffs(parts)
     if not allele_info.imported_c_hgvs:
@@ -270,10 +270,10 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     liftover_diff: Optional[HGVSDiff] = None
     if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
         if normalized := allele_info.variant_info_for_imported_genome_build:
-            if c_hgvs := normalized.c_hgvs_obj:
+            if c_hgvs := normalized.resolved_hgvs_obj:
                 normalized_diff = imported_c_hgvs.components.diff(c_hgvs)
     if (c37 := allele_info.grch37) and (c38 := allele_info.grch38):
-        if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
+        if (c37c := c37.resolved_hgvs_obj) and (c38c := c38.resolved_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
 
     classifications = ClassificationModification.latest_for_user(user=request.user, published=True).filter(classification__in=allele_info.classification_set.all())
@@ -323,12 +323,12 @@ class ImportedAlleleInfoDownload(ExportRow):
     @export_column(label="c.HGVS (37)")
     def c_hgvs_37(self):
         if c37 := self.allele_info[GenomeBuild.grch37()]:
-            return c37.c_hgvs
+            return c37.resolved_hgvs
 
     @export_column(label="c.HGVS (38)")
     def c_hgvs_38(self):
         if c38 := self.allele_info[GenomeBuild.grch38()]:
-            return c38.c_hgvs
+            return c38.resolved_hgvs
 
     @export_column(label="Differences")
     def differences(self):

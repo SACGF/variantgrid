@@ -136,7 +136,7 @@ def evidence_row_data(record: ClassificationModification, user: User) -> dict:
         }
 
     for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
-        c_hgvs = record.classification.get_c_hgvs(genome_build)
+        c_hgvs = record.classification.get_resolved_hgvs(genome_build)
         context["c_hgvs_" + genome_build.pk.lower()] = {
             'value': c_hgvs,
             'note': None,

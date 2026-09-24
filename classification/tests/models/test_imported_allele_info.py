@@ -67,8 +67,8 @@ class ImportedAlleleInfoValidationTest(TestCase):
     C_HGVS_38 = "NM_000059.4(BRCA2):c.1234A>G"
 
     @staticmethod
-    def _resolved(genome_build: GenomeBuild, c_hgvs=None, transcript_version_id=None, variant_id=1) -> ResolvedVariantInfo:
-        return ResolvedVariantInfo(genome_build=genome_build, c_hgvs=c_hgvs,
+    def _resolved(genome_build: GenomeBuild, resolved_hgvs=None, transcript_version_id=None, variant_id=1) -> ResolvedVariantInfo:
+        return ResolvedVariantInfo(genome_build=genome_build, resolved_hgvs=resolved_hgvs,
                                    transcript_version_id=transcript_version_id, variant_id=variant_id)
 
     def _allele_info(self, grch37=None, grch38=None, **kwargs) -> ImportedAlleleInfo:
@@ -89,8 +89,8 @@ class ImportedAlleleInfoValidationTest(TestCase):
     def test_g_hgvs_resolving_to_genomic_form(self):
         allele_info = self._allele_info(
             imported_g_hgvs=self.G_HGVS_38,
-            grch37=self._resolved(GenomeBuild.grch37(), c_hgvs=self.G_HGVS_37),
-            grch38=self._resolved(GenomeBuild.grch38(), c_hgvs=self.G_HGVS_38))
+            grch37=self._resolved(GenomeBuild.grch37(), resolved_hgvs=self.G_HGVS_37),
+            grch38=self._resolved(GenomeBuild.grch38(), resolved_hgvs=self.G_HGVS_38))
         validation_tags = allele_info._calculate_validation()
         self.assertEqual(validation_tags, {})
         self.assertTrue(ImportedAlleleInfoValidation.should_include(validation_tags))
@@ -98,8 +98,8 @@ class ImportedAlleleInfoValidationTest(TestCase):
     def test_g_hgvs_resolving_to_transcript_reports_liftover_as_info(self):
         allele_info = self._allele_info(
             imported_g_hgvs=self.G_HGVS_38,
-            grch37=self._resolved(GenomeBuild.grch37(), c_hgvs=self.C_HGVS_37, transcript_version_id=1),
-            grch38=self._resolved(GenomeBuild.grch38(), c_hgvs="NM_000059.4(BRCA2):c.1240A>G",
+            grch37=self._resolved(GenomeBuild.grch37(), resolved_hgvs=self.C_HGVS_37, transcript_version_id=1),
+            grch38=self._resolved(GenomeBuild.grch38(), resolved_hgvs="NM_000059.4(BRCA2):c.1240A>G",
                                   transcript_version_id=2))
         validation_tags = allele_info._calculate_validation()
         liftover = validation_tags["liftover"]
@@ -149,22 +149,22 @@ class ImportedAlleleInfoValidationTest(TestCase):
         grch37, grch38 = GenomeBuild.grch37(), GenomeBuild.grch38()
         allele_info = self._gene_level_allele_info(
             "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>", grch37=self._resolved(grch37))
-        display = allele_info.matched_without_c_hgvs_display(grch38)
+        display = allele_info.matched_without_resolved_hgvs_display(grch38)
         self.assertEqual("ARV7", display.full_hgvs)
         self.assertEqual(grch37, display.genome_build)
         self.assertTrue(display.is_normalised)
         self.assertFalse(display.is_desired_build)
 
-        self.assertIsNone(self._allele_info(imported_c_hgvs=self.C_HGVS_38).matched_without_c_hgvs_display(grch38))
+        self.assertIsNone(self._allele_info(imported_c_hgvs=self.C_HGVS_38).matched_without_resolved_hgvs_display(grch38))
         with_c_hgvs = self._allele_info(imported_c_hgvs=self.C_HGVS_38,
-                                        grch38=self._resolved(grch38, c_hgvs=self.C_HGVS_38))
-        self.assertIsNone(with_c_hgvs.matched_without_c_hgvs_display(grch38))
+                                        grch38=self._resolved(grch38, resolved_hgvs=self.C_HGVS_38))
+        self.assertIsNone(with_c_hgvs.matched_without_resolved_hgvs_display(grch38))
 
     def test_unsupported_transcript_still_errors(self):
         allele_info = self._allele_info(
             imported_c_hgvs="NX_000059.4(BRCA2):c.1234A>G",
-            grch37=self._resolved(GenomeBuild.grch37(), c_hgvs=self.C_HGVS_37, transcript_version_id=1),
-            grch38=self._resolved(GenomeBuild.grch38(), c_hgvs=self.C_HGVS_38, transcript_version_id=2))
+            grch37=self._resolved(GenomeBuild.grch37(), resolved_hgvs=self.C_HGVS_37, transcript_version_id=1),
+            grch38=self._resolved(GenomeBuild.grch38(), resolved_hgvs=self.C_HGVS_38, transcript_version_id=2))
         validation_tags = allele_info._calculate_validation()
         self.assertEqual(validation_tags["general"]["transcript_type_not_supported"], "E")
         self.assertFalse(ImportedAlleleInfoValidation.should_include(validation_tags))
@@ -186,7 +186,7 @@ class ImportedAlleleInfoValidationTest(TestCase):
         allele_info = self._allele_info(
             imported_c_hgvs=self.C_HGVS_38,
             grch37=self._resolved(GenomeBuild.grch37()),
-            grch38=self._resolved(GenomeBuild.grch38(), c_hgvs=self.C_HGVS_38, transcript_version_id=2))
+            grch38=self._resolved(GenomeBuild.grch38(), resolved_hgvs=self.C_HGVS_38, transcript_version_id=2))
         self.assertEqual(allele_info._calculate_validation()["builds"], {"missing_37": "W"})
 
 
@@ -236,6 +236,6 @@ class ResolvedVariantInfoCNVTest(TestCase):
                                            variant=self.variant)
         variant_info.set_variant_and_save(self.variant)
 
-        self.assertIsNone(variant_info.c_hgvs)
+        self.assertIsNone(variant_info.resolved_hgvs)
         self.assertIn("has no HGVS representation", variant_info.error)
         mock_report_exc_info.assert_not_called()

@@ -1,7 +1,7 @@
 """
 What a classification said about its variant and what it resolved to. ImportedAlleleInfo is unique
 on the md5 of the imported text (build, c.HGVS or g.HGVS, transcript) so re-imports share one
-resolution; ResolvedVariantInfo is that resolution per build (variant, c.HGVS, gene, transcript) and
+resolution; ResolvedVariantInfo is that resolution per build (variant, HGVS, gene, transcript) and
 ImportedAlleleInfoValidation records the include / confirmed decision and its validation tags.
 This is the only link from a classification to an Allele; HGVSConverterVersion records which
 converter produced it.
@@ -110,11 +110,11 @@ class HGVSConverterVersion(TimeStampedModel):
 
 
 @dataclass(frozen=True)
-class CHGVSResolution:
-    c_hgvs: str
-    c_hgvs_compatible: str
-    c_hgvs_converter_version: HGVSConverterVersion
-    c_hgvs_converter_data_version: str
+class HGVSResolution:
+    resolved_hgvs: str
+    resolved_hgvs_compat: str
+    hgvs_converter_version: HGVSConverterVersion
+    hgvs_converter_data_version: str
     """ cdot data version or ClinGen date used during this resolution """
     transcript_version: Optional[str]
     gene_symbol: Optional[str]
@@ -138,27 +138,28 @@ class ResolvedVariantInfo(TimeStampedModel):
     variant = ForeignKey(Variant, null=False, on_delete=CASCADE)
     """ The variant the allele/genome_build matched up to """
 
-    c_hgvs = TextField(null=True, blank=True)
-    """ c.HGVS as you'd normally represent it """
+    resolved_hgvs = TextField(null=True, blank=True)
+    """ HGVS as you'd normally represent it: a c.HGVS when resolved against a transcript (see transcript_version),
+        otherwise a g.HGVS """
 
     @property
-    def c_hgvs_obj(self) -> Optional[HGVSComponents]:
-        if self.c_hgvs:
-            return HGVSComponents(self.c_hgvs)
+    def resolved_hgvs_obj(self) -> Optional[HGVSComponents]:
+        if self.resolved_hgvs:
+            return HGVSComponents(self.resolved_hgvs)
 
     @property
-    def c_hgvs_display(self) -> Optional[HGVSDisplay]:
-        if components := self.c_hgvs_obj:
+    def resolved_hgvs_display(self) -> Optional[HGVSDisplay]:
+        if components := self.resolved_hgvs_obj:
             return HGVSDisplay(components, genome_build=self.genome_build)
 
-    c_hgvs_compat = TextField(null=True, blank=True)
-    """ c.HGVS with all bases explicit in the case of dels & dups """
+    resolved_hgvs_compat = TextField(null=True, blank=True)
+    """ resolved_hgvs with all bases explicit in the case of dels & dups """
 
-    c_hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
-    """ Tool used to generate c_hgvs  """
+    hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
+    """ Tool used to generate resolved_hgvs  """
 
-    c_hgvs_converter_data_version = TextField(blank=True, default='')
-    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when computing c_hgvs """
+    hgvs_converter_data_version = TextField(blank=True, default='')
+    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when computing resolved_hgvs """
 
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     """ The GeneSymbol of the c.HGVS """
@@ -179,7 +180,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         base_manager_name = 'objects'
 
     def __str__(self):
-        return f"{self.c_hgvs}" if self.c_hgvs else "Could not resolve c.HGVS"
+        return f"{self.resolved_hgvs}" if self.resolved_hgvs else "Could not resolve HGVS"
 
     def __lt__(self, other):
         return (self.genomic_sort or '') < (other.genomic_sort or '')
@@ -196,8 +197,8 @@ class ResolvedVariantInfo(TimeStampedModel):
         if not variant:
             raise ValueError("set_variant_and_save requires a non-None variant")
 
-        self.c_hgvs = None
-        self.c_hgvs_compat = None
+        self.resolved_hgvs = None
+        self.resolved_hgvs_compat = None
         self.gene_symbol = None
         self.transcript_version: Optional[TranscriptVersion] = None
         self.variant = variant
@@ -213,13 +214,13 @@ class ResolvedVariantInfo(TimeStampedModel):
             return self
 
         try:
-            c_hgvs_resolution = self.recalc_c_hgvs()
-            self.c_hgvs = c_hgvs_resolution.c_hgvs
-            self.c_hgvs_compat = c_hgvs_resolution.c_hgvs_compatible
-            self.c_hgvs_converter_version = c_hgvs_resolution.c_hgvs_converter_version
-            self.transcript_version = c_hgvs_resolution.transcript_version
-            self.gene_symbol = c_hgvs_resolution.gene_symbol
-            self.c_hgvs_converter_data_version = c_hgvs_resolution.c_hgvs_converter_data_version
+            hgvs_resolution = self.recalc_resolved_hgvs()
+            self.resolved_hgvs = hgvs_resolution.resolved_hgvs
+            self.resolved_hgvs_compat = hgvs_resolution.resolved_hgvs_compat
+            self.hgvs_converter_version = hgvs_resolution.hgvs_converter_version
+            self.transcript_version = hgvs_resolution.transcript_version
+            self.gene_symbol = hgvs_resolution.gene_symbol
+            self.hgvs_converter_data_version = hgvs_resolution.hgvs_converter_data_version
         except NoTranscript as nt:
             # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
             self.error = str(nt)
@@ -240,31 +241,31 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.save()
         return self
 
-    def recalc_c_hgvs(self) -> CHGVSResolution:
+    def recalc_resolved_hgvs(self) -> HGVSResolution:
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
         hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
 
         result = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
-        c_hgvs = result.hgvs_variant.format()
-        c_hgvs_obj = HGVSComponents(c_hgvs)
+        resolved_hgvs = result.hgvs_variant.format()
+        hgvs_obj = HGVSComponents(resolved_hgvs)
 
         hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         version = hgvs_matcher.hgvs_converter.get_version()
-        transcript_version = TranscriptVersion.get_for_parts(genome_build, c_hgvs_obj.transcript_parts)
-        # Prefer data version from the transcript directly used; fall back to the c_hgvs_obj lookup
+        transcript_version = TranscriptVersion.get_for_parts(genome_build, hgvs_obj.transcript_parts)
+        # Prefer data version from the transcript directly used; fall back to the hgvs_obj lookup
         data_version = (result.converter_info.hgvs_converter_data_version
                         or (transcript_version.data.get('cdot', '') if transcript_version else ''))
-        c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
+        hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
                                                           used_converter_type=result.converter_info.used_converter_type)
-        return CHGVSResolution(
-                c_hgvs=c_hgvs,
-                c_hgvs_compatible=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
-                c_hgvs_converter_version=c_hgvs_converter_version,
-                c_hgvs_converter_data_version=data_version,
+        return HGVSResolution(
+                resolved_hgvs=resolved_hgvs,
+                resolved_hgvs_compat=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+                hgvs_converter_version=hgvs_converter_version,
+                hgvs_converter_data_version=data_version,
                 transcript_version=transcript_version,
-                gene_symbol=GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first(),
+                gene_symbol=GeneSymbol.objects.filter(symbol=hgvs_obj.gene_symbol).first(),
         )
 
     @staticmethod
@@ -401,8 +402,8 @@ class ImportedAlleleInfoValidationTagEntry:
 class ImportedAlleleInfoValidation(TimeStampedModel):
     imported_allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE)
     validation_tags = JSONField(null=True, blank=True)  # of type ImportedAlleleInfoValidation
-    c_hgvs_37 = TextField(null=True, blank=True)
-    c_hgvs_38 = TextField(null=True, blank=True)
+    resolved_hgvs_37 = TextField(null=True, blank=True)
+    resolved_hgvs_38 = TextField(null=True, blank=True)
     include = BooleanField(null=False)  # don't provide a default - make sure it's calculated
     confirmed = BooleanField(default=False, blank=True)
     """
@@ -582,10 +583,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ set this once it's matched, but record can exist prior to variant matching """
 
     grch37 = OneToOneField(ResolvedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
-    """ cached reference to 37, so can quickly refer to classification__allele_info__grch37__c_hgvs for example """
+    """ cached reference to 37, so can quickly refer to classification__allele_info__grch37__resolved_hgvs for example """
 
     grch38 = OneToOneField(ResolvedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
-    """ cached reference to 38, so can quickly refer to classification__allele_info__grch38__c_hgvs for example """
+    """ cached reference to 38, so can quickly refer to classification__allele_info__grch38__resolved_hgvs for example """
 
     message = TextField(null=True, blank=True)
     """ used to describe information about the matching process (or failure) """
@@ -614,7 +615,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return {GenomeBuild.grch37(), GenomeBuild.grch38()}
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'): #
+    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'resolved_hgvs'):
         build_str: str
         if genome_build.is_equivalent(GenomeBuild.grch37()):
             build_str = 'grch37'
@@ -645,22 +646,22 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         validation_dict: ImportedAlleleInfoValidationTags = {}
         imported_c_hgvs = self.imported_c_hgvs_obj
-        normalized_c_hgvs: Optional[HGVSComponents] = None
+        normalized_hgvs: Optional[HGVSComponents] = None
         if normalised := self.variant_info_for_imported_genome_build:
-            normalized_c_hgvs = normalised.c_hgvs_obj
-        lifted_c_hgvs: Optional[HGVSComponents] = None
+            normalized_hgvs = normalised.resolved_hgvs_obj
+        lifted_hgvs: Optional[HGVSComponents] = None
         if lifted := self.variant_info_for_lifted_over_genome_build:
-            lifted_c_hgvs = lifted.c_hgvs_obj
+            lifted_hgvs = lifted.resolved_hgvs_obj
 
-        def calculate_diff_dict(c_hgvs_diff: HGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
+        def calculate_diff_dict(hgvs_diff: HGVSDiff, severity: Optional[ALLELE_INFO_VALIDATION_SEVERITY] = None) -> ImportedAlleleValidationTagsDiff:
             diff_dict: ImportedAlleleValidationTagsDiff = {}
             for diff_flag, field_name in _DIFF_TO_VALIDATION_KEY.items():
-                if c_hgvs_diff & diff_flag:
+                if hgvs_diff & diff_flag:
                     diff_dict[field_name] = severity or _VALIDATION_TO_SEVERITY.get(field_name, "E")
             return diff_dict
 
-        if imported_c_hgvs and normalized_c_hgvs:
-            if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_c_hgvs)):
+        if imported_c_hgvs and normalized_hgvs:
+            if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_hgvs)):
                 validation_dict["normalize"] = normal_diff_dict
 
         # a g.HGVS only submission resolves to the genomic form when there's no transcript, and the contig accession
@@ -668,15 +669,15 @@ class ImportedAlleleInfo(TimeStampedModel):
         both_builds_have_transcript = all(
             build_info and build_info.transcript_version_id for build_info in (normalised, lifted)
         )
-        if normalized_c_hgvs and lifted_c_hgvs and (self.imported_as_c_hgvs or both_builds_have_transcript):
+        if normalized_hgvs and lifted_hgvs and (self.imported_as_c_hgvs or both_builds_have_transcript):
             diff_severity = None if self.imported_as_c_hgvs else "W"
-            if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs), diff_severity):
+            if lifted_diff_dict := calculate_diff_dict(normalized_hgvs.diff(lifted_hgvs), diff_severity):
                 validation_dict["liftover"] = lifted_diff_dict
 
         builds: ImportedAlleleValidationTagsBuilds = {}
         for build_str, build_info in (("37", self.grch37), ("38", self.grch38)):
             if self.imported_as_c_hgvs:
-                resolved = build_info and build_info.c_hgvs_obj
+                resolved = build_info and build_info.resolved_hgvs_obj
             else:
                 # a g.HGVS submission only needs the variant coordinate in each build, the c.HGVS is a bonus
                 resolved = build_info and build_info.variant_id
@@ -705,12 +706,12 @@ class ImportedAlleleInfo(TimeStampedModel):
         """
         Make sure to call .save() after this method
         """
-        c_hgvs_37 = self.grch37.c_hgvs if self.grch37 else None
-        c_hgvs_38 = self.grch38.c_hgvs if self.grch38 else None
+        resolved_hgvs_37 = self.grch37.resolved_hgvs if self.grch37 else None
+        resolved_hgvs_38 = self.grch38.resolved_hgvs if self.grch38 else None
 
         update_existing_validation = False
         if check_latest := self.latest_validation:
-            if check_latest.c_hgvs_37 == c_hgvs_37 and check_latest.c_hgvs_38 == c_hgvs_38:
+            if check_latest.resolved_hgvs_37 == resolved_hgvs_37 and check_latest.resolved_hgvs_38 == resolved_hgvs_38:
                 # validation is already up-to-date, maybe add a force option to check that the validation dict is the same?
                 if force_update:
                     update_existing_validation = True
@@ -726,8 +727,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         validation_tags = self._calculate_validation()
         latest_validation.imported_allele_info = self
         latest_validation.validation_tags = validation_tags
-        latest_validation.c_hgvs_37 = c_hgvs_37
-        latest_validation.c_hgvs_38 = c_hgvs_38
+        latest_validation.resolved_hgvs_37 = resolved_hgvs_37
+        latest_validation.resolved_hgvs_38 = resolved_hgvs_38
         if not latest_validation.confirmed:
             latest_validation.include = ImportedAlleleInfoValidation.should_include(validation_tags)
         latest_validation.save()
@@ -762,12 +763,12 @@ class ImportedAlleleInfo(TimeStampedModel):
             return HGVSDisplay(g_hgvs)
         return None
 
-    def matched_without_c_hgvs_display(self, preferred_genome_build: GenomeBuild) -> Optional[HGVSDisplay]:
+    def matched_without_resolved_hgvs_display(self, preferred_genome_build: GenomeBuild) -> Optional[HGVSDisplay]:
         """ A variant HGVS has no way to write (a gene-level event, a symbolic CNV) matches but gets no c.HGVS,
             so show it as imported without calling it unresolved """
         builds = sorted(ImportedAlleleInfo.supported_genome_builds(), key=lambda gb: gb != preferred_genome_build)
         for genome_build in builds:
-            if (variant_info := self[genome_build]) and variant_info.variant_id and not variant_info.c_hgvs:
+            if (variant_info := self[genome_build]) and variant_info.variant_id and not variant_info.resolved_hgvs:
                 return HGVSDisplay(self.imported_hgvs_obj() or HGVSComponents(""), genome_build=genome_build,
                                    is_normalised=True, is_desired_build=genome_build == preferred_genome_build)
         return None
@@ -783,18 +784,18 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             return None
 
-    def preferred_c_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
+    def preferred_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
         if genome_build is None:
             genome_build = GenomeBuildManager.get_current_genome_build()
 
         if preferred := self[genome_build]:
-            return HGVSDisplay(preferred.c_hgvs_obj, genome_build=genome_build)
+            return HGVSDisplay(preferred.resolved_hgvs_obj, genome_build=genome_build)
         else:
             for genome_build in GenomeBuild.builds_with_annotation_cached():
                 if alternative := self[genome_build]:
-                    if c_hgvs_obj := HGVSComponents(alternative.c_hgvs_obj):
+                    if hgvs_obj := HGVSComponents(alternative.resolved_hgvs_obj):
                         return HGVSDisplay(
-                            c_hgvs_obj,
+                            hgvs_obj,
                             is_desired_build=False,
                             genome_build=genome_build
                         )
@@ -809,13 +810,13 @@ class ImportedAlleleInfo(TimeStampedModel):
         return imported_hgvs
 
     @staticmethod
-    def all_chgvs(allele: Allele) -> list[HGVSDisplay]:
-        all_chgvs = set()
+    def all_resolved_hgvs(allele: Allele) -> list[HGVSDisplay]:
+        all_resolved_hgvs = set()
         for iai in allele.importedalleleinfo_set.all():
             for rb in iai.resolved_builds:
-                if c_hgvs := rb.c_hgvs_display:
-                    all_chgvs.add(c_hgvs)
-        return sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str))
+                if hgvs_display := rb.resolved_hgvs_display:
+                    all_resolved_hgvs.add(hgvs_display)
+        return sorted(all_resolved_hgvs, key=lambda x: (x.genome_build, x.sort_str))
 
     @property
     def get_transcript(self) -> str:
@@ -1054,23 +1055,23 @@ class ImportedAlleleInfo(TimeStampedModel):
             message_parts = []
             for rvi in self.resolved_builds:
                 try:
-                    recalc_c_hgvs = rvi.recalc_c_hgvs()
-                    if rvi.c_hgvs != recalc_c_hgvs.c_hgvs:
-                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build}\n{rvi.c_hgvs} ->\n{recalc_c_hgvs.c_hgvs}")
-                        if diffs := c_hgvs_diff_if_applicable(rvi.c_hgvs, recalc_c_hgvs.c_hgvs):
+                    recalc = rvi.recalc_resolved_hgvs()
+                    if rvi.resolved_hgvs != recalc.resolved_hgvs:
+                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build}\n{rvi.resolved_hgvs} ->\n{recalc.resolved_hgvs}")
+                        if diffs := c_hgvs_diff_if_applicable(rvi.resolved_hgvs, recalc.resolved_hgvs):
                             message_parts += diffs
-                        if is_c_hgvs_same_as_imported(rvi.genome_build, recalc_c_hgvs.c_hgvs):
+                        if is_c_hgvs_same_as_imported(rvi.genome_build, recalc.resolved_hgvs):
                             message_parts.append("Now matches imported value")
 
-                    elif rvi.c_hgvs_compat != recalc_c_hgvs.c_hgvs_compatible:
+                    elif rvi.resolved_hgvs_compat != recalc.resolved_hgvs_compat:
                         if message_parts:
                             message_parts.append(" ")
-                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build} compatible\n{rvi.c_hgvs_compat} ->\n{recalc_c_hgvs.c_hgvs_compatible}")
-                        if diffs := c_hgvs_diff_if_applicable(rvi.c_hgvs_compat, recalc_c_hgvs.c_hgvs_compatible):
+                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build} compatible\n{rvi.resolved_hgvs_compat} ->\n{recalc.resolved_hgvs_compat}")
+                        if diffs := c_hgvs_diff_if_applicable(rvi.resolved_hgvs_compat, recalc.resolved_hgvs_compat):
                             message_parts += diffs
                 except Exception as ex:
                     # Make sure that we still fail
-                    if rvi.c_hgvs and HGVSComponents.HGVS_REGEX.match(rvi.c_hgvs):
+                    if rvi.resolved_hgvs and HGVSComponents.HGVS_REGEX.match(rvi.resolved_hgvs):
                         message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
             if message_parts:
                 new_dirty_message = "\n".join(message_parts)

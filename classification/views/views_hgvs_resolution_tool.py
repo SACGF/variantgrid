@@ -117,11 +117,11 @@ def hgvs_resolution_tool(request: HttpRequest):
                                    imported_allele_info=iai)
             all_output.append(output)
             if resolved_variant := iai[genome_build]:
-                output.hgvs = resolved_variant.c_hgvs
+                output.hgvs = resolved_variant.resolved_hgvs
                 if tv := resolved_variant.transcript_version:
                     output.transcript_version = tv.as_parts
                     current_cdot = tv.data.get('cdot', '')
-                    stored_cdot = resolved_variant.c_hgvs_converter_data_version
+                    stored_cdot = resolved_variant.hgvs_converter_data_version
                     if stored_cdot and current_cdot and stored_cdot != current_cdot:
                         output.cdot_version_changed = f"cdot data version changed: {stored_cdot} → {current_cdot}"
                 if v := resolved_variant.variant:

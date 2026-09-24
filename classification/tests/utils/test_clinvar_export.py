@@ -188,8 +188,8 @@ class TestClinVarExport(TestCase):
             genome_build=GenomeBuild.grch37(),
             variant=variant,
             allele_info=allele_info,
-            c_hgvs="NM_000001.2(TECTA):c.1913G>A",
-            c_hgvs_compat="NM_000001.2(TECTA):c.1913G>A"
+            resolved_hgvs="NM_000001.2(TECTA):c.1913G>A",
+            resolved_hgvs_compat="NM_000001.2(TECTA):c.1913G>A"
         )
         allele_info.grch37 = variant_info
         allele_info.latest_validation = validation
@@ -198,8 +198,8 @@ class TestClinVarExport(TestCase):
         c.variant = variant
         c.allele = allele
         c.allele_info = allele_info
-        # c.chgvs_grch37 = "NM_000001.2(TECTA):c.1913G>A"
-        # c.chgvs_grch37_full = "NM_000001.2(TECTA):c.1913G>A"
+        # c.resolved_hgvs_grch37 = "NM_000001.2(TECTA):c.1913G>A"
+        # c.resolved_hgvs_grch37_full = "NM_000001.2(TECTA):c.1913G>A"
         c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "display_text": "MONDO:0008841 ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "resolved_join": None,

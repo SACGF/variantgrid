@@ -135,7 +135,7 @@ class Command(BaseCommand):
                     c.cr_lab_id,
                     c.lab.group_name,
                     c.lab_record_id,
-                    c.chgvs_grch38,
+                    c.resolved_hgvs_grch38,
                     substituted_transcript_version,
                     status
                 ] + gnomad_cells + variant_annotation_cells + transcript_annotations_cells

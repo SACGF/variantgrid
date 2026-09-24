@@ -314,10 +314,10 @@ class ClassificationGroup:
 
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
-        if c_str := cm.classification.get_c_hgvs(genome_build):
+        if c_str := cm.classification.get_resolved_hgvs(genome_build):
             return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True)
         if (allele_info := cm.classification.allele_info) and \
-                (matched := allele_info.matched_without_c_hgvs_display(genome_build)):
+                (matched := allele_info.matched_without_resolved_hgvs_display(genome_build)):
             return matched
 
         imported_genome_build = None

@@ -32,7 +32,7 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
 
         if (genome_build := classification.get_genome_build_opt()) and \
                 (preferred_build := allele_info[genome_build]) and \
-                (c_hgvs := preferred_build.c_hgvs_display):
+                (c_hgvs := preferred_build.resolved_hgvs_display):
             resolved_dict.update(c_hgvs.to_json())
         elif c_hgvs_raw := classification.get(SpecialEKeys.C_HGVS):
             resolved_dict.update(HGVSDisplay.parse(c_hgvs_raw).to_json())
@@ -54,7 +54,7 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
         for variant_info in allele_info.resolved_builds:
             genome_builds[variant_info.genome_build.name] = {
                 'variant_id': variant_info.variant_id,
-                SpecialEKeys.C_HGVS: variant_info.c_hgvs,
+                SpecialEKeys.C_HGVS: variant_info.resolved_hgvs,
                 SpecialEKeys.VARIANT_COORDINATE: str(variant_info.variant.coordinate),
             }
 

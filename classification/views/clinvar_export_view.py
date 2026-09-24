@@ -159,9 +159,9 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             c_hgvs_str: str
             if "h37" in genome_build:
-                c_hgvs_str = row["classification_based_on__classification__allele_info__grch37__c_hgvs"]
+                c_hgvs_str = row["classification_based_on__classification__allele_info__grch37__resolved_hgvs"]
             else:
-                c_hgvs_str = row["classification_based_on__classification__allele_info__grch38__c_hgvs"]
+                c_hgvs_str = row["classification_based_on__classification__allele_info__grch38__resolved_hgvs"]
 
             data: dict[str, Any]
             c_hgvs = HGVSComponents(c_hgvs_str)
@@ -209,19 +209,19 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                        extra_columns=["allele_origin_bucket"]
             ),
             RichColumn(name="c_hgvs", label='Allele',
-                    sort_keys=["classification_based_on__classification__allele_info__grch38__c_hgvs"],
+                    sort_keys=["classification_based_on__classification__allele_info__grch38__resolved_hgvs"],
                     extra_columns=[
                         "clinvar_allele__allele",
                         "classification_based_on__classification__allele_info__allele",
                         "classification_based_on__published_evidence__genome_build__value",
-                        "classification_based_on__classification__allele_info__grch37__c_hgvs",
-                        "classification_based_on__classification__allele_info__grch38__c_hgvs",
+                        "classification_based_on__classification__allele_info__grch37__resolved_hgvs",
+                        "classification_based_on__classification__allele_info__grch38__resolved_hgvs",
                     ],
                     renderer=self.render_c_hgvs, client_renderer='VCTable.hgvs',
                     search=[
                         # "clinvar_allele__allele__clingen_allele__id",  # need a string
-                        "classification_based_on__classification__allele_info__grch37__c_hgvs",
-                        "classification_based_on__classification__allele_info__grch38__c_hgvs"
+                        "classification_based_on__classification__allele_info__grch37__resolved_hgvs",
+                        "classification_based_on__classification__allele_info__grch38__resolved_hgvs"
                     ]
             ),
             RichColumn("condition",
@@ -384,7 +384,7 @@ class ClinVarExportSummary(ExportRow):
     @export_column("c.HGVS")
     def _c_hgvs(self):
         if genome_build := self.genome_build_row:
-            return self.classification.classification.get_c_hgvs(genome_build)
+            return self.classification.classification.get_resolved_hgvs(genome_build)
 
     @export_column("Condition Umbrella")
     def _condition_umbrella(self):

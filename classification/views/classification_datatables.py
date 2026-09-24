@@ -201,8 +201,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 client_renderer='VCTable.hgvs',
                 orderable=True,
                 extra_columns=[
-                    "classification__allele_info__grch37__c_hgvs",
-                    "classification__allele_info__grch38__c_hgvs",
+                    "classification__allele_info__grch37__resolved_hgvs",
+                    "classification__allele_info__grch38__resolved_hgvs",
                     "classification__allele_info__grch37__variant_id",
                     "classification__allele_info__grch38__variant_id",
                     'published_evidence__c_hgvs__value',

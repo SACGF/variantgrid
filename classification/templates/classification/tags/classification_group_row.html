@@ -111,8 +111,8 @@
         {% comment %}<!-- This is now in the Allele Info box -->
         <td>
             <label style="display: inline-block; min-width:140px; text-align: right">Imported {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }}</label>&nbsp;{% c_hgvs group.most_recent.c_parts %}<br/>
-            <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh37</label>&nbsp; {% c_hgvs group.most_recent.classification.chgvs_grch37 %}<br/>
-            <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh38</label>&nbsp; {% c_hgvs group.most_recent.classification.chgvs_grch38 %}
+            <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh37</label>&nbsp; {% c_hgvs group.most_recent.classification.resolved_hgvs_grch37 %}<br/>
+            <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh38</label>&nbsp; {% c_hgvs group.most_recent.classification.resolved_hgvs_grch38 %}
         </td>
         {% endcomment %}
         <td>

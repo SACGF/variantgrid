@@ -312,17 +312,17 @@ class ClassificationAdmin(ModelAdminBasics):
         if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
             return cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
-    @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__c_hgvs")
+    @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__resolved_hgvs")
     def grch37_c_hgvs(self, obj: Classification):
         try:
-            return obj.allele_info.grch37.c_hgvs
+            return obj.allele_info.grch37.resolved_hgvs
         except AttributeError:
             return ""
 
-    @admin_list_column(short_description="c.hgvs (38)", order_field="allele_info__grch37__c_hgvs")
+    @admin_list_column(short_description="c.hgvs (38)", order_field="allele_info__grch38__resolved_hgvs")
     def grch38_c_hgvs(self, obj: Classification):
         try:
-            return obj.allele_info.grch38.c_hgvs
+            return obj.allele_info.grch38.resolved_hgvs
         except AttributeError:
             return ""
 
@@ -856,12 +856,12 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Gene Symbol")
     def _gene_symbol(self):
-        all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
+        all_chgvs = ImportedAlleleInfo.all_resolved_hgvs(self.discordance_report.clinical_context.allele)
         return "\n".join(sorted({chgvs.gene_symbol for chgvs in all_chgvs}))
 
     @export_column("c.HGVS (38)")
     def _variant(self):
-        all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
+        all_chgvs = ImportedAlleleInfo.all_resolved_hgvs(self.discordance_report.clinical_context.allele)
         c38s = sorted([str(chgvs) for chgvs in all_chgvs if chgvs.genome_build == GenomeBuild.grch38()])
         if c38s:
             return "\n".join(c38s)
@@ -1170,14 +1170,14 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
     )
 
     search_fields = (
-        'c_hgvs',
-        'c_hgvs_compat'
+        'resolved_hgvs',
+        'resolved_hgvs_compat'
     )
 
-    @admin_list_column(short_description="c.HGVS", order_field="c_hgvs")
+    @admin_list_column(short_description="c.HGVS", order_field="resolved_hgvs")
     def c_hgvs_both(self, obj: ResolvedVariantInfo):
-        c_hgvs = obj.c_hgvs
-        c_hgvs_compatible = obj.c_hgvs_compat
+        c_hgvs = obj.resolved_hgvs
+        c_hgvs_compatible = obj.resolved_hgvs_compat
         if c_hgvs == c_hgvs_compatible:
             return c_hgvs
         else:
@@ -1205,7 +1205,7 @@ class MatchingOnFilter(admin.SimpleListFilter):
 
 class ImportedAlleleInfoValidationInline(admin.TabularInline):
     model = ImportedAlleleInfoValidation
-    fields = ['c_hgvs_37', 'c_hgvs_38', 'confirmed', 'include', 'validation_tags']
+    fields = ['resolved_hgvs_37', 'resolved_hgvs_38', 'confirmed', 'include', 'validation_tags']
     show_change_link = True
 
     def is_readonly_field(self, f):

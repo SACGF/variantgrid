@@ -435,7 +435,7 @@ class GeneFusionClassificationTest(TestCase):
         gene_fusion = create_gene_fusion("BCR", "ABL1")
         allele_info.set_variant_and_save(matched_variant=gene_fusion.variant)
         resolved = allele_info[self.genome_build]
-        self.assertIsNone(resolved.c_hgvs, "a fusion sits on no transcript")
+        self.assertIsNone(resolved.resolved_hgvs, "a fusion sits on no transcript")
         self.assertIsNone(resolved.error, "and that is not an error")
         self.assertEqual("BCR", resolved.gene_symbol_id)
 
@@ -553,7 +553,7 @@ class GeneCopyNumberClassificationTest(TestCase):
         allele_info.set_variant_and_save(matched_variant=event.variant)
         self.assertEqual(event, allele_info.gene_copy_number_event)
         resolved = allele_info[self.genome_build]
-        self.assertIsNone(resolved.c_hgvs, "a copy number event sits on no transcript")
+        self.assertIsNone(resolved.resolved_hgvs, "a copy number event sits on no transcript")
         self.assertEqual("EGFR", resolved.gene_symbol_id)
 
     def test_a_gene_we_do_not_know_fails_with_the_reason(self):
@@ -600,5 +600,5 @@ class SpliceEventClassificationTest(TestCase):
         allele_info.set_variant_and_save(matched_variant=splice_event_variant.variant)
         self.assertEqual("AR-V7 splice", allele_info.gene_level_event.canonical_str)
         resolved = allele_info[self.genome_build]
-        self.assertIsNone(resolved.c_hgvs, "a splice event sits on no transcript")
+        self.assertIsNone(resolved.resolved_hgvs, "a splice event sits on no transcript")
         self.assertEqual("AR", resolved.gene_symbol_id)

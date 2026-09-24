@@ -1052,7 +1052,7 @@ def clin_sig_change_data(request):
             discordance_dates: list[datetime] = []
             other_labs: set[Lab] = set()
 
-            c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
+            c_hgvs = source.get_resolved_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
             org = source.lab.organization.name
             lab = source.lab.name
             url = get_url_from_view_path(source.get_absolute_url())
