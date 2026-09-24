@@ -15,7 +15,7 @@ from classification.enums import (
     EvidenceCategory,
     LabExternalFilter,
     ShareLevel,
-    SpecialEKeys, TriageState, TriageStatus, TestingContextBucket, ClassificationResultValue,
+    TriageState, TriageStatus, TestingContextBucket, ClassificationResultValue,
 )
 from classification.models import (
     Classification,
@@ -25,7 +25,6 @@ from classification.models import (
     ClassificationGroupingSearchTermType,
     ClassificationModification,
     DiscordanceReport,
-    DiscordanceReportClassification,
     EvidenceKeyMap,
     ImportedAlleleInfo, OverlapContribution, IN_REVIEW_VALUE,
 )
@@ -308,14 +307,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 e_key.evidence_category in (
                     EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
-    def classification_modification_filter_to_grouping(self, cm_q: Q) -> Q:
-        return Q(
-            pk__in=ClassificationGroupingEntry.objects.filter(
-                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(
-                        cm_q).values_list('classification_id', flat=True)
-                ).values_list('grouping_id', flat=True)
-        )
-
     def classification_filter_to_grouping(self, cm_q: Q) -> Q:
         return Q(
             pk__in=ClassificationGroupingEntry.objects.filter(
@@ -342,11 +333,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
         return None
         # FIXME add support for gene symbol alias
-
-    def scv_filter(self, scv: str) -> Optional[Q]:
-        if scv.startswith("SCV"):
-            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
-        return None
 
     @staticmethod
     def get_ontology_q(ontology_terms: str) -> Q | None:

@@ -38,8 +38,7 @@ Patterns here:
   ShareLevel.is_discordant_level (logged_in_users, public) count.
 - ClinicalContext, DiscordanceStatus and DiscordanceReport are the previous generation: still rendered for existing rows
   and still behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
-  models/clinical_context_utils.py:update_clinical_contexts and views/classification_overlaps_view.py are unreachable -
-  both call a recalc_and_save that ClinicalContext no longer defines. Bucketing on that legacy path comes from the
+  Bucketing on that legacy path comes from the
   "bucket" attribute on the clinical_significance EvidenceKey options
   (models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket), not from the ClinicalSignificance enum.
 - Hook the lifecycle with the signals at the top of models/classification.py (classification_validation_signal,

@@ -31,9 +31,6 @@ class ClinGenAllele(TimeStampedModel):
     class ClinGenBuildNotInResponseError(ClinGenAlleleRegistryException):
         pass
 
-    class ClinGenNonChromosomeLiftoverError(ClinGenAlleleRegistryException):
-        pass
-
     class ClinGenMissingAlleleID(ClinGenAlleleRegistryException):
         """ Coordinate is not yet assigned ID and stored on server """
 
@@ -239,10 +236,6 @@ class ClinGenAllele(TimeStampedModel):
         if hgvs_matcher:
             return hgvs_matcher.get_variant_coordinate(g_hgvs)
         return get_hgvs_variant_coordinate(g_hgvs, genome_build)
-
-    def get_variant_string(self, genome_build: GenomeBuild, abbreviate=False):
-        from snpdb.models import Variant
-        return Variant.format_tuple(*self.get_variant_coordinate(genome_build), abbreviate=abbreviate)
 
     @property
     def human_url(self) -> str:

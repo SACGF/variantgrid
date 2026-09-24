@@ -1,6 +1,6 @@
 """
 Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
-and choice display formatting (get_expanded_field, get_choices_formatter), Q helpers for name
+and choice display formatting (get_choices_formatter), Q helpers for name
 searches, timezone and form read-only utilities, `thread_safe_unique_together_get_or_create`,
 related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
 SortByPKMixin that let model instances sort like their querysets. Permission checks live in
@@ -109,17 +109,6 @@ def resolve_field_path(options, field_name: str):
     return options.get_field(field_name)
 
 
-def get_expanded_field(obj, field):
-    """ Uses get_field_display if available """
-    display_method = f"get_{field}_display"
-    display_func = getattr(obj, display_method, None)
-    if display_func:
-        value = display_func()
-    else:
-        value = getattr(obj, field)
-    return value
-
-
 def get_model_fields_and_formatted_values_tuples_list(model):
     rows = []
     for name in get_model_fields(model):
@@ -187,16 +176,6 @@ def get_field_counts(qs, field):
 
 
 staff_only = partial(staff_member_required, login_url=reverse_lazy('staff_only'))
-
-
-def get_redis(**kwargs):
-    port = kwargs.pop("port", settings.REDIS_PORT)
-    return Redis(port=port, decode_responses=True, **kwargs)
-
-
-def get_lower_choice(choices, value):
-    d = invert_dict({name.lower(): v for v, name in choices})
-    return d.get(value.lower())
 
 
 def ensure_timezone_aware(datetime_date):

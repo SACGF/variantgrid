@@ -46,8 +46,6 @@ gunicorn
 html2docx
 HTSeq
 ijson
-inflection
-ipython
 kombu
 levenshtein
 lxml
@@ -57,7 +55,6 @@ matplotlib
 more_itertools
 mozilla_django_oidc
 nameparser
-networkx
 nltk>=3.10.0
 numpy
 oauthlib
@@ -70,9 +67,7 @@ pyBigWig>=0.3.22
 pypdf>=6.15.0
 pysam
 python_dateutil
-pyyaml
 redis
-reportlab
 requests>=2.32.0
 requests_oauthlib
 rich

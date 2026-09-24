@@ -41,19 +41,6 @@ def format_vep_sift_to_choice(vep_sift):
     raise ValueError(f"Unknown SIFT value: '{vep_sift}'")
 
 
-def get_format_alphamissense_class_func():
-    """ GRCh37 has 'benign' while GRCh38 has 'likely_benign'
-        @see https://github.com/Ensembl/VEP_plugins/issues/668
-    """
-    cff = get_choice_formatter_func(AlphaMissensePrediction.choices)
-
-    def _format_alphamissense_class(alphamissense_class):
-        if alphamissense_class == "benign":
-            alphamissense_class = "likely_benign"
-        return cff(alphamissense_class)
-    return _format_alphamissense_class
-
-
 def get_extract_existing_variation(prefix):
     def format_vep_existing_variation(vep_existing_variation):
         ev_list = vep_existing_variation.split(VEP_SEPARATOR)

@@ -47,10 +47,6 @@ class DbRefRegex:
         self._all_db_ref_regexes.append(self)
         self.id_regex_confirm = id_regex_confirm
 
-    def link_for(self, idx: int) -> str:
-        id_str = self.fix_id(str(idx))
-        return self.link.replace("${1}", id_str)
-
     def fix_id(self, id_str: str) -> str:
         if self.expected_length:
             id_str = id_str.rjust(self.expected_length, '0')

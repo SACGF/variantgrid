@@ -25,15 +25,6 @@ from library.utils import get_timer
 INTERNAL_REVIEW_RELEVANT_DAYS = 365
 
 
-# @receiver(allele_info_changed_signal, sender=ImportedAlleleInfo)
-# def update_clinical_contexts_when_allele_changes(sender, allele_info: ImportedAlleleInfo, **kwargs):
-#     """
-#     Triggers clinical contexts to be recalculated when an AlleleInfo changes which allele it's linked to
-#     """
-#     if classifications := list(allele_info.classification_set.all()):
-#         update_clinical_contexts(classifications)
-
-
 # @receiver(post_delete, sender=Classification)
 # def deleted_variant(sender, instance: Classification, **kwargs):  # pylint: disable=unused-argument
 #     classification = instance

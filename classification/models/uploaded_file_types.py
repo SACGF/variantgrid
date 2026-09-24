@@ -5,9 +5,8 @@ import re
 import tarfile
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from os import PathLike
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 from zipfile import ZipFile
 
 
@@ -39,14 +38,6 @@ class FileHandle(ABC):
         while buffer := handle.read(4096):
             yield buffer
         handle.close()
-
-    def download_to(self, filename: Union[str, PathLike]):
-        """
-        Writes the file to the local file system
-        """
-        with open(filename, 'wb') as output_file:
-            with self.open() as input_file:
-                output_file.write(input_file.read())
 
     def download_to_dir(self, download_dir: Path, extract_zip: bool = False):
         with self.open() as input_file:

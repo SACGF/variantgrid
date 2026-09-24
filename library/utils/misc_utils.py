@@ -29,12 +29,6 @@ class DjangoJSONEncoder(JSONEncoder):
         return JSONEncoder.default(self, o)
 
 
-class Struct:
-
-    def __init__(self, **entries):
-        self.__dict__.update(entries)
-
-
 def is_url(url: str) -> bool:
     parse_result = urlparse(url)
     return bool(parse_result.scheme in ('http', 'https') and parse_result.netloc)

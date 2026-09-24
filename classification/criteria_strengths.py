@@ -190,10 +190,6 @@ class CriteriaStrengths:
         return [cs for cs in self.strengths if CriteriaEvaluation.is_met(cs.strength)]
 
     def summary_string(self, acmg_only: bool = True):
-        def report_me(cs: CriteriaStrength):
-            nonlocal acmg_only
-            return CriteriaEvaluation.is_met(cs.strength) and (not acmg_only or not cs.ekey.namespace)
-
         return ", ".join(str(cs) for cs in sorted(self.strength_list_met))
 
     def summary_string_short(self) -> str:

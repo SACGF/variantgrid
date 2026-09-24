@@ -30,7 +30,6 @@ from genes.gene_level_resolver import (
 )
 from genes.models import HGNC, GeneFusion, GeneLevelId, fusion_canonical_str
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
-from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.gene_level_variants import (
     GENE_LEVEL_CONTIG_NAME,
     GENE_LEVEL_REF,
@@ -246,9 +245,3 @@ def find_gene_fusions_for_string(fusion_string: str, resolver: GeneFusionResolve
     return list(GeneFusion.objects.filter(q).select_related("variant", "anchor", "partner"))
 
 
-def get_gene_fusion_allele(gene_fusion: GeneFusion, genome_build: GenomeBuild):
-    """ Fusion variants sit on a contig every build shares, so one Allele serves them all. ClinGen
-        can't register them (no coordinate) - clingen_allele_skip_reason says so - which leaves the
-        ordinary 'no ClinGen' path in get_variant_allele_for_variant """
-    variant_allele = get_variant_allele_for_variant(genome_build, gene_fusion.variant)
-    return variant_allele.allele

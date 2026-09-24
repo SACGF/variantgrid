@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
 from genes.models import (
-    HGNC,
     ActiveSampleGeneList,
     Gene,
     GeneAnnotationRelease,
@@ -59,18 +58,6 @@ class TranscriptVersionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TranscriptVersion
         fields = ('transcript', 'version', 'genome_build', 'gene_version')
-
-
-class HGNCSerializer(serializers.ModelSerializer):
-    gene_symbol = GeneSymbolSerializer()
-    status = serializers.SerializerMethodField()
-
-    class Meta:
-        model = HGNC
-        fields = ('hgnc_id', 'gene_symbol', 'approved_name', 'status')
-
-    def get_status(self, obj: HGNC):
-        return obj.get_status_display()
 
 
 class GeneListCategorySerializer(serializers.ModelSerializer):

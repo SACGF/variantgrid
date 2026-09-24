@@ -2,7 +2,6 @@
     settings.BEACON_CONFIG (§6). These are mostly-static identity/config documents. """
 from django.conf import settings
 
-from beacon.response import GRANULARITIES
 
 # Canonical Beacon v2 schema URIs. The configuration/map `response` objects require a
 # `$schema` property (beaconMapSchema / beaconConfigurationSchema), used by clients for
@@ -137,5 +136,3 @@ def endpoint_map(g_variants_url: str) -> dict:
     }
 
 
-def supported_granularities() -> tuple:
-    return GRANULARITIES

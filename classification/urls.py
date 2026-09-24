@@ -256,7 +256,6 @@ urlpatterns = [
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
     path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),
-    # path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
 
     path('imported_allele_info', view_imported_allele_info, name='view_imported_allele_info'),
     path('imported_allele_info/<int:allele_info_id>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),

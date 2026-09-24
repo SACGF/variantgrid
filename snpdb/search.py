@@ -15,8 +15,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, reduce
-from re import IGNORECASE, Match, Pattern
-from typing import Any, Optional, Union
+from re import Match, Pattern
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -81,12 +81,6 @@ class SearchInput:
     """
     Is this coming from the classify by c.HGVS form
     """
-
-    def matches_pattern(self, pattern: Union[str, Pattern]) -> Match:
-        if isinstance(pattern, str):
-            return re.match(pattern, self.search_string, IGNORECASE)
-        else:
-            return pattern.match(self.search_string)
 
     @property
     def search_words(self) -> list[str]:

@@ -4,7 +4,6 @@ streaming writes and Postgres COPY, mk_path_for_file, name_from_filename, file p
 the DiskUsage / get_disk_usage_for_directory checks that health checks and `vg status` use.
 """
 import gzip
-import logging
 import os
 import subprocess
 from collections.abc import Iterable
@@ -132,16 +131,6 @@ class StashFile:
         data = "".join(self.parts)
         self.parts = []
         return data
-
-
-def add_permissions_to_file(filename: str, add_stat: int):
-    """ Adds file permission on a existing file path """
-    st = os.stat(filename)
-    try:
-        os.chmod(filename, st.st_mode | add_stat)
-    except Exception as e:
-        logging.debug("Path '%s' stat is %s", filename, st)
-        raise e
 
 
 def open_handle_gzip(filename: str, mode=None, **kwargs):

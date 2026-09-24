@@ -65,7 +65,6 @@ from classification.models.classification_variant_info_models import (
     ResolvedVariantInfo,
 )
 from classification.models.clinical_context_models import (
-    ClinicalContextRecalcTrigger,
     DiscordanceNotification,
 )
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
@@ -404,10 +403,6 @@ class ClassificationAdmin(ModelAdminBasics):
     def fix_permissions(self, request, queryset: QuerySet[Classification]):
         for c in queryset:
             c.fix_permissions(fix_modifications=True)
-
-    # @admin_action("Fixes: Clinical Context Germline/Somatic")
-    # def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
-    #     update_clinical_contexts(list(queryset.all()))
 
     @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):

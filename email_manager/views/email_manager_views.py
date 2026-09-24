@@ -7,7 +7,7 @@ from django.shortcuts import render
 from email_manager.models import EmailLog
 from library.django_utils import require_superuser
 from library.utils.django_utils import render_ajax_view
-from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 @require_superuser
@@ -47,12 +47,6 @@ class EmailColumns(DatatableConfig[EmailLog]):
         if search_string:
             qs = qs.filter(Q(recipient_list__icontains=search_string) | Q(subject__icontains=search_string))
         return qs
-
-    def recipient_renderer(self, row: CellData):
-        if filename := row.get('filename'):
-            return filename
-        elif detail := row.get('details'):
-            return detail.split('\n', 1)[0]
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)

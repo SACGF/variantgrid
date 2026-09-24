@@ -2,7 +2,7 @@ import itertools
 
 import cdot
 from django.conf import settings
-from django.http.response import Http404, HttpResponse
+from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from htmlmin.decorators import not_minified_response
@@ -13,7 +13,6 @@ from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
-    VariantAnnotationVersionDiff,
 )
 from annotation.models.models import (
     CachedWebResource,
@@ -23,7 +22,6 @@ from annotation.models.models import (
 )
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines import vep_pipeline_types
-from annotation.models.models_version_diff import VersionDiff
 from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
 from annotation.vep_annotation import (
     get_vep_command,
@@ -319,44 +317,6 @@ def annotation_versions(request):
         "pipeline_types": VariantAnnotationPipelineType,
     }
     return render(request, "annotation/annotation_versions.html", context)
-
-
-def version_diffs(request):
-    def get_last_2(version_klass, version_diff_klass):
-        last_2 = list(version_klass.objects.order_by("-pk")[:2])
-        data = {"num": len(last_2)}
-
-        try:
-            version_from = last_2[1]
-            version_to = last_2[0]
-            version_diff = version_diff_klass.objects.get(version_from=version_from, version_to=version_to)
-            data["diff"] = version_diff
-        except Exception:
-            pass
-
-        for k, v in zip(['version', 'previous'], last_2):
-            data[k] = v
-
-        return data
-
-    VERSION_LEVELS = [('Variant', VariantAnnotationVersion, VariantAnnotationVersionDiff)]
-
-    version_levels = []
-    for name, version_klass, version_diff_klass in VERSION_LEVELS:
-        version_levels.append((name, get_last_2(version_klass, version_diff_klass)))
-    context = {"version_levels": version_levels}
-    return render(request, "annotation/version_diffs.html", context)
-
-
-def view_version_diff(request, version_diff_id):
-    try:
-        diff = VersionDiff.objects.get_subclass(pk=version_diff_id)
-    except VersionDiff.DoesNotExist as exc:
-        raise Http404(f"No VersionDiff pk={version_diff_id}") from exc
-
-    context = {"diff": diff}
-    context.update(diff.get_diff_results())
-    return render(request, "annotation/view_version_diff.html", context)
 
 
 def view_pathogenicity_thresholds(request):

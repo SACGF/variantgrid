@@ -6,7 +6,6 @@ from django.forms.widgets import HiddenInput, TextInput
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import (
     CustomTextGeneList,
-    Gene,
     GeneAnnotationRelease,
     GeneList,
     GeneListCategory,
@@ -33,13 +32,6 @@ class GeneListForm(forms.ModelForm, ROFormMixin):
                    "url": TextInput(),
                    "user": ModelSelect2(url='user_autocomplete',
                                         attrs={'data-placeholder': 'User...'})}
-
-
-class GeneForm(forms.Form):
-    gene = forms.ModelChoiceField(queryset=Gene.objects.all(),
-                                  required=False,
-                                  widget=ModelSelect2(url='gene_autocomplete',
-                                                      attrs={'data-placeholder': 'Gene...'}))
 
 
 class GeneAndTranscriptForm(forms.Form):

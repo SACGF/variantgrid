@@ -71,16 +71,6 @@ class HPOSynonymScope(models.TextChoices):
     RELATED = 'R', 'Related'
 
 
-class ClinGenClassification(models.TextChoices):
-    DEFINITIVE = 'D', 'Definitive'
-    STRONG = 'S', 'Strong'
-    MODERATE = 'M', 'Moderate'
-    LIMITED = 'L', 'Limited'
-    NO_KNOWN_DISEASE_RELATIONSHIP = 'N', 'No Known Disease Relationship'
-    REFUTED = 'R', 'Refuted'
-    DISPUTED = 'P', 'Disputed'
-
-
 class VariantAnnotationPipelineType(models.TextChoices):
     """ An annotation pipeline is a tool applied to a class of variant. Most are VEP over a variant class;
         GENE_LEVEL and ANNOTSV run other tools. This enum is only the stored key - what each pipeline

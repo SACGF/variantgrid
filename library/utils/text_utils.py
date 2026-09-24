@@ -105,12 +105,6 @@ def format_significant_digits(a_number, sig_digits=3) -> str:
     return rounded_number_str
 
 
-class VCFDialect(csv.Dialect):
-    delimiter = ','
-    lineterminator = "\n"
-    quoting = csv.QUOTE_NONE
-
-
 def delimited_row(data: list, delimiter: str = ',', include_new_line=True, **kwargs) -> str:
     # https://docs.python.org/3/library/csv.html#csv.writer
     # If csvfile is a file object, it should be opened with newline=''

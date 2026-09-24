@@ -1,12 +1,6 @@
 from typing import Any, Optional, TypedDict
 
 
-class ClassificationJsonLabDict(TypedDict):
-    group_name: str
-    lab_name: str
-    org_name: str
-
-
 class ClassificationJsonVersionDict(TypedDict):
     version: float
     publish_level: str
@@ -18,11 +12,6 @@ class ClassificationJsonConfigDict(TypedDict):
     evidence_key_overrides: dict[str, dict[str, Any]]
     namespaces: list[str]
     allele_origin_bucket: str
-
-
-class ClassificationJsonSampleDict(TypedDict):
-    id: str
-    name: str
 
 
 class ClassificationJsonAlleleGenomeBuild(TypedDict, total=True):
@@ -55,16 +44,3 @@ class ClassificationJsonAlleleDict(TypedDict, total=False):
     genome_builds: dict[str, ClassificationJsonAlleleGenomeBuild]
 
 
-class ClassificationJsonDictv3(TypedDict, total=False):
-    id: int
-    lab_record_id: str
-    cr_lab_id: str
-    data: dict[str, Any]
-    messages: Optional[list]
-    version: ClassificationJsonVersionDict
-    version_published: ClassificationJsonVersionDict
-    version_latest: ClassificationJsonVersionDict
-
-    latest_version: ClassificationJsonVersionDict
-    config: ClassificationJsonConfigDict
-    allele_info: ClassificationJsonAlleleDict

@@ -237,11 +237,6 @@ class ConflictStrategy(str, Enum):
     MOST_PATHOGENIC = 'most_pathogenic'
 
 
-class VCFEncoding:
-    BASIC = 'basic'
-    FULL = 'full'
-
-
 class VariantWithChgvs:
 
     def __init__(self, vcm: ClassificationModification, chgvs: HGVSComponents):

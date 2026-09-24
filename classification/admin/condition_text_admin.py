@@ -3,7 +3,6 @@ from django.contrib.admin import RelatedFieldListFilter
 from django.db.models import QuerySet
 
 from classification.models import ConditionText, ConditionTextMatch
-from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action
 
 
@@ -62,25 +61,3 @@ class ConditionTextAdmin(ModelAdminBasics):
             condition_text.clear()
 
 
-class ConditionTextMatchUserFilter(admin.SimpleListFilter):
-    list_per_page = 200
-    title = 'User Filter'
-    parameter_name = 'user'
-    default_value = None
-
-    def lookups(self, request, model_admin):
-        return [
-            ("any", "Any User"),
-            ("non_admin", "Non Admin"),
-            ("bot", "Auto-Assigned")
-        ]
-
-    def queryset(self, request, queryset):
-        if user := self.value():
-            if user == "any":
-                queryset = queryset.filter(last_edited_by__isnull=False).exclude(last_edited_by=admin_bot())
-            elif user == "non_admin":
-                queryset = queryset.filter(last_edited_by__is_superuser=False).exclude(last_edited_by=admin_bot())
-            elif user == "bot":
-                queryset = queryset.filter(last_edited_by=admin_bot())
-        return queryset

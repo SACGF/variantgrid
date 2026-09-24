@@ -94,11 +94,6 @@ class ProcessingStatus(models.TextChoices):
     FINISHED_STATES = Constant([e[0] for e in (ERROR, SUCCESS, SKIPPED, TERMINATED_EARLY, TIMED_OUT)])
 
 
-class AnnotationLevel(models.TextChoices):
-    TRANSCRIPT = 'T', 'Transcript'
-    GENE = 'G', 'Gene Symbol'
-
-
 class ColumnAnnotationLevel(models.TextChoices):
     CLINVAR_LEVEL = 'C', 'ClinVar'
     DATABASE_LEVEL = 'D', 'Database'

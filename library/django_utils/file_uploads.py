@@ -37,35 +37,3 @@ def filepond_process_response(file_id) -> HttpResponse:
     return HttpResponse(str(file_id), content_type="text/plain")
 
 
-def filepond_load_initial(file_dicts):
-    """Convert legacy file-dict entries into FilePond's initial ``files`` shape.
-
-    Each entry becomes ``{source, options: {type: 'local', metadata: {...}}}``
-    so FilePond renders the file panel without fetching content. The original
-    dict is stashed under ``metadata`` so existing JS (e.g. upload-poll row
-    rendering) can keep using it untouched.
-    """
-    initial = []
-    for file_dict in file_dicts:
-        source = (
-            file_dict.get('file_upload_id')
-            or file_dict.get('pk')
-            or file_dict.get('id')
-            or file_dict.get('name')
-        )
-        entry = {
-            'source': str(source) if source is not None else '',
-            'options': {
-                'type': 'local',
-                'file': {
-                    'name': file_dict.get('name'),
-                    'size': file_dict.get('size') or 0,
-                },
-                'metadata': file_dict,
-            },
-        }
-        poster = file_dict.get('thumbnailUrl')
-        if poster:
-            entry['options']['metadata']['poster'] = poster
-        initial.append(entry)
-    return initial

@@ -11,11 +11,10 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 
 from classification.models.evidence_mixin import VCPatch, VCStore
-from flags.models import FlagCollection
 from genes.models import GeneSymbol, Transcript
 from library.log_utils import NotificationBuilder
 from library.utils import VarsDict, local_date_string
-from snpdb.models import Allele, Lab
+from snpdb.models import Allele
 
 
 @dataclass
@@ -274,10 +273,6 @@ class PatchMeta:
             self.patch[key] = {'value': value}
         self.modified_keys.add(key)
 
-    def remove_patch_value(self, key: str):
-        if key in self.patch or key in self.existing:
-            self.patch[key] = {'value': None, 'explain': None, 'note': None, 'immutable': None}
-
     def get(self, key: str, fallback_existing=True):
         """
         :param key: The str evidence key
@@ -308,19 +303,6 @@ class PatchMeta:
         if self.revalidate_all:
             return key_set
         return key_set.intersection(self.modified_keys)
-
-
-class UserClassificationStats:
-    def __init__(self, user: User):
-        self.user = user
-
-    @property
-    def issue_count(self) -> int:
-        from classification.models import Classification
-
-        return FlagCollection.filter_for_open_flags(
-            Classification.filter_for_user(user=self.user)
-        ).filter(lab__in=Lab.valid_labs_qs(self.user, admin_check=True)).order_by('-created').exclude(withdrawn=True).count()
 
 
 def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Optional[Q]:

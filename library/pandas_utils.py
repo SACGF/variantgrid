@@ -3,7 +3,6 @@ pandas helpers for the stats pages and exports: percentage columns and rows, NaN
 before JSON, minimum-float handling and read_csv_skip_header for '#'-commented files.
 """
 import os
-import sys
 
 import numpy as np
 import pandas as pd
@@ -42,18 +41,6 @@ def get_total_percent_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """ Return a dataframe as a percentage of sum of rows """
     total = df.sum(axis=0).sum()
     return df.multiply(100.0) / total
-
-
-def df_handle_below_minimum_floats(df: pd.DataFrame) -> pd.DataFrame:
-
-    def handle_if_below_min(series):
-        if series.dtype == 'd':
-            too_small_mask = abs(series) < sys.float_info.min
-            series[too_small_mask] = sys.float_info.min
-
-        return series
-
-    return df.apply(handle_if_below_min, axis=0)
 
 
 def nan_to_none(val):

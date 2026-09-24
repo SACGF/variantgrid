@@ -5,10 +5,6 @@ class NoTranscript(ValueError):
     """
 
 
-class NoTranscriptVersion(NoTranscript):
-    pass
-
-
 class MissingTranscript(NoTranscript):
     """
     Transcript exists in RefSeq/Ensembl, so c.hgvs (or otherwise) might be okay.

@@ -1,11 +1,9 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout
 from django.conf import settings
-from django.http.response import HttpResponse
-from django.shortcuts import get_object_or_404, render
 
 from analysis.forms import SampleCandidatesSearchForm
-from analysis.models import CandidateSearchRun, CandidateSearchType
+from analysis.models import CandidateSearchType
 from analysis.views.views_candidate_search import (
     AbstractCandidateSearchView,
     AbstractNewCandidateSearchView,
@@ -28,15 +26,6 @@ from snpdb.forms import (
 )
 from snpdb.models import Lab, Sample
 from snpdb.user_settings_manager import UserSettingsManager
-
-
-def view_classification_candidate_search(request, pk) -> HttpResponse:
-    classification_candidate_search_run = get_object_or_404(CandidateSearchRun, pk=pk)
-    # Permission check??
-    context = {
-        "classification_candidate_search_run": classification_candidate_search_run,
-    }
-    return render(request, 'classification/candidate_search/classification_candidate_search.html', context)
 
 
 class ReanalyisCandidateSearchView(AbstractCandidateSearchView):

@@ -41,11 +41,6 @@ class VCBlobDict(TypedDict, total=False):
     validation: list[VCValidation]
 
 
-class SomaticValueDict(TypedDict):
-    somatic_clinical_significance: str
-    amp_level: Optional[str]
-
-
 @dataclass(frozen=True)
 class SomaticClinicalSignificanceValue:
     tier_level: str

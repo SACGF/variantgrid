@@ -54,7 +54,6 @@ class Test(URLTestCase):
             ("annotation", {}, 200),
             # Don't run annotation versions as it kicks off new versions after loading VEP
             # ("annotation_versions", {}, 200),
-            # ("version_diffs", {}, 200),
             ("variant_annotation_runs", {}, 403),
             ("view_annotation_descriptions", {}, 200),
             ("view_annotation_version_details", {"annotation_version_id": self.annotation_version_grch37.pk}, 200),

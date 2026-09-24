@@ -213,9 +213,7 @@ the migration's `test=` function.
 2. **Current evidence only, history untouched.** Old `ClassificationModification`s keep what was submitted then;
    the record gets one new modification by `admin_bot`, which is the audit trail. No note is added to the
    evidence: the change is lossless and a note would travel with the record forever.
-3. **`SubmissionSource.VARIANT_GRID`**, not `FORM` as in
-   `classification/management/commands/classification_set_legacy_allele_origin.py`, so API-immutable values
-   are converted too.
+3. **`SubmissionSource.VARIANT_GRID`**, not `FORM`, so API-immutable values are converted too.
 4. **Unsubmitted edits and withdrawn records are normalised but not published.**
 5. **A record with any unmatched part is left whole**, not partially converted.
 6. **Internal labs only.**

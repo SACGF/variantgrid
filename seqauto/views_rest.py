@@ -22,7 +22,6 @@ from genes.views.views_coverage import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
 from seqauto.models import (
-    QC,
     EnrichmentKit,
     Experiment,
     FastQC,
@@ -54,7 +53,6 @@ from seqauto.serializers.seqauto_qc_serializers import (
     QCGeneListBulkCreateSerializer,
     QCGeneListCreateSerializer,
     QCGeneListSerializer,
-    QCSerializer,
 )
 from seqauto.serializers.sequencing_serializers import (
     ExperimentSerializer,
@@ -177,11 +175,6 @@ class SequencingSampleExtractionLinkView(APIView):
         }
         status_code = status.HTTP_200_OK if sequencing_sample.extraction else status.HTTP_202_ACCEPTED
         return Response(response, status=status_code)
-
-
-class QCViewSet(ModelViewSet):
-    queryset = QC.objects.all()
-    serializer_class = QCSerializer
 
 
 class QCGeneListViewSet(ModelViewSet):

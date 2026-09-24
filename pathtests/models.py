@@ -163,13 +163,6 @@ class PathologyTestGeneModificationRequest(TimeStampedModel):
         return f"{name}: {outcome}"
 
 
-class RelatedGeneLists(models.ForeignKey):
-    """ A way to link e.g. competitor tests to yours """
-    pathology_test = models.ForeignKey(PathologyTest, on_delete=CASCADE)
-    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
-    comments = models.TextField(blank=True)
-
-
 class Case(PreviewModelMixin, ExternallyManagedModel):
     name = models.TextField(null=True, blank=True)
     lead_scientist = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)

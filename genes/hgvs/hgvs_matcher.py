@@ -294,10 +294,6 @@ class HGVSMatcher:
     def create_hgvs_variant(self, hgvs_string) -> HGVSVariant:
         return self.hgvs_converter.create_hgvs_variant(hgvs_string)
 
-    def _normalized_check(self, hgvs_variant: HGVSVariant) -> HgvsOriginallyNormalized:
-        normalized_hgvs = self.hgvs_converter.normalize(hgvs_variant)
-        return HgvsOriginallyNormalized(original_hgvs=hgvs_variant, normalized_hgvs=normalized_hgvs)
-
     def filter_best_transcripts_and_converter_type_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> list[tuple[TranscriptVersion, HGVSConverterType]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
@@ -743,11 +739,3 @@ def get_hgvs_variant_coordinate(hgvs_string: str, genome_build: GenomeBuild) -> 
     return matcher.get_variant_coordinate(hgvs_string)
 
 
-def get_hgvs_variant(hgvs_name: str, genome_build: GenomeBuild) -> Optional[Variant]:
-    """ Convenience method for 1 off HGVS - for batches use HGVSMatcher """
-    vc = get_hgvs_variant_coordinate(hgvs_name, genome_build)
-    try:
-        variant = Variant.get_from_variant_coordinate(vc, genome_build)
-    except Variant.DoesNotExist:
-        variant = None
-    return variant

@@ -153,9 +153,6 @@ class Keycloak:
             report_message("KeyCloak Error", level="error", extra_data={"target": response.text})
             return None
 
-    def welcome_user(self, user: KeycloakNewUser):
-        pass
-
     def add_user(self, user: KeycloakNewUser, pre_password_reset: Optional[Callable] = None) -> str:
         if self.existing_user(user.email):
             raise KeycloakError(f'User with email "{user.email}" already exists. Login to Keycloak to see what groups they are associated with')

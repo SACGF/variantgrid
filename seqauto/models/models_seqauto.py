@@ -34,7 +34,6 @@ from genes.models import (
     TranscriptVersion,
 )
 from library.constants import DAY_SECS
-from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
@@ -1515,10 +1514,3 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     return count
 
 
-def get_variant_caller_from_vcf_file(vcf_path):
-    variant_caller, version = get_variant_caller_and_version_from_vcf(vcf_path)
-    if variant_caller is None:
-        variant_caller = "Unknown Variant Caller"
-        version = -1
-
-    return VariantCaller.objects.get_or_create(name=variant_caller, version=version)[0]

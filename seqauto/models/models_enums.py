@@ -19,19 +19,6 @@ class QCCompareType(models.TextChoices):
     ENRICHMENT_KIT_TYPES = Constant((GOLD_ENRICHMENT_KIT_RUNS[0], ENRICHMENT_KIT[0]))
 
 
-class SequencingFileType(models.TextChoices):
-    SAMPLE_SHEET = 'S', 'SampleSheet'
-    ILLUMINA_FLOWCELL_QC = 'I', 'Illumina_Flowcell_QC'
-    FASTQ = 'U', 'FastQ'  # Unmapped
-    FASTQC = 'F', 'FastQC'
-    BAM = 'B', 'Bam'
-    FLAGSTATS = 'T', 'Flagstats'
-    VCF = 'V', 'VCF'
-    COMBINED_VCF = 'C', 'CombinedVCF'
-    QC = 'Q', 'QC'
-    DATA_MIGRATION = 'M', "Data Migration"
-
-
 class DataGeneration(models.TextChoices):
     HISEQ = 'H', 'HiSeq'
     MISEQ = 'M', 'MiSeq'

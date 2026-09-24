@@ -225,9 +225,6 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "variantopedia_wiki": False,
     "variant_wiki": False,
 
-    # Annotation
-    "version_diffs": False,
-
     # Settings
     "change_password": False,
     "custom_columns": False,

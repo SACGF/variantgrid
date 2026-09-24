@@ -809,9 +809,6 @@ class VCDataCell:
         elif mode == WipeMode.ATTRIBUTES_TO_NONE:
             self.raw = dict({'value': None, 'explain': None, 'note': None})
 
-    def clear_validation(self):
-        self.raw.pop('validation', None)
-
     @property
     def value(self) -> Any:
         return self._my_data.get('value')

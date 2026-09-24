@@ -37,7 +37,7 @@ def genome_build_url_arg(genome_build, url_name, **url_kwargs):
         css_class: str
         url: str
 
-    build_urls = []
+    build_urls: list[BuildUrlDict] = []
     for gb in builds_with_annotation:
         url = reverse(url_name, kwargs={"genome_build_name": gb.name, **url_kwargs})
         active = gb == genome_build

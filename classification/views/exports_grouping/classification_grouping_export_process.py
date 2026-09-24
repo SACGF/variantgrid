@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.http import HttpResponseBase, StreamingHttpResponse, HttpResponse
 from django.shortcuts import render
 from more_itertools.more import peekable
-from stream_zip import stream_zip, ZIP_64
+from stream_zip import ZIP_64
 from threadlocals.threadlocals import get_current_request
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFileSettings
@@ -185,15 +185,6 @@ class ClassificationGroupingExportProcess:
 
             yield "error.txt", modified_at, perms, ZIP_64, yield_error_bytes()
             raise
-
-    def _streaming_zip(self) -> StreamingHttpResponse:
-        # Had some issues with stream_zip telling macOS couldn't extract file, but then being able to manually extract the downloaded file fine
-        # not sure if the error is on macOS, stream_zip or my implementation, so using non streaming version for now
-        response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
-        # FIXME re-establish last_modified_header
-        response['Last-Modified'] = self.latest_header_date
-        response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
-        return response
 
     def _non_streaming_zip(self) -> HttpResponse:
         response = HttpResponse(content_type='application/zip')

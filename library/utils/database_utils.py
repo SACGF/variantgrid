@@ -1,6 +1,6 @@
 """
 Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
-text to embed in COPY / INSERT statements, dictfetchall / iter_dictfetchall / iter_db_results read
+text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
 cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first)
 and postgres_arrays formats array literals.
 """
@@ -123,15 +123,6 @@ def get_queryset_select_from_where_parts(qs: QuerySet) -> tuple[str, str, str]:
     return get_select_from_where_parts_str(sql_str)
 
 
-def get_queryset_column_names(queryset: QuerySet, extra_columns: list[str]) -> list[str]:
-    extra_names = list(queryset.query.extra_select)
-    field_names = list(queryset.query.values_select)
-    annotation_names = list(queryset.query.annotation_select)  # aggregate_select => annotation_select in Django 1.8
-
-    column_names = extra_names + field_names + annotation_names + extra_columns
-    return column_names
-
-
 def get_cursor_column_names(cursor):
     return [col[0] for col in cursor.description]
 
@@ -151,14 +142,6 @@ def iter_db_results(cursor, array_size=1000):
         if not results:
             break
         yield from results
-
-
-def iter_dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> dict:
-    if column_names is None:
-        column_names = get_cursor_column_names(cursor)
-
-    for row in iter_db_results(cursor, 10000):
-        yield dict(zip(column_names, row))
 
 
 def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:

@@ -23,13 +23,6 @@ class OperationCounter:
     updates = 0
     deletes = 0
 
-    def count_op(self, created: bool):
-        if created:
-            self.inserts += 1
-            return self.inserts
-        self.updates += 1
-        return self.updates
-
     def __str__(self) -> str:
         return f"Inserts {self.inserts}, Updates {self.updates}, Stale {self.deletes}"
 

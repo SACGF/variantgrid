@@ -24,9 +24,6 @@ class FastaFileWrapper:
         self.fasta_file = FastaFile(fasta_filename)
         self.convert_chrom_func = convert_chrom_func
 
-    def get_seq(self, chrom, start, end):
-        return self[chrom][start:end]
-
     def __contains__(self, rname):
         return self.fasta_file.__contains__(rname)
 

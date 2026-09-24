@@ -195,9 +195,6 @@ The earlier generation is still in the tree but no longer driven:
 calculator for those legacy screens and for the VUS overlaps page
 (`classification/models/allele_overlaps.py:ClinicalGroupingOverlap.status`), where a clinical significance is bucketed via
 `classification/models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket`.
-`classification/models/clinical_context_utils.py:update_clinical_contexts` and the whole of
-`classification/views/classification_overlaps_view.py` are unreachable - both still call a `recalc_and_save` that
-`ClinicalContext` no longer defines.
 
 ### Condition matching
 

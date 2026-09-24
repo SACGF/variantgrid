@@ -19,11 +19,8 @@ from classification.enums.discordance_enums import (
     DiscordanceReportResolution,
 )
 from classification.models import (
-    ClassificationFlagTypes,
     ClassificationModification,
     ClinicalContext,
-    ClinicalContextChangeData,
-    ClinicalContextRecalcTrigger,
     DiscordanceReportClassification,
     ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger, Overlap, OverlapType, \
     classification_flag_types,
@@ -241,9 +238,6 @@ class DiscordanceReportTemplateData:
     @property
     def c_hgvses(self) -> list[HGVSDisplay]:
         return sorted({cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications})
-
-    def resolve_label(self):
-        return f'{self.c_hgvses[0]}'
 
     @property
     def lab_clin_sigs(self) -> list[_LabClinSig]:

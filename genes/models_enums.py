@@ -30,16 +30,6 @@ class HGNCStatus(models.TextChoices):
     ENTRY_WITHDRAWN = 'E', 'Entry Withdrawn'
 
 
-class HGVSKind(models.TextChoices):
-    CODING = "c", "coding"
-    GENOMIC = "g", "genomic"
-    MITOCHONDRIA = "m", "mitochondria"
-    NON_CODING = "n", "non-coding"
-    CIRCULAR_GENOMIC = "o", "circular genomic"
-    PROTEIN = "p", "protein"
-    RNA = "r", "RNA transcript"
-
-
 class GeneSymbolAliasSource(models.TextChoices):
     NCBI = "N", 'NCBI'
     UCSC = "U", 'UCSC'
@@ -74,10 +64,3 @@ class PanelAppConfidence(models.TextChoices):
     INTERMEDIATE = "2", "Intermediate"
     HIGH = "3", "High"
 
-    def get_css_class(self):
-        CSS_CLASSES = {
-            self.HIGH: "HighEvidence",
-            self.INTERMEDIATE: "ModerateEvidence",
-            self.LOW: "LowEvidence",
-        }
-        return CSS_CLASSES[self.value]

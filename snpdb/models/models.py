@@ -788,18 +788,6 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
         """ Whether the user has access to any lab belonging to an active organization """
         return Lab.valid_labs_qs(user=user, admin_check=admin_check).filter(organization__active=True).exists()
 
-    """
-    # these methods have been superseeded by having full classification activity by lab
-    def classifications_activity(self, time_period: timedelta):
-        trunc_func = TimePeriod.truncate_func(time_period)
-        qs = self.classifications.annotate(time_period=trunc_func("created")).values("time_period") \
-            .annotate(num_classifications=Count("id")).order_by("-time_period")
-        return qs.values_list("time_period", "num_classifications")
-
-    def classifications_activity_by_day(self):
-        return self.classifications_activity(TimePeriod.DAY)
-    """
-
     def is_member(self, user: User, admin_check=False) -> bool:
         return self.valid_labs_qs(user=user, admin_check=admin_check).filter(pk=self.pk).exists()
 

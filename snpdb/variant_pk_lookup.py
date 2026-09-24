@@ -46,9 +46,6 @@ class VariantPKLookup:
         self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT,
                                                                defaults=defaults)[0].pk
 
-    def _get_locus_hash(self, contig_id, position, ref_id):
-        return contig_id, position, ref_id
-
     def _get_variant_hash(self, contig_id: int, position: int, ref_id: int, alt_id: int,
                           svlen: Optional[int]) -> VariantHash:
         # Only null means "no svlen" - 0 is a real value gene-level variants rely on

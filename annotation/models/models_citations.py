@@ -585,11 +585,6 @@ class CitationFetchRequest:
         self.id_to_fetch[normalized] = entry
         return entry
 
-    def _fetch_now(self, citation_id: CitationRequest) -> CitationFetchEntry:
-        entry = self._queue(citation_id)
-        self._fetch_queue()
-        return entry
-
     def _load_citation_stubs(self):
         """
         Provides Citation objects to the FetchEntries but doesn't populate them (some might even be new Citations
