@@ -951,10 +951,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def id_str(self):
+        """ The pk as a ClassificationRef string ("1234"). ClassificationModification.id_str appends ".<created timestamp>".
+            The lab form "org_group_name/lab_name/lab_record_id" is built by ClassificationRef.make_lab_id_str,
+            and either form is read back by ClassificationRef.parse_id_str """
         return str(self.id)
 
     @property
     def cr_lab_id(self):
+        """ The record id shown to users: lab_record_id (the lab's own id, unique within the lab, "vc<pk>" when the
+            lab didn't supply one), or "CR_<pk>" on deployments with CLASSIFICATION_ID_OVERRIDE_PREFIX (Shariant) """
         if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX:
             return f"CR_{self.id}"
         return self.lab_record_id
