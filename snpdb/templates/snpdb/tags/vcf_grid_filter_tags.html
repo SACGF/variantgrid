@@ -3,8 +3,7 @@
 {% load ui_utils %}
 <div class="vcf-grid-filter-tags-{{ table_id }}">
     <style>
-    fieldset.grid-filter-container {
-        margin-left: 0px;
+    .grid-filter-container {
         min-width: 700px;
     }
 
@@ -12,12 +11,12 @@
         margin-left: 5px;
     }
 
-    #id_variants_type li {
-        float: left;
+    #id_variants_type > div {
+        display: inline-block;
         margin-right: 10px;
     }
 
-    #id_variants_type li input {
+    #id_variants_type input {
         margin-right: 5px;
     }
 
@@ -124,25 +123,24 @@
     });
 
     </script>
-    <fieldset class="form-fields grid-filter-container">
-        <legend>Filter Grid</legend>
-        <div class="pair">
+    <div class="card grid-filter-container">
+        <div class="card-header">Filter Grid</div>
+        <div class="card-body">
             {% labelled label="Genome Build" %}
             {% genome_build_grid_filter %}
             {% endlabelled %}
             {% labelled label="Project" %}
             {{ project_form.project }}
             {% endlabelled %}
-        </div>
-        {% if variants_type_form %}
-        <div>
-            {{  variants_type_form }}
-        </div>
-        {% endif %}
+            {% if variants_type_form %}
+            {% labelled label="Variants type" %}
+            {{ variants_type_form.variants_type }}
+            {% endlabelled %}
+            {% endif %}
 
-
-        <div id='vcf-grid-filter-description'>
-            Filtering to <span id='vcf-grid-filter'></span>. <a href='javascript:vcfShowAll()'>Show All</a>
+            <div id='vcf-grid-filter-description'>
+                Filtering to <span id='vcf-grid-filter'></span>. <a href='javascript:vcfShowAll()'>Show All</a>
+            </div>
         </div>
-    </fieldset>
+    </div>
 </div>

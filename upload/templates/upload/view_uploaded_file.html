@@ -1,5 +1,6 @@
 {% extends menu_data_base %}
 {% load model_helpers %}
+{% load ui_utils %}
 
 {% block title %}View upload{% endblock %}
 
@@ -7,9 +8,13 @@
 
 	<div class="chunk borderless">
         <h3>View Upload</h3>
-        <fieldset class="form-fields">
-	        {{ file_upload | as_p }}
-        </fieldset>
+        <div class="card">
+            <div class="card-body">
+            {% for name, data_type, value in file_upload|display_rows %}
+                {% labelled label=name value_css=data_type %}{{ value }}{% endlabelled %}
+            {% endfor %}
+            </div>
+        </div>
 	</div>
 
 

@@ -325,9 +325,11 @@ $(document).ready(function() {
 </div>
 
 {% if candidate_search_run.status == 'S' %}
-    <div id="candidate-grid-filters">
-        {{ candidate_status_form }}
-        {{ evidence_form }}
+    <div id="candidate-grid-filters" class="card">
+        <div class="card-body">
+            {% labelled label=candidate_status_form.candidate_status.label %}{{ candidate_status_form.candidate_status }}{% endlabelled %}
+            {% labelled label=evidence_form.evidence.label %}{{ evidence_form.evidence }}{% endlabelled %}
+        </div>
     </div>
     <div id="candidate-grid-aggregate-filter">
         <div id="candidate-grid-aggregate-filter-details"></div>

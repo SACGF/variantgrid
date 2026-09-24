@@ -266,17 +266,19 @@ $(document).ready(function() {
         <form id="patient-form" method="post">
             {% csrf_token %}
 
-            <fieldset class="form-fields">
-                <legend>Create New Patient</legend>
-                <div class="d-flex justify-content-end">
-                    <div id="sample-node-container"></div>
+            <div class="card">
+                <div class="card-header">Create New Patient</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-end">
+                        <div id="sample-node-container"></div>
+                    </div>
+                    {% crispy form form_helper.horizontal %}
                 </div>
-                {% crispy form %}
-                <div class="buttons">
+                <div class="card-footer">
                     <button class="btn btn-primary">Create Patient</button>
                     <button id="reset-form" type='button' class="btn btn-secondary">reset</button>
                 </div>
-            </fieldset>
+            </div>
 
             {% include "messages/messages.html" %}
         </form>

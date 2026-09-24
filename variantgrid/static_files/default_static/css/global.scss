@@ -22,5 +22,3 @@
 @use 'global/external_icons';          // third party and sequencer icons, grid column colours
 @use 'global/classification';          // overlaps, citations, criteria, allele origin, testing context, clinical significance
 @use 'global/tips';                    // feature tips
-// Once global_deprecated.css, loaded after global.css - last, so it still wins the ties it won then
-@use 'global/fieldsets';               // fieldset.form-fields layouts (crispy forms replace them)

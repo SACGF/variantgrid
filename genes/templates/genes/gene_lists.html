@@ -1,5 +1,6 @@
 {% extends menu_genes_base %}
 {% load static %}
+{% load crispy_forms_tags %}
 {% block title %}Gene Lists{% endblock title %}
 
 {% block submenu_page_content %}
@@ -55,12 +56,16 @@
     <div id="new-gene-list-form-container">
       <form id="new-gene-list-form" method="post" action="{% url 'create_custom_gene_list' %}">
         {% csrf_token %}
-          <fieldset class="form-fields small">
-              <legend>Create</legend>
-              {{ create_gene_list_form.as_p }}
-              {% include "messages/messages.html" %}
-              <button id='submit-button' class="btn btn-primary">Create GeneList</button>
-          </fieldset>
+          <div class="card">
+              <div class="card-header">Create</div>
+              <div class="card-body">
+                  {% crispy create_gene_list_form form_helper.horizontal %}
+                  {% include "messages/messages.html" %}
+              </div>
+              <div class="card-footer">
+                  <button id='submit-button' class="btn btn-primary">Create GeneList</button>
+              </div>
+          </div>
       </form>
     </div>
 

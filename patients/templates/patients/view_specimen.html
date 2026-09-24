@@ -39,13 +39,15 @@
             <div class="collapse {% if new_extraction_form.errors %}show{% endif %}" id="new-extraction">
                 <form method="post" id="new-extraction-form">
                     {% csrf_token %}
-                    <fieldset class="form-fields">
-                        <legend>New extraction for {{ specimen.reference_id }}</legend>
-                        {% crispy new_extraction_form form_helper.horizontal %}
-                        <div class="buttons">
+                    <div class="card">
+                        <div class="card-header">New extraction for {{ specimen.reference_id }}</div>
+                        <div class="card-body">
+                            {% crispy new_extraction_form form_helper.horizontal %}
+                        </div>
+                        <div class="card-footer">
                             <button name="{{ create_extraction_field }}" class="btn btn-primary">Create Extraction</button>
                         </div>
-                    </fieldset>
+                    </div>
                 </form>
             </div>
         {% endif %}

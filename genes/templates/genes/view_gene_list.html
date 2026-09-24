@@ -1,6 +1,8 @@
 {% extends menu_genes_base %}
 {% load static %}
 {% load tz %}
+{% load crispy_forms_tags %}
+{% load ui_utils %}
 {% load help_tags %}
 {% load datatable_tags %}
 {% load wiki_tags %}
@@ -30,23 +32,18 @@
             <form method="post" id='gene-form'>
                 {% csrf_token %}
 
-    			<fieldset class="form-fields small">
-                    <p>
-                        <label for="id_created">Created:</label>
-                        <input id="id_created" name="created" readonly disabled=disabled value="{{ gene_list.created|localtime }}" />
-                    </p>
-                    <p>
-                        <label for="id_modified">Modified:</label>
-                        <input id="id_modified" name="modified" readonly disabled=disabled value="{{ gene_list.modified|localtime }}" />
-                    </p>
-
-    			{{ gene_list_form.as_p }}
-                {% if has_write_permission %}
-                    <div class="buttons">
-                    <button id="save-gene-list-button" class="btn btn-primary">Save</button>
+                <div class="card">
+                    <div class="card-body">
+                        {% labelled label="Created" %}{{ gene_list.created|localtime }}{% endlabelled %}
+                        {% labelled label="Modified" %}{{ gene_list.modified|localtime }}{% endlabelled %}
+                        {% crispy gene_list_form form_helper.horizontal %}
                     </div>
-                {% endif %}
-                </fieldset>
+                    {% if has_write_permission %}
+                    <div class="card-footer">
+                        <button id="save-gene-list-button" class="btn btn-primary">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
 
                 {% include "messages/messages.html" %}
         

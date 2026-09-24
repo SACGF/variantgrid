@@ -1,12 +1,5 @@
 {% load static %}
 {% load js_tags %}
-<style>
-
-fieldset.form-fields {
-    max-width: none;
-}
-
-</style>
 <div id='variant-transcript-select-tag-container'>
     {% if vts.transcript_data or empty_transcript_option %}
         {%  if vts.other_annotation_consortium_transcripts_warning %}

@@ -1,5 +1,6 @@
 {% load js_tags %}
 {% load crispy_forms_tags %}
+{% load ui_utils %}
 <div id='analysis-settings-template-tab'>
 
     {% if analysis_template_run %}
@@ -18,8 +19,8 @@
 
         <div>
         {% for node, analysis_variables_list in node_variables.items %}
-            <fieldset class="form-fields">
-                <legend>
+            <div class="card mt-2">
+                <div class="card-header">
                     {{ node }}
                     {% if not node.visible %}
                         <span class="badge badge-light">hidden</span>
@@ -29,22 +30,19 @@
                                     title="Ignore the errors on this node and show it and everything hidden below it">Ignore errors and show hidden nodes</button>
                         {% endif %}
                     {% endif %}
-                </legend>
+                </div>
+                <div class="card-body">
                 {% for av in analysis_variables_list %}
-                    <p>
-                        <label title="{{ av.class_name }}">{{ av.field }}</label>
+                    {% labelled label=av.field %}
                         {% if av.analysistemplaterunargument.error %}
-                            <span class="error">
-                                {{ av.analysistemplaterunargument.error }}
-                            </span>
+                            <span class="error" title="{{ av.class_name }}">{{ av.analysistemplaterunargument.error }}</span>
                         {% else %}
-                            <span>
-                                {{ av.analysistemplaterunargument.value }}
-                            </span>
+                            <span title="{{ av.class_name }}">{{ av.analysistemplaterunargument.value }}</span>
                         {% endif %}
-                    </p>
+                    {% endlabelled %}
                 {% endfor %}
-            </fieldset>
+                </div>
+            </div>
         {% endfor %}
         </div>
         <script>

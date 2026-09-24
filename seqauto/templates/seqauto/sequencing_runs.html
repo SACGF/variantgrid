@@ -76,17 +76,17 @@
 
     <div>
         <form id="filter-grid-enrichment-kit">
-            <fieldset class="form-fields small">
-                <legend>Filter Grid</legend>
-                <div class="pair">
+            <div class="card">
+                <div class="card-header">Filter Grid</div>
+                <div class="card-body">
                     {% labelled label="Enrichment Kit" %}
                         {{ enrichment_kit_form.enrichment_kit }}
                     {% endlabelled %}
+                    <div id='sequencing-runs-filter-description' class='hidden'>
+                        Filtering to <span id='sequencing-runs-filter'></span>. <a href='javascript:showAll()'>Show All</a>
+                    </div>
                 </div>
-                <div id='sequencing-runs-filter-description' class='hidden'>
-                    Filtering to <span id='sequencing-runs-filter'></span>. <a href='javascript:showAll()'>Show All</a>
-                </div>
-            </fieldset>
+            </div>
         </form>
     </div>
 

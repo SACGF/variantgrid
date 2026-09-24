@@ -2,15 +2,9 @@
 {% load static %}
 {% load help_tags %}
 {% load js_tags %}
+{% load ui_utils %}
 
 {% block title %}Variant Classification{% endblock %}
-{% block head %}
-<style>
-    .pair img {
-        margin-top: -6px;
-    }
-</style>
-{% endblock %}
 {% block jshead %}
 {{ block.super }}
 function allowNoSample() {
@@ -54,55 +48,40 @@ restrictSamples();
         <input type='hidden' name="ensembl_transcript_accession" value="{{ ensembl_transcript_accession }}" />
         <input type='hidden' name="sample_id" />
 
-        <fieldset class="form-fields">
-            <div class="pair">
-                <label>HGVS</label>
-                {{ hgvs_string }}
+        <div class="card">
+            <div class="card-body">
+                {% labelled label="HGVS" %}{{ hgvs_string }}{% endlabelled %}
+                {% labelled label="Transcript" %}
+                    {{ ensembl_transcript_accession }}
+                    {{ refseq_transcript_accession }}
+                {% endlabelled %}
+                {% labelled label="Genome build" %}{{ genome_build }}{% endlabelled %}
+                {% labelled label="Sample" %}
+                    {{ sample_autocomplete_form.sample }}
+                    {{ sample_autocomplete_form.media }}
+                    <div id='no-sample-link' class='hidden'>
+                        <a href="javascript:allowNoSample()">My sample isn't here</a>
+                    </div>
+                    <div id='no-sample-text' class='hidden'>
+                        <p>Please find or upload the sample if you have it, as it allows us to link classifications together, and auto-fill fields.
+                        <p>Please remember to set the SampleID field in the classification form manually.
+                    </div>
+                {% endlabelled %}
+                {% labelled label="For lab" %}
+                    {% if lab %}{{ lab.name }}{% endif %}
+                    {% if lab_error %}
+                    <div class='error'>{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
+                    {% endif %}
+                {% endlabelled %}
             </div>
-            <div class="pair">
-                <label>Transcript</label>
-                {{ ensembl_transcript_accession }}
-                {{ refseq_transcript_accession }}
-            </div>
-            <div class="pair">
-                <label>Genome build</label>
-                {{ genome_build }}
-            </div>
-
-            <div class="pair">
-                <label>Sample</label>
-                <div class='value'>
-                {{ sample_autocomplete_form.sample }}
-                {{ sample_autocomplete_form.media }}
-                <div id='no-sample-link' class='hidden'>
-                    <a href="javascript:allowNoSample()">My sample isn't here</a>
-                </div>
-                <div id='no-sample-text' class='hidden'>
-                    <p>Please find or upload the sample if you have it, as it allows us to link classifications together, and auto-fill fields.
-                    <p>Please remember to set the SampleID field in the classification form manually.
-                </div>
-                </div>
-            </div>
-
-            <div class="pair">
-                <label>For lab</label>
-                {% if lab %}
-                <div class='value'>{{ lab.name }}</div>
-                {% endif %}
-                {% if lab_error %}
-                <div class='error'>{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
-                {% endif %}
-            </div>
+            <div class="card-footer">
             {% if lab_error %}
-                <br/>
-                <div>Please fix all errors before creating a classification.</div>
+                Please fix all errors before creating a classification.
             {% else %}
-            <div class="buttons">
-            <button id='create-variant-classification' class="btn btn-primary">Create Classification</button>
-            </div>
+                <button id='create-variant-classification' class="btn btn-primary">Create Classification</button>
             {% endif %}
-
-        </fieldset>
+            </div>
+        </div>
     </form>
 
 {% endblock %}

@@ -1,7 +1,6 @@
+{% load ui_utils %}
 {% if has_write_permission and not obj.data_archived %}
-    <p>
-        <label>Archive data</label>
-        <span>
+    {% labelled label="Archive data" %}
         {% if obj.data_archive_in_progress %}
             <em>Archiving in progress&hellip; this runs in the background and may take a while.</em>
         {% elif can_archive %}
@@ -57,6 +56,5 @@
                 </form>
             </div>
         {% endif %}
-        </span>
-    </p>
+    {% endlabelled %}
 {% endif %}

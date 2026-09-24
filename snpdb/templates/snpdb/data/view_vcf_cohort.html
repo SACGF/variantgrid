@@ -4,6 +4,7 @@
 {% load js_tags %}
 {% load settings_tags %}
 {% load crispy_forms_tags %}
+{% load crispy_forms_field %}
 {% load model_tags %}
 {% load ui_utils %}
 {% load vcf_import_info_tags %}
@@ -428,38 +429,24 @@ $(document).ready(function() {
         {# Membership saves separately, through the samples table's save bar #}
         <form id="cohort-form" method="post">
         {% csrf_token %}
-        <fieldset class="form-fields">
-            <p>
-                <label for="{{ cohort_form.name.id_for_label }}">Name</label>
+        <div class="card">
+            <div class="card-body">
+            {% labelled label="Name" %}
                 {% if has_write_permission %}
-                    {{ cohort_form.name }}
+                    {% crispy_field cohort_form.name %}
                 {% else %}
-                    <span>{{ cohort.name }}</span>
+                    {{ cohort.name }}
                 {% endif %}
-            </p>
-            <p>
-                <label>Status</label>
-                <span>{{ cohort.get_import_status_display }}</span>
-            </p>
-            <p>
-                <label>Genome Build</label>
-                <span>{{ cohort.genome_build }}</span>
-            </p>
-            <p>
-                <label>Samples</label>
-                <span>{{ cohort.sample_count }}</span>
-            </p>
-            <p>
-                <label>Created by</label>
-                <span>{{ cohort.user }}</span>
-            </p>
+            {% endlabelled %}
+            {% labelled label="Status" %}{{ cohort.get_import_status_display }}{% endlabelled %}
+            {% labelled label="Genome Build" %}{{ cohort.genome_build }}{% endlabelled %}
+            {% labelled label="Samples" %}{{ cohort.sample_count }}{% endlabelled %}
+            {% labelled label="Created by" %}{{ cohort.user }}{% endlabelled %}
             {% if cohort_genotype_collection %}
-            <p>
-                <label>Common </label>
-                <span>{{ cohort_genotype_collection.get_common_filter_info }}</span>
-            </p>
+            {% labelled label="Common" %}{{ cohort_genotype_collection.get_common_filter_info }}{% endlabelled %}
             {% endif %}
-        </fieldset>
+            </div>
+        </div>
 
         <h3>Phenotype</h3>
         {% include "snpdb/data/_cohort_phenotype.html" with phenotype_field=cohort_form.phenotype %}
@@ -494,31 +481,21 @@ $(document).ready(function() {
 
     {% if vcf %}
     <div class="tab-pane" role="tabpanel" id="vcf-info">
-        <fieldset class="form-fields">
+        <div class="card">
+            <div class="card-body">
             {% if vcf.uploadedvcf.file_upload.uploadpipeline %}
                 {% if url_name_visible.view_upload_pipeline and can_view_upload_pipeline %}
-                <p>
-                    <label>Processing</label>
-                    <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.file_upload.uploadpipeline.pk %}">View upload processing</a></span>
-                </p>
+                {% labelled label="Processing" %}<a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.file_upload.uploadpipeline.pk %}">View upload processing</a>{% endlabelled %}
                 {% endif %}
                 {% include "snpdb/data/_archive_action.html" with obj=vcf archive_url_name='archive_vcf' %}
                 {% if vcf.uploadedvcf.vcf_importer %}
-                <p>
-                    <label>Importer Version</label>
-                    <span>{{ vcf.uploadedvcf.vcf_importer }}</span>
-                </p>
+                {% labelled label="Importer Version" %}{{ vcf.uploadedvcf.vcf_importer }}{% endlabelled %}
                 {% endif %}
             {% endif %}
             {% if vcf.source %}
-                <p>
-                <label>Source</label>
-                <span>{{ vcf.source }}</span>
-                </p>
+                {% labelled label="Source" %}{{ vcf.source }}{% endlabelled %}
             {% endif %}
-            <p>
-                <label>Special Format Fields</label>
-                <span>
+            {% labelled label="Special Format Fields" %}
                     <table>
                         <tr>
                             <td>
@@ -563,23 +540,14 @@ $(document).ready(function() {
                             </tr>
                         {% endif %}
                     </table>
-                </span>
-            </p>
+            {% endlabelled %}
             {% if not vcf.data_archived %}
-            <p>
-                <label>Common </label>
-                <span>{{ cohort_genotype_collection.get_common_filter_info }}</span>
-            </p>
+            {% labelled label="Common" %}{{ cohort_genotype_collection.get_common_filter_info }}{% endlabelled %}
             {% endif %}
             {% if somalier_stages %}
-            <p>
-                <label>Somalier</label>
-                <span>{% include "snpdb/data/_somalier_stages.html" %}</span>
-            </p>
+            {% labelled label="Somalier" %}{% include "snpdb/data/_somalier_stages.html" %}{% endlabelled %}
             {% endif %}
-            <p>
-                <label>Variant Zygosity Count</label>
-                <span>
+            {% labelled label="Variant Zygosity Count" %}
                     {% if vcf.has_genotype %}
                         {% for vzcc, vzcc_for_vcf in variant_zygosity_count_collections.items %}
                             <span class="zygosity-count-container">
@@ -606,27 +574,23 @@ $(document).ready(function() {
                             <a id="change-zygosity-count" class="hover-link" data-toggle="collapse" href=".zygosity-count-button">change...</a>
                         {% endif %}
                     {% endif %}
-                </span>
-            </p>
-            <p>
-                <label>Header</label>
-                <span>
-                    <a href="javascript:toggleVCFSection('vcf-header')">Show / hide VCF header...</a>
-                </span>
-                <div id='vcf-header' style='display: none'>
-                    <pre>{{ vcf.header }}</pre>
-                </div>
-            </p>
-        </fieldset>
+            {% endlabelled %}
+            {% labelled label="Header" %}
+                <a href="javascript:toggleVCFSection('vcf-header')">Show / hide VCF header...</a>
+            {% endlabelled %}
+            <div id='vcf-header' style='display: none'>
+                <pre>{{ vcf.header }}</pre>
+            </div>
+            </div>
+        </div>
 
         {% if vcf.vcfinfo_set.exists or vcf.vcffilter_set.exists or vcf.vcfformat_set.exists %}
-        <fieldset class="form-fields">
+        <div class="card mt-3">
+            <div class="card-body">
             {% if vcf.vcfinfo_set.exists %}
-            <p>
-                <label>INFO</label>
-                <span>
-                    <a href="javascript:toggleVCFSection('vcf-info-table')">Show / hide INFO...</a>
-                </span>
+            {% labelled label="INFO" %}
+                <a href="javascript:toggleVCFSection('vcf-info-table')">Show / hide INFO...</a>
+            {% endlabelled %}
                 <div id='vcf-info-table' style='display: none'>
                     <table>
                         <tr>
@@ -641,14 +605,11 @@ $(document).ready(function() {
                     {% endfor %}
                     </table>
                 </div>
-            </p>
             {% endif %}
             {% if vcf.vcffilter_set.exists %}
-            <p>
-                <label>FILTER</label>
-                <span>
-                    <a href="javascript:toggleVCFSection('vcf-filter-table')">Show / hide FILTER...</a>
-                </span>
+            {% labelled label="FILTER" %}
+                <a href="javascript:toggleVCFSection('vcf-filter-table')">Show / hide FILTER...</a>
+            {% endlabelled %}
                 <div id='vcf-filter-table' style='display: none'>
                     <table>
                         <tr>
@@ -663,14 +624,11 @@ $(document).ready(function() {
                     {% endfor %}
                     </table>
                 </div>
-            </p>
             {% endif %}
             {% if vcf.vcfformat_set.exists %}
-            <p>
-                <label>FORMAT</label>
-                <span>
-                    <a href="javascript:toggleVCFSection('vcf-format-table')">Show / hide FORMAT...</a>
-                </span>
+            {% labelled label="FORMAT" %}
+                <a href="javascript:toggleVCFSection('vcf-format-table')">Show / hide FORMAT...</a>
+            {% endlabelled %}
                 <div id='vcf-format-table' style='display: none'>
                     <table>
                         <tr>
@@ -685,9 +643,9 @@ $(document).ready(function() {
                     {% endfor %}
                     </table>
                 </div>
-            </p>
             {% endif %}
-        </fieldset>
+            </div>
+        </div>
         {% endif %}
     </div>
 

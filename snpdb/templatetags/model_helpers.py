@@ -5,7 +5,6 @@ By Fydo from http://stackoverflow.com/a/26614950
 """
 from django import template
 from django.utils.html import escape
-from django.utils.safestring import mark_safe
 
 from library.django_utils import get_model_fields, get_model_fields_and_formatted_values_tuples_list
 
@@ -35,10 +34,9 @@ def as_table(model):
 
 
 @register.filter()
-def as_p(model):
-    return mark_safe("".join(f'<p><label for="{name}-value">{name}</label>'
-                             f'<span class="field {data_type}">{value}</span></p>'
-                             for name, data_type, value in _display_rows(model)))
+def display_rows(model):
+    """ For a {% labelled %} row per model field """
+    return list(_display_rows(model))
 
 @register.filter()
 def qs_as_htable(qs):
