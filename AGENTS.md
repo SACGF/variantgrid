@@ -39,6 +39,7 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
+| an issue's ZenHub pipeline, what a release shipped | `claude/runbooks/zenhub_issue_triage.md` | `$ZENHUB_TOKEN`, `gh issue view` |
 | where a URL / task / signal / command lives | `claude/maps/*.md` (generated, gitignored, never hand-edited) | `scripts/vg map` |
 
 `claude/research/<app>.md` are the longer narratives - flows, why, history, traps - each with a `Verified against <sha>` header
