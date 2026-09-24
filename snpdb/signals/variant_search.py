@@ -1,6 +1,7 @@
 import itertools
 import logging
 import re
+import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from itertools import zip_longest
@@ -16,7 +17,8 @@ from annotation.manual_variant_entry import CreateManualVariantForbidden, check_
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSException, HGVSImplementationException, HGVSMatcher, \
     HGVSNomenclatureException, HgvsOriginallyNormalized, VariantResolvingError
-from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
+from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException, HgvsMatchRefAllele
+from genes.hgvs.hgvs_matcher import VariantCoordinateAndDetails
 from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
     find_gene_copy_number_events_for_string,
@@ -613,6 +615,25 @@ def _classify_unresolved_hgvs(user: User, genome_build: GenomeBuild, hgvs_string
         yield SearchResult(classify_no_variant, messages=[SearchMessage(f"Error reading HGVS \"{error_message}\"")])
 
 
+def _get_non_coding_c_hgvs_as_n_details(hgvs_matcher: HGVSMatcher, hgvs_string: str,
+                                        search_messages: list[SearchMessage]) -> VariantCoordinateAndDetails:
+    """ Import refuses c.HGVS on a non-coding transcript (it may be numbered from a coding model, so shifted by
+        the 5' UTR length). Search resolves it as n. with a warning, unless the provided reference doesn't match """
+    hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
+    hgvs_variant.kind = 'n'
+    n_hgvs_string = hgvs_variant.format(max_ref_length=sys.maxsize)
+    vc_details = hgvs_matcher.get_variant_coordinate_and_details(n_hgvs_string)
+    matches_reference = vc_details.matches_reference
+    if isinstance(matches_reference, HgvsMatchRefAllele) and not matches_reference:
+        raise HGVSNomenclatureException(f'c.HGVS used on non-coding transcript. Not resolved as "{n_hgvs_string}" '
+                                        'as the provided reference does not match, so it is probably numbered '
+                                        'from a coding transcript')
+    msg = f'c.HGVS used on non-coding transcript, resolved as "{n_hgvs_string}". If the c. was numbered from a ' \
+          "coding transcript, the position will be shifted by the length of its 5' UTR"
+    search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
+    return vc_details
+
+
 def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
     hgvs_matcher = HGVSMatcher.instance(genome_build)
     variant_qs = visible_variants
@@ -633,7 +654,10 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     search_messages: list[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
 
     try:
-        vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
+        try:
+            vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
+        except HGVSNonCodingTranscriptException:
+            vc_details = _get_non_coding_c_hgvs_as_n_details(hgvs_matcher, hgvs_string, search_messages)
         variant_coordinate = vc_details.variant_coordinate
         used_transcript_accession = vc_details.transcript_accession
         kind = vc_details.kind
