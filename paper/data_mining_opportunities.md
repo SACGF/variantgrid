@@ -18,8 +18,9 @@ evidence, not features, and it is unique to a long-lived deployed platform.
   the 2018 draft's "668 exomes → 2.4B genotypes vs 46M variants, ~50x"; refresh with current
   numbers).
 - Novel-variants-per-VCF decay curve as the database grows (justifies managed shared annotation).
-- How often annotation versions changed, and **what changed between versions** (use the
-  version-diff transition matrices) — e.g. ClinVar significance churn, gnomAD AF shifts.
+- How often annotation versions changed, and **what changed between versions** (computed by
+  joining two versions' partitions, see `data_collection_plan.md` §2a) — e.g. ClinVar significance
+  churn, gnomAD AF shifts.
 - Cases where a stored classification's underlying evidence changed after the fact (the
   reanalysis payoff, VariantGrid-native — complements Talos's yield numbers).
 

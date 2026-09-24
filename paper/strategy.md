@@ -28,7 +28,7 @@ deployed for real, and architected for the long life of genetic data."**
 | Topic | Decision | Why |
 |-------|----------|-----|
 | Continuous ingestion → single cross-build allele record | **IN (lead)** | Core novelty; enables internal population DB + matching |
-| Versioned annotation (partition-per-version) + version-diff re-analysis | **IN (lead)** | Strongest architectural novelty; nobody else does it |
+| Versioned annotation (partition-per-version), every version queryable side by side | **IN (lead)** | Strongest architectural novelty; nobody else does it. Diffs between versions are SQL joins, not a stored feature - see `data_collection_plan.md` §2a |
 | Live interactive node-graph analysis | **IN (lead)** | Only actively-maintained node-graph tool (Alissa EOL) |
 | Internal population DB + sample-level "who carries this" | **IN** | Clean differentiator vs seqr; pairs with allele model |
 | **Configurability** — one codebase → 4 deployments | **IN (elevate)** | New, distinctive; see §4 |
@@ -52,12 +52,12 @@ yield on 4,735 undiagnosed patients. It compares itself to Exomiser.
 and strong. VariantGrid's reanalysis story is **different and complementary**:
 - Talos = a standalone automated **flagging pipeline** (no UI, no persistent queryable database, no
   interactive analysis).
-- VariantGrid = a **platform** where reanalysis is *integrated* — annotation-version diffing inside a
-  queryable database that already holds the samples, classifications, tags, and analyses; plus
+- VariantGrid = a **platform** where reanalysis is *integrated* — every annotation version kept
+  queryable (so "what changed" is a join) inside a database that already holds the samples, classifications, tags, and analyses; plus
   interactive node-graph exploration Talos doesn't offer.
 - They could **interoperate** (Talos as an engine; VariantGrid as the platform/substrate).
 
-Frame VG as **infrastructure for reanalysis** (versioned annotation + diffs + storage + UI), and
+Frame VG as **infrastructure for reanalysis** (versioned annotation + storage + UI), and
 cite Talos + iVar + Exomiser-reinterpretation + the reanalysis-yield reviews as establishing that
 reanalysis *matters*. Position, don't compete.
 
@@ -155,7 +155,7 @@ public demo. Skip feature-completeness chasing.**
 
 ## One-paragraph summary
 Lead with the **platform and its data model** (continuous ingestion → one allele record, versioned
-annotation with diff-driven re-analysis, internal population DB), the **live node-graph** (now the
+annotation where every version stays queryable, internal population DB), the **live node-graph** (now the
 only actively-maintained one), the **configurability** (one codebase → 4 deployments), and the
 **clinical validation** (VG4 at SA Pathology) — and make the **empirical Results a data-mining of
 real usage** that no competitor can match. Push sharing/discordance to a one-paragraph "we are the

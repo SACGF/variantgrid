@@ -56,7 +56,6 @@ class Command(BaseCommand):
         collectors = {
             "ingestion_over_time": self.ingestion_over_time,
             "annotation_versions": self.annotation_versions,
-            "annotation_version_diffs": self.annotation_version_diffs,
             "classifications_over_time": self.classifications_over_time,
             "significance_change_flags": self.significance_change_flags,
             "analysis_usage": self.analysis_usage,
@@ -148,30 +147,6 @@ class Command(BaseCommand):
                          getattr(v, "columns_version", ""), getattr(v, "status", "")])
         self._write("annotation_versions.csv",
                     ["version_id", "created_month", "annotation_month", "columns_version", "status"], rows)
-        return len(rows)
-
-    def annotation_version_diffs(self):
-        """Added/modified/removed/unchanged between annotation versions — backs reanalysis claim."""
-        VD = get_model("annotation", "VariantAnnotationVersionDiff")
-        rows = []
-        for d in VD.objects.all():
-            rows.append([getattr(d, "version_from_id", ""), getattr(d, "version_to_id", ""),
-                         getattr(d, "num_added", ""), getattr(d, "num_modified", ""),
-                         getattr(d, "num_removed", ""), getattr(d, "num_unchanged", "")])
-        self._write("annotation_version_diffs.csv",
-                    ["version_from", "version_to", "num_added", "num_modified",
-                     "num_removed", "num_unchanged"], rows)
-        # Per-column change detail (e.g. ClinVar significance churn). Best-effort: introspect the
-        # FromToResult model and emit aggregate change counts per column. # VERIFY field names.
-        FTR = get_model("annotation", "VersionDiffFromToResult")
-        if FTR is not None:
-            fields = {f.name for f in FTR._meta.get_fields()}
-            col_field = next((c for c in ("column", "column_name", "field", "key") if c in fields), None)
-            if col_field:
-                detail = (FTR.objects.values(col_field)
-                          .annotate(n=Count("id")).order_by("-n"))
-                drows = [[r[col_field], r["n"]] for r in detail]
-                self._write("annotation_version_diff_columns.csv", ["column", "change_rows"], drows)
         return len(rows)
 
     def classifications_over_time(self):

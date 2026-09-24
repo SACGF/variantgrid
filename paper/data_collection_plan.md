@@ -35,8 +35,8 @@ and the VG3→VG4 approach. Scripts are read-only and produce AGGREGATE CSVs onl
 |---|---------------|--------------------------|----------------------|
 | 1 | Ingestion over time (VCFs, samples / month) | Growth; "always-on ingestion" | `snpdb.VCF.date`; `Sample` via `vcf.sample_set`; `Cohort.sample_count` |
 | 2 | Genotype:variant ratio per build | SQL multi-sample packing scales; managed annotation | `snpdb.Variant` count; `CohortGenotype` rows × `CohortGenotypeCollection.num_samples` |
-| 3 | Annotation versions + diffs (added/modified/removed) | Versioned annotation + diff-driven re-analysis (VG-native) | `annotation.VariantAnnotationVersion`; `VariantAnnotationVersionDiff.num_*`; `VersionDiffFromToResult` |
-| 4 | ClinVar/clin-sig churn between versions | What actually changes between annotation versions | `VersionDiffFromToResult` (value_from, value_to, count) for the clin-sig column `# VERIFY column name` |
+| 3 | Annotation versions (dates, VEP / columns / source versions) | Versioned annotation | `annotation.VariantAnnotationVersion`; `annotation.ClinVarVersion` |
+| 4 | ClinVar/clin-sig churn between versions | What actually changes between annotation versions | computed, see §2a: `annotation.ClinVar` rows of two `ClinVarVersion`s joined on `clinvar_variation_id`, `clinical_significance` from → to counts |
 | 5 | Classifications over time (by sig, share level) — LIGHT | "we're substrate beneath Shariant"; reanalysis context | `classification.Classification.created`, `clinical_significance`, `share_level`, `lab` |
 | 6 | Significance-change flags / month | Reclassification-over-time happens in practice | `flags.Flag` where `flag_type__id='classification_significance_change'`, `.created` |
 | 7 | Analysis usage over time + nodes/analysis | Real interactive use of the node-graph | `analysis.Analysis.created`; node counts via `AnalysisNode` MTI subclasses |
@@ -46,6 +46,28 @@ and the VG3→VG4 approach. Scripts are read-only and produce AGGREGATE CSVs onl
 | 11 | Already-classified-variant recurrence | Internal population DB / matching value | alleles with a `Classification` ∩ samples carrying them (`VariantZygosityCount`/`CohortGenotype`) — ADVANCED, verify perf |
 | 12 | Search activity (best-effort) | Search/lookup usage | `eventlog.Event` / `ViewEvent.args` — NO dedicated search log; best-effort only |
 | 13 | Cross-deployment usage contrast | Configurability (one codebase → 4 deployments) | run 1-10 on each deployment; compare profiles |
+
+### 2a. Version diffs are computed, not stored
+VariantGrid keeps every annotation version queryable side by side (one partition per version), but it
+stores no diffs between them. The old `VersionDiff` tables were never filled for variants - the only
+command that populated them built gene-level Ensembl diffs and went in 2021 - and were dropped in 2026
+(SACGF/variantgrid#1795). Datasets 3/4 and any "what changed" figure are queries. Things to decide:
+
+- **The claim.** `strategy.md` leads with "version-diff re-analysis" as a VG-native feature. There is
+  no diff UI or stored diff; the defensible framing is "every version stays queryable, so a diff is a
+  SQL join". Building a diff feature for the paper is a separate piece of work.
+- **Which versions still exist.** Old `ClinVarVersion` / `VariantAnnotationVersion` partitions can be
+  archived (pg_dump + drop) from the admin. Check `snpdb.PartitionArchive` and the live partitions
+  before picking version pairs; an archived pair means restoring its dump to the replica first.
+- **Scale.** A `VariantAnnotation` partition is tens of millions of rows. Join two versions in SQL on
+  `variant_id`, batched by id range, on a replica - or restrict to classified variants or a few
+  columns (gnomAD AF, consequence, ClinVar significance). ClinVar partitions are a few million rows,
+  so dataset 4 is the cheap one.
+- **What "changed" means.** A new `VariantAnnotationVersion` re-annotates every variant, so row counts
+  per version track database growth, not annotation change. Across VEP releases most "modified" rows
+  come from new transcripts, columns or source versions (`columns_version`, gnomAD / dbNSFP versions on
+  the VAV) - compare stable fields, and report the VAV source versions next to each diff.
+- **Suppression.** From → to matrices are aggregates; apply `MIN_CELL` to each cell.
 
 ## 3. Output format
 - One CSV per dataset, written to an `--output-dir`. Header row + aggregate rows only.

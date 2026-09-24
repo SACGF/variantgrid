@@ -26,12 +26,12 @@ python manage.py paper_data_mining --output-dir /tmp/vg_paper_stats --min-cell 5
 ## Before you trust the numbers
 - Run after migrating `vg3_sapath_prod` data up to VG4 (scripts target current models).
 - Each `# VERIFY` comment marks a field/relation that may differ across schema versions — confirm
-  in-context (a couple relate to `VCF.date`, the diff per-column field, and the recurrence join).
+  in-context (a couple relate to `VCF.date` and the recurrence join).
 - Sanity-check 2-3 totals against known VG3 values to confirm the migration preserved them.
 - Collectors fail independently — one error won't stop the others; check `_run_manifest.csv`.
 
 ## Outputs (one CSV each) → see mapping in `../data_collection_plan.md` §2
-ingestion_by_month · genotype_variant_ratio · annotation_versions · annotation_version_diffs
-(+ _diff_columns) · classifications_by_month (light) · significance_changes_by_month ·
+ingestion_by_month · genotype_variant_ratio · annotation_versions · classifications_by_month
+(light) · significance_changes_by_month ·
 analyses_by_month · node_type_usage · template_runs_by_month · variant_tags_by_type / _by_month ·
 classified_variant_recurrence.
