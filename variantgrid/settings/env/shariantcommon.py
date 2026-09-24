@@ -175,7 +175,8 @@ CLASSIFICATION_ID_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = False
 
 VARIANT_SHOW_CANONICAL_HGVS = False
-CLASSIFICATION_MAX_REFERENCE_LENGTH = 1000000  # Try to generate large values for sake of MVL
+CLASSIFICATION_MAX_REFERENCE_LENGTH = 1000000
+# Large value for MVLs that always wanted explicit nucleotides, no longer an issue, reduce when we have time to test
 
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps

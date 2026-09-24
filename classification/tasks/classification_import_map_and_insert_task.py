@@ -107,8 +107,8 @@ class ClassificationImportMapInsertTask(Task):
             upload_file.file_data.download_to_dir(source_dir, extract_zip=True)
             # next step is to trigger the omni importer to map the file
             # read the mapped file back
-            # and import it
-            # --file data/path_west/sharmvl_grch38molecular_variants20220326_060243.json --publish logged_in_users --org path_west --lab unit_1 --env prod
+            # and import it e.g.
+            # --file data/some_lab/some_file.json --publish logged_in_users --org some_lab --lab unit_1 --env prod
 
             publish = settings.CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL
             include_source = settings.CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE

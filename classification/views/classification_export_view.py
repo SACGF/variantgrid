@@ -94,7 +94,6 @@ def _export_view_context(request: HttpRequest) -> dict:
 
     user_settings = UserSettings.get_for_user(request.user)
     format_keys = {'id': 'keys', 'name': 'Evidence Keys Report', 'admin_only': True}
-    format_mvl = {'id': 'mvl', 'name': 'MVL'}
     format_csv = {'id': 'csv', 'name': 'CSV'}
     format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare', 'admin_only': True}
     format_clinvar_expert_compare = {'id': 'clinvar_compare_expert', 'name': 'ClinVar Expert Panel Compare',
@@ -115,7 +114,6 @@ def _export_view_context(request: HttpRequest) -> dict:
         format_lab_compare,
         format_condition_resolution,
         format_json,
-        format_mvl,
         format_franklin
     ]
     if settings.CLASSIFICATION_REDCAP_EXPORT:
@@ -211,7 +209,7 @@ def export_view_redirector(request: HttpRequest) -> Response:
 
 
 class ClassificationApiExportView(APIView):
-    """ Exports classification records in a requested format (e.g. CSV, JSON, MVL),
+    """ Exports classification records in a requested format (e.g. CSV, JSON),
     filtered/configured via query parameters. """
 
     @staticmethod

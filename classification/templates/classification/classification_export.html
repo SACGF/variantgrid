@@ -62,31 +62,6 @@
                 params.full_detail = 'true'
             }
 
-        } else if (format === 'mvl') {
-            let mvlFileFormat = $("input[name='mvl_file_format']:checked").val();
-            if (mvlFileFormat) {
-                params.file_format = mvlFileFormat;
-            }
-
-            params.conflict_strategy = $("input[name='conflict_strategy']:checked").val();
-
-            for (let key of ['b', 'lb', 'vus', 'lp', 'p']) {
-                let full_key = `cs_${key}`;
-                let value = $(`#${full_key}`).val().trim();
-                if (value.length) {
-                    params[full_key] = value;
-                }
-            }
-            params.transcript_strategy = $("input[name='transcript_strategy']:checked").val();
-
-            let detailLevelChecked = $("input[name='mvl_detail']:checked")
-            if (detailLevelChecked.length) {
-                params.mvl_detail = detailLevelChecked.val();
-            }
-
-            if (!allele_origin || allele_origin !== "G") {
-                inputError = 'MVL download only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export as MVL.';
-            }
         } else if (format == 'franklin') {
             if (!allele_origin || allele_origin !== "G") {
                 inputError = 'Franklin download currently only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export in Franklin format.';
@@ -309,10 +284,9 @@
         the export will be blank.</p>
     {% endlabelled %}
     {% labelled label="Rows Per File" %}
-        <input class="form-control" id="rows_per_file" type="number" value="" placeholder="10,000 for MVL, unlimited for other formats"/>
-        <span class="text-muted">Various versions of Alissa and other systems limit how many rows can be in an individual file.<br/>
-        Providing a value for this field will result in a zip file with each entry in the zip not having more than this number of rows.<br/>
-        Min value of 100, set to 0 to force a single file for MVLs.</span>
+        <input class="form-control" id="rows_per_file" type="number" value="" placeholder="Unlimited"/>
+        <span class="text-muted">
+        Providing a value for this field will result in a zip file with each entry in the zip not having more than this number of rows.</span>
     {% endlabelled %}
     {% labelled label="Total Row Limit" admin_only=True %}
         <input class="form-control" id="row_limit" type="number" value="" />
@@ -452,94 +426,7 @@
             Each record will have summary details as well as a link back to {{ site_name }} to see the up to-date data.
             {% endlabelled %}
         </div>
-        <div class="custom-option" data-format="mvl">
 
-            {% labelled label="MVL Grouping" %}
-                MVLs will have one row per transcript-variant combination.<br/>
-                If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
-            {% endlabelled %}
-            {% labelled label="MVL File Format" admin_only=True %}
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input checked="checked" id="mvl_file_format_tsv" type="radio" name="mvl_file_format" value="tsv" class="form-check-input" />
-                        TSV
-                    </label>
-                </div>
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input id="mvl_file_format_json" type="radio" name="mvl_file_format" value="json" class="form-check-input" />
-                        JSON
-                    </label>
-                </div>
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input id="mvl_file_format_html" type="radio" name="mvl_file_format" value="html" class="form-check-input" />
-                        HTML
-                    </label>
-                </div>
-            {% endlabelled %}
-            {% labelled label="MVL Conflict Strategy" %}
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input checked="checked" id="conflict_most_pathogenic" type="radio" name="conflict_strategy" value="most_pathogenic" class="form-check-input" />
-                        Most Pathogenic
-                    </label>
-                </div>
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input id="conflict_most_benign" type="radio" name="conflict_strategy" value="most_benign" class="form-check-input" />
-                        Most Benign
-                    </label>
-                </div>
-            {% endlabelled %}
-            {% labelled label="Transcript Strategy" %}
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input checked="checked" id="transcript_strategy_refseq" type="radio" name="transcript_strategy" value="refseq" class="form-check-input" />
-                        Only include RefSeq
-                    </label>
-                </div>
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input id="transcript_strategy_all" type="radio" name="transcript_strategy" value="all" class="form-check-input" />
-                        Include all transcripts - WARNING Alissa can only handle RefSeq transcripts
-                    </label>
-                </div>
-            {% endlabelled %}
-            {% labelled label="Classification Labels" %}
-                MVL installations might have custom labels for classification values.<br/>
-                If your system does not use the defaults below, you can override individual values.
-            {% endlabelled %}
-            {% labelled label="Benign" %}
-                <input class="form-control" id="cs_b" type="text" placeholder="BENIGN" />
-            {% endlabelled %}
-            {% labelled label="Likely Benign" %}
-                <input class="form-control" id="cs_lb" type="text" placeholder="LIKELY_BENIGN" />
-            {% endlabelled %}
-            {% labelled label="VUS, Risk Factor, Drug Response" %}
-                <input class="form-control" id="cs_vus" type="text" placeholder="VOUS" />
-            {% endlabelled %}
-            {% labelled label="Likely Pathogenic" %}
-                <input class="form-control" id="cs_lp" type="text" placeholder="LIKELY_PATHOGENIC" />
-            {% endlabelled %}
-            {% labelled label="Pathogenic" %}
-                <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
-            {% endlabelled %}
-            {% labelled label="VCF Detail Level" admin_only=True %}
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input checked="checked" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
-                        Standard
-                    </label>
-                </div>
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input id="mvl_detail_shell" type="radio" name="mvl_detail" value="shell" class="form-check-input" />
-                        Minimal (for testing)
-                    </label>
-                </div>
-            {% endlabelled %}
-        </div>
         <div class="custom-option" data-format="json">
 
              {% if restricted_data %}

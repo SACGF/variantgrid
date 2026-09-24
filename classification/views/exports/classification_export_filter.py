@@ -527,8 +527,6 @@ class ClassificationFilter:
                     rows_per_file = 100
             except:
                 pass
-        elif request.query_params.get("type") == "mvl":
-            rows_per_file = 10000
 
         row_limit = None
         if row_limit_str := request.query_params.get('row_limit'):
@@ -665,7 +663,7 @@ class ClassificationFilter:
 
         if not self.since:
             # only worry about withdrawn if doing 'since' (as we might need to report the withdrawing (json),
-            # or at least be aware of it for changes (mvl))
+            # or at least be aware of it for changes)
             cms = cms.exclude(classification__withdrawn=True)
 
         if labs := self.include_sources:
