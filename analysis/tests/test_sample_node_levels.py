@@ -53,6 +53,7 @@ from analysis.views.views import CreateClassificationForVariantTagView
 from annotation.fake_annotation import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
+from library.django_utils.django_partition import temporary_db_table
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
@@ -167,9 +168,7 @@ class SampleNodeLevelsTestCase(TestCase):
     @classmethod
     def _add_genotype(cls, cgc, variant, samples_zygosity, ad, dp, filters=None, af=0.5):
         """ Insert into the collection's partition table, as production inserts do """
-        old_db_table = CohortGenotype._meta.db_table
-        try:
-            CohortGenotype._meta.db_table = cgc.get_partition_table()
+        with temporary_db_table(CohortGenotype, cgc.get_partition_table()):
             CohortGenotype.objects.create(
                 collection=cgc, variant=variant,
                 ref_count=samples_zygosity.count('R'),
@@ -184,8 +183,6 @@ class SampleNodeLevelsTestCase(TestCase):
                 samples_genotype_quality=[30],
                 samples_phred_likelihood=[0],
             )
-        finally:
-            CohortGenotype._meta.db_table = old_db_table
 
     def _node(self, level: str, source, **kwargs) -> SampleNode:
         field = SampleNode.SOURCE_LEVEL_FIELDS[level]

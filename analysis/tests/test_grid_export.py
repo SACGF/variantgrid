@@ -32,6 +32,7 @@ from analysis.tasks.analysis_grid_export_tasks import (
 )
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils import FakeRequest
+from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag, VCFInfo
 from snpdb.models.models_enums import VCFInfoTypes
@@ -110,9 +111,7 @@ class GridExportTestCase(TestCase):
         """ Insert a CohortGenotype row into the collection's partition table (proband at index 0).
             sample_format: the FORMAT JSON the importer keeps, one dict per sample
             sample_info: the record's remaining INFO fields, as the importer stores them """
-        old_db_table = CohortGenotype._meta.db_table
-        try:
-            CohortGenotype._meta.db_table = cgc.get_partition_table()
+        with temporary_db_table(CohortGenotype, cgc.get_partition_table()):
             CohortGenotype.objects.create(
                 collection=cgc, variant=variant,
                 ref_count=0, het_count=1, hom_count=0, unk_count=0,
@@ -126,8 +125,6 @@ class GridExportTestCase(TestCase):
                 samples_genotype_quality=[30, 30, 30],
                 samples_phred_likelihood=[0, 0, 0],
             )
-        finally:
-            CohortGenotype._meta.db_table = old_db_table
 
     def _sample_node(self) -> SampleNode:
         node = SampleNode.objects.create(analysis=self.analysis, sample=self.sample)
