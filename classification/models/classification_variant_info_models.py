@@ -32,7 +32,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.gene_level_resolver import GeneLevelResolution
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
@@ -967,13 +966,6 @@ class ImportedAlleleInfo(TimeStampedModel):
                                            message=message, hgvs_converter_version=hgvs_converter_version,
                                            hgvs_converter_data_version=data_version)
 
-    def resolved_gene_level(self) -> GeneLevelResolution:
-        """ The gene-level identity the imported value names, or the reason it was refused. Writes
-            nothing, so the callers that have to know what a record resolves to before it has a
-            coordinate can ask as well. A junction named by its breakpoints is canonicalised under
-            the imported build, which is part of what it names (@see genes.gene_splice). """
-        return resolve_gene_level_string(self.imported_hgvs, self.imported_genome_build)
-
     def resolve_gene_level(self) -> bool:
         """ A lab submitting 'BCR::ABL1', 'EGFR amplification' or 'AR V7' names genes, not a coordinate - so
             there is no HGVS to resolve. The identity it resolves to has a variant coordinate of its
@@ -984,9 +976,12 @@ class ImportedAlleleInfo(TimeStampedModel):
             A value that names genes and does not validate - a typo'd fusion partner - fails here
             with the reason as its message, rather than going on to be reported as a bad HGVS.
 
+            A junction named by its breakpoints is canonicalised under the imported build, which is
+            part of what it names (@see genes.gene_splice).
+
             Returns whether this was a gene-level event, so the caller can skip HGVS resolution. """
 
-        resolution = self.resolved_gene_level()
+        resolution = resolve_gene_level_string(self.imported_hgvs, self.imported_genome_build)
         if resolved := resolution.resolved:
             self.variant_coordinate = str(resolved.variant_coordinate)
             self.message = f"Matched {resolved.canonical_str}"
