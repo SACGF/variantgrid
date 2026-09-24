@@ -9,7 +9,10 @@ from ontology.tests.test_data_ontology import (
     create_test_ontology_version,
 )
 from patients.models import Patient
-from patients.signals.patient_search import sample_preview_patient_extra
+from patients.signals.patient_search import (
+    patient_preview_phenotype_extra,
+    sample_preview_patient_extra,
+)
 from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
 
 
@@ -40,3 +43,7 @@ class TestSamplePreviewPatientExtra(TestCase):
 
     def test_patient_the_user_cannot_view_is_left_out(self):
         self.assertEqual(self._extras(self.other_user), {})
+
+    def test_patient_preview_phenotype(self):
+        extras = patient_preview_phenotype_extra(sender=Patient, user=self.user, obj=self.patient)
+        self.assertEqual({kv.key: kv.value for kv in extras}, {"HPO": "Increased thyroid-stimulating hormone level"})

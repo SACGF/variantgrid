@@ -54,9 +54,20 @@ def sample_preview_patient_extra(sender, user: User, obj: Sample, **kwargs):
         return None
     if not (patient := Patient.filter_for_user(user).filter(pk=obj.patient_id).first()):
         return None
-    extras = [PreviewKeyValue(key="Patient", value=patient.display_identity, icon=Patient.preview_icon())]
+    patient_row = PreviewKeyValue(key="Patient", value=patient.display_identity, icon=Patient.preview_icon())
+    return [patient_row, *_phenotype_preview_rows(patient)]
+
+
+@receiver(preview_extra_signal, sender=Patient)
+def patient_preview_phenotype_extra(sender, user: User, obj: Patient, **kwargs):
+    return _phenotype_preview_rows(obj)
+
+
+def _phenotype_preview_rows(patient: Patient) -> list[PreviewKeyValue]:
+    """ The terms matched in the patient's phenotype text, one row per ontology """
+    rows = []
     if phenotype_terms := patient_phenotype_terms([patient]).get(patient.pk):
         for service_label in PHENOTYPE_ONTOLOGY_SERVICE_LABELS.values():
             if terms := phenotype_terms.terms.get(service_label):
-                extras.append(PreviewKeyValue(key=service_label, value=", ".join(term.name for term in terms)))
-    return extras
+                rows.append(PreviewKeyValue(key=service_label, value=", ".join(term.name for term in terms)))
+    return rows
