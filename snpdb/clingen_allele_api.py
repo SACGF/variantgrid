@@ -10,6 +10,7 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from functools import lru_cache
 
 import requests
@@ -62,6 +63,10 @@ class ClinGenAlleleRegistryAPI:
     """ Manages API connections to ClinGen Allele Registry """
 
     override_class = None  # Tests sub in a recorded-response implementation - @see variantgrid.test_runner
+    ATTEMPTS = 3
+    RETRY_BACKOFF_SECS = 5
+    # Gateway / unavailable. 500 is also used for input errors (e.g. "Unknown reference") so isn't retried
+    RETRY_STATUS_CODES = {502, 503, 504}
 
     @classmethod
     def instance(cls, **kwargs) -> 'ClinGenAlleleRegistryAPI':
@@ -93,18 +98,51 @@ class ClinGenAlleleRegistryAPI:
     def _check_response(response: requests.Response):
         """ Throws Exception if response status code is not 200 OK """
         if response.status_code != 200:
+            try:
+                response_json = response.json()
+            except requests.JSONDecodeError:
+                # Gateway errors (502/504) come back as HTML
+                response_json = {"text": response.text[:1000]}
             raise ClinGenAlleleServerException(response.url, response.request.method,
-                                               response.status_code, response.json())
+                                               response.status_code, response_json)
 
-    def _put(self, url, data, chunk_size=None):
-        if chunk_size > settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS:
-            raise ValueError(f"ClinGen accepts a max of {settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS} records")
-        logging.debug("Calling ClinGen API")
+    @classmethod
+    def _is_retryable(cls, e: Exception) -> bool:
+        if isinstance(e, ClinGenAlleleServerException):
+            return e.status_code in cls.RETRY_STATUS_CODES
+        return isinstance(e, (requests.ConnectionError, requests.Timeout))
+
+    @classmethod
+    def _json_with_retry(cls, send_request: Callable[[], requests.Response]):
+        """ Retries registry-side failures (gateway errors, connection errors, timeouts) with exponential backoff.
+            send_request is called for each attempt, so the PUT is re-signed with the current time.
+            Worst case is ATTEMPTS x the request timeout, plus the backoff between attempts. """
+        for attempt in range(1, cls.ATTEMPTS + 1):
+            try:
+                response = send_request()
+                cls._check_response(response)
+                return response.json()
+            except Exception as e:
+                if attempt == cls.ATTEMPTS or not cls._is_retryable(e):
+                    raise
+                backoff = cls.RETRY_BACKOFF_SECS * 2 ** (attempt - 1)
+                logging.warning("ClinGen Allele Registry call failed (attempt %d/%d), retrying in %ds: %s",
+                                attempt, cls.ATTEMPTS, backoff, e)
+                time.sleep(backoff)
+
+    def _signed_url(self, url) -> str:
         # copy/pasted from page 5 of https://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
         identity = hashlib.sha1((self.login + self.password).encode('utf-8')).hexdigest()
         gb_time = str(int(time.time()))
         token = hashlib.sha1((url + identity + gb_time).encode('utf-8')).hexdigest()
-        request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
+        return url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
+
+    def _put(self, url, data, chunk_size=None):
+        """ Registers the alleles (or returns the existing ones) - repeating a PUT gives the same
+            canonical allele IDs, so it's safe to retry """
+        if chunk_size > settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS:
+            raise ValueError(f"ClinGen accepts a max of {settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS} records")
+        logging.debug("Calling ClinGen API")
         default_timeout = 2 * MINUTE_SECS
         if chunk_size:
             timeout = 2 * MINUTE_SECS * chunk_size / 1000
@@ -112,13 +150,14 @@ class ClinGenAlleleRegistryAPI:
         else:
             timeout = default_timeout
 
+        def send_request():
+            return requests.put(self._signed_url(url), data=data, timeout=timeout)
+
         try:
-            response = requests.put(request, data=data, timeout=timeout)
-            self._check_response(response)
-            return response.json()
+            return self._json_with_retry(send_request)
         except Exception as e:
             api_failure = {
-                "request": request,
+                "request": url,
                 "timeout": timeout,
                 "data": data,
             }

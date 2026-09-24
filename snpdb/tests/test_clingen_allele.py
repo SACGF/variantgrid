@@ -1,7 +1,11 @@
-from unittest.mock import patch
+import json
+import os
+import tempfile
+from unittest.mock import call, patch
 
+import requests
 from django.db import IntegrityError
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from annotation.fake_annotation import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
@@ -15,6 +19,7 @@ from snpdb.clingen_allele import (
     populate_clingen_alleles_for_variants,
     variant_allele_clingen,
 )
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.mock_clingen_api import (
     MockClinGenAlleleRegistryAPI,
@@ -138,3 +143,51 @@ class ClinGenAlleleNeverRegisteredTestCase(TestCase):
         self.assertEqual(variant_allele.allele, winning_allele)
         # The Allele we made before losing the race is gone, rather than left with nothing pointing at it
         self.assertEqual(Allele.objects.count(), 1)
+
+
+@override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN="login", CLINGEN_ALLELE_REGISTRY_PASSWORD="password")
+@patch("snpdb.clingen_allele_api.time.sleep")
+@patch("snpdb.clingen_allele_api.requests.put")
+class ClinGenAlleleRegistryAPIRetryTestCase(SimpleTestCase):
+    URL = "http://reg.genome.network/alleles?file=hgvs"
+
+    def setUp(self):
+        failure_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(failure_dir.cleanup)
+        self.api = ClinGenAlleleRegistryAPI(os.path.join(failure_dir.name, "failure.json"))
+
+    def _response(self, status_code: int, content: bytes) -> requests.Response:
+        response = requests.Response()
+        response.status_code = status_code
+        response._content = content
+        response.url = self.URL
+        response.request = requests.Request("PUT", self.URL).prepare()
+        return response
+
+    def _put(self):
+        return self.api._put(self.URL, "NC_000001.10:g.100A>G", chunk_size=1)
+
+    def test_retries_gateway_and_connection_errors(self, mock_put, mock_sleep):
+        api_response = [{"@id": "http://reg.genome.network/allele/CA123"}]
+        mock_put.side_effect = [
+            self._response(502, b"<html>Bad Gateway</html>"),
+            requests.ConnectionError("Connection refused"),
+            self._response(200, json.dumps(api_response).encode()),
+        ]
+        self.assertEqual(self._put(), api_response)
+        self.assertEqual(mock_put.call_count, 3)
+        self.assertEqual(mock_sleep.call_args_list, [call(5), call(10)])
+
+    def test_gives_up_after_attempts(self, mock_put, mock_sleep):
+        mock_put.side_effect = requests.ReadTimeout("Read timed out")
+        with self.assertRaises(ClinGenAllele.ClinGenAlleleRegistryException):
+            self._put()
+        self.assertEqual(mock_put.call_count, ClinGenAlleleRegistryAPI.ATTEMPTS)
+
+    def test_internal_server_error_not_retried(self, mock_put, mock_sleep):
+        """ The registry returns 500 for input it can't handle, which will fail the same way again """
+        mock_put.return_value = self._response(500, json.dumps({"message": "Unknown reference"}).encode())
+        with self.assertRaises(ClinGenAllele.ClinGenAlleleRegistryException):
+            self._put()
+        self.assertEqual(mock_put.call_count, 1)
+        mock_sleep.assert_not_called()
