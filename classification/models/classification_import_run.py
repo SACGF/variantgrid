@@ -3,6 +3,7 @@ from functools import cached_property
 from typing import Optional
 
 from django import dispatch
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import CASCADE
 from django.db.models.signals import post_save
@@ -10,7 +11,10 @@ from django.dispatch import receiver
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from classification.models.classification_utils import ClassificationPatchStatus
+from classification.models.classification_utils import (
+    ClassificationPatchResponse,
+    ClassificationPatchStatus,
+)
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.log_utils import NotificationBuilder
 
@@ -37,6 +41,7 @@ class ClassificationImportRunStatus(models.TextChoices):
 
 
 MAX_IMPORT_AGE = timedelta(minutes=5)
+MAX_LAB_RECORD_IDS_ALREADY_WITHDRAWN = 1000  # row_count_already_withdrawn keeps counting past this
 
 
 class ClassificationImportRun(TimeStampedModel):
@@ -54,6 +59,8 @@ class ClassificationImportRun(TimeStampedModel):
     row_count_delete = models.IntegerField(default=0)
     row_count_un_withdrawn = models.IntegerField(default=0)
     row_count_already_withdrawn = models.IntegerField(default=0)
+    # Plain strings rather than FKs, this is a historical log of what was in the import
+    lab_record_ids_already_withdrawn = ArrayField(models.TextField(), default=list, blank=True)
     row_count_unknown = models.IntegerField(default=0)
     missing_row_count = models.IntegerField(null=True, blank=True)
     logging_version = models.IntegerField(default=0)
@@ -79,12 +86,19 @@ class ClassificationImportRun(TimeStampedModel):
             from classification.models import Classification
             self.missing_row_count = Classification.objects.filter(lab=from_file.lab, withdrawn=False).exclude(last_import_run__from_file=from_file).count()
 
-    def increment_status(self, status: ClassificationPatchStatus):
+    @property
+    def lab_record_ids_already_withdrawn_truncated(self) -> bool:
+        return self.row_count_already_withdrawn > len(self.lab_record_ids_already_withdrawn)
+
+    def increment_status(self, response: ClassificationPatchResponse):
+        status = response.status
         self.row_count += 1
         if status == ClassificationPatchStatus.NEW:
             self.row_count_new += 1
         elif status == ClassificationPatchStatus.ALREADY_WITHDRAWN:
             self.row_count_already_withdrawn += 1
+            if response.lab_record_id and len(self.lab_record_ids_already_withdrawn) < MAX_LAB_RECORD_IDS_ALREADY_WITHDRAWN:
+                self.lab_record_ids_already_withdrawn.append(response.lab_record_id)
         elif status == ClassificationPatchStatus.UPDATE:
             self.row_count_update += 1
         elif status == ClassificationPatchStatus.DELETED:
