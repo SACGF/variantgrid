@@ -166,7 +166,6 @@ CELERY_IMPORTS = (
     'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
     'snpdb.tasks.somalier_tasks',
-    'snpdb.tasks.vcf_bed_file_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
     'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',

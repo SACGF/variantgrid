@@ -197,13 +197,6 @@ class IntersectionNodeView(NodeView):
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        _, enrichment_kit = self.object.get_vcf_bed_intersection_and_enrichment_kit()
-        if enrichment_kit:
-            context["enrichment_kit"] = enrichment_kit
-        return context
-
 
 class MergeNodeView(NodeView):
     model = MergeNode
