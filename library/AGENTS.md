@@ -23,9 +23,11 @@ Patterns here:
 - Notify humans with `library/log_utils.py:AdminNotificationBuilder` (Slack, plus superuser email when
   `is_communication=True`) or snpdb's `LabNotificationBuilder`; add blocks with `add_header`/`add_field`/`add_markdown`
   (Markdown, converted to HTML and Slack) and call `send()`. `library/log_utils.py:send_notification` is the raw
-  Slack hook, falls back to Rollbar when Slack is unconfigured, and truncates blocks at `SLACK_CHARACTER_LIMIT`.
+  Slack hook, falls back to `report_event` (EventLog) when Slack is unconfigured, and truncates blocks at `SLACK_CHARACTER_LIMIT`.
 - Report caught exceptions with `library/log_utils.py:report_exc_info` (Rollbar + traceback) and non-fatal problems
   with `library/log_utils.py:report_message`; both find the current request via django-threadlocals.
+  `report_message` and `report_event` (level info) drop Rollbar messages below `ROLLBAR['min_level']` (default warning);
+  pyrollbar has no threshold setting of its own.
 - Make a model hover-previewable and searchable by implementing `library/preview_request.py:PreviewModelMixin`
   (`preview_category`, `preview_icon`, `preview`) and returning `library/preview_request.py:PreviewData` via
   `preview_with`; contribute extra key/values from another app with `@receiver(preview_extra_signal, sender=Model)`
