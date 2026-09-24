@@ -122,7 +122,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         allele_no_clingen_list = []
         new_alleles_with_clingen_list = []
         modified_variant_alleles_list = []
-        modified_alleles_list = []
+        existing_allele_clingen_ids: list[tuple[Allele, int]] = []
         clingen_by_variant_id = {}
         clingen_errors_by_variant_id = {}
 
@@ -142,8 +142,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                 cga = ClinGenAllele(id=clingen_allele_id, api_response=api_response)
                 clingen_allele_list.append(cga)
                 if existing_va:
-                    existing_va.allele.clingen_allele_id = clingen_allele_id
-                    modified_alleles_list.append(existing_va.allele)
+                    existing_allele_clingen_ids.append((existing_va.allele, clingen_allele_id))
                 else:
                     clingen_by_variant_id[variant_id] = clingen_allele_id
                     allele = Allele(clingen_allele_id=clingen_allele_id)
@@ -156,9 +155,8 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
             logging.debug("Updating %d VariantAlleles w/Error", len(modified_variant_alleles_list))
             VariantAllele.objects.bulk_update(modified_variant_alleles_list, ["clingen_error"], batch_size=2000)
 
-        if modified_alleles_list:
-            logging.debug("Updating %d Alleles w/ClinGenAlleleID", len(modified_alleles_list))
-            Allele.objects.bulk_update(modified_alleles_list, ["clingen_allele_id"], batch_size=2000)
+        if existing_allele_clingen_ids:
+            _link_existing_alleles_to_clingen(existing_allele_clingen_ids)
 
         allele_no_clingen_list = Allele.objects.bulk_create(allele_no_clingen_list)
         new_empty_allele_ids.extend(a.pk for a in allele_no_clingen_list)
@@ -199,6 +197,32 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         # Another writer linking the variant first means our VariantAllele was dropped as a conflict,
         # leaving the empty Allele we made for it unused
         Allele.objects.filter(pk__in=new_empty_allele_ids, variantallele__isnull=True).delete()
+
+
+def _link_existing_alleles_to_clingen(existing_allele_clingen_ids: list[tuple[Allele, int]]):
+    """ Alleles created without a ClinGen ID. Allele.clingen_allele is unique, so where the ID ClinGen returns
+        already belongs to another Allele (or an earlier one in this batch), merge into that Allele instead """
+    clingen_ids = {clingen_allele_id for _, clingen_allele_id in existing_allele_clingen_ids}
+    allele_qs = Allele.objects.filter(clingen_allele_id__in=clingen_ids)
+    allele_by_clingen_id = {a.clingen_allele_id: a for a in allele_qs}
+
+    seen_allele_ids = set()
+    modified_alleles_list = []
+    for allele, clingen_allele_id in existing_allele_clingen_ids:
+        if allele.pk in seen_allele_ids:
+            continue  # One Allele linked to 2 variants in this build - the first sets it
+        seen_allele_ids.add(allele.pk)
+
+        if clingen_allele_owner := allele_by_clingen_id.get(clingen_allele_id):
+            clingen_allele_owner.merge(AlleleConversionTool.CLINGEN_ALLELE_REGISTRY, allele)
+        else:
+            allele.clingen_allele_id = clingen_allele_id
+            allele_by_clingen_id[clingen_allele_id] = allele
+            modified_alleles_list.append(allele)
+
+    if modified_alleles_list:
+        logging.debug("Updating %d Alleles w/ClinGenAlleleID", len(modified_alleles_list))
+        Allele.objects.bulk_update(modified_alleles_list, ["clingen_allele_id"], batch_size=2000)
 
 
 def _create_variant_allele_with_new_allele(variant: Variant, genome_build: GenomeBuild, **kwargs) -> VariantAllele:
