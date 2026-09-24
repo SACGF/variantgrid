@@ -29,11 +29,12 @@
                 {% if details.reference_fasta %}
                     {{ details.reference_fasta }}
                 {% else %}
-                    <div class="not-installed">Not found</div>
+                    <div class="no-value">Not found</div>
+                    <div class="mono">{{ details.reference_fasta_error }}</div>
                 {% endif %}
                 {% install-instructions "Reference Fasta" installed=details.reference_fasta %}
-                    <div class="mono">{{ details.reference_fasta_error }}</div>
-                    You need to download the annotations, or change <code>settings.GENOME_BUILD_REFERENCE_FASTA</code>
+                    The path comes from <code>settings.GENOME_BUILD_REFERENCE_FASTA</code> - download the fasta with the
+                    annotation data, or point the setting at an existing copy.
                 {% endinstall-instructions %}
             {% endlabelled %}
             {% labelled label="Contigs" %}
@@ -80,7 +81,7 @@
                     </div>
                 {% endfor %}
 
-                {% install-instructions build_name installed=details.genes_and_transcripts.transcripts %}
+                {% install-instructions "Genes/Transcripts" installed=details.genes_and_transcripts.transcripts %}
                     <p>
                     You can install both Ensembl and RefSeq transcripts (for HGVS) but you NEED the ones used by your variant annotation pipeline which is: '<b>{{ details.annotation_consortium }}</b>'
                     </p>
@@ -128,7 +129,7 @@ cd ${gene_annotation_dir}
                     <div class="no-value">Not Installed</div>
                 {% endif %}
                 {% install-instructions "Gene Annotation Release" installed=details.gene_annotation_release %}
-                    You need a Gene Annotation Release that matches the exact symbol/gene/transcript versions used by VEP.
+                    The Gene Annotation Release must match the exact symbol/gene/transcript versions used by VEP.
                     <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-Version-Data#gene-annotation-release---install">See Wiki for details</a>
 
                     {% with vav=details.latest.variant_annotation_version %}
@@ -183,7 +184,7 @@ cd ${gene_annotation_dir}
                     {% if details.somalier %}
                         {{ details.somalier }}
                     {% else %}
-                       Not installed
+                        <div class="no-value">Not installed</div>
                     {% endif %}
                     {% install-instructions "Somalier" installed=details.somalier %}
                         Upload the <a href="https://github.com/brentp/somalier/releases">Somalier sites VCF</a> for {{ build_name }}
