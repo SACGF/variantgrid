@@ -69,7 +69,7 @@ Static files below). So when an agent is asked to pull or upgrade a box, it runs
 source .venv/bin/activate && scripts/upgrade.sh --quick < /dev/null   # ~75s on vg-test2; exit 0 = all steps passed
 ```
 
-Then it restarts the services and checks the box. On vg-test2 that is one `sudo -n systemctl restart <unit>` per unit, for
+Then it restarts the services and checks the box, even when the pull brought no code (a plan or doc only): `collectstatic_clean_compressor --clear` deletes the collected files and writes them again, and a hashed name can change, while running gunicorn keeps the manifest it loaded at start. Skipping the restart leaves pages linking a file that is gone, and Rollbar fills with `UncompressableFileError: 'css/global.<hash>.css' could not be found in the COMPRESS_ROOT` until it happens. On vg-test2 that is one `sudo -n systemctl restart <unit>` per unit, for
 gunicorn and each celeryd_* unit: sudoers allows exactly those commands, not `restart_services.sh` and not several units in
 one call. After that it runs `vg status` (all services active, 0 manual tasks outstanding) and
 `vg page /variantopedia/dashboard`. If `--quick` stops at the menu (an EOFError under `< /dev/null`), manual steps are outstanding: `--auto-manage`
@@ -87,6 +87,13 @@ migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are th
 
 Caches: `CACHE_VERSION` in `default_settings.py` is the Redis key version - bump it after a change that makes cached values
 wrong. Process-level caches (`library/cache.py:timed_cache`, the caching model managers) only clear on restart.
+
+Postgres statistics: after a crash or an immediate shutdown (not a clean stop or reboot) Postgres 16 discards the
+cumulative stats counters, and autovacuum decides when to re-analyze from those counters. Rows written before the reset
+are then invisible to it, so a table bulk-loaded shortly before keeps its old column statistics until another 10% of it
+changes, and the planner misjudges it. The sign is every `stats_reset` in `pg_stat_bgwriter` / `pg_stat_io` at one moment
+with `pg_stat_database.stats_reset` empty. Run a database-wide `ANALYZE` after such a restart (vg-test2 had this from
+2026-08-19 to 2026-09-24; a plain `ANALYZE;` took 25 minutes there, most of it on the partitioned annotation tables).
 
 Static files: `manage.py collectstatic` writes `variantgrid/sitestatic/`. Storage is `ManifestStaticFilesStorage`, so
 `{% static %}` links the content-hashed names collectstatic records in its manifest, and a changed file gets a new URL - Cloudflare caches
