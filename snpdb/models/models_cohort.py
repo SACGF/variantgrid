@@ -32,6 +32,7 @@ from guardian.shortcuts import get_objects_for_user
 from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.database_utils import run_sql
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -185,6 +186,10 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
 
     def delete_old_counts(self):
         qs = CohortGenotypeCollection.objects.filter(cohort=self, cohort_version__lt=self.version)
+        building_qs = qs.filter(marked_for_deletion=False, celery_task__isnull=False,
+                                collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        for cgc in building_qs:
+            cgc.cancel_build()
         num_to_delete = qs.update(marked_for_deletion=True)
         if num_to_delete:
             task = delete_old_cohort_genotypes_task.si()
@@ -568,6 +573,18 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         if self.common_filter:
             parts.append(str(self.common_filter))
         return " ".join(parts)
+
+    def cancel_build(self):
+        """ Stop cohort_genotype_task building this collection: revoke it if still queued, and cancel a running
+            INSERT into its partitions so delete_old_cohort_genotypes_task's DROP doesn't wait for it """
+        celery.current_app.control.revoke(self.celery_task)
+
+        partition_tables = [self.get_partition_table()]
+        if self.common_collection:
+            partition_tables.append(self.common_collection.get_partition_table())
+        insert_regex = rf"^\s*insert into ({'|'.join(partition_tables)})\s"
+        run_sql("SELECT pg_cancel_backend(pid) FROM pg_stat_activity "
+                "WHERE pid <> pg_backend_pid() AND query ~* %s", [insert_regex])
 
     def get_common_filter_info(self) -> str:
         default_or_rare = self.cohortgenotype_set.count()
