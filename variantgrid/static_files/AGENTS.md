@@ -10,8 +10,8 @@ directory to check a change is fine: `sassc -t expanded` output matches the comm
 (`diff -B -w`), but it cannot read `@use`, so a `global.scss` change needs a dart-sass binary.
 
 `global.scss` is only a list of `@use` lines; the rules are in `css/global/_<concern>.scss`, and the `@use` order is the
-cascade. Moving a rule between partials moves it in the cascade, so compile before and after and diff. The last two
-partials (`_styled_tables`, `_fieldsets`) were the separate global_deprecated stylesheet, loaded after `global.css`.
+cascade. Moving a rule between partials moves it in the cascade, so compile before and after and diff. The last partial,
+`_fieldsets`, was the separate global_deprecated stylesheet, loaded after `global.css`. Tables use Bootstrap `.table`.
 
 `scripts/vg css unused` lists the class / id selectors in the `.scss` that nothing in the templates, JS or Python
 names, so run it before deleting or moving a rule (`--dynamic` adds the names built up at runtime, `cs-{{ status }}`
