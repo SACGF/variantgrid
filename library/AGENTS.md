@@ -63,7 +63,9 @@ Gotchas:
 - `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsMixin.filter_for_user` resolves permitted
   pks off the bare model and applies them as `pk__in`, so pass the caller's annotated queryset as `queryset=` rather
   than the class; Guardian embeds whatever it is given in both its lookups. Override `filter_writable_for_user`
-  alongside `can_write` or the two drift.
+  alongside `can_write` or the two drift, and pass `pks=` through to `super()`: a grid page hands it its pks so
+  Guardian's rows are read by `object_pk`, where the unscoped form reads every row the user's groups hold for the
+  model (~400ms a page at 200k VariantTags, #1432).
 - `library/django_utils/django_partition.py:temporary_db_table` must bracket any query against a partition table;
   swapping `_meta.db_table` by hand leaves `Field.cached_col` pointing at the partition for the life of the process.
   Writes count: a `DELETE`/`UPDATE` of rows known to live in one partition still locks every partition in the tree

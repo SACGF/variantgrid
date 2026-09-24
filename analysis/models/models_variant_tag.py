@@ -114,11 +114,11 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return super().can_write(user_or_group)
 
     @classmethod
-    def filter_writable_for_user(cls, user):
+    def filter_writable_for_user(cls, user, pks=None):
         """ Batch can_write - delegated to the analysis where the tag was made in one """
-        own = super().filter_writable_for_user(user)
-        return cls.objects.filter(Q(analysis__in=Analysis.filter_writable_for_user(user)) |
-                                  Q(analysis__isnull=True, pk__in=own))
+        own = super().filter_writable_for_user(user, pks=pks)
+        return cls._objects_for_pks(pks).filter(Q(analysis__in=Analysis.filter_writable_for_user(user)) |
+                                                Q(analysis__isnull=True, pk__in=own))
 
     @property
     def canonical_c_hgvs(self):

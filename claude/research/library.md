@@ -45,6 +45,9 @@ is no authenticated user) and applies them as `pk__in`, skipping even that when 
 (a superuser, or a global model permission). `filter_writable_for_user` (#1794) is the same idea for the delete column
 of a grid page: one query instead of two guardian lookups per row, superusers short-circuited, and
 `accept_global_perms=False` because that is how `can_write` asks. A class that overrides one must override the other.
+Given the page's `pks`, it filters `UserObjectPermission` / `GroupObjectPermission` by `object_pk__in` the pks as text
+(`_object_permission_for_pks_qs`) rather than calling `get_objects_for_user`, whose `object_pk = id::varchar` join
+reads every permission row the group holds - flat ~400ms a page at 200k VariantTags on vg-test2, 10-19ms scoped (#1432).
 `allow_group_permission_delete` is the third knob: the generic group-permissions delete view will hard-delete anything
 whose class returns True, so the base returns False and only the auto-initial-save mixin (user-created objects) opts in,
 after audit rows like `ClassificationModification` were found deletable through it.

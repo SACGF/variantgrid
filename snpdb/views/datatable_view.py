@@ -764,7 +764,7 @@ class DatatableConfig(Generic[DC]):
             a pair of Guardian lookups per row is the single most expensive thing a grid can do """
         if self._page_writable_pks is None:
             pks = {pk for row in self._page_rows if (pk := row.get(pk_column)) is not None}
-            writable_qs = self._model.filter_writable_for_user(self.user).filter(pk__in=pks)
+            writable_qs = self._model.filter_writable_for_user(self.user, pks=pks)
             self._page_writable_pks = set(writable_qs.values_list("pk", flat=True))
         return self._page_writable_pks
 

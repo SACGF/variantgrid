@@ -142,7 +142,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         return False
 
     @classmethod
-    def filter_writable_for_user(cls, user):
+    def filter_writable_for_user(cls, user, pks=None):
         """ Batch can_write - a locked analysis, and a snapshot (which is locked by definition),
             are read only @see is_locked """
         last_lock_locked = Subquery(AnalysisLock.objects.filter(analysis=OuterRef("pk"))
@@ -150,7 +150,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         unlocked = cls.objects.annotate(last_lock_locked=last_lock_locked).filter(
             Q(last_lock_locked__isnull=True) | Q(last_lock_locked=False),
             analysistemplateversion__isnull=True)
-        return super().filter_writable_for_user(user).filter(pk__in=unlocked.values("pk"))
+        return super().filter_writable_for_user(user, pks=pks).filter(pk__in=unlocked.values("pk"))
 
     def get_absolute_url(self):
         return reverse('analysis', kwargs={"analysis_id": self.pk})
@@ -534,9 +534,9 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         return qs.filter(deleted=False)
 
     @classmethod
-    def filter_writable_for_user(cls, user):
+    def filter_writable_for_user(cls, user, pks=None):
         """ Hides deleted objects """
-        return super().filter_writable_for_user(user).filter(deleted=False)
+        return super().filter_writable_for_user(user, pks=pks).filter(deleted=False)
 
     def default_name_template(self):
         """ The initial analysis_name_template in form for save version """

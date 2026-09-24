@@ -6,13 +6,17 @@ that delegate to another object's permissions. GuardianPermissionsAutoInitialSav
 owner's initial groups on first save. filter_for_user resolves pks on the bare model, so pass an
 annotated queryset as `queryset=` rather than the class.
 """
-from typing import Any, Union
+from collections.abc import Iterable
+from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet, TextField
+from django.db.models.functions import Cast
 from django.shortcuts import get_object_or_404
+from guardian.models import GroupObjectPermission, UserObjectPermission
 from guardian.shortcuts import get_group_perms, get_objects_for_group, get_objects_for_user
 
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
@@ -76,20 +80,48 @@ class GuardianPermissionsMixin:
         return user_or_group.has_perm(self.get_write_perm(), self)
 
     @classmethod
-    def filter_writable_for_user(cls, user) -> QuerySet:
+    def filter_writable_for_user(cls, user, pks: Optional[Iterable] = None) -> QuerySet:
         """ Everything the user can write - the batch form of can_write(), so a page of grid rows
             resolves in one query rather than a pair of Guardian lookups each.
+            Pass the page's pks: Guardian's rows are then looked up by object_pk on its unique index,
+            where otherwise the query reads every permission row the user's groups hold for the model
+            (~400ms a page at 200k VariantTags, #1432).
             A class that overrides can_write() overrides this too, or the two drift apart. """
         if not (user and user.is_authenticated):
             return cls.objects.none()
         perm_class = cls.get_permission_class()
         if perm_class != cls:
-            return cls._filter_from_permission_object_qs(perm_class.filter_writable_for_user(user))
+            writable_qs = cls._filter_from_permission_object_qs(perm_class.filter_writable_for_user(user))
+            return writable_qs if pks is None else writable_qs.filter(pk__in=pks)
         if user.is_superuser:
-            return cls.objects.all()
-        # Object level only, the way can_write() asks Guardian
-        return get_objects_for_user(user, cls.get_write_perm(), klass=cls.objects.all(),
-                                    accept_global_perms=False)
+            return cls._objects_for_pks(pks)
+        if pks is None:
+            # Object level only, the way can_write() asks Guardian
+            return get_objects_for_user(user, cls.get_write_perm(), klass=cls.objects.all(),
+                                        accept_global_perms=False)
+        return cls._object_permission_for_pks_qs(user, cls.get_write_perm(), pks)
+
+    @classmethod
+    def _objects_for_pks(cls, pks: Optional[Iterable]) -> QuerySet:
+        """ The rows filter_writable_for_user answers for - the whole table without pks """
+        return cls.objects.all() if pks is None else cls.objects.filter(pk__in=pks)
+
+    @classmethod
+    def _object_permission_for_pks_qs(cls, user, codename: str, pks: Iterable) -> QuerySet:
+        """ Which of pks the user holds an object permission on, directly or through a group.
+            Guardian stores object_pk as text: filtering its rows by the pks as text uses the
+            (user|group, permission, object_pk) unique index, which get_objects_for_user's
+            object_pk = id::varchar join can't """
+        pks = list(pks)
+        permission_rows = {
+            "content_type": ContentType.objects.get_for_model(cls),
+            "permission__codename": codename,
+            "object_pk__in": [str(pk) for pk in pks],
+        }
+        user_object_pks = UserObjectPermission.objects.filter(user=user, **permission_rows).values("object_pk")
+        group_object_pks = GroupObjectPermission.objects.filter(group__user=user, **permission_rows).values("object_pk")
+        return cls.objects.filter(pk__in=pks).alias(pk_text=Cast("pk", TextField())).filter(
+            Q(pk_text__in=user_object_pks) | Q(pk_text__in=group_object_pks))
 
     def check_can_write(self, user_or_group: Union[User, Group]):
         if not self.can_write(user_or_group):

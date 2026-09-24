@@ -205,9 +205,9 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
     @classmethod
-    def filter_writable_for_user(cls, user):
+    def filter_writable_for_user(cls, user, pks=None):
         """ Batch can_write - a record an external manager owns is read only here """
-        qs = super().filter_writable_for_user(user)
+        qs = super().filter_writable_for_user(user, pks=pks)
         return qs.exclude(external_pk__external_manager__can_modify=False)
 
     @classmethod

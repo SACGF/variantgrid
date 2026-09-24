@@ -1,7 +1,7 @@
 # #1432 Grid write-permission batching: benchmark at scale
 
 Written by Claude Opus 5.5 (claude-opus-5-5), 2026-09-24
-Status: in progress - benchmarked on vg-test2 2026-09-24 (Results below); implementation next
+Status: in progress - `pks` implemented (Outcome); awaiting the vg-test2 re-run under **Verification**
 
 ## Goal
 
@@ -241,7 +241,23 @@ Recommended change for #1432, in place of the `queryset` argument:
 - The mixin and every override (VariantTag, Sample, Cohort, Patient, Analysis) take `pks`; overrides that
   delegate to a permission object (VariantTag -> Analysis) keep delegating unscoped, since Analysis is small.
 - `snpdb/views/datatable_view.py:DatatableConfig._writable_pks_for_page` passes its `pks`.
-- Verify against this plan's script with a `literal` run added: VariantTag page100 and detail should both land
-  near 10-20 ms on vg-test2, with `same answer: True`.
+- Implemented as described: `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsMixin._object_permission_for_pks_qs`
+  holds the scoped Guardian lookup, and Analysis and AnalysisTemplate take `pks` too.
 - An SA Path run is still worthwhile for scale, but no longer decides the design: the literal form's cost follows
   the page, not the table.
+
+## Verification
+
+On vg-test2, with the same synthetic data still in place:
+
+1. Upgrade to master (`scripts/upgrade.sh --quick`, then the usual restart and `vg status`) and confirm the deployed
+   checkout has `filter_writable_for_user(cls, user, pks=None)` in `library/django_utils/guardian_permissions_mixin.py`.
+2. Re-run the Method script with one change: in `runs`, add
+   `"pks": lambda: set(model.filter_writable_for_user(user, pks=pks).values_list("pk", flat=True))`, and point the
+   closing `EXPLAIN` at `VariantTag.filter_writable_for_user(user, pks=pks)`.
+3. Report as before, plus the `pks` line for every model and shape.
+
+Pass: `pks` lands at 10-20 ms for VariantTag page100 and detail, at or below `batched` for every other model, and
+every `same answer:` is `True`; the EXPLAIN reads `guardian_groupobjectpermission` through an index on
+`object_pk` rather than a scan of the group's rows. On a pass the plan's Status becomes landed and the plan is
+deleted.

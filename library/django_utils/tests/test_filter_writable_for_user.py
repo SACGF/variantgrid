@@ -1,8 +1,9 @@
 """
 filter_writable_for_user() is the batch form of can_write() - the grids' delete columns resolve a
-whole page through it. These check the two agree wherever a model overrides one of them.
+whole page through it, passing the page's pks. These check the two agree, with and without pks,
+wherever a model overrides one of them.
 """
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls.base import reverse
 from django.utils import timezone
@@ -38,11 +39,14 @@ class FilterWritableForUserTest(TestCase):
         writable_pks = set(klass.filter_writable_for_user(user).values_list("pk", flat=True))
         self.assertEqual(obj.pk in writable_pks, expected,
                          f"{klass.__name__}.filter_writable_for_user for {user}")
+        page_writable_pks = set(klass.filter_writable_for_user(user, pks=[obj.pk]).values_list("pk", flat=True))
+        self.assertEqual(page_writable_pks, {obj.pk} if expected else set(),
+                         f"{klass.__name__}.filter_writable_for_user(pks=) for {user}")
 
-    def _tag_analysis(self, tag_id: str) -> VariantTag:
+    def _tag_analysis(self, tag_id: str, analysis=None) -> VariantTag:
         tag = Tag.objects.get_or_create(pk=tag_id)[0]
         return VariantTag.objects.create(variant=Variant.objects.first(), tag=tag,
-                                         analysis=self.analysis, user=self.owner,
+                                         analysis=analysis, user=self.owner,
                                          genome_build=self.grch37)
 
     def test_vcf(self):
@@ -99,16 +103,38 @@ class FilterWritableForUserTest(TestCase):
 
     def test_variant_tag_through_analysis(self):
         """ VariantTag.can_write delegates to the analysis when the tag was made in one """
-        variant_tag = self._tag_analysis("writable-test-tag")
+        variant_tag = self._tag_analysis("writable-test-tag", analysis=self.analysis)
         self.assert_agrees_with_can_write(VariantTag, variant_tag, self.owner, True)
         self.assert_agrees_with_can_write(VariantTag, variant_tag, self.other, False)
 
     def test_variant_tag_locked_analysis(self):
         """ ...including the analysis' lock """
-        variant_tag = self._tag_analysis("writable-locked-tag")
+        variant_tag = self._tag_analysis("writable-locked-tag", analysis=self.analysis)
         AnalysisLock.objects.create(analysis=self.analysis, locked=True, user=self.owner,
                                     date=timezone.now())
         self.assert_agrees_with_can_write(VariantTag, variant_tag, self.owner, False)
+
+    def test_variant_tag_without_analysis(self):
+        """ A tag made outside an analysis takes its own Guardian permission """
+        variant_tag = self._tag_analysis("writable-own-tag")
+        self.assert_agrees_with_can_write(VariantTag, variant_tag, self.owner, True)
+        self.assert_agrees_with_can_write(VariantTag, variant_tag, self.other, False)
+
+    def test_group_permission(self):
+        """ A write permission held only through a group """
+        group = Group.objects.create(name="writable test group")
+        self.other.groups.add(group)
+        assign_perm(VCF.get_write_perm(), group, self.vcf)
+        self.assert_agrees_with_can_write(VCF, self.vcf, self.other, True)
+
+    def test_pks_limit_the_answer(self):
+        """ Only the page's rows come back, for Guardian's lookup and a superuser's alike """
+        page_analysis = Analysis.objects.create(name="page analysis", user=self.owner, genome_build=self.grch37)
+        assign_permission_to_user_and_groups(self.owner, page_analysis)
+        superuser = User.objects.create_superuser("writable_superuser")
+        for user in [self.owner, superuser]:
+            page_writable = Analysis.filter_writable_for_user(user, pks=[page_analysis.pk])
+            self.assertEqual(set(page_writable.values_list("pk", flat=True)), {page_analysis.pk}, user)
 
 
 class DeleteColumnPermissionTest(TestCase):
