@@ -465,6 +465,31 @@ class TestPatientFormAuditTrail(TestCase):
             "No PatientModification created for affected False→True change")
 
 
+class TestPatientFormDeceased(TestCase):
+    """ Patient won't save both _deceased and date_of_death """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("form_deceased_user", password="x")
+
+    def _form(self, **data):
+        form_data = {"last_name": "DECEASED", "sex": Sex.UNKNOWN, "population": []}
+        form_data.update(data)
+        return PatientForm(data=form_data, user=self.user)
+
+    def test_deceased_with_date_of_death_keeps_the_date(self):
+        form = self._form(deceased="true", date_of_death="2020-01-01")
+        self.assertTrue(form.is_valid(), form.errors)
+        patient = form.save()
+        self.assertIsNone(patient._deceased)
+        self.assertEqual(date(2020, 1, 1), patient.date_of_death)
+
+    def test_not_deceased_with_date_of_death_is_an_error(self):
+        form = self._form(deceased="false", date_of_death="2020-01-01")
+        self.assertFalse(form.is_valid())
+        self.assertIn("deceased", form.errors)
+
+
 # ---------------------------------------------------------------------------
 # Patient.code — issue #230 de-identified display label fallthrough
 # ---------------------------------------------------------------------------
