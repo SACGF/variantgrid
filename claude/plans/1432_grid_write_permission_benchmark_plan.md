@@ -1,7 +1,7 @@
 # #1432 Grid write-permission batching: benchmark at scale
 
 Written by Claude Opus 5.5 (claude-opus-5-5), 2026-09-24
-Status: draft
+Status: in progress - benchmarked on vg-test2 2026-09-24 (Results below); implementation next
 
 ## Goal
 
@@ -174,3 +174,74 @@ Paste back:
 - Another model showing the same growth as VariantTag goes into the same change.
 - If vg-test2's VariantTag count is well under SA Path's ~412k, the VariantTag verdict needs the same script run on
   an SA Path host, which the user arranges.
+
+## Results (vg-test2, aee138551, 2026-09-24)
+
+Data: VariantTag 200,019 rows (200,015 synthetic, spread 2021-2026), one group holding a `view` and `change` row
+on each (400,000 group permission rows); heavy user 2, non-superuser. Sample has no group permissions and was
+skipped. VCF, Cohort, Patient and Analysis tables are tiny (17-51 rows). Every `same answer:` line was `True`.
+
+`analysis_varianttag` and `guardian_groupobjectpermission` had **never been analyzed** (pg_stat said 15 and 6,116
+rows). The first run was on those stats; the tables were then `ANALYZE`d and the script re-run. Timings in ms,
+best of 5; query counts past the first VariantTag shape are unreliable (Django's 9,000-query log cap).
+
+| Model / shape | rows | per_row | batched | scoped (stale stats) | scoped (analyzed) | literal |
+|---|---|---|---|---|---|---|
+| VariantTag page100 | 100 | 335 | 398 | 1,463 | 11.5 | 10.4 |
+| VariantTag detail | 555 | 1,857 | 408 | 7,919 | 7,851 | 18.7 |
+| VCF page100 | 14 | 51.8 | 3.8 | - | - | - |
+| Cohort page100 | 16 | 85.2 | 8.0 | - | - | - |
+| Patient page100 | 17 | 55.9 | 4.1 | - | - | - |
+| Analysis page100 | 18 | 74.2 | 5.0 | - | - | - |
+
+(Analysis's heavy user had writable=0, so it only exercised the "no" path.)
+
+Findings:
+
+- `batched` is flat at ~400 ms for VariantTag whatever the page size - the cost follows the table, as feared.
+  `EXPLAIN (ANALYZE, BUFFERS)`: 544-566 ms, almost all in the `analysis__isnull=True, pk__in=own` branch, which
+  seq-scans all of `analysis_varianttag`, hash-aggregates 200k `id::varchar` values and hashes all 200k of the
+  group's `change_varianttag` rows. ANALYZE did not change it. At SA Path's ~412k tags expect roughly double.
+- `scoped` (Guardian `get_objects_for_user(klass=page_qs)`) is **not** a fix. Guardian joins
+  `object_pk::text = id::varchar::text`, which the planner can neither estimate (rows=1) nor drive the
+  `(group_id, permission_id, object_pk)` index from, so it still reads every permission row the group holds. On
+  page100 it happened to get a good plan after ANALYZE; on the detail shape (555 pks) it chose a nested-loop semi
+  join over 200k x 555 (110M join-filter rows, 16 s under EXPLAIN).
+- `literal` - Guardian's rows filtered by the page's pks as a **text list**, which the unique index answers
+  directly - is fast and stable for both shapes and returns the same set:
+
+```python
+def literal_variant_tag(user, pks):
+    perm = Permission.objects.get(content_type=ContentType.objects.get_for_model(VariantTag),
+                                  codename="change_varianttag")
+    str_pks = [str(pk) for pk in pks]
+    own = set(UserObjectPermission.objects.filter(user=user, permission=perm, object_pk__in=str_pks)
+              .values_list("object_pk", flat=True))
+    own |= set(GroupObjectPermission.objects.filter(group__user=user, permission=perm, object_pk__in=str_pks)
+               .values_list("object_pk", flat=True))
+    qs = VariantTag.objects.filter(pk__in=pks).filter(Q(analysis__in=Analysis.filter_writable_for_user(user)) |
+                                                      Q(analysis__isnull=True, pk__in=[int(p) for p in own]))
+    return set(qs.values_list("pk", flat=True))
+```
+
+  (4 queries as written; the permission lookup and the two Guardian reads can fold into subqueries of one.)
+
+## Outcome
+
+Neither Decision branch applies as written: `batched` loses to `per_row` on VariantTag page100 (398 vs 335 ms), and
+`scoped` is not reliably fast. The detail grid change is still a clear win (408 vs 1,857 ms), and the small models
+are 11-15x faster batched.
+
+Recommended change for #1432, in place of the `queryset` argument:
+
+- `filter_writable_for_user(user, pks=None)`: with `pks`, the Guardian part filters
+  `UserObjectPermission` / `GroupObjectPermission` by `object_pk__in=[str(pk) for pk in pks]` (plus
+  `content_type`/`permission`, and user or user's groups) instead of calling `get_objects_for_user` over the whole
+  table, and the outer queryset is limited to `pk__in=pks`. `pks=None` keeps today's behaviour.
+- The mixin and every override (VariantTag, Sample, Cohort, Patient, Analysis) take `pks`; overrides that
+  delegate to a permission object (VariantTag -> Analysis) keep delegating unscoped, since Analysis is small.
+- `snpdb/views/datatable_view.py:DatatableConfig._writable_pks_for_page` passes its `pks`.
+- Verify against this plan's script with a `literal` run added: VariantTag page100 and detail should both land
+  near 10-20 ms on vg-test2, with `same answer: True`.
+- An SA Path run is still worthwhile for scale, but no longer decides the design: the literal form's cost follows
+  the page, not the table.
