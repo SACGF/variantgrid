@@ -14,7 +14,7 @@ AR_HGNC_ID = 644
 
 class TestSpliceEventIgvLink(TestCase):
     """ The page hands the junction's breakpoints to the client, which decides whether IGV links
-        show at all - @see renderIgvLocusLinks in grid.js """
+        show at all - @see renderIgvLocusLinks in igv.js """
 
     @classmethod
     def setUpTestData(cls):

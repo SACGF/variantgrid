@@ -96,6 +96,7 @@ def variants(request, genome_build_name=None):
         "default_contig_id": default_contig_ids[0] if default_contig_ids else None,
         "gene_symbol_form": gene_symbol_form,
         "gene_symbol_aliases": gene_symbol_aliases,
+        "igv_data": get_igv_data(request.user, genome_build=genome_build),
     }
     return render(request, "variantopedia/variants.html", context)
 

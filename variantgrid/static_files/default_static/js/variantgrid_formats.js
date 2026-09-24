@@ -4,7 +4,7 @@
      ctx.extra    grid wide metadata from the definition JSON (DatatableConfig.get_extra)
      ctx.kwargs   this column's own settings, where it was declared with client_renderer_kwargs
 
-   Shared page helpers (createGridLink, IGV, tags, load_variant_details) live in grid.js.
+   Shared page helpers (createGridLink, tags, load_variant_details) live in grid.js, IGV links in igv.js.
    A column names its renderer in RichColumn(client_renderer=...) - @see snpdb/grids.py */
 
 const VariantGridFormat = (function() {
@@ -835,7 +835,7 @@ VariantGridFormat.spliceCalls = (call) => {
     const text = String(call);
     const locus = _spliceJunctionLocus(text);
     // '' unless the analysis shows IGV links
-    const igvLink = locus ? create_igv_link(locus, 'getBams') : '';
+    const igvLink = locus ? createIgvLink(locus, 'getBams') : '';
     return igvLink + escapeHtml(text);
 };
 

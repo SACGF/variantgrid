@@ -23,7 +23,7 @@
 
         window.ANALYSIS_SETTINGS = {
             show_igv_links : true,
-            igv_data : [],
+            igv_data : {{ igv_data | jsonify }},
             open_variant_details_in_new_window: true,
         };
 

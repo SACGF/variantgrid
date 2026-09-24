@@ -110,15 +110,6 @@ function load_variant_details(variant_id) {
 
 const GENE_LEVEL_CONTIG_NAME = "GENE_LEVEL";  // @see snpdb/gene_level_variants.py
 
-// Fills the server rendered IGV placeholders in a fragment - '<span class="igv-locus"
-// data-locus="chrX:66905968-66914514"></span>'. The link is built here rather than in the template
-// so it follows ANALYSIS_SETTINGS.show_igv_links wherever the fragment was dropped in
-function renderIgvLocusLinks(container) {
-    $(".igv-locus", container || document).each(function() {
-        $(this).html(create_igv_link($(this).data("locus"), 'getBams'));
-    });
-}
-
 // Expand renderer for the variant grids (@see AbstractVariantGrid.get_expand_client_renderer). The
 // identifiers come from the server for the grid's annotation version; the actions are built here so
 // IGV follows ANALYSIS_SETTINGS.show_igv_links like the rest of the page
@@ -167,101 +158,6 @@ function getAnalysisWindow() {
 }
 
 
-function get_igv_data() {
-    const aWin = getAnalysisWindow();
-    return aWin.ANALYSIS_SETTINGS["igv_data"];
-}
-
-function replaceFilePrefix(replaceDict, bamFiles) {
-    let replacedBamFiles = [];
-    if (replaceDict) {
-        for (let i=0 ; i<bamFiles.length ; ++i) {
-            let bamFile = bamFiles[i];
-            if (bamFile) {
-                for (const fromValue in replaceDict) {
-                    const toValue = replaceDict[fromValue];
-                    if (bamFile.startsWith(fromValue)) {
-                        bamFile = bamFile.replace(fromValue, toValue);
-                        break;
-                    }
-                }
-                replacedBamFiles.push(bamFile);
-            }
-        }
-    } else {
-        replacedBamFiles = bamFiles;
-    }
-    return replacedBamFiles;
-}
-
-
-function create_igv_url(locus, inputBams) {
-    const IGV_DATA = get_igv_data();
-    let url = IGV_DATA['base_url'];
-    const params = ["genome=" + IGV_DATA['genome']];
-    if (locus) {
-    	params.push("locus=" + locus);
-    }
-    let bamFiles = [];
-    const manual_zygosity_cohort = IGV_DATA["manual_zygosity_cohort"];
-    if (manual_zygosity_cohort && manual_zygosity_cohort.length) {
-    	for (let i=0 ; i<manual_zygosity_cohort.length ; ++i) {
-    		bamFiles.push(manual_zygosity_cohort[i]);
-    	}
-    } else {
-        bamFiles = inputBams;
-    }
-
-    let op = 'goto';
-    if (bamFiles.length > 0) {
-        const replaceDict = IGV_DATA["replace_dict"];
-        const replacedBamFiles = replaceFilePrefix(replaceDict, bamFiles);
-        const joinedFiles = replacedBamFiles.join();
-        if (joinedFiles) {
-    		params.push("file=" + joinedFiles);
-    		op = "load";
-    	}
-	}
-	url += '/' + op + '?';
-	url += params.join("&");
-	return url;
-}
-
-
-seen_igv_error = false;
-
-function open_igv_link(locus, getBamsFunc) {
-    const url = create_igv_url(locus, getBamsFunc);
-
-    $.ajax({
-        url: url,
-        error: function(jqXHR, textStatus, errorThrown) {
-            if (!seen_igv_error) {
-                console.log(jqXHR);
-                console.log(textStatus);
-                console.log(errorThrown);
-
-                const IGV_DATA = get_igv_data();
-                const base_url = IGV_DATA['base_url'];
-                const igvIntegrationUrl = Urls.igv_integration();
-
-                let message = "<p>Could not connect to IGV - is it running and accepting connections on " + base_url + "?";
-                message += "<p>See also <a target='_blank' href='" + igvIntegrationUrl + "'>IGV Integration</a>";
-                
-                createModal("igv-error-dialog", "IGV", message);
-                seen_igv_error = true;
-            }
-        },
-        suppressErrors: true,
-    });
-}
-
-
-function noBamsHere() {
-    return [];    
-}
-
-
 function getViewVariantUrl(variantLink) {
     const variantId = $(variantLink).parent(".variant_id-container").attr("variant_id");
     return Urls.view_variant(variantId);
@@ -297,25 +193,6 @@ function createGridLink(title, url, contents, extraLinkClasses, extraIconClasses
     });
     link.append(gridBox);
     return link.prop("outerHTML");
-}
-
-function createIgvUrl(locus, getBamsFuncString) {
-    const aWin = getAnalysisWindow();
-    if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS['show_igv_links']) {
-        if (!getBamsFuncString) {
-            getBamsFuncString = 'noBamsHere';
-        }
-        return 'javascript:open_igv_link("' + locus + '", ' + getBamsFuncString + '())';
-    }
-    return null;
-}
-
-function create_igv_link(locus, getBamsFuncString) {
-    const igvUrl = createIgvUrl(locus, getBamsFuncString);
-    if (igvUrl) {
-        return createGridLink("Open " + locus + " in IGV", igvUrl, '', [], ['igv-link']);
-    }
-    return '';
 }
 
 /* Filter child nodes are raised from cells in the grid (gene symbols) and from the column summary
