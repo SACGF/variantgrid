@@ -55,7 +55,6 @@ from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
 from analysis.views.views_json import get_patient_gene_disease_data
-from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk, resolve_field_path
 from patients.models_enums import SampleSourceLevel
@@ -70,18 +69,8 @@ class AllVariantsNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        out_of_date_message = None
-        if self.object.max_variant is not None:
-            max_variant_id = highest_pk(Variant)
-            if self.object.max_variant_id != max_variant_id:
-                diff = max_variant_id - self.object.max_variant_id
-                out_of_date_message = f"{diff} new variants since last save."
-        else:
-            out_of_date_message = "Please press save."
-
         context['num_samples_for_build'] = self.object.num_samples_for_build
         context["gene_level_enabled"] = settings.VARIANT_GENE_LEVEL_ENABLED
-        context["out_of_date_message"] = out_of_date_message
         context["max_variant_id"] = self.object.max_variant_id
         return context
 
@@ -114,20 +103,6 @@ class BuiltInFilterNodeView(NodeView):
 class ClassificationsNodeView(NodeView):
     model = ClassificationsNode
     form_class = ClassificationsNodeForm
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # ClinVar comes from a fixed annotation version, so only classification filters go out of date
-        if self.object.has_classification_filters():
-            modified = self.object.modified
-            count = Classification.objects.filter(modified__gt=modified).count()
-            if count:
-                if count == 1:
-                    plural = ""
-                else:
-                    plural = "s"
-                context["out_of_date_message"] = f"{count} new classification{plural} since last save."
-        return context
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
