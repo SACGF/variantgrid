@@ -15,12 +15,10 @@
 @use 'global/tables';                  // tables, sticky headers, DataTables
 @use 'global/indicators';              // admin indicators, pills, timestamps, separators
 @use 'global/animations';              // keyframes and the classes that run them
-@use 'global/custom_columns';          // the custom columns arrange page
 @use 'global/cards';                   // cards, headers, modals, toolbars, accordions, ontology terms
 @use 'global/debug';                   // debug text, code / JSON, diff text, DataTables processing, help items
 @use 'global/icons';                   // sprite and file type icons, pedigree symbols, previews
 @use 'global/floating_panels';         // panels floated on the body: tag entry, sort menus, conservation detail
-@use 'global/annotation_descriptions'; // the annotation descriptions page
 @use 'global/external_icons';          // third party and sequencer icons, grid column colours
 @use 'global/classification';          // overlaps, citations, criteria, allele origin, testing context, clinical significance
 @use 'global/tips';                    // feature tips
