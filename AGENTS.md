@@ -77,7 +77,7 @@ python3 manage.py vg settings NAME [--diff]       # resolved value and every set
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
-scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI runs it
+scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI warns
 scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
 scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
@@ -204,8 +204,9 @@ prompt for an agent to implement one are in `claude/plans/AGENTS.md`.
 1. `scripts/vg tests --explain` names the tests at risk and they pass; the ones kept earn their keep (Testing, above).
 2. A new module has a docstring stating what it owns and its entry points. A gotcha learned the hard way is one line in
    the app's `AGENTS.md`, next to the code it is about - not a memory, not this file.
-3. `scripts/vg docs check` passes after any doc edit (CI enforces it). A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
-   its `Status:` is draft, approved or in progress.
+3. `scripts/vg docs check` passes after any doc edit. A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
+   its `Status:` is draft, approved or in progress. CI reports dead citations as a warning rather than failing, so the
+   ones it lists are yours to fix when you are next in that app.
 4. The plan file's `Status:` line records the outcome; a landed plan whose knowledge has moved into docs is deleted.
 5. A fact a later session needs and could not work out from the code goes into the repo in the same change (a doc,
    or a comment next to the code), and the report-back says where. Most changes have no such fact: the code and the

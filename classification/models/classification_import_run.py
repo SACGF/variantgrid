@@ -22,7 +22,7 @@ This is how we defer per-classification work that's too expensive to do row-by-r
 skip it while ClassificationImportRun.ongoing_imports(), then do it in one batch here. Existing examples:
 
 * ClassificationGrouping - classification.signals.classification_hooks_grouping
-* ClinicalContext/discordance - ClinicalContext.recalc_and_save + classification_hooks_import_notifications
+* Overlap/discordance - OverlapServices.send_prepared_discordance_notifications + classification_hooks_import_notifications
 * Common variant filters - snpdb.signals.common_variants_classification_changed
 
 Note the deferred state has to live in the DB (a dirty flag, a pending column, or something the batch step can

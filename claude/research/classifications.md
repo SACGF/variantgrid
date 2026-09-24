@@ -150,34 +150,54 @@ SCV) are fed by `classification_grouping_search_term_signal` so the grid's searc
 
 ### Discordance
 
-Publishing at a discordant level calls `classification/models/clinical_context_utils.py:update_clinical_context`, which
-places the record in the `classification/models/clinical_context_models.py:ClinicalContext` for its allele, allele-origin
-bucket and name (`default` unless a user moved it) and calls
-`classification/models/clinical_context_models.py:ClinicalContext.recalc_and_save`. The verdict comes from
-`classification/models/clinical_context_models.py:DiscordanceStatus.calculate`: each shared, non-withdrawn modification's
-clinical significance is mapped to a bucket via `classification/models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket`,
-and two buckets among the counted records is `DiscordanceLevel.DISCORDANT`; VUS-A/B/C differences and B-vs-LB are the
-"concordant with differences" levels, and a somatic bucket is always `MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED`. If the
-context is discordant but open pending-change flags would resolve it, `pending_concordance` is set - a live calculation,
-never stored, which is why `DiscordanceReportTriage.is_outstanding` recomputes it.
+Discordance is calculated on the `classification/models/overlaps_model.py:Overlap`, keyed on testing context rather than
+on the older ClinicalContext. Publishing, withdrawing, deleting, resolving a condition or matching to an allele all reach
+the receivers in `classification/signals/classification_hooks_grouping.py`, which dirty the record's
+`classification/models/classification_grouping.py:ClassificationGrouping`. While an import is running
+(`ClassificationImportRun.ongoing_imports()`) the grouping is left dirty and swept up afterwards by
+`classification/models/classification_grouping.py:ClassificationGrouping.update_all_dirty`; otherwise it is recalculated
+immediately. A clean grouping's save is what drives the overlap:
+`classification/signals/classification_hooks_overlaps.py` calls
+`classification/services/overlaps_services.py:OverlapServices.update_classification_grouping_overlap_contribution`, which
+upserts the `classification/models/overlaps_model.py:OverlapContribution`, links it
+(`classification/services/overlaps_services.py:OverlapServices._link_overlap_contribution`) and then runs
+`classification/services/overlaps_services.py:OverlapServices.update_next_steps` and
+`classification/services/overlaps_services.py:OverlapServices.recalc_overlap` over each overlap it touches. A ClinVar
+expert panel enters the same machinery as a contribution through
+`classification/services/overlaps_services.py:OverlapServices.update_clinvar_overlap_contribution`.
 
-`recalc_and_save` stores `last_evaluation` and, when no import is ongoing, sends `clinical_context_signal`; with
-`settings.DISCORDANCE_ENABLED` (off by default, on for Shariant) the receiver calls
-`classification/models/discordance_models.py:DiscordanceReport.update_latest`. A context that turns discordant opens a
-`DiscordanceReport` with a `DiscordanceReportClassification` per shared record (original modification, final filled on
-close); each later recalc `update`s it, and the moment the context is concordant again it `close`s as `CONCORDANT`.
-A report closed as `CONTINUED_DISCORDANCE` reopens only if a new lab joins or the context becomes concordant
-(`classification/models/discordance_models.py:DiscordanceReport.should_reopen_continued_discordance`). Flags follow the
-report: `classification/models/discordance_models.py:DiscordanceReport.apply_flags_to_context` is the one place the
-discordant flags on the context and on each classification are opened and closed. `discordance_change_signal` fans out to
-per-lab `DiscordanceNotification` rows (batched into one email per lab per import, #3384) and to
-`classification/models/discordance_models.py:ensure_discordance_report_triages_for`, which keeps a
-`DiscordanceReportTriage` per actively involved lab (#3486; triage statuses "will amend", "for discussion", "confident").
-The discussion itself is a `review` (see `claude/research/review.md`); its outcome view
-`classification/views/discordance_report_views.py:action_discordance_report_review` raises the pending-changes flag with
-`{"to_clin_sig": ...}` on the classifications a lab agreed to change, and
-`classification/signals/classification_hooks_significant_change.py:clinical_significance_change_check` closes it when the
-republished value arrives.
+The verdict comes from `classification/services/overlap_calculator.py:OverlapCalculatorBase.calculate_entries`, which
+sorts the contributions into contributing, non-comparable and unshared, applies any pending (amend) value and can force
+an override status such as continued discordance or "confident vs ClinVar".
+`classification/services/overlap_calculator.py:overlap_calculator_for_value_type` picks the grader:
+`classification/services/overlap_calculator.py:OverlapCalculatorOncPath.calculate_status_for_multiple_entries` for
+germline / oncogenic values, and `classification/services/overlap_calculator.py:OverlapCalculatorClinSig.calculate_status_for_multiple_entries`
+for somatic tiers (gated off by `OVERLAP_CLIN_SIG_ENABLED`). The answer is a rung on
+`classification/enums/classification_enums.py:OverlapStatus` - exact agreement, terminology, resolution and minor
+differences below the line, tier-1-vs-tier-2, major and medically significant above it, with
+`classification/enums/classification_enums.py:OverlapStatus.is_discordant` as the threshold.
+`recalc_overlap` stores the status, the high-water `overlap_max_ever_status` and the cached state, and on a change calls
+`classification/services/overlaps_services.py:OverlapServices._overlap_status_changed` →
+`classification/services/overlaps_services.py:OverlapServices.send_prepared_discordance_notifications`.
+
+Each lab's position on an overlap is the `triage_state` on its `OverlapContribution` (pending, will fix, confident, with
+an optional amend value), and `classification/models/overlaps_model.py:TriageNextStep` turns the set of triages into the
+"waiting on you / waiting on them / to discuss" prompt the overlap page shows. The discussion is a `review` (see
+`claude/research/review.md`) - `Overlap` is a `ReviewableModelMixin`.
+`classification/signals/classification_hooks_significant_change.py:clinical_significance_change_check` closes the loop
+when a lab republishes the value it agreed to amend to.
+
+The earlier generation is still in the tree but no longer driven:
+`classification/models/clinical_context_models.py:ClinicalContext` (allele + allele-origin bucket + name),
+`classification/models/clinical_context_models.py:DiscordanceStatus.calculate` and
+`classification/models/discordance_models.py:DiscordanceReport`. Nothing live assigns a `ClinicalContext` or writes a new
+`DiscordanceReport`; the existing rows are still rendered, and `DiscordanceStatus.calculate` is still the display-time
+calculator for those legacy screens and for the VUS overlaps page
+(`classification/models/allele_overlaps.py:ClinicalGroupingOverlap.status`), where a clinical significance is bucketed via
+`classification/models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket`.
+`classification/models/clinical_context_utils.py:update_clinical_contexts` and the whole of
+`classification/views/classification_overlaps_view.py` are unreachable - both still call a `recalc_and_save` that
+`ClinicalContext` no longer defines.
 
 ### Condition matching
 

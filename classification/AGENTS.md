@@ -29,10 +29,19 @@ Patterns here:
 - Link a classification to a variant only via ImportedAlleleInfo: models/classification.py:Classification.ensure_allele_info ->
   models/classification_variant_info_models.py:ImportedAlleleInfo.get_or_create (unique on md5 of the imported HGVS + transcript
   + build patch). allele_info_changed_signal then fans the resolution out to classifications, groupings and clinical contexts.
-- Discordance is per ClinicalContext (allele + allele_origin_bucket + name), recalculated on publish / withdraw / delete by
-  models/clinical_context_models.py:ClinicalContext.recalc_and_save. Buckets come from the "bucket" attribute on the
-  clinical_significance EvidenceKey options (models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket), not from
-  the ClinicalSignificance enum, and only records at a ShareLevel.is_discordant_level (logged_in_users, public) count.
+- Discordance is per Overlap (keyed on testing context), recalculated when a clean ClassificationGrouping saves:
+  signals/classification_hooks_overlaps.py →
+  services/overlaps_services.py:OverlapServices.update_classification_grouping_overlap_contribution →
+  services/overlaps_services.py:OverlapServices.recalc_overlap. The verdict is graded in
+  services/overlap_calculator.py onto the enums/classification_enums.py:OverlapStatus ladder
+  (enums/classification_enums.py:OverlapStatus.is_discordant is the threshold), and only records at a
+  ShareLevel.is_discordant_level (logged_in_users, public) count.
+- ClinicalContext, DiscordanceStatus and DiscordanceReport are the previous generation: still rendered for existing rows
+  and still behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
+  models/clinical_context_utils.py:update_clinical_contexts and views/classification_overlaps_view.py are unreachable -
+  both call a recalc_and_save that ClinicalContext no longer defines. Bucketing on that legacy path comes from the
+  "bucket" attribute on the clinical_significance EvidenceKey options
+  (models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket), not from the ClinicalSignificance enum.
 - Hook the lifecycle with the signals at the top of models/classification.py (classification_validation_signal,
   classification_post_publish_signal, classification_withdraw_signal, classification_variant_set_signal,
   classification_revalidate_signal, variants_classification_changed_signal). Receivers live in signals/ and are imported by
