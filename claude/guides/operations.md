@@ -53,11 +53,27 @@ notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLAC
 ## Deploy and upgrade
 
 `scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`), then
-`scripts/migrator/migrator.py`, which pulls, runs `manage.py migrate`, and reads `manage.py manual_outstanding` (JSON) to
+`scripts/migrator/migrator.py`, whose standard steps (`scripts/migrator/migrator.py:Migrator.STANDARD_MIGRATIONS`) are git pull +
+install requirements, `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
+and `deployed` (records the deploy in Rollbar). It also reads `manage.py manual_outstanding` (JSON) to
 surface the deploy-time steps migrations registered with `manual/operations/manual_operations.py:ManualOperation`.
 `manage` steps auto-run once their `requires` gates (`manual/gates.py`) clear and the command still exists; `other` steps are
 printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed.sh` records the deploy in Rollbar and runs
 `manage.py deployed`. `scripts/restart_services.sh` finishes it.
+
+A `git pull` is only the first of those steps. The one most often missed is collectstatic: once a pull adds or renames a
+static file, every page that links it fails with `Missing staticfiles manifest entry` until collectstatic runs (see
+Static files below). So when an agent is asked to pull or upgrade a box, it runs the whole thing without the menu:
+
+```bash
+source .venv/bin/activate && scripts/upgrade.sh --quick < /dev/null   # ~75s on vg-test2; exit 0 = all steps passed
+```
+
+Then it restarts the services and checks the box. On vg-test2 that is one `sudo -n systemctl restart <unit>` per unit, for
+gunicorn and each celeryd_* unit: sudoers allows exactly those commands, not `restart_services.sh` and not several units in
+one call. After that it runs `vg status` (all services active, 0 manual tasks outstanding) and
+`vg page /variantopedia/dashboard`. If `--quick` stops at the menu (an EOFError under `< /dev/null`), manual steps are outstanding: `--auto-manage`
+runs the unblocked `manage` ones, and anything else goes back to the user.
 
 Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
 latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read

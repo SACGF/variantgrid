@@ -54,7 +54,7 @@ same name (`claude/guides/operations.md#deployments`). Identify the box before r
 
 | Host (settings stem) | What it is | Rules |
 |---|---|---|
-| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` and `--keepdb` tests without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) ends with `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (sudoers allows exactly those) and then `vg status`, without a separate ask |
+| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` and `--keepdb` tests without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (sudoers allows exactly those) and `vg status`, without a separate ask |
 | `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2, without the restart exception |
 | `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only only. Never run tests, `migrate`, management commands that write, service restarts, or edit files; ask before anything else |
 | anything else | Developer box or unknown | Ask the user what the box is before the list below |
