@@ -21,7 +21,7 @@ from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.admin_utils import get_admin_url
 from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
 from library.utils.django_utils import render_ajax_view
-from snpdb.models import Allele, GenomeBuild, Lab
+from snpdb.models import GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -68,15 +68,6 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 return {"error": "Not resolved to a variant"}
         else:
             return {"error": error}
-
-    @staticmethod
-    def render_allele(data: CellData):
-        if value := data.value:
-            allele = Allele.objects.get(pk=value)
-            return {
-                "text": f'{allele:CA}',
-                "url": allele.get_absolute_url()
-            }
 
     @staticmethod
     def render_validation(data: CellData):

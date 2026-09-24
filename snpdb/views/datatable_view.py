@@ -725,7 +725,8 @@ class DatatableConfig(Generic[DC]):
         """
         Last method called before we start rendering
         qs: The QuerySet with all filtering, ordering applied
-        rows: The page's raw values - use it to resolve in one query what would otherwise be per-row
+        rows: The page's raw values (the page's objects in OBJECTS mode) - use it to resolve in one query
+        what would otherwise be per-row
         Overrides call super() - render_delete resolves the page's write permissions off these rows
         """
         self._page_rows = rows
@@ -768,11 +769,10 @@ class DatatableConfig(Generic[DC]):
         return self._page_writable_pks
 
     def prepare_results(self, qs: QuerySet[DC]) -> list[JsonDataType]:
-        rows = list(qs.values(*self.value_columns()))
-        self.pre_render(qs, rows)
         data = []
-
         if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
+            rows = list(qs.values(*self.value_columns()))
+            self.pre_render(qs, rows)
             # rows selected out all columns, but only send down data for enabled columns
             for row in rows:
                 row_json = {}
@@ -783,7 +783,9 @@ class DatatableConfig(Generic[DC]):
                     row_json["row_css"] = row_css
                 data.append(row_json)
         elif self.server_calculate_mode == DatatableConfigQuerySetMode.OBJECTS:
-            for row_obj in qs:
+            row_objs = list(qs)
+            self.pre_render(qs, row_objs)
+            for row_obj in row_objs:
                 mapped_obj = self.map_object(row_obj)
                 row_json = {}
                 for rc in self.enabled_columns:

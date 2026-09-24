@@ -1,9 +1,10 @@
 import operator
+from collections import defaultdict
 from functools import cached_property, reduce
 from typing import Optional, Tuple
 
 from django.conf import settings
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
 from rest_framework.request import Request
@@ -61,7 +62,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 id_filter = id_filter.lower()
                 matches = {}
 
-                for cm in ClassificationGrouping.objects.get(pk=row.get("id")).classification_modifications:
+                for cm in self._page_grouping_modifications.get(row.get("id"), []):
                     for id_key in self.id_columns:
                         if (value := cm.get(id_key)) and id_filter in value.lower():
                             matches[id_key] = value
@@ -185,6 +186,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def pre_render(self, qs: QuerySet[DC], rows):
         super().pre_render(qs, rows)
+
+        self._page_grouping_modifications = defaultdict(list)
+        if settings.CLASSIFICATION_ID_FILTER and self.get_query_param("id_filter"):
+            grouping_ids = [row["id"] for row in rows]
+            page_cms = ClassificationModification.objects.filter(
+                is_last_published=True,
+                classification__classificationgroupingentry__grouping__in=grouping_ids,
+            ).select_related("classification").annotate(page_grouping_id=F("classification__classificationgroupingentry__grouping"))
+            for cm in sorted(page_cms, key=lambda mod: mod.curated_date_check):
+                self._page_grouping_modifications[cm.page_grouping_id].append(cm)
 
         overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageState] = {}
         for overlap_cont in OverlapContribution.objects.filter(

@@ -2,7 +2,7 @@ import json
 import operator
 import re
 from functools import cached_property, reduce
-from typing import Any, Optional
+from typing import Optional
 
 from django.db import connection
 from django.db.models import (
@@ -97,11 +97,13 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
                        default_sort=SortOrder.DESC),
         ]
 
-    @staticmethod
-    def render_variant(cell: CellData) -> JsonDataType:
+    def pre_render(self, qs: QuerySet[VariantWiki], rows: list[dict]):
+        super().pre_render(qs, rows)
+        self._page_hgvs_g = VariantAnnotation.get_hgvs_g_for_variant_ids(row["variant"] for row in rows)
+
+    def render_variant(self, cell: CellData) -> JsonDataType:
         variant_id = cell["variant"]
-        variant = get_object_or_404(Variant, pk=variant_id)
-        return {"id": variant_id, "g_hgvs": VariantAnnotation.get_hgvs_g(variant)}
+        return {"id": variant_id, "g_hgvs": self._page_hgvs_g.get(variant_id)}
 
     def render_genome_build(self, _cell: CellData) -> JsonDataType:
         return self.get_query_param('genome_build')
@@ -609,12 +611,8 @@ class VariantTagDetailColumns(VariantTagCaseColumnsMixin, DatatableConfig[Varian
             RichColumn('created', name='time_ago', client_renderer='TableFormat.timeAgo'),
         ]
 
-    def can_write(self, row: dict[str, Any]) -> bool:
-        """ This is really inefficient as it instantiates an object per row that has already had values() called on
-            it. Perhaps it would be more efficient to be able to swap in a serializer to produce each row
-            however that takes a lot of messing around with DatabaseTableView/DatatableConfig """
-        variant_tag = VariantTag.objects.get(pk=row["id"])
-        return variant_tag.can_write(self.user)
+    def can_write(self, cell: CellData) -> bool:
+        return cell.value in self._writable_pks_for_page(cell.key)
 
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')

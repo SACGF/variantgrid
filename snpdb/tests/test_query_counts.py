@@ -12,13 +12,24 @@ from django.urls import reverse
 
 from annotation.fake_annotation import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, production_query_count
-from snpdb.models import GenomeBuild, Trio
+from snpdb.models import (
+    Allele,
+    AlleleConversionTool,
+    AlleleLiftover,
+    AlleleOrigin,
+    GenomeBuild,
+    LiftoverRun,
+    ProcessingStatus,
+    Trio,
+    VariantAllele,
+)
 from snpdb.templatetags.model_tags import trio_short_description
 from snpdb.templatetags.related_data_tags import (
     TRIO_SAMPLES_SELECT_RELATED,
     related_data_for_samples,
 )
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class RelatedDataQueryCountTest(TestCase):
@@ -73,3 +84,38 @@ class ViewSampleScalingTest(URLTestCase):
                                 mother=self.trio.mother, father=self.trio.father, proband=self.trio.proband)
         num_queries_eleven_trios = self._view_sample_production_query_count(client)
         self.assertEqual(num_queries_one_trio, num_queries_eleven_trios)
+
+
+class AlleleLiftoverGridScalingTest(TestCase):
+    """ The allele and its current builds are resolved for the whole page, not per row """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get_or_create(username='liftover_grid_user', is_superuser=True)[0]
+        cls.grch37 = GenomeBuild.grch37()
+
+    def _grid_rows_and_query_count(self, num_alleles: int) -> tuple[list[dict], int]:
+        liftover_run = LiftoverRun.objects.create(user=self.user, genome_build=self.grch37,
+                                                  conversion_tool=AlleleConversionTool.SAME_CONTIG)
+        for i in range(num_alleles):
+            allele = Allele.objects.create()
+            if i == 0:
+                variant = slowly_create_test_variant("1", 8_000_000 + liftover_run.pk, "A", "G", self.grch37)
+                VariantAllele.objects.create(variant=variant, allele=allele, genome_build=self.grch37,
+                                             origin=AlleleOrigin.IMPORTED_TO_DATABASE,
+                                             allele_linking_tool=AlleleConversionTool.SAME_CONTIG)
+            AlleleLiftover.objects.create(allele=allele, liftover=liftover_run, status=ProcessingStatus.SUCCESS)
+
+        client = Client()
+        client.force_login(self.user)
+        url = reverse("allele_liftover_datatable")
+        with CaptureQueriesContext(connection) as ctx:
+            response = client.get(url, {"liftover_run_id": liftover_run.pk})
+        self.assertEqual(response.status_code, 200)
+        return response.json()["data"], len(ctx.captured_queries)
+
+    def test_query_count_flat_with_more_rows(self):
+        rows, one_row_queries = self._grid_rows_and_query_count(1)
+        self.assertEqual(rows[0]["status"], "Success (Current: ✅ GRCh37, ❌ GRCh38)")
+        _, five_row_queries = self._grid_rows_and_query_count(5)
+        self.assertEqual(one_row_queries, five_row_queries)

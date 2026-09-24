@@ -34,7 +34,6 @@ from classification.utils.clinvar_matcher import (
 )
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import HGVSComponents
-from library.cache import timed_cache
 from library.django_utils import (
     RequireSuperUserView,
     add_save_message,
@@ -54,11 +53,6 @@ from ontology.models import AncestorCalculator, OntologyTerm, OntologyTermRelati
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, ClinVarKey, GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
-
-
-@timed_cache(size_limit=30, ttl=60)
-def allele_for(allele_id: int) -> Allele:
-    return Allele.objects.select_related('clingen_allele').get(pk=allele_id)
 
 
 class ClinVarExportBatchColumns(DatatableConfig):
@@ -119,12 +113,10 @@ def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> dict[int, list[int]]
 
 class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
-    def render_allele(self, row: dict[str, Any]) -> str:
-        allele = allele_for(row["clinvar_allele__allele"])
-        return f"{allele:CA}"
-
     def pre_render(self, qs: QuerySet[ClinVarExport], rows: list[dict]):
         super().pre_render(qs, rows)
+        allele_ids = {allele_id for row in rows if (allele_id := row["clinvar_allele__allele"])}
+        self._page_alleles = Allele.objects.select_related("clingen_allele").in_bulk(allele_ids)
         # find all the batches these records are in
         # do this once rather than per row
         self.export_to_batches = _export_id_to_batch_ids(qs)
@@ -187,8 +179,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             else:
                 data = {"full": c_hgvs_str}
 
-            if allele_id := row["clinvar_allele__allele"]:
-                allele = allele_for(allele_id)
+            if allele := self._page_alleles.get(row["clinvar_allele__allele"]):
                 data["allele"] = f"{allele:CA}"
 
             return data

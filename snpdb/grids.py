@@ -1,4 +1,5 @@
 import operator
+from collections import defaultdict
 from functools import cached_property, reduce
 from typing import Any, Optional
 
@@ -47,6 +48,7 @@ from snpdb.models import (
     UserGridConfig,
     UserSettings,
     Variant,
+    VariantAllele,
     VariantsType,
     VariantZygosityCountCollection,
 )
@@ -817,8 +819,6 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
 
     def __init__(self, request):
         super().__init__(request)
-        self.user = request
-        self.liftover_run = None
 
         self.rich_columns = [
             RichColumn(key="allele", orderable=True,
@@ -828,10 +828,19 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
             RichColumn(key="error", label="Error", renderer=self.render_error_json, orderable=True),
         ]
 
+    def pre_render(self, qs: QuerySet[AlleleLiftover], rows: list[dict]):
+        super().pre_render(qs, rows)
+        allele_ids = {allele_id for row in rows if (allele_id := row["allele"])}
+        self._page_alleles = Allele.objects.select_related("clingen_allele").in_bulk(allele_ids)
+        self._page_allele_build_ids = defaultdict(set)
+        for allele_id, genome_build_id in VariantAllele.objects.filter(allele__in=allele_ids).values_list("allele_id", "genome_build_id"):
+            self._page_allele_build_ids[allele_id].add(genome_build_id)
+        self._grch37_pk = GenomeBuild.grch37().pk
+        self._grch38_pk = GenomeBuild.grch38().pk
+
     def render_allele(self, row: dict[str, Any]) -> JsonDataType:
         data = {}
-        if allele_id := row['allele']:
-            allele = get_object_or_404(Allele, id=allele_id)
+        if allele := self._page_alleles.get(row['allele']):
             data = {
                 "text": str(allele),
                 "url": allele.get_absolute_url(),
@@ -840,7 +849,6 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
 
     def render_status(self, row: dict[str, Any]) -> JsonDataType:
         label = ""
-        current = ""
         if status := row['status']:
             processing_status = ProcessingStatus(status)
             label = processing_status.label
@@ -850,12 +858,11 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
             False: "❌"
         }
 
-        if allele_id := row['allele']:
-            allele: Allele
-            if allele := Allele.objects.filter(id=allele_id).first():
-                has_37 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
-                has_38 = bool(allele.variant_for_build_optional(GenomeBuild.grch38()))
-                label += f" (Current: {has_build_to_icon[has_37]} GRCh37, {has_build_to_icon[has_38]} GRCh38)"
+        if (allele_id := row['allele']) in self._page_alleles:
+            build_ids = self._page_allele_build_ids[allele_id]
+            has_37 = self._grch37_pk in build_ids
+            has_38 = self._grch38_pk in build_ids
+            label += f" (Current: {has_build_to_icon[has_37]} GRCh37, {has_build_to_icon[has_38]} GRCh38)"
 
         return label
 

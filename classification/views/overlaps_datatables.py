@@ -200,7 +200,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
     def pre_render(self, qs: QuerySet[DC], rows):
         # stores cross context overlaps
-        allele_ids = qs.values_list('allele_id', flat=True)
+        allele_ids = {overlap.allele_id for overlap in rows}
         cross_context_qs = Overlap.objects.filter(valid=True, overlap_type=OverlapType.CROSS_CONTEXT,
                                                   allele_id__in=allele_ids)
         # only ONC PATH for now

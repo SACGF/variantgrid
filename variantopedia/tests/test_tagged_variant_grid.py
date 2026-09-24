@@ -551,6 +551,7 @@ class VariantTagCaseColumnsTest(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["sample"]["text"], self.my_sample.name)
         self.assertEqual(rows[0]["patient"]["text"], self.my_patient.display_identity)
+        self.assertTrue(rows[0]["can_write"])
 
     def test_export_names_the_sample_and_patient(self):
         self.client.force_login(self.user)

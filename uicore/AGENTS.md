@@ -72,6 +72,10 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   `client_renderer` is a JS expression, usually `TableFormat.*`
   (variantgrid/static_files/default_static/js/datatable_definition.js:TableFormat) or a function in
   datatables_client_renderers.js; `visible=False` sends data without a column; `detail=True` moves it to the expand row.
+- A renderer needing more than the row's values resolves it for the whole page in
+  snpdb/views/datatable_view.py:DatatableConfig.pre_render (it gets the page's rows; the page's objects under
+  `server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS`), never a `.get()` per row - per-row write
+  permission is `_writable_pks_for_page`, and snpdb/grids.py:AbstractAlleleLiftoverColumns.pre_render is an example.
 - A User FK column is `self.user_column(fk, label=...)` (snpdb/views/datatable_view.py:DatatableConfig.user_column):
   it sorts/exports on the username, renders through `render_user` and its search matches the "First Last" the cell
   shows via `RichColumn.search_annotations` - expressions power_search annotates only while a search is in flight.

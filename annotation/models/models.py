@@ -2662,15 +2662,33 @@ class VariantAnnotation(AbstractVariantAnnotation):
         hgvs_g = None
         if data:
             hgvs_g = data[0]
-        if hgvs_g is None and not variant.is_gene_level:
-            # Reference variants have no annotation - so we'll have to fall back to generating it.
-            # Not for gene-level, which has no coordinate to write a g.HGVS from - it is annotated, so
-            # a null here means it predates the column being filled rather than "generate one"
-            from genes.hgvs import HGVSMatcher
-            matcher = HGVSMatcher.instance(variant.any_genome_build)
-            hgvs_g = matcher.variant_to_g_hgvs(variant)
-
+        if hgvs_g is None:
+            hgvs_g = VariantAnnotation._generate_hgvs_g(variant)
         return hgvs_g
+
+    @staticmethod
+    def get_hgvs_g_for_variant_ids(variant_ids: Iterable[int]) -> dict[int, Optional[str]]:
+        """ get_hgvs_g for a page of variants in one query, rather than one per variant """
+        variant_ids = set(variant_ids)
+        qs = VariantAnnotation.objects.filter(variant__in=variant_ids, hgvs_g__isnull=False)
+        qs = qs.order_by("variant", "-version").distinct("variant")
+        hgvs_g_by_variant_id = dict(qs.values_list("variant", "hgvs_g"))
+        if unannotated_ids := variant_ids - hgvs_g_by_variant_id.keys():
+            unannotated_qs = Variant.objects.filter(pk__in=unannotated_ids).select_related("locus__contig", "locus__ref", "alt")
+            for variant in unannotated_qs:
+                hgvs_g_by_variant_id[variant.pk] = VariantAnnotation._generate_hgvs_g(variant)
+        return hgvs_g_by_variant_id
+
+    @staticmethod
+    def _generate_hgvs_g(variant: Variant) -> Optional[str]:
+        """ Reference variants have no annotation - so we'll have to fall back to generating it.
+            Not for gene-level, which has no coordinate to write a g.HGVS from - it is annotated, so
+            a null here means it predates the column being filled rather than "generate one" """
+        if variant.is_gene_level:
+            return None
+        from genes.hgvs import HGVSMatcher
+        matcher = HGVSMatcher.instance(variant.any_genome_build)
+        return matcher.variant_to_g_hgvs(variant)
 
     def __str__(self):
         return f"{self.variant}: {self.version}"
