@@ -158,6 +158,7 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
     topic = ReviewTopic.objects.get(pk=topic_id)
     review = reviewed_object.new_review(topic=topic, user=request.user)
     review.check_can_view(request.user)
+    review.check_can_write(request.user)
 
     return _handle_review(request=request, review=review, reviewing=reviewed_object)
 
@@ -166,7 +167,7 @@ def edit_review(request, review_id: int):
     review = Review.objects.get(pk=review_id)
     review.check_can_view(request.user)
 
-    if review.is_complete or review.reviewing.source_object.is_review_locked:
+    if review.is_complete or review.reviewing.source_object.is_review_locked or not review.can_write(request.user):
         return view_discussion_detail(request, review_id)
 
     return _handle_review(request=request, review=review)
@@ -177,7 +178,7 @@ def view_discussion_detail(request, review_id: int):
     review.check_can_view(request.user)
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,
-        "edit": request.GET.get("edit") == "true" and not review.reviewing.source_object.is_review_locked,
+        "edit": request.GET.get("edit") == "true" and not review.reviewing.source_object.is_review_locked and review.can_write(request.user),
         "show_source_object": request.GET.get("show_source_object") != "false",
         "show_outcome": request.GET.get("show_outcome") != "false"
     })

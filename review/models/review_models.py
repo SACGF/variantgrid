@@ -206,6 +206,14 @@ class Review(TimeStampedModel):
             msg = f"You do not have READ permission to view {self.pk}"
             raise PermissionDenied(msg)
 
+    def can_write(self, user: User) -> bool:
+        return self.reviewing.source_object.can_review(user)
+
+    def check_can_write(self, user: User):
+        if not self.can_write(user):
+            msg = f"You do not have WRITE permission to review \"{self.reviewing.label}\""
+            raise PermissionDenied(msg)
+
     def __str__(self):
         try:
             return f"Review \"{self.topic}\" on \"{self.reviewing.source_object}\" by {self.user} on {self.review_date}"
@@ -276,6 +284,11 @@ class ReviewableModelMixin(models.Model):
         if hasattr(self, "lab"):
             return {self.lab}
         raise NotImplementedError(f"{self} has not implemented 'reviewing_labs' property")
+
+    def can_review(self, user: User) -> bool:
+        """ Starting or editing a Review requires membership of one of the reviewing labs """
+        user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
+        return bool(user_labs.intersection(self.reviewing_labs))
 
     @property
     def reviews_safe(self) -> 'ReviewedObject':
