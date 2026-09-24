@@ -23,9 +23,6 @@ class FlagAdmin(ModelAdminBasics):
     list_filter = (('flag_type', RelatedFieldListFilter), ('resolution__status', AllValuesChoicesFieldListFilter), ('user', RelatedFieldListFilter))
     inlines = (FlagCommentAdminTabular,)
 
-    def is_readonly_field(self, f) -> bool:
-        return super().is_readonly_field(f)
-
     def has_add_permission(self, request):
         return False
 

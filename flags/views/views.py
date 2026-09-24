@@ -103,7 +103,7 @@ class FlagHelper:
         if not flag_collection:
             flag_collection = self.flag_collections[0]
 
-        flag_type = data.pop('flag_type')
+        flag_type = data.pop('flag_type', None)
         comment = data.pop('comment', None)
         user_private = data.pop('user_private', False)
         resolution = data.pop('resolution', None)
@@ -380,7 +380,7 @@ class FlagsView(APIView):
         if since:
             try:
                 since = ensure_timezone_aware(datetime.datetime.fromtimestamp(float(since)))
-            except (ValueError, OSError, TypeError):
+            except (ValueError, OverflowError, OSError, TypeError):
                 return Response({'error': 'Invalid since parameter'}, status=400)
             flag_helper.include_comments_since(since)
 
