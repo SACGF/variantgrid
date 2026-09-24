@@ -154,6 +154,7 @@ class ImportedAlleleInfoValidationTest(TestCase):
         self.assertEqual(grch37, display.genome_build)
         self.assertTrue(display.is_normalised)
         self.assertFalse(display.is_desired_build)
+        self.assertTrue(display.is_resolved_without_hgvs)
 
         self.assertIsNone(self._allele_info(imported_c_hgvs=self.C_HGVS_38).matched_without_resolved_hgvs_display(grch38))
         with_c_hgvs = self._allele_info(imported_c_hgvs=self.C_HGVS_38,

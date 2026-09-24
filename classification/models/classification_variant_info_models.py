@@ -770,7 +770,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         for genome_build in builds:
             if (variant_info := self[genome_build]) and variant_info.variant_id and not variant_info.resolved_hgvs:
                 return HGVSDisplay(self.imported_hgvs_obj() or HGVSComponents(""), genome_build=genome_build,
-                                   is_normalised=True, is_desired_build=genome_build == preferred_genome_build)
+                                   is_normalised=True, is_desired_build=genome_build == preferred_genome_build,
+                                   is_resolved_without_hgvs=True)
         return None
 
     @property

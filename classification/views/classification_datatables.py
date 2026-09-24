@@ -75,7 +75,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 try:
                     if row.get(ClassificationModification.column_name_for_build(genome_build, 'variant_id')):
                         c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
-                                                   is_normalised=True, is_desired_build=index == 0)
+                                                   is_normalised=True, is_desired_build=index == 0,
+                                                   is_resolved_without_hgvs=True)
                         return c_hgvs.to_json()
                 except ValueError:
                     pass

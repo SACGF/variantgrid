@@ -154,7 +154,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "variant_id")):
                     c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
-                                               is_normalised=True, is_desired_build=index == 0)
+                                               is_normalised=True, is_desired_build=index == 0,
+                                               is_resolved_without_hgvs=True)
                     return c_hgvs.to_json()
 
             # could be dirty and not have a latest_allele_info
