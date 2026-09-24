@@ -244,10 +244,10 @@ class SomalierAllSamplesPairsTest(TestCase):
         cls.proband = cls.cohort.cohortsample_set.get(sample__name="proband").sample
         cls.mother = cls.cohort.cohortsample_set.get(sample__name="mother").sample
 
-    def _write_pairs(self, rows: list[str]) -> str:
+    def _write_pairs(self, rows: list[str], header: str = PAIRS_HEADER) -> str:
         filename = tempfile.mkstemp(suffix=".pairs.tsv")[1]
         with open(filename, "w") as f:
-            f.write("\n".join([PAIRS_HEADER, *rows]) + "\n")
+            f.write("\n".join([header, *rows]) + "\n")
         return filename
 
     def _name(self, sample: Sample) -> str:
@@ -265,6 +265,13 @@ class SomalierAllSamplesPairsTest(TestCase):
         pair = SomalierRelatePairs.objects.get()
         self.assertEqual(self.proband.pk, pair.sample_a_id)
         self.assertEqual(self.mother.pk, pair.sample_b_id)
+
+    def test_loads_somalier_0_3_5_concordance_column(self):
+        header = PAIRS_HEADER.replace("hom_concordance", "concordance")
+        rows = [_pairs_row(self._name(self.proband), self._name(self.mother), 0.5, 2000, 300)]
+        relate = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.PROCESSING)
+        self.assertEqual(1, _load_somalier_pairs(relate, self._write_pairs(rows, header=header)))
+        self.assertAlmostEqual(0.9, SomalierRelatePairs.objects.get().hom_concordance)
 
     def test_previous_runs_pairs_are_replaced(self):
         old_relate = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.SUCCESS)
