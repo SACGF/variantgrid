@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Optional, Union
 
@@ -781,7 +782,8 @@ class DiscordanceReportAdminExport(ExportRow):
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
 
     @staticmethod
-    def _less_more_certain(summary: DiscordanceLabSummary):
+    def _compare_clinical_significance(summary: DiscordanceLabSummary, differs: Callable[[int, int], str]) -> str:
+        """ Shared withdrawn / same / unknown handling, calling differs(from_value, to_value) otherwise """
         cs_to_index = DiscordanceReportAdminExport.cs_to_index()
         from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
         to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
@@ -793,28 +795,17 @@ class DiscordanceReportAdminExport(ExportRow):
         elif from_value == 0 or to_value == 0:
             return "?"
         else:
-            if abs(to_value - 3) > abs(from_value - 3):
-                return "more"
-            else:
-                return "less"
+            return differs(from_value, to_value)
+
+    @staticmethod
+    def _less_more_certain(summary: DiscordanceLabSummary):
+        return DiscordanceReportAdminExport._compare_clinical_significance(
+            summary, lambda from_value, to_value: "more" if abs(to_value - 3) > abs(from_value - 3) else "less")
 
     @staticmethod
     def _up_down_for(summary: DiscordanceLabSummary):
-        cs_to_index = DiscordanceReportAdminExport.cs_to_index()
-        from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
-        to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
-
-        if summary.clinical_significance_to == 'withdrawn':
-            return "withdrawn"
-        elif from_value == to_value:
-            return "same"
-        elif from_value == 0 or to_value == 0:
-            return "?"
-        else:
-            if to_value > from_value:
-                return "upgrade"
-            else:
-                return "downgrade"
+        return DiscordanceReportAdminExport._compare_clinical_significance(
+            summary, lambda from_value, to_value: "upgrade" if to_value > from_value else "downgrade")
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
         self.discordance_report = discordance_report

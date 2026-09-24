@@ -2,8 +2,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Self
 from dataclasses_json import DataClassJsonMixin
-from classification.criteria_strengths import CriteriaStrength
-from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket, ClassificationResultValue
+from classification.enums import AlleleOriginBucket, SpecialEKeys, TestingContextBucket, ClassificationResultValue
 
 
 @dataclass(frozen=True)
@@ -214,23 +213,7 @@ class ClassificationSummaryCalculator:
 
     @cached_property
     def criteria_labels(self) -> list[str]:
-        from classification.models import EvidenceKeyMap
-        cm = self.cm
-        strengths: set[CriteriaStrength] = set()
-        for e_key in EvidenceKeyMap.cached().criteria():
-            strength = cm.get(e_key.key)
-            if CriteriaEvaluation.is_met(strength):
-                strengths.add(CriteriaStrength(e_key, strength))
-        for amp_level, letter in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
-            if value := cm.get_value_list(amp_level):
-                e_key = EvidenceKeyMap.cached_key(amp_level)
-                for sub_value in value:
-                    sub_value_label = e_key.pretty_value(sub_value)
-                    strengths.add(CriteriaStrength(
-                        ekey=EvidenceKeyMap.cached_key(amp_level),
-                        custom_strength=f"{letter}_{sub_value_label}")
-                    )
-        return list(str(x) for x in sorted(strengths))
+        return [str(x) for x in sorted(self.cm.met_criteria_strengths())]
 
 
 # FIXME underlying code should change due to overlaps
