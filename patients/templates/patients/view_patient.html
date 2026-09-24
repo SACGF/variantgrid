@@ -44,6 +44,12 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
+        {% if somalier_enabled and sample_relatedness.mismatch %}
+            <div class="alert alert-danger" id="sample-relatedness-warning">
+                Somalier finds samples of this patient that are not the same individual - a possible sample swap
+                or mislabel. See <a href="#sample-relatedness">Sample Relatedness</a> below.
+            </div>
+        {% endif %}
         {% ui_register_tab_embedded label="Patient" tab_set="patients" %}
             <form id="patient-form" method="post">
                 {% csrf_token %}
@@ -172,6 +178,62 @@
             </script>
             {% endif %}
         </div>
+        {% endif %}
+
+        {% if somalier_enabled and sample_relatedness %}
+            <a name="sample-relatedness"></a>
+            <h4>Sample Relatedness</h4>
+            <p>
+                Each pair of this patient's samples should be the same individual: <a href="https://github.com/brentp/somalier">Somalier</a>
+                relatedness &ge; {{ duplicate_sample_relatedness }} in the nightly all-samples relate.
+                A sample is only compared once that relate has run on enough of its HET/HOM sites.
+            </p>
+            {% if sample_relatedness.sample_pairs %}
+            <table class="table" id="sample-relatedness-table">
+                <tr>
+                    <th>Sample</th>
+                    <th>Sample</th>
+                    <th>relatedness</th>
+                    <th>shared_hets</th>
+                    <th>shared_hom_alts</th>
+                    <th>N</th>
+                    <th>Check</th>
+                </tr>
+                {% for sp in sample_relatedness.sample_pairs %}
+                    <tr>
+                        <td><a href="{% url 'view_sample' sp.sample_a.pk %}">{{ sp.sample_a }}</a></td>
+                        <td><a href="{% url 'view_sample' sp.sample_b.pk %}">{{ sp.sample_b }}</a></td>
+                        <td>{{ sp.pair.relatedness | floatformat:2 }}</td>
+                        <td>{{ sp.pair.shared_hets }}</td>
+                        <td>{{ sp.pair.shared_hom_alts }}</td>
+                        <td>{{ sp.pair.n }}</td>
+                        <td>
+                            {% if sp.same_individual %}
+                                <span class="badge badge-success">Same individual</span>
+                            {% elif sp.pair %}
+                                <span class="badge badge-danger" title="Related, but not the same DNA">Different individual</span>
+                            {% else %}
+                                <span class="badge badge-danger" title="Too little in common for the all-samples relate to keep the pair">Unrelated</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+            {% if sample_relatedness.not_checked %}
+            <table class="table" id="sample-relatedness-not-checked-table">
+                <tr>
+                    <th>Not checked</th>
+                    <th>Reason</th>
+                </tr>
+                {% for sample, reason in sample_relatedness.not_checked %}
+                    <tr>
+                        <td><a href="{% url 'view_sample' sample.pk %}">{{ sample }}</a></td>
+                        <td>{{ reason }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
         {% endif %}
 
         {% related_data_for_patient patient %}

@@ -1,9 +1,12 @@
+import itertools
 import logging
 import os
 import shutil
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from subprocess import CalledProcessError
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -23,6 +26,10 @@ from snpdb.models.models_enums import ImportStatus, ProcessingStatus, SuperPopul
 from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample
+
+# A pair this close is the same DNA, so two different patients means a sample swap or a mislabel, and one
+# patient's samples falling short of it means one of them isn't theirs (#196)
+DUPLICATE_SAMPLE_RELATEDNESS = 0.9
 
 
 class AbstractSomalierModel(TimeStampedModel):
@@ -296,6 +303,77 @@ class SomalierRelatePairs(models.Model):
     @staticmethod
     def get_for_sample(sample: Sample):
         return SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
+
+    @staticmethod
+    def get_between_samples(samples: Iterable[Sample]):
+        return SomalierRelatePairs.objects.filter(sample_a__in=samples, sample_b__in=samples)
+
+
+@dataclass
+class SamplePairRelatedness:
+    """ Two samples that were both in the last all-samples relate. No pair means it fell under
+        SOMALIER["relatedness"], ie unrelated """
+    sample_a: Sample
+    sample_b: Sample
+    pair: Optional[SomalierRelatePairs]
+
+    @property
+    def same_individual(self) -> bool:
+        return self.pair is not None and self.pair.relatedness >= DUPLICATE_SAMPLE_RELATEDNESS
+
+
+@dataclass
+class SameIndividualRelatedness:
+    sample_pairs: list[SamplePairRelatedness]
+    not_checked: list[tuple[Sample, str]]  # (sample, reason)
+
+    @property
+    def mismatch(self) -> bool:
+        return any(not sp.same_individual for sp in self.sample_pairs)
+
+
+def _not_checked_reason(sample_extract: Optional[SomalierSampleExtract],
+                        all_samples_relate: Optional[SomalierAllSamplesRelate]) -> Optional[str]:
+    if sample_extract is None:
+        return "No somalier extract"
+    if not sample_extract.has_sufficient_data:
+        return "Too few HET/HOM sites"
+    if all_samples_relate is None or all_samples_relate.created < sample_extract.vcf_extract.modified:
+        return "Not yet in the nightly all-samples relate"
+    return None
+
+
+def get_same_individual_relatedness(samples: Iterable[Sample]) -> Optional[SameIndividualRelatedness]:
+    """ Samples that should all be one individual (eg one patient's), paired up. The all-samples relate only
+        keeps pairs over SOMALIER["relatedness"], which two samples of one individual with enough data always
+        clear, so only samples that were in that run are paired - a missing pair between them is unrelated DNA.
+        None when there aren't 2 samples to compare """
+    samples = [s for s in samples if not s.no_dna_control]
+    if len(samples) < 2:
+        return None
+
+    sample_extracts = {sse.sample_id: sse for sse in SomalierSampleExtract.objects.filter(sample__in=samples)
+                       .select_related("vcf_extract")}
+    all_samples_relate = SomalierAllSamplesRelate.objects.filter(status=ProcessingStatus.SUCCESS) \
+        .order_by("-created").first()
+
+    checked = []
+    not_checked = []
+    for sample in sorted(samples, key=lambda s: s.pk):
+        if reason := _not_checked_reason(sample_extracts.get(sample.pk), all_samples_relate):
+            not_checked.append((sample, reason))
+        else:
+            checked.append(sample)
+
+    sample_pairs = []
+    if len(checked) >= 2:
+        # Pairs are loaded in somalier's sample order, which needn't be pk order
+        pairs = {frozenset((p.sample_a_id, p.sample_b_id)): p
+                 for p in SomalierRelatePairs.get_between_samples(checked)}
+        for sample_a, sample_b in itertools.combinations(checked, 2):
+            pair = pairs.get(frozenset((sample_a.pk, sample_b.pk)))
+            sample_pairs.append(SamplePairRelatedness(sample_a, sample_b, pair))
+    return SameIndividualRelatedness(sample_pairs, not_checked)
 
 
 class SomalierConfig:

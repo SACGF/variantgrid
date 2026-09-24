@@ -27,6 +27,7 @@ from snpdb.models import (
     SomalierVCFExtract,
     Zygosity,
 )
+from snpdb.models.models_somalier import get_same_individual_relatedness
 from snpdb.tasks.somalier_tasks import _load_somalier_pairs, somalier_vcf_id
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -278,6 +279,34 @@ class SomalierAllSamplesPairsTest(TestCase):
         pair = SomalierRelatePairs.objects.get()
         self.assertEqual(new_relate, pair.relate)
         self.assertAlmostEqual(0.9, pair.relatedness)
+
+    def test_same_individual_relatedness(self):
+        """ #196 - a patient's samples: a missing pair between samples in the last relate is unrelated, a sample
+            that relate couldn't have compared is listed rather than paired """
+        father = self.cohort.cohortsample_set.get(sample__name="father").sample
+        vcf_extract = SomalierVCFExtract.objects.create(vcf=self.cohort.vcf, status=ProcessingStatus.SUCCESS)
+        for sample, het_count in [(self.proband, 5000), (self.mother, 5000), (father, 10)]:
+            SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample,
+                                                 het_count=het_count, hom_count=5000)
+        relate = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.SUCCESS)
+        # somalier's own order, mother before proband
+        _load_somalier_pairs(relate, self._write_pairs([
+            _pairs_row(self._name(self.mother), self._name(self.proband), 0.98, 4000, 3000)]))
+
+        relatedness = get_same_individual_relatedness([self.proband, self.mother, father])
+        self.assertEqual([(father, "Too few HET/HOM sites")], relatedness.not_checked)
+        self.assertEqual([True], [sp.same_individual for sp in relatedness.sample_pairs])
+        self.assertFalse(relatedness.mismatch)
+
+        SomalierRelatePairs.objects.all().delete()
+        relatedness = get_same_individual_relatedness([self.proband, self.mother, father])
+        self.assertIsNone(relatedness.sample_pairs[0].pair)
+        self.assertTrue(relatedness.mismatch)
+
+        vcf_extract.save()  # re-extracted since the relate
+        relatedness = get_same_individual_relatedness([self.proband, self.mother, father])
+        self.assertEqual([], relatedness.sample_pairs)
+        self.assertFalse(relatedness.mismatch)
 
 
 @override_settings(SOMALIER={"enabled": True, "admin_only": False,
