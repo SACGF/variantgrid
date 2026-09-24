@@ -1,7 +1,7 @@
 """
 `vg status`: the running deployment in one call - settings module, git, database size and the big
 tables, current annotation version per build, celery services and queue depths, annotation runs in
-flight, recent ERROR events, outstanding manual migration tasks and free disk on the data roots.
+flight (and abandoned ones nothing will dispatch), recent ERROR events, outstanding manual migration tasks and free disk on the data roots.
 
 Each section is gathered independently and a failure becomes that section's `error` rather than
 aborting the whole report, because the point of the command is to work when the box is unwell.
@@ -45,6 +45,7 @@ class Status:
     services: dict[str, str] = field(default_factory=dict)
     queues: dict[str, Any] = field(default_factory=dict)
     annotation_runs: dict[str, int] = field(default_factory=dict)
+    annotation_runs_abandoned: dict[str, int] = field(default_factory=dict)
     manual_outstanding: list[str] = field(default_factory=list)
     recent_errors: list[dict[str, str]] = field(default_factory=list)
     disk: dict[str, str] = field(default_factory=dict)
@@ -65,6 +66,7 @@ def gather_status() -> Status:
     _section(status, "services", _services)
     _section(status, "queues", _queues)
     _section(status, "annotation_runs", _annotation_runs)
+    _section(status, "annotation_runs_abandoned", _annotation_runs_abandoned)
     _section(status, "manual_outstanding", _manual_outstanding)
     _section(status, "recent_errors", _recent_errors)
     _section(status, "disk", _disk)
@@ -128,12 +130,30 @@ def _queues() -> dict[str, Any]:
     return queues
 
 
+def _incomplete_runs():
+    return AnnotationRun.objects.exclude(status__in=AnnotationStatus.get_completed_states())
+
+
 def _annotation_runs() -> dict[str, int]:
-    in_flight = AnnotationRun.objects.exclude(status__in=AnnotationStatus.get_completed_states())
+    historical = VariantAnnotationVersion.Status.HISTORICAL
+    in_flight = _incomplete_runs().filter(annotation_range_lock__isnull=False).exclude(
+        annotation_range_lock__version__status=historical)
     by_status = {}
     for run_status, count in in_flight.values_list("status").annotate(n=Count("pk")).order_by("status"):
         by_status[AnnotationStatus(run_status).label] = count
     return by_status
+
+
+def _annotation_runs_abandoned() -> dict[str, int]:
+    """ Incomplete runs nothing will ever pick up: no range lock (#1654), or on a HISTORICAL
+        version. They need deleting, not waiting for. """
+    incomplete = _incomplete_runs()
+    abandoned = {
+        "no range lock": incomplete.filter(annotation_range_lock__isnull=True).count(),
+        "historical version": incomplete.filter(
+            annotation_range_lock__version__status=VariantAnnotationVersion.Status.HISTORICAL).count(),
+    }
+    return {k: v for k, v in abandoned.items() if v}
 
 
 def _manual_outstanding() -> list[str]:
@@ -179,6 +199,9 @@ def render_status(status: Status) -> str:
             f"{name} {info['messages']}q/{info['consumers']}c" if "messages" in info else f"{name} {info['error']}"
             for name, info in status.queues.items()))
     lines.append("annotation runs in flight: " + (", ".join(f"{k} {v}" for k, v in status.annotation_runs.items()) or "none"))
+    if status.annotation_runs_abandoned:
+        lines.append("annotation runs abandoned (nothing will dispatch these, #1940): "
+                     + ", ".join(f"{k} {v}" for k, v in status.annotation_runs_abandoned.items()))
     lines.append(f"manual tasks outstanding: {len(status.manual_outstanding)}"
                  + ("".join(f"\n  {line}" for line in status.manual_outstanding) if status.manual_outstanding else ""))
     lines.append(f"recent ERROR events ({len(status.recent_errors)}):")
