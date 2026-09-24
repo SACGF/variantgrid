@@ -17,7 +17,9 @@ multiple-choice field in a bare `<fieldset>`, so render those fields one at a ti
 
 `scripts/vg css unused` lists the class / id selectors in the `.scss` that nothing in the templates, JS or Python
 names, so run it before deleting or moving a rule (`--dynamic` adds the names built up at runtime, `cs-{{ status }}`
-style, which need a reader's eye). It reads `library/vg/css.py`. `vg css unused --rendered` (`library/vg/css_rendered.py`)
+style, which need a reader's eye). The edit hook (`.claude/hooks/post_edit.py`) runs it after every `.html`, `.scss`
+or first-party `.js` edit and warns when anything is unused; it is deliberately not a CI check, since a class built
+from data or added by JS can be live while nothing in the tree names it. It reads `library/vg/css.py`. `vg css unused --rendered` (`library/vg/css_rendered.py`)
 crawls pages as `claude_agent` and reports which dynamic names reach rendered HTML - it can't see classes JS adds, so
 most grid and flag names still need reading the code that builds them. A class whose name is a database value
 (`SequencerModel.css_class`) goes in `DATA_DERIVED` there, or the scan calls it unused.
