@@ -1,0 +1,324 @@
+////////////////////////
+// DEBUG TEXT
+////////////////////////
+
+.debug-footnote {
+	opacity: 0.7;
+	font-size: 0.8rem;
+}
+
+.code {
+	font-family: monospace;
+	color: #444;
+	font-weight: 400;
+	border: 1px solid #ddd;
+	border-radius: 10px;
+	padding: 6px 6px 6px 12px;
+	background-color: #eee;
+	white-space: pre-wrap;
+	display: block;
+	line-height: 150%;
+
+	&.card-body {
+		border: none;
+		border-radius: 0;
+	}
+}
+
+.json {
+	font-family: monospace;
+	color: #444;
+	font-weight: 400;
+	background-color: #eee;
+
+	&.code-block {
+		border: 1px solid #bbb;
+		padding: 8px;
+		border-radius: 8px;
+	}
+
+	.js-valid {
+		margin-left: 16px;
+
+		.js-valid-body {
+			display: block;
+			padding: 4px;
+			border: 1px dashed #888;
+			border-top: none;
+			border-bottom-left-radius: 4px;
+			border-bottom-right-radius: 4px;
+		}
+	}
+
+	>.js-valid {
+		margin: 0;
+		padding: 0;
+	}
+
+	.js-block {
+		display: block;
+		margin-left: 24px;
+	}
+
+	.js-num,
+	.js-bool {
+		color: #444;
+	}
+
+	.js-null {
+		color: #888;
+		font-style: italic;
+	}
+
+	.js-qt {
+		color: #494;
+	}
+
+	.js-str {
+		color: #464;
+	}
+
+	.js-br {
+		color: #448;
+	}
+
+	.js-pr {
+		color: #44b;
+	}
+
+	.js-colon {
+		color: #666;
+		margin-right: 4px;
+	}
+
+	.js-comma {
+		color: #888;
+		display: inline-block;
+	}
+
+	&.compact {
+		word-break: break-word;
+		background-color: transparent;
+
+		.js-block {
+			display: inline;
+			margin-left: 0px;
+		}
+
+		.js-comma {
+			display: inline;
+		}
+
+		br {
+			display: none;
+		}
+	}
+}
+
+.install-instructions {
+	min-height: 16px;
+	background-size: 16px 16px;
+	background-position: 8px 50%;
+	background-repeat: no-repeat;
+	padding: 16px 16px 16px 28px;
+	border-radius: 4px;
+	background-color: #F0D9ED !important;
+}
+
+/*
+.overlap-container {
+	div:first-of-type {
+	border-radius-top-left: 5px;
+	border-radius-top-right: 5px;
+	}
+}
+*/
+
+.fa-spinner {
+	animation: spin 3s steps(8) infinite;
+}
+
+.fa-hand-point-right {
+	margin-right: 6px;
+}
+
+table .fa-hand-point-right {
+	position: relative;
+	left: -20px;
+	margin: 0;
+}
+
+.diff-text {
+	display: inline-block;
+
+	.diff-text-subtract {
+		color: #aaa;
+		border-radius: 2px;
+		background-color: #FFEEEE;
+	}
+
+	.diff-text-add {
+		border-radius: 2px;
+		background-color: #AAFFAA;
+	}
+
+	.diff-text-different {
+		color: #880;
+	}
+}
+
+.addition {
+	background-color: #e6ffe6;
+}
+
+.deletion {
+	background-color: #e6e6ff;
+}
+
+.modification,
+.addition.deletion {
+	background-color: #ffe6e6;
+}
+
+.chosen-drop {
+	z-index: 100001 !important;
+}
+
+.chosen-search {
+	z-index: 1010 !important;
+}
+
+.current-record-menu-item {
+	display: none;
+
+	&.active {
+		display: block;
+		margin-left: 8px;
+		margin-right: 16px;
+		text-align: right;
+		word-break: break-word;
+	}
+}
+
+a.nav-link.not-important {
+	color: #aaaacc !important;
+	font-style: italic;
+
+	span.badge-info {
+		font-style: normal;
+	}
+
+	&.active {
+		color: #666 !important;
+	}
+}
+
+/*
+// used in combination with gloabl.js's main active item
+
+@keyframes highlight-select {
+	from {transform: scale(1) }
+	to { transform:scale(1.2) }
+}
+
+.group-selected .main-icon, .group-selected.main-icon,	{
+	color: #4a4 !important;
+	animation: highlight-select 1s infinite alternate;
+}
+ */
+
+/* DataTables positions the processing box against the wrapper, which lands it halfway down the
+   grid - the table gets its own container, and the box sticks to the top of it so it stays over
+   the header row (which does its own sticking) however far the grid is scrolled */
+.dt-table-container {
+	position: relative;
+}
+
+div.dataTables_processing {
+	position: sticky;
+	top: 0;
+	left: auto; // DataTables centres the box with left/margin - stick vertically only
+	height: 0; // sticky is in flow - no height so showing the box doesn't shove the table down
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	background: none; // the box itself is the div inside - DataTables gives this one .card
+	border: none;
+	z-index: 2; // table.sticky-header thead is 1
+
+	div {
+		display: inline-block;
+		margin: 0 !important;
+		padding: 2px 8px;
+		background-color: rgba(255, 255, 255, 0.9);
+		border: 1px solid rgba(0, 0, 0, 0.125);
+		border-radius: 4px;
+
+		&::before {
+			content: 'Processing...';
+			color: #444;
+		}
+
+		* {
+			display: none;
+		}
+	}
+
+	>div:last-child {
+		width: auto !important;
+		height: auto !important;
+	}
+}
+
+/**
+ li.help-item, use when you want to put a list of icons/headings/etc and their help in a UL
+ e.g.
+ <ul class="list-group">
+	<li class="list-item help-item"><label>Heading X</label><span>X represents the unknown</li>
+	<li class="list-item help-item"><i class="fas fa-skull-and-cross-bones"><span>Oh no, this means pirates</li>
+ </ul>
+ Make sure there's only two direct elements within the help-item, the key and the description
+ */
+
+li.help-item {
+	display: flex;
+
+	:first-child {
+		display: inline-block;
+		min-width: 150px;
+	}
+
+	:last-child {
+		display: inline-block;
+		flex-grow: 1;
+	}
+}
+
+.helpful:after {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f05a";
+	opacity: 0.4;
+	margin-left: 4px;
+	font-size: 10pt;
+}
+
+.quoted {
+	font-weight: 500;
+	color: #446644;
+	&::before,
+	&::after {
+		content: "\"";
+		font-weight: normal;
+		opacity: 0.5;
+	}
+}
+
+.preview-icon {
+	opacity: 0.6;
+	margin-right: 2px;
+}

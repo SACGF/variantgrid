@@ -1,0 +1,228 @@
+////////////////////////
+// LINKS
+////////////////////////
+
+a {
+	&.cross-link {
+		color: gray;
+	}
+
+	&.no-link-style {
+		color: inherit;
+
+		/* blue colors for links too */
+		text-decoration: none;
+
+		/* no underline */
+	}
+}
+
+.filter-link {
+	color: #4444bb !important;
+	text-decoration: none;
+
+	&:hover {
+		cursor: pointer;
+		text-decoration: underline;
+	}
+	&:after {
+		content:'\f0b0';
+		position: relative;
+		right: -4px;
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+.filter-item {
+	cursor: pointer;
+	display: inline-block;
+	padding: 4px 8px 4px 8px;
+	border: 1px solid #aaaaee;
+	border-radius: 12px;
+	&:hover {
+		text-decoration: none;
+	}
+	&:after {
+		position: relative;
+		right: -4px;
+		content: '\f057';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+
+.hover-link {
+	color: #4444bb !important;
+	text-decoration: none;
+
+	&:hover {
+		cursor: pointer;
+		text-decoration: underline;
+	}
+}
+
+h3 .hover-link {
+	color: #222266 !important;
+}
+
+.hover-detail {
+	color: #444455;
+	text-decoration: none;
+	cursor: help;
+}
+
+a {
+	cursor: pointer;
+}
+
+.subtle-link {
+	color: #446 !important;
+
+	&::after {
+		content: none !important;
+	}
+}
+
+.toggle-link {
+	color: #88B;
+	cursor: pointer;
+}
+
+.admin-link {
+	padding-left: 8px;
+	color: #66AA;
+	cursor: pointer;
+	text-decoration: none;
+	text-transform: uppercase;
+	font-size: 8pt;
+
+	&:hover {
+		text-display: underline;
+	}
+
+	&::before {
+		position: relative;
+		left: -4px;
+		content: '\f084';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+	}
+}
+
+.external-link::after {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f35d";
+	opacity: 0.4;
+	margin-left: 4px;
+}
+
+.edit-link::after {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f044";
+	opacity: 0.4;
+	margin-left: 4px;
+}
+
+.modal-link::after {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f2d0";
+	opacity: 0.4;
+	margin-left: 4px;
+}
+
+.mail-link::after {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f2b6";
+	opacity: 0.4;
+	margin-left: 4px;
+}
+
+.download-link:after,
+.dt-button.buttons-csv span:after {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f56d";
+	opacity: 0.6;
+	margin-left: 4px;
+}
+
+.link-back:before {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f137";
+	opacity: 0.6;
+	margin-right: 4px;
+	width: 12px;
+}
+
+.id-link {
+	min-width: 40px;
+	text-align: center;
+	display: inline-block;
+
+	&:before {
+		display: inline-block;
+		font-style: normal;
+		font-variant: normal;
+		text-rendering: auto;
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+		content: "\f15b";
+		opacity: 0.6;
+		margin-right: 4px;
+		width: 12px;
+	}
+}
+
+.toggle-link {
+	&:before {
+		display: inline-block;
+		font-style: normal;
+		font-variant: normal;
+		text-rendering: auto;
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+		content: "\f105";
+		opacity: 0.6;
+		margin-right: 4px;
+		width: 12px;
+	}
+
+	&[aria-expanded=true]:before {
+		content: "\f107";
+	}
+}
+
+tr.parent .toggle-link:before,
+.toggle-link[aria-expanded=true]:before,
+tr.shown .toggle-link:before {
+	content: "\f107";
+}

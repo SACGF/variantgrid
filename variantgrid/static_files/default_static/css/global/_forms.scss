@@ -1,0 +1,127 @@
+////////////////////////
+// FORMS
+////////////////////////
+
+input {
+	&[type='checkbox'],
+	&[type='radio'] {
+		cursor: pointer;
+	}
+}
+
+.texty {
+	width: calc(100% - 12px);
+	font-size: 14px;
+	margin-bottom: 12px;
+	height: 120px;
+	padding: 4px;
+}
+
+.horizontal-fields {
+	display: flex;
+	align-items: center;
+
+	label,
+	.field-label {
+		font-weight: bold;
+		width: inherit;
+		padding-right: 6px;
+	}
+
+	span.select2-container {
+		min-width: 250px !important;
+		width: 250px !important;
+	}
+
+	input {
+
+		&[type=text],
+		&:not([type]) {
+			min-width: 243px !important;
+			width: 243px !important;
+			height: 22px;
+			border-color: #aaaaaa !important;
+		}
+
+		&[type=text]::placeholder,
+		&:not([type])::placeholder {
+			color: #aaaaaa;
+			font-family: "Raleway", serif;
+			font-size: 14px;
+			position: relative;
+			top: 1px;
+			left: 4px;
+		}
+	}
+
+	> {
+
+		div,
+		p,
+		input,
+		label:not(:first-child),
+		.field-label:not(:first-child),
+		button,
+		a {
+			margin-left: 12px;
+		}
+	}
+}
+
+.horizontal-radio li {
+	display: inline-block;
+}
+
+.horizontal-fields {
+	input {
+		&[type='text'],
+		&[type='password'],
+		&[type='email'],
+		&[type='number'],
+		&:not([type]) {
+			min-width: 300px;
+			border-radius: 4px;
+			border: 1px solid #dddddd;
+			min-height: 20px;
+			padding-left: 4px;
+		}
+	}
+
+	textarea {
+		min-width: 300px;
+		border-radius: 4px;
+		border: 1px solid #dddddd;
+		min-height: 20px;
+		padding-left: 4px;
+	}
+}
+
+.horizontal-fields texta-area,
+fieldset.form-fields texta-area {
+	min-width: inherit;
+}
+
+.horizontal-fields select {
+	min-width: 307px;
+	height: 28px;
+}
+
+.labelled.inline {
+	width: 300px;
+	display: inline-block;
+	vertical-align: top;
+}
+
+.editable {
+	border: 1px dashed gray;
+	min-height: 20px;
+	width: auto;
+}
+
+.radio-row {
+	cursor: pointer;
+
+	&:hover {
+		background-color: #f6f6ff !important;
+	}
+}

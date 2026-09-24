@@ -198,37 +198,11 @@
     background-size: 20px 20px;
     background-image: url(/static/icons/flags/flag.svg);
     position: relative;
-    &.flag-little {
-        width: 16px;
-        height: 16px;
-        background-size: 16px 16px;
-    }
     &.flag-classification_suggestion {
         background-image: url(/static/icons/flags/lightbulb.svg);
     }
-    &.flag-classification_pending_change {
-        background-image: url(/static/icons/flags/delayed_sync.svg);
-    }
-    &.flag-classification_matching_variant {
-        background-image: url(/static/icons/flags/analysis.svg);
-        &.res-matching_failed {
-            background-image: url(/static/icons/flags/not-found.svg);
-        }
-    }
-    &.flag-classification_matching_variant_warning {
-        background-image: url(/static/icons/flags/matching-warning.svg);
-        &.res-vm_rejected {
-            background-image: url(/static/icons/flags/matching-warning-failed.svg);
-        }
-    }
     &.flag-classification_unshared {
         background-image: url(/static/icons/flags/lock.svg);
-    }
-    &.flag-classification_review, &.flag-clinical_context_expert_review {
-        background-image: url(/static/icons/flags/checklist.svg); 
-    }
-    &.flag-classification_discordance_discussion {
-        background-image: url(/static/icons/flags/conversation.svg); 
     }
     &.flag-classification_significance_change {
        background-image: url(/static/icons/flags/exchange.svg); 
@@ -248,9 +222,6 @@
     &.flag-classification_discordant, &.flag-clinical_context_discordance {
         background-image: url(/static/icons/flags/discordance.svg); 
     }
-    &.flag-clinical_context_impass {
-        background-image: url(/static/icons/flags/hold.svg); 
-    }
     &.flag-classification_submitted {
         background-image: url(/static/icons/flags/upload-button.svg);   
     }
@@ -260,29 +231,11 @@
     &.flag-classification_internal_review {
         background-image: url(/static/icons/flags/work.svg);
     }
-    &.flag-allele_missing_37 {
-        background-image: url(/static/icons/flags/missing_37.svg);
-    }
-    &.flag-allele_missing_38 {
-        background-image: url(/static/icons/flags/missing_38.svg);
-    }
-    &.flag-allele_37_not_38 {
-        background-image: url(/static/icons/flags/builds_not_equal.svg);
-    }
-    &.flag-classification_transcript_version_change {
-        background-image: url(/static/icons/flags/transcript_ver_change.svg);
-        &.res-tv_rejected {
-           background-image: url(/static/icons/flags/transcript_ver_change_rejected.svg);
-        }
-    }
     &.flag-classification_not_public {
         background-image: url(/static/icons/flags/world-ban.png);
     }
     &.flag-classification_pending_changes {
         background-image: url(/static/icons/flags/pending_changes.png);
-    }
-    &.flag-settings {
-        background-image: url(/static/icons/flags/settings.svg);
     }
     &.add {
         background-image: url(/static/icons/gear.svg);

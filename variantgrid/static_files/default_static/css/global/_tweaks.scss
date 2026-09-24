@@ -1,0 +1,37 @@
+////////////////////////
+// FONT AWESOME TWEAKS
+////////////////////////
+
+i {
+	&.fas,
+	&.fa-solid {
+		margin-right: 4px;
+	}
+}
+
+.svg-inline--fa {
+	margin-right: 4px;
+}
+
+.fa-animate-1 {
+	animation-iteration-count: 1 !important;
+}
+
+////////////////////////
+// BOOTSTRAP TWEAKS
+////////////////////////
+
+.row.equal {
+	>div {
+		display: flex;
+		flex-direction: column;
+
+		>.card {
+			flex-grow: 1;
+		}
+	}
+}
+
+.spacer {
+	flex-grow: 1;
+}

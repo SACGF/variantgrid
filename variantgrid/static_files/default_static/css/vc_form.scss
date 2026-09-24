@@ -41,9 +41,6 @@ table.diff {
             &.citation-row {
                 font-weight:normal;
                 text-align:left;
-                .show-abstract-link {
-                    display: inline-block;
-                }
             }
             .citation {
                 display: inline;
@@ -108,51 +105,6 @@ table.diff {
             td {
                 white-space: pre-wrap;
             }
-        }
-    }
-}
-
-.share-dialog {
-    .share-level-selection {
-        margin-top: 4px;
-        display: flex;
-        padding: 16px 8px 16px 8px;
-        border: 1px solid lightgray;
-        border-radius: 8px;
-        cursor: pointer;
-        img {
-            margin-left: 12px;
-            margin-right: 12px;   
-        }
-        .check-icon {
-            width: 16px;
-            height: 16px;
-            background-repeat: no-repeat;
-            background-position: center center;
-            background-size: 16px;
-        }
-        &.included {
-            opacity: 0.5;   
-            background-color: #ededf2;
-            cursor: not-allowed;
-            .check-icon {
-                background-image: url('../icons/tick.svg');
-            }
-        }
-        &.current {
-            background-color: #bdbdf2;
-            .check-icon {
-                background-image: url('../icons/tick.svg');
-            }
-        }
-        &.newly-included {
-            background-color: #ddddff;
-            .check-icon {
-                background-image: url('../icons/tick.svg');
-            }
-        }
-        &.not-included:hover {
-            background-color: #ccccff;
         }
     }
 }
@@ -496,11 +448,6 @@ table.diff {
             color: blue;
             text-decoration: underline;
         }
-    }
-    .table-5-note {
-        font-size: small;
-        color: grey;
-        cursor: help;
     }
     .calculated-result {
         margin-top: 8px;

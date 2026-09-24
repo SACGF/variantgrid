@@ -1,0 +1,743 @@
+// The variant grids (@see AbstractVariantGrid in snpdb/grids.py) are dozens of columns wide and hold
+// cells with hundreds of links. Every column carries a width (RichColumn.width, falling back to
+// default_column_width), so lay the table out from those and clip each cell to one line, rather than
+// letting one PubMed cell run to a few thousand pixels.
+// A variant's name as the grid's Variant cell draws it - gene + c.HGVS, g.HGVS, or the coordinate -
+// and as the variant page's locus table draws it. The second line only shows in the grid's two line
+// rows mode. @see VariantGridFormat.representativeVariantLabel in variantgrid_formats.js
+.rv-gene {
+	font-weight: 600;
+}
+
+.rv-hgvs {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 11px;
+}
+
+.rv-hgvs-p,
+.rv-sub {
+	color: #777;
+	font-size: 11px;
+}
+
+.rv-line2 {
+	display: none;
+}
+
+// The kind badge beside a variant's name - what it is when it isn't a small variant. In the grid it
+// sits outside the clipped label so it survives an ellipsis; the variant page's locus table uses it
+// too. @see VariantGridFormat.variantKindBadge in variantgrid_formats.js
+.rv-kind {
+	flex: none;
+	padding: 0 4px;
+	border-radius: 3px;
+	background: #eceff1;
+	color: #546e7a;
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 10px;
+}
+
+.rv-kind-del,
+.rv-kind-loss {
+	background: #fdecea;
+	color: #b3261e;
+}
+
+.rv-kind-dup,
+.rv-kind-cnv,
+.rv-kind-gain {
+	background: #e8f0fe;
+	color: #1a56b8;
+}
+
+.rv-kind-ins,
+.rv-kind-inv {
+	background: #fff4e5;
+	color: #a15c00;
+}
+
+.rv-kind-fusion {
+	background: #ede7f6;
+	color: #5e35b1;
+}
+
+.rv-kind-splice {
+	background: #e0f2f1;
+	color: #00695c;
+}
+
+table.variantgrid-datatable {
+	table-layout: fixed;
+	width: auto;
+
+	th,
+	td {
+		// The width the column asked for is the width it gets - content-box would add
+		// the padding and the sort gutter on top, which over 1100 columns ran 22000px wide
+		box-sizing: border-box;
+		padding: 2px 4px;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	// Every row the same height, so the grid pane divides into a whole number of rows
+	tbody td {
+		line-height: 16px;
+	}
+
+	// The second line every composite cell carries. Off by default - the per-user 'two line rows'
+	// setting turns it on. @see AbstractVariantGrid.get_extra_table_classes
+	.ic-line2 {
+		display: none;
+	}
+
+	&.two-line-rows {
+		tbody td {
+			line-height: 16px;
+			vertical-align: top;
+			white-space: normal;
+		}
+
+		.rv-line2,
+		.ic-line2 {
+			display: block;
+			color: #888;
+			font-size: 10px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.variant_id-container {
+			align-items: flex-start;
+
+			a.rv-label {
+				white-space: normal;
+			}
+		}
+
+		.impact-consequence {
+			display: inline-block;
+		}
+	}
+
+	// A composite header's ▾ - the sort keys the cell's other values offer. The header cell is
+	// itself the sort toggle, so this sits on top of it as its own control. The menu it opens is
+	// floated on the body (the scroll head clips it here) - @see .dt-sort-menu-items
+	th .dt-sort-menu .dt-sort-menu-toggle {
+		margin-left: 4px;
+		color: #888;
+		text-decoration: none;
+		font-size: 10px;
+	}
+
+	// The drag handle on a header's right edge - @see DataTableDefinition.setupColumnResize
+	th {
+		position: relative;
+	}
+
+	// z-index so it sits above the DataTables sort arrows, which are pseudo-elements on the same edge
+	th .dt-col-resize {
+		position: absolute;
+		top: 0;
+		right: 0;
+		z-index: 1;
+		width: 6px;
+		height: 100%;
+		cursor: col-resize;
+
+		&:hover {
+			background: #ccc;
+		}
+	}
+
+	// Representative variant cell: expand arrow (td.toggle-link:before) · checkbox · label (details link)
+	.variant_id-container {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		max-width: calc(100% - 16px);  // the arrow's width + margin
+
+		a.rv-label {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			text-decoration: none;
+		}
+	}
+
+	// How many caller rows a fusion was merged from - the calls are in the title. @see fusionCalls
+	.fusion-calls {
+		padding: 0 4px;
+		border-radius: 3px;
+		background: #ede7f6;
+		color: #5e35b1;
+		font-size: 11px;
+	}
+
+	// The germline pair then the somatic pair, each with a fixed share of whatever the cell is, so
+	// the four line up down the column - the eye scans one origin without tracking sideways. Shares
+	// rather than fixed widths: the cell is overflow:hidden, and fixed widths wider than the column
+	// silently cut the last chip off the right edge
+	.cs-chips {
+		display: grid;
+		grid-template-columns: 74fr 52fr 66fr 60fr;
+		gap: 3px;
+		align-items: center;
+	}
+
+	.cs-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+		min-width: 0;
+		height: 16px;
+		line-height: 16px;
+		padding: 0 5px;
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 700;
+		color: #333;
+		vertical-align: middle;
+		text-decoration: none;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+
+		&.cs-chip-empty {
+			background: transparent;
+			border: 1px dashed #ccc;
+			color: #bbb;
+			font-weight: 500;
+		}
+
+		// Same germline / somatic colours as .allele-origin-box, as a left rail
+		&.allele-origin-G {
+			box-shadow: inset 3px 0 0 #88cc88;
+			padding-left: 7px;
+		}
+
+		&.allele-origin-S {
+			box-shadow: inset 3px 0 0 #cc99cc;
+			padding-left: 7px;
+		}
+
+		.cs-chip-src {
+			font-size: 9px;
+			opacity: .6;
+			margin-right: 2px;
+		}
+
+		.cs-chip-stars {
+			color: #d9a400;
+			font-size: 9px;
+			letter-spacing: -1px;
+
+			.off {
+				color: #ccc;
+			}
+		}
+
+		.cs-chip-count {
+			font-size: 9px;
+			background: rgba(0, 0, 0, .08);
+			border-radius: 99px;
+			padding: 0 4px;
+		}
+	}
+
+	// Impact dot + consequence in one cell
+	.impact-consequence {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+
+		.impact-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex: none;
+		}
+
+		.impact-high { background: #cf3f3a; }
+		.impact-moderate { background: #dd8a1c; }
+		.impact-low { background: #3f9a5e; }
+		.impact-modifier { background: #a0a8b3; }
+		.impact-unknown { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+	}
+
+	// gnomAD popmax AF, with the population it came from alongside it
+	.gnomad-popmax-pop {
+		color: #777;
+		font-size: 10px;
+	}
+
+	// Common in gnomAD - recede rather than disappear, the value is still readable
+	.gnomad-af-common {
+		color: #999;
+	}
+
+	// The Pass/Fail sits on the cell's right edge so the badges line up down the column, whatever
+	// width the frequencies beside them take
+	.gnomad-af-cell {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+
+		.gnomad-af {
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		// The popmax frequency is context for the overall AF, not a second headline
+		.gnomad-popmax-af {
+			color: #777;
+			font-size: 11px;
+			flex: none;
+		}
+
+		.gnomad-link {
+			margin-left: auto;
+			flex: none;
+		}
+	}
+
+	// The generic composite cell - the headline member, everything else on hover
+	.composite-cell {
+		display: inline-block;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	// Nothing to headline but detail to hover - keep the cell there to hover over
+	.composite-empty-headline {
+		color: #bbb;
+	}
+
+	// SpliceAI max delta, dot at the 0.2 / 0.5 / 0.8 cutoffs
+	.spliceai {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+
+		.spliceai-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex: none;
+		}
+
+		.spliceai-high { background: #cf3f3a; }
+		.spliceai-moderate { background: #dd8a1c; }
+		.spliceai-low { background: #d8c53a; }
+		.spliceai-none { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+	}
+
+	// A negative MaxEntScan difference is a weakened splice site - the direction that matters
+	.maxentscan-weakened {
+		color: #cf3f3a;
+	}
+
+	.mastermind-link {
+		text-decoration: none;
+	}
+
+	// ALoFT: the prediction, a dot for how damaging it is and the probability behind it
+	.aloft {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+
+		.aloft-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex: none;
+		}
+
+		.aloft-dominant { background: #cf3f3a; }
+		.aloft-recessive { background: #dd8a1c; }
+		.aloft-tolerant { background: #3f9a5e; }
+		.aloft-unknown { background: transparent; box-shadow: inset 0 0 0 1px #ccc; }
+
+		.aloft-prob {
+			color: #777;
+			font-size: 10px;
+		}
+	}
+
+	// ALoFT's own confidence call (p >= 0.05) - recede rather than read as a firm answer
+	.aloft-low-confidence {
+		color: #999;
+
+		.aloft-dot {
+			opacity: .45;
+		}
+	}
+
+	// One segment per prediction tool that made a call, damaging first
+	.predictions {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
+		min-width: 0;
+
+		i {
+			width: 4px;
+			height: 10px;
+			border-radius: 1px;
+			flex: none;
+		}
+
+		.pred-damaging { background: #cf3f3a; }
+		.pred-benign { background: #a0a8b3; }
+
+		.predictions-count {
+			margin-left: 5px;
+			color: #777;
+			font-size: 10px;
+		}
+	}
+
+	// The highest non-gnomAD population frequency, with the database it came from alongside it
+	.pop-freq-source {
+		margin-left: 4px;
+		color: #777;
+		font-size: 10px;
+	}
+
+	// UniProt: the linked accession, then the function summary running on to the cell's edge
+	.uniprot {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		min-width: 0;
+
+		.uniprot-link {
+			flex: none;
+		}
+
+		.uniprot-function {
+			color: #777;
+			font-size: 11px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
+
+	// Conservation - a dot per score. The detail table it carries only draws once floated on hover
+	.conservation {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		min-width: 0;
+
+		.conservation-detail {
+			display: none;
+		}
+	}
+
+	// Database hom · het; a zero count recedes so a real count stands out
+	.db-count-zero {
+		color: #bbb;
+	}
+
+	// A record that passed every VCF filter is the overwhelming majority - fade it almost out so
+	// the eye only stops on the ones that failed something
+	.vcf-filter-pass {
+		color: #dde1e6;
+		font-size: 10px;
+	}
+
+	.vcf-filter-failed {
+		display: inline-flex;
+		align-items: center;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	// The sample's whole call in one cell: zygosity glyph, allele frequency over alt/total reads,
+	// then GQ/PL as quality marks and a flag if the call failed a filter
+	.sample-zygosity {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		// The row is a 16px line box - take it exactly, so a row with a call is no taller than one
+		// where the sample has none
+		height: 16px;
+		vertical-align: top;
+
+		.zyg-glyph {
+			width: 12px;
+			height: 12px;
+			flex: none;
+		}
+
+		.zyg-het,
+		.zyg-hom-alt { color: #3a6ea5; }
+		.zyg-ref,
+		.zyg-unknown { color: #b0b6bd; }
+
+		.zyg-values {
+			display: inline-flex;
+			align-items: baseline;
+			gap: 4px;
+			color: #555;
+			font-size: 11px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		// The reads behind the frequency - present for the doubt the frequency alone leaves
+		.zyg-depth {
+			color: #888;
+			font-size: 10px;
+		}
+
+		// The caller's own copy number / copy ratio, chipped so it doesn't read as another depth -
+		// what the key means is in the title. @see VCF.copy_number_field
+		.zyg-cn {
+			flex: none;
+			padding: 0 3px;
+			border-radius: 3px;
+			background: #eef3f8;
+			color: #3a6ea5;
+			font-size: 10px;
+		}
+
+		// One mark per quality, coloured by how bad it is - the numbers are in the cell's title
+		.zyg-qual {
+			width: 3px;
+			height: 10px;
+			border-radius: 1px;
+			flex: none;
+		}
+
+		.zyg-qual-good { background: #d5dae0; }
+		.zyg-qual-marginal { background: #dd8a1c; }
+		.zyg-qual-bad { background: #cf3f3a; }
+
+		.zyg-filtered {
+			color: #cf3f3a;
+			font-size: 10px;
+			flex: none;
+		}
+	}
+
+	// A row can carry more tags than the column is wide, and the cell clips. Hovering lifts the
+	// whole set out of the clip - over the cells to its right, on the row's hover colour - so the
+	// tags past the edge (and their delete X) can still be read and clicked
+	.grid-tags {
+		display: inline-block;
+		vertical-align: top;
+	}
+
+	td.dt-tags,
+	td.dt-tags_global {
+		&:hover {
+			overflow: visible;
+
+			> .grid-tags {
+				position: relative;
+				z-index: 3;
+				background: #f8f8f8;
+			}
+		}
+	}
+
+	.grid-tag-deletable .user-tag-colored {
+		cursor: pointer;
+	}
+
+	// A to-do tag a classification has satisfied - still there to be read and untagged, but done
+	.grid-tag-resolved .user-tag-colored {
+		opacity: 0.55;
+	}
+
+	// Whose tagging the pill is - a solid person for a tagging made for a sample, a hollow one for a
+	// tagging nobody owns yet. @see VariantGridFormat.tags
+	.grid-tag-sample-marker {
+		margin-left: 3px;
+		font-size: 8px;
+		vertical-align: 1px;
+		opacity: 0.75;
+	}
+
+	// A tagging for a sample other than the one this grid is about - boxed so it reads apart from
+	// this proband's own at a glance, the tooltip says whose it is
+	.grid-tag-sample-marker.grid-tag-sample-other {
+		opacity: 1;
+		padding: 0 1px;
+		border: 1px solid;
+		border-radius: 2px;
+	}
+
+	// Armed by clicking the tag - it sits over the tag's right end rather than being given room
+	// inside it, so arming a tag resizes nothing and the grid doesn't reflow. @see tagClickHandler
+	.grid-tag-delete {
+		position: absolute;
+		top: 2px;
+		right: 4px;
+		z-index: 2;
+		width: 12px;
+		height: 12px;
+		font-size: 12px;
+		line-height: 12px;
+		color: #c02b2b;
+		background: white;
+		border-radius: 50%;
+		cursor: pointer;
+	}
+
+	.grid-tag-armed .user-tag-colored {
+		outline: 1px solid #c02b2b;
+	}
+
+	// Sits with the tags rather than above them, so an untagged row is the same height as a tagged one
+	.add-variant-tag {
+		display: inline-block;
+		height: 16px;
+		line-height: 16px;
+		margin-right: 3px;
+		font-size: 12px;
+		color: #a0a8b3;
+		vertical-align: top;
+		cursor: pointer;
+
+		&::before {
+			content: "\f055";
+			font-family: 'Font Awesome 6 Free', 'FontAwesome';
+			font-weight: 900;
+		}
+	}
+
+	.show-tag-autocomplete:hover .add-variant-tag {
+		color: #3a6ea5;
+	}
+
+	// A quick tag's own (+), sized and aligned like the plain one. The inner markup is a pill's, so
+	// the per-tag rules from render_tag_styles_and_formatter colour it - the grey is what a quick tag
+	// with no colour of its own falls back to. @see VariantGridFormat.tags
+	.quick-tag {
+		text-decoration: none;
+	}
+
+	.quick-tag-button {
+		width: 16px;
+		padding: 0;
+		border-radius: 50%;
+		font-size: 12px;
+		text-align: center;
+		background: #a0a8b3;
+		color: white;
+
+		&::before {
+			content: "\f055";
+			font-family: 'Font Awesome 6 Free', 'FontAwesome';
+			font-weight: 900;
+		}
+	}
+
+	.quick-tag:hover .quick-tag-button {
+		outline: 1px solid #3a6ea5;
+	}
+
+	// Only the arrow cell invites a click - the rest of the row is links
+	&.expandable td.toggle-link {
+		cursor: pointer;
+	}
+
+	// The child row's td spans every column of a table that can be thousands of px wide - keep the
+	// detail pinned to the visible left edge of the scroll body
+	.variant-row-detail {
+		position: sticky;
+		left: 0;
+		width: max-content;
+		max-width: 90vw;
+		padding: 6px 10px;
+		font-size: 12px;
+		white-space: normal;
+
+		.variant-row-detail-columns {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 12px 32px;
+			align-items: flex-start;
+		}
+
+		// Grid cells are single line with an ellipsis, which the detail tables inherit through the
+		// descendant selector - here there's room to wrap, and a ClinVar condition is a dozen
+		// disease names that would otherwise push everything after it off to the right
+		.variant-row-detail-table {
+			max-width: 420px;
+
+			th, td {
+				overflow: visible;
+				text-overflow: clip;
+			}
+
+			td {
+				white-space: normal;
+				overflow-wrap: anywhere;
+			}
+		}
+
+		.variant-row-detail-table th {
+			color: #777;
+			font-weight: 500;
+			padding-right: 10px;
+			white-space: nowrap;
+			text-align: left;
+		}
+
+		.variant-row-detail-table .mono {
+			font-family: ui-monospace, Menlo, Consolas, monospace;
+			font-size: 11px;
+		}
+
+		.variant-row-detail-actions {
+			margin-top: 6px;
+			padding-top: 6px;
+			border-top: 1px solid #e1e5ea;
+			display: flex;
+			gap: 12px;
+		}
+	}
+
+	// One trailing icon per link is unreadable in a cell holding dozens of them
+	td .external-link::after {
+		content: none;
+	}
+
+	// DataTables draws the row separator on every cell but the first row's, leaving row 1 a pixel
+	// short of the rest. Give it the same border, invisible, so the heights match
+	&.dataTable tbody tr:first-child td {
+		border-top: 1px solid transparent;
+	}
+
+	// DataTables reserves 26px of every header for its sort arrows, which over this many columns
+	// costs more than the labels themselves. Its stylesheet loads after ours, hence !important
+	&.dataTable thead > tr > th {
+		padding-right: 16px !important;
+	}
+
+	// Nothing to make room for where the column can't be sorted - and the genotype columns are
+	// 25px wide, so the gutter would be most of them
+	&.dataTable thead > tr > th.sorting_disabled {
+		padding-right: 4px !important;
+	}
+
+	&.dataTable thead > tr > th::before,
+	&.dataTable thead > tr > th::after {
+		right: 2px !important;
+	}
+}

@@ -1,0 +1,81 @@
+////////////////////////
+// HELP
+////////////////////////
+
+.page-help {
+	&.collapsed {
+		width: 260px;
+	}
+
+	&.expanded {
+		width: 80%;
+
+		.toggle-icon {
+			background-image: url(/static/icons/expanded-button.svg);
+		}
+
+		.page-help-menu-bar {
+			border-bottom-left-radius: 0;
+			border-bottom-right-radius: 0;
+
+			&:hover {
+				background-color: #ddddff;
+			}
+		}
+	}
+
+	.page-help-menu-bar {
+		display: flex;
+		border-radius: 8px;
+		cursor: pointer;
+		align-items: center;
+	}
+
+	.toggle-icon {
+		width: 12px;
+		height: 12px;
+		background-size: 12px 12px;
+		background-position: center;
+		background-repeat: no-repeat;
+		background-image: url(/static/icons/collapsed-button.svg);
+		display: inline-block;
+		margin-right: 4px;
+		opacity: 0.6;
+	}
+
+	.page-help-title {
+		white-space: nowrap;
+		font-weight: bold;
+		line-height: 32px;
+	}
+
+	.help-footer {
+		font-size: 12px;
+		color: #888888;
+	}
+
+	.page-help-logo {
+		border: 2px solid white;
+		border-radius: 8px;
+		background-color: #bbbbff;
+		text-align: center;
+		color: white;
+		font-weight: bold;
+		padding: 2px;
+		margin: 5px;
+		width: 15px;
+	}
+
+	.page-help-content {
+		padding: 5px 16px 5px 16px;
+	}
+}
+
+.color-legend {
+	width: 1rem;
+	height: 1rem;
+	border: 1px solid gray;
+	border-radius: 2px;
+	display: inline-block;
+	margin-right: 4px;
+}

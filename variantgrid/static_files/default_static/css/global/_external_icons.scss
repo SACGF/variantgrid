@@ -1,0 +1,184 @@
+////////////////////////
+// MISC 3rd PARTY icons
+////////////////////////
+
+.gnomad-link {
+	text-decoration: none;
+}
+
+.gnomad-flag-label {
+	display: inline;
+	padding: .2em .6em .3em;
+	font-size: 75%;
+	font-weight: bold;
+	line-height: 1;
+	color: #fff;
+	text-align: center;
+	white-space: nowrap;
+	vertical-align: baseline;
+	border-radius: .25em;
+	background-color: #5cb85c;
+}
+
+.gnomad-filtered, .gnomad-flagged {
+	background-color: #f0ad4e;
+}
+
+.sequencer {
+	float: left;
+	margin: 5px;
+}
+
+.variant-select {
+	float: left;
+}
+
+a.clinical-context {
+	display: inline-block;
+	padding: 2px 4px 2px 4px;
+	border: 1px solid gray;
+	border-radius: 4px;
+}
+
+#gene-grid-link {
+	display: flex;
+	align-items: center;
+}
+
+.csv-icon {
+	background-image: url(/static/icons/csv-file-format-extension.png);
+}
+
+.vcf-icon {
+	background-image: url(/static/icons/vcf_64.png);
+}
+
+// SequencingRun grid VCF cell - pack icons tightly so rows stay short
+.sequencing-run-vcfs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px;
+	line-height: 1;
+	// stop the auto-width column collapsing to a single icon, which forced one icon per line
+	min-width: 106px;
+
+	.sequencing-run-vcfs-toggle {
+		white-space: nowrap;
+
+		.grid-link-icon {
+			display: inline-block;
+			vertical-align: middle;
+		}
+	}
+
+	.sequencing-run-vcfs-list {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 2px;
+		flex-basis: 100%;
+	}
+
+	&.sequencing-run-vcfs-collapsed .sequencing-run-vcfs-list {
+		display: none;
+	}
+}
+
+.clingen-icon {
+	background-image: url(/static/images/clingen.jpeg);
+}
+
+.igv-link {
+	background-image: url(/static/icons/IGV_64.png);
+}
+
+.hiseq-2000,
+.hiseq-2500 {
+	background-image: url(/static/icons/sequencers/hiseq_icon.png);
+}
+
+.nextseq-500 {
+	background-image: url(/static/icons/sequencers/nextseq_icon.png);
+}
+
+.novaseq-5000,
+.novaseq-6000 {
+	background-image: url(/static/icons/sequencers/novaseq_icon.png);
+}
+
+.novaseq-x {
+	background-image: url(/static/icons/sequencers/novaseq_x_icon.png);
+}
+
+.miseq {
+	background-image: url(/static/icons/sequencers/miseq_icon.png);
+}
+
+.iseq-100 {
+	background-image: url(/static/icons/sequencers/iseq_icon.png);
+}
+
+.gold-standard-icon {
+	background-image: url(/static/icons/gold-medal.png);
+}
+
+.hidden-eye-icon {
+	background-image: url(/static/icons/hidden_eye.png);
+}
+
+
+.gene-grid-icon {
+	background-image: url("/static/images/gene_grid.png");
+	cursor: pointer;
+	height: 80px;
+	width: 80px;
+	background-size: 80px 80px;
+}
+
+.gene-list-icon {
+	background-image: url("/static/images/node_icons/filter_list.png");
+}
+
+
+.show-grid-icon {
+	background-image: url(/static/icons/noun_Datatable_935839.png);
+}
+
+.check-mark-green {
+	background-image: url(/static/icons/check-mark-green.svg);
+}
+
+.sequencer-name-text {
+	font-size: .6em;
+}
+
+.color-box {
+	width: 30px;
+	height: 30px;
+	border: 1px solid black;
+}
+
+.sample-column {
+	background-color: #fff29c;
+}
+
+.database-column {
+	background-color: #7c26cb;
+}
+
+.transcript-column {
+	background-color: #8aa3ba;
+}
+
+.variant-column {
+	background-color: #bfccd8;
+}
+
+.gene-column {
+	background-color: #97f988;
+}
+
+.clinvar-column {
+	background-color: #ff0000;
+}

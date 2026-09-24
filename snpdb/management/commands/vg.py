@@ -9,7 +9,7 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg outline <file.py> [--min-lines N] | vg outline --coverage [package ...]
     vg settings [NAME] [--diff] [--json]
     vg docs check [doc.md|dir ...] [--all-plans]
-    vg css unused [file.scss ...] [--dynamic]
+    vg css unused [file.scss ...] [--dynamic] [--rendered [--max-pages N] [--per-name N] [--as USER]]
     vg inspect <kind> <id> [--depth N] [--json]
 
 All logic lives in library/vg/; this file only parses arguments. See claude/plans/agent_system.md §4.2.
@@ -27,6 +27,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from library.vg import maps
 from library.vg.css import find_unused, render_unused_report
+from library.vg.css_rendered import crawl_rendered_classes, render_rendered_report
 from library.vg.docs import check_docs, render_report
 from library.vg.inspect import KINDS, inspect, render_inspection
 from library.vg.outline import outline, render_coverage, render_outline
@@ -96,6 +97,11 @@ class Command(BaseCommand):
         css_parser.add_argument("action", choices=["unused"])
         css_parser.add_argument("paths", nargs="*", help="Stylesheets to check (default: every .scss under static_files)")
         css_parser.add_argument("--dynamic", action="store_true", help="Also list names whose prefix is built up at runtime")
+        css_parser.add_argument("--rendered", action="store_true",
+                                help="Crawl pages as claude_agent and report which dynamic names appear in rendered HTML")
+        css_parser.add_argument("--max-pages", type=int, default=500)
+        css_parser.add_argument("--per-name", type=int, default=2, help="Pages rendered per URL name")
+        css_parser.add_argument("--as", dest="username", help="Crawl as this user instead of claude_agent")
 
         inspect_parser = subparsers.add_parser("inspect", help="An object's whole graph by domain kind: " + ", ".join(KINDS))
         inspect_parser.add_argument("kind", choices=list(KINDS))
@@ -218,9 +224,13 @@ class Command(BaseCommand):
 
     # --- css ---
 
-    def handle_css(self, paths, dynamic, **_):
+    def handle_css(self, paths, dynamic, rendered, max_pages, per_name, username, **_):
         report = find_unused(paths or None)
-        self.stdout.write(render_unused_report(report, show_dynamic=dynamic))
+        self.stdout.write(render_unused_report(report, show_dynamic=dynamic and not rendered))
+        if rendered:
+            crawl = crawl_rendered_classes(username, max_pages=max_pages, per_name=per_name,
+                                           progress=lambda path: self.stderr.write(path))
+            self.stdout.write("\n" + render_rendered_report(report, crawl))
         if not report.ok:
             raise CommandError(f"{len(report.unused)} unused selector(s)")
 

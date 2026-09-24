@@ -2,7 +2,7 @@
 """
 scripts/vg — thin dispatcher for `manage.py vg` (see snpdb/management/commands/vg.py).
 
-Subcommands that need no Django (`tests`, `outline`, `docs`, `css`, and the static maps: signals, settings, tasks)
+Subcommands that need no Django (`tests`, `outline`, `docs`, `css` without `--rendered`, and the static maps: signals, settings, tasks)
 run here in well under a second. Everything else delegates to `manage.py vg` with the repo's virtualenv, and
 `map` is run under the canonical CI settings module so the committed maps are deterministic.
 """
@@ -119,7 +119,7 @@ def main(argv: list[str]) -> int:
         return _static_outline(argv[1:])
     if subcommand == "docs":
         return _static_docs(argv[1:])
-    if subcommand == "css":
+    if subcommand == "css" and "--rendered" not in argv:
         return _static_css(argv[1:])
     if subcommand == "map":
         if len(argv) > 1 and argv[1] in maps.STATIC_MAPS and "--app" not in argv:

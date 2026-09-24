@@ -13,7 +13,8 @@ reported as *dynamic*, not unused, when any proper prefix of it that ends in `-`
 somewhere (`cs-` is a token of `"cs-" + status`, `cs-{{ x }}`, `f"cs-{x}"` and `cs-${x}` alike). Those
 need a reader's eye, which is why they are listed (`--dynamic`) rather than dropped. A class added by code
 that is not in the tree at all - Django's form `errorlist`, jQuery UI's `ui-*`, FontAwesome's SVG output -
-is listed in LIBRARY_ADDED and reported as such, never as unused.
+is listed in LIBRARY_ADDED and reported as such, never as unused. So is a class whose name is a database
+value (DATA_DERIVED: `SequencerModel.css_class` is the lowercased model name, `hiseq-2500`).
 
 Entry points: `find_unused` (returns an UnusedReport) and `render_unused_report`. Pure filesystem - no Django.
 """
@@ -23,7 +24,7 @@ from pathlib import Path
 
 from library.vg.repo import REPO_ROOT, first_party_packages
 
-SCSS_GLOBS = ("variantgrid/static_files/*_static/css/*.scss",)
+SCSS_GLOBS = ("variantgrid/static_files/*_static/css/**/*.scss",)
 SOURCE_SUFFIXES = (".html", ".js", ".py", ".jinja", ".jinja2")
 # Directories under a package that are build output or vendored trees, never a source of class names
 SKIPPED_DIRS = {"sitestatic", "node_modules", "__pycache__"}
@@ -35,6 +36,11 @@ LIBRARY_ADDED = (
     "ui-",  # jQuery UI widgets (CDN)
     "svg-inline--fa",  # FontAwesome's SVG rendering (CDN)
     "fileupload-", "template-download", "template-upload",  # jQuery File Upload
+    "select2-",  # select2, served by django-autocomplete-light (dal_select2)
+)
+# Class names that are a database value, so no source file names them
+DATA_DERIVED = (
+    "hiseq-", "nextseq-", "novaseq-", "iseq-",  # seqauto SequencerModel.css_class
 )
 
 _TOKEN = re.compile(r"[\w-]+")
@@ -59,7 +65,7 @@ class UnusedReport:
     selectors: int
     unused: list[Selector]
     dynamic: list[Selector]  # a prefix is built up somewhere, so a reader must decide
-    library: list[Selector]  # named only by code outside the tree (LIBRARY_ADDED)
+    library: list[Selector]  # named only by code outside the tree or by data (LIBRARY_ADDED, DATA_DERIVED)
 
     @property
     def ok(self) -> bool:
@@ -124,7 +130,7 @@ def _dynamic_prefixes(name: str):
 
 def classify(name: str, tokens: set[str]) -> str:
     """ 'used', 'library', 'dynamic' (a `-`/`_` prefix of the name is a token) or 'unused' """
-    if name.startswith(LIBRARY_ADDED):
+    if name.startswith(LIBRARY_ADDED + DATA_DERIVED):
         return "library"
     if name in tokens:
         return "used"
@@ -165,7 +171,7 @@ def render_unused_report(report: UnusedReport, show_dynamic: bool = False) -> st
         if show_dynamic:
             out.extend(_render_selector(s) for s in report.dynamic)
     if report.library:
-        out.append(f"\n{len(report.library)} named only by a library outside the tree, kept: "
+        out.append(f"\n{len(report.library)} named only by a library outside the tree or by data, kept: "
                    + " ".join(s.spelled for s in report.library))
     return "\n".join(out)
 

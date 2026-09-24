@@ -1,0 +1,642 @@
+////////////////////////
+// MISC common meaningful elements, overlaps, citations, etc
+////////////////////////
+
+.overlap-discordant {
+	color: #b44;
+	font-weight: 600;
+}
+
+.overlap-concordant_confidence {
+	color: #FFA500;
+	font-weight: 600;
+}
+
+.overlap-concordant_agreement,
+.overlap-concordant_agreement_diff_vus {
+	color: #287745;
+	font-weight: 600;
+}
+
+.overlap-single_submission,
+.overlap-no_entries {
+	color: #aaa;
+	font-weight: 600;
+}
+
+.overlap-pending_concordance {
+	color: #66aa66;
+	font-weight: 600;
+}
+
+.citations {
+	max-width: 534px;
+	flex-direction: column;
+}
+
+.citation {
+	a {
+		color: #222288;
+		text-decoration: none;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+
+	.author,
+	.authors {
+		color: gray;
+	}
+
+	.title {
+		color: #444444;
+		display: inline-block;
+	}
+
+	.year {
+		color: gray;
+	}
+
+	.abstract {
+		color: #444444;
+		margin-bottom: 0;
+	}
+
+	.loading {
+		opacity: 1.0;
+	}
+
+	&.failed {
+		background-color: #ffcccc;
+	}
+
+	+.citation {
+		margin-top: 15px;
+		padding-top: 15px;
+		border-top: 1px dashed lightgray;
+	}
+}
+
+.crit-value {
+	text-align: center !important;
+	font-weight: 500;
+}
+
+.crit-strength-N {
+	background-color: #eee;
+	color: #888;
+}
+
+.crit-direction-B {
+	&.crit-strength-0 {
+		background-color: #f8f8ff;
+	}
+
+	&.crit-strength-1 {
+		background-color: #eef;
+	}
+
+	&.crit-strength-2 {
+		background-color: #ddf;
+	}
+
+	&.crit-strength-3 {
+		background-color: #ccf;
+	}
+
+	&.crit-strength-4 {
+		background-color: #bbf;
+	}
+
+	&.crit-strength-5 {
+		background-color: #aaf;
+	}
+}
+
+.crit-direction-P {
+	&.crit-strength-0 {
+		background-color: #fff8f8;
+	}
+
+	&.crit-strength-1 {
+		background-color: #fee;
+	}
+
+	&.crit-strength-2 {
+		background-color: #fdd;
+	}
+
+	&.crit-strength-3 {
+		background-color: #fcc;
+	}
+
+	&.crit-strength-4 {
+		background-color: #fbb;
+	}
+
+	&.crit-strength-5 {
+		background-color: #faa;
+	}
+}
+
+.crit-direction-X {
+	background-color: #faf;
+}
+
+#allele-origin-toggle .btn-group {
+	label {
+		opacity: 0.5;
+		background-color: #aaa;
+		color: #222;
+
+		&.active {
+			opacity: 1;
+		}
+	}
+
+	.allele-origin-A.active {
+		color: #fff;
+		background-color: #aaaabb;
+	}
+
+	.allele-origin-G.active {
+		color: #fff;
+		background-color: #88cc88 !important;
+	}
+
+	.allele-origin-S.active {
+		color: #fff;
+		background-color: #cc99cc;
+	}
+}
+
+.allele-origin-box {
+	background-color: #999;
+	border-radius: 8px;
+
+	&.allele-origin-A {
+		background-color: #aaaabb;
+	}
+
+	&.allele-origin-G {
+		background-color: #88cc88;
+	}
+
+	&.allele-origin-S {
+		background-color: #cc99cc;
+	}
+
+	&.allele-origin-U .allele-origin-text {
+		font-size: 7pt;
+		padding-bottom: 0.5px;
+	}
+
+	.allele-origin-text {
+		font-weight: 500;
+		color: white;
+		font-size: 8pt;
+		text-transform: uppercase;
+		text-align: center;
+	}
+
+	&.horizontal {
+		display: inline-block;
+		position: relative;
+		width: 70px;
+		margin-right: 6px;
+
+		.allele-origin-text {
+			padding-top: 1px;
+			padding-bottom: 1px;
+		}
+	}
+
+	&.vertical {
+		margin-top: -4px;
+		margin-left: 6px;
+		margin-right: 8px;
+		width: 14px;
+		height: 66px;
+
+		.allele-origin-text {
+			width: 180px;
+			transform: rotate(-90deg);
+			position: relative;
+			left: -83px;
+			bottom: -28px;
+		}
+	}
+}
+
+.overlap-source {
+	font-size: 8pt;
+    text-align: center;
+	border-radius: 2px;
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    background-color: #888888;
+	font-weight: bold;
+	color: #FFF;
+}
+
+.testing-context-box {
+    font-size: 8pt;
+    text-align: center;
+    display: inline-block;
+    position: relative;
+    width: 80px;
+	padding: 4px;
+	border-radius: 6px;
+    background-color: #ddbbdd;
+
+    /*
+    all testing contexts other than Germline are somatic
+
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumour"
+    OTHER = "O", "Other" # FIXME Somatic Other
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+     */
+
+    color: #FFF;
+    font-weight: bold;
+    &.testing-context-G {
+        color: #444;
+        background-color: #aaeeaa;
+    }
+}
+
+.testing-context-text-G {
+	color: #44cc22;
+	font-weight: bold;
+}
+.testing-context-text-S {
+	color: #aa33aa;
+	font-weight: bold;
+}
+.testing-context-text-H {
+	color: #aa3399;
+	font-weight: bold;
+}
+.testing-context-text-N {
+	color: #aa3388;
+	font-weight: bold;
+}
+
+.testing-context-G {
+	background-color: #ddeedd;
+}
+
+.testing-context-S {
+	background-color: #ffc6ff;
+}
+.testing-context-H {
+	background-color: #ffccff;
+}
+.testing-context-N {
+	background-color: #ffbbff;
+}
+
+.testing-context-table {
+	.testing-context-S {
+		background-color: #ffe8ff;
+	}
+
+	.testing-context-H {
+		background-color: #ffddff;
+	}
+
+	.testing-context-N {
+		background-color: #ffccff;
+	}
+}
+td.allele-origin-G {
+	background-color: #ddffdd;
+}
+.testing-context-C {
+	// C for cross context
+	background-color: #eeeeee;
+	opacity: 0.7;
+	color: #444444;
+}
+td.allele-origin-S {
+	background-color: #ffdcff;
+}
+.testing-context-table {
+	tbody tr td {
+		border-top-width: 0;
+	}
+}
+
+
+a .c-hgvs-body {
+
+	.c-hgvs-transcript,
+	.c-hgvs-nomen {
+		color: #444488 !important;
+	}
+}
+
+#vc-datatable {
+	.dt-c_hgvs {
+		.c-hgvs-body {
+			.colon::after {
+				content: "\a";
+				white-space: pre;
+			}
+		}
+	}
+}
+
+.c-hgvs-body {
+	.bracket {
+		margin-left: 2pt;
+		margin-right: 2pt;
+		color: #555;
+
+		&.bracket-close {
+			letter-spacing: 2px;
+		}
+	}
+
+	.colon {
+		margin-left: -1pt;
+		margin-right: 1pt;
+		color: #666;
+	}
+
+	.colon-no-gene-symbol {
+		margin-left: 2pt;
+		margin-right: 2pt;
+		color: #666;
+	}
+
+	.c-hgvs-transcript,
+	.c-hgvs-gene-symbol-b {
+		white-space: nowrap;
+		word-break: normal;
+	}
+
+	.c-hgvs-nomen {
+		word-break: break-all;
+	}
+
+	.c-hgvs-gene-symbol {
+		margin-left: 1pt;
+		margin-right: 1pt;
+		color: #6c757d;
+		letter-spacing: 0.5px;
+	}
+}
+
+.genome-build {
+	font-size: 8px;
+	margin-right: 4px;
+}
+
+.share-level-LAB,
+.share-level-ORGANISATION {
+	opacity: 0.4;
+}
+
+.c-pill {
+	font-weight: bold;
+	display: inline-block;
+	padding: 4px;
+	border-radius: 6px;
+	width: 130px;
+	text-align: center;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	// color: #555;
+	font-weight: 600;
+
+	.amp-level {
+		//color: #777;
+		//&::before {
+		//	content: '-';
+		//	padding-right: 2px;
+		//}
+	}
+
+}
+
+// master branch had this in a .c-pill, .node-chip, .cs-chip wrapper
+// but somatic branch removed the scs prefix to just be cs as well for simplicity
+
+.cs-none {
+	border: none !important;
+	background-color: #eeeeee;
+}
+
+.cs-tier_1 {
+	background-color: #ffcccc;
+}
+
+.cs-tier_1_or_2 {
+	background-color: #ffd5d5;
+}
+
+.cs-tier_2 {
+	background-color: #ffdddd;
+}
+
+.cs-tier_3 {
+	background-color: #dddddd;
+}
+
+.cs-tier_4 {
+	background-color: #ccccff;
+}
+
+.cs-b {
+	background-color: #ccccff;
+}
+
+.cs-lb {
+	background-color: #ddddff;
+}
+
+.cs-r, cs-dr {
+	background-color: #eeeeee;
+}
+
+.cs-vus,
+.cs-vus_a,
+.cs-vus_b,
+.cs-vus_c {
+	background-color: #dddddd;
+}
+
+.cs-lp, .cs-lo {
+	background-color: #ffdddd;
+}
+
+.cs-p, .cs-o {
+	background-color: #ffcccc;
+}
+
+//.cs- {
+//	background-color: #f0f0f0;
+//}
+
+.cs-pending {
+	background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
+}
+
+.cs-withdrawn {
+	opacity: 0.5;
+}
+.cs-in-review {
+	opacity: 0.8;
+	background-color: #eee;
+}
+
+// Clinical significance counts above a classification grouping grid
+// Pill + count toggles that filter the grid below - classification groupings, analysis/gene tag counts
+.summary-counts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 8px;
+
+	.summary-count {
+		display: flex;
+		align-items: stretch;
+		white-space: nowrap;
+		cursor: pointer;
+		border-radius: 6px;
+		text-decoration: none;
+
+		.c-pill {
+			width: auto;
+			min-width: 90px;
+			border-radius: 6px 0 0 6px;
+		}
+
+		.count {
+			padding: 4px 10px;
+			border: 1px solid #ddd;
+			border-left: none;
+			border-radius: 0 6px 6px 0;
+			background-color: #fafafa;
+			color: #555;
+			font-weight: 600;
+		}
+
+		&:hover .count {
+			background-color: #eee;
+		}
+
+		&.selected {
+			outline: 2px solid #555;
+			outline-offset: 1px;
+		}
+	}
+
+	&.filtered .summary-count:not(.selected) {
+		opacity: 0.5;
+	}
+
+	// Tag counts sit above a grid rather than heading a page, so they run smaller
+	&.tag-counts-summary {
+		align-items: center;
+
+		.summary-count {
+			.c-pill {
+				min-width: 60px;
+				padding: 2px 8px;
+				font-size: 11px;
+			}
+
+			.count {
+				padding: 2px 8px;
+				font-size: 11px;
+			}
+		}
+	}
+}
+
+.cs-dot {
+	min-width: 16px;
+	border-radius: 6px;
+	padding: 6px;
+	text-align: center;
+	display: inline-block;
+}
+
+.health-check {
+	.health-value {
+		display: inline-block;
+		text-align: right;
+		min-width: 120px;
+		padding-right: 20px;
+		font-weight: 500;
+	}
+	.modal-link {
+		margin-left: 122px;
+	}
+}
+
+.ontology-term {
+	.term-id {
+		// font-family monospace is a bit overpowering on the classification table
+		// font-family: monospace;
+	}
+	// occasionally a gene-symbol can be represented as an ontology-term, normally for showing relationships
+	.gene-symbol {
+		letter-spacing: 1px;
+		font-weight: bold;
+	}
+	.term-name {
+		color: #444;
+	}
+	&.free-text {
+		font-style: italic;
+		color: #666;  // when the "ontology term" is just free text
+	}
+}
+
+.comment {
+	padding: 8px 8px 8px 0;
+	color: #888;
+
+	&:before {
+		content: '\f27a';
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-weight: 900;
+		padding-right: 8px;
+	}
+}
+
+table.overlap-summary {
+	th.overlap-lab {
+		width: 250px;
+	}
+	th.overlap-value {
+		width: 200px;
+	}
+	th.overlap-condition {
+		width: 200px;
+	}
+	th.overlap-curated {
+		width: 100px;
+	}
+	th.overlap-triage {
+		width: 300px;
+	}
+	tr.users-row {
+		background-color: #eeeeee;
+	}
+	tr.cross-context-row {
+		opacity: 0.6;
+		background-color: #f4f4f4;
+	}
+	.overlap-criteria {
+		padding: 3px 0 3px 0;
+		color: #444;
+	}
+}

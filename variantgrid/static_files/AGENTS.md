@@ -5,10 +5,19 @@ Source JS/CSS/images live here, under `<site>_static/` (`default_static` unless 
 
 `global.css` and friends are compiled from `.scss` by a PyCharm file watcher - do not run `sassc`/`sass` yourself (its
 formatting creates huge diffs). Edit the `.scss`, then hand-apply the same minimal change to the generated `.css`
-matching its formatting, so it works before the next recompile. Leave `.css.map` files alone.
+matching its formatting, so it works before the next recompile. Leave `.css.map` files alone. Compiling to a scratch
+directory to check a change is fine: `sassc -t expanded` output matches the committed `.css` bar blank lines
+(`diff -B -w`), but it cannot read `@use`, so a `global.scss` change needs a dart-sass binary.
+
+`global.scss` is only a list of `@use` lines; the rules are in `css/global/_<concern>.scss`, and the `@use` order is the
+cascade. Moving a rule between partials moves it in the cascade, so compile before and after and diff. The last two
+partials (`_styled_tables`, `_fieldsets`) were the separate global_deprecated stylesheet, loaded after `global.css`.
 
 `scripts/vg css unused` lists the class / id selectors in the `.scss` that nothing in the templates, JS or Python
 names, so run it before deleting or moving a rule (`--dynamic` adds the names built up at runtime, `cs-{{ status }}`
-style, which need a reader's eye). It reads `library/vg/css.py`.
+style, which need a reader's eye). It reads `library/vg/css.py`. `vg css unused --rendered` (`library/vg/css_rendered.py`)
+crawls pages as `claude_agent` and reports which dynamic names reach rendered HTML - it can't see classes JS adds, so
+most grid and flag names still need reading the code that builds them. A class whose name is a database value
+(`SequencerModel.css_class`) goes in `DATA_DERIVED` there, or the scan calls it unused.
 
 Bootstrap 4: `data-toggle` / `data-target`, not the Bootstrap 5 `data-bs-*` forms.

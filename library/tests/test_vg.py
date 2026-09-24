@@ -7,9 +7,10 @@ import ast
 import tempfile
 from pathlib import Path
 
+from bs4 import BeautifulSoup
 from django.test import SimpleTestCase
 
-from library.vg import css, docs
+from library.vg import css, css_rendered, docs
 from library.vg import inspect as inspect_pkg
 from library.vg.import_graph import (
     ImportGraph,
@@ -334,7 +335,8 @@ class CssUnusedTest(SimpleTestCase):
         self.assertEqual(css.classify("crit-strength-3", tokens), "dynamic")
         self.assertEqual(css.classify("flag-classification_withdrawn", tokens), "dynamic")
         self.assertEqual(css.classify("errorlist", tokens), "library")
-        self.assertEqual(css.classify("hiseq-2000", tokens), "unused")
+        self.assertEqual(css.classify("hiseq-2000", tokens), "library")  # SequencerModel.css_class, from data
+        self.assertEqual(css.classify("gone", tokens), "unused")
 
     def test_tokens_include_the_stem_of_a_built_up_name(self):
         with tempfile.NamedTemporaryFile("w", suffix=".html", dir=REPO_ROOT / "library", delete=False) as f:
@@ -342,3 +344,14 @@ class CssUnusedTest(SimpleTestCase):
         self.addCleanup(Path(f.name).unlink)
         tokens = css.source_tokens([Path(f.name)])
         self.assertTrue({"cs-", "crit-strength-", "share-level-"} <= tokens)
+
+    def test_rendered_crawl_follows_only_local_paths(self):
+        soup = BeautifulSoup("""
+            <a href="/snpdb/view_sample/3?tab=vcf#x">local</a>
+            <a href="http://localhost/genes/view_gene/1">same host</a>
+            <div data-url="/analysis/1/node_doc/2/"></div>
+            <a href="https://gnomad.broadinstitute.org/variant/1">external</a>
+            <a href="#top">anchor</a> <a href="mailto:x@y">mail</a> <a href="relative/page">relative</a>
+        """, "html.parser")
+        self.assertEqual(css_rendered._links(soup),  # pylint: disable=protected-access
+                         ["/snpdb/view_sample/3", "/genes/view_gene/1", "/analysis/1/node_doc/2/"])

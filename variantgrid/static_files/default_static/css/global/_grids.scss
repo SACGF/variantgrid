@@ -1,0 +1,133 @@
+////////////////////////
+// GRIDS
+////////////////////////
+
+.grid-link {
+	float: left;
+	border: 0px !important;
+}
+
+#node-data-container a.grid-link {
+	text-align: center;
+	text-decoration: none;
+	font-weight: bold;
+}
+
+.grid-link-icon,
+.icon16 {
+	width: 16px;
+	height: 16px;
+	background-size: 16px 16px;
+}
+
+// The analysis grid internal classification boxes - standard germline/somatic colours
+.grid-link-icon.allele-origin-G {
+	background-color: #88cc88;
+}
+
+.grid-link-icon.allele-origin-S {
+	background-color: #cc99cc;
+}
+
+.icon24 {
+	width: 24px;
+	height: 24px;
+	background-size: 24px 24px;
+}
+
+.icon32 {
+	width: 32px;
+	height: 32px;
+	background-size: 32px 32px;
+}
+
+.icon48 {
+	width: 48px;
+	height: 48px;
+	background-size: 48px 48px;
+}
+
+// Font Awesome glyphs rather than images, so they take the surrounding font size and colour
+.click-to-delete-button,
+.click-to-add-button {
+	cursor: pointer;
+	height: 16px;
+	width: 16px;
+	line-height: 16px;
+	text-align: center;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	font-size: 14px;
+}
+
+.click-to-delete-button {
+	color: #c02b2b;
+	&::before {
+		content: "\f057";
+	}
+}
+
+.click-to-add-button {
+	color: #3f9a5e;
+	&::before {
+		content: "\f055";
+	}
+}
+
+////////////////////////
+// TABLES
+////////////////////////
+
+table.table {
+	font-size: 12px;
+}
+
+table.as_table {
+	th {
+		width: 50%;
+		text-align: right;
+		border: none;
+	}
+
+	td {
+		width: 50%;
+		text-align: left !important;
+		border: none;
+	}
+}
+
+// Every tag on the site is this markup (@see getVariantTagHtml) - the grids, the tags pages, the
+// node counts lists and the tag autocomplete - so the pill is shaped once here. Tag colours come
+// from UserTagColor (@see render_rgb_css), which is why the background is only a fallback.
+// Sized to sit inside a grid row's line box, so tagging a variant doesn't make its row taller
+// than every other row in the grid.
+.grid-tag {
+	position: relative;
+	display: inline-block;
+	// top, not middle - a 16px box aligned to the middle of a 16px line box makes the line
+	// (and so every tagged row) taller than the rest of the grid
+	vertical-align: top;
+
+	// Capped so one long tag name can't take the whole cell (and push the X out of the clipped
+	// cell with it) - the full name is in the tag's title
+	.user-tag-colored {
+		display: inline-block;
+		max-width: 130px;
+		height: 16px;
+		line-height: 16px;
+		margin: 0 3px 0 0;
+		padding: 0 6px;
+		border-radius: 8px;
+		font-size: 10px;
+		background: #eceff3;
+		color: #333;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+}
+
+// Variant tags grid - sits inline after the variant string. @see renderVariantTagVariant
+.btn.new-classification-button {
+	margin-left: 6px;
+}

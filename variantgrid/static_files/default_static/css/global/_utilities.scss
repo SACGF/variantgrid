@@ -1,0 +1,85 @@
+////////////////////////
+// BASIC/SIMPLE CLASS for STYLE or basic style tweak
+////////////////////////
+
+strong {
+	font-weight: 500;
+}
+
+.mono {
+	font-family: monospace;
+}
+
+.strike {
+	text-decoration: line-through;
+}
+
+.cursor-pointer {
+	cursor: pointer;
+}
+
+.cursor-move {
+	cursor: move;
+}
+
+.hidden {
+	display: none;
+}
+
+.left {
+	float: left;
+}
+
+.right {
+	float: right;
+}
+
+.clear {
+	clear: both;
+}
+
+.margin-r-5 {
+	margin-right: 5px;
+}
+
+img.vcenter {
+	vertical-align: middle;
+}
+
+.center {
+	text-align: center;
+}
+
+.display-flex {
+	display: flex;
+}
+
+.flex-1 {
+	flex: 1;
+}
+
+.flex-none {
+	flex: none;
+}
+
+.flex-grow {
+	flex-grow: 1;
+}
+
+.flex-shrink {
+	flex-shrink: 1;
+}
+
+.flex-no-grow {
+	flex-grow: 0;
+}
+
+.flex-center-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.borderless {
+	border: none !important;
+}

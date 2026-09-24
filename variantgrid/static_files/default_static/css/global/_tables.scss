@@ -1,0 +1,257 @@
+table {
+	&.sticky-header thead th {
+		background-color: white;
+		position: sticky !important;
+		top: -36px;
+		z-index: 1;
+	}
+
+	&.responsive {
+		width: 100%;
+
+		tr {
+
+			&.odd,
+			&.even {
+				cursor: pointer;
+			}
+		}
+	}
+
+	&.summary {
+		margin-left: auto;
+		margin-right: auto;
+
+		td,
+		th {
+			padding: 5px 10px 5px 10px;
+		}
+
+		td {
+			max-width: 1000px;
+			vertical-align: top;
+		}
+	}
+
+	th.num,
+	td.num {
+		text-align: right;
+	}
+
+	&.data td,
+	td.num {
+		font-family: monospace;
+	}
+}
+
+td {
+	&.dt-preview {
+		font-family: monospace;
+		font-size: 12px;
+		overflow-x: hidden;
+	}
+
+	&.dt-hgvs {
+		min-width: 200px;
+	}
+}
+
+table.dataTable {
+	tr {
+
+		&.odd:hover,
+		&.even:hover {
+			background-color: #f8f8f8;
+		}
+
+		&.odd:hover .toggle-link:before,
+		&.even:hover .toggle-link:before {
+			opacity: 1;
+		}
+	}
+
+	.dt-detail {
+		font-size: 12px;
+		color: #444444;
+	}
+
+	tr.child td.child {
+		padding-top: 0;
+		padding-bottom: 16px;
+
+		fieldset.form-fields {
+			padding-top: 0;
+
+			>*> {
+				label,
+				.field-label {
+					width: 100px;
+				}
+
+				*:nth-child(2) {
+					width: calc(100% - 100px);
+				}
+			}
+		}
+	}
+
+	td.dataTables_empty {
+		font-size: 16px !important;
+		padding-top: 22px;
+		padding-bottom: 12px;
+		color: #BBBBBB !important;
+		font-style: italic;
+		text-align: center;
+	}
+}
+
+td.table-empty {
+	font-size: 16px !important;
+	padding-top: 22px;
+	padding-bottom: 12px;
+	color: #BBBBBB !important;
+	font-style: italic;
+	text-align: center;
+}
+
+table.dataTable td.dataTables_empty:before,
+td.table-empty:before {
+	display: inline-block;
+	font-style: normal;
+	font-variant: normal;
+	text-rendering: auto;
+	font-family: 'Font Awesome 6 Free', 'FontAwesome';
+	font-weight: 900;
+	content: "\f1b2";
+	opacity: 0.4;
+	margin-right: 8px;
+}
+
+table.datatable.expandable tr {
+
+	&.even,
+	&.odd {
+		cursor: pointer;
+	}
+}
+
+.dataTables_wrapper {
+	.toolbar {
+		display: flex;
+		align-items: baseline;
+
+		.custom {
+			flex-grow: 1;
+		}
+	}
+
+	.bottom {
+		display: flex;
+		align-items: center;
+
+		.showing {
+			flex-grow: 1;
+		}
+
+		// Grid level actions (the analysis node grid's CSV/VCF) sit beside the pager
+		.bottom-toolbar {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-right: 12px;
+		}
+	}
+
+	/* The variant grids trade control chrome for rows: default Bootstrap sizing puts ~60px under the
+	   table (the info and length lines stack, on top of 32px pager buttons), which is three rows the
+	   user can't see. @see compactControls in the definition */
+	&.dt-compact .bottom {
+		$control-height: 22px;
+
+		.showing {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+		}
+
+		.dataTables_info,
+		.dataTables_length,
+		.dataTables_paginate {
+			padding: 0;
+			margin: 0;
+			line-height: $control-height;
+			white-space: nowrap;
+		}
+
+		select,
+		input {
+			height: $control-height;
+			padding-top: 0;
+			padding-bottom: 0;
+			line-height: $control-height;
+		}
+
+		// Buttons carry a 1px border top and bottom, so they line up with the rest at 20px
+		.btn {
+			padding: 0 6px;
+			line-height: $control-height - 2px;
+		}
+
+		.btn-rnd-rect {
+			width: auto;
+			min-width: $control-height;
+			height: $control-height;
+			border-radius: 6px;
+			margin-left: 2px;
+			margin-right: 2px;
+		}
+	}
+}
+
+/* be able to show alerts in tables without them making the row giant */
+/* the below worked when we're in a table table cell, but screws up formatting if
+ we just so happen to be in a table (maybe an expanded row) */
+/*
+.table .alert {
+	margin-bottom: 1px;
+	height: 20px;
+	line-height: 16px;
+	padding: 0px 15px 3px 15px;
+}
+ */
+
+.dtrg-start td {
+	background-color: #efefef;
+}
+
+tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
+	border-top: 40px solid white;
+}
+
+div.dataTables_wrapper div.dataTables_filter label {
+	font-weight: 500 !important;
+	position: relative;
+	top: 0.5px;
+}
+
+.dataTables_filter input[type=search] {
+	min-width: 200px;
+}
+
+.table {
+	th {
+		font-weight: 500;
+	}
+
+	&.df-table {
+		td {
+			text-align: right;
+		}
+
+		th {
+			text-align: right;
+			font-weight: 600;
+		}
+	}
+}
+

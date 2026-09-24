@@ -42,9 +42,6 @@ table.diff tbody th.citation-row {
   font-weight: normal;
   text-align: left;
 }
-table.diff tbody th.citation-row .show-abstract-link {
-  display: inline-block;
-}
 table.diff tbody th .citation {
   display: inline;
 }
@@ -97,49 +94,6 @@ table.diff tbody tr .explain-icon {
 }
 table.diff tbody tr.textarea td {
   white-space: pre-wrap;
-}
-
-.share-dialog .share-level-selection {
-  margin-top: 4px;
-  display: flex;
-  padding: 16px 8px 16px 8px;
-  border: 1px solid lightgray;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.share-dialog .share-level-selection img {
-  margin-left: 12px;
-  margin-right: 12px;
-}
-.share-dialog .share-level-selection .check-icon {
-  width: 16px;
-  height: 16px;
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-size: 16px;
-}
-.share-dialog .share-level-selection.included {
-  opacity: 0.5;
-  background-color: #ededf2;
-  cursor: not-allowed;
-}
-.share-dialog .share-level-selection.included .check-icon {
-  background-image: url("../icons/tick.svg");
-}
-.share-dialog .share-level-selection.current {
-  background-color: #bdbdf2;
-}
-.share-dialog .share-level-selection.current .check-icon {
-  background-image: url("../icons/tick.svg");
-}
-.share-dialog .share-level-selection.newly-included {
-  background-color: #ddddff;
-}
-.share-dialog .share-level-selection.newly-included .check-icon {
-  background-image: url("../icons/tick.svg");
-}
-.share-dialog .share-level-selection.not-included:hover {
-  background-color: #ccccff;
 }
 
 .custom-scientific {
@@ -440,11 +394,6 @@ table.diff tbody tr.textarea td {
 .summary-crit table tr:hover th.row-header {
   color: blue;
   text-decoration: underline;
-}
-.summary-crit .table-5-note {
-  font-size: small;
-  color: grey;
-  cursor: help;
 }
 .summary-crit .calculated-result {
   margin-top: 8px;

@@ -1,0 +1,180 @@
+////////////////////////
+// OVERALL LAYOUT
+////////////////////////
+
+html,
+body {
+	font-size: 14px;
+	font-family: 'Raleway', serif;
+}
+
+nav.navbar {
+	border-bottom: 1px solid #bbb;
+
+	a.nav-link {
+		padding-top: 0;
+		padding-bottom: 0;
+		margin-bottom: 0;
+		align-self: center;
+
+		&.active {
+			color: #000;
+		}
+	}
+}
+
+.navbar-brand {
+	background-size: contain;
+	background-position: center center;
+	background-repeat: no-repeat;
+	height: 35px;
+}
+
+.main-content {
+	padding-bottom: 60px;
+	overflow: auto;
+	max-width: calc(100vw);
+}
+
+.external-content {
+	overflow: auto;
+	max-width: calc(100vw);
+	height: 100vh;
+
+	h3 {
+		margin-top: 30px;
+	}
+}
+
+#submenu_page_content {
+	padding: 10px;
+}
+
+#site-message {
+	text-align: center;
+	padding: 1px;
+}
+
+div#content {
+	margin: 8px;
+	border: 0px;
+}
+
+#email-icon {
+	top: 0px;
+	left: 0px;
+	width: 24px;
+	height: 24px;
+	position: absolute;
+}
+
+.settings-icon {
+	background-image: url(/static/icons/settings-icon.png);
+}
+
+// this is menu list items
+li {
+	&.current a {
+		background-color: rgba(0, 0, 0, 0.05);
+	}
+
+	&.logout {
+		border-top: 1px solid rgba(0, 0, 0, 0.1);
+	}
+}
+
+@media screen and (min-width: 0) and (max-width: 991px) {
+	.nav-side-bar {
+		margin-top: 60px;
+		border-bottom: 1px dotted #cfcfcf;
+
+		.site-message {
+			width: 100%;
+		}
+
+		.nav-link {
+			font-weight: bold;
+		}
+	}
+
+	.main-content {
+		padding-top: 20px;
+	}
+
+	#vcform-filter-wrapper {
+		position: inherit !important;
+	}
+
+	#vcform-content {
+		margin-top: 0 !important;
+	}
+
+	.container,
+	.container-table {
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+		max-width: 991px !important;
+	}
+}
+
+@media screen and (min-width: 992px) {
+	body {
+		overflow-y: hidden;
+	}
+
+	.main-content {
+		padding-top: 80px;
+		margin-left: 170px;
+		overflow: auto;
+		max-width: calc(100vw);
+		height: calc(100vh);
+	}
+
+	.nav-side-bar {
+		border-right: 1px solid #cfcfcf;
+		-ms-flex: 0 0 200px;
+		flex: 0 0 200px;
+		position: fixed;
+		width: 160px;
+		top: 49px;
+
+		.nav {
+			flex-direction: column !important;
+		}
+
+		nav {
+			padding-top: 10px;
+			background-color: white;
+			min-height: 200px;
+
+			.nav-link {
+				cursor: pointer;
+				text-align: right;
+				line-height: 2rem;
+
+				&.active {
+					color: #000;
+				}
+			}
+		}
+	}
+}
+
+nav .nav-link:hover {
+	text-decoration: underline;
+	text-decoration-color: rgba(0, 0, 0, 0.3);
+}
+
+.navbar-brand {
+	width: 170px;
+}
+
+#navbar-search-form {
+	margin-block-end: 0;
+	max-width: 300px;
+	min-length: 100px;
+}
+
+#navbar-search-button {
+	height: 27px;
+}

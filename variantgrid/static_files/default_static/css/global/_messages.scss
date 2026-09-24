@@ -1,0 +1,51 @@
+////////////////////////
+// ERRORS, WARNINGS, INFO, MESSAGES
+////////////////////////
+
+ul.messages {
+	list-style-type: none;
+	width: 80%;
+
+	li {
+		padding: 16px;
+		padding-left: 48px;
+		position: relative;
+
+		&::before {
+			font-family: "Font Awesome 5 Free";
+			content: "\f00c";
+			font-weight: 900;
+			color: #28a745;
+			position: absolute;
+			left: 16px;
+			top: 16px;
+		}
+	}
+}
+
+li.error::before {
+	font-family: "Font Awesome 5 Free";
+	content: "\f00d" !important;
+	font-weight: 900 !important;
+	color: #dc3545 !important;
+}
+
+.info {
+	background-color: #C9F0DD;
+}
+
+.warning:not(.alert-warning) {
+	background-color: #FEBC00;
+}
+
+.error {
+	background-color: #F0C9DD;
+}
+
+.errorlist {
+	color: red;
+}
+
+#page-help {
+	display: none;
+}
