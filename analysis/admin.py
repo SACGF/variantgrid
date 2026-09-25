@@ -43,6 +43,11 @@ class AnalysisTemplateVersionAdmin(ModelAdminBasics):
     pass
 
 
+@admin.register(models.EvidenceKey)
+class EvidenceKeyAdmin(ModelAdminBasics):
+    pass
+
+
 @admin.register(models.VariantTag)
 class VariantTagAdmin(ModelAdminBasics):
     pass
