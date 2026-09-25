@@ -260,25 +260,36 @@ def _alt_description(v: Union[Variant, VariantCoordinate]) -> str:
     return Sequence.abbreviate(str(v.alt))
 
 
+def _alt_mismatch_message(variant_coordinate: VariantCoordinate, alternative_variant: Variant,
+                          hgvs_matcher: Optional[HGVSMatcher]) -> str:
+    """ Alts alone ("AC" vs "AT") are hard to compare for indels, so an HGVS search names both as g.HGVS """
+    if hgvs_matcher:
+        try:
+            searched_g_hgvs = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
+            found_g_hgvs = hgvs_matcher.variant_to_g_hgvs(alternative_variant)
+            return f'No results for "{searched_g_hgvs}", but found "{found_g_hgvs}" at the same position'
+        except HGVSException:
+            pass
+    original_alt_desc = _alt_description(variant_coordinate)
+    alt_alt_desc = _alt_description(alternative_variant)
+    return f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"'
+
+
 def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
                                              variant_coordinate: VariantCoordinate,
-                                             search_messages: list[SearchMessage]) -> Iterable[SearchResult]:
+                                             search_messages: list[SearchMessage],
+                                             hgvs_matcher: Optional[HGVSMatcher] = None) -> Iterable[SearchResult]:
     # manual variants
     variant_string = variant_coordinate.format()
     if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build,
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    original_alt_desc = _alt_description(variant_coordinate)
-
     # search for alt alts
     alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
     for alternative_variant in alts:
-        alt_alt_desc = _alt_description(alternative_variant)
-
-        alt_messages = search_messages + [
-            SearchMessage(f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"',
-                          severity=LogLevel.ERROR, substituted=True)]
+        message = _alt_mismatch_message(variant_coordinate, alternative_variant, hgvs_matcher)
+        alt_messages = [*search_messages, SearchMessage(message, severity=LogLevel.ERROR, substituted=True)]
         yield SearchResult(alternative_variant.preview, messages=alt_messages)
 
 
@@ -824,7 +835,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # if we're saying what we're resolving to, no need to complain about reference_message
 
             yield from _yield_no_results_for_variant_coordinate(user, genome_build, variant_qs,
-                                                                variant_coordinate, search_messages)
+                                                                variant_coordinate, search_messages,
+                                                                hgvs_matcher=hgvs_matcher)
 
 
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
