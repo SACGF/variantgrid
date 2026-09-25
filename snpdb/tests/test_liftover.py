@@ -169,7 +169,7 @@ class TestLiftoverBatching(TestCase):
 
 
 class TestFailedLiftoverAlleles(TestCase):
-    """ #1273 - which alleles a per-tool retry re-attempts """
+    """ Which alleles a per-tool retry re-attempts (#1273) and which deployment_check says need liftover (#1220) """
 
     @classmethod
     def setUpTestData(cls):
@@ -177,6 +177,7 @@ class TestFailedLiftoverAlleles(TestCase):
         grch38 = GenomeBuild.grch38()
         cls.still_missing = create_mock_allele(slowly_create_test_variant("3", 1000, 'A', 'T', grch37), grch37)
         cls.lifted_over = create_mock_allele(slowly_create_test_variant("3", 2000, 'A', 'T', grch37), grch37)
+        cls.never_attempted = create_mock_allele(slowly_create_test_variant("3", 3000, 'A', 'T', grch37), grch37)
         VariantAllele.objects.create(variant=slowly_create_test_variant("3", 2001, 'A', 'T', grch38),
                                      genome_build=grch38, allele=cls.lifted_over,
                                      origin=AlleleOrigin.LIFTOVER,
@@ -195,6 +196,11 @@ class TestFailedLiftoverAlleles(TestCase):
 
         qs = Allele.failed_liftover_for_build(grch38, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
         self.assertEqual(list(qs), [], "Only the tool being retried counts")
+
+    def test_liftover_never_attempted_for_build(self):
+        qs = Allele.liftover_never_attempted_for_build(GenomeBuild.grch38())
+        self.assertEqual(list(qs), [self.never_attempted], "Failed and lifted over alleles have both been attempted")
+        self.assertEqual(list(Allele.liftover_never_attempted_for_build(GenomeBuild.grch37())), [])
 
 
 class TestLiftoverQueries(TestCase):
