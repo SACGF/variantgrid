@@ -74,7 +74,6 @@ STATICFILES_DIRS = (VG_TEST_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_BASE_DIR, "somalier")
-SOMALIER["compensate_allele_order"] = False  # somalier 0.3.5: relate takes --sites
 
 USER_CREATE_ORG_LABS = {
     "unknown": "unknown",
