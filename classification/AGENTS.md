@@ -22,7 +22,9 @@ Patterns here:
   carries only the write perm (models/classification.py:Classification.filter_for_user).
 - Query what a user may see with models/classification.py:ClassificationModification.latest_for_user (published=True, allele=...,
   shared_only=...). It applies Guardian perms plus withdrawn and allele-origin filters; pass allele= rather than variant=.
-- Parse "org/lab/record_id.version" ids with models/classification_ref.py:ClassificationRef.init_from_str; lab_record_id is unique per lab.
+- Parse "org/lab/record_id.version" ids with models/classification_ref.py:ClassificationRef.init_from_str and build the
+  "org/lab/lab_record_id" form with ClassificationRef.make_lab_id_str; lab_record_id is unique per lab. Classification.id_str
+  is the pk form, cr_lab_id the id shown to users (docstrings in models/classification.py).
 - Look keys up through models/evidence_key.py:EvidenceKeyMap.instance (60s timed_cache) and apply lab config with
   EvidenceKeyMap.with_overrides(classification.evidence_key_overrides). EvidenceKey.max_share_level hides a field from users
   below that level (models/classification.py:Classification.get_visible_evidence).

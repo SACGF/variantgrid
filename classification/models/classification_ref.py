@@ -205,8 +205,20 @@ class ClassificationRef:
             user=user, lab=lab, rid=record_id, lab_record_id=lab_record_id, version=version)
 
     @staticmethod
+    def make_lab_id_str(lab_group_name: str, lab_record_id: str) -> str:
+        """Build the lab form of a classification ref string, which parse_id_str reads back.
+
+        lab_group_name is Lab.group_name ("org_group_name/lab_name"), so the result is
+        "org_group_name/lab_name/lab_record_id". Both parts are required: without the lab prefix the
+        lab_record_id would be read as a Classification pk (Classification.id_str).
+        """
+        if not lab_group_name or not lab_record_id:
+            raise ValueError(f"Lab id str needs both lab_group_name ({lab_group_name}) and lab_record_id ({lab_record_id})")
+        return f"{lab_group_name}/{lab_record_id}"
+
+    @staticmethod
     def parse_id_str(id_str: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
-        """Parse a classification ref string into (lab_ref, record_id, version).
+        """Parse a classification ref string into (lab_ref, record_id, version), see make_lab_id_str.
 
         Format: [lab_id/]record_id[.version]
         lab_id may itself contain slashes (e.g. org/lab_name); the last slash

@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from classification.enums.classification_enums import ShareLevel, SpecialEKeys
 from classification.models.classification import ClassificationModification
+from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.constants import MINUTE_SECS
@@ -207,7 +208,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         lab_record_id = cm.classification.lab_record_id
         if self.remote_lab_record_url:
             path = reverse('view_classification_lab_record',
-                           kwargs={'classification_ref': f"{mapped_lab_name}/{lab_record_id}"})
+                           kwargs={'classification_ref': ClassificationRef.make_lab_id_str(mapped_lab_name, lab_record_id)})
         else:
             # remote is on a version without view_classification_lab_record, so search for it instead
             path = f"variantopedia/search?search={quote(lab_record_id)}"
@@ -224,7 +225,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         share_level = self.share_level_mappings.get(share_level, share_level)
 
         # might need to map the lab group names if we don't map them all into shariant
-        formatted_json['id'] = mapped_lab_name + '/' + vcm.classification.lab_record_id
+        formatted_json['id'] = ClassificationRef.make_lab_id_str(mapped_lab_name, vcm.classification.lab_record_id)
         data = raw_json.get('data')
         for dont_share in SHARIANT_PRIVATE_FIELDS:
             data.pop(dont_share, None)
