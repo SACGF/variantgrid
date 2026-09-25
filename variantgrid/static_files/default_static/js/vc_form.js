@@ -2440,11 +2440,13 @@ VCTable.format_hgvs = (parts) => {
         outterDom.prepend($('<dom>', {class: 'font-weight-bold', text: allele}));
     }
 
-    if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.always_show_genome_build)) {
+    if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.resolved_without_hgvs || parts.always_show_genome_build)) {
         const genomeBuildWrapper = $('<div>');
         let addNewLine = false;
         if (parts.normalized === false) {
             $('<span>', {html: 'not resolved<br/>showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+        } else if (parts.resolved_without_hgvs) {
+            $('<span>', {html: 'resolved, no c.HGVS<br/>showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else if (parts.desired === false) {
             $('<span>', {html: 'not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else {

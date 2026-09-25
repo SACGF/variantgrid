@@ -156,9 +156,8 @@ write so analysis nodes can pin what they read. Per-sample stats moved to `snpdb
 whose chrX het/hom ratio is the "detected sex" (`CohortGenotypeStats.chrx_sex_guess`).
 
 `snpdb/models/models_vcf.py:VCFSourceSettings` rewrites a VCF's sample-field bindings by regex on its `source` header,
-because callers reuse standard FORMAT ids for other meanings. `snpdb/signals/signal_handlers.py:backend_vcf_import_success_handler`
-creates BED intersections for sequencing samples, and `trio_post_save_handler` launches karyomapping for a new Trio only
-(Duo and Quad do not).
+because callers reuse standard FORMAT ids for other meanings. `snpdb/signals/signal_handlers.py:trio_post_save_handler`
+launches karyomapping for a new Trio only (Duo and Quad do not).
 
 ### Labs, users and the current build
 

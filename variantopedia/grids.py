@@ -1,10 +1,8 @@
 import json
 import operator
-import re
 from functools import cached_property, reduce
 from typing import Optional
 
-from django.db import connection
 from django.db.models import (
     Case,
     Count,
@@ -29,6 +27,7 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation
+from library.django_utils.database_utils import get_queryset_row_estimate
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.utils import JsonDataType
 from patients.models import Patient
@@ -203,15 +202,9 @@ class AllVariantsGrid(AbstractVariantGrid):
             an F().asc(nulls_first=...) sort defeats that index. @see issue #1663 """
         return qs.order_by(*self.DEFAULT_ORDER_BY)
 
-    def _get_approx_count(self, qs) -> int:
-        sql, params = qs.query.sql_with_params()
-        with connection.cursor() as cursor:
-            cursor.execute(f"EXPLAIN {sql}", params)
-            first_line = cursor.fetchone()[0]
-        match = re.search(r'rows=(\d+)', first_line)
-        if not match:
-            raise ValueError(f"Could not parse row estimate from EXPLAIN output: {first_line!r}")
-        return int(match.group(1))
+    @staticmethod
+    def _get_approx_count(qs) -> int:
+        return get_queryset_row_estimate(qs)
 
     def known_count(self, qs) -> Optional[int]:
         """ A COUNT(*) over a huge table costs more than the page itself - report the planner's

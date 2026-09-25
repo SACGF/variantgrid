@@ -10,13 +10,14 @@ class AnalysisConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         # imported to activate receivers
 
-        from analysis.models import VariantTag
+        from analysis.models import Analysis, VariantTag
 
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
         from analysis.signals import analysis_health_check, analysis_search  # noqa: F401
         from analysis import user_awards  # noqa: F401  # registers award definitions on import
         from analysis.signals.signal_handlers import (
+            analysis_pre_delete,
             handle_active_sample_gene_list_created,
             handle_vcf_import_success,
             variant_tag_create,
@@ -40,6 +41,10 @@ class AnalysisConfig(AppConfig):
         post_delete.connect(variant_tag_delete, sender=VariantTag)
         vcf_import_success_signal.connect(handle_vcf_import_success)
         post_save.connect(handle_active_sample_gene_list_created, sender=ActiveSampleGeneList)
+
+        # Stop any node still loading before the delete cascades into its caches - see
+        # analysis_pre_delete. SACGF/variantgrid_com#2
+        pre_delete.connect(analysis_pre_delete, sender=Analysis)
 
         # Bump analysis source-node versions when their input data is deleted, so cached
         # q-dicts referencing now-missing CohortGenotype annotations are invalidated.

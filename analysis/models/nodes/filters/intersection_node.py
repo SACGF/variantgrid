@@ -1,4 +1,3 @@
-import logging
 import operator
 import os
 import subprocess
@@ -17,13 +16,7 @@ from django.db.models.query_utils import Q
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.variant_text import get_variant_text_summary, parse_region, resolve_variant_text
-from snpdb.models import (
-    Cohort,
-    GenomicIntervalsCollection,
-    Sample,
-    VariantCollection,
-    VCFBedIntersection,
-)
+from snpdb.models import GenomicIntervalsCollection, VariantCollection
 from snpdb.models.models_genome import Contig
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
@@ -33,8 +26,7 @@ class IntersectionNode(AnalysisNode):
     # accordion_panel is the accordion index in intersectionnode_editor.html
     SELECTED_INTERVALS = 0
     VARIANTS = 1
-    BACKEND_ENRICHMENT_KIT = 2
-    CONTIG = 3
+    CONTIG = 2
 
     # A pk__in list stops being the cheap option somewhere around here - above it we let
     # NodeCache write the result out to a VariantCollection instead
@@ -66,17 +58,12 @@ class IntersectionNode(AnalysisNode):
         # Text that resolved to nothing still filters (to nothing) - that's the honest answer
         return self.accordion_panel == self.VARIANTS and bool(self.variant_text)
 
-    def valid_backend_enrichment_kit(self):
-        pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
-        return self.accordion_panel == self.BACKEND_ENRICHMENT_KIT and pbi is not None
-
     def valid_contig(self):
         return self.accordion_panel == self.CONTIG and bool(self.contig_ids)
 
     def modifies_parents(self):
         return any([self.valid_selected_genomic_intervals_collection(),
                     self.valid_variants(),
-                    self.valid_backend_enrichment_kit(),
                     self.valid_contig()])
 
     @property
@@ -113,51 +100,9 @@ class IntersectionNode(AnalysisNode):
                 q = reduce(operator.or_, [Q(locus__contig_id=c) for c in self.contig_ids])
             else:
                 q = self.q_none()
-        else:
-            variant_collection = None
-            if self.accordion_panel == self.SELECTED_INTERVALS:
-                raise ValueError("Should never be here - NodeCache should have been generated!")
-            if self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
-                pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
-                variant_collection = pbi.variant_collection
-
-            if variant_collection:
-                q = Q(variantcollectionrecord__variant_collection=variant_collection)
+        elif self.accordion_panel == self.SELECTED_INTERVALS:
+            raise ValueError("Should never be here - NodeCache should have been generated!")
         return q
-
-    def get_vcf_bed_intersection_and_enrichment_kit(self):
-        input_sample_ids = self.get_sample_ids()
-        num_samples = len(input_sample_ids)
-
-        pbi = None
-        enrichment_kit = None
-        if num_samples == 1:
-            sample_id = input_sample_ids[0]
-            sample = Sample.objects.get(pk=sample_id)
-            pbi, enrichment_kit = VCFBedIntersection.get_with_enrichment_kit_for_sample(sample)
-        elif num_samples > 1:
-            all_samples = set(input_sample_ids)
-            try:
-                extra_cohort_filter_kwargs = {'cohortcount__collection__isnull': False}
-                containing_cohort = Cohort.get_cohort_containing_all_samples(all_samples, extra_cohort_filter_kwargs=extra_cohort_filter_kwargs)
-                vcf = containing_cohort.vcf
-                backend_vcf = vcf.uploadedvcf.backendvcf
-                enrichment_kits = list(backend_vcf.sample_sheet.get_sample_enrichment_kits())
-                if len(enrichment_kits) == 1:
-                    enrichment_kit = enrichment_kits[0]
-                    pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(vcf, enrichment_kit)
-            except Exception:
-                pass
-
-        return pbi, enrichment_kit
-
-    def handle_ancestor_input_samples_changed(self):
-        AUTO_SWITCH_TO_PANEL_KIT = False
-        if AUTO_SWITCH_TO_PANEL_KIT:
-            pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
-            if pbi:
-                logging.info("Setting to backend enrichment_kit")
-                self.accordion_panel = self.BACKEND_ENRICHMENT_KIT
 
     def _get_method_summary(self):
         method_summary = 'No filtering applied.'
@@ -166,9 +111,6 @@ class IntersectionNode(AnalysisNode):
                 method_summary = f"Filtering to variant entries: {self.variant_text}"
             elif self.accordion_panel == self.SELECTED_INTERVALS:
                 method_summary = f"Filtering to selected interval {self.genomic_intervals_collection.name}"
-            elif self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
-                _, enrichment_kit = self.get_vcf_bed_intersection_and_enrichment_kit()
-                method_summary = f"Filtering to enrichment_kit {enrichment_kit}"
             elif self.accordion_panel == self.CONTIG:
                 method_summary = f"Filtering to contigs {self._get_contig_names()}"
         return method_summary
@@ -187,9 +129,6 @@ class IntersectionNode(AnalysisNode):
                 name = self._get_variant_text_name()
             elif self.accordion_panel == self.SELECTED_INTERVALS:
                 name = self.genomic_intervals_collection.name
-            elif self.accordion_panel == self.BACKEND_ENRICHMENT_KIT:
-                _, enrichment_kit = self.get_vcf_bed_intersection_and_enrichment_kit()
-                name = f"Enrichment Kit: {enrichment_kit}"
             elif self.accordion_panel == self.CONTIG:
                 name = self._get_contig_names()
         return name

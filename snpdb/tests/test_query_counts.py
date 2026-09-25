@@ -11,7 +11,11 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from annotation.fake_annotation import get_fake_annotation_version
-from library.django_utils.unittest_utils import URLTestCase, production_query_count
+from library.django_utils.unittest_utils import (
+    URLTestCase,
+    frozen_cache_expiry,
+    production_query_count,
+)
 from snpdb.models import (
     Allele,
     AlleleConversionTool,
@@ -76,13 +80,14 @@ class ViewSampleScalingTest(URLTestCase):
     def test_view_sample_query_count_flat_with_more_trios(self):
         client = Client()
         client.force_login(self.user)
-        self._view_sample_production_query_count(client)  # warm up per-process caches
+        with frozen_cache_expiry():
+            self._view_sample_production_query_count(client)  # warm up per-process caches
 
-        num_queries_one_trio = self._view_sample_production_query_count(client)
-        for i in range(10):
-            Trio.objects.create(name=f"scaling_trio_{i}", user=self.user, cohort=self.trio.cohort,
-                                mother=self.trio.mother, father=self.trio.father, proband=self.trio.proband)
-        num_queries_eleven_trios = self._view_sample_production_query_count(client)
+            num_queries_one_trio = self._view_sample_production_query_count(client)
+            for i in range(10):
+                Trio.objects.create(name=f"scaling_trio_{i}", user=self.user, cohort=self.trio.cohort,
+                                    mother=self.trio.mother, father=self.trio.father, proband=self.trio.proband)
+            num_queries_eleven_trios = self._view_sample_production_query_count(client)
         self.assertEqual(num_queries_one_trio, num_queries_eleven_trios)
 
 

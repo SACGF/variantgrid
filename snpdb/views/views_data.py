@@ -77,6 +77,7 @@ from snpdb.models import (
 from snpdb.models.models_enums import (
     ImportStatus,
 )
+from snpdb.models.models_somalier import DUPLICATE_SAMPLE_RELATEDNESS
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
 from upload.models import UploadedVCF
@@ -456,10 +457,6 @@ def _sample_stats(sample) -> Optional[SampleStats]:
         enqueue_cohort_stats_recompute(cohort, annotation_version)
 
     return SampleStats(variant_class_df, zygosity_df, annotated_df)
-
-
-# A pair this close is the same DNA, so two different patients means a sample swap or a mislabel (#196)
-DUPLICATE_SAMPLE_RELATEDNESS = 0.9
 
 
 def _related_samples(sample: Sample) -> list[dict]:

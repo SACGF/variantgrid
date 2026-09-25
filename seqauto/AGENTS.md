@@ -27,5 +27,8 @@ JointCalledVCF), QC models, EnrichmentKit and gold coverage, and the seqauto RES
   (run, pair, arm) through `seqauto/qc/library_qc_summary.py:summarise_library_qc` and link here for the metrics.
 
 API:
+- Reads are open to any logged-in user; writes need a superuser or a member of `SEQAUTO_API_WRITE_GROUP` (the
+  pipeline's token user). A new write endpoint subclasses `seqauto/views_rest.py:SeqAutoModelViewSet` or
+  `seqauto/views_rest.py:SeqAutoWriteAPIView`; a POST that only reads (batch lookups) stays a plain `APIView`.
 - A client-visible API change needs a name in `variantgrid/views_rest.py:API_FEATURES` (see
   claude/guides/operations.md#authentication-surface).

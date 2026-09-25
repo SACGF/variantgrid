@@ -3,11 +3,14 @@ from functools import cached_property
 from typing import Optional
 
 from auditlog.registry import auditlog
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
+from django.utils import timezone
+from django.utils.timesince import timesince
 from rest_framework.exceptions import NotFound
 
 from analysis.exceptions import NodeConfigurationException
@@ -282,6 +285,33 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
                     errors.append(f"{gene_list}: {gene_list.error_message}")
 
         return errors
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        if self.accordion_panel == self.PATHOLOGY_TEST_GENE_LIST and self.pathology_test_version:
+            age_days = (timezone.now() - self.pathology_test_version.modified).days
+            if age_days > settings.PATHOLOGY_TEST_STALE_WARNING_DAYS:
+                warnings.append(f"Pathology test {self.pathology_test_version} was last modified {age_days} days "
+                                "ago and may be out of date - check its current gene list")
+        elif self.accordion_panel == self.PANEL_APP_GENE_LIST:
+            warnings.extend(self._get_panel_app_warnings())
+        return warnings
+
+    def _get_panel_app_warnings(self) -> list[str]:
+        """ Saving re-creates the node's panels, which fetches the latest version on load """
+        warnings = []
+        gln_pap_qs = self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache__isnull=False,
+                                                               panel_app_panel__deleted=False)
+        for gln_pap in gln_pap_qs.select_related("panel_app_panel_local_cache__panel_app_panel"):
+            local_cache = gln_pap.panel_app_panel_local_cache
+            panel_app_panel = local_cache.panel_app_panel
+            if local_cache.version != panel_app_panel.current_version:
+                warnings.append(f"Using {panel_app_panel} v.{local_cache.version} while latest is "
+                                f"{panel_app_panel.current_version} - press save to update")
+            elif not panel_app_panel.cache_valid:
+                warnings.append(f"{panel_app_panel} may be out of date (last checked "
+                                f"{timesince(panel_app_panel.modified)} ago) - press save to check")
+        return warnings
 
     @staticmethod
     def get_node_class_label():

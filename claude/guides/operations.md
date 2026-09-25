@@ -136,7 +136,10 @@ and many more variants and samples.
   `annotate()` / `Count` / `Min` + `update()` / `delete()` on a queryset. Streaming rows into a `set`, `dict` or `Counter` is a
   design error at these sizes, in management commands as much as in views.
 - **Restrict variants to a build with an IN list on contig ids** (`Variant.get_contigs_q`); joining through GenomeBuildContig
-  wrecks the planner's row estimate (#1720).
+  wrecks the planner's row estimate (#1720). To probe a pk range for any build variant, use `order_by("pk")` + `first()`,
+  not `.exists()`: with a bare LIMIT 1 the planner drives from the locus contig index and walks every locus of the build
+  (5 s on 7.8 M loci here) when the range holds none, where the pk-ordered probe only reads the range
+  (`annotation/annotation_versions.py:get_range_lock_gaps_with_variants`, #1044).
 - **Partitioned tables** - one child table per collection or version, dropped rather than deleted from:
   `CohortGenotypeCollection`, `VariantCollection`, `VariantZygosityCountCollection`
   (`library/django_utils/django_partition.py:RelatedModelsPartitionModel`) and every `SubVersionPartition` annotation table

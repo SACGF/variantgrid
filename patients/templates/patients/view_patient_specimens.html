@@ -35,7 +35,24 @@
         {% endif %}
         <form id="patient-specimens-form" method="post" action="{% url 'view_patient_specimens' patient.pk %}">
             {% csrf_token %}
-            {% crispy specimen_formset form_helper.horizontal %}
+            {{ specimen_formset.management_form }}
+            {% if specimen_formset.non_form_errors %}
+                <div class="alert alert-danger">{{ specimen_formset.non_form_errors }}</div>
+            {% endif %}
+            {% for specimen_form in specimen_formset %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        {% if specimen_form.instance.pk %}
+                            Specimen <a href="{% url 'view_specimen' specimen_form.instance.pk %}">{{ specimen_form.instance.reference_id }}</a>
+                        {% else %}
+                            New Specimen
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% crispy specimen_form form_helper.horizontal %}
+                    </div>
+                </div>
+            {% endfor %}
             <table>
             {% if has_write_permission %}
             <td><button id='save-button' class="btn btn-primary">Save</button></td>
