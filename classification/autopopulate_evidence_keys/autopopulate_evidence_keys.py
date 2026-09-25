@@ -33,6 +33,7 @@ from classification.tasks.classification_import_process_variants_task import (
     liftover_classification_import,
 )
 from library.git import Git
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import GenomeBuild, ImportSource, Lab, Sample, Variant
 
 
@@ -44,7 +45,8 @@ def create_classification_for_sample_and_variant_objects(
         genome_build: GenomeBuild,
         refseq_transcript_accession: str = None,
         ensembl_transcript_accession: str = None,
-        annotation_version: str = None):
+        annotation_version: str = None,
+        clingen_api: ClinGenAlleleRegistryAPI = None):
     """ Create internally from existing variant - not used by API which may need to create variants """
 
     kwargs = {"user": user,
@@ -57,7 +59,8 @@ def create_classification_for_sample_and_variant_objects(
     classification_populate_from_variant(classification, genome_build,
                                          refseq_transcript_accession=refseq_transcript_accession,
                                          ensembl_transcript_accession=ensembl_transcript_accession,
-                                         annotation_version=annotation_version)
+                                         annotation_version=annotation_version,
+                                         clingen_api=clingen_api)
     return classification
 
 
@@ -66,12 +69,14 @@ def classification_populate_from_variant(
         genome_build: GenomeBuild,
         refseq_transcript_accession: str = None,
         ensembl_transcript_accession: str = None,
-        annotation_version: str = None):
+        annotation_version: str = None,
+        clingen_api: ClinGenAlleleRegistryAPI = None):
     """ What a new record gets from its variant - evidence from annotation, its allele info and liftover """
     classification_auto_populate_fields(classification, genome_build,
                                         refseq_transcript_accession=refseq_transcript_accession,
                                         ensembl_transcript_accession=ensembl_transcript_accession,
-                                        annotation_version=annotation_version)
+                                        annotation_version=annotation_version,
+                                        clingen_api=clingen_api)
 
     allele_info, allele_info_created = classification.ensure_allele_info_with_created()
     if allele_info and allele_info_created:
@@ -120,7 +125,8 @@ def generate_auto_populate_data(
         annotation_version: Optional[AnnotationVersion] = None,
         refseq_transcript_accession: Optional[str] = None,
         ensembl_transcript_accession: Optional[str] = None,
-        sample: Optional[Sample] = None) -> AutopopulateData:
+        sample: Optional[Sample] = None,
+        clingen_api: Optional[ClinGenAlleleRegistryAPI] = None) -> AutopopulateData:
     """
     Shows all complete auto-populate data for a would be classification.
     """
@@ -138,7 +144,7 @@ def generate_auto_populate_data(
     data.annotation_version = annotation_version
     data.update(get_evidence_fields_for_variant(genome_build, variant,
                                                 refseq_transcript_accession, ensembl_transcript_accession,
-                                                evidence_keys_list, annotation_version))
+                                                evidence_keys_list, annotation_version, clingen_api=clingen_api))
 
     if sample:
         data.update(get_evidence_fields_for_sample_and_patient(variant, sample))
@@ -154,7 +160,8 @@ def classification_auto_populate_fields(
         ensembl_transcript_accession: str = None,
         leave_existing_values: bool = True,
         annotation_version: str = None,
-        save: bool = True):
+        save: bool = True,
+        clingen_api: ClinGenAlleleRegistryAPI = None):
     """
     Applies annotation data to the classification
     """
@@ -165,7 +172,8 @@ def classification_auto_populate_fields(
         refseq_transcript_accession=refseq_transcript_accession,
         ensembl_transcript_accession=ensembl_transcript_accession,
         sample=classification.sample,
-        annotation_version=annotation_version
+        annotation_version=annotation_version,
+        clingen_api=clingen_api
     )
     classification.annotation_version = auto_data.annotation_version
     return classification.patch_value(auto_data.data,

@@ -46,9 +46,12 @@ from classification.classification_stats import (
 from classification.enums import (
     AlleleOriginBucket,
     LabExternalFilter,
+    OverlapStatus,
+    OverlapType,
     ShareLevel,
     SpecialEKeys,
-    WithdrawReason, OverlapStatus, OverlapType, TestingContextBucket,
+    TestingContextBucket,
+    WithdrawReason,
 )
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import (
@@ -66,7 +69,10 @@ from classification.models import (
     GeneConsensusGroup,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
-    ReportNames, OverlapContribution, OverlapContributionNextStep, Overlap,
+    Overlap,
+    OverlapContribution,
+    OverlapContributionNextStep,
+    ReportNames,
 )
 from classification.models.classification import (
     COPY_SCOPES_ALL,
@@ -79,9 +85,6 @@ from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.tasks.classification_create_tasks import populate_new_classification_task
-from classification.services.public_summary_data import ClassificationPublicSummaryData
-from classification.tasks.classification_create_tasks import populate_new_classification_task
-from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import (
@@ -97,10 +100,11 @@ from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
+from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_traceback
 from library.utils import delimited_row
-from library.django_utils.view_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.forms import (
     LabMultiSelectForm,
     LabSelectForm,
@@ -343,7 +347,8 @@ class AutopopulateView(APIView):
             refseq_transcript_accession=refseq_transcript_accession,
             ensembl_transcript_accession=ensembl_transcript_accession,
             sample=sample,
-            annotation_version=None
+            annotation_version=None,
+            clingen_api=ClinGenAlleleRegistryAPI.instance(max_attempts=1)
         )
 
         used_keys = set()
@@ -464,7 +469,8 @@ def create_classification_object(request, populate_async: bool = False) -> Class
     classification = create_classification_for_sample_and_variant_objects(request.user, lab, sample,
                                                                           variant, genome_build,
                                                                           refseq_transcript_accession=refseq_transcript_accession,
-                                                                          ensembl_transcript_accession=ensembl_transcript_accession)
+                                                                          ensembl_transcript_accession=ensembl_transcript_accession,
+                                                                          clingen_api=ClinGenAlleleRegistryAPI.instance(max_attempts=1))
     classification_complete_web_create(classification, request.user, evidence=evidence,
                                        copy_from=copy_from, copy_gene_from=copy_gene_from)
     return classification
