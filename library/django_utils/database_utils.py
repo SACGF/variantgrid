@@ -2,8 +2,10 @@
 Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
 text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
 cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first),
-postgres_arrays formats array literals, and long_running_sql / get_active_backend_pids / signal_backends /
-wait_for_backends_to_stop find and cancel other connections' running queries.
+postgres_arrays formats array literals, long_running_sql / get_active_backend_pids / signal_backends /
+wait_for_backends_to_stop find and cancel other connections' running queries, pg_settings / get_pg_setting set
+and read this connection's run-time settings, and get_table_row_estimates / get_queryset_row_estimate give planner
+row counts without scanning.
 """
 import contextlib
 import json
@@ -102,6 +104,66 @@ def wait_for_backends_to_stop(pids: Iterable[int], timeout_seconds: float) -> bo
         time.sleep(0.1)
 
 
+def get_pg_setting(name: str) -> str:
+    """ Current value of a Postgres run-time setting on this connection, as SHOW would print it """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_setting(%s)", [name])
+        return cursor.fetchone()[0]
+
+
+def _set_pg_settings(values: dict[str, str], local: bool):
+    with connection.cursor() as cursor:
+        for name, value in values.items():
+            cursor.execute("SELECT set_config(%s, %s, %s)", [name, value, local])
+
+
+@contextlib.contextmanager
+def pg_settings(local: bool = False, **values):
+    """ Set Postgres run-time settings (eg statement_timeout=5000, work_mem="4GB") on this connection for the
+        block. A value of None leaves that setting alone.
+
+        Session settings are put back to what they were on exit - connections are reused (CONN_MAX_AGE) and
+        this may be nested inside another caller's settings. local=True is SET LOCAL: it ends with the
+        current transaction, so there is nothing to put back (and nothing can run in an aborted one) """
+    values = {name: str(value) for name, value in values.items() if value is not None}
+    if not values or connection.vendor != 'postgresql':
+        yield
+        return
+
+    previous = {} if local else {name: get_pg_setting(name) for name in values}
+    _set_pg_settings(values, local)
+    try:
+        yield
+    finally:
+        if previous:
+            _set_pg_settings(previous, local=False)
+
+
+def get_table_row_estimates(table_names: Optional[Iterable[str]] = None) -> dict[str, int]:
+    """ {table: planner row estimate} from pg_class for tables and partitioned tables - all of them, or just
+        table_names. -1 means the table has never been vacuumed or analyzed. An inheritance parent only
+        counts its own rows, not its children's """
+    sql = "SELECT relname, reltuples::bigint FROM pg_class WHERE relkind IN ('r', 'p')"
+    params = []
+    if table_names is not None:
+        sql += " AND relname = ANY(%s)"
+        params.append(list(table_names))
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return dict(cursor.fetchall())
+
+
+def get_queryset_row_estimate(qs: QuerySet) -> int:
+    """ The planner's row estimate for a queryset, without running it - cheap where count() would scan """
+    sql, params = qs.query.sql_with_params()
+    with connection.cursor() as cursor:
+        cursor.execute(f"EXPLAIN (FORMAT JSON) {sql}", params)
+        plan = cursor.fetchone()[0]
+    if isinstance(plan, str):
+        plan = json.loads(plan)
+    return int(plan[0]["Plan"]["Plan Rows"])
+
+
 def get_postgresql_version() -> str:
     # Few ways to get this, but we'll go with the simpler one:
     # SHOW server_version - '14.12 (Ubuntu 14.12-0ubuntu0.22.04.1)'
@@ -147,11 +209,11 @@ def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
         qs.query returns something that isn't valid SQL, this returns the actual
         valid SQL that's executed: https://code.djangoproject.com/ticket/17741  """
 
-    cursor = connection.cursor()
     query, params = queryset.query.sql_with_params()
     PREFIX = 'select 1 -- '
-    cursor.execute(PREFIX + query, params)
-    res = str(cursor.db.ops.last_executed_query(cursor, query, params))
+    with connection.cursor() as cursor:
+        cursor.execute(PREFIX + query, params)
+        res = str(cursor.db.ops.last_executed_query(cursor, query, params))
     assert res.startswith(PREFIX)
     query_sql = res[len(PREFIX):]
 
