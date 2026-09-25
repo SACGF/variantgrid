@@ -27,6 +27,7 @@ from library.utils import get_single_element
 from snpdb.clingen_allele_api import (
     ClinGenAlleleAPIException,
     ClinGenAlleleRegistryAPI,
+    ClinGenAlleleRegistryUnavailableException,
     ClinGenAlleleServerException,
     ClinGenAlleleTooLargeException,
 )
@@ -276,7 +277,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     g_hgvs = HGVSMatcher.instance(genome_build).variant_to_g_hgvs(variant)
     try:
         api_response = get_single_element(list(clingen_api.hgvs_put([g_hgvs])))
-    except ClinGenAlleleServerException as cgse:
+    except (ClinGenAlleleServerException, ClinGenAlleleRegistryUnavailableException) as cgse:
         api_response = cgse.get_fake_api_response()  # Sets errorType: 'ServerError'
         api_response['inputLine'] = g_hgvs
 

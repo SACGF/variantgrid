@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from library.constants import MINUTE_SECS
 from patients.models_enums import Zygosity
 from snpdb.clingen_allele import get_variant_allele_for_variant
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import Duo, GenomeBuild, Quad, Sample, Trio, Variant
 from snpdb.models.models_vcf import Project
 from snpdb.serializers import (
@@ -93,7 +94,8 @@ class VariantAlleleForVariantView(APIView):
         variant = get_object_or_404(Variant, pk=self.kwargs['variant_id'])
         genome_build = GenomeBuild.get_name_or_alias(self.kwargs['genome_build_name'])
 
-        variant_allele = get_variant_allele_for_variant(genome_build, variant)
+        clingen_api = ClinGenAlleleRegistryAPI.instance(max_attempts=1)
+        variant_allele = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
         data = VariantAlleleSerializer.data_with_link_data(variant_allele)
         return Response(data)
 

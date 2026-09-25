@@ -59,12 +59,25 @@ class ClinGenAlleleTooLargeException(ClinGenAllele.ClinGenAlleleRegistryExceptio
     """ Too big for ClinGen Allele Registry  """
 
 
+class ClinGenAlleleRegistryUnavailableException(ClinGenAllele.ClinGenAlleleRegistryException):
+    """ Registry down or unreachable (gateway error, connection error, timeout) - the same call may work later """
+    def __init__(self, cause: Exception):
+        super().__init__(f"ClinGen Allele Registry is unavailable, it may work if you try again later ({cause})")
+
+    def get_fake_api_response(self):
+        """ Stored as a VariantAllele.clingen_error, the server error type means it's retried next time """
+        message = str(self)
+        return {
+            'message': message,
+            'errorType': ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE,
+            'description': message,
+        }
+
+
 class ClinGenAlleleRegistryAPI:
     """ Manages API connections to ClinGen Allele Registry """
 
     override_class = None  # Tests sub in a recorded-response implementation - @see variantgrid.test_runner
-    ATTEMPTS = 3
-    RETRY_BACKOFF_SECS = 5
     # Gateway / unavailable. 500 is also used for input errors (e.g. "Unknown reference") so isn't retried
     RETRY_STATUS_CODES = {502, 503, 504}
 
@@ -72,9 +85,13 @@ class ClinGenAlleleRegistryAPI:
     def instance(cls, **kwargs) -> 'ClinGenAlleleRegistryAPI':
         return (cls.override_class or cls)(**kwargs)
 
-    def __init__(self, api_failure_output_filename=None):
+    def __init__(self, api_failure_output_filename=None, max_attempts=3, retry_backoff_secs=5):
+        """ max_attempts/retry_backoff_secs apply to PUTs. Batch jobs can wait out an outage, a user waiting on
+            a web request should pass max_attempts=1 """
         self.login = settings.CLINGEN_ALLELE_REGISTRY_LOGIN
         self.password = settings.CLINGEN_ALLELE_REGISTRY_PASSWORD
+        self.max_attempts = max_attempts
+        self.retry_backoff_secs = retry_backoff_secs
         # Left None unless a caller names one - the path is only worked out when there's a failure to dump.
         # Computing it here minted an empty import_processing dir per instance (#928)
         self.api_failure_output_filename = api_failure_output_filename
@@ -113,21 +130,24 @@ class ClinGenAlleleRegistryAPI:
         return isinstance(e, (requests.ConnectionError, requests.Timeout))
 
     @classmethod
-    def _json_with_retry(cls, send_request: Callable[[], requests.Response]):
-        """ Retries registry-side failures (gateway errors, connection errors, timeouts) with exponential backoff.
+    def _json_with_retry(cls, send_request: Callable[[], requests.Response], max_attempts=1, retry_backoff_secs=0):
+        """ Retries registry-side failures (gateway errors, connection errors, timeouts) with exponential backoff,
+            raising ClinGenAlleleRegistryUnavailableException once attempts run out.
             send_request is called for each attempt, so the PUT is re-signed with the current time.
-            Worst case is ATTEMPTS x the request timeout, plus the backoff between attempts. """
-        for attempt in range(1, cls.ATTEMPTS + 1):
+            Worst case is max_attempts x the request timeout, plus the backoff between attempts. """
+        for attempt in range(1, max_attempts + 1):
             try:
                 response = send_request()
                 cls._check_response(response)
                 return response.json()
             except Exception as e:
-                if attempt == cls.ATTEMPTS or not cls._is_retryable(e):
+                if not cls._is_retryable(e):
                     raise
-                backoff = cls.RETRY_BACKOFF_SECS * 2 ** (attempt - 1)
+                if attempt == max_attempts:
+                    raise ClinGenAlleleRegistryUnavailableException(e) from e
+                backoff = retry_backoff_secs * 2 ** (attempt - 1)
                 logging.warning("ClinGen Allele Registry call failed (attempt %d/%d), retrying in %ds: %s",
-                                attempt, cls.ATTEMPTS, backoff, e)
+                                attempt, max_attempts, backoff, e)
                 time.sleep(backoff)
 
     def _signed_url(self, url) -> str:
@@ -154,7 +174,8 @@ class ClinGenAlleleRegistryAPI:
             return requests.put(self._signed_url(url), data=data, timeout=timeout)
 
         try:
-            return self._json_with_retry(send_request)
+            return self._json_with_retry(send_request, max_attempts=self.max_attempts,
+                                         retry_backoff_secs=self.retry_backoff_secs)
         except Exception as e:
             api_failure = {
                 "request": url,
@@ -166,6 +187,9 @@ class ClinGenAlleleRegistryAPI:
                 json.dump(api_failure, f)
 
             msg = f"API call failed, debug info written to '{api_failure_output_filename}'"
+            if isinstance(e, ClinGenAlleleRegistryUnavailableException):
+                logging.error(msg)
+                raise
             raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e
 
     @classmethod
@@ -188,9 +212,8 @@ class ClinGenAlleleRegistryAPI:
 
     @classmethod
     def get(cls, url):
-        response = requests.get(url, timeout=MINUTE_SECS)
-        cls._check_response(response)
-        return response.json()
+        """ Single attempt - GETs back interactive lookups such as search, so fail fast """
+        return cls._json_with_retry(lambda: requests.get(url, timeout=MINUTE_SECS))
 
     def _clingen_hgvs_put_iter(self, hgvs_iter, file_type="hgvs"):
         """ Calls ClinGen in batches

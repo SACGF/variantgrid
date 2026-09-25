@@ -19,7 +19,10 @@ from snpdb.clingen_allele import (
     populate_clingen_alleles_for_variants,
     variant_allele_clingen,
 )
-from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
+from snpdb.clingen_allele_api import (
+    ClinGenAlleleRegistryAPI,
+    ClinGenAlleleRegistryUnavailableException,
+)
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.mock_clingen_api import (
     MockClinGenAlleleRegistryAPI,
@@ -180,9 +183,17 @@ class ClinGenAlleleRegistryAPIRetryTestCase(SimpleTestCase):
 
     def test_gives_up_after_attempts(self, mock_put, mock_sleep):
         mock_put.side_effect = requests.ReadTimeout("Read timed out")
-        with self.assertRaises(ClinGenAllele.ClinGenAlleleRegistryException):
+        with self.assertRaises(ClinGenAlleleRegistryUnavailableException):
             self._put()
-        self.assertEqual(mock_put.call_count, ClinGenAlleleRegistryAPI.ATTEMPTS)
+        self.assertEqual(mock_put.call_count, self.api.max_attempts)
+
+    def test_single_attempt_fails_fast(self, mock_put, mock_sleep):
+        self.api.max_attempts = 1
+        mock_put.return_value = self._response(504, b"<html>Gateway Timeout</html>")
+        with self.assertRaisesMessage(ClinGenAlleleRegistryUnavailableException, "try again later"):
+            self._put()
+        self.assertEqual(mock_put.call_count, 1)
+        mock_sleep.assert_not_called()
 
     def test_internal_server_error_not_retried(self, mock_put, mock_sleep):
         """ The registry returns 500 for input it can't handle, which will fail the same way again """
