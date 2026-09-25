@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('classification', '0175_ekey_gene_fusion_options'),
+        ('classification', '0216_rename_c_hgvs_resolved_hgvs'),
     ]
 
     operations = [
