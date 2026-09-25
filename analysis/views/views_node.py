@@ -387,7 +387,7 @@ def node_load(request, analysis_id, node_id):
 
 @require_POST
 def node_cancel_load(request, analysis_id, node_id):
-    node = get_node_subclass_or_404(request.user, node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
     node_task_qs = NodeTask.objects.filter(node_version__node=node, node_version__version=node.version)
     if not cancel_node_tasks(node_task_qs):
         logging.error("No running task for node %s", node_id)
