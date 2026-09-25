@@ -49,6 +49,7 @@ from analysis.models import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
 from genes.models import GeneList
+from library.django_utils.database_utils import get_pg_setting, pg_settings
 from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
 from snpdb.models.models_enums import ProcessingStatus
 
@@ -198,9 +199,9 @@ class Command(BaseCommand):
 
         try:
             for jcl in jcl_modes:
-                pg_settings = {"join_collapse_limit": jcl} if jcl else {}
-                with _PgSessionSettings(**pg_settings):
-                    self._join_collapse_limit = _current_join_collapse_limit()
+                session_settings = {"join_collapse_limit": jcl} if jcl else {}
+                with pg_settings(**session_settings):
+                    self._join_collapse_limit = get_pg_setting("join_collapse_limit")
                     if len(jcl_modes) > 1:
                         self.stdout.write(
                             f"########## join_collapse_limit={self._join_collapse_limit} ##########")
@@ -757,20 +758,19 @@ class Command(BaseCommand):
         if planner_diagnostic:
             # Diagnostic: re-run cohort_exclude_lookahead under tuning variants — answers
             # "is the variant-hash bottleneck a planner / RAM issue?" without changing
-            # cluster-wide settings. SET runs at session level via the context manager;
-            # RESET in __exit__ restores defaults so other cohorts in the same invocation
-            # are not affected.
+            # cluster-wide settings. Set at session level for the block and put back after,
+            # so other cohorts in the same invocation are not affected.
             tuning_variants = [
-                ("wm4gb",       {"work_mem":         "'4GB'"}),
+                ("wm4gb",       {"work_mem":         "4GB"}),
                 ("rpc11",       {"random_page_cost": "1.1"}),
-                ("wm4gb_rpc11", {"work_mem":         "'4GB'", "random_page_cost": "1.1"}),
+                ("wm4gb_rpc11", {"work_mem":         "4GB", "random_page_cost": "1.1"}),
             ]
-            for label_suffix, pg_settings in tuning_variants:
-                with _PgSessionSettings(**pg_settings):
+            for label_suffix, session_settings in tuning_variants:
+                with pg_settings(**session_settings):
                     rows.append(self._profile_synthetic_pattern(
                         f"cohort_exclude_lookahead_{label_suffix}", cohort_id, qs_excl_regex,
                         f"cohort={cohort_id} cgc={cgc.pk} n={n} chosen={half_count} "
-                        f"(seed={seed}) settings={'+'.join(f'{k}={v}' for k,v in pg_settings.items())}",
+                        f"(seed={seed}) settings={'+'.join(f'{k}={v}' for k,v in session_settings.items())}",
                         rerun=rerun, explain=explain, plans_dir=plans_dir,
                         file_prefix="synthetic_c"))
 
@@ -973,12 +973,12 @@ class Command(BaseCommand):
         rows.append(baseline_row)
 
         # Tuning variants: same query, same fresh stats, additional session settings.
-        for label_suffix, pg_settings in tuning_variants:
-            with _PgSessionSettings(**pg_settings):
+        for label_suffix, session_settings in tuning_variants:
+            with pg_settings(**session_settings):
                 variant_row = self._profile_synthetic_pattern(
                     f"cohort_exclude_vc_join_postanalyze_{label_suffix}", cohort_id, qs,
                     f"{config} post_analyze settings="
-                    f"{'+'.join(f'{k}={v}' for k,v in pg_settings.items())}",
+                    f"{'+'.join(f'{k}={v}' for k,v in session_settings.items())}",
                     rerun=rerun, explain=explain, plans_dir=plans_dir,
                     file_prefix="synthetic_c")
                 variant_row["vc_record_count"] = vc.count
@@ -1094,34 +1094,6 @@ def _config_summary(node):
     return " | ".join(b for b in bits if b)[:500]
 
 
-class _PgSessionSettings:
-    """ Context manager — SET session-level PG settings around a block, RESET on exit.
-    Used by --planner-diagnostic to test work_mem / random_page_cost variants on the
-    cohort-exclude queries without touching cluster config (#1546). """
-
-    def __init__(self, **settings):
-        self.settings = settings
-
-    def __enter__(self):
-        if self.settings:
-            with connection.cursor() as cur:
-                for k, v in self.settings.items():
-                    cur.execute(f"SET {k} = {v}")
-        return self
-
-    def __exit__(self, *_):
-        if self.settings:
-            with connection.cursor() as cur:
-                for k in self.settings:
-                    cur.execute(f"RESET {k}")
-
-
-def _current_join_collapse_limit() -> str:
-    with connection.cursor() as cursor:
-        cursor.execute("SHOW join_collapse_limit")
-        return cursor.fetchone()[0]
-
-
 def _qs_sql_with_params(qs):
     sql, params = qs.query.sql_with_params()
     return sql, params
@@ -1137,8 +1109,7 @@ def _run_explain(sql, params, plan_path):
 
     Returns (planning_ms, execution_ms) extracted from the plan."""
     explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}"
-    with connection.cursor() as cursor:
-        cursor.execute("SET statement_timeout = 0")
+    with pg_settings(statement_timeout=0), connection.cursor() as cursor:
         cursor.execute(explain_sql, params)
         rows = cursor.fetchall()
 

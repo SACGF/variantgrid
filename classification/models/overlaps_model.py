@@ -87,6 +87,7 @@ class OverlapContribution(TimeStampedModel):
             msg = f"You do not have WRITE permission for {self.pk}"
             raise PermissionDenied(msg)
 
+    @property
     def is_review_agreed_value_met(self) -> bool:
         """
         Was there a review where there was going to be continued discordance

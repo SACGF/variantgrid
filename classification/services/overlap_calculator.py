@@ -69,7 +69,7 @@ class OverlapCalculatorBase(ABC):
             interactive_contributors = [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
 
             if interactive_contributors:
-                all_matching_reviewed_value = all(con.is_review_agreed_value_met() for con in interactive_contributors)
+                all_matching_reviewed_value = all(con.is_review_agreed_value_met for con in interactive_contributors)
                 all_complex = all(con.triage_state_obj.status == TriageStatus.COMPLEX for con in interactive_contributors)
 
                 if all_complex:

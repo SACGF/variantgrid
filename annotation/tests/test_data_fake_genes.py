@@ -124,6 +124,27 @@ def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
     return _insert_transcript_data(genome_build, nm_001145661_2, gene_version)
 
 
+def create_gata2_as1_transcript_version(genome_build) -> TranscriptVersion:
+    """ Non-coding (lnc_RNA) transcript, GRCh37 only """
+
+    gene_version = _create_fake_gene_version(genome_build, "101927167", "GATA2-AS1", AnnotationConsortium.REFSEQ)
+    nr_125398_1 = {"id": "NR_125398.1",
+                   "cdot": "0.2.34",
+                   "hgnc": "51108",
+                   "biotype": ["lnc_RNA", "ncRNA"],
+                   "gene_name": "GATA2-AS1",
+                   "genome_builds": {
+                       "GRCh37": {
+                           "url": "https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/GCF_000001405.25-RS_2024_09/GCF_000001405.25_GRCh37.p13_genomic.gff.gz",
+                           "exons": [[128208045, 128208513, 0, 1, 468, None],
+                                     [128208621, 128208912, 1, 469, 759, None],
+                                     [128220451, 128222050, 2, 760, 2358, None]],
+                           "contig": "NC_000003.11",
+                           "strand": "+"}}}
+
+    return _insert_transcript_data(genome_build, nr_125398_1, gene_version)
+
+
 def create_pten_transcript_version(genome_build) -> TranscriptVersion:
     """ Plus strand - GATA2 above is minus, so the pair covers both orientations """
 

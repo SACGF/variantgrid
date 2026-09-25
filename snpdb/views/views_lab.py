@@ -1,8 +1,9 @@
 from collections.abc import Iterable
+from typing import Optional
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
 from django.views.decorators.http import require_POST
@@ -34,6 +35,7 @@ from snpdb.models import (
     LabUserSettingsOverride,
     Organization,
     OrganizationUserSettingsOverride,
+    SettingsOverride,
     State,
     UserSettings,
 )
@@ -52,6 +54,19 @@ def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):
     messages.add_message(request, messages.INFO, read_only_message)
 
 
+def _get_group_initial_perm_form(request, group: Optional[Group], settings_override: SettingsOverride,
+                                 parent_overrides: list[SettingsOverride]) -> Optional[SettingsInitialGroupPermissionForm]:
+    """ Initial permissions a lab/org's settings_override gives its own group (applied over parent_overrides) """
+    if not (settings.USER_SETTINGS_SHOW_GROUPS and group):
+        return None
+
+    settings_overrides = [*parent_overrides, settings_override]
+    read_groups, write_groups = UserSettings.get_initial_perm_read_and_write_groups([group], settings_overrides)
+    initial = {"read": group in read_groups, "write": group in write_groups}
+    return SettingsInitialGroupPermissionForm(request.POST or None, initial=initial,
+                                              settings_override=settings_override, group=group)
+
+
 def view_lab(request, lab_id: int):
     lab = get_object_or_404(Lab, pk=lab_id)
 
@@ -61,15 +76,7 @@ def view_lab(request, lab_id: int):
     override_fields = set(get_model_fields(LabUserSettingsOverride)) - {"id", "settingsoverride_ptr", "lab"}
     parent_overrides = UserSettings.get_settings_overrides(organization=lab.organization)
     override_source, override_values = UserSettings.get_override_source_and_values(override_fields, parent_overrides)
-    settings_overrides = parent_overrides + [lab_settings_override]
-    read_groups, write_groups = UserSettings.get_initial_perm_read_and_write_groups([lab.group], settings_overrides)
-
-    initial = {"read": lab.group in read_groups, "write": lab.group in write_groups}
-    group_initial_perm_form = None
-    if settings.USER_SETTINGS_SHOW_GROUPS:
-        group_initial_perm_form = SettingsInitialGroupPermissionForm(request.POST or None, initial=initial,
-                                                                 settings_override=lab_settings_override,
-                                                                 group=lab.group)
+    group_initial_perm_form = _get_group_initial_perm_form(request, lab.group, lab_settings_override, parent_overrides)
     lab_settings_override_form = LabUserSettingsOverrideForm(request.POST or None, instance=lab_settings_override)
 
     has_write_permission = lab.can_write(request.user)
@@ -193,8 +200,11 @@ def view_organization(request, organization_id: int):
     override_fields = set(get_model_fields(OrganizationUserSettingsOverride)) - {"id", "settingsoverride_ptr", "organization"}
     parent_overrides = UserSettings.get_settings_overrides()
     override_source, override_values = UserSettings.get_override_source_and_values(override_fields, parent_overrides)
+    organization_group = organization.group
+    group_initial_perm_form = _get_group_initial_perm_form(request, organization_group, org_settings_override,
+                                                           parent_overrides)
     org_settings_override_form = OrganizationUserSettingsOverrideForm(request.POST or None, instance=org_settings_override)
-    all_forms = [organization_form, org_settings_override_form]
+    all_forms = [form for form in [organization_form, group_initial_perm_form, org_settings_override_form] if form]
 
     if request.method == "POST":
         organization.check_can_write(request.user)
@@ -218,6 +228,8 @@ def view_organization(request, organization_id: int):
         "is_member": organization.is_member(request.user) or request.user.is_superuser,
         "organization_form": organization_form,
         'settings_override_form': org_settings_override_form,
+        'group_initial_perm_form': group_initial_perm_form,
+        'organization_group': organization_group,
         'override_source': override_source,
         'override_values': override_values,
         'has_write_permission': has_write_permission,

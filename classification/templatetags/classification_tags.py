@@ -180,11 +180,11 @@ def classification_groupings(context, show_allele_origin_filter=True, show_summa
     </script>
     :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
     :param show_summary_counts: Set to True to show clinical significance counts above the table, worth it where the
-    table can run to many rows
+    table can run to many rows. Only shown when settings.CLASSIFICATION_GRID_SUMMARY_COUNTS is on
     """
     return {
         "show_allele_origin_filter": show_allele_origin_filter,
-        "show_summary_counts": show_summary_counts,
+        "show_summary_counts": show_summary_counts and settings.CLASSIFICATION_GRID_SUMMARY_COUNTS,
         "genome_build": GenomeBuildManager.get_current_genome_build()
     }
 

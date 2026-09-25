@@ -692,13 +692,18 @@ const Flags = (function () {
                 `);
                 setupModalAnimationForWebTesting(modalContent);
                 modalContent.find('.modal-header').html(`
-                    <nav aria-label="breadcrumb">
-                      <ol class="breadcrumb"></ol>
-                    </nav>
+                    <div>
+                        <h5 class="modal-title" id="FlagModalLabel"></h5>
+                        <nav aria-label="breadcrumb" class="mt-1">
+                          <ol class="breadcrumb"></ol>
+                        </nav>
+                    </div>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 `);
+                const collectionLabel = this.collection.label;
+                modalContent.find('.modal-title').text(collectionLabel ? `Flags for ${collectionLabel}` : 'Flags');
 
                 this.content = modalContent;
 
@@ -734,19 +739,18 @@ const Flags = (function () {
                 activeContent.init();
                 activeContent.update();
                 this.activeContent = activeContent;
-                const parentTitle = (this.collection.label || 'Flags').replace('/', '-'); // fixme trim title
                 const title = this.activeContent.title;
                 let titleDom = this.activeContent.titleDom;
                 if (!titleDom && title) {
                     titleDom = $('<span/>', {text: title});
                 }
                 const breadcrumbs = this.content.find('ol.breadcrumb');
+                // the summary is the top level, so the modal title is all it needs
                 if (!title && !titleDom) {
-                    breadcrumbs.html([
-                        $('<li>', {class: 'breadcrumb-item', text: parentTitle})
-                    ]);
+                    breadcrumbs.empty();
+                    breadcrumbs.closest('nav').addClass('d-none');
                 } else {
-                    // not showing parent title as it can get a bit out of control
+                    breadcrumbs.closest('nav').removeClass('d-none');
                     breadcrumbs.html([
                         $('<li>', {class: 'breadcrumb-item font-weight-bold', html: $('<a>', {html: '<i class="fas fa-angle-left"></i> Back to All Flags', click: () => { this.back(); }})}),
                         $('<li>', {class: 'breadcrumb-item active', html: titleDom})

@@ -265,7 +265,7 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
     overlap: Overlap = review.reviewing.source_object
 
     if request.method == 'POST':
-        # check to see if user is involved in this overlap?
+        review.check_can_write(request.user)
         action = request.POST.get('action')
 
         review.user = request.user

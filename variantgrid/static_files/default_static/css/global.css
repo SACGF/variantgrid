@@ -2521,6 +2521,10 @@ ul.compact li:before {
   background-repeat: no-repeat;
   padding: 16px 16px 16px 28px;
   border-radius: 4px;
+  background-color: #F1F3F5 !important;
+}
+
+.install-instructions.not-installed {
   background-color: #F0D9ED !important;
 }
 

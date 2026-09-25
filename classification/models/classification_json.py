@@ -14,6 +14,7 @@ from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
     ClassificationJsonAlleleRevolvedDict,
 )
+from classification.models.classification_ref import ClassificationRef
 from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
 
@@ -83,7 +84,7 @@ def populate_classification_json(classification: Classification, params: Classif
 
     include_data_bool = bool(include_data) or flatten
 
-    title = classification.lab.group_name + '/' + classification.lab_record_id
+    title = ClassificationRef.make_lab_id_str(classification.lab.group_name, classification.lab_record_id)
     # have version and last_edited as separate as we might be looking at an older version
     # but still want to know last edited
     latest_modification = None
@@ -279,7 +280,7 @@ def populate_classification_json(classification: Classification, params: Classif
             content['publish'] = content.pop('publish_level')
 
         content['meta'] = meta
-        content['id'] = classification.lab.group_name + '/' + classification.lab_record_id
+        content['id'] = ClassificationRef.make_lab_id_str(classification.lab.group_name, classification.lab_record_id)
 
     if params.hardcode_extra_data:
         for key, value in params.hardcode_extra_data.items():

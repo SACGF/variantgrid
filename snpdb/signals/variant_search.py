@@ -1,6 +1,7 @@
 import itertools
 import logging
 import re
+import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from itertools import zip_longest
@@ -16,7 +17,8 @@ from annotation.manual_variant_entry import CreateManualVariantForbidden, check_
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSException, HGVSImplementationException, HGVSMatcher, \
     HGVSNomenclatureException, HgvsOriginallyNormalized, VariantResolvingError
-from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
+from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException, HgvsMatchRefAllele
+from genes.hgvs.hgvs_matcher import VariantCoordinateAndDetails
 from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
     find_gene_copy_number_events_for_string,
@@ -260,25 +262,36 @@ def _alt_description(v: Union[Variant, VariantCoordinate]) -> str:
     return Sequence.abbreviate(str(v.alt))
 
 
+def _alt_mismatch_message(variant_coordinate: VariantCoordinate, alternative_variant: Variant,
+                          hgvs_matcher: Optional[HGVSMatcher]) -> str:
+    """ Alts alone ("AC" vs "AT") are hard to compare for indels, so an HGVS search names both as g.HGVS """
+    if hgvs_matcher:
+        try:
+            searched_g_hgvs = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
+            found_g_hgvs = hgvs_matcher.variant_to_g_hgvs(alternative_variant)
+            return f'No results for "{searched_g_hgvs}", but found "{found_g_hgvs}" at the same position'
+        except HGVSException:
+            pass
+    original_alt_desc = _alt_description(variant_coordinate)
+    alt_alt_desc = _alt_description(alternative_variant)
+    return f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"'
+
+
 def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
                                              variant_coordinate: VariantCoordinate,
-                                             search_messages: list[SearchMessage]) -> Iterable[SearchResult]:
+                                             search_messages: list[SearchMessage],
+                                             hgvs_matcher: Optional[HGVSMatcher] = None) -> Iterable[SearchResult]:
     # manual variants
     variant_string = variant_coordinate.format()
     if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build,
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    original_alt_desc = _alt_description(variant_coordinate)
-
     # search for alt alts
     alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
     for alternative_variant in alts:
-        alt_alt_desc = _alt_description(alternative_variant)
-
-        alt_messages = search_messages + [
-            SearchMessage(f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"',
-                          severity=LogLevel.ERROR, substituted=True)]
+        message = _alt_mismatch_message(variant_coordinate, alternative_variant, hgvs_matcher)
+        alt_messages = [*search_messages, SearchMessage(message, severity=LogLevel.ERROR, substituted=True)]
         yield SearchResult(alternative_variant.preview, messages=alt_messages)
 
 
@@ -602,6 +615,25 @@ def _classify_unresolved_hgvs(user: User, genome_build: GenomeBuild, hgvs_string
         yield SearchResult(classify_no_variant, messages=[SearchMessage(f"Error reading HGVS \"{error_message}\"")])
 
 
+def _get_non_coding_c_hgvs_as_n_details(hgvs_matcher: HGVSMatcher, hgvs_string: str,
+                                        search_messages: list[SearchMessage]) -> VariantCoordinateAndDetails:
+    """ Import refuses c.HGVS on a non-coding transcript (it may be numbered from a coding model, so shifted by
+        the 5' UTR length). Search resolves it as n. with a warning, unless the provided reference doesn't match """
+    hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
+    hgvs_variant.kind = 'n'
+    n_hgvs_string = hgvs_variant.format(max_ref_length=sys.maxsize)
+    vc_details = hgvs_matcher.get_variant_coordinate_and_details(n_hgvs_string)
+    matches_reference = vc_details.matches_reference
+    if isinstance(matches_reference, HgvsMatchRefAllele) and not matches_reference:
+        raise HGVSNomenclatureException(f'c.HGVS used on non-coding transcript. Not resolved as "{n_hgvs_string}" '
+                                        'as the provided reference does not match, so it is probably numbered '
+                                        'from a coding transcript')
+    msg = f'c.HGVS used on non-coding transcript, resolved as "{n_hgvs_string}". If the c. was numbered from a ' \
+          "coding transcript, the position will be shifted by the length of its 5' UTR"
+    search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
+    return vc_details
+
+
 def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
     hgvs_matcher = HGVSMatcher.instance(genome_build)
     variant_qs = visible_variants
@@ -622,7 +654,10 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     search_messages: list[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
 
     try:
-        vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
+        try:
+            vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
+        except HGVSNonCodingTranscriptException:
+            vc_details = _get_non_coding_c_hgvs_as_n_details(hgvs_matcher, hgvs_string, search_messages)
         variant_coordinate = vc_details.variant_coordinate
         used_transcript_accession = vc_details.transcript_accession
         kind = vc_details.kind
@@ -824,7 +859,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # if we're saying what we're resolving to, no need to complain about reference_message
 
             yield from _yield_no_results_for_variant_coordinate(user, genome_build, variant_qs,
-                                                                variant_coordinate, search_messages)
+                                                                variant_coordinate, search_messages,
+                                                                hgvs_matcher=hgvs_matcher)
 
 
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")

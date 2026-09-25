@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 
@@ -99,6 +100,14 @@ class Test(URLTestCase):
             ('genomic_intervals_graphs_tab', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
         ]
 
+        # Graph views redirect to the CachedGeneratedFile they enqueue
+        cls.PRIVATE_GRAPH_URL_NAMES_AND_KWARGS = [
+            ('chrom_density_graph', {"sample_id": cls.sample.pk, "cmap": "jet"}, 302),
+            ('homozygosity_graph', {"sample_id": cls.sample.pk, "cmap": "jet"}, 302),
+            ('sample_allele_frequency_histogram_graph', {"sample_id": cls.sample.pk, "min_read_depth": 10}, 302),
+            ('genomic_intervals_graph', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 302),
+        ]
+
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
             ('vcf_autocomplete', cls.vcf, {"q": cls.vcf.name}),
             ('sample_autocomplete', cls.sample, {"q": cls.sample.name}),
@@ -159,6 +168,16 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+
+    @patch("snpdb.views.views_graphs.graphcache.async_graph", return_value="/")
+    def testGraphPermission(self, _async_graph):
+        self._test_urls(self.PRIVATE_GRAPH_URL_NAMES_AND_KWARGS, self.user_owner)
+
+    @prevent_request_warnings
+    @patch("snpdb.views.views_graphs.graphcache.async_graph", return_value="/")
+    def testGraphNoPermission(self, async_graph):
+        self._test_urls(self.PRIVATE_GRAPH_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+        async_graph.assert_not_called()
 
     def testAutocompletePermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_owner, True)

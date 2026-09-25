@@ -1,11 +1,15 @@
+from datetime import timedelta
+
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from analysis.models import GeneListNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_annotation import create_fake_variants
 from annotation.models import AnnotationRun, VariantGeneOverlap
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.models import GeneList, GeneListGeneSymbol
+from genes.models import GeneList, GeneListGeneSymbol, PanelAppPanel, PanelAppPanelLocalCache, PanelAppServer
+from pathtests.models import PathologyTest, PathologyTestVersion
 from snpdb.models import ImportStatus, Variant
 
 
@@ -57,3 +61,32 @@ class TestGeneListNode(AnalysisSetupMixin, TestCase):
     def test_exclude_has_no_known_contigs(self):
         """ Excluding a gene list can match anything, so contig optimisation has to be skipped """
         self.assertIsNone(self._node(exclude=True)._get_node_contigs())
+
+    def _panel_app_node(self, cached_version: str) -> GeneListNode:
+        server = PanelAppServer.objects.create(name="Test PanelApp", url="https://panelapp.example.com",
+                                               icon_css_class="")
+        panel = PanelAppPanel.objects.create(server=server, panel_id=1, disease_group="", disease_sub_group="",
+                                             name="Test Panel", status="public", current_version="0.2")
+        local_cache = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel, version=cached_version)
+        node = GeneListNode.objects.create(analysis=self.analysis, accordion_panel=GeneListNode.PANEL_APP_GENE_LIST)
+        node.genelistnodepanelapppanel_set.create(panel_app_panel=panel, panel_app_panel_local_cache=local_cache)
+        return node
+
+    def test_panel_app_older_cached_version_warns(self):
+        warnings = self._panel_app_node(cached_version="0.1").get_warnings()
+        self.assertTrue(any("v.0.1 while latest is 0.2" in w for w in warnings))
+
+    def test_panel_app_current_cached_version_no_warning(self):
+        self.assertEqual([], self._panel_app_node(cached_version="0.2").get_warnings())
+
+    @override_settings(PATHOLOGY_TEST_STALE_WARNING_DAYS=365)
+    def test_stale_pathology_test_warns(self):
+        pathology_test = PathologyTest.objects.create(name="test")
+        ptv = PathologyTestVersion.objects.create(pathology_test=pathology_test, gene_list=self.gene_list)
+        node = GeneListNode.objects.create(analysis=self.analysis, pathology_test_version=ptv,
+                                           accordion_panel=GeneListNode.PATHOLOGY_TEST_GENE_LIST)
+        self.assertFalse(any("last modified" in w for w in node.get_warnings()))
+
+        PathologyTestVersion.objects.filter(pk=ptv.pk).update(modified=timezone.now() - timedelta(days=400))
+        node = GeneListNode.objects.get(pk=node.pk)
+        self.assertTrue(any("last modified 400 days ago" in w for w in node.get_warnings()))

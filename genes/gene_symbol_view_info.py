@@ -54,10 +54,15 @@ class HasVariants:
     has_tagged_variants: bool
     has_observed_variants: bool
     has_classified_variants: bool
+    has_clinvar_variants: bool
+
+    @property
+    def has_internal_variants(self) -> bool:
+        return self.has_tagged_variants or self.has_observed_variants or self.has_classified_variants
 
     @property
     def has_variants(self) -> bool:
-        return self.has_tagged_variants or self.has_observed_variants or self.has_classified_variants
+        return self.has_internal_variants or self.has_clinvar_variants
 
     def __bool__(self):
         return self.has_variants
@@ -144,6 +149,7 @@ class GeneSymbolViewInfo:
         has_tagged_variants = False
         has_observed_variants = False
         has_classified_variants = False
+        has_clinvar_variants = False
 
         if self.gene_version:
             annotation_version = AnnotationVersion.latest(self.genome_build)
@@ -159,10 +165,14 @@ class GeneSymbolViewInfo:
             q = get_has_classifications_q(self.genome_build)
             has_classified_variants = gene_variant_qs.filter(q).exists()
 
+            if clinvar_version := annotation_version.clinvar_version:
+                has_clinvar_variants = gene_variant_qs.filter(clinvar__version=clinvar_version).exists()
+
         return HasVariants(
             has_tagged_variants=has_tagged_variants,
             has_observed_variants=has_observed_variants,
-            has_classified_variants=has_classified_variants)
+            has_classified_variants=has_classified_variants,
+            has_clinvar_variants=has_clinvar_variants)
 
     @property
     def has_classified_variants(self):

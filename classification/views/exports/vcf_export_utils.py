@@ -7,6 +7,7 @@ from typing import Any, Optional, Protocol, TypeAlias
 
 from django.conf import settings
 
+from library.genomics.vcf_writer import vcf_file_format, vcf_header_description
 from library.utils import ExportTweak, get_decorated_methods, local_date_str_no_dash
 from snpdb.models import Allele, Contig, GenomeBuild, GenomeBuildContig, Variant
 
@@ -103,7 +104,7 @@ class VCFHeader:
                 header = header.value
             parts.append(f"Type={header}")
         if self.description is not None:
-            description = self.description.replace("\"", "'")
+            description = vcf_header_description(self.description)
             parts.append(f"Description=\"{description}\"")
         if custom_attributes := self.custom_attributes:
             for key, value in custom_attributes.items():
@@ -250,7 +251,7 @@ class ExportVCF:
         if not extras:
             extras = []
         return ([
-            VCFHeader("fileformat", value="VCFv4.1"),
+            VCFHeader("fileformat", value=vcf_file_format()),
             VCFHeader("fileDate", value=local_date_str_no_dash()),
             VCFHeader("source", value=settings.SITE_NAME)
         ] +
