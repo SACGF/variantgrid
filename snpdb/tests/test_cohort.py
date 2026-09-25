@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
+from celery import states
+from celery.app.control import Control
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import (
@@ -10,10 +12,16 @@ from snpdb.models import (
     CohortGenotypeStats,
     CohortSample,
     GenomeBuild,
+    ImportStatus,
     SampleStatsCodeVersion,
     Trio,
 )
-from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
+from snpdb.tasks.cohort_genotype_tasks import (
+    _cohort_genotype_task_needs_launch,
+    cohort_genotype_task,
+    create_cohort_genotype_and_launch_task,
+    create_cohort_genotype_collection,
+)
 from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.views.vcf_cohort_page import _family_groups_by_sample_id, cohort_zygosity_stats
 
@@ -111,6 +119,31 @@ class CohortGenotypeTestCase(TestCase):
         self.assertFalse(CohortGenotypeCollection.objects.filter(cohort=cohort,
                                                                  cohort_version=cohort.version).exists())
 
+    @patch.object(Control, "revoke")
+    def test_new_version_cancels_superseded_build(self, mock_revoke):
+        cohort = Cohort.objects.create(name="superseded", user=self.user_owner, genome_build=self.grch37)
+        samples = list(self.trio1.get_samples())
+        samples2 = list(self.trio2.get_samples())
+        cohort.set_samples([samples[0].pk, samples2[0].pk])
+        _, celery_task = create_cohort_genotype_and_launch_task(cohort, run_async=False)
+
+        cohort.set_samples([samples[0].pk, samples2[1].pk])
+        mock_revoke.assert_called_once_with(celery_task)
+
+    def test_superseded_build_leaves_cohort_status(self):
+        """ A build finishing (or failing when cancelled) after a version bump mustn't set the new version's status """
+        cohort = Cohort.objects.create(name="superseded_status", user=self.user_owner, genome_build=self.grch37)
+        samples = list(self.trio1.get_samples())
+        samples2 = list(self.trio2.get_samples())
+        cohort.set_samples([samples[0].pk, samples2[0].pk])
+        cgc = create_cohort_genotype_collection(cohort)
+
+        cohort.set_samples([samples[0].pk, samples2[1].pk])
+        Cohort.objects.filter(pk=cohort.pk).update(import_status=ImportStatus.IMPORTING)
+        cohort_genotype_task(cgc.pk)
+        cohort.refresh_from_db()
+        self.assertEqual(ImportStatus.IMPORTING, cohort.import_status)
+
     def test_family_groups_warned_about_before_removal(self):
         """ Duo/Trio/Quad cascade off CohortSample, so the editor names what a removal would delete """
         cohort = Cohort.objects.create(name="has_a_trio", user=self.user_owner, genome_build=self.grch37)
@@ -177,3 +210,25 @@ class CohortGenotypeTestCase(TestCase):
         create_cohort_genotype_and_launch_task(cohort, run_async=False)
         cs = cohort.cohortsample_set.order_by("-cohort_genotype_packed_field_index").first()
         self.assertLess(cs.cohort_genotype_packed_field_index, cohort.cohort_genotype_collection.num_samples)
+
+
+class CohortGenotypeTaskNeedsLaunchTest(SimpleTestCase):
+    @patch("snpdb.tasks.cohort_genotype_tasks.AsyncResult")
+    def test_relaunch_only_after_failure(self, mock_async_result):
+        CELERY_TASK = "a-task-id"
+        cases = [
+            # (import_status, celery_task, task state, expected)
+            (ImportStatus.ERROR, CELERY_TASK, states.PENDING, True),
+            (ImportStatus.SUCCESS, None, None, False),  # VCF cohort, built by import
+            (ImportStatus.IMPORTING, None, None, True),  # Launch didn't get as far as recording a task
+            (ImportStatus.SUCCESS, CELERY_TASK, states.PENDING, False),  # Result expired from backend
+            (ImportStatus.IMPORTING, CELERY_TASK, states.PENDING, False),  # Queued or running
+            (ImportStatus.IMPORTING, CELERY_TASK, states.STARTED, False),
+            (ImportStatus.IMPORTING, CELERY_TASK, states.FAILURE, True),
+            (ImportStatus.IMPORTING, CELERY_TASK, states.REVOKED, True),
+        ]
+        for import_status, celery_task, state, expected in cases:
+            with self.subTest(import_status=import_status, celery_task=celery_task, state=state):
+                mock_async_result.return_value.state = state
+                cohort = Cohort(import_status=import_status)
+                self.assertEqual(expected, _cohort_genotype_task_needs_launch(cohort, celery_task))

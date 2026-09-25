@@ -634,8 +634,8 @@ class TestCancelNodeTasks(AnalysisSetupMixin, TestCase):
     def setUp(self):
         patchers = [mock.patch.object(app.control, "revoke"),
                     mock.patch.object(node_utils, "AbortableAsyncResult"),
-                    mock.patch.object(node_utils, "run_sql")]
-        self.revoke, self.abortable_result, self.run_sql = (p.start() for p in patchers)
+                    mock.patch.object(node_utils, "signal_backends")]
+        self.revoke, self.abortable_result, self.signal_backends = (p.start() for p in patchers)
         for p in patchers:
             self.addCleanup(p.stop)
 
@@ -652,7 +652,7 @@ class TestCancelNodeTasks(AnalysisSetupMixin, TestCase):
         self.revoke.assert_called_once_with("task-1", terminate=True)
         self.abortable_result.assert_called_once_with("task-1")
         self.abortable_result.return_value.abort.assert_called_once_with()
-        self.run_sql.assert_called_once_with("select pg_cancel_backend(%s)", [987654])
+        self.signal_backends.assert_called_once_with([987654])
 
     def test_handles_cleared_so_a_second_call_is_a_no_op(self):
         node = AllVariantsNode.objects.create(analysis=self.analysis)
