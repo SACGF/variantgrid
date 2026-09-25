@@ -579,9 +579,6 @@ VIEW_TRANSCRIPT_VERSION_SHOW_CLASSIFICATIONS = False
 
 DEFAULT_COLUMNS_NAME = 'Default columns'
 
-DEFAULT_ENRICHMENT_KIT_LEFT_PADDING = 0
-DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING = 0
-
 ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
@@ -623,6 +620,11 @@ ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
 # statement_timeout. Node queries run under this limit instead (@see node_query_planner_settings); it
 # is not set server-wide as the extra planning time regressed unrelated queries. None = server default.
 ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT = 32
+# pg_cancel_backend only signals the backend, so after cancelling a node's load we poll
+# pg_stat_activity for up to this long waiting for those queries to actually stop - a caller that
+# cancelled so it could drop partitions (analysis delete, version bump) would otherwise queue
+# behind the locks it just asked to be released
+ANALYSIS_NODE_CANCEL_WAIT_SECONDS = 5
 # Node exports are cached per (node, version, user, filter set, export type) so accumulate much faster
 # than the cohort/sample ones - a beat task drops the CachedGeneratedFile rows (and files) older than this
 ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
@@ -666,6 +668,7 @@ CLASSIFICATION_GRID_SHOW_SAMPLE = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
 CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = True  # Toggle to show only internal/external (e.g. synced from Shariant) labs
 CLASSIFICATION_GRID_FADE_NON_SHARED = False  # Fade grid rows and record summaries that haven't been shared, for deployments where sharing is the point
+CLASSIFICATION_GRID_SUMMARY_COUNTS = True  # Clinical significance counts above the gene / allele / variant classification grids
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_NEW_GROUPING = False
 CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
@@ -767,6 +770,8 @@ ROLLBAR = {
     'root': BASE_DIR,
     'capture_username': True,
     'code_version': Git(BASE_DIR).hash,
+    # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
+    'min_level': 'warning',
     'ignorable_404_urls': (
         re.compile(r'.*\.map'),
         re.compile(r'.*\.ico')
@@ -1359,7 +1364,7 @@ BASH_ZCAT = 'zcat'
 # If True, will run a series of bash commands as one long string with Shell=True
 # otherwise will pipe each command into the next more safely with Shell=False
 VCF_IMPORT_PREPROCESS_POPEN_SHELL = True  # For vcf split
-VCF_EXPORT_VERSION = "4.3"
+VCF_EXPORT_VERSION = "4.3"  # ##fileformat=VCFv<this> on every VCF we write (library.genomics.vcf_writer.vcf_file_format)
 
 CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
 CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True

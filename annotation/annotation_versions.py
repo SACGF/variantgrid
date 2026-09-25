@@ -2,13 +2,16 @@
 Which variants still need annotation: get_annotation_range_lock_and_unannotated_count and
 get_lowest_unannotated_variant_id decide where the next AnnotationRangeLock starts, and
 merge_pending_range_locks combines small pending locks into batch-sized ones (#2667). The scheduler
-in annotation/tasks/annotation_scheduler_task.py calls these.
+in annotation/tasks/annotation_scheduler_task.py calls these. get_range_lock_gaps_with_variants finds
+variants left between locks, which the scheduler never goes back for (deployment_check reports them).
 """
 import logging
 import sys
 
 from django.db import transaction
+from django.db.models import F, Value, Window
 from django.db.models.aggregates import Count, Max, Min
+from django.db.models.functions import Coalesce, Lag
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
@@ -17,6 +20,7 @@ from annotation.models import (
     AnnotationRun,
     AnnotationStatus,
     Variant,
+    VariantAnnotation,
     VariantAnnotationVersion,
 )
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
@@ -123,6 +127,31 @@ def get_annotation_range_lock_and_unannotated_count(variant_annotation_version: 
 
     logging.info("AnnotationRangeLock: range: %s, count: %d", annotation_range_lock, unannotated_variants_count)
     return annotation_range_lock, unannotated_variants_count
+
+
+def get_range_lock_gaps_with_variants(variant_annotation_version: VariantAnnotationVersion) -> list[tuple[int, int]]:
+    """ Variant pk ranges (inclusive) between consecutive AnnotationRangeLocks that hold variants the
+        scheduler would annotate. The scheduler only searches above the highest lock, so these are never
+        annotated - left by a deleted lock, or by variants committed after a lock above them was taken.
+
+        Most pk gaps between locks hold only other builds' variants. Each gap is probed with
+        ORDER BY id LIMIT 1 rather than .exists(): without the ordering Postgres walks every locus of the
+        build (the contig index) per gap, instead of just the gap's pk range. Gap variants are not joined to
+        the annotation partition to check they are unannotated (that made each probe ~7x slower): deleting
+        a lock cascades to its runs' annotation. """
+    prev_max_variant_id = Coalesce(Window(Lag("max_variant_id"), order_by="min_variant_id"), Value(0))
+    gaps_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
+    gaps_qs = gaps_qs.annotate(prev_max_variant_id=prev_max_variant_id)
+    gaps_qs = gaps_qs.filter(min_variant_id__gt=F("prev_max_variant_id") + 1)
+
+    build_variants_qs = Variant.objects.filter(Variant.get_contigs_q(variant_annotation_version.genome_build),
+                                               *VariantAnnotation.VARIANT_ANNOTATION_Q)
+    gaps_with_variants = []
+    for prev_max_id, next_min_id in gaps_qs.values_list("prev_max_variant_id", "min_variant_id"):
+        gap_qs = build_variants_qs.filter(pk__gt=prev_max_id, pk__lt=next_min_id)
+        if gap_qs.order_by("pk").values_list("pk", flat=True).first() is not None:
+            gaps_with_variants.append((prev_max_id + 1, next_min_id - 1))
+    return gaps_with_variants
 
 
 def _range_lock_is_dispatchable(range_lock: AnnotationRangeLock, now=None) -> bool:

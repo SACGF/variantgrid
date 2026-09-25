@@ -120,6 +120,7 @@ function addCreatePatientButton(dialog, patientSelect, sampleName, buttonContain
             <div class="form-row">
                 <div class="col-md-4">{{ patient_form.affected|as_crispy_field }}</div>
                 <div class="col-md-4">{{ patient_form.consanguineous|as_crispy_field }}</div>
+                <div class="col-md-4">{{ patient_form.deceased|as_crispy_field }}</div>
             </div>
             {{ patient_form.phenotype|as_crispy_field }}
             {% page_help user 'patients/patient_population_help' 'Patient Population' %}

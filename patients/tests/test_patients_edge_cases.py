@@ -15,6 +15,7 @@ from django.test import TestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.forms import PatientForm
 from patients.import_records import (
+    InvalidPatientRecord,
     import_patient_records,
     parse_boolean,
     parse_choice,
@@ -422,6 +423,36 @@ class TestProcessRecordSpecimenPatientMismatch(TestCase):
                 PatientColumns.SPECIMEN_REFERENCE_ID: "MISMATCH_SPEC001",
             }))
 
+    def test_message_tells_same_named_patients_apart(self):
+        """ #422 - a changed DOB made a new patient, and the message showed two identical names """
+        owner = Patient.objects.create(first_name="SAMENAME", last_name="CLASH", sex=Sex.MALE,
+                                       date_of_birth=date(1990, 1, 1))
+        assign_permission_to_user_and_groups(self.user, owner)
+        Specimen.objects.create(reference_id="MISMATCH_SPEC002", patient=owner)
+        with self.assertRaises(InvalidPatientRecord) as cm:
+            process_record(self.pr, record_id=1, row=_make_row(**{
+                PatientColumns.PATIENT_FIRST_NAME: "SAMENAME",
+                PatientColumns.PATIENT_LAST_NAME: "CLASH",
+                PatientColumns.SEX: "M",
+                PatientColumns.DATE_OF_BIRTH: "1990-01-02",
+                PatientColumns.SPECIMEN_REFERENCE_ID: "MISMATCH_SPEC002",
+            }))
+        msg = str(cm.exception)
+        self.assertIn(f"Patient:{owner.pk}, DOB: 1990-01-01", msg)
+        self.assertIn("created new patient CLASH, SAMENAME (M) [DOB: 1990-01-02]", msg)
+
+    def test_message_hides_owner_user_cant_view(self):
+        hidden_owner = Patient.objects.create(first_name="HIDDEN", last_name="OWNER")
+        Specimen.objects.create(reference_id="MISMATCH_SPEC003", patient=hidden_owner)
+        with self.assertRaises(InvalidPatientRecord) as cm:
+            process_record(self.pr, record_id=1, row=_make_row(**{
+                PatientColumns.SPECIMEN_REFERENCE_ID: "MISMATCH_SPEC003",
+            }))
+        msg = str(cm.exception)
+        self.assertIn(f"don't have access to (Patient:{hidden_owner.pk})", msg)
+        self.assertNotIn("HIDDEN", msg)
+        self.assertIn(f"matched patient {self.new_patient} [Patient:{self.new_patient.pk}", msg)
+
 
 # ---------------------------------------------------------------------------
 # PatientForm audit trail
@@ -463,6 +494,31 @@ class TestPatientFormAuditTrail(TestCase):
         self.assertTrue(
             PatientModification.objects.filter(patient=patient).exists(),
             "No PatientModification created for affected False→True change")
+
+
+class TestPatientFormDeceased(TestCase):
+    """ Patient won't save both _deceased and date_of_death """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("form_deceased_user", password="x")
+
+    def _form(self, **data):
+        form_data = {"last_name": "DECEASED", "sex": Sex.UNKNOWN, "population": []}
+        form_data.update(data)
+        return PatientForm(data=form_data, user=self.user)
+
+    def test_deceased_with_date_of_death_keeps_the_date(self):
+        form = self._form(deceased="true", date_of_death="2020-01-01")
+        self.assertTrue(form.is_valid(), form.errors)
+        patient = form.save()
+        self.assertIsNone(patient._deceased)
+        self.assertEqual(date(2020, 1, 1), patient.date_of_death)
+
+    def test_not_deceased_with_date_of_death_is_an_error(self):
+        form = self._form(deceased="false", date_of_death="2020-01-01")
+        self.assertFalse(form.is_valid())
+        self.assertIn("deceased", form.errors)
 
 
 # ---------------------------------------------------------------------------

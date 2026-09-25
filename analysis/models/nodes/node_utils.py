@@ -1,9 +1,9 @@
 """
 Node graph operations that span the whole analysis: get_toposorted_nodes (parents before children),
 get_nodes_by_id, reload_analysis_nodes (bump versions and requeue, optionally only error nodes),
-update_analysis_tag_node_counts (tags do not bump versions, so tag nodes recount here) and
-get_rendering_dict for the DAG canvas. The per-node lifecycle is analysis_node.py; scheduling is
-analysis/tasks/.
+update_analysis_tag_node_counts (tags do not bump versions, so tag nodes recount here),
+cancel_node_tasks (stop running loads) and get_rendering_dict for the DAG canvas. The per-node
+lifecycle is analysis_node.py; scheduling is analysis/tasks/.
 """
 import json
 import logging
@@ -14,8 +14,10 @@ from dataclasses import asdict
 
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature
+from celery.contrib.abortable import AbortableAsyncResult
+from django.conf import settings
 from django.db import connection
-from django.db.models import F
+from django.db.models import F, QuerySet
 from django.db.models.query_utils import Q
 from django.utils import timezone
 from toposort import toposort
@@ -24,6 +26,7 @@ from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeColors, NodeStatus
 from analysis.models.nodes.analysis_node import (
     AnalysisEdge,
+    NodeTask,
     NodeVersion,
     node_query_planner_settings,
 )
@@ -31,9 +34,13 @@ from analysis.models.nodes.node_counts import (
     get_tag_node_counts_dict,
     get_tagged_variant_ids_by_label,
 )
-from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
+from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
 from snpdb.models.models_enums import TagFilter
+from variantgrid.celery import app
+
+CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
+DELETE_OLD_NODE_VERSIONS_TASK = "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions"
 
 
 def get_nodes_by_id(nodes_qs):
@@ -96,10 +103,31 @@ def get_toposorted_nodes_from_parent_value_data(nodes, parent_value_data):
 def update_analysis(analysis_id):
     """ Launches async job to update analysis """
 
-    delete_analysis_old_node_versions.si(analysis_id).apply_async()
+    # Both by name - node_update_tasks imports cancel_node_tasks from here
+    Signature(DELETE_OLD_NODE_VERSIONS_TASK, args=(analysis_id,)).apply_async()
+    Signature(CREATE_AND_LAUNCH_TASK, args=(analysis_id,)).apply_async()
 
-    task = Signature("analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks", args=(analysis_id,))
-    task.apply_async()
+
+def cancel_node_tasks(node_task_qs: QuerySet[NodeTask]) -> int:
+    """ Stops the celery task and the database query behind each running NodeTask; returns how many were cancelled """
+
+    db_pids = []
+    cancelled_pks = []
+    for node_task in node_task_qs.filter(celery_task__isnull=False):
+        logging.info("Cancelling node task %s", node_task)
+        app.control.revoke(node_task.celery_task, terminate=True)
+        AbortableAsyncResult(node_task.celery_task).abort()
+        if node_task.db_pid:
+            db_pids.append(node_task.db_pid)
+        cancelled_pks.append(node_task.pk)
+
+    if cancelled_pks:
+        # Null the handles so a second call is a no-op, and nothing cancels a pid the worker has moved on from
+        NodeTask.objects.filter(pk__in=cancelled_pks).update(celery_task=None, db_pid=None)
+        # A caller about to drop partitions needs the cancelled queries' locks released first
+        signal_backends(db_pids)
+        wait_for_backends_to_stop(db_pids, settings.ANALYSIS_NODE_CANCEL_WAIT_SECONDS)
+    return len(cancelled_pks)
 
 
 def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):

@@ -951,10 +951,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def id_str(self):
+        """ The pk as a ClassificationRef string ("1234"). ClassificationModification.id_str appends ".<created timestamp>".
+            The lab form "org_group_name/lab_name/lab_record_id" is built by ClassificationRef.make_lab_id_str,
+            and either form is read back by ClassificationRef.parse_id_str """
         return str(self.id)
 
     @property
     def cr_lab_id(self):
+        """ The record id shown to users: lab_record_id (the lab's own id, unique within the lab, "vc<pk>" when the
+            lab didn't supply one), or "CR_<pk>" on deployments with CLASSIFICATION_ID_OVERRIDE_PREFIX (Shariant) """
         if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX:
             return f"CR_{self.id}"
         return self.lab_record_id
@@ -2266,19 +2271,28 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                                                    allele=self.variant.allele,
                                                                                    published=True)
             latest_others_for_variant = latest_others_for_variant.exclude(classification__id=self.id)
-
-            counts = Counter(
-                [vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, "Unclassified") for vcm in latest_others_for_variant])
-            classifications = []
-            for counted in counts.most_common():
-                count = counted[1]
-                if count:
-                    cs = counted[0]
-                    cs_label = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(cs)
-                    classifications.append(f"{cs_label} x{count}")
-            other_classifications_summary = ", ".join(classifications)
+            other_classifications_summary = Classification.clinical_significance_counts_summary(latest_others_for_variant)
 
         return other_classifications_summary
+
+    @staticmethod
+    def clinical_significance_counts_summary(records: Iterable[EvidenceMixin]) -> str:
+        """ e.g. "Pathogenic x5, Tier I x3, Unclassified x1" - germline and somatic values are counted separately,
+            so a record with both counts once under each """
+        significance_keys = [
+            EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+            EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),
+        ]
+        counts = Counter()
+        unclassified_count = 0
+        for record in records:
+            if record_labels := [e_key.pretty_value(value) for e_key in significance_keys if (value := record.get(e_key.key))]:
+                counts.update(record_labels)
+            else:
+                unclassified_count += 1
+        if unclassified_count:
+            counts["Unclassified"] = unclassified_count
+        return ", ".join(f"{label} x{count}" for label, count in counts.most_common())
 
     def get_variant_for_build(self, genome_build: GenomeBuild) -> Optional[Variant]:
         if self.variant and self.variant.allele:

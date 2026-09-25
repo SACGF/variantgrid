@@ -49,8 +49,7 @@ def variant_qs_filter_has_internal_data(variant_qs: QuerySet, annotation_version
     interesting = [Q(**{f"{vzcc.non_ref_call_alias}__gt": 0}),
                    get_has_classifications_q(annotation_version.genome_build),
                    get_has_variant_tags(annotation_version.genome_build)]
-    # annotation_version.clinvar_version.get
-    if show_clinvar:
+    if show_clinvar and annotation_version.clinvar_version:
         interesting.append(Q(clinvar__version=annotation_version.clinvar_version))
     q = reduce(operator.or_, interesting)
     return qs.filter(q)

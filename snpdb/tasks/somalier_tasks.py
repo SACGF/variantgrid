@@ -281,6 +281,7 @@ def _load_somalier_pairs(all_samples: SomalierAllSamplesRelate, pairs_filename: 
     """ Replaces every stored pair with the ones from this run. Returns how many were kept """
     somalier_settings = settings.SOMALIER["relatedness"]
     df = pd.read_csv(pairs_filename, sep='\t')
+    df = df.rename(columns={"concordance": "hom_concordance"})  # somalier 0.3.5 renamed it
     shared_het_mask = df["shared_hets"] >= somalier_settings["min_shared_hets"]
     shared_hom_mask = df["shared_hom_alts"] > somalier_settings["min_shared_hom_alts"]
     relateness_mask = df["relatedness"] > somalier_settings["min_relatedness"]

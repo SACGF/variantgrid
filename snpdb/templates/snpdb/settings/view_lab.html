@@ -37,30 +37,7 @@
                     </div>
                     <div id="lab-permissions">
                         {% if group_initial_perm_form %}
-                            {% page_help_embedded "Groups" %}
-                                <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
-                            {% end_page_help_embedded %}
-                            <p class="text-info">
-                                The settings below are how data is initially shared with your groups.
-                                You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
-                            </p>
-                            <label>Initial group permissions</label>
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Group</th>
-                                        <th>Read</th>
-                                        <th>Write</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>{{ lab.group }}</td>
-                                        <td>{{ group_initial_perm_form.read }}</td>
-                                        <td>{{ group_initial_perm_form.write }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            {% include "snpdb/settings/group_initial_perm_form.html" with group=lab.group form=group_initial_perm_form %}
                         {% endif %}
                     </div>
                     <div id="lab-settings">

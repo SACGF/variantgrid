@@ -19,7 +19,12 @@ from django.test.client import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls.base import resolve, reverse
 
-from analysis.grid_export import format_items_iterator, get_node_export_basename, node_grid_get_export_iterator
+from analysis.grid_export import (
+    format_items_iterator,
+    get_canonical_transcript_collection_filename_part,
+    get_node_export_basename,
+    node_grid_get_export_iterator,
+)
 from analysis.grids import ExportVariantGrid
 from analysis.models import Analysis
 from analysis.models.enums import NodeStatus
@@ -40,7 +45,7 @@ from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from analysis.grids import VariantGrid
-from genes.models import GeneSymbol
+from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.genomics.vcf_writer import percent_encode_info_value
 from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
@@ -368,6 +373,15 @@ class TestNodeExportLaunch(GridExportTestCase):
         self.assertEqual(get_node_export_basename(node), expected)
         node.name = ""
         self.assertTrue(get_node_export_basename(node).startswith(node.get_node_class_label() + "_"))
+
+    def test_canonical_export_filename_part(self):
+        ctc = CanonicalTranscriptCollection(description="", filename="/data/canonical/MedEx v2.GeneTable.tsv")
+        self.assertEqual(get_canonical_transcript_collection_filename_part(ctc), "canonical_MedEx_v2")
+        ctc.description = "Haem panel (2024)"
+        self.assertEqual(get_canonical_transcript_collection_filename_part(ctc), "canonical_Haem_panel_2024")
+        ctc.description = ""
+        ctc.filename = ""
+        self.assertEqual(get_canonical_transcript_collection_filename_part(ctc), "canonical")
 
     def test_export_task_writes_plain_csv(self):
         cgf = self._launch_export()

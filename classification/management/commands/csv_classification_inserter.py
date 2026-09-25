@@ -8,6 +8,7 @@ from django.core.management import BaseCommand
 from classification.enums import SubmissionSource
 from classification.models import ClassificationImportRun, EvidenceKey
 from classification.models.classification_inserter import BulkClassificationInserter
+from classification.models.classification_ref import ClassificationRef
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from library.pandas_utils import df_nan_to_none
@@ -143,7 +144,7 @@ class Command(BaseCommand):
             data.update(row.to_dict())
 
             lab_record_id = data.pop("lab_record_id")
-            id_str = f"{lab.group_name}/{lab_record_id}"  # Format is lab_id/]record_id[.version
+            id_str = ClassificationRef.make_lab_id_str(lab.group_name, lab_record_id)
             # Special case: column name differs from ekey name
             data[internal_notes_ekey] = {
                 "value": data.pop("internal_use"),

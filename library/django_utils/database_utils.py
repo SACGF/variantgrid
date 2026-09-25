@@ -1,12 +1,19 @@
 """
 Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
 text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
-cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first)
-and postgres_arrays formats array literals.
+cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first),
+postgres_arrays formats array literals, long_running_sql / get_active_backend_pids / signal_backends /
+wait_for_backends_to_stop find and cancel other connections' running queries, pg_settings / get_pg_setting set
+and read this connection's run-time settings, and get_table_row_estimates / get_queryset_row_estimate give planner
+row counts without scanning.
 """
 import contextlib
 import json
+import logging
+import time
 from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Optional, TypeVar, Generic, Type, Callable
 
 import sqlparse
@@ -30,6 +37,131 @@ def run_sql(sql, params=None) -> tuple[Any, int]:
         value = cursor.execute(sql, params)  # Remember it only accepts '%s' not %d etc.
         rowcount = cursor.rowcount
         return value, rowcount
+
+
+@dataclass
+class RunningQuery:
+    pid: int
+    duration: timedelta
+    query: str
+    state: str
+
+
+def long_running_sql(min_age_in_seconds: int = 30) -> list[RunningQuery]:
+    """ Non-idle connections to this database whose current query started more than min_age_in_seconds ago,
+        longest first. Idle ones are pooled connections showing their last query, not running anything """
+    sql = """
+        SELECT pid, now() - query_start AS duration, query, state
+        FROM pg_stat_activity
+        WHERE datname = current_database() AND state <> 'idle' AND now() - query_start > interval %s
+        ORDER BY duration DESC
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [f"{min_age_in_seconds} seconds"])
+        return [RunningQuery(*row) for row in cursor.fetchall()]
+
+
+def get_active_backend_pids(query_regex: str) -> list[int]:
+    """ Other connections to this database currently running a query matching query_regex (case-insensitive) """
+    sql = """
+        SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid() AND state = 'active' AND query ~* %s
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [query_regex])
+        return [row[0] for row in cursor.fetchall()]
+
+
+def signal_backends(pids: Iterable[int], terminate: bool = False) -> list[int]:
+    """ pg_cancel_backend (stop the current query, keep the connection) or, with terminate, pg_terminate_backend
+        (close the connection). Returns the pids Postgres signalled - it only signals, so a caller that needs the
+        locks released must wait_for_backends_to_stop. Needs the same DB role as the backend (or superuser) """
+    pids = list(pids)
+    if not pids:
+        return []
+    pg_function = "pg_terminate_backend" if terminate else "pg_cancel_backend"
+    with connection.cursor() as cursor:
+        cursor.execute(f"SELECT pid FROM unnest(%s::int[]) AS pid WHERE {pg_function}(pid)", [pids])
+        return [row[0] for row in cursor.fetchall()]
+
+
+def wait_for_backends_to_stop(pids: Iterable[int], timeout_seconds: float) -> bool:
+    """ Polls until none of pids is running a query, or timeout_seconds passes. Returns whether they all stopped """
+    pids = list(pids)
+    if not pids:
+        return True
+
+    sql = "SELECT count(*) FROM pg_stat_activity WHERE pid = ANY(%s) AND state = 'active'"
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [pids])
+            if not cursor.fetchone()[0]:
+                return True
+        if time.monotonic() >= deadline:
+            logging.warning("Signalled backends (pids=%s) still running after %s seconds", pids, timeout_seconds)
+            return False
+        time.sleep(0.1)
+
+
+def get_pg_setting(name: str) -> str:
+    """ Current value of a Postgres run-time setting on this connection, as SHOW would print it """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_setting(%s)", [name])
+        return cursor.fetchone()[0]
+
+
+def _set_pg_settings(values: dict[str, str], local: bool):
+    with connection.cursor() as cursor:
+        for name, value in values.items():
+            cursor.execute("SELECT set_config(%s, %s, %s)", [name, value, local])
+
+
+@contextlib.contextmanager
+def pg_settings(local: bool = False, **values):
+    """ Set Postgres run-time settings (eg statement_timeout=5000, work_mem="4GB") on this connection for the
+        block. A value of None leaves that setting alone.
+
+        Session settings are put back to what they were on exit - connections are reused (CONN_MAX_AGE) and
+        this may be nested inside another caller's settings. local=True is SET LOCAL: it ends with the
+        current transaction, so there is nothing to put back (and nothing can run in an aborted one) """
+    values = {name: str(value) for name, value in values.items() if value is not None}
+    if not values or connection.vendor != 'postgresql':
+        yield
+        return
+
+    previous = {} if local else {name: get_pg_setting(name) for name in values}
+    _set_pg_settings(values, local)
+    try:
+        yield
+    finally:
+        if previous:
+            _set_pg_settings(previous, local=False)
+
+
+def get_table_row_estimates(table_names: Optional[Iterable[str]] = None) -> dict[str, int]:
+    """ {table: planner row estimate} from pg_class for tables and partitioned tables - all of them, or just
+        table_names. -1 means the table has never been vacuumed or analyzed. An inheritance parent only
+        counts its own rows, not its children's """
+    sql = "SELECT relname, reltuples::bigint FROM pg_class WHERE relkind IN ('r', 'p')"
+    params = []
+    if table_names is not None:
+        sql += " AND relname = ANY(%s)"
+        params.append(list(table_names))
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return dict(cursor.fetchall())
+
+
+def get_queryset_row_estimate(qs: QuerySet) -> int:
+    """ The planner's row estimate for a queryset, without running it - cheap where count() would scan """
+    sql, params = qs.query.sql_with_params()
+    with connection.cursor() as cursor:
+        cursor.execute(f"EXPLAIN (FORMAT JSON) {sql}", params)
+        plan = cursor.fetchone()[0]
+    if isinstance(plan, str):
+        plan = json.loads(plan)
+    return int(plan[0]["Plan"]["Plan Rows"])
 
 
 def get_postgresql_version() -> str:
@@ -77,11 +209,11 @@ def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
         qs.query returns something that isn't valid SQL, this returns the actual
         valid SQL that's executed: https://code.djangoproject.com/ticket/17741  """
 
-    cursor = connection.cursor()
     query, params = queryset.query.sql_with_params()
     PREFIX = 'select 1 -- '
-    cursor.execute(PREFIX + query, params)
-    res = str(cursor.db.ops.last_executed_query(cursor, query, params))
+    with connection.cursor() as cursor:
+        cursor.execute(PREFIX + query, params)
+        res = str(cursor.db.ops.last_executed_query(cursor, query, params))
     assert res.startswith(PREFIX)
     query_sql = res[len(PREFIX):]
 

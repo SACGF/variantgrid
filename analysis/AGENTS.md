@@ -163,6 +163,15 @@ Gotchas:
 - Never call `node.save()` inside a celery task — use `analysis/models/nodes/analysis_node.py:AnalysisNode.update`, a
   conditional UPDATE on (pk, version) that raises `analysis/exceptions.py:NodeOutOfDateException` if the user bumped the
   node meanwhile; `update_node_task` treats that as "exit quietly, a newer version is coming".
+- `analysis/models/nodes/node_utils.py:cancel_node_tasks` is the one place a running load is stopped (revoke + abort the
+  celery task, `pg_cancel_backend` its query, then wait for the backends to go idle): the node's cancel button, deleting
+  the analysis (`analysis/signals/signal_handlers.py:analysis_pre_delete` - it is registered from `analysis/apps.py`
+  rather than beside `pre_delete_analysis`, since models_analysis is imported by the module NodeTask lives in) and
+  `analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions`, which cancels before dropping the old
+  versions' NodeCache partitions rather than deadlocking with the load reading them (SACGF/variantgrid_com#2).
+- A cancelled query reaches the task as `OperationalError` with a `psycopg.errors.QueryCanceled` cause
+  (`analysis/tasks/node_update_tasks.py:query_was_cancelled`) and means exit, never back off - the transient-error
+  branch would re-queue the load that was just cancelled.
 - `AnalysisNode.save` locks the Analysis row first (`select_for_update`) so concurrent subtree cascades take NodeVersion
   locks in one order; copy `analysis/signals/source_data_invalidation.py:_bump_nodes` or
   `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump.

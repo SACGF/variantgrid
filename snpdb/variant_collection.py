@@ -12,8 +12,8 @@ def write_sql_to_variant_collection(variant_collection, sql):
     sql = sql_template % {'table_name': table_name, 'sql': sql}
     # print(sql)
 
-    cursor = connection.cursor()
-    cursor.execute(sql)
-    variant_collection.count = cursor.rowcount
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        variant_collection.count = cursor.rowcount
     variant_collection.save()
     logging.debug("write_sql_to_variant_collection: count = %d", variant_collection.count)
