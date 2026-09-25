@@ -9,6 +9,7 @@ from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from analysis.models.nodes.node_display import NodeIcon
 from genes.models import GeneSymbol
+from library.django_utils import highest_pk
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig
 from snpdb.variant_filters import (
@@ -44,6 +45,10 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         warnings = super().get_warnings()
         if msg := self.get_min_above_max_warning_message(self.zygosity_count_max_samples):
             warnings.append(msg)
+        if self.max_variant_id is None:
+            warnings.append("Press save to fix the variants this node retrieves")
+        elif num_new := highest_pk(Variant) - self.max_variant_id:
+            warnings.append(f"{num_new} new variants in the database since last save - press save to include them")
         return warnings
 
     def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:

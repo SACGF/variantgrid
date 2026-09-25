@@ -947,8 +947,10 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
 def evidence_keys(request: HttpRequest) -> HttpResponse:
     """ public page to display EKey details """
 
+    keys = EvidenceKeyMap.instance().all_keys
     context = {
-        'keys': EvidenceKeyMap.instance().all_keys
+        'keys': keys,
+        'last_modified': max((ekey.modified for ekey in keys if not ekey.hide), default=None),
     }
     return render(request, 'classification/evidence_keys.html', context)
 

@@ -145,7 +145,7 @@ class ReviewedObject(TimeStampedModel):
         foreign_sets = [m for m in dir(self) if m.endswith('_set') and m != "review_set" and not m.startswith("_")]
         for foreign_set in foreign_sets:
             try:
-                source_object = getattr(self, foreign_set).first()
+                source_object = getattr(self, foreign_set).order_by('pk').first()
                 if source_object:
                     return source_object
             except:
@@ -204,6 +204,14 @@ class Review(TimeStampedModel):
     def check_can_view(self, user):
         if not self.can_view(user):
             msg = f"You do not have READ permission to view {self.pk}"
+            raise PermissionDenied(msg)
+
+    def can_write(self, user: User) -> bool:
+        return self.reviewing.source_object.can_review(user)
+
+    def check_can_write(self, user: User):
+        if not self.can_write(user):
+            msg = f"You do not have WRITE permission to review \"{self.reviewing.label}\""
             raise PermissionDenied(msg)
 
     def __str__(self):
@@ -276,6 +284,11 @@ class ReviewableModelMixin(models.Model):
         if hasattr(self, "lab"):
             return {self.lab}
         raise NotImplementedError(f"{self} has not implemented 'reviewing_labs' property")
+
+    def can_review(self, user: User) -> bool:
+        """ Starting or editing a Review requires membership of one of the reviewing labs """
+        user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
+        return bool(user_labs.intersection(self.reviewing_labs))
 
     @property
     def reviews_safe(self) -> 'ReviewedObject':

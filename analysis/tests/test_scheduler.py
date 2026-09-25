@@ -9,16 +9,21 @@ import uuid
 from datetime import timedelta
 from unittest import mock
 
+import psycopg
 from celery.canvas import Signature, _chain
 from django.conf import settings
+from django.db.models import F
+from django.db.utils import OperationalError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from analysis.models import AllVariantsNode, AnalysisNode, NodeTask
 from analysis.models.enums import NodeStatus, SetOperations
-from analysis.models.nodes.analysis_node import NodeCache
+from analysis.models.nodes import node_utils
+from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
+from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.tasks import analysis_update_tasks
 from analysis.tasks.analysis_update_tasks import (
     _node_launch_signature,
@@ -30,12 +35,14 @@ from analysis.tasks.analysis_update_tasks import (
 from analysis.tasks.node_update_tasks import (
     MAX_NODE_ATTEMPTS,
     _backoff_node,
+    delete_analysis_old_node_versions,
     next_backoff,
     node_cache_task,
     update_node_task,
 )
 from analysis.tests.utils import AnalysisSetupMixin
 from snpdb.models import ProcessingStatus, VariantCollection
+from variantgrid.celery import app
 
 
 class TestNodeStatusCoverage(TestCase):
@@ -617,6 +624,101 @@ class TestDuplicateDispatchClaim(AnalysisSetupMixin, TestCase):
         AllVariantsNode.objects.filter(pk=node.pk).update(status=NodeStatus.READY)
         node.refresh_from_db()
         self.assertFalse(node.claim_for_load("worker"))
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestCancelNodeTasks(AnalysisSetupMixin, TestCase):
+    """ Stopping a running load - by itself, and from the two things that are about to drop the
+        partitions it is reading: deleting the analysis and deleting old node versions. """
+
+    def setUp(self):
+        patchers = [mock.patch.object(app.control, "revoke"),
+                    mock.patch.object(node_utils, "AbortableAsyncResult"),
+                    mock.patch.object(node_utils, "signal_backends")]
+        self.revoke, self.abortable_result, self.signal_backends = (p.start() for p in patchers)
+        for p in patchers:
+            self.addCleanup(p.stop)
+
+    @staticmethod
+    def _running_task(node, celery_task="task-1", db_pid=987654):
+        return NodeTask.objects.create(node_version=node.node_version, analysis_update_uuid=uuid.uuid4(),
+                                       celery_task=celery_task, db_pid=db_pid)
+
+    def test_cancels_celery_task_and_database_query(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        node_task = self._running_task(node)
+
+        self.assertEqual(cancel_node_tasks(NodeTask.objects.filter(pk=node_task.pk)), 1)
+        self.revoke.assert_called_once_with("task-1", terminate=True)
+        self.abortable_result.assert_called_once_with("task-1")
+        self.abortable_result.return_value.abort.assert_called_once_with()
+        self.signal_backends.assert_called_once_with([987654])
+
+    def test_handles_cleared_so_a_second_call_is_a_no_op(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        node_task = self._running_task(node)
+        node_task_qs = NodeTask.objects.filter(pk=node_task.pk)
+
+        cancel_node_tasks(node_task_qs)
+        node_task.refresh_from_db()
+        self.assertIsNone(node_task.celery_task)
+        self.assertIsNone(node_task.db_pid)
+        self.assertEqual(cancel_node_tasks(node_task_qs), 0)
+
+    def test_task_with_no_handles_is_skipped(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        node_task = NodeTask.objects.create(node_version=node.node_version, analysis_update_uuid=uuid.uuid4())
+
+        self.assertEqual(cancel_node_tasks(NodeTask.objects.filter(pk=node_task.pk)), 0)
+        self.assertFalse(self.revoke.called)
+
+    def test_delete_old_node_versions_cancels_only_the_obsolete_load(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        self._running_task(node, "old-task", 1)
+        AnalysisNode.objects.filter(pk=node.pk).update(version=F("version") + 1)
+        node = AllVariantsNode.objects.get(pk=node.pk)  # node_version is cached
+        NodeVersion.objects.create(node_id=node.pk, version=node.version)
+        current_task = self._running_task(node, "current-task", 2)
+
+        delete_analysis_old_node_versions(self.analysis.pk)
+
+        self.revoke.assert_called_once_with("old-task", terminate=True)
+        current_task.refresh_from_db()
+        self.assertEqual(current_task.celery_task, "current-task")
+
+    def test_analysis_delete_cancels_every_running_load(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        other_node = AllVariantsNode.objects.create(analysis=self.analysis)
+        self._running_task(node, "task-1", 1)
+        self._running_task(other_node, "task-2", 2)
+
+        self.analysis.delete()
+
+        self.assertEqual({c.args[0] for c in self.revoke.call_args_list}, {"task-1", "task-2"})
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestCancelledLoad(AnalysisSetupMixin, TestCase):
+    """ A load killed by pg_cancel_backend must exit, not treat it as a transient error and re-queue
+        the load that was just cancelled. """
+
+    def test_cancelled_load_exits_without_backing_off(self):
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        lease_ready_nodes(self.analysis.pk, "worker")
+        cancelled = OperationalError("canceling statement due to user request")
+        cancelled.__cause__ = psycopg.errors.QueryCanceled()
+
+        with mock.patch.object(Signature, "apply_async"):
+            # No Variants in the fixture, so AllVariantsNode has no max_variant to report on
+            with mock.patch.object(AllVariantsNode, "get_errors", return_value=[]):
+                with mock.patch.object(AllVariantsNode, "load", side_effect=cancelled):
+                    update_node_task(node.pk, node.version)
+
+        node.refresh_from_db()
+        node_task = NodeTask.objects.get(node_version__node=node)
+        self.assertEqual(node.status, NodeStatus.LOADING, "cancelled load must leave the status alone")
+        self.assertIsNone(node_task.run_after, "cancelled load must not schedule a retry")
+        self.assertIsNone(node_task.db_pid, "lease must not leave a stale pid behind")
 
 
 class TestSingleWorkerInvariant(TestCase):

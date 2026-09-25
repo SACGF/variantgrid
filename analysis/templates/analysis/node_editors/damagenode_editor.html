@@ -297,8 +297,12 @@
             <tr class="editor-table-head">
                 <th></th>
                 <th></th>
-                <th><a class="hover-link" href="javascript:toggleRequiredFilter()">Required</a></th>
-                <th class="collapse filter-required">Allow Null</th>
+                <th><a class="hover-link" href="javascript:toggleRequiredFilter()"
+                       title="Show/hide the Required and Allow Null columns. Variants must pass every Required filter, plus at least one of the others">Required</a></th>
+                <th class="collapse filter-required">
+                    <span class="hover-detail" data-toggle="tooltip"
+                          title="For a Required filter, also keep variants the tool has no score for (eg pathogenicity predictors only score non-synonymous SNVs) rather than filtering them out. For Damage predictions, a tool with no prediction is not counted as benign">Allow Null</span>
+                </th>
             </tr>
             <tr>
                 <th>{{ form.variant_class.label }}</th>
@@ -620,7 +624,7 @@
 
             {% if node.columns_version >= 2 %}
                 <tr>
-                    <th>ALoFT</th>
+                    <th title="Annotation of Loss-of-Function Transcripts - predicts whether a loss-of-function variant is tolerated, or causes recessive or dominant disease. Only high-confidence predictions match">ALoFT</th>
                     <td>{{ form.aloft.errors }} {{ form.aloft }}</td>
                     <td class="collapse filter-required">{{ form.aloft_required }}</td>
                     <td class="collapse filter-required">{{ form.aloft_allow_null }}</td>

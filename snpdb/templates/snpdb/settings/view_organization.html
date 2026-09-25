@@ -34,6 +34,11 @@
                         <div id="org-profile">
                             {% crispy organization_form form_helper.horizontal_nested %}
                         </div>
+                        <div id="org-permissions">
+                            {% if group_initial_perm_form %}
+                                {% include "snpdb/settings/group_initial_perm_form.html" with group=organization_group form=group_initial_perm_form %}
+                            {% endif %}
+                        </div>
                         <div id="org-settings">
                             {% settings_override form=settings_override_form override_level="Organisation" override_source=override_source override_values=override_values %}
                         </div>

@@ -73,11 +73,6 @@
         </table>
     </div>
 
-    {% if out_of_date_message %}
-        <div class="editor-warning">
-            This node retrieves all variants in the database - this can change! {{ out_of_date_message }}
-        </div>
-    {% endif %}
     <div class="editor-actions">
         {% if has_write_permission %}
             <button id='all-variants-save' class="btn btn-primary">Save</button>

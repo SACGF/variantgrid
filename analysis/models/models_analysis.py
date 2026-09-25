@@ -402,7 +402,8 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
 
 @receiver(pre_delete, sender=Analysis)
 def pre_delete_analysis(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    """ Delete analysis template if not used for a run, otherwise soft delete it """
+    """ Delete analysis template if not used for a run, otherwise soft delete it.
+        Running node loads are stopped by analysis/signals/signal_handlers.py:analysis_pre_delete """
     try:
         analysis_template = instance.analysistemplate
         analysis_template.delete_or_soft_delete()

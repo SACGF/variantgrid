@@ -26,6 +26,7 @@ from classification.models import (
     ClinVarExportSubmission,
     EvidenceKeyMap,
 )
+from classification.models.classification_ref import ClassificationRef
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.utils.clinvar_matcher import (
     ClinVarLegacyExportMatchType,
@@ -363,7 +364,7 @@ class ClinVarExportSummary(ExportRow):
     def _record_id(self):
         if modification := self.classification:
             classification = modification.classification
-            return classification.lab.group_name + "/" + classification.lab_record_id
+            return ClassificationRef.make_lab_id_str(classification.lab.group_name, classification.lab_record_id)
 
     @export_column("Allele Origin")
     def _allele_origin(self):

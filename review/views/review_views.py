@@ -141,7 +141,9 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
     else:
         initial = {}
         if not review.pk:
-            initial["reviewing_labs"] = {UserSettings.get_for_user(request.user).default_lab}
+            default_lab = UserSettings.get_for_user(request.user).default_lab
+            if default_lab in review.reviewing.source_object.reviewing_labs:
+                initial["reviewing_labs"] = {default_lab}
         discussion_form = ReviewForm(review=review, initial=initial)
 
     return render(request, 'review/review.html', {
@@ -153,9 +155,10 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
 
 def new_review(request, reviewed_object_id: int, topic_id: str):
     reviewed_object = ReviewedObject.objects.get(pk=reviewed_object_id)
-
     topic = ReviewTopic.objects.get(pk=topic_id)
     review = reviewed_object.new_review(topic=topic, user=request.user)
+    review.check_can_view(request.user)
+    review.check_can_write(request.user)
 
     return _handle_review(request=request, review=review, reviewing=reviewed_object)
 
@@ -164,7 +167,7 @@ def edit_review(request, review_id: int):
     review = Review.objects.get(pk=review_id)
     review.check_can_view(request.user)
 
-    if review.is_complete or review.reviewing.source_object.is_review_locked:
+    if review.is_complete or review.reviewing.source_object.is_review_locked or not review.can_write(request.user):
         return view_discussion_detail(request, review_id)
 
     return _handle_review(request=request, review=review)
@@ -175,7 +178,7 @@ def view_discussion_detail(request, review_id: int):
     review.check_can_view(request.user)
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,
-        "edit": request.GET.get("edit") == "true" and not review.reviewing.source_object.is_review_locked,
+        "edit": request.GET.get("edit") == "true" and not review.reviewing.source_object.is_review_locked and review.can_write(request.user),
         "show_source_object": request.GET.get("show_source_object") != "false",
         "show_outcome": request.GET.get("show_outcome") != "false"
     })
