@@ -460,13 +460,28 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return self.overlap_type == OverlapType.SINGLE_CONTEXT
 
     @property
-    def overlap_status_label(self):
+    def disagreement_label(self) -> str:
+        """ Cross context and somatic clinical significance overlaps have differences, single context ones discordances """
         if self.overlap_type == OverlapType.CROSS_CONTEXT or self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
-            match self.overlap_status:
-                case OverlapStatus.MAJOR_DIFFERENCES: return "Difference"
-                case OverlapStatus.MEDICALLY_SIGNIFICANT: return "Medically significant difference"
-                case _: return self.overlap_status.label
-        return self.overlap_status.label
+            return "Difference"
+        return "Discordance"
+
+    def label_for_status(self, overlap_status: OverlapStatus) -> str:
+        match overlap_status:
+            case OverlapStatus.MAJOR_DIFFERENCES:
+                return self.disagreement_label
+            case OverlapStatus.MEDICALLY_SIGNIFICANT:
+                return f"Medically significant {self.disagreement_label.lower()}"
+            case _:
+                return OverlapStatus(overlap_status).label
+
+    @property
+    def overlap_status_label(self) -> str:
+        return self.label_for_status(self.overlap_status)
+
+    @property
+    def overlap_max_ever_status_label(self) -> str:
+        return self.label_for_status(self.overlap_max_ever_status)
 
     @property
     def testing_contexts_objs(self) -> list[TestingContextBucket]:
@@ -524,7 +539,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         parts.append("-".join(t.label for t in self.testing_contexts_objs))
         if tumor_type_category := self.tumor_type_category:
             parts.append(tumor_type_category)
-        return " ".join(parts) + f" : {OverlapStatus(self.overlap_status).label}"
+        return " ".join(parts) + f" : {self.overlap_status_label}"
 
     def relevant_values(self) -> list[str]:
         relevant_values = set()

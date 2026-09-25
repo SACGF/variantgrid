@@ -5,7 +5,7 @@
 {% endif %}
 <div>
     <span {% if overlap.overlap_status.is_attention %}class="text-danger"{% endif %}>
-        {% if overlap.overlap_status == 90 %}{% if overlap.value_type == "O" %}Discordance{% else %}Difference{% endif %} <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status_label }}{% endif %}
+        {% if overlap.overlap_status == 90 %}{{ overlap.disagreement_label }} <i class="fa-solid fa-briefcase-medical" title="Medically Significant"></i>{% else %}{{ overlap.overlap_status_label }}{% endif %}
     </span>
     {% if overlap.overlap_status_change_timestamp %} : {% timestamp overlap.overlap_status_change_timestamp time_ago=True %}{% endif %}
     {% for c_value in values.sorted %}
@@ -21,6 +21,6 @@
     {% endif %}
 </div>
 {% if overlap.has_pending_values %}<div class="mt-1" style="color:#888">Includes Pending Updates</div>{% endif %}
-{% if max_overlap_status %}<div class="mt-1" style="color:#888">Was : {{ max_overlap_status.label }}</div>{% endif %}
+{% if max_overlap_status %}<div class="mt-1" style="color:#888">Was : {{ overlap.overlap_max_ever_status_label }}</div>{% endif %}
 <div id="overlap-{{ overlap.pk }}-updated"></div>
 </div>

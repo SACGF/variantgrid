@@ -17,7 +17,7 @@
             {% labelled label="Overlap Status" %}
                 {% overlap_state overlap %}
                 {% if overlap.overlap_max_ever_status != overlap.overlap_status %}
-                    <div class="my-1" style="color:#888">Was : {{ overlap.overlap_max_ever_status.label }}</div>
+                    <div class="my-1" style="color:#888">Was : {{ overlap.overlap_max_ever_status_label }}</div>
                 {% endif %}
                 {% if overlap.has_pending_values %}<div class="my-1" style="color:#888">Includes Pending Updates</div>{% endif %}
                 <div id="overlap-{{ overlap.pk }}-updated"></div>
