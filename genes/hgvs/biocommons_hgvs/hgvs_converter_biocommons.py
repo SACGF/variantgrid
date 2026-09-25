@@ -33,6 +33,7 @@ from genes.hgvs.hgvs_converter import (
     HGVSException,
     HGVSImplementationException,
     HGVSNomenclatureException,
+    HGVSNonCodingTranscriptException,
     HgvsMatchRefAllele,
     HgvsOriginallyNormalized,
 )
@@ -346,6 +347,12 @@ class BioCommonsHGVSConverter:
         }
 
         var_x_original = self._parser_hgvs(hgvs_string)
+        # Check before anything asks the transcript for its CDS (which fails with "CDS is undefined")
+        if var_x_original.type == 'c':
+            transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x_original)
+            if get_refseq_type(transcript_accession) == 'RNA':
+                raise HGVSNonCodingTranscriptException(transcript_accession)
+
         var_x, matches_reference = self._fix_ref(var_x_original)
 
         # TODO: Maybe we can always just normalize? Need some test cases to make sure
@@ -359,12 +366,6 @@ class BioCommonsHGVSConverter:
                                                              normalized_hgvs=HGVSVariant(var_x_normalized))
         except HGVSUnsupportedOperationError as hgvs_error:
             normalization_error = hgvs_error
-
-        # We are occasionally passed c. HGVS for non-coding transcripts - convert them to n.
-        if var_x.type == 'c':
-            transcript_accession = self.get_transcript_accession(hgvs_string)
-            if get_refseq_type(transcript_accession) == 'RNA':
-                var_x.type = 'n'
 
         try:
             self.ev.validate(var_x, strict=True)  # Validate in transcript range

@@ -1,6 +1,7 @@
 from unittest import mock
 
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from annotation.models.models_phenotype_match import (
     PatientTextPhenotype,
@@ -12,7 +13,7 @@ from annotation.phenotype_matcher import (
     _build_ambiguous_acronym_denylist,
     get_ambiguous_acronym_denylist,
 )
-from ontology.models import OntologyService
+from ontology.models import OntologyImport, OntologyService, OntologyTerm
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
@@ -26,7 +27,24 @@ class TestPhenotypeMatching(TestCase):
     def setUpTestData(cls):
         create_ontology_test_data()
         create_test_ontology_version()
+        cls._create_skip_word_test_terms()
         cls.phenotype_matcher = PhenotypeMatcher()
+
+    @staticmethod
+    def _create_skip_word_test_terms():
+        """ Real terms whose aliases a common word matches (variantgrid_com#60) """
+        ontology_import, _ = OntologyImport.objects.get_or_create(import_source="test", filename="test_skip_words",
+                                                                  context="test",
+                                                                  defaults={"processed_date": timezone.now()})
+        terms = [
+            ("OMIM:614813", OntologyService.OMIM, "SHORT STATURE, ONYCHODYSPLASIA, FACIAL DYSMORPHISM, AND HYPOTRICHOSIS",
+             ["SOFT", "SOFT SYNDROME"]),
+            ("HP:0032198", OntologyService.HPO, "Decreased prothrombin time", ["Decreased INR"]),
+        ]
+        for term_id, ontology_service, name, aliases in terms:
+            OntologyTerm.objects.get_or_create(id=term_id, defaults={
+                "ontology_service": ontology_service, "index": int(term_id.split(":")[1]), "name": name,
+                "aliases": aliases, "from_import": ontology_import})
 
     def create_patient_match_phenotypes(self, phenotype):
         patient = Patient(phenotype=phenotype)
@@ -74,6 +92,15 @@ class TestPhenotypeMatching(TestCase):
                            "IMERSLUND-GRSBECK SYND 1": (OntologyService.OMIM, "OMIM:261100")}  # Alias
 
         self.check_expected_results_for_description(SYNDROME_ABBREV)
+
+    def test_skip_words(self):
+        """ "soft" is an exact alias of SOFT syndrome and "decreased in" is 1 edit from "Decreased INR" """
+        SKIP_WORDS = {"soft": None,
+                      "decreased in": None,
+                      "SOFT syndrome": (OntologyService.OMIM, "OMIM:614813"),
+                      "Decreased INR": (OntologyService.HPO, "HP:0032198")}
+
+        self.check_expected_results_for_description(SKIP_WORDS)
 
     @override_settings(PATIENT_PHENOTYPE_EXCLUDE_STRING="----needs human review")
     def test_exclude_string_skips_persistence(self):

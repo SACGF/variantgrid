@@ -163,11 +163,11 @@ class PhenotypeMatcher:
         'bad', 'bilateral', 'birth', 'blood', 'borderline', 'brain', 'brainstem',
         'can', 'carries', 'cause', 'cells', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma',
         'commas', 'common', 'complete', 'coned', 'cord', 'cousin', 'cousins',
-        'day', 'days', 'diffused', 'deficiency', 'disease', 'disorder', 'distal',
+        'day', 'days', 'decreased in', 'diffused', 'deficiency', 'disease', 'disorder', 'distal',
         'ear', 'exclude', 'exome',
         'face', 'familial', 'father', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
         'generalized', "generalised",
-        'hard', 'has', 'hearing', 'health', 'high grade',
+        'hard', 'has', 'health', 'healthy', 'hearing', 'high grade',
         'image', 'inheritance', 'insulin',
         'joints',
         'kit',
@@ -178,7 +178,8 @@ class PhenotypeMatcher:
         'panel', 'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
         'proximal', 'progressive',
         'range', 'raise', 'recurrent', 'right', 'req',
-        'second', 'score', 'severe', 'she', 'short', 'son', 'skeletal', 'sleep', 'spine', 'stage', 'study', 'syndrome',
+        'second', 'score', 'severe', 'she', 'short', 'son', 'skeletal', 'sleep', 'soft', 'spine', 'stable', 'stage', 'study',
+        'syndrome',
         'tat', 'the', 'transient', 'trio', 'trial',
         'wants', 'was', 'week', 'weeks', 'wes', 'wgs', 'white', 'with',
     }
@@ -309,6 +310,8 @@ class PhenotypeMatcher:
         """ Return true to skip a word, throws SkipAllPhenotypeMatchException to skip all.
             Only need to skip >MIN_LENGTH words as will do that later (after exact) """
 
+        # Off: SkipAllPhenotypeMatchException drops every match in the sentence, and _words_together tests substrings
+        # of the whole sentence ("tat" is in "mutation"). Skip an exact multi-word phrase by adding it to COMMON_WORDS
         SKIP_MULTI_WORDS = False
         if SKIP_MULTI_WORDS:
             # For multi-words where you want to skip components

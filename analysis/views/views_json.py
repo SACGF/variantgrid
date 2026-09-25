@@ -360,8 +360,9 @@ def set_variant_selected(request, analysis_id, node_id):
     return JsonResponse({})
 
 
+@require_POST
 def create_filter_child(request, analysis_id, node_id):
-    node = get_node_subclass_or_404(request.user, node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
     column_name = request.POST['column_name']
     column_filter = request.POST['column_filter']
 
@@ -405,8 +406,9 @@ def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
     return JsonResponse(data)
 
 
+@require_POST
 def create_selected_child(request, analysis_id, node_id):
-    node = get_node_subclass_or_404(request.user, node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
     x, y = get_child_position(node)
 
     selected_node = SelectedInParentNode.objects.create(analysis=node.analysis,
