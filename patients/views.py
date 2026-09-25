@@ -27,6 +27,10 @@ from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC, SequencingSample
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from snpdb.models import Sample
+from snpdb.models.models_somalier import (
+    DUPLICATE_SAMPLE_RELATEDNESS,
+    get_same_individual_relatedness,
+)
 from uicore.utils.form_helpers import form_helper_horizontal
 
 
@@ -50,10 +54,17 @@ def view_patient(request, patient_id):
     specimens = f" ({patient.num_specimens})" if patient.num_specimens else ''
     existing_files = get_patient_attachment_file_dicts(patient)
 
+    # One patient's samples should all be the one individual - a pair that isn't is a sample swap (#196)
+    sample_relatedness = None
+    if settings.SOMALIER.get("enabled"):
+        sample_relatedness = get_same_individual_relatedness(patient.get_samples())
+
     context = {"patient": patient,
                "form": form,
                "specimens": specimens,
                "existing_files": existing_files,
+               "sample_relatedness": sample_relatedness,
+               "duplicate_sample_relatedness": DUPLICATE_SAMPLE_RELATEDNESS,
                "show_read_only_patient_dob": show_read_only_patient_dob,
                "has_write_permission": has_write_permission}
     return render(request, 'patients/view_patient.html', context)
