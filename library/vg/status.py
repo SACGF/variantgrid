@@ -21,6 +21,7 @@ from django.utils import timezone
 from annotation.models import AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus
 from eventlog.models import Event
+from library.django_utils.database_utils import get_table_row_estimates
 from library.enums.log_level import LogLevel
 from library.vg.repo import REPO_ROOT, git
 from library.vg.settings_chain import resolved_settings_module
@@ -86,8 +87,7 @@ def _db() -> dict[str, Any]:
     with connection.cursor() as cursor:
         cursor.execute("SELECT current_database(), pg_database_size(current_database()), version()")
         name, size_bytes, version = cursor.fetchone()
-        cursor.execute("SELECT relname, reltuples::bigint FROM pg_class WHERE relname = ANY(%s)", [list(SCALE_TABLES)])
-        estimates = dict(cursor.fetchall())
+    estimates = get_table_row_estimates(SCALE_TABLES)
     counts = {table: estimates[table] for table in SCALE_TABLES if table in estimates}
     return {"name": name, "size_gb": round(size_bytes / 1e9, 1), "postgres": version.split(",")[0],
             "estimated_rows": counts}

@@ -48,7 +48,7 @@ Patterns here:
   (`ExportRow`, `export_column`) · `class_utils.py` (`import_class`, `get_all_subclasses`) · `os_utils.py`
   (`execute_cmd`) · `timer_utils.py` (`get_timer`) · `misc_utils.py` (`empty_to_none`, `ChoicesEnum`, `iter_http_lines`)
   · `xml_utils.py` (`XmlParser`); then `library/django_utils/`: `database_utils.py` (`queryset_to_sql`, `dictfetchall`,
-  `sql_delete_qs`, `IntegerFieldChoices`/`TextFieldChoices`) · `model_utils.py` (`ArrayLength`, `model_has_field`,
+  `sql_delete_qs`, `pg_settings`, `get_table_row_estimates`, `IntegerFieldChoices`/`TextFieldChoices`) · `model_utils.py` (`ArrayLength`, `model_has_field`,
   `refresh_for_update`, `AuditUtils`) · `view_utils.py` (`is_ajax`, `render_ajax_view`) · `__init__.py`
   (`require_superuser`, `get_cached_project_git_hash`) · `django_postgres.py` (`copy_from_file`).
 Gotchas:
