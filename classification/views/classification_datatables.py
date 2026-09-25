@@ -57,6 +57,15 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"]
         }
 
+    @staticmethod
+    def _imported_genome_build(row: dict[str, Any]) -> Optional[GenomeBuild]:
+        if genome_build_str := row.get('published_evidence__genome_build__value'):
+            try:
+                return GenomeBuild.get_name_or_alias(genome_build_str)
+            except GenomeBuild.DoesNotExist:
+                pass
+        return None
+
     def render_c_hgvs(self, row: dict[str, Any]) -> JsonDataType:
         def get_preferred_chgvs_json() -> dict:
             nonlocal row
@@ -70,12 +79,15 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     pass
 
             imported_hgvs = row.get('published_evidence__c_hgvs__value') or row.get('published_evidence__g_hgvs__value')
-            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS
-            for index, genome_build in enumerate(self.genome_build_prefs):
+            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS.
+            # The imported value is shown, so it is labelled with the build it was imported against
+            for genome_build in self.genome_build_prefs:
                 try:
                     if row.get(ClassificationModification.column_name_for_build(genome_build, 'variant_id')):
-                        c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
-                                                   is_normalised=True, is_desired_build=index == 0,
+                        imported_genome_build = self._imported_genome_build(row) or genome_build
+                        c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=imported_genome_build,
+                                                   is_normalised=True,
+                                                   is_desired_build=imported_genome_build == self.genome_build_preferred,
                                                    is_resolved_without_hgvs=True)
                         return c_hgvs.to_json()
                 except ValueError:
