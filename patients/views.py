@@ -345,11 +345,10 @@ def patients(request):
         valid = form.is_valid()
         if valid:
             patient = form.save()
-            form = forms.PatientForm(user=request.user)  # clear form for next patient
-            msg = f"Patient #{patient.pk}: {patient!s}"
-        else:
-            msg = "Patient"
-        add_save_message(request, valid, msg, created=True)
+            add_save_message(request, valid, f"Patient #{patient.pk}: {patient!s}", created=True)
+            # Specimens, samples and attachments are added from the patient's own page
+            return redirect(patient)
+        add_save_message(request, valid, "Patient", created=True)
         initially_hide_create_patient_form = False
     else:
         initially_hide_create_patient_form = True

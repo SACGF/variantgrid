@@ -25,10 +25,6 @@
         margin-right: 12px;
     }
 
-    #patient-phenotype-form-section {
-        margin-bottom: 10px;
-    }
-
     {% if not has_write_permission %}
     #phenotype-container {
         border: 1px solid gray;
@@ -58,17 +54,15 @@
                     {% else %}
                         {{ form.age | as_crispy_field }}
                     {% endif %}
+                    {{ form.deceased | as_crispy_field }}
+                    {{ form.consanguineous | as_crispy_field }}
+                    {{ form.affected | as_crispy_field }}
                 <div>
                     {% page_help 'patients/patient_population_help' 'Patient Population' header_tag="h4" %}
                     {{ form.population | as_crispy_field }}
                 </div>
-                {{  form.consanguineous | as_crispy_field }}
 
                 <div>
-                    <h4>Phenotype</h4>
-                    <div id='patient-phenotype-form-section'>
-                        {{ form.affected | as_crispy_field }}
-                    </div>
                     <div id="phenotype-container">
                     {% phenotype_entry form.phenotype patient.phenotype_description edit=has_write_permission %}
                     </div>
