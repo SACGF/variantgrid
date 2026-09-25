@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Optional
 
 import celery
+from celery import states
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
 
@@ -53,32 +54,48 @@ def create_cohort_genotype_and_launch_task(cohort, run_async=True):
         try:
             cgc = cohort.cohort_genotype_collection
             celery_task = cgc.celery_task
-            logging.warning("This count task was already running")
-            result = AsyncResult(celery_task)
-            if (not result.successful()) or cohort.import_status == ImportStatus.ERROR:
+            if _cohort_genotype_task_needs_launch(cohort, celery_task):
                 launch_task = True
 
                 logging.info("Deleting existing and creating new partition")
                 cgc.delete_related_objects()
                 cgc.delete()
                 cgc = create_cohort_genotype_collection(cohort)
+            else:
+                logging.info("Cohort %s genotype task %s already launched", cohort, celery_task)
         except CohortGenotypeCollection.DoesNotExist:
             cgc = create_cohort_genotype_collection(cohort)
             launch_task = True
 
         if launch_task:
+            # Do as updates as other jobs may be modifying objects. Set before launching, as the task sets the
+            # final status (synchronously when not run_async)
+            Cohort.objects.filter(pk=cohort.pk).update(import_status=ImportStatus.IMPORTING)
             task = cohort_genotype_task.si(cgc.id)  # @UndefinedVariable
             if run_async:
                 result = task.apply_async()
             else:
                 result = task.apply()
 
-            # Do as an update as other jobs may be modifying objects
             celery_task = result.id
-            CohortGenotypeCollection.objects.filter(cohort_id=cohort.pk).update(celery_task=celery_task)
-            Cohort.objects.filter(pk=cohort.pk).update(import_status=ImportStatus.IMPORTING)
+            CohortGenotypeCollection.objects.filter(cohort_id=cohort.pk,
+                                                    cohort_version=cgc.cohort_version).update(celery_task=celery_task)
 
     return status, celery_task
+
+
+def _cohort_genotype_task_needs_launch(cohort: Cohort, celery_task: Optional[str]) -> bool:
+    """ Only rebuild when the last build failed - relaunching one still queued or running drops the partition
+        under it. The result backend reports PENDING for a task it has no record of (queued, running, or its
+        result expired), so the cohort's import_status decides that case """
+    if cohort.import_status == ImportStatus.ERROR:
+        return True
+    if not celery_task:
+        # A VCF's cohort is built by its import, which records no task; otherwise the launch never got that far
+        return cohort.import_status != ImportStatus.SUCCESS
+    if cohort.import_status == ImportStatus.SUCCESS:
+        return False
+    return AsyncResult(celery_task).state in (states.FAILURE, states.REVOKED)
 
 
 def create_cohort_genotype_collection(cohort):
@@ -220,9 +237,10 @@ def cohort_genotype_task(cohort_genotype_collection_id):
     NAME = "cohort_genotype_task - 20241125 - packed fields (handle rare/common)"  # Change this if the data changes!
     task_version, _ = CohortGenotypeTaskVersion.objects.get_or_create(name=NAME)
 
-    cohort = cgc.cohort
-    cohort.import_status = ImportStatus.IMPORTING
-    cohort.save()
+    # Do as updates as other jobs may be modifying object. Once the cohort has moved to another version this
+    # build is superseded (Cohort.delete_old_counts cancels it) and mustn't set the new version's status
+    cohort_version_qs = Cohort.objects.filter(pk=cgc.cohort_id, version=cgc.cohort_version)
+    cohort_version_qs.update(import_status=ImportStatus.IMPORTING)
 
     try:
         cohort_genotype_collection_list = [
@@ -243,12 +261,11 @@ def cohort_genotype_task(cohort_genotype_collection_id):
                 cgc.task_version = task_version
                 cgc.save()
 
-        # Do as an update as other jobs may be modifying object
-        import_status = ImportStatus.SUCCESS
-        Cohort.objects.filter(pk=cohort.pk).update(import_status=import_status)
+        cohort_version_qs.update(import_status=ImportStatus.SUCCESS)
     except:
-        import_status = ImportStatus.ERROR
-        Cohort.objects.filter(pk=cohort.pk).update(import_status=import_status)
+        if not cohort_version_qs.update(import_status=ImportStatus.ERROR):
+            logging.info("cohort_genotype_task: %s superseded by a newer cohort version", cgc)
+            return
         log_traceback()
         raise  # So it errors
 

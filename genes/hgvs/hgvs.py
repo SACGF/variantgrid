@@ -217,17 +217,22 @@ class HGVSDisplay:
     """
     HGVSComponents plus the view state needed to render it - which build it came from, whether it's the build the
     user asked for, and whether it's our normalised representation or exactly what the lab submitted.
+    is_resolved_without_hgvs: matched a variant on genome_build, but we have no HGVS for it (gene-level event, or
+    generating the HGVS failed) so this is the imported value
     """
     components: HGVSComponents
     genome_build: Optional[GenomeBuild] = None
     is_normalised: Optional[bool] = None
     is_desired_build: Optional[bool] = None
+    is_resolved_without_hgvs: bool = False
 
     @staticmethod
     def parse(full_hgvs: str, transcript: str = None, genome_build: Optional[GenomeBuild] = None,
-              is_normalised: Optional[bool] = None, is_desired_build: Optional[bool] = None) -> 'HGVSDisplay':
+              is_normalised: Optional[bool] = None, is_desired_build: Optional[bool] = None,
+              is_resolved_without_hgvs: bool = False) -> 'HGVSDisplay':
         return HGVSDisplay(HGVSComponents(full_hgvs, transcript), genome_build=genome_build,
-                           is_normalised=is_normalised, is_desired_build=is_desired_build)
+                           is_normalised=is_normalised, is_desired_build=is_desired_build,
+                           is_resolved_without_hgvs=is_resolved_without_hgvs)
 
     @property
     def full_hgvs(self) -> str:
@@ -254,7 +259,8 @@ class HGVSDisplay:
             "full": self.full_hgvs,
             "genome_build": self.genome_build.pk if self.genome_build else None,
             "desired": self.is_desired_build,
-            "normalized": self.is_normalised
+            "normalized": self.is_normalised,
+            "resolved_without_hgvs": self.is_resolved_without_hgvs,
         }
 
     @cached_property

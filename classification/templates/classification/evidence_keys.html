@@ -45,8 +45,11 @@
         .option-label {
             color: #666666;
         }
-        td.position {
+        td.position, td.created, td.modified {
             color: #666666;
+        }
+        td.created, td.modified {
+            white-space: nowrap;
         }
         #share-level-filter {
             position: relative;
@@ -116,6 +119,7 @@
 {% block content %}
     <div class="container-table">
         <h3>Evidence Keys</h3>
+        {% if last_modified %}<p class="text-muted">Last updated {{ last_modified|date:'Y-m-d' }}</p>{% endif %}
         <table id="key-table" class="evidencekey-table sticky-header table">
             <thead>
             <tr>
@@ -126,6 +130,8 @@
                 <th class="max-share-level" style="min-width:80px">Max<br/>Share Level</th>
                 <th class="values">Values</th>
                 <th class="description">Description</th>
+                <th class="created">Created</th>
+                <th class="modified">Modified</th>
             </tr>
             </thead>
             <tbody>
@@ -150,6 +156,8 @@
                         <td class="description">
                             {% if ekey.description %}{{ ekey.description | safe }}{% endif %}{% if ekey.see %}<br><a href="{{ekey.see}}">{{ ekey.see }}{% endif %}</a>
                         </td>
+                        <td class="created">{{ ekey.created|date:'Y-m-d' }}</td>
+                        <td class="modified">{{ ekey.modified|date:'Y-m-d' }}</td>
                     </tr>
                 {% endif %}
             {% endfor %}

@@ -28,6 +28,7 @@ from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
+from library.django_utils.unittest_utils import frozen_cache_expiry
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
 from snpdb.models import (
@@ -574,13 +575,14 @@ class VariantTagCaseColumnsTest(TestCase):
     def test_link_permissions_cost_the_same_however_many_rows(self):
         """ Resolved per page, not per row - a pair of Guardian lookups a row is the most expensive
             thing a grid can do (@see DatatableConfig._writable_pks_for_page) """
-        self._rows_by_tag_id()  # Warm the caches the first request of a session fills
-        with CaptureQueriesContext(connection) as three_rows:
-            self.assertEqual(len(self._rows_by_tag_id()), 3)
+        with frozen_cache_expiry():
+            self._rows_by_tag_id()  # Warm the caches the first request of a session fills
+            with CaptureQueriesContext(connection) as three_rows:
+                self.assertEqual(len(self._rows_by_tag_id()), 3)
 
-        for variant in (self.mine_variant, self.theirs_variant, self.patient_only_variant):
-            self._tag(variant, sample=self.their_sample, patient=self.my_patient)
-        with CaptureQueriesContext(connection) as six_rows:
-            self.assertEqual(len(self._rows_by_tag_id()), 6)
+            for variant in (self.mine_variant, self.theirs_variant, self.patient_only_variant):
+                self._tag(variant, sample=self.their_sample, patient=self.my_patient)
+            with CaptureQueriesContext(connection) as six_rows:
+                self.assertEqual(len(self._rows_by_tag_id()), 6)
 
         self.assertEqual(len(six_rows.captured_queries), len(three_rows.captured_queries))

@@ -4,6 +4,8 @@
 {% load js_tags %}
 {% load model_helpers %}
 {% load help_tags %}
+{% load ui_help %}
+{% load settings_tags %}
 {% load humanize %}
 {% block title %}Annotation Status{% endblock title %}
 {% block submenu %}{% menu_bar_annotations %}{% endblock submenu %}
@@ -14,29 +16,57 @@
          <a href="{% url 'variant_annotation_runs' %}" class="hover-link"><i class="fas fa-angle-left"></i>Back to Annotation Runs</a>
         {% admin_link annotation_run %}
     </p>
+    {% page_help_embedded title="Annotation Run" %}
+        <p>
+        Runs are dispatched and reclaimed automatically - a run whose worker dies or stalls is re-launched, up to
+        {% settings_value 'ANNOTATION_MAX_RUN_ATTEMPTS' %} attempts, before it is marked Error. The buttons are for a
+        run in Error. Read <b>Error Exception</b> and <b>Pipeline StdErr</b> below first: a VEP version mismatch or a
+        wrong setting fails again on every retry until it is fixed.
+        </p>
+        <dl>
+            <dt>Retry Annotation</dt>
+            <dd>Deletes any annotation this run had partly imported and resets it to Created, so it is counted, dumped
+            and annotated again from scratch. Use after fixing the cause of an error, or for a one-off failure (a worker
+            restart, a full disk).</dd>
+            <dt>Retry Annotation (upload only)</dt>
+            <dd>Keeps the annotated VCF and repeats only the database import, after deleting any rows already
+            imported. Use when annotation completed but the import failed. It needs the annotated VCF still on disk -
+            that is removed once a run imports successfully - otherwise use Retry Annotation.</dd>
+            <dt>Subdivide AnnotationRun</dt>
+            <dd>Splits the range lock in half and replaces this run with one run per half. Use when a run keeps failing
+            from running out of memory or time; subdivide a half again if it still fails. Every run on this range,
+            of any pipeline type, is replaced - the scheduler recreates the other types for both halves. Offered for
+            ranges spanning at least 1,000 variant IDs.</dd>
+            <dt>Make Local (annotate locally)</dt>
+            <dd>For a run awaiting external annotation: drops the external dump and returns the run to the local
+            pipeline, so it is annotated on this server. Use when the external result is not coming back, or the run is
+            too small to be worth the round trip. An annotated VCF for this run from the external machine will no
+            longer import.</dd>
+        </dl>
+    {% end_page_help_embedded %}
     <div class="btn-toolbar">
         {% if can_retry_annotation_run %}
           <form id="retry-annotation-form" action={% url 'retry_annotation_run' annotation_run.pk %} method="post">
             {% csrf_token %}
-            <button type='submit' class="btn btn-primary">Retry Annotation</button>
+            <button type='submit' class="btn btn-primary" title="Delete anything this run imported and annotate it again from scratch">Retry Annotation</button>
           </form>
         {% endif %}
         {% if can_retry_annotation_run_upload %}
           <form id="retry-annotation-upload-form" action={% url 'retry_annotation_run_upload' annotation_run.pk %} method="post">
             {% csrf_token %}
-            <button type='submit' class="btn btn-primary">Retry Annotation (upload only)</button>
+            <button type='submit' class="btn btn-primary" title="Re-import the existing annotated VCF without re-running annotation">Retry Annotation (upload only)</button>
           </form>
         {% endif %}
         {% if can_subdivide_annotation_run %}
           <form id="subdivide-annotation-upload-form" action={% url 'subdivide_annotation_run' annotation_run.pk %} method="post">
             {% csrf_token %}
-              <button type='submit' class="btn btn-primary">Subdivide AnnotationRun</button>
+              <button type='submit' class="btn btn-primary" title="Split this range in half and annotate each half as its own run">Subdivide AnnotationRun</button>
           </form>
         {% endif %}
         {% if can_make_annotation_run_local %}
           <form id="make-annotation-run-local-form" action={% url 'make_annotation_run_local' annotation_run.pk %} method="post">
             {% csrf_token %}
-              <button type='submit' class="btn btn-primary">Make Local (annotate locally)</button>
+              <button type='submit' class="btn btn-primary" title="Drop the external dump and annotate this run on this server">Make Local (annotate locally)</button>
           </form>
         {% endif %}
     </div>

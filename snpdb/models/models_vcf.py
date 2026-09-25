@@ -26,21 +26,18 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
-from library.log_utils import log_traceback
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
-    ProcessingStatus,
     SampleFileType,
     VariantsType,
     VCFInfoTypes,
 )
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
-from snpdb.models.models_variant import AlleleSource, Variant, VariantCollection
+from snpdb.models.models_variant import AlleleSource, Variant
 
 
 @Field.register_lookup
@@ -838,47 +835,3 @@ class VCFSourceSettings(models.Model):
         return f"{self.source_regex} sample_variants_type={self.get_sample_variants_type_display()}, " \
                f"variant_zygosity_count={self.variant_zygosity_count}"
 
-
-class VCFBedIntersection(models.Model):
-    name = models.TextField()
-    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
-    error_exception = models.TextField(null=True, blank=True)
-    vcf = models.ForeignKey(VCF, on_delete=CASCADE)
-    genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, on_delete=CASCADE)
-    left_padding = models.IntegerField(default=0)
-    right_padding = models.IntegerField(default=0)
-    variant_collection = models.ForeignKey(VariantCollection, null=True, on_delete=CASCADE)
-
-    @staticmethod
-    def get_for_vcf_and_enrichment_kit(vcf, enrichment_kit):
-        pbi = None
-        try:
-            kwargs = {'vcf': vcf,
-                      'genomic_intervals': enrichment_kit.genomic_intervals,
-                      'left_padding': settings.DEFAULT_ENRICHMENT_KIT_LEFT_PADDING,
-                      'right_padding': settings.DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING}
-
-            pbi = VCFBedIntersection.objects.get(**kwargs)
-        except VCFBedIntersection.DoesNotExist:
-            pass
-        except Exception:
-            log_traceback()
-        return pbi
-
-    @staticmethod
-    def get_with_enrichment_kit_for_sample(sample):
-        if sample.enrichment_kit:
-            pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(sample.vcf, sample.enrichment_kit)
-            return pbi, sample.enrichment_kit
-        return None, None
-
-    def __str__(self):
-        num_records = 0
-        if self.variant_collection:
-            num_records = self.variant_collection.variantcollectionrecord_set.count()
-
-        name = f"{self.name} ({self.get_status_display()}) proj: {self.vcf}, genomic_intervals: {self.genomic_intervals} variant_collection: {self.variant_collection} ({num_records} records)"
-        if self.error_exception:
-            name += self.error_exception
-
-        return name
