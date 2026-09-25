@@ -145,7 +145,7 @@ const CitationsManager = (function() {
             if (!citation.error) {
                 $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom);
             } else {
-                $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
+                $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(citDom);
             }
             return citDom;
         },

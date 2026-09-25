@@ -4,19 +4,19 @@ function getEvidenceHover(geneSymbol, evidence, confidence) {
     container.append(geneTitle);
     const modeOfInheritance = evidence["mode_of_inheritance"];
     if (modeOfInheritance) {
-        mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
+        const mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
         container.append(mohDiv);
     }
     const penetrance = evidence["penetrance"];
     if (penetrance) {
-        penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
+        const penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
         container.append(penetranceDiv);
     }
 
     const evidences = evidence["evidence"];
     if (evidences) {
         container.append($("<h3 />").text("Sources"));
-        evidencesUl = $("<ul />");
+        const evidencesUl = $("<ul />");
         for (let i=0 ; i<evidences.length ; ++i) {
             evidencesUl.append($("<li />").text(evidences[i]));
         }
@@ -26,7 +26,7 @@ function getEvidenceHover(geneSymbol, evidence, confidence) {
     const phenotypes = evidence["phenotypes"];
     if (phenotypes) {
         container.append($("<h3 />").text("Phenotypes"));
-        phenotypesUl = $("<ul />");
+        const phenotypesUl = $("<ul />");
         for (let i=0 ; i<phenotypes.length ; ++i) {
             phenotypesUl.append($("<li />").text(phenotypes[i]));
         }

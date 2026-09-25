@@ -10,20 +10,20 @@ function venn_select(selector, venn_flag) {
 }
 
 function vennAddToggleCallbacks(selector, callback) {
-	get_venn_flag = function() {
+	const get_venn_flag = function() {
 		let venn_flag = 0;
 		$('.' + VENN_TOGGLE_WIDGET_CLASS, selector).each(function() {
 			const widget = svgSelect(this);
-			toggled = widget.attr("toggled");
+			const toggled = widget.attr("toggled");
 			if (toggled == "true") {
 				venn_flag |= widget.attr("venn_bit");
 			}
 		});
 		return venn_flag;
 	};
-	toggleColor = function() {
+	const toggleColor = function() {
 		toggleSelect(svgSelect(this));
-		venn_flag = get_venn_flag();
+		const venn_flag = get_venn_flag();
 		callback(venn_flag);
 	};
 
@@ -35,7 +35,7 @@ function vennAddToggleCallbacks(selector, callback) {
 
 // Either set to value (if provided) or toggle (if not)
 function toggleSelect(select, value) {
-	toggled = value;
+	let toggled = value;
 	if (toggled == null) {
 		toggled = select.attr('toggled');
 		toggled = toggled != "true";
