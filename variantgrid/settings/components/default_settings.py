@@ -769,6 +769,8 @@ ROLLBAR = {
     'root': BASE_DIR,
     'capture_username': True,
     'code_version': Git(BASE_DIR).hash,
+    # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
+    'min_level': 'warning',
     'ignorable_404_urls': (
         re.compile(r'.*\.map'),
         re.compile(r'.*\.ico')
