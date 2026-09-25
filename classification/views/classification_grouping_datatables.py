@@ -150,18 +150,24 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     return c_hgvs.to_json()
 
             imported_hgvs = row["latest_allele_info__imported_c_hgvs"] or row["latest_allele_info__imported_g_hgvs"]
-            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS
-            for index, genome_build in enumerate(self.genome_build_prefs):
+            imported_genome_build = None
+            if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
+                imported_genome_build = GenomeBuild.get_name_or_alias(raw_genome_build)
+
+            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS.
+            # The imported value is shown, so it is labelled with the build it was imported against
+            for genome_build in self.genome_build_prefs:
                 if row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "variant_id")):
-                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
-                                               is_normalised=True, is_desired_build=index == 0)
+                    display_genome_build = imported_genome_build or genome_build
+                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=display_genome_build,
+                                               is_normalised=True,
+                                               is_desired_build=display_genome_build == first(self.genome_build_prefs),
+                                               is_resolved_without_hgvs=True)
                     return c_hgvs.to_json()
 
             # could be dirty and not have a latest_allele_info
-            if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
-                c_hgvs = HGVSDisplay.parse(imported_hgvs,
-                                           genome_build=GenomeBuild.get_name_or_alias(raw_genome_build),
-                                           is_normalised=False)
+            if imported_genome_build:
+                c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=imported_genome_build, is_normalised=False)
                 return c_hgvs.to_json()
             else:
                 return {}

@@ -151,9 +151,12 @@ class ImportedAlleleInfoValidationTest(TestCase):
             "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>", grch37=self._resolved(grch37))
         display = allele_info.matched_without_resolved_hgvs_display(grch38)
         self.assertEqual("ARV7", display.full_hgvs)
-        self.assertEqual(grch37, display.genome_build)
+        # the imported value is shown, so it carries the imported build rather than the one that matched
+        self.assertEqual(grch38, display.genome_build)
         self.assertTrue(display.is_normalised)
-        self.assertFalse(display.is_desired_build)
+        self.assertTrue(display.is_desired_build)
+        self.assertTrue(display.is_resolved_without_hgvs)
+        self.assertFalse(allele_info.matched_without_resolved_hgvs_display(grch37).is_desired_build)
 
         self.assertIsNone(self._allele_info(imported_c_hgvs=self.C_HGVS_38).matched_without_resolved_hgvs_display(grch38))
         with_c_hgvs = self._allele_info(imported_c_hgvs=self.C_HGVS_38,
