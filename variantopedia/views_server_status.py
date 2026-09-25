@@ -2,14 +2,11 @@ import logging
 import operator
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import reduce
-from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
-from django.db import connection
 from django.shortcuts import render
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
@@ -23,7 +20,7 @@ from annotation.models import (
 from classification.models.classification_import_run import ClassificationImportRun
 from genes.hgvs import HGVSMatcher
 from library.django_utils import highest_pk, require_superuser
-from library.django_utils.database_utils import signal_backends
+from library.django_utils.database_utils import long_running_sql, signal_backends
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
 from library.integration_status import get_integration_statuses, run_integration_trigger
 from library.log_utils import AdminNotificationBuilder, report_message, slack_bot_username
@@ -259,45 +256,6 @@ def health_check_details(request):
         'overall_lines': overall_lines,
     }
     return render(request, "variantopedia/health_check_details.html", context)
-
-
-@dataclass
-class RunningQuery:
-    pid: int
-    duration: Any  # is actually a Duration
-    query: str
-    state: str
-
-
-def long_running_sql(min_age_in_seconds: int = 30):
-    with connection.cursor() as cursor:
-        db_name = connection.settings_dict['NAME']
-        # We exclude "idle" state - as they are from connection pool and not actually running
-        cursor.execute(
-            """
-            SELECT
-              pid,
-              now() - pg_stat_activity.query_start AS duration,
-              query,
-              state
-            FROM pg_stat_activity
-            WHERE (now() - pg_stat_activity.query_start) > interval %s
-            AND datname = %s
-            AND state <> 'idle'                
-            ORDER BY now() - pg_stat_activity.query_start desc;
-            """,
-            [f"{min_age_in_seconds} seconds", db_name]
-        )
-
-        def to_obj(row) -> RunningQuery:
-            return RunningQuery(
-                pid=row[0],
-                duration=row[1],
-                query=row[2],
-                state=row[3]
-            )
-
-        return [to_obj(result) for result in cursor.fetchall()]
 
 
 @require_superuser

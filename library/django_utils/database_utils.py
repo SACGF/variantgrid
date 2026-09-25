@@ -2,7 +2,7 @@
 Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
 text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
 cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first),
-postgres_arrays formats array literals, and get_active_backend_pids / signal_backends /
+postgres_arrays formats array literals, and long_running_sql / get_active_backend_pids / signal_backends /
 wait_for_backends_to_stop find and cancel other connections' running queries.
 """
 import contextlib
@@ -10,6 +10,8 @@ import json
 import logging
 import time
 from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Optional, TypeVar, Generic, Type, Callable
 
 import sqlparse
@@ -33,6 +35,28 @@ def run_sql(sql, params=None) -> tuple[Any, int]:
         value = cursor.execute(sql, params)  # Remember it only accepts '%s' not %d etc.
         rowcount = cursor.rowcount
         return value, rowcount
+
+
+@dataclass
+class RunningQuery:
+    pid: int
+    duration: timedelta
+    query: str
+    state: str
+
+
+def long_running_sql(min_age_in_seconds: int = 30) -> list[RunningQuery]:
+    """ Non-idle connections to this database whose current query started more than min_age_in_seconds ago,
+        longest first. Idle ones are pooled connections showing their last query, not running anything """
+    sql = """
+        SELECT pid, now() - query_start AS duration, query, state
+        FROM pg_stat_activity
+        WHERE datname = current_database() AND state <> 'idle' AND now() - query_start > interval %s
+        ORDER BY duration DESC
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [f"{min_age_in_seconds} seconds"])
+        return [RunningQuery(*row) for row in cursor.fetchall()]
 
 
 def get_active_backend_pids(query_regex: str) -> list[int]:
