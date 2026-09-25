@@ -13,6 +13,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.generics import RetrieveAPIView, get_object_or_404
+from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -68,6 +69,26 @@ from seqauto.serializers.sequencing_serializers import (
 )
 
 
+class SeqAutoWritePermission(BasePermission):
+    """ The sequencing pipeline creates and updates seqauto records - reads are open to any
+        authenticated user, writes need a superuser or a member of SEQAUTO_API_WRITE_GROUP """
+    message = f"Writing sequencing data requires membership of the '{settings.SEQAUTO_API_WRITE_GROUP}' group"
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        user = request.user
+        return user.is_superuser or user.groups.filter(name=settings.SEQAUTO_API_WRITE_GROUP).exists()
+
+
+class SeqAutoModelViewSet(ModelViewSet):
+    permission_classes = (IsAuthenticated, SeqAutoWritePermission)
+
+
+class SeqAutoWriteAPIView(APIView):
+    permission_classes = (IsAuthenticated, SeqAutoWritePermission)
+
+
 class EnrichmentKitSummaryView(RetrieveAPIView):
     """ Doesn't return gene list so is much faster """
     serializer_class = EnrichmentKitSummarySerializer
@@ -77,65 +98,65 @@ class EnrichmentKitSummaryView(RetrieveAPIView):
         return EnrichmentKit.objects.all()
 
 
-class EnrichmentKitViewSet(ModelViewSet):
+class EnrichmentKitViewSet(SeqAutoModelViewSet):
     queryset = EnrichmentKit.objects.all()
     serializer_class = EnrichmentKitSerializer
     lookup_field = 'pk'
 
 
-class SequencerModelViewSet(ModelViewSet):
+class SequencerModelViewSet(SeqAutoModelViewSet):
     queryset = SequencerModel.objects.all()
     serializer_class = SequencerModelSerializer
 
 
-class SequencerViewSet(ModelViewSet):
+class SequencerViewSet(SeqAutoModelViewSet):
     queryset = Sequencer.objects.all()
     serializer_class = SequencerSerializer
 
 
-class ExperimentViewSet(ModelViewSet):
+class ExperimentViewSet(SeqAutoModelViewSet):
     queryset = Experiment.objects.all()
     serializer_class = ExperimentSerializer
 
 
-class VariantCallerViewSet(ModelViewSet):
+class VariantCallerViewSet(SeqAutoModelViewSet):
     queryset = VariantCaller.objects.all()
     serializer_class = VariantCallerSerializer
 
 
-class SequencingRunViewSet(ModelViewSet):
+class SequencingRunViewSet(SeqAutoModelViewSet):
     queryset = SequencingRun.objects.filter(hidden=False)
     serializer_class = SequencingRunSerializer
     lookup_field = 'name'
     lookup_value_regex = '[^/]+'
 
 
-class SampleSheetViewSet(ModelViewSet):
+class SampleSheetViewSet(SeqAutoModelViewSet):
     queryset = SampleSheet.objects.all()
     serializer_class = SampleSheetSerializer
 
 
-class SingleSampleVCFViewSet(ModelViewSet):
+class SingleSampleVCFViewSet(SeqAutoModelViewSet):
     queryset = SingleSampleVCF.objects.all()
     serializer_class = SingleSampleVCFSerializer
 
 
-class JointCalledVCFViewSet(ModelViewSet):
+class JointCalledVCFViewSet(SeqAutoModelViewSet):
     queryset = JointCalledVCF.objects.all()
     serializer_class = JointCalledVCFSerializer
 
 
-class FastQCViewSet(ModelViewSet):
+class FastQCViewSet(SeqAutoModelViewSet):
     queryset = FastQC.objects.all()
     serializer_class = FastQCSerializer
 
 
-class IlluminaFlowcellQCViewSet(ModelViewSet):
+class IlluminaFlowcellQCViewSet(SeqAutoModelViewSet):
     queryset = IlluminaFlowcellQC.objects.all()
     serializer_class = IlluminaFlowcellQCSerializer
 
 
-class SequencingFilesBulkCreateView(APIView):
+class SequencingFilesBulkCreateView(SeqAutoWriteAPIView):
     """ Bulk create sequencing file records (fastqs, BAM and VCF) for samples on a sample sheet """
 
     @extend_schema(
@@ -151,7 +172,7 @@ class SequencingFilesBulkCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class SequencingSampleExtractionLinkView(APIView):
+class SequencingSampleExtractionLinkView(SeqAutoWriteAPIView):
     """ Name the extraction a sequencing sample was made from.
 
         The sequencing sample is the anchor: without it there is nothing to park a claim on, so an
@@ -177,7 +198,7 @@ class SequencingSampleExtractionLinkView(APIView):
         return Response(response, status=status_code)
 
 
-class QCGeneListViewSet(ModelViewSet):
+class QCGeneListViewSet(SeqAutoModelViewSet):
     queryset = QCGeneList.objects.all()
 
     def get_serializer_class(self):
@@ -186,7 +207,7 @@ class QCGeneListViewSet(ModelViewSet):
         return QCGeneListSerializer
 
 
-class QCGeneListBulkCreateView(APIView):
+class QCGeneListBulkCreateView(SeqAutoWriteAPIView):
     """ Bulk create QC gene lists """
 
     @extend_schema(
@@ -202,7 +223,7 @@ class QCGeneListBulkCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class QCExecSummaryBulkCreateView(APIView):
+class QCExecSummaryBulkCreateView(SeqAutoWriteAPIView):
     """ Bulk create QC exec summaries """
 
     @extend_schema(
@@ -218,7 +239,7 @@ class QCExecSummaryBulkCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class QCGeneCoverageBulkCreateView(APIView):
+class QCGeneCoverageBulkCreateView(SeqAutoWriteAPIView):
     """ Bulk create QC gene coverage records """
 
     @extend_schema(
@@ -234,12 +255,12 @@ class QCGeneCoverageBulkCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class QCGeneCoverageViewSet(ModelViewSet):
+class QCGeneCoverageViewSet(SeqAutoModelViewSet):
     queryset = QCGeneCoverage.objects.all()
     serializer_class = QCGeneCoverageSerializer
 
 
-class QCExecSummaryViewSet(ModelViewSet):
+class QCExecSummaryViewSet(SeqAutoModelViewSet):
     queryset = QCExecSummary.objects.all()
     serializer_class = QCExecSummarySerializer
 

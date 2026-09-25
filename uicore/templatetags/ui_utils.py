@@ -115,12 +115,9 @@ class InstallInstructionsTag(template.Node):
         if not context.request.user.is_superuser:
             return ""
 
-        label_str = TagUtils.value_str(context, self.label)
-        if not label_str:
-            label_str = ""
-            id_safe = str(uuid.uuid4()).replace("-", "_") + "_instructions"
-        else:
-            id_safe = re.sub(r"\W", "_", label_str).lower()
+        label_str = TagUtils.value_str(context, self.label) or ""
+        # Unique even when the same label renders twice on a page (eg one "Clinvar" per build panel)
+        id_safe = re.sub(r"\W", "_", label_str).lower() + "_" + uuid.uuid4().hex + "_instructions"
 
         div_css_classes = ["install-instructions", "collapse"]
         link_css_classes = ["toggle-link"]

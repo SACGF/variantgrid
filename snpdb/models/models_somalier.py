@@ -322,9 +322,9 @@ class SomalierConfig:
         return self._annotation_dir(sites)
 
     def get_relate_sites_args(self, genome_build: 'GenomeBuild') -> list[str]:
-        """ somalier only counts hom-ref/hom-alt the right way round if relate is given the sites VCF
-            (v0.3.5, brentp/somalier#163). Older ones have no --sites at all, and we compensate in the
-            exported AD order instead - @see snpdb.variants_to_vcf.somalier_alleles_flipped """
+        """ Without our compensation, v0.3.5's relate needs the sites VCF to report per-sample
+            hom-ref/hom-alt the right way round (brentp/somalier#163) - it doesn't fix the pairs, so
+            @see snpdb.variants_to_vcf.somalier_alleles_flipped. Older ones have no --sites at all. """
         if self.settings["compensate_allele_order"]:
             return []
         sites = self.get_sites(genome_build)

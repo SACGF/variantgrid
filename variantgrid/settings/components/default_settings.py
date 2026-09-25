@@ -579,9 +579,6 @@ VIEW_TRANSCRIPT_VERSION_SHOW_CLASSIFICATIONS = False
 
 DEFAULT_COLUMNS_NAME = 'Default columns'
 
-DEFAULT_ENRICHMENT_KIT_LEFT_PADDING = 0
-DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING = 0
-
 ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT = "Cohort VCF Export auto analysis"
@@ -623,6 +620,11 @@ ANALYSIS_GRID_SORT_MAX_ROWS = 10_000
 # statement_timeout. Node queries run under this limit instead (@see node_query_planner_settings); it
 # is not set server-wide as the extra planning time regressed unrelated queries. None = server default.
 ANALYSIS_NODE_QUERY_JOIN_COLLAPSE_LIMIT = 32
+# pg_cancel_backend only signals the backend, so after cancelling a node's load we poll
+# pg_stat_activity for up to this long waiting for those queries to actually stop - a caller that
+# cancelled so it could drop partitions (analysis delete, version bump) would otherwise queue
+# behind the locks it just asked to be released
+ANALYSIS_NODE_CANCEL_WAIT_SECONDS = 5
 # Node exports are cached per (node, version, user, filter set, export type) so accumulate much faster
 # than the cohort/sample ones - a beat task drops the CachedGeneratedFile rows (and files) older than this
 ANALYSIS_NODE_EXPORT_CACHE_DAYS = 7
@@ -767,6 +769,8 @@ ROLLBAR = {
     'root': BASE_DIR,
     'capture_username': True,
     'code_version': Git(BASE_DIR).hash,
+    # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
+    'min_level': 'warning',
     'ignorable_404_urls': (
         re.compile(r'.*\.map'),
         re.compile(r'.*\.ico')

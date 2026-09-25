@@ -47,21 +47,6 @@
         </div>
         </div>
         <div class="card">
-        <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-enrichment-kit">Enrichment Kit</div>
-        <div id="intersection-panel-enrichment-kit" class="collapse" data-parent="#intersection-node-accordion">
-        <div class="card-body">
-            {% if enrichment_kit %}
-                <div class="editor-row">
-                    <span class="editor-label">Enrichment kit</span>
-                    {{ enrichment_kit }}
-                </div>
-            {% else %}
-                <div class="editor-help">Can't determine the enrichment kit from the input samples.</div>
-            {% endif %}
-        </div>
-        </div>
-        </div>
-        <div class="card">
         <div class="card-header" data-toggle="collapse" data-target="#intersection-panel-contig">Contig</div>
         <div id="intersection-panel-contig" class="collapse" data-parent="#intersection-node-accordion">
             <div class="card-body" id='intersectionnode-contig'>

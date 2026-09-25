@@ -26,7 +26,8 @@ from sync.sync_runner import ClassificationUploadSyncRunner, SyncRunInstance, re
 
 # add variant_type to private fields as the key has been deprecated
 SHARIANT_PRIVATE_FIELDS = [
-    'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'sample_id', 'variant_type'
+    'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'redcap_record_id', 'sample_id',
+    'variant_type'
 ]
 
 # server-side processing of a 50 record batch can exceed the default minute
