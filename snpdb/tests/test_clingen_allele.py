@@ -15,7 +15,14 @@ from snpdb.clingen_allele import (
     populate_clingen_alleles_for_variants,
     variant_allele_clingen,
 )
-from snpdb.models import Allele, ClinGenAllele, GenomeBuild, VariantAllele, VariantCoordinate
+from snpdb.models import (
+    Allele,
+    AlleleMergeLog,
+    ClinGenAllele,
+    GenomeBuild,
+    VariantAllele,
+    VariantCoordinate,
+)
 from snpdb.tests.utils.mock_clingen_api import (
     MockClinGenAlleleRegistryAPI,
     MockServerErrorClinGenAlleleRegistryAPI,
@@ -79,6 +86,24 @@ class ClinGenAlleleTestCase(TestCase):
                                                 existing_variant_allele=variant_allele,
                                                 clingen_api=clingen_api_success)
         self.assertEqual(clingen_allele.allele, variant_allele.allele, "Alleles merged")
+
+    def _populate_variant_with_allele_missing_clingen(self) -> VariantAllele:
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        variant = slowly_create_test_variant("3", 128198980, 'A', 'T', grch37)
+        create_mock_allele(variant, grch37)
+        populate_clingen_alleles_for_variants(grch37, [variant], clingen_api=MockClinGenAlleleRegistryAPI())
+        return VariantAllele.objects.get(variant=variant, genome_build=grch37)
+
+    def test_populate_links_allele_missing_clingen(self):
+        variant_allele = self._populate_variant_with_allele_missing_clingen()
+        self.assertEqual(str(variant_allele.allele.clingen_allele), "CA10617208")
+
+    def test_populate_merges_into_allele_already_owning_clingen(self):
+        # ClinGen ID is unique on Allele, so the one it returns for the Variant's Allele may already be taken
+        clingen_allele = get_clingen_allele("CA10617208", clingen_api=MockClinGenAlleleRegistryAPI())
+        variant_allele = self._populate_variant_with_allele_missing_clingen()
+        self.assertEqual(variant_allele.allele, clingen_allele.allele)
+        self.assertTrue(AlleleMergeLog.objects.filter(new_allele=clingen_allele.allele, success=True).exists())
 
 
 class ClinGenAlleleNeverRegisteredTestCase(TestCase):
