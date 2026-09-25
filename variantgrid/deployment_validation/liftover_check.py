@@ -28,7 +28,8 @@ def check_alleles_never_lifted_over() -> dict:
             else:
                 num_alleles = f"{count:,}"
             data["warning"] = f"{num_alleles} Alleles have no {genome_build} variant and have never been lifted " \
-                              f"over to it. Go to the liftover page ({liftover_url}) and click " \
-                              f"'Liftover variants' for {genome_build}"
+                              f"over to it. To lift them over, click 'Liftover variants' for {genome_build} " \
+                              f"on the liftover page ({liftover_url}), or run " \
+                              f"'python3 manage.py liftover_alleles' (needs celery running)"
         liftover_checks[f"Alleles lifted over to {genome_build}"] = data
     return liftover_checks
