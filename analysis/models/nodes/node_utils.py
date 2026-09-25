@@ -34,7 +34,7 @@ from analysis.models.nodes.node_counts import (
     get_tag_node_counts_dict,
     get_tagged_variant_ids_by_label,
 )
-from library.django_utils.database_utils import run_sql
+from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
 from snpdb.models.models_enums import TagFilter
 from variantgrid.celery import app
@@ -118,36 +118,16 @@ def cancel_node_tasks(node_task_qs: QuerySet[NodeTask]) -> int:
         app.control.revoke(node_task.celery_task, terminate=True)
         AbortableAsyncResult(node_task.celery_task).abort()
         if node_task.db_pid:
-            run_sql("select pg_cancel_backend(%s)", [node_task.db_pid])
             db_pids.append(node_task.db_pid)
         cancelled_pks.append(node_task.pk)
 
     if cancelled_pks:
         # Null the handles so a second call is a no-op, and nothing cancels a pid the worker has moved on from
         NodeTask.objects.filter(pk__in=cancelled_pks).update(celery_task=None, db_pid=None)
-        _wait_for_cancelled_queries(db_pids)
+        # A caller about to drop partitions needs the cancelled queries' locks released first
+        signal_backends(db_pids)
+        wait_for_backends_to_stop(db_pids, settings.ANALYSIS_NODE_CANCEL_WAIT_SECONDS)
     return len(cancelled_pks)
-
-
-def _wait_for_cancelled_queries(db_pids: list[int]):
-    """ pg_cancel_backend only signals the backend, so wait for the queries to actually stop - a caller
-        that is about to drop partitions needs their locks released first """
-    if not db_pids:
-        return
-
-    sql = "select count(*) from pg_stat_activity where pid = ANY(%s) and state = 'active'"
-    deadline = time.monotonic() + settings.ANALYSIS_NODE_CANCEL_WAIT_SECONDS
-    while True:
-        with connection.cursor() as cursor:
-            cursor.execute(sql, [db_pids])
-            still_active = cursor.fetchone()[0]
-        if not still_active:
-            return
-        if time.monotonic() >= deadline:
-            logging.warning("Cancelled node queries (pids=%s) still running after %s seconds",
-                            db_pids, settings.ANALYSIS_NODE_CANCEL_WAIT_SECONDS)
-            return
-        time.sleep(0.1)
 
 
 def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):

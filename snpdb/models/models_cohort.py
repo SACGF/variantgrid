@@ -32,7 +32,7 @@ from guardian.shortcuts import get_objects_for_user
 from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
-from library.django_utils.database_utils import run_sql
+from library.django_utils.database_utils import get_active_backend_pids, signal_backends
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -583,8 +583,7 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         if self.common_collection:
             partition_tables.append(self.common_collection.get_partition_table())
         insert_regex = rf"^\s*insert into ({'|'.join(partition_tables)})\s"
-        run_sql("SELECT pg_cancel_backend(pid) FROM pg_stat_activity "
-                "WHERE pid <> pg_backend_pid() AND query ~* %s", [insert_regex])
+        signal_backends(get_active_backend_pids(insert_regex))
 
     def get_common_filter_info(self) -> str:
         default_or_rare = self.cohortgenotype_set.count()

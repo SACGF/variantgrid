@@ -1,11 +1,14 @@
 """
 Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
 text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
-cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first)
-and postgres_arrays formats array literals.
+cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first),
+postgres_arrays formats array literals, and get_active_backend_pids / signal_backends /
+wait_for_backends_to_stop find and cancel other connections' running queries.
 """
 import contextlib
 import json
+import logging
+import time
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Generic, Type, Callable
 
@@ -30,6 +33,49 @@ def run_sql(sql, params=None) -> tuple[Any, int]:
         value = cursor.execute(sql, params)  # Remember it only accepts '%s' not %d etc.
         rowcount = cursor.rowcount
         return value, rowcount
+
+
+def get_active_backend_pids(query_regex: str) -> list[int]:
+    """ Other connections to this database currently running a query matching query_regex (case-insensitive) """
+    sql = """
+        SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid() AND state = 'active' AND query ~* %s
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [query_regex])
+        return [row[0] for row in cursor.fetchall()]
+
+
+def signal_backends(pids: Iterable[int], terminate: bool = False) -> list[int]:
+    """ pg_cancel_backend (stop the current query, keep the connection) or, with terminate, pg_terminate_backend
+        (close the connection). Returns the pids Postgres signalled - it only signals, so a caller that needs the
+        locks released must wait_for_backends_to_stop. Needs the same DB role as the backend (or superuser) """
+    pids = list(pids)
+    if not pids:
+        return []
+    pg_function = "pg_terminate_backend" if terminate else "pg_cancel_backend"
+    with connection.cursor() as cursor:
+        cursor.execute(f"SELECT pid FROM unnest(%s::int[]) AS pid WHERE {pg_function}(pid)", [pids])
+        return [row[0] for row in cursor.fetchall()]
+
+
+def wait_for_backends_to_stop(pids: Iterable[int], timeout_seconds: float) -> bool:
+    """ Polls until none of pids is running a query, or timeout_seconds passes. Returns whether they all stopped """
+    pids = list(pids)
+    if not pids:
+        return True
+
+    sql = "SELECT count(*) FROM pg_stat_activity WHERE pid = ANY(%s) AND state = 'active'"
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [pids])
+            if not cursor.fetchone()[0]:
+                return True
+        if time.monotonic() >= deadline:
+            logging.warning("Signalled backends (pids=%s) still running after %s seconds", pids, timeout_seconds)
+            return False
+        time.sleep(0.1)
 
 
 def get_postgresql_version() -> str:

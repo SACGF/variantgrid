@@ -23,6 +23,7 @@ from annotation.models import (
 from classification.models.classification_import_run import ClassificationImportRun
 from genes.hgvs import HGVSMatcher
 from library.django_utils import highest_pk, require_superuser
+from library.django_utils.database_utils import signal_backends
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
 from library.integration_status import get_integration_statuses, run_integration_trigger
 from library.log_utils import AdminNotificationBuilder, report_message, slack_bot_username
@@ -146,10 +147,8 @@ def server_status(request):
                                      message=f"No integration is registered against '{action_id}'.")
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT pg_terminate_backend(%s)", [pid])
-                terminated = cursor.fetchone()[0]
-                messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
+            terminated = bool(signal_backends([pid], terminate=True))
+            messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
             logging.warning("Unrecognised action %s", action)
 
