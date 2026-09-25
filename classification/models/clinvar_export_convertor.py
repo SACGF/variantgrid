@@ -1,7 +1,7 @@
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cache, cached_property
 from typing import Any, Optional, TypedDict
 
 from annotation.models import CitationFetchRequest
@@ -20,6 +20,7 @@ from classification.models import (
     MultiCondition,
     classification_flag_types,
 )
+from flags.models.models import FlagType
 from genes.hgvs import HGVSComponents
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
@@ -279,17 +280,21 @@ class ClinVarEvidenceKey:
 
 class ClinVarExportConverter:
 
-    FLAG_TYPES_TO_MESSAGES = {
-        classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
-        # these flags are now handled by AlleleInfo
-        # classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
-        # classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
-        classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
-        classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
-        classification_flag_types.classification_outstanding_edits: JsonMessages.error("Classification has un-submitted changes"),
-        classification_flag_types.classification_pending_changes: JsonMessages.error("Classification has pending changes"),
-        # classification_flag_types.classification_not_public - this has special handling to include a comment
-    }
+    @staticmethod
+    @cache
+    def flag_types_to_messages() -> dict[FlagType, JsonMessages]:
+        # Lazy as FlagType lookups hit the DB, which isn't available when the module is imported
+        return {
+            classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
+            # these flags are now handled by AlleleInfo
+            # classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
+            # classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
+            classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
+            classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
+            classification_flag_types.classification_outstanding_edits: JsonMessages.error("Classification has un-submitted changes"),
+            classification_flag_types.classification_pending_changes: JsonMessages.error("Classification has pending changes"),
+            # classification_flag_types.classification_not_public - this has special handling to include a comment
+        }
 
     BOOKSHELF_ID_RE = re.compile(".*(NBK[0-9]+)")
 
@@ -451,7 +456,7 @@ class ClinVarExportConverter:
                                 message_text += " - " + last_comment_text
                     messages += JsonMessages.error(message_text)
 
-                elif message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
+                elif message := ClinVarExportConverter.flag_types_to_messages().get(flag.flag_type):
                     messages += message
 
             if not self.classification_based_on.classification.allele_info.latest_validation.include:
