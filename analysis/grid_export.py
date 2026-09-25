@@ -161,7 +161,8 @@ def _get_vcf_info_dict(csv_columns):
         name = c['name']
         col_info = column_vcf_info.get(name)
         if col_info:
-            col_info['number'] = col_info['number'] or '.'
+            if col_info['number'] is None:
+                col_info['number'] = '.'
 
             info_id = col_info['info_id']
             info_dict[info_id] = col_info
