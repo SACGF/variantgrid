@@ -118,7 +118,8 @@ lifecycle `status` NEW → ACTIVE → HISTORICAL. "The VAV" means the ACTIVE one
 new VAV re-annotates every variant - a shared, hours-long operation.
 
 **AnnotationRun** - `annotation/models/models.py:AnnotationRun`. One batch (an `AnnotationRangeLock` of variant pks) through
-dump → VEP → upload, with `AnnotationStatus` (`annotation/models/models_enums.py`); `vg status` counts the ones in flight.
+dump → VEP → upload, with `AnnotationStatus` (`annotation/models/models_enums.py`); `vg status` counts the ones in flight, and
+lists separately the abandoned ones nothing will dispatch (no range lock, or on a HISTORICAL version).
 
 **VariantAnnotation / VariantTranscriptAnnotation** - `annotation/models/models.py:VariantAnnotation`,
 `VariantTranscriptAnnotation`. Partitioned per VAV (`SubVersionPartition`): VariantAnnotation is the representative-transcript

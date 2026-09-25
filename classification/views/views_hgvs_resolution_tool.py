@@ -75,6 +75,12 @@ class MatcherOutputs:
         return all_equal(x.hgvs for x in self.all_output)
 
 
+def _error_message(ex: Exception) -> str:
+    if isinstance(ex, VariantResolvingError) and ex.technical_message:
+        return ex.technical_message
+    return str(ex)
+
+
 @require_superuser
 def hgvs_resolution_tool(request: HttpRequest):
 
@@ -145,25 +151,22 @@ def hgvs_resolution_tool(request: HttpRequest):
             all_output.append(output)
 
             try:
-                variant_coordinate: Optional[VariantCoordinate] = None
-                if vcd := matcher.get_variant_coordinate_and_details(resolve_hgvs):
-                    variant_coordinate = vcd.variant_coordinate
-                    output.variant_coordinate = variant_coordinate
-                    output.used_converter_type = vcd.converter_info.used_converter_type.name
-                    output.method = vcd.converter_info.method
-
-                if vcd.transcript_accession:
-                    output.transcript_version = TranscriptVersion.transcript_parts(vcd.transcript_accession)
-
-                    if variant_coordinate:
-                        if variant_details := matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
-                                                                                         vcd.transcript_accession):
-                            output.hgvs = variant_details.format()
-
-            except VariantResolvingError as vre:
-                output.message = vre.technical_message if vre.technical_message else str(vre)
-
+                vcd = matcher.get_variant_coordinate_and_details(resolve_hgvs)
             except Exception as ex:
-                output.message = str(ex)
+                output.message = f"Resolving to variant: {_error_message(ex)}"
+                continue
+
+            output.variant_coordinate = vcd.variant_coordinate
+            output.used_converter_type = vcd.converter_info.used_converter_type.name
+            output.method = vcd.converter_info.method
+
+            if vcd.transcript_accession:
+                output.transcript_version = TranscriptVersion.transcript_parts(vcd.transcript_accession)
+                try:
+                    if variant_details := matcher.variant_coordinate_to_hgvs_variant(vcd.variant_coordinate,
+                                                                                     vcd.transcript_accession):
+                        output.hgvs = variant_details.format()
+                except Exception as ex:
+                    output.message = f"Generating c.HGVS: {_error_message(ex)}"
 
     return render(request, "classification/hgvs_resolution_tool.html", context)

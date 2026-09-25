@@ -1,4 +1,5 @@
 import operator
+import os
 import re
 from collections import Counter
 from collections.abc import Callable, Iterator
@@ -21,8 +22,9 @@ TRANSCRIPT_REPLACE_BATCH_SIZE = 1000
 
 
 def node_grid_get_export_iterator(request, node, export_type, canonical_transcript_collection=None,
-                                  variant_tags_dict=None, basename: str = None, grid_kwargs: dict = None,
-                                  row_wrapper: Callable = None) -> tuple[str, Iterator[str]]:
+                                  variant_tags_dict=None, basename: Optional[str] = None,
+                                  grid_kwargs: Optional[dict] = None,
+                                  row_wrapper: Optional[Callable] = None) -> tuple[str, Iterator[str]]:
     """ row_wrapper: wraps the rows iterator, e.g. so a Celery task can report progress per row -
         the file iterator yields a chunk of rows at a time so is no use for counting """
 
@@ -44,7 +46,7 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     items = grid.iter_export_rows(grid.apply_filters(grid.get_initial_queryset()))
 
     if canonical_transcript_collection:
-        basename += f"_{canonical_transcript_collection}"
+        basename += "_" + get_canonical_transcript_collection_filename_part(canonical_transcript_collection)
         items = _replace_transcripts_iterator(grid, canonical_transcript_collection, items)
 
     tag_stale_date = node.analysis.variant_tag_stale_date
@@ -67,11 +69,23 @@ def node_grid_get_export_iterator(request, node, export_type, canonical_transcri
     filename = f"{basename}.{export_type}"
     return filename, file_iterator
 
+
+def _filename_part(text: str) -> str:
+    return re.sub(r"\W+", "_", text).strip("_")
+
+
+def get_canonical_transcript_collection_filename_part(ctc: CanonicalTranscriptCollection) -> str:
+    """ 'canonical_<name>' so the file can't be mistaken for the plain export - name is the collection's
+        description, else its source file without directory or extensions (eg 'MedEx.GeneTable.tsv' -> 'MedEx') """
+    name = ctc.description or os.path.basename(ctc.filename).split(".", 1)[0]
+    return "_".join(filter(None, ["canonical", _filename_part(name)]))
+
+
 def get_node_export_basename(node: AnalysisNode) -> str:
     """ Short enough to survive Windows path limits once it lands in a downloads folder - the analysis pk,
         node pk and version keep it unique; the node name (or class when unnamed) says what it is """
     if node.name:
-        label = re.sub(r"\W+", "_", node.name).strip("_")
+        label = _filename_part(node.name)
     else:
         label = node.get_node_class_label()
     name_parts = [label]
@@ -147,7 +161,8 @@ def _get_vcf_info_dict(csv_columns):
         name = c['name']
         col_info = column_vcf_info.get(name)
         if col_info:
-            col_info['number'] = col_info['number'] or '.'
+            if col_info['number'] is None:
+                col_info['number'] = '.'
 
             info_id = col_info['info_id']
             info_dict[info_id] = col_info

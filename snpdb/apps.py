@@ -15,7 +15,6 @@ class SnpdbConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         from django.contrib.auth.models import Group, User
 
-        from seqauto.signals.signals_list import backend_vcf_import_success_signal
         from snpdb import checks  # noqa: F401  # registers system checks on import
         from snpdb import user_award_definitions  # noqa: F401  # registers award definitions on import
         from snpdb.models import Trio
@@ -43,14 +42,11 @@ class SnpdbConfig(AppConfig):
             vcf_search,
         )
         from snpdb.signals.signal_handlers import (
-            backend_vcf_import_success_handler,
             group_post_save_handler,
             trio_post_save_handler,
             user_post_save_handler,
         )
         # pylint: enable=import-outside-toplevel,unused-import
-
-        backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)
 
         if not settings.UNIT_TEST:
             # Add newly created users to public group

@@ -244,7 +244,9 @@ def annotation_detail(request):
 
     # These are empty/None if not set.
     annotations_ok = [all_ontologies_accounted_for,
-                      hpa_counts > 0]
+                      hpa_counts > 0,
+                      gene_symbol_alias_counts,
+                      dbnsfp_gene_annotation]
     if somalier_enabled:
         annotations_ok.append(somalier)
     annotations_all_imported = all(annotations_ok)  # Any unset will show instructions header

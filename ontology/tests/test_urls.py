@@ -64,10 +64,14 @@ class Test(URLTestCase):
             # Digits anywhere in the id, bare or prefixed (HP:0001061)
             ('hpo_autocomplete', self.hpo, {"q": "106"}),
             ('hpo_autocomplete', self.hpo, {"q": "HP:106"}),
+            # Each word matched separately, in any order
+            ('omim_autocomplete', self.omim, {"q": "term  fake"}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
         # The index of one term is not another term
         self._test_autocomplete_urls([('omim_autocomplete', self.omim, {"q": str(self.hpo.index)})], self.user, False)
+        # Every word has to be in the name
+        self._test_autocomplete_urls([('omim_autocomplete', self.omim, {"q": "fake hpo"})], self.user, False)
 
 
 if __name__ == "__main__":

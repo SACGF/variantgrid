@@ -318,7 +318,8 @@ denormalised `summary` JSON with its `summary__p_sort_idx` index that the grids 
 - ClinVar batches are germline only: `ClinVarExportSync.next_request` raises `NOT_SUPPORTED_YET` for any other
   `allele_origin_bucket`, and the converter marks somatic exports as errors first, so they never reach a batch.
 - `ClassificationRef.init_from_str` treats a numeric id as a `Classification.pk` and anything else as `org/lab/record`;
-  a lab whose `lab_record_id`s are integers must always be addressed with the lab prefix.
+  a lab whose `lab_record_id`s are integers must always be addressed with the lab prefix. Build that prefixed form with
+  `classification/models/classification_ref.py:ClassificationRef.make_lab_id_str` (`Lab.group_name` is already `org/lab`).
 - Tests: `classification/tests/models/test_utils.py:ClassificationTestUtils` builds the lab/user pairs;
   `classification/tests/utils/test_urls.py` is the URLTestCase with `LIFTOVER_CLASSIFICATIONS=False`;
   `classification/tests/views/test_query_scaling.py` guards the grid query count. There are no tests for the OmniImporter

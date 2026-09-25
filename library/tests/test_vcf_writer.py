@@ -1,12 +1,13 @@
 import io
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from library.genomics.vcf_writer import (
     VCFInfoHeader,
     VCFWriter,
     build_header_lines,
     symbolic_alt_info,
+    vcf_file_format,
 )
 
 BASE_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]
@@ -26,15 +27,16 @@ class TestVCFWriter(TestCase):
 
     def test_info_header_number_and_quote_sanitisation(self):
         h = VCFInfoHeader(id="END", type="Integer", number=".",
-                          description='Stop "position" of the interval')
+                          description='Stop "position" of the \\interval')
         self.assertEqual(
-            "##INFO=<ID=END,Number=.,Type=Integer,Description=\"Stop 'position' of the interval\">",
+            "##INFO=<ID=END,Number=.,Type=Integer,Description=\"Stop 'position' of the \\\\interval\">",
             str(h))
 
+    @override_settings(VCF_EXPORT_VERSION="4.2")
     def test_build_header_lines_minimal(self):
         lines = build_header_lines()
-        self.assertEqual(["##fileformat=VCFv4.1"], lines[:-1])
-        self.assertEqual(["#CHROM"] + BASE_COLUMNS[1:], lines[-1].split("\t"))
+        self.assertEqual(["##fileformat=VCFv4.2"], lines[:-1])
+        self.assertEqual(["#CHROM", *BASE_COLUMNS[1:]], lines[-1].split("\t"))
 
     def test_build_header_lines_full(self):
         info = [
@@ -45,18 +47,18 @@ class TestVCFWriter(TestCase):
         lines = build_header_lines(meta_lines=["##source=VariantGrid"], info=info, formats=formats,
                                    contig_lines=contig_lines, samples=["S1", "S2"])
         self.assertEqual([
-            "##fileformat=VCFv4.1",
+            f"##fileformat={vcf_file_format()}",
             "##source=VariantGrid",
             '##INFO=<ID=END,Number=.,Type=Integer,Description="Stop position of the interval">',
             '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
             "##contig=<ID=1,length=249250621>",
         ], lines[:-1])
-        self.assertEqual(["#CHROM"] + BASE_COLUMNS[1:] + ["FORMAT", "S1", "S2"], lines[-1].split("\t"))
+        self.assertEqual(["#CHROM", *BASE_COLUMNS[1:], "FORMAT", "S1", "S2"], lines[-1].split("\t"))
 
     def test_build_header_lines_samples_without_formats_have_no_format_column(self):
         lines = build_header_lines(samples=["S1"])
-        self.assertEqual(["##fileformat=VCFv4.1"], lines[:-1])
-        self.assertEqual(["#CHROM"] + BASE_COLUMNS[1:], lines[-1].split("\t"))
+        self.assertEqual([f"##fileformat={vcf_file_format()}"], lines[:-1])
+        self.assertEqual(["#CHROM", *BASE_COLUMNS[1:]], lines[-1].split("\t"))
 
     def test_symbolic_alt_info(self):
         self.assertEqual({}, symbolic_alt_info("T", svlen=None, end=100))
@@ -100,3 +102,9 @@ class TestVCFWriter(TestCase):
         writer.write_record("1", 100, "A", "T", info={"X": "a;b,c"})
         # ';' -> ',:' then ',' -> '|' (the second replace also hits the ',' just inserted)
         self.assertEqual([["1", "100", ".", "A", "T", ".", ".", "X=a|:b|c"]], _rows(handle.getvalue()))
+
+    def test_true_info_value_is_a_flag(self):
+        handle = io.StringIO()
+        writer = VCFWriter(handle, encode_info=str)
+        writer.write_record("1", 100, "A", "T", info={"GNOMAD_FILTERED": True, "AF": 0.5})
+        self.assertEqual([["1", "100", ".", "A", "T", ".", ".", "GNOMAD_FILTERED;AF=0.5"]], _rows(handle.getvalue()))
