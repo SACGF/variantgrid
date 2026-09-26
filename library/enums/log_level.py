@@ -1,6 +1,6 @@
 """
 LogLevel: the severity strings (DEBUG .. ERROR) stored on eventlog Event rows and used by
-notification builders; `vg status` filters ERROR.
+notification builders.
 """
 
 

@@ -10,12 +10,13 @@ from django.test import Client, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import (
     URLTestCase,
     frozen_cache_expiry,
     production_query_count,
 )
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import (
     Allele,
     AlleleConversionTool,
@@ -32,7 +33,6 @@ from snpdb.templatetags.related_data_tags import (
     TRIO_SAMPLES_SELECT_RELATED,
     related_data_for_samples,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

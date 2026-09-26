@@ -2,7 +2,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_annotation import create_fake_variant_annotation, create_fake_variants
+from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
 from annotation.models.damage_enums import PathogenicityImpact
 from snpdb.models import BuiltInFilters, Variant
 

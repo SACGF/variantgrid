@@ -11,9 +11,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.health_check import health_check_overall_stats_signal
+from library.utils import sha256sum_str
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
@@ -23,7 +24,6 @@ from seqauto.models import SampleFromSequencingSample
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.models import ImportSource, Sample, Sequence
 from snpdb.models.models_genome import GenomeBuild
-from library.utils import sha256sum_str
 from upload.models import FileUpload, UploadedFileTypes, UploadPipeline, UploadStep
 from upload.vcf.vcf_import import (
     ExtractionMismatchException,

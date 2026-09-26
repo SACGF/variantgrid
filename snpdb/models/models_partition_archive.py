@@ -7,7 +7,7 @@ from django.db.models.deletion import SET_NULL
 class PartitionArchive(models.Model):
     """ Tracks a pg_dump+drop of a RelatedModelsPartitionModel's child partition tables.
 
-        @see claude/issue_1537_archive_plan.md
+        @see https://github.com/SACGF/variantgrid/issues/1537
     """
 
     class Status(models.TextChoices):

@@ -6,7 +6,7 @@ is the value object between HGVS, VCF and the database - canonicalise with as_in
 before lookup or insert. Also the liftover records (LiftoverRun, AlleleLiftover, the AlleleSource
 family) and VariantCollection (a partitioned set of variants used as a cache). Gene-level variants
 are a declared hack: read snpdb/gene_level_variants.py before touching get_gene_level_q. Bulk
-insert goes through snpdb/variant_pk_lookup.py, not this module. snpdb/AGENTS.md has the rules.
+insert goes through snpdb/variant_pk_lookup.py, not this module.
 """
 import logging
 import re

@@ -8,8 +8,8 @@ attributes and hooks at the top of InheritanceNodeTestsMixin.
 
 samples_zygosity encoding: E=HET, R=HOM_REF, O=HOM_ALT, U=UNKNOWN, .=MISSING
 """
+from snpdb.fake_data import make_cohort_genotype
 from snpdb.models import Variant
-from snpdb.models.models_cohort import CohortGenotype
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 # attribute, chrom, position - the zygosity string per pattern comes from the subclass
@@ -21,28 +21,6 @@ SHARED_VARIANTS = [
     ("xlinked_v", "X", 1000),
     ("xlinked_unknown_mother_v", "X", 2000),
 ]
-
-
-DEFAULT_GENOTYPE_VALUES = object()  # so a test can ask for a NULL array, eg a VCF with no AF field
-
-
-def make_cohort_genotype(cgc, variant, samples_zygosity: str,
-                         allele_depth=DEFAULT_GENOTYPE_VALUES, allele_frequency=DEFAULT_GENOTYPE_VALUES):
-    """ allele_depth/allele_frequency are per sample, in packed order - the mosaic modes read them """
-    n = len(samples_zygosity)
-    CohortGenotype.objects.create(
-        collection=cgc,
-        variant=variant,
-        ref_count=samples_zygosity.count('R'),
-        het_count=samples_zygosity.count('E'),
-        hom_count=samples_zygosity.count('O'),
-        samples_zygosity=samples_zygosity,
-        samples_allele_depth=[20] * n if allele_depth is DEFAULT_GENOTYPE_VALUES else allele_depth,
-        samples_allele_frequency=[100] * n if allele_frequency is DEFAULT_GENOTYPE_VALUES else allele_frequency,
-        samples_read_depth=[30] * n,
-        samples_genotype_quality=[30] * n,
-        samples_phred_likelihood=[0] * n,
-    )
 
 
 class InheritanceNodeTestsMixin:

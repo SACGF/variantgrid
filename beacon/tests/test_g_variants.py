@@ -10,9 +10,9 @@ from classification.models.classification import Classification, ClassificationM
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import public_group
 from patients.models_enums import Zygosity
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
 from snpdb.models.models_zygosity_counts import VariantZygosityCount, VariantZygosityCountCollection
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 

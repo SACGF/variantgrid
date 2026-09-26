@@ -17,8 +17,6 @@ This is the mirror image of annotation.external_annotation at each step: it dump
 annotated, leaves AnnotationRun / range-lock state alone, UPDATEs named columns rather than INSERTing
 whole rows, and its input deliberately comes from a different annotation source than the one that
 produced the version.
-
-See claude/plans/1675_backfill_annotation_column_plan.md.
 """
 import csv
 import io

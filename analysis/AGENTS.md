@@ -233,8 +233,8 @@ Gotchas:
   (`analysis/models/nodes/cohort_mixin.py:CohortMixin._get_cohort`) - a subclass is ahead of the mixin either way.
 Tests:
 - `analysis/tests/utils.py:AnalysisSetupMixin` gives `cls.analysis` + `cls.grch37` with a fake annotation version
-  (`annotation/fake_annotation.py:get_fake_annotation_version`); samples/cohorts/trios/quads/pedigrees from
-  `snpdb/tests/utils/fake_cohort_data.py:create_fake_cohort` and friends;
+  (`annotation/fake_data.py:get_fake_annotation_version`); samples/cohorts/trios/quads/pedigrees from
+  `snpdb/fake_data.py:create_fake_cohort` and friends;
   `snpdb/tests/utils/vcf_testing_utils.py:slowly_create_test_variant` for a handful of real Variants.
 - `analysis/tests/test_urls.py:Test` is the URLTestCase (every analysis/node URL incl. editors and grid exports, owner vs
   non-owner) — run it after touching urls.py, a view signature or an editor template. Celery is eager under URLTestCase,

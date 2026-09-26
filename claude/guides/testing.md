@@ -34,7 +34,7 @@ python3 manage.py vg tests --changed                                        # on
   `get_or_create` lookups rather than 240 ontology re-imports. Two consequences: a test that counts
   `AnnotationVersion` / `VariantAnnotationVersion` / `OntologyTerm` rows sees the seeded ones, and a test that
   needs its own ACTIVE `VariantAnnotationVersion` (`one_active_vav_per_build`) calls
-  `annotation/fake_annotation.py:retire_seeded_annotation_version(genome_build)` first. Under `--keepdb` the
+  `annotation/fake_data.py:retire_seeded_annotation_version(genome_build)` first. Under `--keepdb` the
   seeded rows persist between runs; the seed is idempotent.
 - Every app package needs an `__init__.py`: `manage.py test <app>.tests` fails at discovery with
   `expected str ... not NoneType` when the app is an implicit namespace package.
@@ -46,6 +46,10 @@ Almost everything wants a `GenomeBuild` and a `User`; get them with
 `GenomeBuild.get_name_or_alias("GRCh37")` (or `GenomeBuild.grch37()` / `.grch38()`) and
 `User.objects.get_or_create(username=...)[0]`. Builders are `get_or_create` based and safe to call in `setUpTestData`.
 
+The builders live in each app's `fake_data.py` (or `fake_data/` package), next to that app's steps of
+`manage.py create_fake_data` (the registry is `library/fake_data.py:FakeData`), so tests and dev boxes build from
+one implementation. `snpdb/tests/test_create_fake_data.py` runs `create_fake_data all` on the test database.
+
 ### Users, labs, organisations
 - `classification/tests/models/test_utils.py:ClassificationTestUtils.setUp()` → creates org `instx`, labs `instx/labby` and external `instx/ext`, users `joejoe` (labby) and `joejoe2` (both); read back with `.lab_and_user()` / `.external_lab_and_user()` (each returns `(Lab, User)`).
 - No shared Lab/Org builder outside that: the pattern is `Organization.objects.get_or_create(name=, group_name=)`, `Country.objects.get_or_create(name=)`, `Lab.objects.get_or_create(name=, city=, country=, organization=, group_name="org/lab")` then `lab.group.user_set.add(user)` (copy from `classification/tests/utils/test_urls.py` `setUpTestData`).
@@ -55,41 +59,42 @@ Almost everything wants a `GenomeBuild` and a `User`; get them with
 - `snpdb/tests/utils/vcf_testing_utils.py:slowly_create_test_variant(chrom, position, ref, alt, genome_build)` → `Variant` (creates Sequence/Locus, normalises symbolic alts); needs the build's contigs (always loaded). Bypasses `VariantPKLookup`, test only.
 - `snpdb/tests/utils/vcf_testing_utils.py:create_mock_allele(variant, genome_build)` → `Allele` linked via a `VariantAllele` (origin IMPORTED_TO_DATABASE, tool DBSNP).
 - `snpdb/tests/utils/vcf_testing_utils.py:slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_variant_id_from_info=False)` → None; inserts every record of a VCF as Loci/Variants (first ALT only, honours SVLEN); `get_variant_id_from_info` pins pks from `INFO/variant_id`.
-- `annotation/fake_annotation.py:create_fake_variants(genome_build)` → None; loads `annotation/tests/test_data/test_columns_version1_<build>.vep_annotated.vcf` (4 records) via the function above, pks from INFO. Pick one with `Variant.objects.filter(Variant.get_no_reference_q()).first()`.
+- `annotation/fake_data.py:create_fake_variants(genome_build)` → None; loads `annotation/tests/test_data/test_columns_version1_<build>.vep_annotated.vcf` (4 records) via the function above, pks from INFO. Pick one with `Variant.objects.filter(Variant.get_no_reference_q()).first()`.
 - `genes/tests/gene_fusion_test_utils.py:create_gene_fusion(gene_a, gene_b, directionality_known=True, resolver=None)` → `GeneFusion` (plus its gene-level `Variant`), built the way the VCF insert pipeline would; needs the gene symbols to resolve.
 
 ### VCF, samples, cohorts, trios
-- `snpdb/tests/utils/fake_cohort_data.py:create_fake_cohort(user, genome_build)` → `Cohort` of 3 samples (`proband`, `mother`, `father`) on one `VCF` (`genotype_samples=1`, import SUCCESS, a `VCFFilter`), with a `CohortGenotypeCollection`; permissions assigned to `user`.
-- `snpdb/tests/utils/fake_cohort_data.py:create_fake_trio(user, genome_build)` → `Trio` (mother affected, father not) over `create_fake_cohort`.
-- `snpdb/tests/utils/fake_cohort_data.py:create_fake_quad(user, genome_build, sibling_affected=False)` → `Quad` over its own 4-sample cohort (`proband`, `mother`, `father`, `sibling`).
-- `snpdb/tests/utils/fake_cohort_data.py:create_fake_duo(user, genome_build, relationship=DuoRelationship.MOTHER, parent_affected=False)` → `Duo` over its own 2-sample cohort (`proband`, `parent`).
-- `snpdb/tests/utils/fake_cohort_data.py:create_fake_pedigree(user, genome_build)` → `Pedigree` (`PedFile` + `PedFileFamily`) over `create_fake_cohort`.
-- `analysis/tests/inheritance_node_mixin.py:make_cohort_genotype(cgc, variant, samples_zygosity)` → None; writes one `CohortGenotype` row for `cgc` (`trio.cohort.cohort_genotype_collection`). Zygosity string per sample in cohort order: `E`=HET, `R`=HOM_REF, `O`=HOM_ALT, `U`=UNKNOWN, `.`=MISSING, so a trio `"ERR"` is a het de novo.
+- `snpdb/fake_data.py:create_fake_cohort(user, genome_build, name="test_urls")` → `Cohort` of 3 samples (`proband`, `mother`, `father`) on one `VCF` (`genotype_samples=1`, import SUCCESS, a `VCFFilter`), with a `CohortGenotypeCollection`; permissions assigned to `user`.
+- `snpdb/fake_data.py:create_fake_trio(user, genome_build, name="test_urls")` → `Trio` (mother affected, father not) over `create_fake_cohort`.
+- `snpdb/fake_data.py:create_fake_quad(user, genome_build, sibling_affected=False, name="test_quad")` → `Quad` over its own 4-sample cohort (`proband`, `mother`, `father`, `sibling`).
+- `snpdb/fake_data.py:create_fake_duo(user, genome_build, relationship=DuoRelationship.MOTHER, relative_affected=False, name="test_duo")` → `Duo` over its own 2-sample cohort (`proband` and the relative, named after the relationship).
+- `snpdb/fake_data.py:create_fake_pedigree(user, genome_build, cohort=None, name="fake pedigree")` → `Pedigree` (`PedFile` + `PedFileFamily`) over `cohort`, or its own `create_fake_cohort`.
+- `snpdb/fake_data.py:make_cohort_genotype(cgc, variant, samples_zygosity, allele_depth=, allele_frequency=)` → None; writes one `CohortGenotype` row for `cgc` (`trio.cohort.cohort_genotype_collection`). Zygosity string per sample in cohort order: `E`=HET, `R`=HOM_REF, `O`=HOM_ALT, `U`=UNKNOWN, `.`=MISSING, so a trio `"ERR"` is a het de novo.
 - Single-sample VCF + `CohortGenotypeCollection`: copy `_create_vcf_sample` from `analysis/tests/test_sample_node_levels.py` (private, but the canonical 12 lines).
 
 ### Genes, transcripts, annotation versions
-- `annotation/tests/test_data_fake_genes.py:create_fake_transcript_version(genome_build, release=None)` → `TranscriptVersion` ENST00000300305.7 (RUNX1, Ensembl, minus strand, chr21) with real exon data for GRCh37 and GRCh38; passing a `GeneAnnotationRelease` also links the symbol into that release. `tv.gene_version.gene_symbol` is the usual next step.
-- `annotation/tests/test_data_fake_genes.py:create_gata2_transcript_version(genome_build)` → NM_001145661.2 (GATA2, RefSeq, minus strand, chr3).
-- `annotation/tests/test_data_fake_genes.py:create_pten_transcript_version(genome_build)` → NM_000314.8 (PTEN, RefSeq, plus strand, chr10) - use with GATA2 to cover both orientations.
+- `genes/fake_data.py:create_fake_transcript_version(genome_build, release=None)` → `TranscriptVersion` ENST00000300305.7 (RUNX1, Ensembl, minus strand, chr21) with real exon data for GRCh37 and GRCh38; passing a `GeneAnnotationRelease` also links the symbol into that release. `tv.gene_version.gene_symbol` is the usual next step.
+- `genes/fake_data.py:create_gata2_transcript_version(genome_build)` → NM_001145661.2 (GATA2, RefSeq, minus strand, chr3).
+- `genes/fake_data.py:create_pten_transcript_version(genome_build)` → NM_000314.8 (PTEN, RefSeq, plus strand, chr10) - use with GATA2 to cover both orientations.
+- `genes/fake_data.py:create_fake_gene_version(genome_build, gene_id, gene_symbol_str, annotation_consortium)` and `insert_transcript_data(genome_build, data, gene_version, release=None)` → your own transcript from a cdot-style `data` dict (see the three above).
 - `mme/tests/fakes.py:make_gene_version(gene_id, symbol, annotation_consortium, version=1)` → `GeneVersion` on GRCh38; call twice with the same `gene_id` to model a symbol rename.
-- `annotation/fake_annotation.py:get_fake_annotation_version(genome_build)` → `AnnotationVersion` (the thing `Analysis.set_defaults_and_save` and most views need). Creates a `GeneAnnotationRelease` "42.20240101", the test ontology, an ACTIVE `VariantAnnotationVersion` (columns_version 2, gnomAD 2.1.1/3.1, dbNSFP 4.0a), a `ClinVarVersion` and an HPA version. Raises unless `settings.UNIT_TEST`. Call it once per build in `setUpTestData`.
-- `annotation/fake_annotation.py:retire_seeded_annotation_version(genome_build)` → None; demotes the runner-seeded ACTIVE `VariantAnnotationVersion` to HISTORICAL, for a test that creates its own ACTIVE one (only one per build is allowed).
-- `annotation/fake_annotation.py:get_fake_vep_version(genome_build, annotation_consortium, columns_version)` → dict of `VariantAnnotationVersion` kwargs (not saved); for tests that need a VAV at another `columns_version` - pair it with `FIXTURE_VEP_VERSIONS` and the `test_columns_version<N>_<build>.vep_annotated.vcf` fixtures in `annotation/tests/test_data/`.
-- `annotation/fake_annotation.py:create_fake_variant_annotation(variant, variant_annotation_version)` → `VariantAnnotation` (with its `AnnotationRangeLock` and `AnnotationRun`); only `hgvs_g` is filled, set other columns on the returned row.
-- `annotation/fake_annotation.py:create_fake_clinvar_data(clinvar_version)` → None; a `ClinVar` row (Pathogenic, 42/42 ids) on the first fake variant plus a PubMed `ClinVarCitation`; calls `create_fake_variants` itself.
+- `annotation/fake_data.py:get_fake_annotation_version(genome_build)` → `AnnotationVersion` (the thing `Analysis.set_defaults_and_save` and most views need). Creates a `GeneAnnotationRelease` "42.20240101", the test ontology, an ACTIVE `VariantAnnotationVersion` (columns_version 2, gnomAD 2.1.1/3.1, dbNSFP 4.0a), a `ClinVarVersion` and an HPA version. Raises unless `settings.UNIT_TEST` (`create_fake_annotation_version` is the same without the check, for the `create_fake_data annotation` step). Call it once per build in `setUpTestData`.
+- `annotation/fake_data.py:retire_seeded_annotation_version(genome_build)` → None; demotes the runner-seeded ACTIVE `VariantAnnotationVersion` to HISTORICAL, for a test that creates its own ACTIVE one (only one per build is allowed).
+- `annotation/fake_data.py:get_fake_vep_version(genome_build, annotation_consortium, columns_version)` → dict of `VariantAnnotationVersion` kwargs (not saved); for tests that need a VAV at another `columns_version` - pair it with `FIXTURE_VEP_VERSIONS` and the `test_columns_version<N>_<build>.vep_annotated.vcf` fixtures in `annotation/tests/test_data/`.
+- `annotation/fake_data.py:create_fake_variant_annotation(variant, variant_annotation_version)` → `VariantAnnotation` (with its `AnnotationRangeLock` and `AnnotationRun`); only `hgvs_g` is filled, set other columns on the returned row.
+- `annotation/fake_data.py:create_fake_clinvar_data(clinvar_version)` → None; a `ClinVar` row (Pathogenic, 42/42 ids) on the first fake variant plus a PubMed `ClinVarCitation`; calls `create_fake_variants` itself.
 - `ontology/tests/test_data_ontology.py:create_ontology_test_data()` → None; imports `ontology/tests/test_data/biomart_omim.tsv` and `small.owl` (OMIM + a small HPO). `create_test_ontology_version()` → `OntologyVersion`. Both already run inside `get_fake_annotation_version`.
 - `mme/tests/fakes.py:make_term(term_id, service, index, name)` → unsaved `OntologyTerm`.
 
 ### Classifications
 - `classification/models/classification.py:Classification.create(user, lab, lab_record_id=None, data=None, save=True, source=SubmissionSource.VARIANT_GRID, make_fields_immutable=False, populate_with_defaults=False, **kwargs)` → `Classification` with its first `ClassificationModification`; `data` is `{evidence_key: {"value": ...}}`. Marked deprecated in favour of `create_with_response`, but it is what every test uses. Needs the lab/user from `ClassificationTestUtils`.
 - `mme/tests/fakes.py:make_classification(lab, user, gene_symbol="BRCA1", share_level=ShareLevel.PUBLIC.value, clinical_significance=ClinicalSignificance.VUS, withdrawn=False, is_last_published=True)` → `Classification` with a deterministic latest published modification; defaults are MME-eligible, vary one argument to break one rule.
-- `classification/fake_reclassifications.py:FakeReclassifications` is the `manage.py create_fake_data reclassifications` subcommand (labs, curators, allele infos, classifications with multi-year histories); dev-box data for pages rather than a unit-test builder. `--delete` removes it.
+- `classification/fake_data/reclassifications.py:FakeReclassifications` is the `manage.py create_fake_data reclassifications` step (allele infos, classifications with multi-year histories), and `classification/fake_data/__init__.py:FakeClassifications` the `classifications` one (current records, agreeing / discordant / withdrawn); dev-box data for pages rather than unit-test builders. `--delete` removes each.
 
 ### Analyses, nodes, tags
 - `analysis/tests/utils.py:AnalysisSetupMixin` → mix into a `TestCase`: its `setUpTestData` sets `cls.grch37`, calls `get_fake_annotation_version`, and saves `cls.analysis` for a per-class user. Extend, then add samples/nodes.
 - By hand: `analysis = Analysis(genome_build=grch37); analysis.set_defaults_and_save(user)` (needs an `AnnotationVersion` for the build). Nodes are plain creates, `SampleNode.objects.create(analysis=analysis, sample=sample)`, `TrioNode.objects.create(analysis=..., trio=..., inheritance=...)`; chain with `child.add_parent(parent)` then `child.save()` (see `_create_child_node` in `analysis/tests/test_models.py`).
 - `analysis/tests/inheritance_node_mixin.py:InheritanceNodeTestsMixin` → shared inheritance-mode assertions for `TrioNode` / `QuadNode`; subclass sets `INHERITANCE`, `NODE_CLASS`, `REQUIRE_PARENT_ZYGOSITY`, `SHARED_ZYGOSITIES` and calls `cls.create_shared_variants(cgc)`. `DuoNode` has its own `analysis/tests/test_duo_node.py` - one parent means a different mode set and a `parent`-keyed zygosity table.
-- Tags: `Tag.objects.get_or_create(pk="artefact")[0]` then `VariantTag.objects.create(genome_build=, analysis=, variant=, tag=, user=)` (`analysis/tests/test_variant_tags.py`). `analysis/fake_variant_tags.py:FakeVariantTags` is the `create_fake_data tags` subcommand for dev boxes.
+- Tags: `Tag.objects.get_or_create(pk="artefact")[0]` then `VariantTag.objects.create(genome_build=, analysis=, variant=, tag=, user=)` (`analysis/tests/test_variant_tags.py`). `analysis/fake_data/variant_tags.py:FakeVariantTags` is the `create_fake_data tags` step for dev boxes.
 - `snpdb/tests/utils/tag_testing_utils.py:create_classify_queue_tag(tag_id="ToDo", bucket=AlleleOriginBucket.UNKNOWN)` → a live `Tag` with `requires_classification` set, for anything about the classify queue: the to-do lists, the "New Classification" buttons, tag resolution. The default bucket is "Both"; pass `AlleleOriginBucket.SOMATIC` for the somatic path. Name the tag for the property under test rather than reaching for the seeded `settings.TAG_REQUIRES_CLASSIFICATION` name.
 
 ### Mocks and recorded data

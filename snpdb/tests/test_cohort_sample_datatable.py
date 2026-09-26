@@ -2,9 +2,9 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls.base import resolve, reverse
 
+from snpdb.fake_data import create_fake_trio
 from snpdb.grids import CohortSampleListColumns
 from snpdb.models import Cohort, GenomeBuild, ImportStatus, Sample
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 class CohortSampleDatatableTests(TestCase):

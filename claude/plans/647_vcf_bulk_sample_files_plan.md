@@ -157,7 +157,7 @@ Add `sample.check_can_write(request.user)` at the top of its POST branch, the sa
 
 ## Tests
 
-New *snpdb/tests/test_vcf_sample_file_paths.py*, fixtures from `snpdb/tests/utils/fake_cohort_data.py:create_fake_cohort`
+New *snpdb/tests/test_vcf_sample_file_paths.py*, fixtures from `snpdb/fake_data.py:create_fake_cohort`
 (one VCF, samples `proband`/`mother`/`father`, permissions for the creating user). Give `proband` a `Patient` with a
 `patient_code` and `mother` a patient without one; leave `father` with none.
 

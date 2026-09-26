@@ -3,7 +3,7 @@ splice annotation and evidence - @see gene_level_strings_respace."""
 from django.core.management import call_command
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
     AnnotationRangeLock,

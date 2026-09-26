@@ -1,3 +1,8 @@
+"""
+Fake genes and transcripts: RUNX1 (Ensembl, minus strand), GATA2 (RefSeq, minus) and PTEN (RefSeq, plus), each with
+real exon data for GRCh37 and GRCh38 - the transcripts tests build on, and the 'create_fake_data genes' step, which
+makes them for a build that has no real gene annotation to place fake variants in.
+"""
 from genes.models import (
     Gene,
     GeneAnnotationImport,
@@ -11,10 +16,11 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium
+from library.fake_data import FakeData, FakeDataContext, register
 from snpdb.models import GenomeBuild
 
 
-def _create_fake_gene_version(genome_build: GenomeBuild, gene_id, gene_symbol_str, annotation_consortium):
+def create_fake_gene_version(genome_build: GenomeBuild, gene_id, gene_symbol_str, annotation_consortium):
     gene_symbol = GeneSymbol.objects.get_or_create(symbol=gene_symbol_str)[0]
     gene, _ = Gene.objects.get_or_create(identifier=gene_id,
                                          annotation_consortium=annotation_consortium)
@@ -25,7 +31,7 @@ def _create_fake_gene_version(genome_build: GenomeBuild, gene_id, gene_symbol_st
     return gene_version
 
 
-def _insert_transcript_data(genome_build, data: dict, gene_version: GeneVersion,
+def insert_transcript_data(genome_build, data: dict, gene_version: GeneVersion,
                             release: GeneAnnotationRelease = None):
     build_data = data["genome_builds"][genome_build.name]
     contig = genome_build.chrom_contig_mappings[build_data["contig"]]
@@ -56,7 +62,7 @@ def _insert_transcript_data(genome_build, data: dict, gene_version: GeneVersion,
 def create_fake_transcript_version(genome_build: GenomeBuild,
                                    release: GeneAnnotationRelease = None) -> TranscriptVersion:
 
-    gene_version = _create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
+    gene_version = create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
 
     data = {
         "id": "ENST00000300305.7",
@@ -80,12 +86,12 @@ def create_fake_transcript_version(genome_build: GenomeBuild,
         "cds_start": 34792134,
     }
     data["genome_builds"] = {genome_build.name: build_data}
-    return _insert_transcript_data(genome_build, data, gene_version, release)
+    return insert_transcript_data(genome_build, data, gene_version, release)
 
 
 def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
 
-    gene_version = _create_fake_gene_version(genome_build, "2624", "GATA2", AnnotationConsortium.REFSEQ)
+    gene_version = create_fake_gene_version(genome_build, "2624", "GATA2", AnnotationConsortium.REFSEQ)
     nm_001145661_2 = {"id": "NM_001145661.2",
                       "cdot": "0.2.17",
                       "hgnc": "4171",
@@ -121,13 +127,13 @@ def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
                               "cds_end": 128487031,
                               "cds_start": 128481018}}}
 
-    return _insert_transcript_data(genome_build, nm_001145661_2, gene_version)
+    return insert_transcript_data(genome_build, nm_001145661_2, gene_version)
 
 
 def create_gata2_as1_transcript_version(genome_build) -> TranscriptVersion:
     """ Non-coding (lnc_RNA) transcript, GRCh37 only """
 
-    gene_version = _create_fake_gene_version(genome_build, "101927167", "GATA2-AS1", AnnotationConsortium.REFSEQ)
+    gene_version = create_fake_gene_version(genome_build, "101927167", "GATA2-AS1", AnnotationConsortium.REFSEQ)
     nr_125398_1 = {"id": "NR_125398.1",
                    "cdot": "0.2.34",
                    "hgnc": "51108",
@@ -142,13 +148,13 @@ def create_gata2_as1_transcript_version(genome_build) -> TranscriptVersion:
                            "contig": "NC_000003.11",
                            "strand": "+"}}}
 
-    return _insert_transcript_data(genome_build, nr_125398_1, gene_version)
+    return insert_transcript_data(genome_build, nr_125398_1, gene_version)
 
 
 def create_pten_transcript_version(genome_build) -> TranscriptVersion:
     """ Plus strand - GATA2 above is minus, so the pair covers both orientations """
 
-    gene_version = _create_fake_gene_version(genome_build, "5728", "PTEN", AnnotationConsortium.REFSEQ)
+    gene_version = create_fake_gene_version(genome_build, "5728", "PTEN", AnnotationConsortium.REFSEQ)
     nm_000314_8 = {"id": "NM_000314.8",
                    "cdot": "0.2.17",
                    "hgnc": "9588",
@@ -188,4 +194,44 @@ def create_pten_transcript_version(genome_build) -> TranscriptVersion:
                            "cds_end": 87965472,
                            "cds_start": 87864469}}}
 
-    return _insert_transcript_data(genome_build, nm_000314_8, gene_version)
+    return insert_transcript_data(genome_build, nm_000314_8, gene_version)
+
+
+# When the build has real gene annotation, fake variants go in real genes that tagging and classification
+# are busiest in (the steps that use them each prefer their own subset)
+WELL_KNOWN_GENES = [
+    "TP53", "KRAS", "NRAS", "BRAF", "EGFR", "PIK3CA", "KIT", "JAK2", "DNMT3A", "TET2", "ASXL1", "RUNX1", "IDH1",
+    "IDH2", "FLT3", "NPM1", "SF3B1", "CALR", "PTEN", "SMAD4", "BRCA1", "BRCA2", "ATM", "MSH2", "MLH1", "MSH6",
+    "PMS2", "PALB2", "CHEK2", "APC", "CFTR", "TTN", "MYBPC3", "RYR1", "DMD", "FBN1", "NF1", "LDLR", "SCN1A",
+    "COL4A5", "STK11", "CDH1", "RB1", "VHL", "RET", "SDHB", "MUTYH", "BMPR1A",
+]
+
+
+def has_real_gene_annotation(genome_build: GenomeBuild) -> bool:
+    return GeneAnnotationRelease.objects.filter(genome_build=genome_build) \
+        .exclude(gene_annotation_import__url="fake").exists()
+
+
+@register
+class FakeGenes(FakeData):
+    name = "genes"
+    help = ("RUNX1, GATA2 and PTEN transcripts, when the build has no real gene annotation - "
+            "otherwise later steps use real, well known genes")
+
+    def create(self, context: FakeDataContext, **options):
+        genome_build = context.genome_build
+        if has_real_gene_annotation(genome_build):
+            context.genes = WELL_KNOWN_GENES
+            context.stdout.write(f"{genome_build} has real gene annotation - using {len(context.genes)} real genes")
+            return
+
+        if genome_build.name not in ("GRCh37", "GRCh38"):
+            raise ValueError(f"The fake transcripts only have exons for GRCh37 and GRCh38, not {genome_build}")
+        transcript_versions = [create_fake_transcript_version(genome_build),
+                               create_gata2_transcript_version(genome_build),
+                               create_pten_transcript_version(genome_build)]
+        context.genes = [tv.gene_version.gene_symbol_id for tv in transcript_versions]
+        context.stdout.write(f"Fake transcripts for {', '.join(context.genes)}")
+
+    def delete(self, context: FakeDataContext, **options):
+        context.stdout.write("Leaving the fake transcripts - tests and the fake annotation version build on them")

@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from snpdb.grid_columns.custom_columns import get_variant_grid_columns
 from snpdb.models import (
     CompositeColumnMember,

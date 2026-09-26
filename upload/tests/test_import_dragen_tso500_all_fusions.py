@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
 from genes.models import GeneFusion, GeneLevelId
 from genes.tests.gene_fusion_test_utils import create_gene_fusion

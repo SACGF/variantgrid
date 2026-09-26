@@ -25,32 +25,30 @@ from analysis.grid_export import (
     get_node_export_basename,
     node_grid_get_export_iterator,
 )
-from analysis.grids import ExportVariantGrid
+from analysis.grids import ExportVariantGrid, VariantGrid
 from analysis.models import Analysis
 from analysis.models.enums import NodeStatus
+from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
-from analysis.models.models_variant_tag import VariantTag
 from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_node_to_downloadable_file,
 )
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.models import CanonicalTranscriptCollection, GeneSymbol
+from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
-from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag, VCFInfo
-from snpdb.models.models_enums import VCFInfoTypes
-from snpdb.models.models_cohort import CohortGenotypeCollection
-from snpdb.models.models_enums import CohortGenotypeCollectionType
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
-from analysis.grids import VariantGrid
-from genes.models import CanonicalTranscriptCollection, GeneSymbol
-from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.genomics.vcf_writer import percent_encode_info_value
-from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
+from snpdb.fake_data import create_fake_cohort
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
+from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag, VCFInfo
+from snpdb.models.models_cohort import CohortGenotypeCollection
+from snpdb.models.models_enums import CohortGenotypeCollectionType, VCFInfoTypes
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
 
 # (contig name, position) - deliberately out of both PK order and contig-name string order, so an
 # export that leaks either shows up as a difference

@@ -10,7 +10,7 @@ from django.db.migrations.loader import MigrationLoader
 from django.test.runner import DiscoverRunner
 
 import library.genomics.fasta_wrapper as fasta_wrapper
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.tests.utils.mock_transcript_sequence_retrieval import MockTranscriptSequenceFetcher
 from genes.transcript_sequence_retrieval import TranscriptSequenceFetcher
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI

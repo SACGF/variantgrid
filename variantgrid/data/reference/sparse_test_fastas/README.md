@@ -33,3 +33,9 @@ The recording runner logs every fasta region the suite reads (override the outpu
 path with `VG_FASTA_REGIONS_FILE`); the generator rebuilds the sparse fastas from
 those regions and verifies each one round-trips byte-identically against the real
 fasta before it finishes.
+
+A recording on one machine can miss regions the committed files carry (2026-09: a
+fresh GRCh37 recording on vg-test2 came out smaller than the committed file). To
+only add regions, append the committed file's non-`N` runs to the regions file as
+extra `[real fasta, contig, start, end]` lines before generating, and replace just
+the build whose regions changed.

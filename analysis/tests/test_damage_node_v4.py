@@ -3,7 +3,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     create_fake_variant_annotation,
     create_fake_variants,
     get_fake_annotation_settings_dict,

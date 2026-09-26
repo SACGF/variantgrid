@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
 from ontology.tests.test_data_ontology import create_test_ontology_version

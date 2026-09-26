@@ -161,7 +161,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 
 ## Tests (`claude/guides/testing.md`)
 
-Fixtures: `annotation/fake_annotation.py:get_fake_vep_version` via the `_make_vav` helper in
+Fixtures: `annotation/fake_data.py:get_fake_vep_version` via the `_make_vav` helper in
 `annotation/tests/test_variant_annotation_version_status.py`; runs from `_make_lock` / `_lease` in
 `annotation/tests/test_annotation_dispatch.py`; eager `annotate_variants` with the VEP stage patched as in
 `annotation/tests/test_annotation_run_lease_abort.py`.

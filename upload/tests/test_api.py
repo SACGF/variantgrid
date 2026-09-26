@@ -13,10 +13,10 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from analysis.models import AnalysisTemplate
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CachedGeneratedFile, GenomeBuild
 from snpdb.models.models_enums import ImportSource, ProcessingStatus
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline
 
 METRICS_OUTPUT_ORIG = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",

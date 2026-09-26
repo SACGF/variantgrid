@@ -11,7 +11,7 @@ class ArchivePartitionDataAdminMixin:
     """ Adds an "Archive partition data" admin action to any ModelAdmin
         whose model uses DataArchiveMixin + RelatedModelsPartitionModel.
 
-        @see claude/issue_1537_archive_plan.md
+        @see https://github.com/SACGF/variantgrid/issues/1537
     """
 
     @admin_action("Archive partition data")

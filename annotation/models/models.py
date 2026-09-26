@@ -5,8 +5,7 @@ VariantAnnotationVersion); AnnotationVersion bundles one of each per build and i
 AnnotationRangeLock / AnnotationRun are one batch of variants through VEP; VariantAnnotation (the
 representative transcript row) and VariantTranscriptAnnotation (every transcript) hold the columns
 VEPColumnDef writes. Query a version's rows through annotation/annotation_version_querysets.py,
-never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py;
-annotation/AGENTS.md has the rules. Large: use `scripts/vg outline`.
+never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py.
 """
 import logging
 import os

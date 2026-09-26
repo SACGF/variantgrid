@@ -4,7 +4,7 @@ resources off) with _test_urls / _test_datatable_urls / _test_autocomplete_urls 
 checks, production_query_count (drops savepoints and the tables production caches),
 frozen_cache_expiry (so two requests' counts can be compared), and QueryProfilingClient which
 appends per-GET query stats when VG_QUERY_PROFILE is set (stacks for matching SQL under
-VG_QUERY_TRACE). `vg page --queries` reuses the same counting.
+VG_QUERY_TRACE).
 """
 import json
 import logging

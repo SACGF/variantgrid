@@ -330,7 +330,7 @@ MME_FROM_EMAIL = None
 # --- Beacon v2 ------------------------------------------------------------
 # GA4GH Beacon v2 genomic data-sharing endpoint (#1661). Variant-centric discovery:
 # "does this database contain an allele at chrom:pos ref>alt on assembly?", tiered
-# (boolean -> count -> record) by requester permission. See claude/beacon_v2_plan.md.
+# (boolean -> count -> record) by requester permission.
 # Off everywhere by default; only vgaws.py (prod) and vgtest2.py (test) turn it on.
 BEACON_ENABLED = False
 BEACON_CONFIG = {

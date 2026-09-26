@@ -13,7 +13,6 @@ from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
-from analysis.tests.inheritance_node_mixin import make_cohort_genotype
 from analysis.variant_tag_operations import (
     VARIANT_TAG_CLASSIFIED,
     classification_resolves_tag,
@@ -21,14 +20,14 @@ from analysis.variant_tag_operations import (
     resolve_requires_classification_tags_for_samples,
     resolve_variant_tag,
 )
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationReportTemplate, ReportNames
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models import Patient
 from patients.models_enums import SampleSourceLevel
+from snpdb.fake_data import create_fake_cohort, create_fake_trio, make_cohort_genotype
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
 # The mandatory keys - a record missing any of them has errors, so the form will not submit it

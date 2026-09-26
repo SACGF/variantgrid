@@ -3,15 +3,15 @@ import unittest
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.enums.titles import Title
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import (
     Clinician,
-    Extraction,
     ExternalModelManager,
     ExternalPK,
+    Extraction,
     Patient,
     PatientImport,
     PatientRecords,

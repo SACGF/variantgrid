@@ -16,7 +16,8 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import (
+from annotation.annotation_run_files import get_annotsv_dir
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
@@ -28,12 +29,11 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.pipelines import get_runner
+from annotation.pipelines.vep import VEPRunner
 from annotation.signals.annotation_run_cleanup import remove_annotation_run_output
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from annotation.tasks import annotation_scheduler_task
-from annotation.annotation_run_files import get_annotsv_dir
-from annotation.pipelines import get_runner
-from annotation.pipelines.vep import VEPRunner
 from annotation.tasks.annotate_variants import (
     _cleanup_reclaimed_run_files,
     annotate_variants,

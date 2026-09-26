@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from analysis.grids import VariantGrid
 from analysis.models import AllVariantsNode, Analysis
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils import FakeRequest
 from snpdb.models import GenomeBuild
 

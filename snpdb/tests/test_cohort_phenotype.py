@@ -14,8 +14,8 @@ from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import Cohort, GenomeBuild, ImportStatus
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 RAISED_TSH = "Raised TSH"
 RAISED_TSH_HPO = "HP:0002925"

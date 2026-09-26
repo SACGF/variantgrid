@@ -5,8 +5,6 @@ Backfill VariantAnnotation columns from an annotated VCF (#1675).
 --dump writes the variants already annotated in a version to a VCF carrying variant_id in INFO; the
 operator annotates that file however suits the column (bcftools annotate against a COSMIC VCF, or VEP);
 --import reads it back and updates the named columns.
-
-See claude/plans/1675_backfill_annotation_column_plan.md.
 """
 import os
 

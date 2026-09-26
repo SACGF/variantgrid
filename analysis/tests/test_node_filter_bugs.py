@@ -10,7 +10,7 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.utils import AnalysisSetupMixin
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
+from snpdb.fake_data import create_fake_cohort
 
 # ---------------------------------------------------------------------------
 # AbstractZygosityCountNode - max_count=0

@@ -3,7 +3,7 @@ from django.test import TestCase, override_settings
 from analysis.models import AllVariantsNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_annotation import create_fake_variants
+from annotation.fake_data import create_fake_variants
 from snpdb.models import Variant
 
 
