@@ -200,6 +200,12 @@ raise them on your own without permission. Draft the title/summary in chat and a
 explicitly asked to. Before proposing a new one, check for an existing issue that already covers it and suggest
 commenting there instead.
 
+Issues in the private repos - `SACGF/variantgrid_private`, `SACGF/variantgrid_sapath`, the Shariant repos
+(`SACGF/variantgrid_shariant`, `SACGF/shariant-admin`) and any other private SACGF repo - can carry private details of
+labs, patients or variants: don't open, read or search them unless I hand you a specific
+issue, and then read only that one. When searching across the org, restrict it to the public repos
+(`gh search issues --repo SACGF/variantgrid`, not `--owner SACGF`). The public `SACGF/variantgrid` is fine to read.
+
 ### Plans and implementation prompts
 Plans live in `claude/plans/<issue>_<slug>_plan.md`; the format (model line, `Status:`, models first) and how to draft a
 prompt for an agent to implement one are in `claude/plans/AGENTS.md`.
