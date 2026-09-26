@@ -1,11 +1,10 @@
 """
 Fake germline classifications with a curation history, so the reclassification analytics page has
-something to render. Run via 'manage.py create_fake_data reclassifications' - @see
-https://github.com/SACGF/variantgrid/issues/1790
+something to render: the 'create_fake_data reclassifications' step (@see https://github.com/SACGF/variantgrid/issues/1790),
+curated by the fake users at the fake labs on the fake variants.
 
-Everything created is obviously fake (labs and users are all 'Fake ...' / 'fake_...', and every record's
-lab_record_id starts with 'fake-recl-') so it can't be mistaken for real curation, and '--delete' takes it
-all away again.
+Everything created is obviously fake (every record's lab_record_id starts with 'fake-recl-') so it can't be
+mistaken for real curation, and '--delete' takes it all away again.
 
 The page reads ReclassificationEvent, which is derived from published modification history rather than
 written directly, so this builds the history the derivation expects - a chain of published
@@ -25,32 +24,42 @@ criteria that flip are the ones that would actually justify the direction travel
 """
 import random
 from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from django.contrib.auth.models import Group, Permission, User
-from django.contrib.contenttypes.models import ContentType
-from django.db import transaction
 from django.utils.timezone import get_current_timezone, now
-from guardian.models import GroupObjectPermission
 
-from annotation.fake_data import get_variant_ids_by_gene, zipf_weight
-from classification.enums import (AlleleOriginBucket, ClinicalSignificance, CriteriaEvaluation, ShareLevel,
-                                  SpecialEKeys, SubmissionSource)
-from classification.models import (Classification, ClassificationModification, ClassificationSummaryCalculator,
-                                   EvidenceKeyMap, ImportedAlleleInfo, ReclassificationEvent,
-                                   ReclassificationEventBuilder, ResolvedVariantInfo)
-from classification.models.classification_grouping import (AlleleOriginGrouping, ClassificationGrouping,
-                                                           ClassificationGroupingEntry)
-from classification.models.classification_variant_info_models import ImportedAlleleInfoStatus
-from library.guardian_utils import all_users_group
-from snpdb.models import (Allele, AlleleConversionTool, AlleleOrigin, GenomeBuild, GenomeBuildPatchVersion, Lab,
-                          Organization, VariantAllele)
+from classification.enums import (
+    AlleleOriginBucket,
+    ClinicalSignificance,
+    CriteriaEvaluation,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+)
+from classification.fake_data.shared import (
+    assign_all_users_permissions,
+    create_fake_allele_infos,
+    delete_fake_classifications,
+    keeping_our_timestamps,
+)
+from classification.models import (
+    Classification,
+    ClassificationModification,
+    ClassificationSummaryCalculator,
+    EvidenceKeyMap,
+    ReclassificationEvent,
+    ReclassificationEventBuilder,
+)
+from classification.models.classification_grouping import (
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+)
+from library.fake_data import FakeData, FakeDataContext, in_preferred_order, register, zipf_weight
+from snpdb.fake_data import GERMLINE, SOMATIC
+from snpdb.models import Lab
 
-FAKE_PREFIX = "fake"
-FAKE_ORGANIZATION_GROUP = f"{FAKE_PREFIX}_curation_network"
 LAB_RECORD_PREFIX = "fake-recl-"
 SOMATIC_LAB_RECORD_PREFIX = f"{LAB_RECORD_PREFIX}som-"
 BATCH_SIZE = 2000
@@ -64,35 +73,19 @@ INITIAL_SPREAD = 0.35
 
 @dataclass(frozen=True)
 class FakeCurationLab:
-    name: str
+    """ How one of the fake labs (made by "people") curates """
     weight: float
     """ Share of the classifications """
     review_rate: float
     """ Multiplier on how often this lab revisits a record - drives the spread on the by-lab chart """
     move_rate: float = 1.0
     """ Multiplier on how often one of its reviews changes the call """
-    external: bool = False
-
-    @property
-    def group_name(self) -> str:
-        slug = self.name.lower().replace(" ", "_")
-        return f"{FAKE_ORGANIZATION_GROUP}/{slug}"
 
 
-FAKE_LABS = [
-    FakeCurationLab("Fake Diagnostic Genetics", weight=10, review_rate=1.0),
-    FakeCurationLab("Fake Molecular Pathology", weight=6, review_rate=1.7, move_rate=0.8),
-    FakeCurationLab("Fake Rare Disease Service", weight=4, review_rate=0.5, move_rate=1.4),
-    FakeCurationLab("Fake Partner Laboratory", weight=3, review_rate=0.8, external=True),
-]
-
-FAKE_CURATORS = [
-    "fake_curator_nadia",
-    "fake_curator_omar",
-    "fake_curator_priya",
-    "fake_curator_quinn",
-    "fake_curator_reuben",
-]
+CURATION_BY_LAB_FOCUS = {
+    GERMLINE: FakeCurationLab(weight=10, review_rate=1.0),
+    SOMATIC: FakeCurationLab(weight=6, review_rate=1.7, move_rate=0.8),
+}
 
 
 @dataclass(frozen=True)
@@ -127,8 +120,8 @@ SIGNIFICANCE_SCALE = [
     ClinicalSignificance.PATHOGENIC,
 ]
 
-# Real gene symbols (they need annotated variants to join against), longest tail first - the VUS burden
-# chart is only interesting if a few genes carry far more of it than the rest
+# The genes to curate, longest tail first - the VUS burden chart is only interesting if a few genes carry far
+# more of it than the rest. Out of those the fake variants are in, or all of them when it's none of these
 GENES = ["TTN", "BRCA2", "BRCA1", "ATM", "APC", "MSH6", "NF1", "PMS2", "MLH1", "MSH2",
          "PALB2", "CHEK2", "JAK2", "RYR1", "CFTR", "DMD", "FBN1", "MYBPC3", "SCN1A", "LDLR",
          "COL4A5", "TP53", "PTEN", "STK11", "CDH1", "RB1", "VHL", "RET", "SDHB", "MUTYH", "BMPR1A"]
@@ -245,16 +238,15 @@ class FakeStep:
     evidence: dict
 
 
-class FakeReclassifications:
-    HELP = ("Classifications with a curation history - germline for the reclassification analytics page, "
+@register
+class FakeReclassifications(FakeData):
+    name = "reclassifications"
+    help = ("Classifications with a curation history - germline for the reclassification analytics page, "
             "somatic clustered onto shared alleles")
+    requires = ("people", "variants")
 
-    def __init__(self, stdout):
-        self.stdout = stdout
-
-    @staticmethod
-    def add_arguments(parser):
-        parser.add_argument("--genome-build", default="GRCh38")
+    @classmethod
+    def add_arguments(cls, parser):
         parser.add_argument("--classifications", type=int, default=500,
                             help="Germline classifications, one allele each")
         parser.add_argument("--somatic-classifications", type=int, default=200,
@@ -267,68 +259,55 @@ class FakeReclassifications:
                             help="History spans this many years back from today")
         parser.add_argument("--adjacent-percent", type=float, default=85,
                             help="Share of moves that go to the neighbouring bucket rather than further")
-        parser.add_argument("--seed", type=int, default=1790)
 
-    def create(self, **options):
-        genome_build = GenomeBuild.get_name_or_alias(options["genome_build"])
-        random.seed(options["seed"])
-        self.stdout.write(f"Creating {options['classifications']} germline and about "
-                          f"{options['somatic_classifications']} somatic fake classifications in {genome_build}")
+    def create(self, context: FakeDataContext, **options):
+        if Classification.objects.filter(lab_record_id__startswith=LAB_RECORD_PREFIX).exists():
+            context.stdout.write("Fake reclassifications already exist")
+            return
 
-        labs, curators = self._create_labs_and_curators()
-        groups = self._pick_groups(genome_build, labs, options)
+        random.seed(context.seed)
+        context.stdout.write(f"Creating {options['classifications']} germline and about "
+                             f"{options['somatic_classifications']} somatic fake classifications")
+
+        labs = dict(zip((GERMLINE, SOMATIC), context.labs))
+        groups = self._pick_groups(context, labs, options)
         records = [record for group in groups for record in group.records]
         _build_histories(records, options["adjacent_percent"] / 100)
 
-        self._create_allele_infos(genome_build, groups)
-        self._create_classifications(records, curators)
-        modifications = self._create_modifications(records, curators)
-        self._assign_permissions(records, modifications)
-        self._summarise_and_group(records)
-        self._build_timelines(records)
+        allele_infos = create_fake_allele_infos(context.genome_build,
+                                                [(group.variant_id, group.gene_symbol) for group in groups])
+        for group, allele_info in zip(groups, allele_infos):
+            for record in group.records:
+                record.allele_info_id = allele_info.pk
+        context.stdout.write(f"Created {len(allele_infos)} allele infos")
 
-    def _create_labs_and_curators(self) -> tuple[dict[str, Lab], list[User]]:
-        organization, _ = Organization.objects.get_or_create(
-            group_name=FAKE_ORGANIZATION_GROUP,
-            defaults={"name": "Fake Curation Network", "short_name": "FakeCuration"})
+        self._create_classifications(context, records)
+        modifications = self._create_modifications(context, records)
+        num_permissions = assign_all_users_permissions(Classification, [r.classification_id for r in records])
+        num_permissions += assign_all_users_permissions(ClassificationModification, [m.pk for m in modifications])
+        context.stdout.write(f"Created {num_permissions} group permissions")
+        self._summarise_and_group(context, records)
+        self._build_timelines(context, records)
 
-        labs = {}
-        lab_groups = []
-        for fake_lab in FAKE_LABS:
-            lab, _ = Lab.objects.get_or_create(
-                group_name=fake_lab.group_name,
-                defaults={"name": fake_lab.name, "city": "Faketown", "organization": organization,
-                          "external": fake_lab.external})
-            labs[fake_lab.name] = lab
-            lab_groups.append(Group.objects.get_or_create(name=lab.group_name)[0])
-
-        curators = []
-        for username in FAKE_CURATORS:
-            user, created = User.objects.get_or_create(username=username,
-                                                       defaults={"first_name": "Fake", "is_active": False})
-            if created:
-                user.groups.add(all_users_group(), *lab_groups)
-            curators.append(user)
-        return labs, curators
-
-    def _pick_groups(self, genome_build: GenomeBuild, labs: dict[str, Lab], options: dict) -> list[FakeAlleleGroup]:
-        """ Real variants, so the gene chart has real symbols and the records link somewhere sensible """
-        variant_ids_by_gene = get_variant_ids_by_gene(genome_build, GENES, without_alleles=True)
+    @staticmethod
+    def _pick_groups(context: FakeDataContext, labs: dict[str, Lab], options: dict) -> list[FakeAlleleGroup]:
+        """ Annotated variants, so the gene chart has gene symbols and the records link somewhere sensible """
+        genes = in_preferred_order(GENES, context.genes)
         years = options["years"]
         period_start = _period_start(years)
         initial_window = INITIAL_SPREAD * years * 365
         per_grouping = max(1, options["somatic_per_grouping"])
         somatic_clusters = round(options["somatic_classifications"] / per_grouping)
-        total_weight = sum(zipf_weight(i) for i in range(len(GENES)))
+        total_weight = sum(zipf_weight(i) for i in range(len(genes)))
 
         groups = []
-        for index, gene_symbol in enumerate(GENES):
+        for index, gene_symbol in enumerate(genes):
             gene_share = zipf_weight(index) / total_weight
-            available = variant_ids_by_gene.get(gene_symbol, [])
+            available = context.variant_ids_by_gene.get(gene_symbol, [])
             germline_wanted = round(options["classifications"] * gene_share)
             wanted = germline_wanted + round(somatic_clusters * gene_share)
             if len(available) < wanted:
-                self.stdout.write(f"{gene_symbol}: only {len(available)} annotated variants, wanted {wanted}")
+                context.stdout.write(f"{gene_symbol}: only {len(available)} annotated variants, wanted {wanted}")
                 wanted = len(available)
                 germline_wanted = min(germline_wanted, wanted)
             chosen = random.sample(available, wanted)
@@ -342,49 +321,18 @@ class FakeReclassifications:
 
         somatic_groups = [group for group in groups if group.records[0].somatic]
         somatic_records = sum(len(group.records) for group in somatic_groups)
-        self.stdout.write(f"{len(groups) - len(somatic_groups)} germline records, {somatic_records} somatic "
-                          f"records in {len(somatic_groups)} clusters, over {len(variant_ids_by_gene)} genes")
+        context.stdout.write(f"{len(groups) - len(somatic_groups)} germline records, {somatic_records} somatic "
+                             f"records in {len(somatic_groups)} clusters, over {len(genes)} genes")
         return groups
 
-    def _create_allele_infos(self, genome_build: GenomeBuild, groups: list[FakeAlleleGroup]):
-        """ The gene chart reads gene_symbol off the allele info, and a record only reaches the
-            classification listing once it has an allele to be grouped under """
-        patch_version = GenomeBuildPatchVersion.get_or_create(genome_build.name)
-        alleles = Allele.objects.bulk_create([Allele() for _ in groups], batch_size=BATCH_SIZE)
-        VariantAllele.objects.bulk_create([
-            VariantAllele(variant_id=group.variant_id, genome_build=genome_build, allele=allele,
-                          origin=AlleleOrigin.IMPORTED_TO_DATABASE,
-                          allele_linking_tool=AlleleConversionTool.SAME_CONTIG)
-            for group, allele in zip(groups, alleles)], batch_size=BATCH_SIZE)
-
-        allele_infos = ImportedAlleleInfo.objects.bulk_create([
-            ImportedAlleleInfo(imported_c_hgvs=f"{group.gene_symbol}:c.{group.variant_id}A>G",
-                               imported_genome_build_patch_version=patch_version,
-                               allele=allele,
-                               status=ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS)
-            for group, allele in zip(groups, alleles)], batch_size=BATCH_SIZE)
-
-        variant_infos = ResolvedVariantInfo.objects.bulk_create([
-            ResolvedVariantInfo(allele_info=allele_info, genome_build=genome_build,
-                                variant_id=group.variant_id, gene_symbol_id=group.gene_symbol,
-                                resolved_hgvs=allele_info.imported_c_hgvs)
-            for group, allele_info in zip(groups, allele_infos)], batch_size=BATCH_SIZE)
-
-        build_field = "grch38" if genome_build.name == "GRCh38" else "grch37"
-        for group, allele_info, variant_info in zip(groups, allele_infos, variant_infos):
-            setattr(allele_info, build_field, variant_info)
-            for record in group.records:
-                record.allele_info_id = allele_info.pk
-        ImportedAlleleInfo.objects.bulk_update(allele_infos, [build_field], batch_size=BATCH_SIZE)
-        self.stdout.write(f"Created {len(allele_infos)} alleles and allele infos")
-
-    def _create_classifications(self, records: list[FakeRecord], curators: list[User]):
+    @staticmethod
+    def _create_classifications(context: FakeDataContext, records: list[FakeRecord]):
         classifications = []
         for index, record in enumerate(records):
             latest = record.steps[-1]
             prefix = SOMATIC_LAB_RECORD_PREFIX if record.somatic else LAB_RECORD_PREFIX
             classifications.append(Classification(
-                user=random.choice(curators), lab=record.lab_obj,
+                user=random.choice(context.users), lab=record.lab_obj,
                 lab_record_id=f"{prefix}{index + 1}",
                 allele_info_id=record.allele_info_id,
                 evidence=latest.evidence,
@@ -393,17 +341,17 @@ class FakeReclassifications:
                 share_level=ShareLevel.ALL_USERS.key,
                 created=record.started, modified=latest.published_on))
 
-        with _keeping_our_timestamps(Classification):
+        with keeping_our_timestamps(Classification):
             Classification.objects.bulk_create(classifications, batch_size=BATCH_SIZE)
         for record, classification in zip(records, classifications):
             record.classification_id = classification.pk
-        self.stdout.write(f"Created {len(classifications)} classifications")
+        context.stdout.write(f"Created {len(classifications)} classifications")
 
-    def _create_modifications(self, records: list[FakeRecord],
-                              curators: list[User]) -> list[ClassificationModification]:
+    @staticmethod
+    def _create_modifications(context: FakeDataContext, records: list[FakeRecord]) -> list[ClassificationModification]:
         modifications = []
         for record in records:
-            curator = random.choice(curators)
+            curator = random.choice(context.users)
             for position, step in enumerate(record.steps):
                 modifications.append(ClassificationModification(
                     classification_id=record.classification_id, user=curator,
@@ -415,29 +363,13 @@ class FakeReclassifications:
                     is_last_edited=position == len(record.steps) - 1,
                     created=step.published_on, modified=step.published_on))
 
-        with _keeping_our_timestamps(ClassificationModification):
+        with keeping_our_timestamps(ClassificationModification):
             ClassificationModification.objects.bulk_create(modifications, batch_size=BATCH_SIZE)
-        self.stdout.write(f"Created {len(modifications)} published modifications")
+        context.stdout.write(f"Created {len(modifications)} published modifications")
         return modifications
 
-    def _assign_permissions(self, records: list[FakeRecord], modifications: list[ClassificationModification]):
-        """ bulk_create skips the mixin's save(), and everyone can see (and clean up) fake data """
-        group = all_users_group()
-        total = 0
-        for klass, objects in ((Classification, [r.classification_id for r in records]),
-                               (ClassificationModification, [m.pk for m in modifications])):
-            content_type = ContentType.objects.get_for_model(klass)
-            permissions = Permission.objects.filter(content_type=content_type,
-                                                    codename__in=[klass.get_read_perm(), klass.get_write_perm()])
-            for permission in permissions:
-                for i in range(0, len(objects), BATCH_SIZE):
-                    GroupObjectPermission.objects.bulk_create(
-                        [GroupObjectPermission(group=group, permission=permission, content_type=content_type,
-                                               object_pk=str(pk)) for pk in objects[i:i + BATCH_SIZE]])
-                    total += len(objects[i:i + BATCH_SIZE])
-        self.stdout.write(f"Created {total} group permissions")
-
-    def _summarise_and_group(self, records: list[FakeRecord]):
+    @staticmethod
+    def _summarise_and_group(context: FakeDataContext, records: list[FakeRecord]):
         """ The classification listing renders groupings, and both they and the summary they read are
             derived from the published modifications the same way an import would leave them """
         modifications_qs = ClassificationModification.objects \
@@ -453,71 +385,24 @@ class FakeReclassifications:
 
         for classification in classifications:
             ClassificationGrouping.assign_grouping_for_classification(classification)
-        for grouping in ClassificationGrouping.objects.filter(dirty=True).iterator():
-            grouping.update()
-        for allele_origin_grouping in AlleleOriginGrouping.objects.filter(dirty=True).iterator():
-            allele_origin_grouping.update()
+        ClassificationGrouping.update_all_dirty()
 
         groupings = ClassificationGroupingEntry.objects.filter(classification__in=classifications) \
             .values("grouping").distinct().count()
-        self.stdout.write(f"Summarised {len(classifications)} classifications into {groupings} groupings")
+        context.stdout.write(f"Summarised {len(classifications)} classifications into {groupings} groupings")
 
-    def _build_timelines(self, records: list[FakeRecord]):
+    @staticmethod
+    def _build_timelines(context: FakeDataContext, records: list[FakeRecord]):
         """ Same call the analytics page makes, so what it renders is what a real import would have left """
         classification_qs = Classification.objects.filter(pk__in=[r.classification_id for r in records])
         events = ReclassificationEventBuilder.rebuild(classification_qs)
         reclassifications = ReclassificationEvent.reclassifications_qs() \
             .filter(classification__in=classification_qs).count()
-        self.stdout.write(f"Built {events} timeline events, {reclassifications} of them reclassifications")
+        context.stdout.write(f"Built {events} timeline events, {reclassifications} of them reclassifications")
 
-    @transaction.atomic
-    def delete(self, **_options):
+    def delete(self, context: FakeDataContext, **options):
         classifications_qs = Classification.objects.filter(lab_record_id__startswith=LAB_RECORD_PREFIX)
-        classification_ids = list(classifications_qs.values_list("pk", flat=True))
-        modification_ids = list(ClassificationModification.objects
-                                .filter(classification__in=classifications_qs).values_list("pk", flat=True))
-        allele_info_ids = [pk for pk in classifications_qs.values_list("allele_info_id", flat=True) if pk]
-        allele_ids = [pk for pk in ImportedAlleleInfo.objects.filter(pk__in=allele_info_ids)
-                      .values_list("allele_id", flat=True) if pk]
-
-        deleted_permissions = 0
-        for klass, object_ids in ((Classification, classification_ids),
-                                  (ClassificationModification, modification_ids)):
-            content_type = ContentType.objects.get_for_model(klass)
-            object_pks = [str(pk) for pk in object_ids]
-            for i in range(0, len(object_pks), BATCH_SIZE):
-                deleted, _ = GroupObjectPermission.objects.filter(
-                    content_type=content_type, object_pk__in=object_pks[i:i + BATCH_SIZE]).delete()
-                deleted_permissions += deleted
-
-        ReclassificationEvent.objects.filter(classification__in=classifications_qs).delete()
-        classifications_qs.delete()  # cascades to modifications
-        ResolvedVariantInfo.objects.filter(allele_info_id__in=allele_info_ids).delete()
-        ImportedAlleleInfo.objects.filter(pk__in=allele_info_ids).delete()
-        VariantAllele.objects.filter(allele_id__in=allele_ids).delete()
-        Allele.objects.filter(pk__in=allele_ids).delete()  # cascades the groupings built on them
-
-        User.objects.filter(username__in=FAKE_CURATORS).delete()
-        Lab.objects.filter(group_name__in=[fl.group_name for fl in FAKE_LABS]).delete()
-        Organization.objects.filter(group_name=FAKE_ORGANIZATION_GROUP).delete()
-        Group.objects.filter(name__startswith=FAKE_ORGANIZATION_GROUP).delete()
-        self.stdout.write(f"Deleted {len(classification_ids)} classifications, {len(modification_ids)} "
-                          f"modifications, {deleted_permissions} permissions, {len(allele_info_ids)} allele "
-                          f"infos, {len(allele_ids)} alleles, and the fake labs/users")
-
-
-@contextmanager
-def _keeping_our_timestamps(klass):
-    """ created/modified are auto_now_add/auto_now, which would stamp years of curation as happening now """
-    created = klass._meta.get_field("created")
-    modified = klass._meta.get_field("modified")
-    created.auto_now_add = False
-    modified.auto_now = False
-    try:
-        yield
-    finally:
-        created.auto_now_add = True
-        modified.auto_now = True
+        context.stdout.write(delete_fake_classifications(classifications_qs))
 
 
 def _period_start(years: int) -> datetime:
@@ -531,8 +416,8 @@ def _started(period_start: datetime, initial_window: float) -> datetime:
 
 
 def _pick_lab(labs: dict[str, Lab]) -> tuple[FakeCurationLab, Lab]:
-    fake_lab = random.choices(FAKE_LABS, weights=[lab.weight for lab in FAKE_LABS])[0]
-    return fake_lab, labs[fake_lab.name]
+    focus = random.choices(list(labs), weights=[CURATION_BY_LAB_FOCUS[focus].weight for focus in labs])[0]
+    return CURATION_BY_LAB_FOCUS[focus], labs[focus]
 
 
 def _germline_record(labs: dict[str, Lab], gene_symbol: str, variant_id: int, started: datetime) -> FakeRecord:

@@ -1,7 +1,7 @@
 """
 Tests for GeneCoverageCollection archive helpers.
 
-@see claude/issue_1536_data_archive_plan.md §4
+@see https://github.com/SACGF/variantgrid/issues/1536
 """
 
 import os

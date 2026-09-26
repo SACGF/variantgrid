@@ -83,16 +83,18 @@ Gotchas:
   looping the other consortium's transcripts — only for alts that have an explicit form. Symbolic DEL/DUP/INV go to the
   converter as coordinates (#1571) and <CNV>/<INS> have no HGVS at all (#1574), so both are passed through symbolic.
 Tests:
-- annotation/fake_annotation.py:get_fake_annotation_version builds a full valid AnnotationVersion (ACTIVE VAV at
+- annotation/fake_data.py:get_fake_annotation_version builds a full valid AnnotationVersion (ACTIVE VAV at
   columns_version 2, fake gene release, ontology, ClinVar, HPA); refuses to run outside UNIT_TEST.
 - variantgrid/test_runner.py:VariantGridTestRunner seeds get_fake_annotation_version for GRCh37/GRCh38 into the
   main test database before Django clones it for the workers, so the per-class calls are lookups. A test that
   needs its own ACTIVE VariantAnnotationVersion (one_active_vav_per_build) calls
-  annotation/fake_annotation.py:retire_seeded_annotation_version(genome_build) first.
-- annotation/fake_annotation.py:create_fake_variants loads the fixture VCF's variants (wraps
+  annotation/fake_data.py:retire_seeded_annotation_version(genome_build) first.
+- annotation/fake_data.py:create_fake_variants loads the fixture VCF's variants (wraps
   snpdb/tests/utils/vcf_testing_utils.py:slowly_create_loci_and_variants_for_vcf); create_fake_variant_annotation and
-  create_fake_clinvar_data add rows. annotation/tests/test_data_fake_genes.py:create_fake_transcript_version (and the
+  create_fake_clinvar_data add rows. genes/fake_data.py:create_fake_transcript_version (and the
   create_gata2_transcript_version / create_pten_transcript_version presets) make genes/transcripts with exon structure.
+- An ORM insert into VariantAnnotation lands in the base table, which analysis nodes never read - they join the
+  version's partition. Rows a node must see are written inside `temporary_db_table` (fake_data.py:FakeVariants).
 - @override_settings(**get_fake_annotation_settings_dict(columns_version=N)) pins settings.ANNOTATION to the
   tests/test_data/test_columns_versionN_<build>.vep_annotated.vcf fixtures; regenerate them with `vep_run --test`
   (needs a real VEP install).

@@ -2,7 +2,7 @@
 External annotation runs (#1568): dump/import helpers shared by the annotation_external command.
 
 The heavy VEP step can be run externally and the resulting annotated VCFs re-imported, and reused between a
-database and its own clone for identical annotation runs. See claude/plans/1568_external_annotation_runs_plan.md.
+database and its own clone for identical annotation runs.
 """
 import glob
 import json

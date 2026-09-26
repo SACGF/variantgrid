@@ -19,7 +19,14 @@ from genes.models import GeneSymbol
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
-from snpdb.models import CompositeColumnMember, Country, CustomColumnsCollection, Lab, Organization, UserSettings
+from snpdb.models import (
+    CompositeColumnMember,
+    Country,
+    CustomColumnsCollection,
+    Lab,
+    Organization,
+    UserSettings,
+)
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 

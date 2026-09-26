@@ -6,7 +6,7 @@ reasoning lives here rather than being spread across the places that have to kno
 have arrived here from an `@see`, this file is the explanation.
 
 Issue: https://github.com/SACGF/variantgrid/issues/1506
-Where this sits in the TSO 500 work: claude/plans/tso500_overall_plan.md (Phase 5)
+Where this sits in the TSO 500 work: https://github.com/SACGF/variantgrid/issues/1704 (Phase 5)
 
 
 ## The problem

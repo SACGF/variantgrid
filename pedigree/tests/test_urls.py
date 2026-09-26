@@ -3,8 +3,8 @@ import unittest
 from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from snpdb.fake_data import create_fake_pedigree
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_pedigree
 
 
 class Test(URLTestCase):

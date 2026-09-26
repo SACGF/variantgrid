@@ -5,12 +5,11 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, QuadNode
 from analysis.models.enums import QuadInheritance
-from analysis.tests.inheritance_node_mixin import (DEFAULT_GENOTYPE_VALUES, InheritanceNodeTestsMixin,
-                                                   make_cohort_genotype)
-from annotation.fake_annotation import get_fake_annotation_version
+from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin
+from annotation.fake_data import get_fake_annotation_version
+from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_quad, make_cohort_genotype
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import CohortGenotypeCollection
-from snpdb.tests.utils.fake_cohort_data import create_fake_quad
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

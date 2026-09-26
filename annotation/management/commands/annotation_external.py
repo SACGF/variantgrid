@@ -6,8 +6,6 @@ The same command both dumps (write VCFs + metadata, park runs awaiting external 
 (re-import annotated VCFs), selected by --dump / --import. Run against a NEW (not yet ACTIVE)
 VariantAnnotationVersion: the normal scheduler only operates on the latest ACTIVE version, so it will not
 touch a NEW version's range locks.
-
-See claude/plans/1568_external_annotation_runs_plan.md.
 """
 import os
 

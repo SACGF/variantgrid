@@ -10,11 +10,11 @@ from django.utils import timezone
 from guardian.shortcuts import assign_perm
 
 from analysis.models import Analysis, AnalysisLock, VariantTag
-from annotation.fake_annotation import create_fake_variants
+from annotation.fake_data import create_fake_variants
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import ExternalModelManager, ExternalPK, Patient
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import VCF, Cohort, GenomeBuild, ImportStatus, Sample, Tag, Trio, Variant
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 class FilterWritableForUserTest(TestCase):

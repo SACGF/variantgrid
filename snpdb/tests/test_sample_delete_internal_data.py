@@ -6,16 +6,16 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild, SampleLocusCount, SampleStatsCodeVersion
 from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_enums import ImportStatus
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
 class SampleDeleteInternalDataTest(TestCase):

@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 
 from analysis.analysis_import_export import analysis_export_to_dict
 from analysis.models import Analysis, AnalysisEdge, MergeNode, SampleNode
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import ImportSource
 from upload.import_task_factories.import_task_factories import AnalysisImportTaskFactory

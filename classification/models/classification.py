@@ -5,8 +5,7 @@ evidence through Classification.patch_value, publish through ClassificationModif
 and read what a user may see through ClassificationModification.latest_for_user; allele resolution
 is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also here:
 ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
-ClassificationConsensus and CuratedDate. classification/AGENTS.md has the rules. Large: use
-`scripts/vg outline`.
+ClassificationConsensus and CuratedDate.
 """
 import copy
 import json

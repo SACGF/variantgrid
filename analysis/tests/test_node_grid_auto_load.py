@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from analysis.models import AllVariantsNode, Analysis
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_user_settings import GlobalSettings

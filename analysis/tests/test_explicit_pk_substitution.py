@@ -26,11 +26,12 @@ from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.sources.sample_node import SampleNode
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun
 from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
-from patients.models_enums import Zygosity
 from library.django_utils.django_partition import temporary_db_table
+from patients.models_enums import Zygosity
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild, Variant
 from snpdb.models.models_cohort import (
     CohortGenotype,
@@ -38,7 +39,6 @@ from snpdb.models.models_cohort import (
     CohortGenotypeCommonFilterVersion,
 )
 from snpdb.models.models_enums import CohortGenotypeCollectionType
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

@@ -6,11 +6,11 @@ have no HGVS at all (#1574), so neither is expanded to explicit ref/alt.
 """
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun
 from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
-from annotation.tests.test_data_fake_genes import create_gata2_transcript_version
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from genes.fake_data import create_gata2_transcript_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant

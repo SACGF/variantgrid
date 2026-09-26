@@ -5,10 +5,16 @@ from django.utils import timezone
 
 from analysis.models import GeneListNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_annotation import create_fake_variants
+from annotation.fake_data import create_fake_variants
 from annotation.models import AnnotationRun, VariantGeneOverlap
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.models import GeneList, GeneListGeneSymbol, PanelAppPanel, PanelAppPanelLocalCache, PanelAppServer
+from genes.fake_data import create_fake_transcript_version
+from genes.models import (
+    GeneList,
+    GeneListGeneSymbol,
+    PanelAppPanel,
+    PanelAppPanelLocalCache,
+    PanelAppServer,
+)
 from pathtests.models import PathologyTest, PathologyTestVersion
 from snpdb.models import ImportStatus, Variant
 

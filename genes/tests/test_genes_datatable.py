@@ -3,8 +3,8 @@ from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase
 from django.urls.base import resolve, reverse
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from genes.grids import GenesColumns
 from snpdb.models import GenomeBuild
 

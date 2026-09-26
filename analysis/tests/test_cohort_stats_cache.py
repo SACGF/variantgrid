@@ -23,7 +23,7 @@ from analysis.models.nodes.stats_cache import (
     get_handler_for_node,
     inheritance_filter_key,
 )
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
     CohortGenotypeGeneAnnotationStats,
@@ -35,13 +35,13 @@ from annotation.tasks.calculate_sample_stats import (
     calculate_cohort_stats,
 )
 from library.utils.json_utils import canonical_filter_key
+from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
     CohortGenotypeStats,
     GenomeBuild,
     ImportStatus,
     SampleStatsCodeVersion,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 
 
 class TestCanonicalFilterKey(TestCase):

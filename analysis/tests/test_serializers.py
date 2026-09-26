@@ -27,13 +27,13 @@ from analysis.models import (
     VennNode,
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from genes.models import GeneList, GeneListGeneSymbol, ImportStatus
 from library.utils import get_all_subclasses
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import BuiltInFilters, GenomeBuild, UserSettings
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
 def _round_trip(user, genome_build, annotation_version, analysis):

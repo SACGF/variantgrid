@@ -30,7 +30,7 @@ from annotation.external_annotation import (
     write_dump_metadata,
     write_snakemake_bundle,
 )
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     create_fake_variants,
     get_fake_annotation_settings_dict,
     get_fake_annotation_version,

@@ -7,8 +7,8 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
     get_copy_number_evidence,
 )
 from classification.enums import SpecialEKeys
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CohortGenotype, GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

@@ -19,8 +19,9 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.annotation_run_files import get_annotated_filename
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
@@ -32,11 +33,9 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.tasks import annotation_scheduler_task
-from annotation.annotation_run_files import get_annotated_filename
-from annotation.vep_annotation import get_vep_skipped_variants_filename
 from annotation.pipelines import enabled_pipeline_types, get_runner
 from annotation.pipelines.vep import VEPRunner
+from annotation.tasks import annotation_scheduler_task
 from annotation.tasks.annotate_variants import (
     _trigger_dispatch,
     annotate_variants,
@@ -48,13 +47,14 @@ from annotation.tasks.annotation_scheduler_task import (
     COUNT_LEASE_PREFIX,
     _dispatch_counts,
     _handle_range_lock,
-    _scheduled_pipeline_versions,
     _lane_in_flight_qs,
     _lease_and_launch_run,
+    _scheduled_pipeline_versions,
     count_annotation_runs,
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
+from annotation.vep_annotation import get_vep_skipped_variants_filename
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

@@ -2,7 +2,7 @@ import unittest
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     create_fake_clinvar_data,
     create_fake_variant_annotation,
     get_fake_annotation_version,

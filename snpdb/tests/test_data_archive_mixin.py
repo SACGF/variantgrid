@@ -1,7 +1,5 @@
 """
 Tests for DataArchiveMixin and the chokepoint behaviour added in #1536.
-
-@see claude/issue_1536_data_archive_plan.md
 """
 
 from unittest.mock import patch
@@ -16,13 +14,13 @@ from snpdb.archive import (
     archive_vcf,
     mark_vcf_archive_started,
 )
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import VCF, GenomeBuild
 from snpdb.models.models_zygosity_counts import (
     VariantZygosityCountCollection,
     VariantZygosityCountForVCF,
 )
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
 class DataArchiveMixinTests(TestCase):

@@ -22,7 +22,7 @@ from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_node_to_downloadable_file,
 )
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups

@@ -2,7 +2,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.liftover import (
