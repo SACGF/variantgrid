@@ -322,10 +322,11 @@ class ClassificationGrouping(TimeStampedModel):
         return None, False
 
     @staticmethod
-    def assign_grouping_for_classification(classification: Classification, force_dirty_up=True) -> bool:
+    def assign_grouping_for_classification(classification: Classification, force_dirty_up=True, update_new_grouping=True) -> bool:
         """
         :param classification: The classification that needs to go into a grouping
         :param force_dirty_up: If grouping for the classification needs to be marked as dirty even if the classification is not changing groupings
+        :param update_new_grouping: If a grouping created for the classification is updated right away, rather than left dirty
         :return: A boolean indicating if the classification changed groupings
         """
         desired_grouping, is_new_grouping = ClassificationGrouping._desired_grouping_for_classification(classification)
@@ -335,8 +336,9 @@ class ClassificationGrouping(TimeStampedModel):
                 defaults={"grouping": desired_grouping}
             )
             if is_new_grouping and is_new_entry:
-                # if we've got the first record in the grouping, process it right now, so we can see it during the import process
-                desired_grouping.update()
+                if update_new_grouping:
+                    # if we've got the first record in the grouping, process it right now, so we can see it during the import process
+                    desired_grouping.update()
                 return True
             elif is_new_entry:
                 entry.dirty_up()

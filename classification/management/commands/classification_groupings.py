@@ -1,7 +1,7 @@
 from contextlib import nullcontext
 
 from django.core.management import BaseCommand
-from django.db.models import Subquery, Exists
+from django.db import transaction
 
 from classification.models import (
     Classification,
@@ -13,6 +13,8 @@ from classification.models.classification_grouping import (
     ClassificationGrouping,
 )
 from classification.services.overlaps_services import OverlapServices
+from classification.signals.classification_hooks_grouping_search_terms import latest_annotation_versions_cached
+from library.utils.collection_utils import batch_iterator
 
 
 class Command(BaseCommand):
@@ -40,16 +42,21 @@ class Command(BaseCommand):
     @staticmethod
     def _rebuild(summary: bool, all: bool, dirty: bool, refresh: bool):
         if all or summary:
-            for index, cm in enumerate(ClassificationModification.objects.filter(is_last_published=True).select_related("classification").iterator()):
-                classification = cm.classification
-                classification.summary = ClassificationSummaryCalculator(cm).cache_dict()
-                classification.save(update_fields=["summary"])
-                if index % 1000 == 0 and index:
-                    print(f"Updating {index} classification summaries")
+            modification_qs = ClassificationModification.objects.filter(is_last_published=True).select_related("classification")
+            for batch in batch_iterator(modification_qs.iterator(), 1000):
+                classifications = []
+                for cm in batch:
+                    classification = cm.classification
+                    classification.summary = ClassificationSummaryCalculator(cm).cache_dict()
+                    classifications.append(classification)
+                Classification.objects.bulk_update(classifications, fields=["summary"])
+                print(f"Updated {len(classifications)} classification summaries")
 
         if all:
-            for index, classification in enumerate(Classification.objects.iterator()):
-                ClassificationGrouping.assign_grouping_for_classification(classification)
+            classification_qs = Classification.objects.select_related("lab", "allele_info__allele")
+            for index, classification in enumerate(classification_qs.iterator()):
+                # every grouping is marked dirty and updated below
+                ClassificationGrouping.assign_grouping_for_classification(classification, force_dirty_up=False, update_new_grouping=False)
                 if index % 1000 == 0 and index:
                     print(f"Updating {index} classification assigned to classification groups")
             print("About to update all classification groups")
@@ -60,10 +67,11 @@ class Command(BaseCommand):
             if not refresh:
                 qs = qs.filter(dirty=True)
 
-            index = 0
-            for index, dirty in enumerate(qs.iterator()):
-                dirty.update()
-                if index % 1000 == 0 and index:
-                    print(f"Updating {index} classification groupings")
-            print(f"Updated {index+1} classification groupings")
-
+            grouping_ids = list(qs.order_by("pk").values_list("pk", flat=True))
+            with OverlapServices.overlap_recalcs_deferred(), latest_annotation_versions_cached():
+                for index, batch_ids in enumerate(batch_iterator(grouping_ids, 500)):
+                    with transaction.atomic():
+                        for grouping in ClassificationGrouping.objects.filter(pk__in=batch_ids):
+                            grouping.update()
+                    print(f"Updated {index * 500 + len(batch_ids)} of {len(grouping_ids)} classification groupings")
+                print("Recalculating overlaps")
