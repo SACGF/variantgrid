@@ -2,7 +2,6 @@ import datetime
 import io
 import tarfile
 import zipfile
-from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -18,6 +17,7 @@ from django.utils.timezone import now
 from django.views import View
 
 from classification.models import (
+    Classification,
     ClassificationImportRun,
     FileHandle,
     UploadedClassificationsUnmappedValidationRow,
@@ -113,11 +113,19 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
         UploadedClassificationsUnmappedStatus.Validated,
         UploadedClassificationsUnmappedStatus.Processed}
 
-    import_runs: Iterable[ClassificationImportRun] = ClassificationImportRun.objects.filter(from_file=record).order_by('pk')
+    import_runs = list(ClassificationImportRun.objects.filter(from_file=record).order_by('pk'))
+    already_withdrawn_lab_record_ids = {lab_record_id for import_run in import_runs
+                                        for lab_record_id in import_run.lab_record_ids_already_withdrawn}
+    classification_ids_by_lab_record_id = {}
+    if already_withdrawn_lab_record_ids:
+        classification_ids_by_lab_record_id = dict(
+            Classification.objects.filter(lab=record.lab, lab_record_id__in=already_withdrawn_lab_record_ids)
+            .values_list("lab_record_id", "pk"))
 
     http_response = render(request, 'classification/uploaded_classifications_unmapped_detail.html', {
         "record": record,
         "import_runs": import_runs,
+        "classification_ids_by_lab_record_id": classification_ids_by_lab_record_id,
         "now": now(),
         "in_progress": in_progress
     })

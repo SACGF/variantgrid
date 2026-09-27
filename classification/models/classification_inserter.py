@@ -316,6 +316,7 @@ class BulkClassificationInserter:
                     # Withdrawn records are no longer automatically un-withdrawn
                     # record.set_withdrawn(user=user, withdraw=False)
                     patch_response.status = ClassificationPatchStatus.ALREADY_WITHDRAWN
+                    patch_response.lab_record_id = record.lab_record_id
                     patch_response.append_warning(code="withdrawn",
                                                   message="The record you updated is withdrawn and will not appear to users")
 
