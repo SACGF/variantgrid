@@ -50,7 +50,7 @@ The Candidate Search feature can find existing classifications across your datab
 You can bulk import classifications from a CSV or Excel file. Go to Classifications → Import Upload to check the expected format and upload.,classification,classification_upload_unmapped,
 Export your classifications as a REDCap-compatible CSV for research database integration.,classification,export_classifications_grid_redcap,CLASSIFICATION_REDCAP_EXPORT
 "ClinVar export is managed per-lab. Once configured, you can prepare, review, and submit ClinVar batches directly from the ClinVar Export Summary page.",classification,clinvar_key_summary,CLINVAR_EXPORT.mode
-The Classifications Groupings page organises records by allele or gene. Useful for getting a high-level picture of what's been classified.,classification,classification_groupings,CLASSIFICATION_NEW_GROUPING
+The Classifications page groups records by allele. Useful for getting a high-level picture of what's been classified.,classification,classifications,
 Ontology term pages show all classifications and patients linked to that term. Useful for finding relevant prior work when classifying a phenotype-associated variant.,ontology,ontology_term,
 Patients can have HPO/OMIM/MONDO phenotype terms attached. These are used by the Phenotype node to filter variants in linked analyses.,patients,view_patient,
 "You can bulk import patient records from CSV. Download the template first and include phenotype terms, DOB, sex, and specimen info.",patients,patient_imports,
