@@ -99,7 +99,6 @@ urlpatterns = [
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
     path('classifications', views.classifications, name='classifications'),
 
-    path('groupings', views.classification_groupings, name='classification_groupings'),
     path('groupings/export_config', view_classification_grouping_export, name='classification_grouping_export_config'),
     path('groupings/export', serve_export, name='classification_grouping_export'),
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
