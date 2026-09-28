@@ -55,8 +55,6 @@ bioutils==0.6.1
     #   biocommons-seqrepo
     #   cdot
     #   hgvs
-bleach==6.4.0
-    # via martor
 boto3==1.43.89
     # via
     #   -r requirements.in
@@ -65,8 +63,6 @@ botocore==1.43.89
     # via
     #   boto3
     #   s3transfer
-cachebox==5.2.3
-    # via deepdiff
 cdot==0.2.31
     # via -r requirements.in
 celery==5.6.3
@@ -107,8 +103,6 @@ coloredlogs==15.0.1
     # via
     #   biocommons-seqrepo
     #   cyvcf2
-configargparse==1.7.7
-    # via -r requirements.in
 contourpy==1.3.3
     # via matplotlib
 crispy-bootstrap4==2026.2
@@ -129,12 +123,8 @@ dataclasses-json==0.6.7
     # via -r requirements.in
 decorator==5.3.1
     # via ipython
-deepdiff==9.1.0
-    # via -r requirements.in
 defusedxml==0.7.1
     # via nltk
-deprecation==2.1.0
-    # via -r requirements.in
 dill==0.4.1
     # via pylint
 django==6.1.1
@@ -150,7 +140,6 @@ django==6.1.1
     #   django-crispy-forms
     #   django-datetime-utc
     #   django-debug-toolbar
-    #   django-downloadview
     #   django-extensions
     #   django-guardian
     #   django-js-reverse
@@ -165,7 +154,6 @@ django==6.1.1
     #   drf-spectacular
     #   drf-spectacular-sidecar
     #   easy-thumbnails
-    #   martor
     #   mozilla-django-oidc
 django-amazon-ses==4.0.1
     # via -r requirements.in
@@ -194,8 +182,6 @@ django-dag==1.4.3
 django-datetime-utc==1.0.6
     # via -r requirements.in
 django-debug-toolbar==8.0.0
-    # via -r requirements.in
-django-downloadview==2.5.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
@@ -275,8 +261,6 @@ html5lib==1.1
     # via
     #   django-htmlmin
     #   xhtml2pdf
-htseq==2.1.2
-    # via -r requirements.in
 humanfriendly==10.0
     # via coloredlogs
 idna==3.19
@@ -334,15 +318,11 @@ lxml==6.1.3
     #   python-docx
     #   svglib
 markdown==3.10.3
-    # via
-    #   -r requirements.in
-    #   martor
+    # via -r requirements.in
 markdown-it-py==4.2.0
     # via rich
 marshmallow==3.26.2
     # via dataclasses-json
-martor==1.8.2
-    # via -r requirements.in
 matplotlib==3.11.1
     # via -r requirements.in
 matplotlib-inline==0.2.2
@@ -382,7 +362,6 @@ numpy==2.5.3
     #   biopython
     #   contourpy
     #   cyvcf2
-    #   htseq
     #   matplotlib
     #   pandas
     #   scipy
@@ -392,13 +371,10 @@ oauthlib==3.3.1
     #   requests-oauthlib
 openpyxl==3.1.5
     # via -r requirements.in
-orderly-set==5.5.0
-    # via deepdiff
 oscrypto==1.3.0
     # via pyhanko-certvalidator
 packaging==26.3
     # via
-    #   deprecation
     #   django-js-reverse
     #   kombu
     #   marshmallow
@@ -495,7 +471,6 @@ pysam==0.24.0
     # via
     #   -r requirements.in
     #   biocommons-seqrepo
-    #   htseq
 pytest==9.1.1
     # via ped-parser
 python-bidi==0.6.11
@@ -538,17 +513,13 @@ requests==2.34.2
     #   biocommons-seqrepo
     #   bioutils
     #   cdot
-    #   django-downloadview
-    #   martor
     #   mozilla-django-oidc
     #   requests-oauthlib
     #   rollbar
 requests-oauthlib==2.0.0
     # via -r requirements.in
 rich==15.0.0
-    # via
-    #   -r requirements.in
-    #   import-linter
+    # via import-linter
 rjsmin==1.2.5
     # via django-compressor
 rollbar==1.4.0
@@ -562,8 +533,6 @@ ruff==0.16.6
 s3transfer==0.19.2
     # via boto3
 scipy==1.18.1
-    # via -r requirements.in
-simplejson==4.1.2
     # via -r requirements.in
 six==1.17.0
     # via
@@ -596,8 +565,6 @@ tinycss2==1.5.1
     #   svglib
 tomlkit==0.15.1
     # via pylint
-toposort==1.10
-    # via -r requirements.in
 tqdm==4.70.0
     # via
     #   biocommons-seqrepo
@@ -636,15 +603,11 @@ typing-inspect==0.9.0
 typing-inspection==0.4.4
     # via pydantic
 tzdata==2026.3
-    # via
-    #   kombu
-    #   martor
+    # via kombu
 tzlocal==5.4.4
     # via
     #   celery
     #   pyhanko
-unidecode==1.4.0
-    # via -r requirements.in
 uritemplate==4.2.0
     # via drf-spectacular
 uritools==6.1.3
@@ -652,7 +615,6 @@ uritools==6.1.3
 urllib3==2.7.0
     # via
     #   botocore
-    #   martor
     #   requests
 vine==5.1.0
     # via
@@ -663,7 +625,6 @@ wcwidth==0.8.3
     # via prompt-toolkit
 webencodings==0.6.1
     # via
-    #   bleach
     #   cssselect2
     #   html5lib
     #   tinycss2
@@ -674,6 +635,4 @@ yarl==1.24.5
 yoyo-migrations==9.0.0
     # via biocommons-seqrepo
 zipp==4.1.0
-    # via
-    #   importlib-metadata
-    #   martor
+    # via importlib-metadata

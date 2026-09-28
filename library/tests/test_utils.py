@@ -2,6 +2,8 @@
 Adversarial unit tests for library utilities.
 Pure-function tests — no DB needed (TestCase used for consistency).
 """
+import io
+import math
 import os
 import tempfile
 import time
@@ -11,24 +13,32 @@ from decimal import Decimal
 from django.test import TestCase
 
 from library.cache import timed_cache
+from library.genomics.bed_file import BedFileReader
 from library.log_utils import NotificationBuilder
 from library.unit_percent import (
     convert_from_percent_to_unit,
     convert_from_unit_to_percent,
     server_side_format_percent,
 )
-from library.utils.color_utils import rgb_contrasting_text, rgb_relative_luminance
 from library.utils.collection_utils import (
     IterableStitcher,
     LimitedCollection,
     batch_iterator,
     flatten_nested_lists,
     group_by_key,
+    toposort_groups,
 )
+from library.utils.color_utils import rgb_contrasting_text, rgb_relative_luminance
 from library.utils.date_utils import calculate_age, parse_yymm, utc_from_timestamp
 from library.utils.file_utils import IteratorFile, file_to_array
-from library.utils.json_utils import JsonDiffs, make_json_safe_in_place, strip_json
+from library.utils.json_utils import (
+    JsonDiffs,
+    json_dumps_nan_as_null,
+    make_json_safe_in_place,
+    strip_json,
+)
 from library.utils.text_utils import (
+    emoji_to_unicode,
     format_significant_digits,
     join_with_commas_and_ampersand,
     limit_str,
@@ -500,3 +510,32 @@ class TestRgbContrastingText(TestCase):
     def test_picks_white_on_dark_black_on_light(self):
         self.assertEqual(rgb_contrasting_text("#000080"), "#ffffff")
         self.assertEqual(rgb_contrasting_text("#ffff00"), "#000000")
+
+
+class TestJsonDumpsNanAsNull(TestCase):
+    def test_nested_non_finite_become_null(self):
+        data = {"a": [1.5, math.nan], "b": (math.inf, "NaN"), "c": {"d": -math.inf}}
+        self.assertEqual(json_dumps_nan_as_null(data), '{"a": [1.5, null], "b": [null, "NaN"], "c": {"d": null}}')
+
+
+class TestEmojiToUnicode(TestCase):
+    def test_known_codes_replaced_others_left(self):
+        self.assertEqual(emoji_to_unicode(":hospital: [lab] :not_an_emoji: 12:30:00"),
+                         "\U0001f3e5 [lab] :not_an_emoji: 12:30:00")
+
+
+class TestToposortGroups(TestCase):
+    def test_groups_in_dependency_order_ignoring_self_dependency(self):
+        self.assertEqual(list(toposort_groups({2: {1}, 3: {1, 2}, 4: {4}})), [{1, 4}, {2}, {3}])
+
+
+class TestBedFileReader(TestCase):
+    def test_bed_detail_id_and_description(self):
+        bed = io.StringIO("track name=x db=hg19 type=bedDetail\n"
+                          "chr1\t10\t20\tfoo\t5\t+\t10\t20\t0\t1\t10,\t0,\tID1\tdesc one\n")
+        reader = BedFileReader(bed)
+        feature = next(reader)
+        self.assertEqual(reader.get_genome_build_name(), "hg19")
+        self.assertEqual((feature.iv.chrom, feature.iv.start, feature.iv.end), ("chr1", 10, 20))
+        self.assertEqual(feature.attr["block_starts"], "0,")
+        self.assertEqual((feature.attr["ID"], feature.attr["description"]), ("ID1", "desc one"))

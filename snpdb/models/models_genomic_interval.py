@@ -39,7 +39,7 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
         return self.genomicinterval_set.count()
 
     def genomic_interval_iterator(self):
-        """ returns iterator of GenomicInterval (collection) or HTSeq.GenomicInterval (bed file)
+        """ returns iterator of GenomicInterval (collection) or BedInterval (bed file)
             both classes share chrom/start/end fields """
         if self.processed_file is not None:
             with open(self.processed_file, encoding="utf-8") as f:

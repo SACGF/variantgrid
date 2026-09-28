@@ -1,8 +1,8 @@
 """SpliceGirl's SpliceVariants.vcf rewritten as gene-level splice variants (#1903)."""
+import json
 import os
 
 import cyvcf2
-import simplejson
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -127,7 +127,7 @@ class TestSpliceGirlVCF(TestCase):
 
     def test_the_callers_record_rides_along_in_info(self):
         encoded = self._by_splice()["MET exon 14 skipping"].INFO.get(SPLICE_OBSERVATION_INFO)
-        observation = simplejson.loads(percent_decode_info_value(encoded))
+        observation = json.loads(percent_decode_info_value(encoded))
         self.assertEqual("chr7:116411708→chr7:116414934 (91 reads)", format_splice_observation(observation))
         self.assertEqual(91, observation["ALTDUP"])
 

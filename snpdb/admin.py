@@ -1,11 +1,9 @@
 import re
+import unicodedata
 
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
-from django.forms import ModelForm
-from martor.widgets import AdminMartorWidget
-from unidecode import unidecode
 
 from classification.models import Overlap
 from classification.services.overlaps_services import OverlapServices
@@ -238,7 +236,8 @@ def make_code_friendly(text: str) -> str:
     lower case, replace - and spaces with underscores
     remove anything that's then not a-z or underscore
     """
-    text = unidecode(text) \
+    ascii_text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+    text = ascii_text \
         .lower() \
         .replace('-', '_').replace(' ', '_')
     return re.sub(r'[^a-z0-9_]', '', text)
@@ -390,20 +389,9 @@ class GenomicIntervalsCollectionAdmin(ModelAdminBasics):
     search_fields = ('name', )
 
 
-class SiteMessageAdminForm(ModelForm):
-    class Meta:
-        model = SiteMessage
-        fields = '__all__'
-
-
 @admin.register(SiteMessage)
 class SiteMessagesAdmin(ModelAdminBasics):
-    form = SiteMessageAdminForm
-
-    def get_form(self, request, obj=None, **kwargs):
-        return super().get_form(request, obj, widgets={
-            'message': AdminMartorWidget(),
-        }, **kwargs)
+    pass
 
 
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)

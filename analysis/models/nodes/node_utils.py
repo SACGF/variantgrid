@@ -20,7 +20,6 @@ from django.db import connection
 from django.db.models import F, QuerySet
 from django.db.models.query_utils import Q
 from django.utils import timezone
-from toposort import toposort
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeColors, NodeStatus
@@ -36,6 +35,7 @@ from analysis.models.nodes.node_counts import (
 )
 from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
+from library.utils.collection_utils import toposort_groups
 from snpdb.models.models_enums import TagFilter
 from variantgrid.celery import app
 
@@ -88,7 +88,7 @@ def get_toposorted_nodes(nodes_qs):
 
 def get_toposorted_nodes_from_parent_value_data(nodes, parent_value_data):
     topo_sorted_nodes = []
-    for grp in toposort(parent_value_data):
+    for grp in toposort_groups(parent_value_data):
         nodes_group = []
         for node_id in grp:
             node = nodes.get(node_id)

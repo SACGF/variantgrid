@@ -7,8 +7,7 @@ from typing import Optional
 import requests
 from django.conf import settings
 from django.contrib.auth.models import User
-from requests import Response
-from simplejson import JSONDecodeError
+from requests import JSONDecodeError, Response
 
 from library.constants import MINUTE_SECS
 from library.email import Email
