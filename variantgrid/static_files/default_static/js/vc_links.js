@@ -55,15 +55,6 @@ const VCLink = (function() {
 
 })();
 
-EMPTY_LINK = new VCLink({
-    text: null,
-    href: null,
-    missing: true,
-    title: null,
-    build: null,
-    geneLink: false,
-});
-
 const VCLinks = (function() {
 
     const VCLinks = function(eKeys) {
