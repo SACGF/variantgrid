@@ -55,6 +55,8 @@ bioutils==0.6.1
     #   biocommons-seqrepo
     #   cdot
     #   hgvs
+bleach==6.4.0
+    # via -r requirements.in
 boto3==1.43.89
     # via
     #   -r requirements.in
@@ -625,6 +627,7 @@ wcwidth==0.8.3
     # via prompt-toolkit
 webencodings==0.6.1
     # via
+    #   bleach
     #   cssselect2
     #   html5lib
     #   tinycss2
