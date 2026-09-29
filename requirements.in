@@ -21,7 +21,6 @@ django-compressor
 django_crispy_forms
 django_dag
 django_datetime_utc
-django_debug_toolbar
 django-extensions
 django_glrm
 django-guardian

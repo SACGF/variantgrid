@@ -140,7 +140,6 @@ django==6.1.1
     #   django-compressor
     #   django-crispy-forms
     #   django-datetime-utc
-    #   django-debug-toolbar
     #   django-extensions
     #   django-guardian
     #   django-js-reverse
@@ -181,8 +180,6 @@ django-crispy-forms==2.7
 django-dag==1.4.3
     # via -r requirements.in
 django-datetime-utc==1.0.6
-    # via -r requirements.in
-django-debug-toolbar==8.0.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
@@ -536,7 +533,6 @@ sqlparse==0.6.0
     # via
     #   -r requirements.in
     #   django
-    #   django-debug-toolbar
     #   yoyo-migrations
 stack-data==0.6.3
     # via ipython

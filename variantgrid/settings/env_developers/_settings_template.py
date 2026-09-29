@@ -20,6 +20,11 @@ ALLOWED_HOSTS = ["localhost", WEB_HOSTNAME, WEB_IP]
 
 # PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
+# Debug toolbar is not in requirements.txt: uv pip install django-debug-toolbar, then
+# INSTALLED_APPS += ["debug_toolbar"]
+# MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware", *MIDDLEWARE)
+# INTERNAL_IPS = ["127.0.0.1"]
+
 _use_grch38 = False
 if _use_grch38:
     ANNOTATION[BUILD_GRCH38]["enabled"] = True
