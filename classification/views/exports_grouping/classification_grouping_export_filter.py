@@ -7,12 +7,12 @@ from typing import Set, Union, Optional, Iterator
 
 import itertools
 from django.contrib.auth.models import User
-from django.db.models import Q, QuerySet
+from django.db.models import Q, QuerySet, Model
 from django.http import HttpRequest
 from more_itertools.more import peekable
 from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
-    OverlapContribution
+    OverlapContribution, Overlap, OverlapContributionNextStep
 from classification.models import EvidenceKeyMap
 from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
@@ -93,7 +93,15 @@ class ClassificationGroupingExportFilter:
             # update based on either ConflictLab updating, or the latest classification of a grouping updating
             # and the grouping itself updating (make sure we don't do any null updates)
 
-            via_updated_conflicts = OverlapContribution.objects.filter(modified__gte=since).values_list("classification_grouping", flat=True)
+            # for when overlaps change from discordant to not and vice versa
+            updated_overlaps_contributions = OverlapContributionNextStep.objects.filter(
+                contribution__classification_grouping__in=groupings,
+                overlap__overlap_status_change_timestamp__gte=since).values_list('contribution__id', flat=True)
+
+            # catches when an overlap is triaged or when the latest classification for a grouping is changed to a different record
+            via_updated_conflicts = OverlapContribution.objects.filter(Q(modified__gte=since) | Q(pk__in=updated_overlaps_contributions)).values_list("classification_grouping", flat=True)
+
+            # catches when the latest classification for a grouping has its contents updated
             groupings = groupings.filter(Q(latest_classification_modification__modified__gte=since) | Q(pk__in=via_updated_conflicts))
 
         # order by allele ordering
