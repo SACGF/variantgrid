@@ -162,11 +162,11 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 
 ## Authentication surface
 
-`library/django_utils/login_required_middleware.py:PublicPathsLoginRequiredMiddleware` requires login everywhere except `PUBLIC_PATHS`
-(`variantgrid/settings/components/default_settings.py`), which exempts the API prefixes (`/classification/api/`, `/patients/api/`,
-`/seqauto/api/`, `/upload/api/`, `/mme/api/`, `/beacon/`) so DRF's `IsAuthenticated` can answer 401 instead. A plain Django
-`View` mounted under an exempt prefix is reachable anonymously (it usually 500s on `AnonymousUser`); new endpoints there must
-be `rest_framework.views.APIView` subclasses. Verify with an unauthenticated request - a 500 means the view is unprotected.
+`library/django_utils/login_required_middleware.py:SiteLoginRequiredMiddleware` requires login on every view not marked
+`login_not_required`, and sends anonymous users to `LOGIN_URL` (OIDC on Shariant). DRF marks every `APIView` and `ViewSet`
+`login_not_required`, so REST endpoints skip it and DRF's `IsAuthenticated` default answers 401/403 instead - a DRF view with
+empty `permission_classes` (`beacon/views_rest.py`, `mme/views_rest.py`) is public. Third-party URLconfs that must work before
+login (registration, OIDC) are mounted with `login_not_required_include` in `variantgrid/urls.py`. The URL path exempts nothing.
 `variantgrid/views_rest.py:CapabilitiesView` (`/api/v1/capabilities`) tells a client which calls this server accepts, as VG3 and
 VG4 run side by side. `API_FEATURES` is the client contract: add a name in the same change as a client-visible feature, and keep
 names once added. `upload_file_types` is derived from the import task factories, so it needs no upkeep. A server too old to have

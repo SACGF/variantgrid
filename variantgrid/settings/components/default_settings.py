@@ -870,7 +870,7 @@ MIDDLEWARE = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'library.django_utils.login_required_middleware.PublicPathsLoginRequiredMiddleware',  # Must be after other auth middleware
+    'library.django_utils.login_required_middleware.SiteLoginRequiredMiddleware',  # Must be after other auth middleware
     'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
     'auditlog.middleware.AuditlogMiddleware',
     #'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
@@ -906,8 +906,7 @@ CACHE_GENERATED_FILES = True
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 
-    # NOTE: Middleware is run first - so PublicPathsLoginRequiredMiddleware will reject tokens w/o logins
-    # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
+    # DRF views are login_not_required, so the login middleware leaves token/basic auth to DRF at view time
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',  # Needed to classification export clients
         'rest_framework.authentication.SessionAuthentication',
@@ -922,7 +921,7 @@ REST_FRAMEWORK = {
 }
 
 # drf-spectacular OpenAPI schema / Swagger docs (served at /api/schema and /api/docs)
-# The docs pages are public (see PUBLIC_PATHS) but the API endpoints themselves still require auth
+# The docs pages are public (DRF views, SERVE_PERMISSIONS below) but the API endpoints themselves still require auth
 SPECTACULAR_SETTINGS = {
     'TITLE': 'VariantGrid API',
     'DESCRIPTION': 'REST API for VariantGrid - variant database, annotation and classification platform. '
@@ -1165,26 +1164,8 @@ LOGGING = {
     }
 }
 
-# Instead of @login_required we use PublicPathsLoginRequiredMiddleware to block non-auth by default
-# then whitelist with @login_not_required (django.contrib.auth.decorators) or PUBLIC_PATHS setting below.
-
-# Django REST Framework:
-# DRF overrides Django's internals, so request.user is AnonymousUser during
-# the middleware check (and will fail with PublicPathsLoginRequiredMiddleware).
-# @see https://github.com/encode/django-rest-framework/issues/760#issuecomment-391127616
-# Thus for DRF we need to exclude it and add its own check (at view time)
-PUBLIC_PATHS = [
-    r'^/accounts/.*',  # allow public access to all django registration views,
-    r'^/oidc/.*',  # all oidc URLs
-    r'^/api/.*',  # OpenAPI schema + Swagger/ReDoc docs pages (drf-spectacular)
-    r'^/classification/api/.*',  # REST framework used by command line tools
-    r'^/patients/api/.*',
-    r'^/seqauto/api/.*',
-    r'^/upload/api/.*',
-    r'^/mme/api/.*',  # Inbound MME /match + /metrics - authenticated by per-peer X-Auth-Token (see mme/auth.py)
-    r'^/mme/(metrics|disclaimers)$',  # MME requires these be published publicly
-    r'^/beacon/.*',  # Beacon v2 answers anonymous requests (public tier); views still enforce per-tier permission
-]
+# Instead of @login_required, SiteLoginRequiredMiddleware requires login everywhere. A view opts out with
+# @login_not_required (django.contrib.auth.decorators); DRF views are already marked, and check auth at view time.
 
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control
 RECAPTCHA_PUBLIC_KEY = ""  # get_secret('RECAPTCHA.public_key')

@@ -3,11 +3,13 @@ from django.conf import settings
 from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
 from django.views.generic.base import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
+from library.django_utils.login_required_middleware import login_not_required_include
 from variantgrid import views
 from variantgrid.views import ContactFormView, OneStepRegistrationView
 from variantgrid.views_rest import CapabilitiesView
@@ -73,20 +75,21 @@ if getattr(settings, "REGISTRATION_OPEN", False):
     # registration.backends.simple.urls, but with our own view (see OneStepRegistrationView)
     urlpatterns += [
         path('accounts/register/closed/',
-             TemplateView.as_view(template_name='registration/registration_closed.html'),
+             login_not_required(TemplateView.as_view(template_name='registration/registration_closed.html')),
              name='registration_disallowed'),
         path('accounts/register/',
-             OneStepRegistrationView.as_view(success_url=getattr(settings, 'SIMPLE_BACKEND_REDIRECT_URL', '/')),
+             login_not_required(OneStepRegistrationView.as_view(
+                 success_url=getattr(settings, 'SIMPLE_BACKEND_REDIRECT_URL', '/'))),
              name='registration_register'),
-        path('accounts/', include('registration.auth_urls')),
+        path('accounts/', login_not_required_include('registration.auth_urls')),
     ]
 else:
-    urlpatterns += [path('accounts/', include('registration.backends.default.urls'))]
+    urlpatterns += [path('accounts/', login_not_required_include('registration.backends.default.urls'))]
 
 
 if settings.USE_OIDC:
     urlpatterns += [
-        path('oidc/', include('mozilla_django_oidc.urls')),
+        path('oidc/', login_not_required_include('mozilla_django_oidc.urls')),
         path('oidc_login/', views.oidc_login),
     ]
 

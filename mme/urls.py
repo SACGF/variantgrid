@@ -8,7 +8,7 @@ urlpatterns = [
     path('api/metrics', views_rest.MMEMetricsView.as_view(), name='mme_api_metrics'),
     path('api/heartbeat', views_rest.MMEHeartbeatView.as_view(), name='mme_api_heartbeat'),
 
-    # Public (PUBLIC_PATHS) - MME requires these be published.
+    # Public (login_not_required) - MME requires these be published.
     path('metrics', views.mme_public_metrics, name='mme_public_metrics'),
     path('disclaimers', views.mme_public_disclaimers, name='mme_public_disclaimers'),
 
