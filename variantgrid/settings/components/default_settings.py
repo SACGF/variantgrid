@@ -918,6 +918,8 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 
 # Turn ON in production!
 CACHE_GENERATED_FILES = True
+# A generation with no heartbeat (row save or progress update) for this long is assumed dead and is relaunched
+CACHED_GENERATED_FILE_STALLED_MINUTES = 30
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',

@@ -8,10 +8,11 @@ entry point the view and the Celery export tasks use.
 import csv
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -289,6 +290,8 @@ class TestNodeExportLaunch(GridExportTestCase):
         get_or_create_and_launch de-dupes on the params hash, so a double-click can't start two of them,
         while a differently filtered view of the same node is a separate download """
 
+    FAKE_TASK_ID = "fake-celery-task-id"
+
     def setUp(self):
         super().setUp()
         self.node = self._sample_node()
@@ -309,7 +312,7 @@ class TestNodeExportLaunch(GridExportTestCase):
         params = dict(self._grid_params(**extra_params), export_type="csv")
         url = reverse("node_grid_export", kwargs={"analysis_id": self.analysis.pk}) + "?" + urlencode(params)
         with mock.patch.object(export_node_to_downloadable_file, "apply_async") as mock_apply_async:
-            mock_apply_async.return_value = mock.Mock(id="fake-celery-task-id", result=None)
+            mock_apply_async.return_value = mock.Mock(id=self.FAKE_TASK_ID, result=None)
             response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
         cgf_id = resolve(response.url).kwargs["cgf_id"]
@@ -344,6 +347,32 @@ class TestNodeExportLaunch(GridExportTestCase):
         self.assertNotEqual(first.pk, second.pk)
         self.assertFalse(CachedGeneratedFile.objects.filter(pk=first.pk).exists())
         self.assertEqual(self._num_cached_files(), 1)
+
+    def _stall(self, cgf):
+        stalled_minutes = settings.CACHED_GENERATED_FILE_STALLED_MINUTES + 1
+        stalled_modified = datetime.now(tz=timezone.utc) - timedelta(minutes=stalled_minutes)
+        CachedGeneratedFile.objects.filter(pk=cgf.pk).update(modified=stalled_modified)
+
+    @mock.patch("snpdb.models.models.AsyncResult")
+    def test_stalled_generation_is_relaunched(self, mock_async_result):
+        """ A worker killed mid-export records neither a filename nor an exception - once the heartbeat
+            is old the row is relaunched, rather than reported as generating forever """
+        mock_async_result.return_value.result = None
+        first = self._launch_export()
+        self.assertEqual(first.pk, self._launch_export().pk)  # Heartbeat still fresh
+        self._stall(first)
+        second = self._launch_export()
+        self.assertNotEqual(first.pk, second.pk)
+        self.assertEqual(self._num_cached_files(), 1)
+
+    @mock.patch("snpdb.models.models.AsyncResult")
+    def test_poll_reports_stalled_generation_as_failure(self, mock_async_result):
+        mock_async_result.return_value.result = None
+        cgf = self._launch_export()
+        self._stall(cgf)
+        url = reverse("cached_generated_file_check", kwargs={"cgf_id": cgf.pk})
+        data = self.client.get(url).json()
+        self.assertEqual(data["status"], "FAILURE")
 
     def test_poll_reports_missing_file_as_failure(self):
         """ Pollers holding a cgf_id (@see analysis_downloads.js) don't go through the launch view,
@@ -389,7 +418,8 @@ class TestNodeExportLaunch(GridExportTestCase):
         with tempfile.TemporaryDirectory() as generated_dir:
             with override_settings(GENERATED_DIR=generated_dir):
                 export_node_to_downloadable_file.apply(args=(self.node.pk, self.node.version, self.user.pk,
-                                                             "csv", None, task_grid_params))
+                                                             "csv", None, task_grid_params),
+                                                       task_id=self.FAKE_TASK_ID)
                 cgf.refresh_from_db()
                 self.assertEqual(cgf.task_status, "SUCCESS")
                 self.assertEqual(cgf.progress, 1)
@@ -397,6 +427,18 @@ class TestNodeExportLaunch(GridExportTestCase):
                 with open(cgf.filename) as f:
                     lines = f.read().splitlines()
                 self.assertEqual(len(lines), self.node.count + 1)  # header
+
+    def test_superseded_export_task_does_not_write(self):
+        """ A stalled row relaunched under a new task - the original run, if it ever starts, must not also
+            write the file """
+        cgf = self._launch_export()
+        task_grid_params = self._grid_params()
+        task_grid_params.pop("version_id")
+        export_node_to_downloadable_file.apply(args=(self.node.pk, self.node.version, self.user.pk,
+                                                     "csv", None, task_grid_params),
+                                               task_id="superseded-task-id")
+        cgf.refresh_from_db()
+        self.assertIsNone(cgf.filename)
 
 
 class TestGeneLevelExport(GridExportTestCase):
