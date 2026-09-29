@@ -145,9 +145,11 @@ class CachedGeneratedFile(TimeStampedModel):
     def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
         cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                  params_hash=params_hash)
-        if cgf.file_missing:
-            # Drop the row so the get_or_create below regenerates it lazily
-            logging.info("Discarding CachedGeneratedFile %s - %s is gone", cgf.pk, cgf.filename)
+        if cgf.file_missing or cgf.exception:
+            # Drop the row so the get_or_create below regenerates it lazily. A failed generation (eg the worker
+            # was restarted mid-export) is retried the same way - otherwise the failure is cached forever
+            logging.info("Discarding CachedGeneratedFile %s - file_missing=%s exception=%s",
+                         cgf.pk, cgf.file_missing, cgf.exception)
             cgf.delete()
             cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                      params_hash=params_hash)
