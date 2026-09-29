@@ -3,11 +3,9 @@ The classification datatable's query count must not grow with the number of
 classification rows returned - per-row work in server renderers is the main
 N+1 risk in DataTables endpoints (row data itself comes from .values()).
 """
-from unittest import mock
-
 from django.contrib.auth.models import User
 from django.db import connection
-from django.test import Client
+from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
@@ -16,9 +14,9 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
     create_classification_for_sample_and_variant_objects,
 )
 from library.django_utils.unittest_utils import URLTestCase, production_query_count
-from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Variant
-from snpdb.tests.utils.mock_clingen_api import MockServerErrorClinGenAlleleRegistryAPI
+
+MOCK_SERVER_ERROR_CLINGEN_API = "snpdb.tests.utils.mock_clingen_api.MockServerErrorClinGenAlleleRegistryAPI"
 
 
 class ClassificationDatatableScalingTest(URLTestCase):
@@ -44,8 +42,7 @@ class ClassificationDatatableScalingTest(URLTestCase):
             datatable's query count, not allele registration, so serve the unreachable-registry
             response rather than needing a recorded one per fixture variant - autopopulate records
             the error and carries on. """
-        with mock.patch.object(ClinGenAlleleRegistryAPI, "override_class",
-                               MockServerErrorClinGenAlleleRegistryAPI):
+        with override_settings(CLINGEN_ALLELE_REGISTRY_API_CLASS=MOCK_SERVER_ERROR_CLINGEN_API):
             for variant in variants:
                 classification = create_classification_for_sample_and_variant_objects(
                     cls.user, cls.lab, None, variant, cls.genome_build,

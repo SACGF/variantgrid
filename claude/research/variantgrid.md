@@ -70,8 +70,9 @@ configured here (`JOBS_AUTOPAUSE_ON_REBOOT*`) but implemented in `snpdb/signals/
 
 ### Tests
 
-`variantgrid/test_runner.py:VariantGridTestRunner` swaps in recorded-data mocks for the ClinGen Allele Registry and
-transcript sequence fetching, so the suite needs no network. `setup_databases` creates the main test DB with
+Under `UNIT_TEST`, settings swap in recorded-data mocks for the ClinGen Allele Registry and transcript sequence fetching,
+so the suite needs no network (`claude/guides/testing.md#external-services-in-tests`).
+`variantgrid/test_runner.py:VariantGridTestRunner.setup_databases` creates the main test DB with
 `parallel=1`, seeds the fake GRCh37/GRCh38 annotation versions once
 (`variantgrid/test_runner.py:VariantGridTestRunner._seed_fake_annotation_versions`),
 then clones it per worker - 240-odd test classes used to rebuild that chain in `setUpTestData`. Under `--keepdb` it drops

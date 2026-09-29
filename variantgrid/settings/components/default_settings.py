@@ -247,6 +247,15 @@ CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 CLINGEN_ALLELE_REGISTRY_REATTEMPT_WITH_ACTUAL_REF = True
 CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS = 180  # Set to None to last forever. 180 = ~6 months
 
+# External service clients. Tests use implementations serving recorded data, so they neither depend on the services
+# being up nor take the latency of calling them. Each mock raises when asked for something its recordings don't cover,
+# naming the fixture to add. Settings rather than the test runner, so parallel test workers get them too
+CLINGEN_ALLELE_REGISTRY_API_CLASS = "snpdb.clingen_allele_api.ClinGenAlleleRegistryAPI"
+TRANSCRIPT_SEQUENCE_FETCHER_CLASS = "genes.transcript_sequence_retrieval.TranscriptSequenceFetcher"
+if UNIT_TEST:
+    CLINGEN_ALLELE_REGISTRY_API_CLASS = "snpdb.tests.utils.mock_clingen_api.MockClinGenAlleleRegistryAPI"
+    TRANSCRIPT_SEQUENCE_FETCHER_CLASS = "genes.tests.utils.mock_transcript_sequence_retrieval.MockTranscriptSequenceFetcher"
+
 # --- MatchMaker Exchange -------------------------------------------------
 # Patient-centric, phenotype-aware rare-disease matching federation (GA4GH mme-apis v1.1).
 # Disabled by default; enable per-deployment - needs incoming connections (ie on internet)

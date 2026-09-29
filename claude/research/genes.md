@@ -239,7 +239,7 @@ in mid-2026 (`genes/cdot_data_release.py`, `annotation/gene_annotation_release_m
 the nearest higher (or highest) version when the requested one is missing, then raises `MissingTranscript` if the
 row has no valid data; `genes/models/models_gene.py:TranscriptVersion.raise_bad_or_missing_transcript` tells
 `genes/transcript_errors.py:BadTranscript` (their typo) from `NoTranscript` (our gap) by asking NCBI/Ensembl, and
-caches both answers for a week (`variantgrid/test_runner.py` swaps in
+caches both answers for a week (the `UNIT_TEST` settings swap in
 `genes/tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher` so tests never make them).
 With `HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH` on, `TranscriptVersion.hgvs_ok` excludes a RefSeq transcript whose exon
 lengths do not sum to the fetched sequence length and silently routes it to ClinGen;

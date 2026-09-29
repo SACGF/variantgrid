@@ -67,7 +67,7 @@ Gotchas:
 Tests:
 - genes/fake_data.py:create_fake_transcript_version builds Gene/GeneVersion/Transcript/TranscriptVersion (RUNX1, ENST00000300305.7) for a build; `create_gata2_transcript_version` / `create_pten_transcript_version` add RefSeq examples.
 - Pair those with annotation/fake_data.py:get_fake_annotation_version, which creates the GeneAnnotationRelease and VariantAnnotationVersion that release-scoped code needs.
-- Transcript sequence fetches are mocked for the whole suite by variantgrid/test_runner.py setting `TranscriptSequenceFetcher.override_class` to tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher — add new accessions to the fasta files in tests/test_data rather than hitting NCBI/Ensembl.
+- Transcript sequence fetches are mocked for the whole suite by the UNIT_TEST setting `TRANSCRIPT_SEQUENCE_FETCHER_CLASS` = tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher — add new accessions to the fasta files in tests/test_data rather than hitting NCBI/Ensembl.
 - tests/test_urls.py:Test is the URLTestCase for every genes page (owner vs non-owner permission checks included).
 - tests/test_hgvs_corpus.py:HGVSCorpusTests runs tests/test_data/hgvs_corpus.tsv (400+ strings, malformed on purpose) through HGVSComponents; add new edge cases there.
 - tests/test_hgvs.py needs the fake annotation version and a genome fasta for coordinate resolution, and is the slow one.

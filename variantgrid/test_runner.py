@@ -11,23 +11,14 @@ from django.test.runner import DiscoverRunner
 
 import library.genomics.fasta_wrapper as fasta_wrapper
 from annotation.fake_data import get_fake_annotation_version
-from genes.tests.utils.mock_transcript_sequence_retrieval import MockTranscriptSequenceFetcher
-from genes.transcript_sequence_retrieval import TranscriptSequenceFetcher
-from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 
 
 class VariantGridTestRunner(DiscoverRunner):
-    """ Points the external service clients at implementations serving recorded data, so tests neither
-        depend on those services being up nor take the latency of calling them.
-
-        Each mock raises when asked for something its recordings don't cover, naming the fixture to add. """
-
-    def setup_test_environment(self, **kwargs):
-        super().setup_test_environment(**kwargs)
-        ClinGenAlleleRegistryAPI.override_class = MockClinGenAlleleRegistryAPI
-        TranscriptSequenceFetcher.override_class = MockTranscriptSequenceFetcher
+    """ Seeds the kept test database before cloning it for parallel workers, and cleans up the per-suite
+        import processing dir. External service clients are swapped for recorded-data mocks in settings
+        (CLINGEN_ALLELE_REGISTRY_API_CLASS etc.), not here - a spawned worker never runs this runner's
+        setup_test_environment """
 
     def teardown_test_environment(self, **kwargs):
         super().teardown_test_environment(**kwargs)

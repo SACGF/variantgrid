@@ -122,8 +122,10 @@ class Test(URLTestCase):
 
 ## External services in tests
 
-`variantgrid/test_runner.py:VariantGridTestRunner.setup_test_environment` sets `override_class` on two clients, so
-tests never reach the network:
+The `UNIT_TEST` block in `variantgrid/settings/components/default_settings.py` points `CLINGEN_ALLELE_REGISTRY_API_CLASS`
+and `TRANSCRIPT_SEQUENCE_FETCHER_CLASS` at recorded-data mocks, so tests never reach the network. It is a setting rather
+than the test runner because `--parallel` workers are spawned (forkserver, the Linux default from Python 3.14) and never
+run the runner's `setup_test_environment`. A test wanting another client uses `override_settings`:
 
 - ClinGen Allele Registry → `MockClinGenAlleleRegistryAPI`. HGVS lookups come from `snpdb/tests/test_data/clingen_hgvs_responses.json` (verbatim API JSON keyed by HGVS string), canonical alleles from `CANONICAL_ALLELES` in the mock. A miss raises `ValueError` naming the file to add the recording to; record it against the real registry and paste the JSON in.
 - RefSeq/Ensembl transcript sequences → `MockTranscriptSequenceFetcher`, served from `genes/tests/test_data/transcript_sequences_{refseq,ensembl}.fasta`. A miss raises `BadTranscript` naming the FASTA; fetch with `TranscriptVersionSequenceInfo.get(accession)` on a real deployment and append `>accession` + sequence.

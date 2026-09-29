@@ -92,9 +92,9 @@ Gotchas:
   `env_developers/` checked before `env/`) and only logs an error when no file matches.
 - `library/vg/inspect/__init__.py:inspect` opens `transaction.atomic()` and calls `set_rollback(True)` only after the
   inspector returns: marking rollback first makes Django refuse every query in the block (TransactionManagementError).
-Tests: `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner`, which swaps `ClinGenAlleleRegistryAPI`
-and `TranscriptSequenceFetcher` for recorded mocks that raise, naming the fixture to add, when asked for anything
-unrecorded; `FastaRecordingRunner` regenerates the sparse test fastas. Page tests extend
+Tests: settings under `UNIT_TEST` swap `ClinGenAlleleRegistryAPI` and `TranscriptSequenceFetcher` for recorded mocks
+that raise, naming the fixture to add, when asked for anything unrecorded. `TEST_RUNNER` is
+`variantgrid/test_runner.py:VariantGridTestRunner`; `FastaRecordingRunner` regenerates the sparse test fastas. Page tests extend
 `library/django_utils/unittest_utils.py:URLTestCase` (Celery eager, plain static storage, annotation web resources
 off) and use `_test_urls` / `_test_datatable_urls` / `_test_autocomplete_urls` / `_test_datatables_grid_urls_contains_objs`.
 Count queries with `library/django_utils/unittest_utils.py:production_query_count`, which drops savepoints and the

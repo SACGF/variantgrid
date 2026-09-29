@@ -15,6 +15,7 @@ from functools import lru_cache
 
 import requests
 from django.conf import settings
+from django.utils.module_loading import import_string
 
 from library.constants import MINUTE_SECS
 from library.django_utils.django_file_utils import get_import_processing_filename
@@ -77,13 +78,13 @@ class ClinGenAlleleRegistryUnavailableException(ClinGenAllele.ClinGenAlleleRegis
 class ClinGenAlleleRegistryAPI:
     """ Manages API connections to ClinGen Allele Registry """
 
-    override_class = None  # Tests sub in a recorded-response implementation - @see variantgrid.test_runner
     # Gateway / unavailable. 500 is also used for input errors (e.g. "Unknown reference") so isn't retried
     RETRY_STATUS_CODES = {502, 503, 504}
 
     @classmethod
     def instance(cls, **kwargs) -> 'ClinGenAlleleRegistryAPI':
-        return (cls.override_class or cls)(**kwargs)
+        """ settings.CLINGEN_ALLELE_REGISTRY_API_CLASS - tests serve recorded responses """
+        return import_string(settings.CLINGEN_ALLELE_REGISTRY_API_CLASS)(**kwargs)
 
     def __init__(self, api_failure_output_filename=None, max_attempts=3, retry_backoff_secs=5):
         """ max_attempts/retry_backoff_secs apply to PUTs. Batch jobs can wait out an outage, a user waiting on
