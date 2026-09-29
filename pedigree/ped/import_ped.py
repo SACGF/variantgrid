@@ -3,8 +3,8 @@ import logging
 import pandas as pd
 from django.db.models.aggregates import Count
 from guardian.shortcuts import assign_perm
-from toposort import toposort
 
+from library.utils.collection_utils import toposort_groups
 from pedigree.models import PedFile, PedFileFamily, PedFileRecord, create_automatch_pedigree
 from pedigree.ped.ped_file_utils import PED_COLUMNS, get_affection, get_parent_id, get_sex
 from snpdb.models import Cohort, ImportStatus
@@ -12,7 +12,7 @@ from snpdb.models import Cohort, ImportStatus
 
 def save_ped_records(ped_file_family, family_df, dependency_graph):
     ped_records_dict = {}
-    for samples in toposort(dependency_graph):
+    for samples in toposort_groups(dependency_graph):
         for sample in samples:
             record = family_df.loc[sample]
             father_id = get_parent_id(record['father'])

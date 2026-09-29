@@ -90,7 +90,7 @@ uv venv under systemd (#1572). `variantgrid/deployment_validation/tool_version_c
   recessive hit unless `require_zygosity` is off - and even that only admits no-calls.
 - **One bad family aborts the rest.** `import_ped` raises on the first invalid family: earlier families are already
   saved, later ones never are, and a family with no affected member (or a parent ID not in the family - a `KeyError`,
-  or a parent cycle - `toposort` error) fails the whole upload.
+  or a parent cycle - `graphlib.CycleError`) fails the whole upload.
 - **Auto-match is not idempotent.** Re-uploading the same PED file creates another PedFile and another auto Pedigree per
   matching cohort.
 - **The chart needs an upload.** `PedigreeChart.save` reads `ped_file.uploadedpedfile`, so a PedFile made any other way

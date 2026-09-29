@@ -2,15 +2,14 @@ stream-zip
 more-itertools
 beautifulsoup4
 bgzip>=0.5.0
+bleach
 biopython>=1.81
 cdot>=0.2.31
 celery
-ConfigArgParse
-dataclasses-json
+dataclasses-json==0.6.7  # pinned for omniimporter
 crispy-bootstrap4
 cryptography>=50.0.0
 cyvcf2>=0.30.14
-deprecation
 Django>=6.0.7
 django-amazon-ses
 django-auditlog>=3.0.0
@@ -22,8 +21,6 @@ django-compressor
 django_crispy_forms
 django_dag
 django_datetime_utc
-django_debug_toolbar
-django_downloadview
 django-extensions
 django_glrm
 django-guardian
@@ -44,20 +41,18 @@ fontawesomefree==6.4.0
 git+https://github.com/biocommons/hgvs#egg=hgvs
 gunicorn
 html2docx
-HTSeq
 ijson
 kombu
 levenshtein
 lxml
 Markdown
-martor
 matplotlib
-more_itertools
 mozilla_django_oidc
 nameparser
 nltk>=3.10.0
 numpy
 oauthlib
+openpyxl  # pandas read_excel (SA Pathology somatic xlsx import)
 pandas
 ped_parser
 pillow>=12.3.0
@@ -70,15 +65,11 @@ python_dateutil
 redis
 requests>=2.32.0
 requests_oauthlib
-rich
 rollbar
 scipy
-simplejson
 sqlparse>=0.6.0
 tblib  # picklable tracebacks for manage.py test --parallel
-toposort
 typing-extensions  # @deprecated until Python 3.13 (warnings.deprecated)
-Unidecode
 xhtml2pdf
 # below are only required for environments directly integrating with s3
 # separate to django-amazon-ses
@@ -87,11 +78,8 @@ django-storages
 django_threadlocals
 frozendict
 pydantic>=2.4.0
-deepdiff
 
 # --- linting & type checking (dev only) ---
-dataclasses-json==0.6.7
-# required for omniimporter
 # Run: mypy --config-file mypy.ini snpdb   (or any app)
 # Lint: ./scripts/linting/run_pylint.sh   |   ruff check
 ruff
@@ -100,6 +88,4 @@ django-stubs
 djangorestframework-stubs
 pylint
 pylint-django
-# Import contracts: lint-imports (reads .importlinter)
-import-linter
-openpyxl
+# Import contracts are not installed here (import-linter pulls in rich): uvx --from import-linter lint-imports

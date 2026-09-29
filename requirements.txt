@@ -56,7 +56,7 @@ bioutils==0.6.1
     #   cdot
     #   hgvs
 bleach==6.4.0
-    # via martor
+    # via -r requirements.in
 boto3==1.43.89
     # via
     #   -r requirements.in
@@ -65,8 +65,6 @@ botocore==1.43.89
     # via
     #   boto3
     #   s3transfer
-cachebox==5.2.3
-    # via deepdiff
 cdot==0.2.31
     # via -r requirements.in
 celery==5.6.3
@@ -90,7 +88,6 @@ click==8.5.0
     #   click-plugins
     #   click-repl
     #   cyvcf2
-    #   import-linter
     #   nltk
     #   ped-parser
 click-didyoumean==0.3.1
@@ -107,8 +104,6 @@ coloredlogs==15.0.1
     # via
     #   biocommons-seqrepo
     #   cyvcf2
-configargparse==1.7.7
-    # via -r requirements.in
 contourpy==1.3.3
     # via matplotlib
 crispy-bootstrap4==2026.2
@@ -129,12 +124,8 @@ dataclasses-json==0.6.7
     # via -r requirements.in
 decorator==5.3.1
     # via ipython
-deepdiff==9.1.0
-    # via -r requirements.in
 defusedxml==0.7.1
     # via nltk
-deprecation==2.1.0
-    # via -r requirements.in
 dill==0.4.1
     # via pylint
 django==6.1.1
@@ -149,8 +140,6 @@ django==6.1.1
     #   django-compressor
     #   django-crispy-forms
     #   django-datetime-utc
-    #   django-debug-toolbar
-    #   django-downloadview
     #   django-extensions
     #   django-guardian
     #   django-js-reverse
@@ -165,7 +154,6 @@ django==6.1.1
     #   drf-spectacular
     #   drf-spectacular-sidecar
     #   easy-thumbnails
-    #   martor
     #   mozilla-django-oidc
 django-amazon-ses==4.0.1
     # via -r requirements.in
@@ -192,10 +180,6 @@ django-crispy-forms==2.7
 django-dag==1.4.3
     # via -r requirements.in
 django-datetime-utc==1.0.6
-    # via -r requirements.in
-django-debug-toolbar==8.0.0
-    # via -r requirements.in
-django-downloadview==2.5.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
@@ -261,8 +245,6 @@ frozenlist==1.8.0
     # via
     #   aiohttp
     #   aiosignal
-grimp==3.17
-    # via import-linter
 gunicorn==26.2.0
     # via -r requirements.in
 hgvs @ git+https://github.com/biocommons/hgvs@46bf1903254eec957507b1aeb8fd39384d37f6f5#egg=hgvs
@@ -275,8 +257,6 @@ html5lib==1.1
     # via
     #   django-htmlmin
     #   xhtml2pdf
-htseq==2.1.2
-    # via -r requirements.in
 humanfriendly==10.0
     # via coloredlogs
 idna==3.19
@@ -284,8 +264,6 @@ idna==3.19
     #   requests
     #   yarl
 ijson==3.5.1
-    # via -r requirements.in
-import-linter==2.15
     # via -r requirements.in
 importlib-metadata==9.0.1
     # via yoyo-migrations
@@ -334,23 +312,15 @@ lxml==6.1.3
     #   python-docx
     #   svglib
 markdown==3.10.3
-    # via
-    #   -r requirements.in
-    #   martor
-markdown-it-py==4.2.0
-    # via rich
+    # via -r requirements.in
 marshmallow==3.26.2
     # via dataclasses-json
-martor==1.8.2
-    # via -r requirements.in
 matplotlib==3.11.1
     # via -r requirements.in
 matplotlib-inline==0.2.2
     # via ipython
 mccabe==0.7.0
     # via pylint
-mdurl==0.1.2
-    # via markdown-it-py
 more-itertools==11.1.0
     # via
     #   -r requirements.in
@@ -382,7 +352,6 @@ numpy==2.5.3
     #   biopython
     #   contourpy
     #   cyvcf2
-    #   htseq
     #   matplotlib
     #   pandas
     #   scipy
@@ -392,13 +361,10 @@ oauthlib==3.3.1
     #   requests-oauthlib
 openpyxl==3.1.5
     # via -r requirements.in
-orderly-set==5.5.0
-    # via deepdiff
 oscrypto==1.3.0
     # via pyhanko-certvalidator
 packaging==26.3
     # via
-    #   deprecation
     #   django-js-reverse
     #   kombu
     #   marshmallow
@@ -465,7 +431,6 @@ pygments==2.21.0
     # via
     #   ipython
     #   pytest
-    #   rich
 pyhanko==0.37.0
     # via xhtml2pdf
 pyhanko-certvalidator==0.32.1
@@ -495,7 +460,6 @@ pysam==0.24.0
     # via
     #   -r requirements.in
     #   biocommons-seqrepo
-    #   htseq
 pytest==9.1.1
     # via ped-parser
 python-bidi==0.6.11
@@ -538,17 +502,11 @@ requests==2.34.2
     #   biocommons-seqrepo
     #   bioutils
     #   cdot
-    #   django-downloadview
-    #   martor
     #   mozilla-django-oidc
     #   requests-oauthlib
     #   rollbar
 requests-oauthlib==2.0.0
     # via -r requirements.in
-rich==15.0.0
-    # via
-    #   -r requirements.in
-    #   import-linter
 rjsmin==1.2.5
     # via django-compressor
 rollbar==1.4.0
@@ -563,8 +521,6 @@ s3transfer==0.19.2
     # via boto3
 scipy==1.18.1
     # via -r requirements.in
-simplejson==4.1.2
-    # via -r requirements.in
 six==1.17.0
     # via
     #   html5lib
@@ -577,7 +533,6 @@ sqlparse==0.6.0
     # via
     #   -r requirements.in
     #   django
-    #   django-debug-toolbar
     #   yoyo-migrations
 stack-data==0.6.3
     # via ipython
@@ -596,8 +551,6 @@ tinycss2==1.5.1
     #   svglib
 tomlkit==0.15.1
     # via pylint
-toposort==1.10
-    # via -r requirements.in
 tqdm==4.70.0
     # via
     #   biocommons-seqrepo
@@ -621,7 +574,6 @@ typing-extensions==4.16.0
     #   django-stubs
     #   django-stubs-ext
     #   djangorestframework-stubs
-    #   import-linter
     #   mypy
     #   psycopg
     #   psycopg-pool
@@ -636,15 +588,11 @@ typing-inspect==0.9.0
 typing-inspection==0.4.4
     # via pydantic
 tzdata==2026.3
-    # via
-    #   kombu
-    #   martor
+    # via kombu
 tzlocal==5.4.4
     # via
     #   celery
     #   pyhanko
-unidecode==1.4.0
-    # via -r requirements.in
 uritemplate==4.2.0
     # via drf-spectacular
 uritools==6.1.3
@@ -652,7 +600,6 @@ uritools==6.1.3
 urllib3==2.7.0
     # via
     #   botocore
-    #   martor
     #   requests
 vine==5.1.0
     # via
@@ -674,6 +621,4 @@ yarl==1.24.5
 yoyo-migrations==9.0.0
     # via biocommons-seqrepo
 zipp==4.1.0
-    # via
-    #   importlib-metadata
-    #   martor
+    # via importlib-metadata

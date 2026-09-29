@@ -31,7 +31,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import cyvcf2
-import simplejson
 
 from genes.gene_splice import ResolvedSpliceEvent, SpliceEventResolver
 from library.genomics.vcf_enums import VCFColumns, VCFSymbolicAllele
@@ -41,6 +40,7 @@ from library.genomics.vcf_writer import (
     build_header_lines,
     percent_encode_info_value,
 )
+from library.utils.json_utils import json_dumps_nan_as_null
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
 from snpdb.vcf_utils import vcf_header_filter_ids
@@ -207,7 +207,7 @@ def write_splicegirl_vcf(filename: str, rewrite: SpliceGirlRewrite, reader: cyvc
             info = {
                 "END": variant_coordinate.position,
                 SPLICE_INFO: record.event.canonical_str,
-                SPLICE_OBSERVATION_INFO: simplejson.dumps(record.observation, ignore_nan=True),
+                SPLICE_OBSERVATION_INFO: json_dumps_nan_as_null(record.observation),
             }
             writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
                                 variant_coordinate.ref, variant_coordinate.alt,

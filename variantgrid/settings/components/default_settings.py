@@ -1037,7 +1037,6 @@ INSTALLED_APPS = [
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'martor',
     "psqlextra",
     'rest_framework',
     'rest_framework.authtoken',

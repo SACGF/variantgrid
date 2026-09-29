@@ -1,10 +1,12 @@
 import json
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from decimal import Decimal
 from functools import cached_property
 from typing import Any, Optional, Union
+
 from dataclasses_json import config
 from django.db.models.enums import TextChoices
 
@@ -210,6 +212,25 @@ class JsonDiffs:
                 diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
         else:
             diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
+
+
+def _non_finite_to_none(obj):
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _non_finite_to_none(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_non_finite_to_none(v) for v in obj]
+    return obj
+
+
+def json_dumps_nan_as_null(obj, **kwargs) -> str:
+    """ json.dumps writing NaN/Infinity as null (they aren't valid JSON, and Postgres JSONB rejects them).
+        Only walks the object when the fast C encoder output shows one is present """
+    json_str = json.dumps(obj, **kwargs)
+    if "NaN" in json_str or "Infinity" in json_str:
+        json_str = json.dumps(_non_finite_to_none(obj), **kwargs)
+    return json_str
 
 
 def json_default_converter(obj):
