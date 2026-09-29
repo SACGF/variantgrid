@@ -88,7 +88,6 @@ click==8.5.0
     #   click-plugins
     #   click-repl
     #   cyvcf2
-    #   import-linter
     #   nltk
     #   ped-parser
 click-didyoumean==0.3.1
@@ -249,8 +248,6 @@ frozenlist==1.8.0
     # via
     #   aiohttp
     #   aiosignal
-grimp==3.17
-    # via import-linter
 gunicorn==26.2.0
     # via -r requirements.in
 hgvs @ git+https://github.com/biocommons/hgvs@46bf1903254eec957507b1aeb8fd39384d37f6f5#egg=hgvs
@@ -270,8 +267,6 @@ idna==3.19
     #   requests
     #   yarl
 ijson==3.5.1
-    # via -r requirements.in
-import-linter==2.15
     # via -r requirements.in
 importlib-metadata==9.0.1
     # via yoyo-migrations
@@ -321,8 +316,6 @@ lxml==6.1.3
     #   svglib
 markdown==3.10.3
     # via -r requirements.in
-markdown-it-py==4.2.0
-    # via rich
 marshmallow==3.26.2
     # via dataclasses-json
 matplotlib==3.11.1
@@ -331,8 +324,6 @@ matplotlib-inline==0.2.2
     # via ipython
 mccabe==0.7.0
     # via pylint
-mdurl==0.1.2
-    # via markdown-it-py
 more-itertools==11.1.0
     # via
     #   -r requirements.in
@@ -443,7 +434,6 @@ pygments==2.21.0
     # via
     #   ipython
     #   pytest
-    #   rich
 pyhanko==0.37.0
     # via xhtml2pdf
 pyhanko-certvalidator==0.32.1
@@ -520,8 +510,6 @@ requests==2.34.2
     #   rollbar
 requests-oauthlib==2.0.0
     # via -r requirements.in
-rich==15.0.0
-    # via import-linter
 rjsmin==1.2.5
     # via django-compressor
 rollbar==1.4.0
@@ -590,7 +578,6 @@ typing-extensions==4.16.0
     #   django-stubs
     #   django-stubs-ext
     #   djangorestframework-stubs
-    #   import-linter
     #   mypy
     #   psycopg
     #   psycopg-pool

@@ -89,5 +89,4 @@ django-stubs
 djangorestframework-stubs
 pylint
 pylint-django
-# Import contracts: lint-imports (reads .importlinter)
-import-linter
+# Import contracts are not installed here (import-linter pulls in rich): uvx --from import-linter lint-imports
