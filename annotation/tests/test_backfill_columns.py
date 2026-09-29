@@ -1,7 +1,5 @@
 """
 Backfilling VariantAnnotation columns from an annotated VCF (#1675).
-
-@see claude/plans/1675_backfill_annotation_column_plan.md
 """
 import os
 import tempfile

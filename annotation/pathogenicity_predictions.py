@@ -111,7 +111,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_pathogenic_threshold=0.13,
         source="Pejaver 2022", source_detail=_PEJAVER_2022[0], source_url=_PEJAVER_2022[1],
     ),
-    # CADD - Kircher 2014, Nat Genet (DOI 10.1038/ng.2892). claude/pdfs/nihms555958.pdf.
+    # CADD - Kircher 2014, Nat Genet (DOI 10.1038/ng.2892).
     # Pejaver 2022 calibrated CADD_phred PP3-supporting band [25.3, 28.1); BP4-supporting upper 22.7.
     # We slider on cadd_phred (the user-facing scale). cadd_raw is not exposed as a slider.
     PathogenicityTool(
@@ -191,7 +191,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         pred_pathogenic_values=("D",),
         source="dbNSFP readme 82", source_detail=_LI_2022[0], source_url=_LI_2022[1],
     ),
-    # MPC - Samocha 2017, bioRxiv 148353 (DOI 10.1101/148353). claude/pdfs/148353v1.full.pdf.
+    # MPC - Samocha 2017, bioRxiv 148353 (DOI 10.1101/148353).
     # Range 0-5 (page 14). Pejaver 2022 PP3-supporting band [1.360, 1.828). No BP4 band defined.
     PathogenicityTool(
         name="MPC",
@@ -228,7 +228,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         pred_pathogenic_values=("D",),
         source="Pejaver 2022", source_detail=_PEJAVER_2022[0], source_url=_PEJAVER_2022[1],
     ),
-    # REVEL - Ioannidis 2016, AJHG (DOI 10.1016/j.ajhg.2016.08.016). claude/pdfs/main.pdf.
+    # REVEL - Ioannidis 2016, AJHG (DOI 10.1016/j.ajhg.2016.08.016).
     # Pejaver 2022 PP3-supporting band [0.644, 0.773); BP4-supporting upper 0.290.
     PathogenicityTool(
         name="REVEL",
@@ -240,7 +240,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_pathogenic_threshold=0.644,
         source="Pejaver 2022", source_detail=_PEJAVER_2022[0], source_url=_PEJAVER_2022[1],
     ),
-    # VARITY_R - Wu 2021, AJHG (DOI 10.1016/j.ajhg.2021.08.012). claude/pdfs/1-s2.0-S0002929721003207-mainext.pdf.
+    # VARITY_R - Wu 2021, AJHG (DOI 10.1016/j.ajhg.2021.08.012).
     # Bergquist 2024 PP3-supporting band [0.252, 0.674]; BP4-supporting upper 0.251. Adjacent-band note
     # as for AlphaMissense.
     PathogenicityTool(
@@ -264,7 +264,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_pathogenic_threshold=None,
         source="Wu 2021 (no calibration)", source_detail=_WU_2021[0], source_url=_WU_2021[1],
     ),
-    # VEST4 - Carter 2013, BMC Genomics (DOI 10.1186/1471-2164-14-S3-S3). claude/pdfs/1471-2164-14-S3-S3.pdf.
+    # VEST4 - Carter 2013, BMC Genomics (DOI 10.1186/1471-2164-14-S3-S3).
     # Pejaver 2022 PP3-supporting band [0.764, 0.861); BP4-supporting upper 0.449.
     PathogenicityTool(
         name="VEST4",

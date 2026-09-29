@@ -6,7 +6,7 @@ from django.db.models.deletion import SET_NULL
 class DataArchiveMixin(models.Model):
     """ Stamps a model when its underlying data has been dropped but the row is kept.
 
-        @see claude/issue_1536_data_archive_plan.md
+        @see https://github.com/SACGF/variantgrid/issues/1536
     """
     data_archived_date = models.DateTimeField(null=True, blank=True)
     data_archived_by = models.ForeignKey(
