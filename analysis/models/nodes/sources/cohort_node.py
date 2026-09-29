@@ -183,6 +183,12 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
+            if not cohort.is_sub_cohort:
+                # The genotype join is a LEFT OUTER, and default count bounds are dropped as no-ops, so
+                # without this a full cohort with no zygosity filter returns every variant in the database
+                alias = self.cohort_genotype_collection.cohortgenotype_alias
+                q_in_cohort = Q(**{f"{alias}__isnull": False})
+                self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q_in_cohort): q_in_cohort}})
             self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
             self.merge_arg_q_dicts(arg_q_dict, self.get_cohort_settings_arg_q_dict(cohort))
         return arg_q_dict
