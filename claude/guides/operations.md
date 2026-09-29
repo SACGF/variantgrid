@@ -162,11 +162,13 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 
 ## Authentication surface
 
-`library/django_utils/login_required_middleware.py:SiteLoginRequiredMiddleware` requires login on every view not marked
-`login_not_required`, and sends anonymous users to `LOGIN_URL` (OIDC on Shariant). DRF marks every `APIView` and `ViewSet`
-`login_not_required`, so REST endpoints skip it and DRF's `IsAuthenticated` default answers 401/403 instead - a DRF view with
-empty `permission_classes` (`beacon/views_rest.py`, `mme/views_rest.py`) is public. Third-party URLconfs that must work before
-login (registration, OIDC) are mounted with `login_not_required_include` in `variantgrid/urls.py`. The URL path exempts nothing.
+Django's `LoginRequiredMiddleware` requires login on every view not marked `login_not_required`, redirecting to the view's
+`login_url` or else `LOGIN_URL` (OIDC on Shariant). DRF marks every `APIView` and `ViewSet` `login_not_required`, so REST
+endpoints skip it and DRF's `IsAuthenticated` default answers 401/403 instead - a DRF view with empty `permission_classes`
+(`beacon/views_rest.py`, `mme/views_rest.py`) is public. Third-party URLconfs that must work before login (registration, OIDC)
+are mounted with `library/django_utils/view_utils.py:login_not_required_include` in `variantgrid/urls.py`. Admin views name
+the admin login as their `login_url`, and Django marks it `login_not_required`, so `variantgrid/urls.py` wraps
+`admin.site.login` in `login_required` to keep the admin password form behind the site login. The URL path exempts nothing.
 `variantgrid/views_rest.py:CapabilitiesView` (`/api/v1/capabilities`) tells a client which calls this server accepts, as VG3 and
 VG4 run side by side. `API_FEATURES` is the client contract: add a name in the same change as a client-visible feature, and keep
 names once added. `upload_file_types` is derived from the import task factories, so it needs no upkeep. A server too old to have

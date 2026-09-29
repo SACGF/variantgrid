@@ -3,18 +3,20 @@ from django.conf import settings
 from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.decorators import login_not_required, login_required
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
 from django.views.generic.base import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-from library.django_utils.login_required_middleware import login_not_required_include
+from library.django_utils.view_utils import login_not_required_include
 from variantgrid import views
 from variantgrid.views import ContactFormView, OneStepRegistrationView
 from variantgrid.views_rest import CapabilitiesView
 
 admin.autodiscover()
+# Django marks the admin login login_not_required - send anonymous users to the site login (OIDC on Shariant) instead
+admin.site.login = login_required(admin.site.login)
 
 APPS_WITH_URLS = [
     "analysis",

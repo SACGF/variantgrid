@@ -107,10 +107,9 @@ week old, except packages we publish (cdot), listed in `exclude-newer-package`.
 ### Security
 Two protections are global middleware, so individual views do **not** need per-view decorators for either - their
 absence is intentional and must not be flagged during audits:
-- **Login:** `library/django_utils/login_required_middleware.py:SiteLoginRequiredMiddleware` (Django's
-  `LoginRequiredMiddleware`) enforces login on all views, so no view needs `@login_required`; a public view uses Django's
-  `@login_not_required`. DRF views are already marked `login_not_required` and authenticate at view time
-  (`claude/guides/operations.md#authentication-surface`).
+- **Login:** Django's `LoginRequiredMiddleware` enforces login on all views, so no view needs `@login_required`; a
+  public view uses Django's `@login_not_required`. DRF views are already marked `login_not_required` and authenticate at
+  view time (`claude/guides/operations.md#authentication-surface`).
 - **CSRF:** Django's `CsrfViewMiddleware` is active globally, so state-changing views, grid handlers included, need no `@csrf_protect`.
 
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so REST endpoints need no explicit `permission_classes`.

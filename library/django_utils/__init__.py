@@ -10,7 +10,7 @@ import datetime
 import operator
 import os
 from functools import reduce
-from functools import wraps, partial
+from functools import wraps
 from typing import Any
 
 import nameparser
@@ -18,7 +18,6 @@ from cache_memoize import cache_memoize
 from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
 from django.db.models import F, JSONField
 from django.db.models.aggregates import Count, Max
@@ -27,7 +26,7 @@ from django.db.models.fields.reverse_related import OneToOneRel
 from django.db.models.options import Options
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
-from django.urls.base import reverse_lazy
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django.views import View
@@ -182,7 +181,17 @@ def get_field_counts(qs, field):
     return field_counts
 
 
-staff_only = partial(staff_member_required, login_url=reverse_lazy('staff_only'))
+def staff_only(view_func):
+    """ A logged-in user who isn't active staff gets the staff_only page. Anonymous users never reach this -
+        LoginRequiredMiddleware sends them to LOGIN_URL """
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if request.user.is_active and request.user.is_staff:
+            return view_func(request, *args, **kwargs)
+        return redirect('staff_only')
+
+    return wrapper
 
 
 def ensure_timezone_aware(datetime_date):

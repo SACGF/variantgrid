@@ -4,7 +4,7 @@ Needs Django set up (the resolver imports every urls.py and view module); never 
 
 Templates are best-effort: `template_name` on a class-based view, otherwise any '*.html' literal in
 the view function's source. API rows are DRF views or paths under an /api/ segment; Public rows are views
-marked login_not_required (DRF views included), which SiteLoginRequiredMiddleware skips.
+marked login_not_required (DRF views included), which LoginRequiredMiddleware skips.
 """
 import inspect
 import re

@@ -46,7 +46,7 @@ still registered but wrapped in `require_superuser`; `variantgrid/perm_path.py:r
 URLs (#1869). Templates read the same register through `variantgrid/perm_path.py:get_visible_url_names` (as
 `url_name_visible`) to hide menu items and tabs, and `variantgrid/tips.py` uses it to show only tips about reachable pages.
 
-Middleware order in `default_settings` matters: `SiteLoginRequiredMiddleware` sits after auth, then Rollbar, auditlog,
+Middleware order in `default_settings` matters: `LoginRequiredMiddleware` sits after auth, then Rollbar, auditlog,
 `library/request_context.py:RequestContextMiddleware`, `eventlog/middleware.py:IntegrationApiMiddleware`, and axes last. Views that must be
 public use `@login_not_required` (`claude/guides/operations.md#authentication-surface`)
 (`variantgrid/views.py:index`, `loading_animations`, the error handlers). The `connection_created` receiver

@@ -870,7 +870,7 @@ MIDDLEWARE = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'library.django_utils.login_required_middleware.SiteLoginRequiredMiddleware',  # Must be after other auth middleware
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',  # Must be after other auth middleware
     'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
     'auditlog.middleware.AuditlogMiddleware',
     #'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
@@ -1164,7 +1164,7 @@ LOGGING = {
     }
 }
 
-# Instead of @login_required, SiteLoginRequiredMiddleware requires login everywhere. A view opts out with
+# Instead of @login_required, LoginRequiredMiddleware requires login everywhere. A view opts out with
 # @login_not_required (django.contrib.auth.decorators); DRF views are already marked, and check auth at view time.
 
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control
