@@ -16,13 +16,13 @@ from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.variant_tag_operations import resolve_requires_classification_tags
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild, Tag, TagConfigCollection, Variant
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 

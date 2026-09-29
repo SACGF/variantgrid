@@ -4,7 +4,7 @@ from typing import Optional
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.gene_fusions import (
     GeneFusionResolver,
     find_gene_fusions_for_string,
@@ -12,8 +12,8 @@ from genes.gene_fusions import (
 )
 from genes.models import (
     HGNC,
-    GeneLevelId,
     GeneFusion,
+    GeneLevelId,
     GeneSymbol,
     GeneSymbolAlias,
     HGNCImport,

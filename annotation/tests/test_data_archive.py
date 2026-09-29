@@ -14,7 +14,7 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_annotation_version,
     get_variants_qs_for_annotation,
 )
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,

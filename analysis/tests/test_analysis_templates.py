@@ -22,7 +22,7 @@ from analysis.models import (
 )
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import prevent_request_warnings
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
 from snpdb.models import (

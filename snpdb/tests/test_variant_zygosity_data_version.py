@@ -4,8 +4,8 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild, VariantZygosityCountCollection
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.variant_zygosity_count import update_variant_zygosity_count_for_vcf
 
 

@@ -22,7 +22,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,

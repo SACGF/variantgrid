@@ -14,9 +14,9 @@ from pedigree.models import (
     create_automatch_pedigree,
     validate,
 )
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
 def _make_family(user, name="FAM001"):

@@ -1,7 +1,7 @@
 """Splice event identity - the canonical label, the alt encoding, and how a junction gets its name."""
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.gene_splice import (
     SPLICE_STRING_PATTERN,
     SpliceEventResolver,

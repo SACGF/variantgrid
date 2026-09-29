@@ -8,7 +8,7 @@ from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     get_or_create_variant_annotation_version_from_current_vep,
 )
-from annotation.fake_annotation import get_fake_annotation_settings_dict
+from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import (
     ALoFTPrediction,

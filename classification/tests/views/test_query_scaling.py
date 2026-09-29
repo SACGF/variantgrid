@@ -11,7 +11,7 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
     create_classification_for_sample_and_variant_objects,
 )

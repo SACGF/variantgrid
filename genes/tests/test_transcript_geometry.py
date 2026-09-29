@@ -1,7 +1,7 @@
 from django.test import TestCase
 
-from annotation.tests.test_data_fake_genes import create_gata2_transcript_version
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import TranscriptGeometry
+from genes.fake_data import create_gata2_transcript_version
 from snpdb.models.models_genome import GenomeBuild
 
 

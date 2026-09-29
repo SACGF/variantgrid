@@ -11,12 +11,12 @@ from django.utils import timezone
 
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from snpdb.archive import DataArchivedError
-from snpdb.models import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import (
+from snpdb.fake_data import (
     create_fake_cohort,
     create_fake_quad,
     create_fake_trio,
 )
+from snpdb.models import GenomeBuild
 
 
 class SourceNodeArchiveToleranceTests(TestCase):

@@ -8,7 +8,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
+from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.hgvs import HGVSMatcher
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.models import MANE, TranscriptVersion
@@ -20,7 +20,7 @@ from snpdb.signals.variant_search import _get_search_hgvs_gene_symbol_transcript
 def _make_transcript_version(genome_build, accession, gene_symbol, annotation_consortium,
                              contig, length, tag=None) -> TranscriptVersion:
     gene_id = f"GENE_{accession}"
-    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol, annotation_consortium)
+    gene_version = create_fake_gene_version(genome_build, gene_id, gene_symbol, annotation_consortium)
     build_data = {
         "url": "fake",
         # single exon [start, end] - get_tx_ac_tags_for_gene ranks by sum(end-start)
@@ -42,7 +42,7 @@ def _make_transcript_version(genome_build, accession, gene_symbol, annotation_co
         "stop_codon": length,
         "genome_builds": {genome_build.name: build_data},
     }
-    return _insert_transcript_data(genome_build, data, gene_version)
+    return insert_transcript_data(genome_build, data, gene_version)
 
 
 class TestGeneSymbolResolution(TestCase):

@@ -3,10 +3,11 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import Duo, TagConfigCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
@@ -22,7 +23,6 @@ from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
     GenomicIntervalsCollection,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 
 
 class Test(URLTestCase):

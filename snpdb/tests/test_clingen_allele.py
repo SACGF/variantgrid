@@ -7,7 +7,7 @@ import requests
 from django.db import IntegrityError
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.clingen_allele import (
     ClinGenAlleleAPIException,

@@ -5,7 +5,8 @@ from celery.app.control import Control
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import (
     Cohort,
     CohortGenotypeCollection,
@@ -22,7 +23,6 @@ from snpdb.tasks.cohort_genotype_tasks import (
     create_cohort_genotype_and_launch_task,
     create_cohort_genotype_collection,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.views.vcf_cohort_page import _family_groups_by_sample_id, cohort_zygosity_stats
 
 

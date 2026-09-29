@@ -1,11 +1,12 @@
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 
 from analysis.models import Analysis, VariantTag
 from analysis.user_awards import _analyses_worked_on, _tags_created, _tags_in_hours
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from snpdb.models import GenomeBuild, Tag, Variant
 from snpdb.models.models_user_settings import UserSettingsOverride
 

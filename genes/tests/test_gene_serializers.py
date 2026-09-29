@@ -1,7 +1,7 @@
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from genes.models import TranscriptVersion
 from genes.serializers import GeneDetailSerializer, GeneSymbolDetailSerializer
 from snpdb.models import GenomeBuild

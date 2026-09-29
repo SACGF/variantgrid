@@ -2,7 +2,7 @@ import unittest
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
     create_classification_for_sample_and_variant_objects,
 )

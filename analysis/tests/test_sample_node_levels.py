@@ -50,7 +50,7 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
 from analysis.views.views import CreateClassificationForVariantTagView
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
