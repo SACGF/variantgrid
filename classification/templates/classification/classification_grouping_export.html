@@ -18,9 +18,6 @@
             left: 4px;
         }
     </style>
-    {% comment %}
-    <a href="{% url 'classification_grouping_export' %}">Click here to download</a>
-    {% endcomment %}
 
     <div class="container">
         {% page_help_embedded title="Classification Group Export" %}
@@ -198,6 +195,10 @@
     </div>
 
     <script>
+        function alleleOriginToggle(filterValue) {
+            updateLink();
+        }
+
         function updateLink() {
             let params = {};
 
