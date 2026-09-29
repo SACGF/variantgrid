@@ -90,7 +90,7 @@ Gotchas:
 - Bulk-import guard: while a ClassificationImportRun is ONGOING, per-classification work (grouping, common-variant filters,
   clinical-context recalc) is skipped and caught up on classification_imports_complete_signal
   (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). An abandoned ONGOING run silently stalls all of it.
-- /classification/api/* is in PUBLIC_PATHS, so GlobalLoginRequiredMiddleware skips it: every view under that prefix must be a
+- /classification/api/* is in PUBLIC_PATHS, so the login middleware skips it: every view under that prefix must be a
   DRF APIView so the IsAuthenticated default applies (views/classification_view.py:ClassificationView is the model). A plain
   Django view there is anonymous.
 - EvidenceKeys are rows seeded by data migrations (ls migrations | grep ekey): adding or renaming a key is a migration, and

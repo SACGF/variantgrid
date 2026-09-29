@@ -5,6 +5,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.http.response import HttpResponseNotFound, HttpResponseServerError, JsonResponse
@@ -15,7 +16,6 @@ from django.urls.exceptions import Resolver404
 from django.views.generic import FormView
 from django_recaptcha.fields import ReCaptchaField
 from django_recaptcha.widgets import ReCaptchaV3
-from global_login_required import login_not_required
 from registration.backends.simple.views import RegistrationView as SimpleRegistrationView
 from registration.signals import user_registered
 

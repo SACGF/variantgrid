@@ -106,7 +106,7 @@ class Test(URLTestCase):
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [("cohorts", {}, 200), ("view_user", {"pk": self.user_owner.pk}, 200)]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
-        self._test_urls(URL_NAMES_AND_KWARGS, expected_code_override=302)  # GlobalLoginRequiredMiddleware bounces anon
+        self._test_urls(URL_NAMES_AND_KWARGS, expected_code_override=302)  # the login middleware bounces anon
 ```
 
 - `_test_datatable_urls(...)` hits each URL and again with `?dataTableDefinition=1`; `_test_autocomplete_urls(names_obj_kwargs, user, in_results)` and `_test_datatables_grid_urls_contains_objs(names_obj, user, in_results)` assert an object's pk is (or is not) in the JSON - the standard permission check for grids.
@@ -134,7 +134,7 @@ points there). A test that passes locally but sees `N` bases on CI fetches a reg
 - `UNIT_TEST = sys.argv[1:2] == ['test']` (`default_settings.py`). Under it: the cache is in-process `LocMemCache`, the celery broker is `memory://`, Postgres JIT is off, axes and rollbar are off, passwords hash with MD5 rather than PBKDF2 (~1 s a hash, and the suite creates ~75 users), `ObjectManagerCachingImmutable` / `ObjectManagerCachingRequest` stop caching, and `admin_bot()` is uncached. Nothing in the suite should touch the dev Redis or RabbitMQ; if it does, a setting override is leaking.
 - `CELERY_TASK_ALWAYS_EAGER` is `False` in `celery_settings.py`; with the memory broker a `.delay()` in a plain `TestCase` is enqueued and never runs. Use `URLTestCase` or override it.
 - `get_fake_annotation_version` is the expensive fixture (ontology import, several versions): call it in `setUpTestData`, once per build, never per test. The runner seeds GRCh37 and GRCh38 (see Running tests), so those two builds are cheap; a test running alone still pays for the first call.
-- `ThreadLocalMiddleware` stores the request in a thread-local and never clears it, so a `self.client` request leaves that request behind for later tests in the same process. `UserSettings.get_for_user` and other `get_request_variable` callers then read the leaked request's cache for that user. A test that changes user settings after another test made a request as the same user needs `set_thread_variable('request', None)` in `setUp` (`snpdb/tests/test_lab_members.py`, `variantopedia/tests/test_tagged_variant_grid.py`).
+- `library/request_context.py:RequestContextMiddleware` sets the current request and clears it when the response closes, so a `self.client` request doesn't leave one behind for later tests. Code a test calls directly runs with no current request, and `get_request_variable` / `set_request_variable` then fall back to a store that lasts for the whole test process.
 - Bulk variant builders are named `slowly_*` for a reason: fine for a handful of records, wrong for thousands.
 - `snpdb/tests/test_fasta_index.py` loads the genome fasta `.fai`; `upload/tests/vcf/test_vcf_preprocess.py` writes a placeholder fasta and only asserts the command line (the bcftools pipe itself is not run in tests).
 - Skipped on purpose: `genes/tests/test_hgvs.py` "Needs Ensembl contigs", and four `classification/tests/views/test_classification_view.py` cases pending variantgrid_private#3740.

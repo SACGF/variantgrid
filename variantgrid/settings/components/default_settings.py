@@ -870,27 +870,20 @@ MIDDLEWARE = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'global_login_required.GlobalLoginRequiredMiddleware',  # Must be after other auth middleware
+    'library.django_utils.login_required_middleware.PublicPathsLoginRequiredMiddleware',  # Must be after other auth middleware
     'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
     'auditlog.middleware.AuditlogMiddleware',
     #'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
     # if you want to always avoid 404, use
     # 'rollbar.contrib.django.middleware.RollbarNotifierMiddlewareExcluding404'
 
-    'htmlmin.middleware.HtmlMinifyMiddleware',
-    'htmlmin.middleware.MarkRequestMiddleware',
-    'threadlocals.middleware.ThreadLocalMiddleware',
+    'library.request_context.RequestContextMiddleware',
     'eventlog.middleware.IntegrationApiMiddleware',
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
 
     'axes.middleware.AxesMiddleware',  # Must be last
 )
-HTML_MINIFY = True
-EXCLUDE_FROM_MINIFYING = (
-    '^media/',  # Died in Django 4: FileResponse instance has no 'content' attribute. Use 'streaming_content' instead.
-)
-EXCLUDE_TAGS_FROM_MINIFYING = ("pre", "script", "textarea", "nomin", "code")
 
 ROOT_URLCONF = 'variantgrid.urls'
 
@@ -913,7 +906,7 @@ CACHE_GENERATED_FILES = True
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 
-    # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
+    # NOTE: Middleware is run first - so PublicPathsLoginRequiredMiddleware will reject tokens w/o logins
     # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',  # Needed to classification export clients
@@ -1172,12 +1165,12 @@ LOGGING = {
     }
 }
 
-# Instead of @login_required we use GlobalLoginRequiredMiddleware to block non-auth by
-# default then whitelist with @login_not_required or PUBLIC_PATHS setting below.
+# Instead of @login_required we use PublicPathsLoginRequiredMiddleware to block non-auth by default
+# then whitelist with @login_not_required (django.contrib.auth.decorators) or PUBLIC_PATHS setting below.
 
 # Django REST Framework:
 # DRF overrides Django's internals, so request.user is AnonymousUser during
-# the middleware check (and will fail with GlobalLoginRequiredMiddleware).
+# the middleware check (and will fail with PublicPathsLoginRequiredMiddleware).
 # @see https://github.com/encode/django-rest-framework/issues/760#issuecomment-391127616
 # Thus for DRF we need to exclude it and add its own check (at view time)
 PUBLIC_PATHS = [

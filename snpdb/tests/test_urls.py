@@ -152,7 +152,7 @@ class Test(URLTestCase):
 
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
-        # Make sure that GlobalLoginRequiredMiddleware bounces unauth users
+        # Make sure that the login middleware bounces unauth users
         self._test_urls(URL_NAMES_AND_KWARGS, expected_code_override=302)
 
     def testDataGridUrls(self):

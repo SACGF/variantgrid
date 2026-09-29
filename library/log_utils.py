@@ -4,7 +4,7 @@ log_admin_change for audit, and the NotificationBuilder family (AdminNotificatio
 LabNotificationBuilder in snpdb) that renders header / field / markdown blocks to Slack and email.
 `send_notification` is the raw Slack hook, falling back to report_event (EventLog) when Slack is
 unconfigured and truncating at SLACK_CHARACTER_LIMIT. Messages below settings.ROLLBAR['min_level']
-are not sent to Rollbar. The current request is found through django-threadlocals.
+are not sent to Rollbar. The current request is found through library/request_context.py.
 """
 import json
 import logging
@@ -28,11 +28,11 @@ from django.utils import timezone
 from markdown import markdown
 from requests import HTTPError
 from rest_framework.request import Request
-from threadlocals.threadlocals import get_current_request, get_current_user
 
 from eventlog.models import Event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
+from library.request_context import get_current_request, get_current_user
 from library.utils import pretty_label
 
 

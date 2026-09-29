@@ -12,17 +12,14 @@ from library.django_utils.unittest_utils import URLTestCase
 class AnnotationDescriptionsTest(URLTestCase):
     """ The composite cells card - @see annotation.views_descriptions.view_annotation_descriptions """
 
-    # The response goes through htmlmin, which picks the attribute quoting - so match either
     SECTION_RE = re.compile(
-        r"""id="composite-(?P<pk>\w+)".*?"""
-        r"""data-column-json=(?P<cq>["'])(?P<column>.*?)(?P=cq)\s*"""
-        r"""data-row-json=(?P<rq>["'])(?P<row>.*?)(?P=rq)""", re.DOTALL)
-    # htmlmin also orders the attributes, so the version range is read out of the tag by name
+        r'id="composite-(?P<pk>\w+)".*?'
+        r'data-column-json="(?P<column>[^"]*)"\s*'
+        r'data-row-json="(?P<row>[^"]*)"', re.DOTALL)
     ROW_RE = re.compile(
-        r"""<tr (?P<attrs>[^>]*annotation-row[^>]*)>"""
-        r""".*?annotation-grid-column-name["']>(?P<pk>\w+)<"""
-        r"""(?P<body>.*?)</tr>""", re.DOTALL)
-    ATTR_RE = re.compile(r"""(?P<name>data-(?:min|max)-cv)=["'](?P<value>\d*)["']""")
+        r"""<tr class='annotation-row' data-min-cv="(?P<min>\d*)" data-max-cv="(?P<max>\d*)">"""
+        r'.*?annotation-grid-column-name">(?P<pk>\w+)<'
+        r'(?P<body>.*?)</tr>', re.DOTALL)
 
     @classmethod
     def setUpTestData(cls):
@@ -46,8 +43,7 @@ class AnnotationDescriptionsTest(URLTestCase):
         self.assertEqual(response.status_code, 200)
         rows = defaultdict(list)
         for m in self.ROW_RE.finditer(response.content.decode()):
-            attrs = {a["name"]: a["value"] for a in self.ATTR_RE.finditer(m["attrs"])}
-            rows[m["pk"]].append({"min": attrs.get("data-min-cv"), "max": attrs.get("data-max-cv"), "body": m["body"]})
+            rows[m["pk"]].append({"min": m["min"], "max": m["max"], "body": m["body"]})
         self.assertTrue(rows, "No annotation rows on the page")
         return rows
 

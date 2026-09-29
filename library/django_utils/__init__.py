@@ -32,9 +32,9 @@ from django.utils import timezone
 from django.utils.timezone import localtime
 from django.views import View
 from redis import Redis
-from threadlocals.threadlocals import get_current_request
 
 from library.git import Git
+from library.request_context import get_current_request
 from library.utils import invert_dict
 
 

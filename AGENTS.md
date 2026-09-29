@@ -93,14 +93,23 @@ rules live in `<app>/AGENTS.md`; `claude/maps/` are generated facts, gitignored 
 run `scripts/vg map` to refresh them after changing a model, URL, task, signal, setting or command.
 
 Python packages: this project uses **uv** - the `.venv` is uv-created and `requirements.txt` is compiled from
-`requirements.in`. Use `uv pip install <package>`, `uv pip compile requirements.in -o requirements.txt`, `uv pip sync requirements.txt`.
+`requirements.in`. Deployments install `requirements.txt` only; dev tools (ruff, mypy, pylint, the stubs) are in
+`requirements-dev.in`, compiled against the production pins, and CI and developers install both
+(`scripts/install_requirements.sh --dev`). After editing either `.in` file:
+`uv pip compile requirements.in --generate-hashes -o requirements.txt --python-version 3.12` then
+`uv pip compile requirements-dev.in --generate-hashes -o requirements-dev.txt --python-version 3.12`, and
+`uv pip sync requirements.txt requirements-dev.txt`. uv checks every hash on install (the git-pinned hgvs has none - its
+commit is the pin). `uv.toml` holds a 7-day cooldown (`exclude-newer`): uv never picks or installs a release less than a
+week old, except packages we publish (cdot), listed in `exclude-newer-package`.
 
 ## Rules
 
 ### Security
 Two protections are global middleware, so individual views do **not** need per-view decorators for either - their
 absence is intentional and must not be flagged during audits:
-- **Login:** `global_login_required.GlobalLoginRequiredMiddleware` enforces login on all views, so no view needs `@login_required`.
+- **Login:** `library/django_utils/login_required_middleware.py:PublicPathsLoginRequiredMiddleware` (Django's
+  `LoginRequiredMiddleware` plus `PUBLIC_PATHS`) enforces login on all views, so no view needs `@login_required`; a
+  public view uses Django's `@login_not_required`.
   The exception is `PUBLIC_PATHS` (the `/*/api/` prefixes and `/beacon/`), exempted so DRF can answer 401: a new endpoint
   under one of those prefixes must be a `rest_framework.views.APIView` (`claude/guides/operations.md#authentication-surface`).
 - **CSRF:** Django's `CsrfViewMiddleware` is active globally, so state-changing views, grid handlers included, need no `@csrf_protect`.

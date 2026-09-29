@@ -246,7 +246,7 @@ class CaseReportPermissionTest(ClassifyReportTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
-        # HtmlMinifyMiddleware turns &nbsp; into the character, which reads as "Â " without a charset
+        # Without a charset the browser reads the report's non-ASCII characters as Latin-1 ("Â ")
         self.assertIn("charset=utf-8", response["Content-Type"])
 
 
@@ -463,7 +463,7 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
         content = response.content.decode()
         self.assertIn("2.48% (MSS)", content)
         self.assertIn("no measure", content)  # the case has no TMB, tumour fraction or GIS
-        self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_msi"')
+        self.assertRegex(content, r'id="case_field_assay_success_msi"[^>]*checked')
         # The policy behind the tick is on the form, so a scientist can ask for it to change
         self.assertIn("ticked when the measure has a call", content)
         self.assertIn("policy MSI-High &gt;= 30%, MSI-Low &gt;= 10%, MSS &lt; 10% unstable sites, needs &gt;= 40 usable sites "
@@ -630,7 +630,7 @@ class CaseReportLibraryQCTickTest(ClassifyReportTestCase):
         content = response.content.decode()
         self.assertIn("GENE_SCALED_MAD 0.059 (&lt;= 0.134), MEDIAN_BIN_COUNT_CNV_TARGET 6.4 (&gt;= 1)", content)
         self.assertIn("no QC", content)  # the case has no RNA or DNA library QC
-        self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_amplifications"')
+        self.assertRegex(content, r'id="case_field_assay_success_amplifications"[^>]*checked')
         self.assertIn("ticked when the library passed QC", content)
         self.assertIn("ticked when the library failed QC or the run did not complete for the library", content)
 

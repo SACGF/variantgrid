@@ -14,7 +14,6 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-from htmlmin.decorators import not_minified_response
 
 from analysis import forms
 from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
@@ -95,7 +94,6 @@ def get_node_sql(grid):
     return node_sql, grid_sql
 
 
-@not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
 def node_debug(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
@@ -123,7 +121,6 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
     return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
-@not_minified_response
 # @cache_page(WEEK_SECS)
 # @vary_on_cookie
 def node_audit_log(request, analysis_id, analysis_version, node_id, node_version, extra_filters):

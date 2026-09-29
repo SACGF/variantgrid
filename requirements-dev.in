@@ -1,0 +1,16 @@
+# Dev tools: linting and type checking. Not installed on deployments (they install requirements.txt only).
+# Compile: uv pip compile requirements-dev.in --generate-hashes -o requirements-dev.txt --python-version 3.12
+# Install: uv pip install -r requirements.txt -r requirements-dev.txt   (or scripts/install_requirements.sh --dev)
+# Run: mypy --config-file mypy.ini snpdb   (or any app)
+# Lint: ./scripts/linting/run_pylint.sh   |   ruff check
+# Import contracts are not installed here (import-linter pulls in rich): uvx --from import-linter lint-imports
+
+# Shared dependencies (Django for the stubs, etc.) resolve to the same pins as production
+-c requirements.txt
+
+ruff
+mypy
+django-stubs
+djangorestframework-stubs
+pylint
+pylint-django

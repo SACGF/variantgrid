@@ -89,12 +89,14 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          cache-dependency-glob: requirements.txt
+          cache-dependency-glob: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install Python dependencies
         run: |
           uv venv --python 3.12
-          uv pip install -r requirements.txt
+          uv pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Generate js_reverse static file
         # django-compressor resolves it from STATIC_ROOT when rendering templates;

@@ -2,9 +2,9 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from threadlocals.threadlocals import set_thread_variable
 
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from library.request_context import set_thread_variable
 from snpdb.models import Lab, LabHead, Organization, UserSettingsOverride
 from user_messages.models import Message
 
@@ -45,8 +45,7 @@ class LabMembershipModelTest(TestCase):
         LabHead.objects.create(lab=cls.lab, user=cls.head)
 
     def setUp(self):
-        # AdminNotificationBuilder logs an Event against the thread-local user - a client request in
-        # an earlier test leaves a rolled-back one behind
+        # AdminNotificationBuilder logs an Event against the current request's user - start with none
         set_thread_variable('request', None)
         self.lab.refresh_from_db()
 

@@ -52,7 +52,8 @@ notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLAC
 
 ## Deploy and upgrade
 
-`scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`), then
+`scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`, not the
+dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then
 `scripts/migrator/migrator.py`, whose standard steps (`scripts/migrator/migrator.py:Migrator.STANDARD_MIGRATIONS`) are git pull +
 install requirements, `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
 and `deployed` (records the deploy in Rollbar). It also reads `manage.py manual_outstanding` (JSON) to
@@ -161,7 +162,7 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 
 ## Authentication surface
 
-`global_login_required.GlobalLoginRequiredMiddleware` requires login everywhere except `PUBLIC_PATHS`
+`library/django_utils/login_required_middleware.py:PublicPathsLoginRequiredMiddleware` requires login everywhere except `PUBLIC_PATHS`
 (`variantgrid/settings/components/default_settings.py`), which exempts the API prefixes (`/classification/api/`, `/patients/api/`,
 `/seqauto/api/`, `/upload/api/`, `/mme/api/`, `/beacon/`) so DRF's `IsAuthenticated` can answer 401 instead. A plain Django
 `View` mounted under an exempt prefix is reachable anonymously (it usually 500s on `AnonymousUser`); new endpoints there must

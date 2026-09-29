@@ -90,8 +90,7 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         for group_name in ("SNV", "Indel", "Copy number", "Rearrangement", "Fusion", "Other"):
             self.assertIn(group_name, content)
         # The checkbox for the node's stored value comes back ticked
-        self.assertRegex(content, r'<input checked[^>]*id="id_variant_class_0"[^>]*'
-                                  rf'value="{VariantClass.SNV.value}"')
+        self.assertIn(f'value="{VariantClass.SNV.value}" id="id_variant_class_0" checked>', content)
 
     def test_intersection_node_variant_text(self):
         node = IntersectionNode.objects.create(analysis=self.analysis,

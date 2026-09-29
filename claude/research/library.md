@@ -69,7 +69,7 @@ was never sent, which is how a forgotten `send()` gets noticed.
 
 The other half of the module is reporting. `library/log_utils.py:report_exc_info` sends `sys.exc_info()` to Rollbar
 with the exception message as extra data and prints the traceback; `library/log_utils.py:report_message` is the
-non-fatal variant. Both find the current request through django-threadlocals (`ThreadLocalMiddleware` in
+non-fatal variant. Both find the current request through `library/request_context.py` (`RequestContextMiddleware` in
 `MIDDLEWARE`), so a caller deep in a model never has to thread a request through. Uncaught view exceptions take a
 different road: `library/django_utils/rollbar_middleware.py:CustomRollbarNotifierMiddleware` attaches the message and
 skips anything derived from `RollbarIgnoreException` (analysis node errors that are the user's problem, not ours).
@@ -127,8 +127,8 @@ and coverage restore legitimately drop without archiving because the source file
 
 `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` and `ObjectManagerCachingRequest` swap
 the manager's queryset class for one whose `get()` consults a cache first: the immutable one keeps results in a
-module-level dict for the life of the process (GenomeBuild, FlagType), the request one stores them as a threadlocals
-request variable that dies with the request (Allele, Lab, Organization, GeneSymbol, ResolvedVariantInfo). Keys are
+module-level dict for the life of the process (GenomeBuild, FlagType), the request one stores them as a
+`library/request_context.py` request variable that dies with the request (Allele, Lab, Organization, GeneSymbol, ResolvedVariantInfo). Keys are
 `(model, args, frozendict(kwargs))`, so an unhashable argument silently bypasses the cache. Both constructors check
 `settings.UNIT_TEST` and leave the plain `QuerySet` in place when it is set (d02b5914f), because a cached instance
 outlives the test transaction that created it - the same reason `admin_bot` skips its `lru_cache` under `UNIT_TEST`
@@ -183,7 +183,7 @@ out of the planner's way.
 
 Notifications go through a builder rather than a Slack call because the same content has three destinations with
 three renderings, and because every send is also an `Event` row: the event log is the audit trail and the overflow
-buffer for Slack's size limit. Reporting through threadlocals rather than passing requests is the price of having
+buffer for Slack's size limit. Reporting through the request context rather than passing requests is the price of having
 model methods that can report problems from a view or a task alike.
 
 Partitions are inheritance children rather than declarative partitions because they predate Postgres 10 and the
@@ -244,7 +244,7 @@ the base table twice gets both occurrences rewritten, which is usually right and
 
 `ObjectManagerCachingImmutable` on a model whose rows are ever updated serves stale instances until every worker
 restarts; `Meta.base_manager_name = 'objects'` is needed for the cache to cover related-object access too. The request
-cache needs `ThreadLocalMiddleware`; in a celery task there is no request and every `get` hits the database, which is
+cache needs `RequestContextMiddleware`; in a celery task there is no request and every `get` hits the database, which is
 correct but surprising in a query count. `timed_cache` has no `cache_clear` across processes and keys on argument
 identity, so passing a model instance rather than its pk defeats it.
 
