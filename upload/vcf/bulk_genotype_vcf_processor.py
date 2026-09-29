@@ -7,7 +7,6 @@ from typing import Optional
 
 import cyvcf2
 import numpy as np
-import simplejson
 from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Max
@@ -23,6 +22,7 @@ from library.genomics.vcf_enums import (
 )
 from library.git import Git
 from library.utils import double_quote, json_default_converter
+from library.utils.json_utils import json_dumps_nan_as_null
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
@@ -486,8 +486,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             genotype_quality_str,
             phred_likelihood_str,
             samples_filters_str,
-            simplejson.dumps(format_json, ignore_nan=True, default=json_default_converter),
-            simplejson.dumps(info_json, ignore_nan=True, default=json_default_converter),
+            json_dumps_nan_as_null(format_json, default=json_default_converter),
+            json_dumps_nan_as_null(info_json, default=json_default_converter),
         ]
 
         self.locus_variant_hashes.append(variant_hash)

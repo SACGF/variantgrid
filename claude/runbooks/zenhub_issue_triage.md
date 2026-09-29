@@ -4,6 +4,11 @@ Issues for VariantGrid are spread over several GitHub repos (`SACGF/variantgrid`
 `SACGF/variantgrid_shariant`, `SACGF/variantgrid_sapath`) but tracked on one ZenHub board. GitHub has the issue text and
 comments (`gh issue view`); ZenHub has the pipeline (board column) each issue is in, which GitHub cannot see.
 
+Only `SACGF/variantgrid` is public. The others can carry private details of labs, patients or variants, so the rule in
+root `AGENTS.md` (GitHub comments) applies here too: read the title, body or comments of a private-repo issue - through
+`gh` or through ZenHub, which returns titles as well - only when the user has handed you that issue or explicitly asked
+for triage over that repo. Otherwise query and report on `SACGF/variantgrid` alone.
+
 ## 1. Get a token
 
 1. Go to https://app.zenhub.com/settings/tokens and create a **GraphQL Personal API Key** (starts with `zh_`).

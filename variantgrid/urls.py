@@ -42,7 +42,6 @@ urlpatterns = [
     path('loading_animations', views.loading_animations, name='loading_animations'),
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
-    path('martor/', include('martor.urls')),
     path('external_help', views.external_help, name='external_help'),
     path('system/version', views.version, name='version'),
     path('system/changelog', views.changelog, name='changelog'),

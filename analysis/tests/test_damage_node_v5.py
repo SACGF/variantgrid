@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_annotation_version,
 )

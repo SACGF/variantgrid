@@ -2,8 +2,8 @@
 from django.contrib.auth.models import User
 from django.urls import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from genes.models import Gene, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, _make_test_client

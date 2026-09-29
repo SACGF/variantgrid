@@ -1,166 +1,79 @@
-# VariantGrid Review App — Reference Document
+# review — research notes
 
-## Purpose and Overview
+Verified against a96540a68 on 2026-09-25
 
-The `review` app implements a collaborative review workflow system for multi-lab discussions on shared objects (particularly variant classifications and discordance reports). It allows teams to document review meetings, record decisions with detailed reasoning, and track post-review actions.
+`review` records a multi-lab discussion about a shared object - in practice an Overlap (and, read-only now, a legacy
+DiscordanceReport) in `classification` - and hands off to the owning app for the follow-up action. It owns no
+classification logic: the form captures who met, how, which labs took part and a set of per-question "difference"
+answers, all stored as JSON on `review/models/review_models.py:Review`. Models and URLs are in
+[models](../maps/models.md#review) and [urls](../maps/urls.md#review); the one signal is listed in
+[signals](../maps/signals.md). There are no tasks or commands.
 
-**Key Design:** Structured meeting documentation with templates; multi-lab participant tracking; signal-based domain-specific processing.
+## Flows
 
----
+### Starting and saving a review
 
-## Models
+The owning app makes its model reviewable with `review/models/review_models.py:ReviewableModelMixin`, which adds a
+nullable `reviews` FK to a `review/models/review_models.py:ReviewedObject` (created lazily by `reviews_safe`). Its
+view then redirects to `start_review` with the ReviewedObject pk and a topic key - both callers hard-code
+`"discordance_report"` (`classification/views/overlaps_view.py:overlap_report_review`,
+`classification/views/discordance_report_views.py:discordance_report_review`).
 
-### ReviewTopic
-Template for a type of review (e.g., "Discordance Discussion").
-- Fields: key (PK, text), name, heading
-- Methods: questions property → ordered list of enabled ReviewQuestions
+`review/views/review_views.py:new_review` builds an unsaved Review, checks view and write permission and renders
+`review/views/review_views.py:ReviewForm`. The form's lab choices come from the source object's `reviewing_labs`
+(`review/widgets/multi_lab_selector.py:MultiChoiceLabField`, pre-selecting the user's default lab if it is one of them),
+and one `DescribeDifferenceField` per enabled `ReviewQuestion` of the topic. `clean` requires at least one question
+answered. `ReviewForm.save` writes `meeting_meta = {"participants": {"review_method", "review_participants"},
+"answers": {question_key: DescribeDifference JSON}}`, sets the M2M labs (saving first if new), logs via
+`log_admin_change`, and the view redirects to `Review.next_step_url()` - i.e. the source object's `post_review_url`.
 
-### ReviewQuestion
-A specific question prompted in a review form.
-- Fields: topic FK, key (PK), label (question text), help (nullable), heading (groups related questions), order (int), value_type (QuestionValueType, currently only 'D'=Disagreement), enabled (bool)
+### Completing: the action page lives in the owner
 
-### ReviewedObject
-Container representing an object being reviewed.
-- Fields: label (display name/description)
-- Methods:
-  - `new_review(topic, user)` → Review: Create new Review for this object
-  - `source_object` (cached_property): Lazy-loads actual related object (Allele, Classification, etc.) via generic relation
+The post-review step is not in this app. `classification/views/overlaps_view.py:action_overlap_review` (and the
+discordance equivalent) either postpones or applies per-lab value changes, then calls
+`Review.complete_with_data_and_save(post_review_data)`. Once `is_complete`, `review/views/review_views.py:edit_review`
+serves the read-only detail instead of the form. To render `post_review_data`, `Review.post_review_data_formatted`
+sends `review_detail_signal` with the source object's class as sender; receivers are
+`classification/signals/overlap_review_formatting.py` and `classification/signals/discordance_report_review_detail.py`,
+falling back to raw JSON.
 
-### Review
-Actual documentation of a review meeting.
-- Fields:
-  - reviewing FK (ReviewedObject), topic FK (ReviewTopic), user FK (PROTECT)
-  - review_date (DateField)
-  - reviewing_labs (M2M → Lab)
-  - meeting_meta (JSONField) — core review data (see structure below)
-  - is_complete (bool) — marks ready for post-review action
-  - post_review_data (JSONField) — populated after completion
-- Methods:
-  - `as_json()` → dict
-  - `can_view(user_or_group)` → bool (delegates to source_object)
-  - `check_can_view(user)` — raises PermissionDenied
-  - `next_step_url()` — calls source_object.post_review_url()
-  - `review_method` property → list of ValueOther
-  - `participants` property → list of ValueOther
-  - `answers` property → list of ReviewAnswer objects parsed from meeting_meta
-  - `post_review_data_formatted` (cached_property) — formatted via review_detail_signal
-  - `complete_with_data_and_save(data)` — marks complete
+### Permissions
 
-### ReviewableModelMixin (Abstract)
-Mixin for models that can be reviewed.
-- Fields: reviews FK (ReviewedObject, nullable)
-- Methods:
-  - `reviewing_labs` property — returns {self.lab} by default; subclass for multi-lab
-  - `reviews_safe` property — lazy-creates ReviewedObject
-  - `post_review_url(review)` → str — URL after review (default: get_absolute_url())
-  - `reviews_all()` → QuerySet[Review] — in reverse date order
-  - `is_review_locked` property — default False
-- Known implementations: **DiscordanceReport**
+View: `Review.can_view` defers to `source_object.can_view` if it exists, else allows - Overlap has none, so overlap
+reviews are visible to every logged-in user (matching the overlap pages). Write: `ReviewableModelMixin.can_review` -
+the user (admin-checked) belongs to one of `reviewing_labs`. `edit_review` falls back to the detail view for
+non-writers, complete reviews, or `is_review_locked` sources (DiscordanceReport always returns True: reviews are
+being moved to Overlaps). Covered by `classification/tests/views/test_overlap_review_permissions.py`.
 
----
+## Why it is shaped this way
 
-## Enums and Data Classes
+- `ReviewedObject` is an indirection instead of a GenericFK or per-model M2M: each reviewable model carries one FK to
+  it, and `ReviewedObject.source_object` finds the owner by scanning its reverse `*_set` managers
+  (hardened for Django 6 in ab4de89de). Adding a new reviewable model needs no change here.
+- Topics and questions are data (edited in the admin, `review/admin/review_admin.py:ReviewTopicAdmin` with a question
+  inline), so wording can change per deployment. The only question type is `QuestionValueType.Disagreement`.
+- `ReviewMedium` / `ReviewParticipants` are fixed choices with a free-text "other"; stored values that are not a choice
+  are read back as `ValueOther(key="other")`. `review_method` was single-select originally, and `Review.review_method`
+  still accepts a string.
 
-### ReviewMedium
-- `email = 'email'`
-- `phone = 'phone'`
-- `video = 'mtm'` (Multi-disciplinary Team Meeting)
+## History
 
-### ReviewParticipants
-- `curation = 'curation'` (Curation Scientists)
-- `clinicians = 'clinicians'`
-- `external_experts = 'external_experts'`
+Built May 2023 for discordance reports (0c4f089ae; "only one review per discordance report" 7c7ac005e), with the UI
+wording later changed from "Review" to "Discussion" (ebdbfb9f1) while code names stayed. The Overlaps rework (September 2026,
+25ed4f32f) made `Overlap` reviewable and locked DiscordanceReport reviews. Write permission by reviewing-lab
+membership came in e26588083 / e54821fba (variantgrid_private#3827).
 
-### ValueOther
-Represents a selected value with "other" option support.
-- Fields: key (identifier or "other"), label
-- Static method: `from_str(value, text_choices_class)` — returns as "other" if unrecognized
-- Sortable (other values go to end)
+## Traps
 
-### ReviewAnswer
-Represents one answer in a review.
-- Fields: question (ReviewQuestion), details (text), resolution (DifferenceResolution enum value)
-
----
-
-## Views and Forms
-
-### ReviewForm
-- Fields: review_date (DateField), review_method (MultiChoiceFieldWithOther), review_participants (MultiChoiceFieldWithOther), reviewing_labs (MultiChoiceLabField), dynamic question fields (DescribeDifferenceField)
-- Validation: at least one question must have an answer
-- Save logic: serializes to meeting_meta JSON, associates reviewing_labs M2M, logs change
-- Init: populates from existing review.meeting_meta if editing; defaults to user's default lab
-
-### View Functions
-
-- `new_review(request, reviewed_object_id, topic_id)` — creates new Review
-- `edit_review(request, review_id)` — edits existing Review; checks can_view() first
-- `view_discussion_detail(request, review_id)` — AJAX endpoint for viewing review detail template
-  - Query params: edit, show_source_object, show_outcome
-- `_handle_review(request, review, reviewing=None)` — internal helper for GET/POST
-
----
-
-## URL Patterns
-```python
-path('new/<int:reviewed_object_id>/<str:topic_id>/', views.new_review, name='start_review'),
-path('detail/<int:review_id>', views.view_discussion_detail, name='review_detail'),
-path('<int:review_id>/', views.edit_review, name='edit_review'),
-```
-
----
-
-## Admin Interface
-
-- **ReviewTopicAdmin**: id, key, name, heading; ReviewQuestionInline (editable, ordered by order field)
-- **ReviewAdmin**: default ModelAdminBasics display
-
----
-
-## Signal
-
-### review_detail_signal
-- Sender: ReviewedObject model class (source_object's class)
-- Args: instance (Review)
-- Purpose: Allow source objects to provide formatted representation of post_review_data
-- Usage: Classification/discordance app implements handler to format domain-specific outcomes
-
----
-
-## Data Storage Structure
-
-### Review.meeting_meta JSON
-```json
-{
-  "participants": {
-    "review_method": ["email", "phone"],
-    "review_participants": ["curation", "clinicians", "other_value"]
-  },
-  "answers": {
-    "question_key": {
-      "details": "Discussion details here",
-      "resolution": "AGREED"
-    }
-  }
-}
-```
-
----
-
-## Workflow
-
-1. **Identify Object** → get ReviewedObject (or use reviews_safe on ReviewableModelMixin object)
-2. **Start Review** → `/review/new/<object_id>/<topic_id>/` — displays ReviewForm with topic questions
-3. **Document Meeting** → fill form: date, method, participants, lab(s), answers to questions
-4. **Save Review** → meeting data serialized to meeting_meta JSON
-5. **Post-Review Action** → review.next_step_url() redirects to source_object's post-review page
-
----
-
-## Integration Points
-
-| App | Integration |
-|-----|-------------|
-| Classification/Discordance | DiscordanceReport uses ReviewableModelMixin; reviews document how labs resolved disagreements; review_detail_signal hooks into classification formatting |
-| Lab system | M2M reviewing_labs; lab permission system controls access |
-| User settings | UserSettings.get_for_user() for default lab pre-population |
+- No migration or fixture seeds the `discordance_report` topic or its questions. On a database without it (this
+  box's test DB has no ReviewTopic rows) the "review" buttons 500 on `ReviewTopic.objects.get`; create it in the admin.
+- Overlaps start a new Review each time (resume is commented out), DiscordanceReports resume the first existing one.
+- `Review.user` means "last actor", not author: the action views overwrite it with whoever completed the review.
+- Bug (wrong data): `ReviewForm.__init__` sets the `review_date` initial to today even when editing, so re-saving an
+  incomplete review silently moves its date.
+- Bug (minor, audit): `review/views/review_views.py:_handle_review` never updates `review.user` on edit, and
+  `ReviewForm.save` logs with `review.user`, so a second lab member's edit is logged and shown as the original author's.
+- Bug (minor): `Review.answers` uses `ReviewQuestion.objects.get(topic=..., key=...)`; deleting a question in the admin
+  (rather than setting `enabled=False`) makes every review that answered it raise `DoesNotExist` on display.
+- `Review.review_method` returns `None`, not `[]`, when no method is stored.
+- Question `key` is the table-wide primary key, not per topic: prefix it with the topic when adding questions.

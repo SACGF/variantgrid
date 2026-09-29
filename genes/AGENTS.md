@@ -65,8 +65,8 @@ Gotchas:
 - GeneGrid's gene/disease (GenCC) column asks for relations by symbol, and a symbol with no HGNC record yields empty relations rather than an error from both traversers (`ontology/models/models_ontology.py:OntologySnake.terms_for_gene_symbol` and `ontology/ontology_traversal.py:MemoryOntologyTraverser`), so column and page code needs no guard.
 - `<CNV>` and `<INS>` have no HGVS at all - neither a ranged form nor an explicit expansion - so hgvs/hgvs_matcher.py:HGVSMatcher raises hgvs/hgvs_converter.py:HGVSNoRepresentationException before any converter runs, and classification records it as `ResolvedVariantInfo.error` rather than a Rollbar bug.
 Tests:
-- annotation/tests/test_data_fake_genes.py:create_fake_transcript_version builds Gene/GeneVersion/Transcript/TranscriptVersion (RUNX1, ENST00000300305.7) for a build; `create_gata2_transcript_version` / `create_pten_transcript_version` add RefSeq examples.
-- Pair those with annotation/fake_annotation.py:get_fake_annotation_version, which creates the GeneAnnotationRelease and VariantAnnotationVersion that release-scoped code needs.
+- genes/fake_data.py:create_fake_transcript_version builds Gene/GeneVersion/Transcript/TranscriptVersion (RUNX1, ENST00000300305.7) for a build; `create_gata2_transcript_version` / `create_pten_transcript_version` add RefSeq examples.
+- Pair those with annotation/fake_data.py:get_fake_annotation_version, which creates the GeneAnnotationRelease and VariantAnnotationVersion that release-scoped code needs.
 - Transcript sequence fetches are mocked for the whole suite by variantgrid/test_runner.py setting `TranscriptSequenceFetcher.override_class` to tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher — add new accessions to the fasta files in tests/test_data rather than hitting NCBI/Ensembl.
 - tests/test_urls.py:Test is the URLTestCase for every genes page (owner vs non-owner permission checks included).
 - tests/test_hgvs_corpus.py:HGVSCorpusTests runs tests/test_data/hgvs_corpus.tsv (400+ strings, malformed on purpose) through HGVSComponents; add new edge cases there.

@@ -1,14 +1,14 @@
 """Import of AllFusions.csv - the VCF the loader writes, and the GeneFusions made from it."""
+import json
 import os
 import tempfile
 
 import cyvcf2
-import simplejson
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
 from genes.models import GeneFusion, GeneLevelId
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
@@ -172,7 +172,7 @@ class TestGeneFusionVCF(GeneFusionTestCase):
         """ ENTPD3::RPL14 appears three times from one caller with three different 5' breakpoints """
         by_fusion = {record.INFO.get(FUSION_INFO): record for record in self.records}
         record = by_fusion["ENTPD3::RPL14"]
-        observations = simplejson.loads(percent_decode_info_value(record.INFO.get(FUSION_OBSERVATIONS_INFO)))
+        observations = json.loads(percent_decode_info_value(record.INFO.get(FUSION_OBSERVATIONS_INFO)))
         self.assertEqual(3, len(observations))
         self.assertEqual(3, len({o["Gene A Breakpoint"] for o in observations}))
 

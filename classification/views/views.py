@@ -46,9 +46,12 @@ from classification.classification_stats import (
 from classification.enums import (
     AlleleOriginBucket,
     LabExternalFilter,
+    OverlapStatus,
+    OverlapType,
     ShareLevel,
     SpecialEKeys,
-    WithdrawReason, OverlapStatus, OverlapType, TestingContextBucket,
+    TestingContextBucket,
+    WithdrawReason,
 )
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import (
@@ -66,7 +69,10 @@ from classification.models import (
     GeneConsensusGroup,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
-    ReportNames, OverlapContribution, OverlapContributionNextStep, Overlap,
+    Overlap,
+    OverlapContribution,
+    OverlapContributionNextStep,
+    ReportNames,
 )
 from classification.models.classification import (
     COPY_SCOPES_ALL,
@@ -79,9 +85,6 @@ from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.tasks.classification_create_tasks import populate_new_classification_task
-from classification.services.public_summary_data import ClassificationPublicSummaryData
-from classification.tasks.classification_create_tasks import populate_new_classification_task
-from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import (
@@ -97,10 +100,11 @@ from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
+from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_traceback
 from library.utils import delimited_row
-from library.django_utils.view_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.forms import (
     LabMultiSelectForm,
     LabSelectForm,
@@ -245,74 +249,6 @@ def classifications(request):
     return render(request, template, context)
 
 
-# def classifications_legacy(request):
-#     """
-#         Classification listing page
-#         """
-#
-#     # is cached on the request
-#     user_settings = UserSettingsManager.get_user_settings()
-#
-#     initial = {'classify': True}
-#     search_and_classify_form = SearchAndClassifyForm(initial=initial)
-#     search_and_classify_form.fields['search'].label = "HGVS / dbSNP / VCF coordinate"
-#     helper = form_helper_horizontal()
-#     helper.layout = Layout(
-#         FieldWithButtons(Field('search', placeholder=""), Submit(name="action", value="Go"))
-#     )
-#     search_and_classify_form.helper = helper
-#
-#     flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context) \
-#         .exclude(pk__in=[
-#         'classification_withdrawn',
-#         'classification_submitted',
-#         'classification_clinical_context_change']).order_by('label')
-#     flag_type_json = []
-#     for ft in flag_types:
-#         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
-#
-#     if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
-#         lab_form = LabMultiSelectForm()
-#     else:
-#         lab_form = LabSelectForm()
-#
-#     context = {
-#         "can_create_classification": Classification.can_create_via_web_form(request.user),
-#         "flag_types": flag_type_json,
-#         "gene_form": GeneSymbolForm(),
-#         "user_form": UserSelectForm(),
-#         "lab_form": lab_form,
-#         "allele_origin_form": ClassificationAlleleOriginForm(),
-#         "labs": Lab.valid_labs_qs(request.user),
-#         "search_and_classify_form": search_and_classify_form,
-#         "genome_build": user_settings.default_genome_build,
-#         "user_settings": user_settings,
-#     }
-#     return render(request, 'classification/classifications.html', context)
-#
-
-def classification_groupings(request):
-    user_settings = UserSettingsManager.get_user_settings()
-    if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
-        lab_form = LabMultiSelectForm()
-    else:
-        lab_form = LabSelectForm()
-
-    context = {
-        "can_create_classification": Classification.can_create_via_web_form(request.user),
-        "gene_form": GeneSymbolForm(),
-        "user_form": UserSelectForm(),
-        "lab_form": lab_form,
-        "allele_origin_form": ClassificationAlleleOriginForm(),
-        "labs": Lab.valid_labs_qs(request.user),
-        "genome_build": user_settings.default_genome_build,
-        "user_settings": user_settings,
-        "lab_external_choices": LabExternalFilter.choices,
-        "lab_external_default": LabExternalFilter.ALL,
-    }
-    return render(request, 'classification/classification_groupings.html', context)
-
-
 class AutopopulateView(APIView):
     """ Generates auto-populated evidence key values for a variant (from annotation, sample data,
     and optionally an existing classification to copy from), used to pre-fill the classification form. """
@@ -343,7 +279,8 @@ class AutopopulateView(APIView):
             refseq_transcript_accession=refseq_transcript_accession,
             ensembl_transcript_accession=ensembl_transcript_accession,
             sample=sample,
-            annotation_version=None
+            annotation_version=None,
+            clingen_api=ClinGenAlleleRegistryAPI.instance(max_attempts=1)
         )
 
         used_keys = set()
@@ -464,7 +401,8 @@ def create_classification_object(request, populate_async: bool = False) -> Class
     classification = create_classification_for_sample_and_variant_objects(request.user, lab, sample,
                                                                           variant, genome_build,
                                                                           refseq_transcript_accession=refseq_transcript_accession,
-                                                                          ensembl_transcript_accession=ensembl_transcript_accession)
+                                                                          ensembl_transcript_accession=ensembl_transcript_accession,
+                                                                          clingen_api=ClinGenAlleleRegistryAPI.instance(max_attempts=1))
     classification_complete_web_create(classification, request.user, evidence=evidence,
                                        copy_from=copy_from, copy_gene_from=copy_gene_from)
     return classification

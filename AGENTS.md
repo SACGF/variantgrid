@@ -121,6 +121,9 @@ and `lint-imports` (`.importlinter`: `library` never imports an app) both gate C
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't
 write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a
 lot of comments, perhaps you could make the code clearer by extracting logic into better named variables.
+Code, docstrings and templates cite a GitHub issue (`#1537`), not a plan file or anything else under `claude/` - plans
+are deleted when they land, and copies of papers or prototypes aren't in the repo. Point at an app's `AGENTS.md` only
+for something specific it holds, and name `vg` only where it calls the code.
 
 ### Frontend
 Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and
@@ -199,6 +202,12 @@ Suggest issues when you find something worth tracking (e.g. a related problem fo
 raise them on your own without permission. Draft the title/summary in chat and ask first. Only create an issue when
 explicitly asked to. Before proposing a new one, check for an existing issue that already covers it and suggest
 commenting there instead.
+
+Issues in the private repos - `SACGF/variantgrid_private`, `SACGF/variantgrid_sapath`, the Shariant repos
+(`SACGF/variantgrid_shariant`, `SACGF/shariant-admin`) and any other private SACGF repo - can carry private details of
+labs, patients or variants: don't open, read or search them unless I hand you a specific
+issue, and then read only that one. When searching across the org, restrict it to the public repos
+(`gh search issues --repo SACGF/variantgrid`, not `--owner SACGF`). The public `SACGF/variantgrid` is fine to read.
 
 ### Plans and implementation prompts
 Plans live in `claude/plans/<issue>_<slug>_plan.md`; the format (model line, `Status:`, models first) and how to draft a

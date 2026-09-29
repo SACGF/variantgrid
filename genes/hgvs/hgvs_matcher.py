@@ -49,6 +49,10 @@ from snpdb.clingen_allele import (
     get_clingen_allele_for_variant_coordinate,
     get_clingen_allele_from_hgvs,
 )
+from snpdb.clingen_allele_api import (
+    ClinGenAlleleRegistryAPI,
+    ClinGenAlleleRegistryUnavailableException,
+)
 from snpdb.models import ClinGenAllele, Variant
 from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
@@ -217,7 +221,7 @@ class HGVSMatcher:
                 if settings.CLINGEN_ALLELE_REGISTRY_REATTEMPT_WITH_ACTUAL_REF and match_ref_allele is None:
                     # Don't do if already swapped (stop infinite recursion)
                     rjson = cga_se.response_json
-                    if rjson["errorType"] == 'IncorrectReferenceAllele':
+                    if rjson.get("errorType") == 'IncorrectReferenceAllele':
                         actual_allele = rjson['actualAllele']
                         given_allele = rjson['givenAllele']
                         transcript_reference_sequence = rjson["referenceSequence"]
@@ -417,6 +421,7 @@ class HGVSMatcher:
 
             variant_coordinate = None
             hgvs_methods = []
+            clingen_unavailable = False
             for tv, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_variant.transcript = tv.accession
@@ -427,7 +432,7 @@ class HGVSMatcher:
                     variant_coordinate, matches_reference, originally_normalized = self.hgvs_converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string_for_version, tv)
                 elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
                     method = HGVSConverterType.CLINGEN_ALLELE_REGISTRY.name
-                    if self._clingen_allele_registry_ok(tv.accession):
+                    if not clingen_unavailable and self._clingen_allele_registry_ok(tv.accession):
                         error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry"
                         try:
                             variant_coordinate, matches_reference, originally_normalized = self._clingen_get_variant_coordinate_matches_reference_and_normalized(hgvs_string_for_version)
@@ -439,6 +444,11 @@ class HGVSMatcher:
                                 msg = f"{error_message} : {cga_se}"
                                 logging.error(msg)
                                 error_messages.append(msg)
+                        except ClinGenAlleleRegistryUnavailableException as cgaue:
+                            # Fail fast rather than wait on the registry again for each transcript version
+                            clingen_unavailable = True
+                            logging.error("%s : %s", error_message, cgaue)
+                            error_messages.append(str(cgaue))
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             msg = f"{error_message} : {cgare}"
@@ -559,6 +569,9 @@ class HGVSMatcher:
                 return self._lrg_variant_coordinate_to_hgvs(variant_coordinate, transcript_accession)
 
             hgvs_methods = {}
+            # Called while rendering pages, so fail fast rather than retry
+            clingen_api = ClinGenAlleleRegistryAPI.instance(max_attempts=1)
+            clingen_unavailable = False
             for transcript_version, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
                 hgvs_method = f"{potential_converter_type}: {transcript_version}"
                 hgvs_methods[hgvs_method] = None
@@ -572,11 +585,13 @@ class HGVSMatcher:
 
                     hgvs_variant = self.hgvs_converter.variant_coordinate_to_c_hgvs(variant_coordinate, transcript_version)
                 elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
-                    if self._clingen_allele_registry_ok(transcript_version.accession):
+                    if not clingen_unavailable and self._clingen_allele_registry_ok(transcript_version.accession):
                         error_message = f"Could not convert '{variant_coordinate.format_short()}' ({transcript_version}) using {potential_converter_type}: %s"
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
-                            if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
+                            if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self,
+                                                                               require_allele_id=False,
+                                                                               clingen_api=clingen_api):
                                 if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use biocommons or ClinGen to resolve
@@ -590,6 +605,10 @@ class HGVSMatcher:
                             else:
                                 logging.error(error_message, cga_se)
                                 hgvs_methods[hgvs_method] = str(cga_se)
+                        except ClinGenAlleleRegistryUnavailableException as cgaue:
+                            clingen_unavailable = True
+                            logging.error(error_message, cgaue)
+                            hgvs_methods[hgvs_method] = str(cgaue)
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)

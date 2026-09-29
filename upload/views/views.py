@@ -1,17 +1,15 @@
 import json
 import os
 from datetime import timedelta
-from functools import cached_property
 
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http.response import HttpResponseRedirect
+from django.http.response import FileResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls.base import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django_downloadview import PathDownloadView
 
 from annotation.views import get_build_contigs
 from library.django_utils.view_utils import render_ajax_view
@@ -172,26 +170,12 @@ def upload_retry_import(request, upload_pipeline_id):
     return HttpResponseRedirect(reverse("view_upload_pipeline", kwargs={"upload_pipeline_id": upload_pipeline.pk}))
 
 
-class DownloadUploadedFile(PathDownloadView):
-    @cached_property
-    def file_upload(self):
-        file_upload_id = self.kwargs["pk"]
-        file_upload = get_object_or_404(FileUpload, pk=file_upload_id)
-        upload_data = get_upload_data_for_uploaded_file(file_upload)
-        data = upload_data.get_data()
-        # TODO: use check_can_view once everything implements GuardianPermissionsMixin
-        if not data.can_view(self.request.user):
-            raise PermissionDenied(f"You do not have permission to access: {data}")
-        return file_upload
-
-    def get_mimetype(self):
-        """ Firefox 86 downloads XX.vcf.gz as XX.vcf.vcf - so provide mimetype to force .gz extension
-            @see https://stackoverflow.com/a/65596550/295724 """
-        mimetype = super().get_mimetype()
-        filename = self.get_path()
-        if filename.endswith(".gz"):
-            mimetype = "application/gzip"
-        return mimetype
-
-    def get_path(self):
-        return self.file_upload.get_filename()
+def download_uploaded_file(request, pk):
+    file_upload = get_object_or_404(FileUpload, pk=pk)
+    data = get_upload_data_for_uploaded_file(file_upload).get_data()
+    # TODO: use check_can_view once everything implements GuardianPermissionsMixin
+    if not data.can_view(request.user):
+        raise PermissionDenied(f"You do not have permission to access: {data}")
+    # FileResponse sends .gz as application/gzip - Firefox 86 downloads XX.vcf.gz as XX.vcf.vcf without it
+    # @see https://stackoverflow.com/a/65596550/295724
+    return FileResponse(open(file_upload.get_filename(), "rb"), as_attachment=True)

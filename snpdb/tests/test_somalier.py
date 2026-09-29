@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from analysis.tests.inheritance_node_mixin import make_cohort_genotype
+from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
 from snpdb.models import (
     CohortGenotype,
     GenomeBuild,
@@ -29,7 +29,6 @@ from snpdb.models import (
 )
 from snpdb.models.models_somalier import get_same_individual_relatedness
 from snpdb.tasks.somalier_tasks import _load_somalier_pairs, somalier_vcf_id
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from snpdb.variants_to_vcf import _allele_depths, vcf_export_to_file
 

@@ -295,7 +295,7 @@ Specifics:
   `self.assertProductionQueries(max_n)` on a shared base TestCase, and have `vg page --queries` print
   the same number so I can measure before I write the assertion.
 - **Fixture facade.** The builders in `snpdb/tests/utils`, `genes/tests/utils`,
-  `classification/tests/utils`, `annotation/tests/test_data_fake_genes.py` are the answer to "how do I
+  `classification/tests/utils`, `genes/fake_data.py` are the answer to "how do I
   conjure a Variant / Sample / Classification / Analysis in three lines" — a question I grep for every
   time. Index them in `claude/guides/testing.md` (one line per builder, what it needs, what it returns)
   and reference that index from each app AGENTS.md.
@@ -462,15 +462,18 @@ fail on regressions for the cheap one (dead citations) once it reaches zero.
   annotation, classifications, email_manager, eventlog, upload, snpdb, analysis, genes, ontology, library (the rest are
   still the old field-by-field docs - see the list below).
 - **Phase 2 open items**, in the order to do them (§6.2 says how):
-  1. Research docs still to rewrite, one app per run: variantgrid, uicore, variantopedia, seqauto, patients, pedigree,
-     pathtests, review, flags, sync, vcauth_oidc_auth. `vg docs check` reports the 5 dead citations they still carry, so
-     CI's docs step fails until they are done (or those five lines are patched).
+  1. ~~Research docs still to rewrite~~ done 2026-09-25: all 21 now carry `Verified against`. The bugs the rewrites
+     turned up are collected in SACGF/variantgrid_private#3912 for triage.
   2. `vg health`: the ratchet numbers in one place (`vg outline --coverage` already gives docstring coverage; add dead
      citations, one-off command count, lint line count, last suite wall time).
   3. `vg logs`, then `vg sql --explain`, then `vg browse` (Playwright is installed on vg-test2).
   4. Skills (`vg-plan`, `vg-implement`, `vg-research`, `vg-run`) and the two subagents; `vg-research` is the research-doc
      recipe from §6.2 written down so the remaining docs and future refreshes cost one prompt.
-  5. `create_fake_data vcf | classifications | analysis`.
+  5. `create_fake_data`: one command that fills an empty dev database, each app owning its steps -
+     `claude/plans/1816_fake_data_plan.md`. Done before 2-4: people use it directly.
+- **Human readability comes first** (2026-09-25): agent tooling and agent-facing docs stay in `claude/`, `library/vg/`,
+  `scripts/vg`, `.claude/` and the `AGENTS.md` files; code and docstrings carry nothing a developer has to skim past.
+  Items 3-4 wait for the three-times rule in §7.
 
 ### 6.2 How to run the remaining work (learned 2026-09-06)
 

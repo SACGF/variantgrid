@@ -91,6 +91,7 @@ from library.django_utils.admin_utils import (
 from library.guardian_utils import admin_bot
 from library.utils import ExportDataType, ExportRow, export_column, first
 from ontology.models import AncestorCalculator, OntologyTerm
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
 
@@ -347,6 +348,7 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Data: Populate w Annotations")
     def populate_base_variant_data(self, request, queryset: QuerySet[Classification]):
+        clingen_api = ClinGenAlleleRegistryAPI.instance(max_attempts=1)
         for vc in queryset:
             refseq_transcript_id = vc.get(SpecialEKeys.REFSEQ_TRANSCRIPT_ID)
             ensembl_transcript_id = vc.get(SpecialEKeys.ENSEMBL_TRANSCRIPT_ID)
@@ -357,7 +359,8 @@ class ClassificationAdmin(ModelAdminBasics):
                 annotation_version = AnnotationVersion.latest(genome_build)
                 data = get_evidence_fields_for_variant(genome_build, vc.variant, refseq_transcript_id,
                                                        ensembl_transcript_id,
-                                                       evidence_keys_list=[], annotation_version=annotation_version)
+                                                       evidence_keys_list=[], annotation_version=annotation_version,
+                                                       clingen_api=clingen_api)
                 patch = {}
                 publish = False
                 for key in [SpecialEKeys.GENOME_BUILD,

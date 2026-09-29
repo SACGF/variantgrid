@@ -9,10 +9,10 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.tasks.calculate_sample_stats import calculate_cohort_stats
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.views.views_data import _sample_stats
 
 

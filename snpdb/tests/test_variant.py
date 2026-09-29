@@ -2,7 +2,7 @@ from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import AlleleOrigin, GenomeBuild, Variant, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant

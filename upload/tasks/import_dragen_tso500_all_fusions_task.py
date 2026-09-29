@@ -26,11 +26,10 @@ sample has no zygosity to filter on. What it does have is read support, written 
 ALT_READS and REF_READS; the ^FusionProcessor VCFSourceSettings row binds those as alt and ref depth
 so the sample node's minimum-reads threshold and allele frequency work on fusions.
 """
+import json
 import logging
 from collections import defaultdict
 from typing import Optional
-
-import simplejson
 
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
 from library.genomics.vcf_writer import (
@@ -40,6 +39,7 @@ from library.genomics.vcf_writer import (
     percent_decode_info_value,
     percent_encode_info_value,
 )
+from library.utils.json_utils import json_dumps_nan_as_null
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
 from upload.models import (
@@ -148,7 +148,7 @@ def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, s
             info = {
                 "END": variant_coordinate.position,
                 FUSION_INFO: resolved_fusion.canonical_str,
-                FUSION_OBSERVATIONS_INFO: simplejson.dumps(observations[resolved_fusion], ignore_nan=True),
+                FUSION_OBSERVATIONS_INFO: json_dumps_nan_as_null(observations[resolved_fusion]),
             }
             writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
                                 variant_coordinate.ref, variant_coordinate.alt,
@@ -195,7 +195,7 @@ def _record_merged_rows(upload_step, variant_qs):
     for variant_id, info in variant_qs.values_list("pk", info_alias):
         # INFO values are stored as VCF writes them - htslib doesn't decode, so we do
         encoded = (info or {}).get(FUSION_OBSERVATIONS_INFO) or "[]"
-        observations = simplejson.loads(percent_decode_info_value(encoded))
+        observations = json.loads(percent_decode_info_value(encoded))
         if len(observations) > 1:
             merged.append((variant_id, len(observations), format_fusion_observations(observations)))
 

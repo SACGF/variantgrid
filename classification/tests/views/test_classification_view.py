@@ -1,6 +1,5 @@
 from unittest import skip
 
-from deepdiff import DeepDiff
 from django.test import RequestFactory, TestCase, override_settings
 
 from classification.enums import EvidenceKeyValueType, SubmissionSource
@@ -177,8 +176,7 @@ class ClassificationTestCaseViews(TestCase):
             ]
         }
 
-        diffs = DeepDiff(t1=expected, t2=response)
-        self.assertFalse(diffs)
+        self.assertEqual(expected, response)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
@@ -259,8 +257,7 @@ class ClassificationTestCaseViews(TestCase):
             ]
         }
 
-        diffs = DeepDiff(t1=expected, t2=response_json)
-        self.assertFalse(diffs)
+        self.assertEqual(expected, response_json)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     @skip("Failing pending fix - SACGF/variantgrid_private#3740")

@@ -8,7 +8,7 @@ produces. Fusions build on this in gene_fusion_test_utils.
 """
 from django.db import transaction
 
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
+from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.gene_copy_number import (
     ResolvedGeneCopyNumberEvent,
     create_gene_copy_number_events_for_variants,
@@ -79,7 +79,7 @@ def create_splice_event_variant(gene_name: str, label: str,
 def make_release_gene(genome_build, release, gene_id, gene_symbol, transcript_id, contig, start,
                       hgnc_id=None):
     """ A gene of the release with one 10 kb transcript from start, so a position inside it resolves """
-    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol,
+    gene_version = create_fake_gene_version(genome_build, gene_id, gene_symbol,
                                              AnnotationConsortium.ENSEMBL)
     gene_version.hgnc_id = hgnc_id
     gene_version.save()
@@ -98,6 +98,6 @@ def make_release_gene(genome_build, release, gene_id, gene_symbol, transcript_id
             }
         },
     }
-    transcript_version = _insert_transcript_data(genome_build, data, gene_version, release)
+    transcript_version = insert_transcript_data(genome_build, data, gene_version, release)
     ReleaseTranscriptVersion.objects.get_or_create(release=release, transcript_version=transcript_version)
     return gene_version.gene

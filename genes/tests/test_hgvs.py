@@ -9,8 +9,8 @@ from django.conf import settings
 from django.test import TestCase, override_settings
 from hgvs.parser import Parser
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import (
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import (
     create_fake_transcript_version,
     create_gata2_as1_transcript_version,
     create_gata2_transcript_version,

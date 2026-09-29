@@ -1,10 +1,10 @@
+import json
 import operator
 import re
 from collections.abc import Callable
 from functools import cached_property, reduce
 from typing import Optional
 
-import simplejson
 from django.db.models import Q, QuerySet
 
 from analysis.models.enums import GroupOperation
@@ -39,7 +39,7 @@ def _render_fusion_calls(cell: CellData) -> str:
         htslib doesn't decode, so we do. @see upload.tso500.dragen_all_fusions_parser """
     if not (encoded := cell.value):
         return ""
-    return format_fusion_observations(simplejson.loads(percent_decode_info_value(encoded)))
+    return format_fusion_observations(json.loads(percent_decode_info_value(encoded)))
 
 
 def _render_splice_calls(cell: CellData) -> str:
@@ -47,7 +47,7 @@ def _render_splice_calls(cell: CellData) -> str:
         reads that crossed it. @see upload.tso500.dragen_combined_variant_output_parser """
     if not (encoded := cell.value):
         return ""
-    return format_splice_observation(simplejson.loads(percent_decode_info_value(encoded)))
+    return format_splice_observation(json.loads(percent_decode_info_value(encoded)))
 
 
 def get_sample_annotation_kwargs(sample: Sample, **kwargs) -> dict:

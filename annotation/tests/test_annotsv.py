@@ -7,10 +7,10 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
-from annotation.annotsv_columns import ANNOTSV_COLUMNS, all_variant_grid_column_ids
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
-from annotation.fake_annotation import (
+from annotation.annotsv_columns import ANNOTSV_COLUMNS, all_variant_grid_column_ids
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
@@ -39,11 +39,11 @@ from genes.models_enums import AnnotationConsortium
 from snpdb.grids import render_annotsv_pathogenic_overlaps
 from snpdb.models import Variant, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import CellData
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_loci_and_variants_for_vcf,
     slowly_create_test_variant,
 )
+from snpdb.views.datatable_view import CellData
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
 TEST_ANNOTSV_TSV = os.path.join(TEST_DATA_DIR, "annotsv", "test_grch37_sv.annotated.tsv")

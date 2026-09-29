@@ -12,25 +12,25 @@ from analysis.models.enums import DuoInheritance, NodeStatus, QuadInheritance, T
 from analysis.models.nodes.sources.duo_node import DuoCompHet
 from analysis.models.nodes.sources.quad_node import QuadCompHet
 from analysis.models.nodes.sources.trio_node import CompHet
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
 from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
-from annotation.tests.test_data_fake_genes import (
-    _create_fake_gene_version,
-    _insert_transcript_data,
+from genes.fake_data import (
+    create_fake_gene_version,
     create_fake_transcript_version,
+    insert_transcript_data,
 )
 from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
+from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant
 from snpdb.models.models_cohort import CohortGenotype, CohortGenotypeCollection
-from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 def _create_extra_gene_on_chr21(genome_build, release, ensembl_id: str, symbol: str, start: int, end: int):
     """ A gene downstream of RUNX1 (chr21) so an SV can span both """
-    gene_version = _create_fake_gene_version(genome_build, ensembl_id, symbol,
+    gene_version = create_fake_gene_version(genome_build, ensembl_id, symbol,
                                              AnnotationConsortium.ENSEMBL)
     data = {
         "id": f"{ensembl_id.replace('ENSG', 'ENST')}.1",
@@ -48,7 +48,7 @@ def _create_extra_gene_on_chr21(genome_build, release, ensembl_id: str, symbol: 
             }
         },
     }
-    return _insert_transcript_data(genome_build, data, gene_version, release)
+    return insert_transcript_data(genome_build, data, gene_version, release)
 
 
 def _create_test_sv(genome_build, chrom: str, position: int, end: int) -> Variant:

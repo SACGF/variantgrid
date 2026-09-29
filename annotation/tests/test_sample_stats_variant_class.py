@@ -5,12 +5,12 @@ insertion nor a deletion, and it is a class of its own rather than the SNP fallb
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.tasks.calculate_sample_stats import calculate_cohort_stats
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from patients.models_enums import Zygosity
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, CohortGenotypeStats, GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

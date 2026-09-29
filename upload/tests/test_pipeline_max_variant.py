@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from annotation.annotation_version_querysets import pipeline_type_variant_q
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,

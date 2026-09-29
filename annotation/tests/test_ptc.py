@@ -2,11 +2,11 @@ from django.test import SimpleTestCase, TestCase
 
 from annotation.models.models_enums import NMDEscapeStatus
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
-from annotation.tests.test_data_fake_genes import create_gata2_transcript_version
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import (
     TranscriptGeometryCache,
     add_calculated_ptc,
 )
+from genes.fake_data import create_gata2_transcript_version
 from snpdb.models.models_genome import GenomeBuild
 
 

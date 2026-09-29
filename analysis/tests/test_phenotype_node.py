@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.analysis_templates import populate_analysis_from_template_run
+from analysis.forms.forms_nodes import PhenotypeNodeForm
 from analysis.models import (
     Analysis,
     AnalysisTemplate,
@@ -14,13 +15,12 @@ from analysis.models import (
     PhenotypeNode,
     TrioNode,
 )
-from analysis.forms.forms_nodes import PhenotypeNodeForm
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
+from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import Cohort, GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 
 TEXT_COLUMNS = [
     "variantannotation__gene__summary",

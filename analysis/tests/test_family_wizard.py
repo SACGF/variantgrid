@@ -9,8 +9,8 @@ from analysis.models.enums import DuoSample, QuadSample, TrioSample
 from analysis.views.views_wizard import _confident_sex
 from library.django_utils.unittest_utils import URLTestCase
 from patients.models_enums import Sex
+from snpdb.fake_data import create_fake_duo
 from snpdb.models import Duo, DuoRelationship, GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_duo
 
 
 class ConfidentSexTest(TestCase):

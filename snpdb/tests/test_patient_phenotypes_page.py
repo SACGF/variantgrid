@@ -16,8 +16,8 @@ from ontology.tests.test_data_ontology import (
     create_test_ontology_version,
 )
 from patients.models import Patient
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
 
 

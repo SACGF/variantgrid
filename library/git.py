@@ -1,6 +1,6 @@
 """
 Git: the repo's current hash, version, branch, last modified date and a GitHub link, read by the site footer,
-`vg status`, deployment checks and the VARIANTGRID_VERSION setting.
+deployment checks and the VARIANTGRID_VERSION setting.
 """
 import re
 import subprocess

@@ -2,7 +2,7 @@
 Source-node archive tolerance: when a source's VCF is archived, the node surfaces
 a configuration error and the cohort_genotype_collection mirror returns None.
 
-@see claude/issue_1536_data_archive_plan.md §3
+@see https://github.com/SACGF/variantgrid/issues/1536
 """
 
 from django.contrib.auth.models import User
@@ -11,12 +11,12 @@ from django.utils import timezone
 
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from snpdb.archive import DataArchivedError
-from snpdb.models import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import (
+from snpdb.fake_data import (
     create_fake_cohort,
     create_fake_quad,
     create_fake_trio,
 )
+from snpdb.models import GenomeBuild
 
 
 class SourceNodeArchiveToleranceTests(TestCase):

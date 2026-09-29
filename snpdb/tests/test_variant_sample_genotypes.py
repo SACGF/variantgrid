@@ -3,13 +3,14 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen, Tissue
 from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     CohortGenotype,
     CohortGenotypeCollection,
@@ -19,7 +20,6 @@ from snpdb.models import (
     VariantZygosityCountCollection,
     VCFFilter,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.variant_sample_information import VariantSampleGenotypes
 

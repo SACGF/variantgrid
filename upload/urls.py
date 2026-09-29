@@ -31,7 +31,7 @@ urlpatterns = [
     path('vcf_import_info_tags/accept/<int:vcf_import_info_id>', views_json.accept_vcf_import_info_tag, name='accept_vcf_import_info_tag'),
     path('upload_file/', views_json.upload_file, name='upload_file'),
     path('upload_file_delete/<int:pk>', views_json.upload_file_delete, name='upload_file_delete'),
-    path('uploaded_file/download/<int:pk>', views.DownloadUploadedFile.as_view(), name='download_uploaded_file'),
+    path('uploaded_file/download/<int:pk>', views.download_uploaded_file, name='download_uploaded_file'),
 
     # APIs - Django REST framework
     path('api/v1/file_upload', APIFileUploadView.as_view(), name='api_file_upload'),

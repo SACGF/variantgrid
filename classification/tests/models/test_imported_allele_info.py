@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from classification.models import ImportedAlleleInfo
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfoStatus,

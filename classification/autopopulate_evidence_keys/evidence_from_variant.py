@@ -34,6 +34,7 @@ from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
 from seqauto.models import get_20x_gene_coverage
 from snpdb.clingen_allele import ClinGenAlleleAPIException, get_clingen_allele_for_variant
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import ColumnAnnotationLevel
@@ -194,11 +195,12 @@ def ekey_from_vg_column_formatters():
     }
 
 
-def get_clingen_allele_and_evidence_value_for_variant(genome_build: GenomeBuild, variant: Variant) -> tuple[ClinGenAllele, str, str]:
+def get_clingen_allele_and_evidence_value_for_variant(genome_build: GenomeBuild, variant: Variant,
+                                                      clingen_api: ClinGenAlleleRegistryAPI = None) -> tuple[ClinGenAllele, str, str]:
     """ returns (clingen_allele, evidence_value) """
     message = None
     try:
-        clingen_allele = get_clingen_allele_for_variant(genome_build, variant)
+        clingen_allele = get_clingen_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
         evidence_value = str(clingen_allele)
     except ClinGenAlleleAPIException as cge:
         clingen_allele = None
@@ -210,14 +212,17 @@ def get_clingen_allele_and_evidence_value_for_variant(genome_build: GenomeBuild,
 
 def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
                                     refseq_transcript_accession, ensembl_transcript_accession,
-                                    evidence_keys_list: list, annotation_version: AnnotationVersion) -> AutopopulateData:
-    """ annotation_version is optional (defaults to latest for genome build) """
+                                    evidence_keys_list: list, annotation_version: AnnotationVersion,
+                                    clingen_api: ClinGenAlleleRegistryAPI = None) -> AutopopulateData:
+    """ annotation_version is optional (defaults to latest for genome build)
+        clingen_api - web requests pass one with max_attempts=1 so a registry outage doesn't hold up the page """
 
     data = AutopopulateData("basic variant")
     hgvs_matcher = HGVSMatcher.instance(genome_build=genome_build)
     clingen_allele = None
     if variant:
-        clingen_allele, evidence_value, message = get_clingen_allele_and_evidence_value_for_variant(genome_build, variant)
+        clingen_allele, evidence_value, message = get_clingen_allele_and_evidence_value_for_variant(genome_build, variant,
+                                                                                                    clingen_api=clingen_api)
         if message:
             data.message = message
         data[SpecialEKeys.CLINGEN_ALLELE_ID] = evidence_value

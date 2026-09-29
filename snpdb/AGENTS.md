@@ -56,8 +56,8 @@ Gotchas:
 - Views are split by topic (views/views_data.py, views_cohort.py, views_lab.py, views_user_settings.py, views_liftover.py, …); views/views.py holds only index, wiki and genome build/contig pages.
 
 Tests:
-- Fixture builders: tests/utils/fake_cohort_data.py:create_fake_cohort / create_fake_trio / create_fake_quad / create_fake_pedigree build VCF + samples + cohort in one call.
-- Variants: tests/utils/vcf_testing_utils.py:slowly_create_test_variant and create_mock_allele; annotation/fake_annotation.py:get_fake_annotation_version for anything that touches annotation.
+- Fixture builders: fake_data.py:create_fake_cohort / create_fake_trio / create_fake_quad / create_fake_pedigree build VCF + samples + cohort in one call; the same module holds the `people` and `trio` steps of `manage.py create_fake_data` (tests/test_create_fake_data.py runs every step).
+- Variants: tests/utils/vcf_testing_utils.py:slowly_create_test_variant and create_mock_allele; annotation/fake_data.py:get_fake_annotation_version for anything that touches annotation.
 - Never hit the real registry: inject tests/utils/mock_clingen_api.py:MockClinGenAlleleRegistryAPI (or its ServerError sibling) via clingen_api=, as test_liftover.py and test_clingen_allele.py do.
 - URL coverage: tests/test_urls.py:Test (URLTestCase); add new views to URL_NAMES_AND_KWARGS or PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, datatable endpoints to testDataGridUrls.
 - Query-count guards: tests/test_query_counts.py (view_sample must stay flat as trios grow).

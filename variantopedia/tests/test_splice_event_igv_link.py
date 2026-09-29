@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import HGNC, GeneSymbol, HGNCImport
 from genes.models_enums import HGNCStatus
 from genes.tests.gene_level_test_utils import create_splice_event_variant
