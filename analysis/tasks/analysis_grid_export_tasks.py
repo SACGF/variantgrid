@@ -36,11 +36,12 @@ NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 
 def _get_usable_cgf(generator, pk, export_type) -> Optional[CachedGeneratedFile]:
-    """ A cached file whose output is gone is no better than never having generated it - return None so
-        the page offers the generate link, and get_or_create_and_launch drops the row when they click """
+    """ A cached file whose output is gone, or whose generation failed, is no better than never having
+        generated it - return None so the page offers the generate link, and get_or_create_and_launch
+        drops the row when they click """
     params_hash = get_grid_downloadable_file_params_hash(pk, export_type)
     cgf = CachedGeneratedFile.objects.filter(generator=generator, params_hash=params_hash).first()
-    if cgf and cgf.file_missing:
+    if cgf and (cgf.file_missing or cgf.exception):
         cgf = None
     return cgf
 
