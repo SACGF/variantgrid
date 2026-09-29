@@ -2,8 +2,7 @@
 snpdb's models as one namespace: every models_*.py module is star-imported here so callers write
 `from snpdb.models import Variant, Sample, Cohort` without knowing which file holds what.
 Add a new models module to this list or it will not be importable this way (and its signal receivers
-will not load). `scripts/vg outline snpdb/models/<module>.py` shows what each file holds; the
-vocabulary is claude/domain.md.
+will not load).
 """
 from .models import *
 from .models_jobs_control import *

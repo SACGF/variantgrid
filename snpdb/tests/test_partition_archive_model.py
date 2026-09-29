@@ -1,7 +1,7 @@
 """
 Tests for PartitionArchive model + archive_partitioned_model helper.
 
-@see claude/issue_1537_archive_plan.md §7
+@see https://github.com/SACGF/variantgrid/issues/1537
 """
 
 import tempfile

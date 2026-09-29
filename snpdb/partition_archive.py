@@ -4,7 +4,7 @@ Generic pre-drop archival pipeline for any RelatedModelsPartitionModel subclass.
 The helper kicks off the long-running Celery task and returns immediately;
 the task does the actual pg_dump -> verify -> drop sequence.
 
-@see claude/issue_1537_archive_plan.md
+@see https://github.com/SACGF/variantgrid/issues/1537
 """
 
 import os

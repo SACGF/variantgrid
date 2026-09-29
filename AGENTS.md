@@ -121,6 +121,9 @@ and `lint-imports` (`.importlinter`: `library` never imports an app) both gate C
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't
 write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a
 lot of comments, perhaps you could make the code clearer by extracting logic into better named variables.
+Code, docstrings and templates cite a GitHub issue (`#1537`), not a plan file or anything else under `claude/` - plans
+are deleted when they land, and copies of papers or prototypes aren't in the repo. Point at an app's `AGENTS.md` only
+for something specific it holds, and name `vg` only where it calls the code.
 
 ### Frontend
 Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and

@@ -1,7 +1,7 @@
 """
 Tests for the perform_partition_archive Celery task and admin lifecycle helpers.
 
-@see claude/issue_1537_archive_plan.md §7
+@see https://github.com/SACGF/variantgrid/issues/1537
 """
 
 import os

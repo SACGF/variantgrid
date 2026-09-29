@@ -1,7 +1,5 @@
 """
 Tests for DataArchiveMixin and the chokepoint behaviour added in #1536.
-
-@see claude/issue_1536_data_archive_plan.md
 """
 
 from unittest.mock import patch
