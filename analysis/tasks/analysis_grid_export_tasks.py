@@ -36,12 +36,11 @@ NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 
 def _get_usable_cgf(generator, pk, export_type) -> Optional[CachedGeneratedFile]:
-    """ A cached file whose output is gone, or whose generation failed, is no better than never having
-        generated it - return None so the page offers the generate link, and get_or_create_and_launch
-        drops the row when they click """
+    """ A cached file that needs regenerating is no better than never having generated it - return None so
+        the page offers the generate link, and get_or_create_and_launch drops the row when they click """
     params_hash = get_grid_downloadable_file_params_hash(pk, export_type)
     cgf = CachedGeneratedFile.objects.filter(generator=generator, params_hash=params_hash).first()
-    if cgf and (cgf.file_missing or cgf.exception):
+    if cgf and cgf.needs_regenerating:
         cgf = None
     return cgf
 
@@ -75,17 +74,33 @@ def get_node_grid_downloadable_file_params_hash(node_id, node_version, user_id, 
 
 def update_cgf_progress_iterator(iterator, cgf_id, total_records, update_size):
     """ Wraps the export's rows iterator - the file iterator yields a chunk of rows at a time, so
-        counting its yields would under-report progress by the chunk size """
+        counting its yields would under-report progress by the chunk size. Each update bumps modified,
+        the heartbeat that keeps a long export from looking stalled (@see CachedGeneratedFile.generation_stalled) """
     update_size = int(update_size)  # make sure int so modulus below will hit
     cgf_qs = CachedGeneratedFile.objects.filter(id=cgf_id)
-    cgf_qs.update(progress=0)
+    cgf_qs.update(progress=0, modified=timezone.now())
 
     for i, record in enumerate(iterator):
         if i % update_size == 0:
-            progress = i / total_records if total_records else 0
-            cgf_qs.update(progress=progress)
+            # Capped as the cached node count can be behind the rows actually exported
+            progress = min(i / total_records, 1) if total_records else 0
+            cgf_qs.update(progress=progress, modified=timezone.now())
         yield record
-    cgf_qs.update(progress=1)
+    cgf_qs.update(progress=1, modified=timezone.now())
+
+
+def _get_cgf_for_task(task, generator, params_hash) -> Optional[CachedGeneratedFile]:
+    """ The row this run writes to, with its heartbeat bumped - or None if the row has been relaunched under
+        another task since this one was queued (@see CachedGeneratedFile.generation_stalled), so two runs
+        don't write the same file """
+    # This should have been created by CachedGeneratedFile.get_or_create_and_launch
+    cgf = CachedGeneratedFile.objects.get(generator=generator, params_hash=params_hash)
+    if cgf.task_id and cgf.task_id != task.request.id:
+        logging.info("CachedGeneratedFile %s now belongs to task %s - skipping superseded task %s",
+                     cgf.pk, cgf.task_id, task.request.id)
+        return None
+    CachedGeneratedFile.objects.filter(pk=cgf.pk).update(modified=timezone.now())
+    return cgf
 
 
 def _get_annotated_basename(analysis, name: str) -> str:
@@ -159,10 +174,10 @@ def _wait_for_output_node(self, node):
 @celery.shared_task(bind=True)
 def export_cohort_to_downloadable_file(self, cohort_id, export_type):
     try:
-        # This should have been created in analysis.views.views_grid.cohort_grid_export
         params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
-        cgf = CachedGeneratedFile.objects.get(generator="export_cohort_to_downloadable_file",
-                                              params_hash=params_hash)
+        cgf = _get_cgf_for_task(self, "export_cohort_to_downloadable_file", params_hash)
+        if cgf is None:
+            return
 
         cohort = Cohort.objects.get(pk=cohort_id)
         analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
@@ -181,10 +196,10 @@ def export_cohort_to_downloadable_file(self, cohort_id, export_type):
 @celery.shared_task(bind=True)
 def export_sample_to_downloadable_file(self, sample_id, export_type):
     try:
-        # This should have been created in analysis.views.views_grid.sample_grid_export
         params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
-        cgf = CachedGeneratedFile.objects.get(generator="export_sample_to_downloadable_file",
-                                              params_hash=params_hash)
+        cgf = _get_cgf_for_task(self, "export_sample_to_downloadable_file", params_hash)
+        if cgf is None:
+            return
 
         sample = Sample.objects.get(pk=sample_id)
         analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
@@ -208,10 +223,11 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
         gunicorn request timeout. grid_params are the whitelisted grid GET params the browser sent, so
         the export sees the same filters as the grid the user was looking at. """
     try:
-        # This should have been created in analysis.views.views_grid.node_grid_export
         params_hash = get_node_grid_downloadable_file_params_hash(node_id, node_version, user_id, export_type,
                                                                  canonical_transcript_collection_id, grid_params)
-        cgf = CachedGeneratedFile.objects.get(generator=NODE_EXPORT_GENERATOR, params_hash=params_hash)
+        cgf = _get_cgf_for_task(self, NODE_EXPORT_GENERATOR, params_hash)
+        if cgf is None:
+            return
 
         user = User.objects.get(pk=user_id)
         node = get_node_subclass_or_non_fatal_exception(user, node_id, version=node_version)
