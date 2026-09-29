@@ -1,7 +1,7 @@
 """
 Archive/restore for GeneCoverageCollection.
 
-@see https://github.com/SACGF/variantgrid/issues/1536
+@see claude/issue_1536_data_archive_plan.md
 """
 
 import logging

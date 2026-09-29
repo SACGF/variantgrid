@@ -1,7 +1,7 @@
 """
 Tests for VAV-archive guards on annotation queryset builders.
 
-@see https://github.com/SACGF/variantgrid/issues/1536
+@see claude/issue_1536_data_archive_plan.md §3
 """
 
 from django.contrib.auth.models import User

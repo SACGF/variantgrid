@@ -1,7 +1,7 @@
 """
 Celery task that performs the long-running pg_dump+drop for a PartitionArchive row.
 
-@see https://github.com/SACGF/variantgrid/issues/1537
+@see claude/issue_1537_archive_plan.md
 """
 
 import hashlib

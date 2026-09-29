@@ -2,7 +2,7 @@
 Source-node archive tolerance: when a source's VCF is archived, the node surfaces
 a configuration error and the cohort_genotype_collection mirror returns None.
 
-@see https://github.com/SACGF/variantgrid/issues/1536
+@see claude/issue_1536_data_archive_plan.md §3
 """
 
 from django.contrib.auth.models import User

@@ -1,7 +1,7 @@
 """
 Archive/restore for VCF (and exception types reused across apps).
 
-@see https://github.com/SACGF/variantgrid/issues/1536
+@see claude/issue_1536_data_archive_plan.md
 """
 
 import logging

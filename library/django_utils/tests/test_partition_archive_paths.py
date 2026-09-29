@@ -1,7 +1,7 @@
 """
 Tests for the get_partition_archive_path helper.
 
-@see https://github.com/SACGF/variantgrid/issues/1537
+@see claude/issue_1537_archive_plan.md §1
 """
 
 import os
