@@ -368,6 +368,7 @@ def export_discordance_report(request: HttpRequest, discordance_report_id: int) 
 
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
+            request=request,
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
             file_prefix=f"discordance_report_{discordance_report_id}",

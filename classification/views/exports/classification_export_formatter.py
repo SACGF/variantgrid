@@ -8,7 +8,6 @@ from typing import Any, Optional
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
-from django.shortcuts import render
 from more_itertools import peekable
 from stream_zip import ZIP_64
 
@@ -18,7 +17,6 @@ from classification.views.exports.classification_export_filter import (
 )
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
-from library.request_context import get_current_request
 from snpdb.models import AlleleOriginFilterDefault, GenomeBuild
 
 
@@ -91,7 +89,7 @@ class ClassificationExportFormatter(ABC):
             for count, row in enumerate(self._yield_single_file()):
                 if count > 100:
                     break
-            return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
+            return HttpResponse("<html><body>Benchmark complete - for use with Debug Toolbar</body></html>")
 
         if self.classification_filter.rows_per_file:
             # Had subtle issues with stream_zip, maybe try again after a version increase
@@ -338,7 +336,7 @@ class ClassificationExportFormatter(ABC):
         nb = NotificationBuilder(message="Classification Download")\
             .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
-        for key, value in self.classification_filter.request_params.items():
+        for key, value in (self.classification_filter.request_params or {}).items():
             nb.add_field(key, value)
         nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
         nb.send()

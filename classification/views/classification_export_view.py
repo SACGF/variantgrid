@@ -267,6 +267,7 @@ def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
 
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
+            request=request,
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
             starting_query=qs,
@@ -310,6 +311,7 @@ def internal_lab_download(request):
                     return render(request, 'classification/classification_export.html', context)
 
         filter_data = ClassificationFilter(
+            request=request,
             user=user,
             genome_build=genome_build,
             allele_origin_filter=allele_origin,
