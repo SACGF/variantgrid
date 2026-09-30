@@ -220,7 +220,7 @@ class Test(URLTestCase):
         DATATABLE_URLS = [
             ("analyses_list_datatable", {}, 200),
             ("analysis_templates_datatable", {}, 200),
-            ("analysis_node_issues_datatable", {}, 200),
+            ("analysis_node_issues_datatable", {}, 403),
             ("karyomapping_analyses_datatable", {}, 200),
         ]
         self._test_datatable_urls(DATATABLE_URLS, self.user_non_owner)

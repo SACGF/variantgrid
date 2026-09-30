@@ -41,6 +41,11 @@ class Test(URLTestCase):
             ('view_upload_pipeline_warnings_and_errors', upload_pipeline_kwargs, 200),
         ]
 
+        cls.PRIVATE_DATATABLE_URL_NAMES_AND_KWARGS = [
+            ("upload_pipeline_skipped_annotation_datatable", upload_pipeline_kwargs, 200),
+            ("upload_pipeline_modified_variants_datatable", upload_pipeline_kwargs, 200),
+        ]
+
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("upload_pipeline_modified_variants_datatable", upload_pipeline_kwargs, None),
@@ -60,6 +65,10 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+
+    @prevent_request_warnings
+    def testDatatableNoPermission(self):
+        self._test_urls(self.PRIVATE_DATATABLE_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
 
     def testDatatableGridListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
