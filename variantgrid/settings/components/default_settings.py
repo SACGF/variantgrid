@@ -1258,6 +1258,8 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "lab_members_tab": LAB_HEAD_MANAGE_MEMBERS,
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
+# The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default
+MENUS = "variantgrid.menus.MENUS"
 
 DEFAULT_TERMS_SLUG = 'site-terms'
 ACCEPT_TERMS_PATH = '/terms/accept/'

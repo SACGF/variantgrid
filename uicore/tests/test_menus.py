@@ -6,7 +6,8 @@ from django.template import RequestContext, Template
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import get_resolver, resolve, reverse
 
-from uicore.menus import MENUS, current_menu
+from uicore.menus import current_menu
+from variantgrid.menus import MENUS
 
 
 def _visible_except(*hidden):

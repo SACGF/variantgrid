@@ -24,7 +24,8 @@ div; a few menu-less pages use `uicore/templates/uicore/page/base_external.html`
 (`uicore/utils/form_helpers.py:FORM_HELPER_HELPER`), so templates can write `{% crispy form form_helper.horizontal_nested %}`
 and hide links without loading anything.
 
-Menus are data (#2007): `uicore/menus.py:MENUS` declares each top-bar entry and its sub-menu items, and which url
+Menus are data (#2007): `variantgrid/menus.py:MENUS` (the registry `settings.MENUS` names, so a deployment repo can
+supply its own built on it) declares each top-bar entry and its sub-menu items, and which url
 names belong to it - an item, a detail page that highlights an item (`uicore/menus.py:MenuItem` `pages`), or a page in
 the menu under no item (`uicore/menus.py:Menu` `pages`). `uicore/menus.py:current_menu` finds the menu for the
 request's url name, and `base.html` renders `uicore/templatetags/ui_menus.py:menu_bar_main` and `menu_bar_sub` from
@@ -162,7 +163,7 @@ picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by 
 - **`labelled` does not escape `label` or `help`.** Both are interpolated into an f-string (`help` only has `"`
   swapped for `'`); pass user text through `|escape` first.
 - **A `MenuItem` with `href` skips the URL register** - only the `url_name` path is checked (the Django admin link).
-- **A url name in two menus goes to the first visible one** in `uicore/menus.py:MENUS`: Liftover and Seq / Software
+- **A url name in two menus goes to the first visible one** in `variantgrid/menus.py:MENUS`: Liftover and Seq / Software
   Versions sit in Settings with a `condition`, so they appear there only when their own menu is off.
 - **`ChoiceFieldWithOther.valid_value` is always `True`** (`uicore/widgets/radio_other_widget.py`): any posted string
   is accepted as a choice, since "other" text is legitimately anything. Validate the value downstream if it matters.

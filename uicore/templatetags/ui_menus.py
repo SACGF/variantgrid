@@ -1,5 +1,5 @@
 """
-Renders the menus declared in uicore/menus.py: menu_bar_main (the top bar) and menu_bar_sub (the side bar for the
+Renders the menus from settings.MENUS (uicore/menus.py:get_menus): menu_bar_main (the top bar) and menu_bar_sub (the side bar for the
 current page), both picked from the request's url name. Also the page chrome's site_messages and the absolute_url tag.
 """
 from typing import Optional
@@ -9,7 +9,7 @@ from django.template.library import Library
 from django.urls import reverse
 
 from library.django_utils import get_url_from_view_path
-from uicore.menus import MENUS, MenuItem, current_menu
+from uicore.menus import MenuItem, current_menu, get_menus
 
 register = Library()
 
@@ -45,7 +45,7 @@ def menu_bar_main(context):
         'type': 'top',
         'id': f'menu-top-{menu.key}',
         'method': 'get',
-    } for menu in MENUS if menu.in_top_bar]
+    } for menu in get_menus() if menu.in_top_bar]
     return {
         'top_items': top_items,
         'help_url': context.get('help_url'),

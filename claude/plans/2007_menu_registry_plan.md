@@ -10,7 +10,7 @@ asking, and the menu is the first of those things.
 
 ## Where it stands
 
-Menus are data in `uicore/menus.py:MENUS`, rendered server-side by `uicore/templatetags/ui_menus.py:menu_bar_main` and
+Menus are data in `variantgrid/menus.py:MENUS` (`settings.MENUS`; the classes are `uicore/menus.py`), rendered server-side by `uicore/templatetags/ui_menus.py:menu_bar_main` and
 `menu_bar_sub` from the request's url name; the per-area menu bars, the wrapper templates and the context-processor
 `menu_*_base` variables are gone, and no page template chooses a menu. The how-to is in `uicore/AGENTS.md` and
 `claude/research/uicore.md`.
@@ -76,7 +76,7 @@ fills the top bar, side bar and the navbar right-hand side; the navbar reserves 
 
 ### Order of work
 
-1. ~~Menus as data: `uicore/menus.py`, rendered server-side.~~ Done.
+1. ~~Menus as data: `variantgrid/menus.py`, rendered server-side.~~ Done.
 2. ~~Port every page, delete the menu bars, wrappers and context-processor variables.~~ Done.
 3. Chrome endpoint: move the menu and the rest of the user chrome into it; strip `base.html`.
 4. `public_page_cache`, the version counter and the warmer; open view_gene_symbol first (no lab-scoped content), then
