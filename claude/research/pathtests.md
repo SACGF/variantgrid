@@ -29,9 +29,9 @@ the parent test so its `modified` reflects version changes.
 Anyone can file a request to add or remove a gene: the gene grid JS (`variantgrid/static_files/default_static/js/gene_grid.js`)
 POSTs to `pathtests/views.py:modify_pathology_test_version`, creating a PENDING
 `pathtests/models.py:PathologyTestGeneModificationRequest`. The curator reviews them on the version page:
-`pathtests/views.py:get_gene_modification_request` splits pending requests into additions and deletions **by whether
-the gene is currently in the list**, not by the request's `operation`, and the form posts `add-<gene>` / `del-<gene>`
-radios (ignore / reject / accept). If the version is already confirmed and anything is accepted,
+`pathtests/views.py:get_gene_modification_request` splits pending requests into additions and deletions by the
+request's `operation`, and the form posts `add-<gene>` / `del-<gene>` radios (ignore / reject / accept); a request with
+no radio in the POST (filed after the page loaded) stays pending. If the version is already confirmed and anything is accepted,
 `PathologyTestVersion.next_version` clones it (gene list cloned and unlocked, version +1, unconfirmed), all reviewed
 requests move to the new draft, and the genes are changed there via
 `genes/models/models_gene_list.py:GeneList.add_and_remove_gene_symbols` with a provenance note per added gene
@@ -65,7 +65,8 @@ scientists a user follows (`patients/models.py:get_lead_scientist_users_for_user
 - **Confirmed versions are immutable** (locked gene list) because orders and analyses reference a specific version; a
   change after confirmation must be a new version so historical results keep the list they were run against.
 - **ActivePathologyTestVersion is a separate row** so switching the active version is one update, and deleting a
-  test can drop "active" without touching versions.
+  test can drop "active" without touching versions (`pathtests/models.py:PathologyTest.delete_test`; `restore_test`
+  re-activates the latest confirmed version, since a confirmed version cannot be re-confirmed).
 
 ## History
 
@@ -77,21 +78,8 @@ timestamps are copied from Helix by sapath.
 
 ## Traps
 
-- `pathtests/models.py:PathologyTestGeneModificationRequest.__str__` does `" ".join(...)` over model instances and raises
-  `TypeError`, so the admin changelist for that model (registered in `pathtests/admin.py`) errors.
-- `pathtests/views.py:manage_pathology_tests` clones a source gene list without resetting `locked`. A test created from
-  a *confirmed* version gets a locked v1 list, and accepting any request on that draft fails in
-  `GeneList.add_and_remove_gene_symbols` with PermissionDenied. `next_version` unlocks; this path does not.
-- Deleting a test (`pathtests/views.py:view_pathology_test`, type "delete") removes its ActivePathologyTestVersion;
-  restoring does not put it back, and a confirmed version cannot be re-confirmed, so a restored test has no active
-  version (API 404) until a gene request is accepted to make a new one, or an admin fixes it.
-- Deletion vs addition is inferred from list membership, not `operation`: a REMOVE request for a gene not in the list
-  is shown and applied as an addition.
-- A request filed after the curator loaded the page has no radio in the POST, so `handle_modification_requests` saves it
-  with `outcome=None` and hits the NOT NULL constraint.
 - `PathologyTestVersion.next_version` and `GeneList.clone` turn `self` into the copy (`copy = self; copy.pk = None`).
   Re-fetch if you still need the original.
-- `PathologyTestVersion.replace_gene_list` has no callers; it overwrites the new list's row with the old list's fields.
-- Curator checks are an exact user match (no superuser override) and raise `PermissionError`, which is a 500, not a 403.
-- `pathtests/models.py:cases_for_user` always returns an empty queryset (disabled TODO), so the variantopedia dashboard's
-  `user_has_cases` is always false.
+- Curator checks are an exact user match (no superuser override); `check_is_curator` raises `PermissionDenied` (403).
+- `pathtests/models.py:cases_for_user` is what the variantopedia dashboard's `user_has_cases` uses: cases led by the
+  user or by a lead scientist they follow, the same set as the "My cases" page.
