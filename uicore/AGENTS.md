@@ -13,7 +13,9 @@ Patterns here:
   `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike; add a behaviour as
   a new processor entry.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
-  it escapes `</script>` and marks safe; `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
+  `json.dumps` with `<`, `>`, `&` \u-escaped, marked safe; `{{ value|js_symbol }}` for identifiers. Never build JS
+  literals with `{{ }}`. JSON shown as text in HTML (`<pre>`, `.format-json`) is `jsonify_html` / `jsonify_pretty`
+  (uicore/templatetags/js_tags.py:jsonify_for_html, HTML-escaped) - `jsonify` output in HTML shows `\u003C`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
   which takes hint, help, admin_only, show_if - use it rather than a hand-built Bootstrap row. New block tags parse
   kwargs with uicore/templatetags/ui_utils.py:parse_tag.
@@ -49,9 +51,9 @@ Gotchas:
 - `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the
   pedigree symbols in uicore/templates/uicore/tags/svg_icon_sprite.html theme themselves through `style="fill: var(...)"`
   instead, which is what lets a page fill in the affected members with `--pedigree-*-fill`.
-Tests: no uicore/tests. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
-  (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
-  ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
+Tests: uicore/tests/test_js_tags.py (jsonify escaping, embedded admin_only tabs). Tag logic is tested by rendering a
+  `Template("{% load x %}...")` with a Context (variantgrid/tests/test_tips.py) or `render_to_string` of the template
+  (analysis/tests/test_node_display.py); ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
   library/django_utils/unittest_utils.py:URLTestCase - `_test_urls` for pages, `_test_datatable_urls` for grid
   endpoints (hits the URL and `?dataTableDefinition=1`). No JS tests - check processors in a browser (`run` skill).
 Deep reference: __uicore_readme.md · claude/research/uicore.md

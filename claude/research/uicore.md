@@ -86,8 +86,9 @@ annotation source" block on the annotation page, open and pink only when the com
 ### JSON on the page
 
 Two paths. Data for JavaScript goes into a `<script>` with `{{ x|jsonify }}`
-(`uicore/templatetags/js_tags.py:jsonify_for_js`: `json.dumps`, `</script>` escaped, marked safe). Data for humans goes
-through `{% code_json x %}` (`uicore/templatetags/js_tags.py:code_json`), which drops the JSON into a `.format-json` div
+(`uicore/templatetags/js_tags.py:jsonify_for_js`: `json.dumps` with `<`, `>`, `&` \u-escaped, marked safe). Data for
+humans goes through `{% code_json x %}` (`uicore/templatetags/js_tags.py:code_json`), which drops the HTML-escaped JSON
+(`uicore/templatetags/js_tags.py:jsonify_for_html`) into a `.format-json` div
 that global.js parses and replaces with coloured, collapsible HTML (`_formatJson`). `code_json` serialises a
 `uicore/json/validated_json.py:ValidatedJson` first; the `"*wrapper$": "VJ"` envelope written by
 `ValidatedJson._serialize` is what `_formatJson` recognises to draw each message inline beside the value it is about.
@@ -140,36 +141,25 @@ picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by 
 
 ## Traps
 
-- **`jsonify` does not escape quotes in a plain string.** In `uicore/templatetags/js_tags.py:jsonify_for_js` the str
-  branch does `replace('"', '\"')`, which in Python is a no-op: `{{ 'a"b'|jsonify }}` renders `"a"b"`, broken JS (and
-  an injection vector for user text). Dicts and lists go through `json.dumps` and are fine; wrap a lone string in a
-  dict or use `json.dumps` in the view until it is fixed.
-- **`jsonify` output is only safe inside `<script>`.** `json.dumps` leaves `<` and `>` alone and the result is marked
-  safe, so `uicore/templates/uicore/tags/code_block_json.html`, which puts it into a `div.format-json`, renders any
-  HTML inside a JSON string as markup before global.js reads it back with `.text()`. Treat `code_json` of
-  user-supplied values with suspicion.
-- **`admin_only` on `ui_register_tab_embedded` crashes for non-superusers.** `LocalTabContent.render` returns `None`
-  instead of `""` for a hidden tab, and Django's `NodeList.render` joins strings, so the page raises `TypeError`
-  (reproduced on Django 6.1). `snpdb/templates/snpdb/labs_graph_detail.html` uses it. The body is also rendered
-  before the admin check.
+- **`jsonify` is for `<script>`, not HTML.** `uicore/templatetags/js_tags.py:jsonify_for_js` \u-escapes `<`, `>` and
+  `&`, so in an element body it shows `\u003C`, and it leaves `"` alone, so it can't go in a double-quoted attribute
+  (a bare bool or number is fine). Use `jsonify_html` / `jsonify_pretty` for JSON shown as text. Until
+  SACGF/variantgrid_private#3921 a plain string skipped `json.dumps` and `"` was not escaped.
 - **`tab_id` on `ui_register_tab` only affects active-tab matching.** The stored id is always `url + "_" + param`
   (`uicore/templatetags/ui_tabs_builder.py:ui_register_tab`), and `url` is required even though it defaults to `None`.
   Tabs registered inside a `{% for %}` or `{% with %}` vanish when the sub-context pops - call
   `{% ui_register_tabs tab_set="x" %}` at the outer level first (the error from `ui_render_tabs` says so).
 - **`labelled` does not escape `label` or `help`.** Both are interpolated into an f-string (`help` only has `"`
   swapped for `'`); pass user text through `|escape` first.
-- **`current_record` points at a template that does not exist** (`uicore/templatetags/ui_menus.py:current_record`
-  renders a `current_record` template under uicore/menus that is not in the tree); nothing uses it yet.
 - **`menu_item(href=...)` skips the URL register** - only the `url_name` path is checked. `menu_top` accepts
   `a|b` and uses the first visible name.
 - **`ChoiceFieldWithOther.valid_value` is always `True`** (`uicore/widgets/radio_other_widget.py`): any posted string
   is accepted as a choice, since "other" text is legitimately anything. Validate the value downstream if it matters.
-- **global.js's initial pass ignores its skip list.** The ready-time loop does `for (const badTest in
-  badElementTests)`, iterating indices, so `func: null` selectors only protect nodes added later through the
-  MutationObserver. The observer's `ignoreSelectors` (`.wiki-tag`) is tested against the mutation target's parents
-  only, and only the top-level added node is marked `data-p`, so a child re-added elsewhere can be processed twice.
+- **global.js's `ignoreSelectors` (`.wiki-tag`) is tested against the mutation target's parents only**, and only
+  the top-level added node is marked `data-p`, so a child re-added elsewhere can be processed twice.
 - **There is no `jsstring` filter** (commented out in `js_tags`); which library holds which tag is in `uicore/AGENTS.md`.
-- **No tests in uicore.** Tag behaviour is exercised by rendering templates in other apps' tests
+- **Few tests in uicore** (`uicore/tests/test_js_tags.py`: jsonify escaping, embedded `admin_only` tabs). Other tag
+  behaviour is exercised by rendering templates in other apps' tests
   (`variantgrid/tests/test_tips.py`, `analysis/tests/test_node_display.py`, ValidatedJson in
   `classification/tests/utils/test_json_utils.py`) and by URL tests; nothing tests global.js - check processors in a
   browser.
