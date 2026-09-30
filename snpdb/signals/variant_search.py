@@ -23,7 +23,7 @@ from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
     find_gene_copy_number_events_for_string,
 )
-from genes.gene_fusions import find_gene_fusions_for_string
+from genes.gene_fusions import FUSION_STRING_SEPARATOR, find_gene_fusions_for_string
 from genes.gene_splice import SPLICE_STRING_PATTERN, find_splice_events_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
@@ -894,9 +894,8 @@ def search_allele_id(search_input: SearchInputInstance):
     yield Allele.objects.filter(pk=search_input.match.group(1))
 
 
-# '::' is the HGVS/ISCN fusion convention; a single hyphen is what callers write, so it separates
-# only where neither side contains one of its own (RP11-458D21.5 is a gene name, not a pair)
-GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.]+)$")
+# The separators classification import accepts - never a single hyphen, which gene names contain (HLA-A)
+GENE_FUSION_PATTERN = re.compile(rf"^([A-Za-z0-9.\-]+?)\s*(?:{FUSION_STRING_SEPARATOR.pattern})\s*([A-Za-z0-9.\-]+)$")
 
 
 @search_receiver(
@@ -905,7 +904,7 @@ GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.
     sub_name="Gene Fusion",
     example=SearchExample(
         note="A gene fusion, named by its gene pair",
-        examples=["BCR::ABL1", "CD74-ROS1"]
+        examples=["BCR::ABL1", "CD74--ROS1"]
     ),
     enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )

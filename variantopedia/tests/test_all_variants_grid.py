@@ -10,10 +10,9 @@ from django.urls import reverse
 
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
-from genes.fake_data import create_fake_transcript_version
+from genes.fake_data import create_fake_transcript_version, create_gene_level_variant, get_sequence
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneSymbolAliasSource
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
-from genes.tests.gene_level_test_utils import create_gene_level_variant, get_sequence
 from library.django_utils import FakeRequest
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VCFSymbolicAllele
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN

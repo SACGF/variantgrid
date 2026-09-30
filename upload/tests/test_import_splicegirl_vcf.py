@@ -8,9 +8,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import get_sequence
 from genes.models import HGNC, GeneSymbol, HGNCImport
 from genes.models_enums import HGNCStatus
-from genes.tests.gene_level_test_utils import get_sequence, make_release_gene
+from genes.tests.gene_level_test_utils import make_release_gene
 from library.genomics.vcf_writer import percent_decode_info_value
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild, ImportSource

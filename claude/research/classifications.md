@@ -69,7 +69,7 @@ conversion is attempted, are:
 
 | Written | Resolves via | Since |
 |---|---|---|
-| `BCR::ABL1`, `CD74-ROS1` | `genes/gene_fusions.py:resolve_fusion_string` - both sides have to be genes we know | #1506 |
+| `BCR::ABL1`, `CD74--ROS1` (`~`, `/` too; never a single hyphen, which gene names contain) | `genes/gene_fusions.py:resolve_fusion_string` - both sides have to be genes we know | #1506, #1876 |
 | `EGFR amplification`, `PTEN loss` (`amp`, `gain`, `deletion`, `del` also accepted) | `genes/gene_copy_number.py:resolve_gene_copy_number_string` | #1836 |
 | `AR V7`, `AR-V7 splice variant`, `EGFRvIVa`, `MET exon 14 skipping`, `AR X_66905968_66914514` | `genes/gene_splice.py:resolve_splice_string` - every form canonicalised to one label (`genes/gene_splice.py:canonical_splice_label`), the gene has to be one we know, and the breakpoint form is read under the imported build | #1875, #1835 |
 

@@ -58,11 +58,9 @@ class GeneFusionResolver(GenePositionResolver):
 
     @staticmethod
     def split_fusion_string(fusion_string: str) -> Optional[tuple[str, str]]:
-        """ 'BCR::ABL1' -> ('BCR', 'ABL1'). A single hyphen is ambiguous with the hyphens inside
-            clone-based identifiers, so it only separates when exactly one hyphen is present """
+        """ 'BCR::ABL1' -> ('BCR', 'ABL1'). A single hyphen never separates - it is ambiguous with gene
+            names (HLA-A, RP11-458D21.5) - so 'CD74-ROS1' is not a fusion string; write 'CD74::ROS1' """
         parts = FUSION_STRING_SEPARATOR.split(fusion_string.strip())
-        if len(parts) == 1:
-            parts = fusion_string.strip().split("-")
         if len(parts) == 2:
             gene_a, gene_b = (p.strip() for p in parts)
             if gene_a and gene_b:

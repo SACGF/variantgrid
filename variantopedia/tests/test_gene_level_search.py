@@ -40,7 +40,7 @@ class TestGeneLevelSearch(TestCase):
 
     def test_gene_fusion(self):
         gene_fusion = create_gene_fusion("BCR", "ABL1")
-        for written in ["BCR::ABL1", "ABL1::BCR", "BCR-ABL1"]:
+        for written in ["BCR::ABL1", "ABL1::BCR", "BCR--ABL1"]:
             self._assert_finds(written, gene_fusion.variant)
 
     def test_gene_copy_number(self):
