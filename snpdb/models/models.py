@@ -156,18 +156,20 @@ class CachedGeneratedFile(TimeStampedModel):
 
     @property
     def needs_regenerating(self) -> bool:
-        """ The file is gone, or generation failed or stalled - no better than never having generated it """
-        return self.file_missing or bool(self.exception) or self.generation_stalled
+        """ The file is gone or generation stalled - no better than never having generated it. A row that
+            failed with an exception is not retried: it stays failed (and visible) until the cause is fixed
+            and the rows are cleared with the cached_generated_file_reset command """
+        return self.file_missing or self.generation_stalled
 
     @staticmethod
     def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
         cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                  params_hash=params_hash)
         if cgf.needs_regenerating:
-            # Drop the row so the get_or_create below regenerates it lazily. A failed or stalled generation (eg the
-            # worker was restarted mid-export) is retried the same way - otherwise it is cached forever
-            logging.info("Discarding CachedGeneratedFile %s - file_missing=%s exception=%s stalled=%s",
-                         cgf.pk, cgf.file_missing, cgf.exception, cgf.generation_stalled)
+            # Drop the row so the get_or_create below regenerates it lazily. A stalled generation (the worker
+            # died mid-export) is retried the same way - otherwise it is cached forever
+            logging.info("Discarding CachedGeneratedFile %s - file_missing=%s stalled=%s",
+                         cgf.pk, cgf.file_missing, cgf.generation_stalled)
             cgf.delete()
             cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                      params_hash=params_hash)

@@ -14,6 +14,8 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.client import Client
@@ -373,6 +375,20 @@ class TestNodeExportLaunch(GridExportTestCase):
         url = reverse("cached_generated_file_check", kwargs={"cgf_id": cgf.pk})
         data = self.client.get(url).json()
         self.assertEqual(data["status"], "FAILURE")
+
+    def test_failed_generation_stays_failed_until_reset(self):
+        """ A failure is not retried on the next request - the cause gets fixed, then the fix clears the
+            rows it explains with cached_generated_file_reset and they regenerate """
+        failed = self._launch_export()
+        CachedGeneratedFile.objects.filter(pk=failed.pk).update(task_status="FAILURE", exception="disk full")
+        self.assertEqual(failed.pk, self._launch_export().pk)
+
+        with self.assertRaises(CommandError):
+            call_command("cached_generated_file_reset")
+        call_command("cached_generated_file_reset", generator=NODE_EXPORT_GENERATOR, exception_contains="quota")
+        self.assertTrue(CachedGeneratedFile.objects.filter(pk=failed.pk).exists())
+        call_command("cached_generated_file_reset", generator=NODE_EXPORT_GENERATOR, exception_contains="disk")
+        self.assertNotEqual(failed.pk, self._launch_export().pk)
 
     def test_poll_reports_missing_file_as_failure(self):
         """ Pollers holding a cgf_id (@see analysis_downloads.js) don't go through the launch view,

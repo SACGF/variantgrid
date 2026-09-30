@@ -22,7 +22,7 @@ from genes.models import CanonicalTranscriptCollection
 from library.constants import MINUTE_SECS
 from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
-from library.log_utils import log_traceback
+from library.log_utils import log_traceback, report_exc_info
 from library.utils import mk_path_for_file, name_from_filename, sha256sum_str
 from snpdb.models import CachedGeneratedFile, Cohort, Sample
 from snpdb.utils import get_tag_sort_order_by_tag
@@ -37,7 +37,8 @@ NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 def _get_usable_cgf(generator, pk, export_type) -> Optional[CachedGeneratedFile]:
     """ A cached file that needs regenerating is no better than never having generated it - return None so
-        the page offers the generate link, and get_or_create_and_launch drops the row when they click """
+        the page offers the generate link, and get_or_create_and_launch drops the row when they click.
+        A failed row is returned so the page shows the failure rather than a link that would fail again """
     params_hash = get_grid_downloadable_file_params_hash(pk, export_type)
     cgf = CachedGeneratedFile.objects.filter(generator=generator, params_hash=params_hash).first()
     if cgf and cgf.needs_regenerating:
@@ -145,7 +146,10 @@ def _write_node_to_cached_generated_file(cgf, request, node, basename, export_ty
         cgf.generate_end = timezone.now()
         logging.info("Wrote %s", media_root_filename)
     except Exception as e:
+        # The row stays failed until the cause is fixed (@see CachedGeneratedFile.needs_regenerating), so
+        # admins hear about it now rather than from the user
         logging.error("Failed to write %s: %s", media_root_filename, e)
+        report_exc_info()
         cgf.exception = str(e)
         cgf.task_status = "FAILURE"
     cgf.save()
