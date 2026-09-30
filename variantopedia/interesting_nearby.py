@@ -1,34 +1,41 @@
 import operator
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from functools import reduce
 
 from django.conf import settings
-from django.db.models import Count, Q, StringAgg, Sum, Value
+from django.db.models import Count, Q, Sum
 
+from analysis.models.models_variant_tag import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import AnnotationVersion, VariantTranscriptAnnotation
+from annotation.models import (
+    AnnotationVersion,
+    VariantAnnotationVersion,
+    VariantTranscriptAnnotation,
+)
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
 from genes.models import GeneSymbol
-from snpdb.models import Variant, VariantZygosityCountCollection
+from library.django_utils import get_field_counts
+from snpdb.models import GenomeBuild, Variant, VariantZygosityCountCollection
 
 
 def get_method_summaries(variant, annotation_version, distance=None):
     if distance is None:
         distance = settings.VARIANT_DETAILS_NEARBY_RANGE
+    vav = annotation_version.variant_annotation_version
 
-    if transcripts_and_codons := get_transcripts_and_codons(variant):
+    if transcripts_and_codons := get_transcripts_and_codons(variant, vav):
         codon_summary = " or ".join([f"Transcript: {t}, Codon: {codon}" for (t, codon) in transcripts_and_codons.items()])
     else:
         codon_summary = "Intergenic - no codon search performed"
 
-    if transcripts_and_exons := get_transcript_and_exons(variant):
+    if transcripts_and_exons := get_transcript_and_exons(variant, vav):
         exon_summary = " or ".join([f"Transcript: {t}, Exon: {e}" for t, e in transcripts_and_exons.items()])
     else:
         exon_summary = "Intergenic - no exon search performed."
 
-    if transcript_and_domains := get_transcript_and_domains(variant):
+    if transcript_and_domains := get_transcript_and_domains(variant, vav):
         domains = []
         for t, domain_set in transcript_and_domains.items():
             domains.append(f"Transcript: {t} and domain contains: {', '.join(domain_set)}")
@@ -36,7 +43,6 @@ def get_method_summaries(variant, annotation_version, distance=None):
     else:
         domain_summary = "Not in an annotated domain - no domain search performed"
 
-    vav = annotation_version.variant_annotation_version
     if GeneSymbol.overlapping_variant(variant, vav).exists():
         gene_summary = f"{settings.ANNOTATION_VEP_DISTANCE}bp up or downstream of a gene"
     else:
@@ -63,10 +69,11 @@ def get_nearby_qs(variant, annotation_version, distance=None):
     q = Variant.get_no_reference_q() & ~Q(pk=variant.pk)  # Exclude ref and self
     qs = qs.filter(q)
 
+    vav = annotation_version.variant_annotation_version
     qs_dict = {
-        "codon": filter_variant_codon(qs, variant),
-        "exon": filter_variant_exon(qs, variant),
-        "domain": filter_variant_domain(qs, variant),
+        "codon": filter_variant_codon(qs, variant, vav),
+        "exon": filter_variant_exon(qs, variant, vav),
+        "domain": filter_variant_domain(qs, variant, vav),
         "range": filter_variant_range(qs, variant, distance=distance),
     }
     if settings.VARIANT_DETAILS_NEARBY_SHOW_GENE:
@@ -139,9 +146,7 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
                     classification_summary = classification_count
                 summaries.append(f"{label}: {classification_summary}")
 
-        if tags := counts.get("tags"):
-            counter = Counter(tags.split("|"))
-            tag_counts = dict(counter.most_common())  # Sort highest -> lowest
+        tag_counts = dict(sorted(counts["tag_counts"].items(), key=lambda kv: kv[1], reverse=True))
 
         zygosity_counts = []
         for zygosity in ["REF", "HET", "HOM_ALT"]:
@@ -163,12 +168,11 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
     return summary, tag_counts
 
 
-def interesting_counts(qs, user, genome_build, clinical_significance=False):
+def interesting_counts(qs, user, genome_build: GenomeBuild, clinical_significance=False):
     """ qs: Variant queryset annotated w/VariantZygosityCountCollection """
 
     agg_kwargs = {
         "total": Count("id", distinct=True),
-        "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter=Value('|')),
     }
 
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]
@@ -196,6 +200,11 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
     counts.update(qs.aggregate(REF=Sum("global_variant_zygosity__ref_count"),
                                HET=Sum("global_variant_zygosity__het_count"),
                                HOM_ALT=Sum("global_variant_zygosity__hom_count")))
+    # Tags are counted on their own: aggregated alongside the classification join above each tag was
+    # repeated once per classification on the allele. Same visibility as the tag grids.
+    tags_qs = VariantTag.get_for_build(genome_build, tags_qs=VariantTag.filter_for_user(user),
+                                       variant_qs=qs.values("pk"))
+    counts["tag_counts"] = get_field_counts(tags_qs, "tag")
     return counts
 
 
@@ -205,9 +214,10 @@ def filter_variant_range(qs, variant: Variant, distance):
     return qs.filter(locus__contig=variant.locus.contig, locus__position__lte=end, end__gte=start)
 
 
-def get_transcripts_and_codons(variant: Variant):
+def get_transcripts_and_codons(variant: Variant, vav: VariantAnnotationVersion) -> dict:
     transcript_codons = {}
-    transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False, hgvs_c__isnull=False)
+    transcript_qs = variant.varianttranscriptannotation_set.filter(version=vav, exon__isnull=False,
+                                                                   hgvs_c__isnull=False)
     for t, hgvs_c in transcript_qs.values_list("transcript_id", "hgvs_c"):
         if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out e.g. ":c.1057"
             codon = m.group(1)
@@ -215,9 +225,9 @@ def get_transcripts_and_codons(variant: Variant):
     return transcript_codons
 
 
-def filter_variant_codon(qs, variant: Variant):
+def filter_variant_codon(qs, variant: Variant, vav: VariantAnnotationVersion):
     q_or = []
-    for transcript_id, codon in get_transcripts_and_codons(variant).items():
+    for transcript_id, codon in get_transcripts_and_codons(variant, vav).items():
         codon_regex = codon + r"[^\d]"
         q_or.append(Q(varianttranscriptannotation__transcript_id=transcript_id,
                       varianttranscriptannotation__hgvs_c__regex=codon_regex))
@@ -229,14 +239,14 @@ def filter_variant_codon(qs, variant: Variant):
     return qs
 
 
-def get_transcript_and_exons(variant) -> dict:
-    transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False)
+def get_transcript_and_exons(variant: Variant, vav: VariantAnnotationVersion) -> dict:
+    transcript_qs = variant.varianttranscriptannotation_set.filter(version=vav, exon__isnull=False)
     return dict(transcript_qs.values_list("transcript_id", "exon"))
 
 
-def filter_variant_exon(qs, variant: Variant):
+def filter_variant_exon(qs, variant: Variant, vav: VariantAnnotationVersion):
     q_or = []
-    for t, e in get_transcript_and_exons(variant).items():
+    for t, e in get_transcript_and_exons(variant, vav).items():
         q_or.append(Q(varianttranscriptannotation__transcript_id=t, varianttranscriptannotation__exon=e))
     if q_or:
         q = reduce(operator.or_, q_or)
@@ -246,18 +256,18 @@ def filter_variant_exon(qs, variant: Variant):
     return qs
 
 
-def get_transcript_and_domains(variant) -> dict[str, set]:
+def get_transcript_and_domains(variant: Variant, vav: VariantAnnotationVersion) -> dict[str, set]:
     transcript_and_domain = defaultdict(set)
-    transcript_qs = variant.varianttranscriptannotation_set.filter(interpro_domain__isnull=False)
+    transcript_qs = variant.varianttranscriptannotation_set.filter(version=vav, interpro_domain__isnull=False)
     for t, interpro_domain in transcript_qs.values_list("transcript_id", "interpro_domain"):
         transcript_and_domain[t].update(interpro_domain.split("&"))  # VEP separator
     return transcript_and_domain
 
 
-def filter_variant_domain(qs, variant: Variant):
+def filter_variant_domain(qs, variant: Variant, vav: VariantAnnotationVersion):
     q_or = []
 
-    for t, domain_set in get_transcript_and_domains(variant).items():
+    for t, domain_set in get_transcript_and_domains(variant, vav).items():
         for domain in domain_set:
             q_or.append(Q(varianttranscriptannotation__transcript_id=t,
                           varianttranscriptannotation__interpro_domain__contains=domain))

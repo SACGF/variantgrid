@@ -131,19 +131,8 @@ pages.
 unannotated variant is expected to fail there), so a real bug in that path shows up as a page missing its transcript
 panel, not a 500 - check the logs.
 
-Confirmed bugs (not fixed):
-- Nearby tag counts are inflated. `variantopedia/interesting_nearby.py:interesting_counts` puts the tag `StringAgg`
-  in the same aggregate as the classification count join, so each tag is repeated once per classification on the allele
-  (verified read-only: allele 54409, 2 tags, 2 classifications, counted 4). It also counts every user's tags, not only
-  those visible to the viewer (`VariantTag.filter_for_user` is not applied), unlike the tag grids and tag stats.
-- `variantopedia/interesting_nearby.py:get_transcripts_and_codons`, `get_transcript_and_exons` and
-  `get_transcript_and_domains` read the source variant's `varianttranscriptannotation_set` with no version filter, so
-  rows from historical VAVs feed the codon/exon/domain lookups and the method summaries.
-- `variantopedia/views_server_status.py:server_status`: the "Not annotated, no AnnotationRun!" branch catches
-  `AnnotationRun.DoesNotExist`, which a `filter()` never raises; an unannotated highest variant with no run shows a
-  warning reading `AnnotationRuns: ` instead. The POST actions also render rather than redirect (a TODO in the code), so
-  a browser refresh repeats Test Slack / kill-pid.
-- `variantopedia/tasks/server_status_tasks.py:notify_server_status` is a bare `celery.shared_task` with no queue; it
-  lands on the default `db_workers`, against the rule that every task names its queue.
-- The `gene` parameter of `variantopedia/grids.py:VariantTagsColumns.filter_queryset` is sent by no page, and it filters
-  on the tag's own variant rather than the build variant, so it would drop taggings made in another build.
+Tag counts in `variantopedia/interesting_nearby.py:interesting_counts` are a separate query over
+`VariantTag.get_for_build` / `VariantTag.filter_for_user`, deliberately outside the aggregate that joins
+classifications - inside it every tag was repeated once per classification on the allele, and every user's tags were
+counted. The codon / exon / domain lookups there take the `VariantAnnotationVersion` so historical partitions stay out.
+`variantopedia/views_server_status.py:server_status` redirects after a POST action, so a refresh repeats nothing.
