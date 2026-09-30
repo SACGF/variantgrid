@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from genes.models import GeneList, GeneListGeneSymbol, GeneSymbol
 from library.enums import ModificationOperation
+from library.guardian_utils import assign_permission_to_user_and_groups
 from pathtests.models import (
     Case,
     PathologyTest,
@@ -125,6 +126,15 @@ class PathologyTestVersionTest(TestCase):
         self.assertEqual(403, self.client.post(ptv.pathology_test.get_absolute_url(),
                                                {"restore_test": "true"}).status_code)
 
+    def test_modification_request_rejects_unknown_operation(self):
+        ptv = _confirmed_test(self.curator, "operation_test", "GATA2")
+        gene_symbol, _ = GeneSymbol.objects.get_or_create(symbol="RUNX1")
+        self.client.force_login(self.requester)
+        url = reverse("modify_pathology_test_version", kwargs={"pk": ptv.pk})
+        data = {"gene_symbol": gene_symbol.pk, "comments": ""}
+        self.assertEqual(400, self.client.post(url, {**data, "operation": "X"}).status_code)
+        self.assertEqual(200, self.client.post(url, {**data, "operation": ModificationOperation.ADD}).status_code)
+
 
 class CasesForUserTest(TestCase):
     def test_cases_led_by_user_or_followed_scientist(self):
@@ -132,6 +142,8 @@ class CasesForUserTest(TestCase):
         follower = User.objects.create_user("pathtests_follower")
         stranger = User.objects.create_user("pathtests_stranger")
         patient = Patient.objects.create(first_name="Cases", last_name="ForUser")
+        for user in (scientist, follower, stranger):
+            assign_permission_to_user_and_groups(user, patient)
         case = Case.objects.create(name="led_case", patient=patient, lead_scientist=scientist)
 
         self.assertEqual([case], list(cases_for_user(scientist)))

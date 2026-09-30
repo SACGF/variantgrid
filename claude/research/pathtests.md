@@ -26,7 +26,7 @@ the parent test so its `modified` reflects version changes.
 
 ### Gene modification requests
 
-Anyone can file a request to add or remove a gene: the gene grid JS (`variantgrid/static_files/default_static/js/gene_grid.js`)
+Anyone can file a request to add or remove a gene (an unknown `operation` is a 400): the gene grid JS (`variantgrid/static_files/default_static/js/gene_grid.js`)
 POSTs to `pathtests/views.py:modify_pathology_test_version`, creating a PENDING
 `pathtests/models.py:PathologyTestGeneModificationRequest`. The curator reviews them on the version page:
 `pathtests/views.py:get_gene_modification_request` splits pending requests into additions and deletions by the
@@ -57,6 +57,11 @@ The pages here are read-only views, the three datatables in `pathtests/grids.py`
 scientists a user follows (`patients/models.py:get_lead_scientist_users_for_user`, toggled by
 `pathtests/views.py:follow_scientist`). `pathtests/models.py:get_external_order_system_last_checked` reaches into
 `sapath` for the "last checked" time, and returns None when that app is absent.
+
+A case is visible to whoever can view its patient: `Case` delegates its Guardian permissions to
+`patients/models.py:Patient`, and `PathologyTestOrder.filter_for_user` / `can_view` go through the order's case (an order
+without a case: its user or a superuser). The grids, the case autocomplete, "my cases" (`pathtests/models.py:get_cases_qs`)
+and the view pages all apply it.
 
 ## Why it is shaped this way
 

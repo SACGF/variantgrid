@@ -5,7 +5,7 @@ from collections import defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.http.response import HttpResponse, JsonResponse
+from django.http.response import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -63,7 +63,7 @@ def follow_scientist(request, follow_user_id):
 
 
 def view_cases_for_users(request, title, users_list, has_menu=True):
-    cases_qs = get_cases_qs().filter(lead_scientist__in=users_list).order_by("-created")
+    cases_qs = get_cases_qs(request.user).filter(lead_scientist__in=users_list).order_by("-created")
 
     last_checked = get_external_order_system_last_checked()
     if has_menu:
@@ -358,9 +358,12 @@ def view_pathology_test(request, name):
 
 @require_POST
 def modify_pathology_test_version(request, pk):
+    """ Any user may request a gene be added/removed - the curator accepts or rejects it """
     pathology_test_version = get_object_or_404(PathologyTestVersion, pk=pk)
 
     operation = request.POST['operation']
+    if operation not in dict(ModificationOperation.CHOICES):
+        return HttpResponseBadRequest(f"Unknown operation '{operation}'")
     symbol = request.POST['gene_symbol']
     comments = request.POST['comments']
 
@@ -383,6 +386,7 @@ def add_external_manager_notice(request, obj):
 
 def view_pathology_test_order(request, pk):
     pathology_test_order = get_object_or_404(PathologyTestOrder, pk=pk)
+    pathology_test_order.check_can_view(request.user)
     form = PathologyTestOrderForm(instance=pathology_test_order)
     add_external_manager_notice(request, pathology_test_order)
 
@@ -393,11 +397,12 @@ def view_pathology_test_order(request, pk):
 
 def view_external_pathology_test_order(request, external_pk):
     pathology_test_order = get_object_or_404(PathologyTestOrder, external_pk=external_pk)
+    pathology_test_order.check_can_view(request.user)
     return redirect(pathology_test_order)
 
 
 def view_case(request, pk):
-    case = get_object_or_404(Case, pk=pk)
+    case = Case.get_for_user(request.user, pk)
     form = CaseForm(user=request.user, instance=case)
 
     add_external_manager_notice(request, case)
@@ -409,4 +414,5 @@ def view_case(request, pk):
 
 def view_external_case(request, external_pk):
     case = get_object_or_404(Case, external_pk=external_pk)
+    case.check_can_view(request.user)
     return redirect(case)
