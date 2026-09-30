@@ -219,6 +219,8 @@ issue, and then read only that one. When searching across the org, restrict it t
 ### Plans and implementation prompts
 Plans live in `claude/plans/<issue>_<slug>_plan.md`; the format (model line, `Status:`, models first) and how to draft a
 prompt for an agent to implement one are in `claude/plans/AGENTS.md`.
+When a plan is written for a GitHub issue, add the `Has Plan` label to that issue (`gh issue edit N --add-label "Has Plan"`)
+and remove it when the plan lands or is deleted.
 
 ## Definition of done
 
