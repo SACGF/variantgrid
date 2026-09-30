@@ -52,7 +52,7 @@ class EmailSummaryData:
         self.lab_summaries: list[EmailLabSummaryData] = [EmailLabSummaryData(lab=lab, user=perspective.user) for lab in labs]
 
 
-@celery.shared_task
+@celery.shared_task(queue='db_workers')
 def send_summary_emails():
     report_message("Attempting to send weekly summary emails", level="info")
     for user in User.objects.filter(is_active=True):

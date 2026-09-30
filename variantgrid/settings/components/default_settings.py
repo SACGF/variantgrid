@@ -1254,10 +1254,14 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_match_test": False,
     "discordance_reports": False,
     "vus": False,
-    "maps": USE_MAPS,
-    "lab_members_tab": LAB_HEAD_MANAGE_MEMBERS,
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
+# URL names that also follow a feature setting - read when the register is consulted
+# (variantgrid/perm_path.py:url_name_enabled), so an env file that changes the setting need not touch the register
+URLS_NAME_REGISTER_SETTINGS = {
+    "maps": "USE_MAPS",
+    "lab_members_tab": "LAB_HEAD_MANAGE_MEMBERS",
+}
 
 DEFAULT_TERMS_SLUG = 'site-terms'
 ACCEPT_TERMS_PATH = '/terms/accept/'
