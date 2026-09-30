@@ -192,23 +192,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     return render(request, "genes/view_gene_symbol.html", context)
 
 
-def view_classifications(request, gene_symbol: str, genome_build_name: str):
-
-    genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
-    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-
-    view_info = GeneSymbolViewInfo(
-        gene_symbol=gene_symbol,
-        desired_genome_build=genome_build,
-        user=request.user)
-
-    return render(request, "genes/view_gene_symbol_classifications.html", {
-        "classifications": view_info.classifications,
-        "gene_symbol": gene_symbol,
-        "genome_build": genome_build
-    })
-
-
 @dataclass(frozen=True)
 class GenomeBuildGenes:
     genome_build: GenomeBuild
