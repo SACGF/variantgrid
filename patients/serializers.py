@@ -136,6 +136,16 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
             return qs.filter(q).first()
         return None
 
+    def _external_pk_for(self, instance, external_pk_data) -> ExternalPK:
+        """ _get_existing only searches rows the user can see, so the ExternalPK may already belong
+            to a row of this model they cannot - a 400 rather than the one-to-one IntegrityError """
+        external_pk = ExternalPKSerializer.get_or_create(external_pk_data)
+        taken = self.Meta.model.objects.filter(external_pk=external_pk).exclude(pk=instance.pk).exists()
+        if taken:
+            raise serializers.ValidationError({
+                "external_pk": f"{external_pk} is already used by a record you do not have access to"})
+        return external_pk
+
     def create(self, validated_data):
         external_pk_data = validated_data.pop("external_pk", None)
         user = self.context["request"].user
@@ -149,7 +159,7 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
                 for field, value in validated_data.items():
                     setattr(instance, field, value)
             if external_pk_data:
-                instance.external_pk = ExternalPKSerializer.get_or_create(external_pk_data)
+                instance.external_pk = self._external_pk_for(instance, external_pk_data)
             instance.save()
             if created:
                 self._post_create(instance, user)
@@ -160,7 +170,7 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         instance.check_can_write(user)
         if external_pk_data:
-            instance.external_pk = ExternalPKSerializer.get_or_create(external_pk_data)
+            instance.external_pk = self._external_pk_for(instance, external_pk_data)
         return super().update(instance, validated_data)
 
 

@@ -97,7 +97,9 @@
                 <td>{{ form.cohort_sample | as_crispy_field }}
             {% endfor %}
         </table>
-        <button id='save-pedigree' class="btn btn-primary">save</button
+        {% if has_write_permission %}
+        <button id='save-pedigree' class="btn btn-primary">save</button>
+        {% endif %}
 		</p>
 	</form>
     </div>

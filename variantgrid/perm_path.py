@@ -23,10 +23,19 @@ from library.django_utils import require_superuser
 from library.django_utils.view_utils import view_to_string
 
 
+def url_name_enabled(name: str) -> bool:
+    """ URLS_NAME_REGISTER, and for the names in URLS_NAME_REGISTER_SETTINGS the feature setting as it stands now """
+    if not settings.URLS_NAME_REGISTER[name]:
+        return False
+    if setting_name := settings.URLS_NAME_REGISTER_SETTINGS.get(name):
+        return bool(getattr(settings, setting_name))
+    return True
+
+
 def _perm_path(route, view, path_func, **kwargs):
     name = kwargs.get('name')
     if name is not None:
-        if not settings.URLS_NAME_REGISTER[name]:
+        if not url_name_enabled(name):
             view = require_superuser(view)
     else:
         logging.warning("url: route='%s' view=%s, has no name, so is not tested via URLS_NAME_REGISTER",
@@ -42,7 +51,7 @@ def router_urls(router) -> list[URLPattern]:
     """ A DRF router's patterns with URLS_NAME_REGISTER applied, as path() does for a named view """
     urls = []
     for url in router.urls:
-        if url.name is not None and not settings.URLS_NAME_REGISTER[url.name]:
+        if url.name is not None and not url_name_enabled(url.name):
             url = URLPattern(url.pattern, require_superuser(url.callback), url.default_args, url.name)
         urls.append(url)
     return urls
@@ -53,5 +62,5 @@ def get_visible_url_names() -> Mapping[str, bool]:
     # Only include loaded URLs, then use what's configured in URLS_NAME_REGISTER
     url_name_visible = defaultdict(lambda: False)
     for url_name in (k for k in get_resolver(None).reverse_dict.keys() if isinstance(k, str)):
-        url_name_visible[url_name] = settings.URLS_NAME_REGISTER[url_name]
+        url_name_visible[url_name] = url_name_enabled(url_name)
     return url_name_visible

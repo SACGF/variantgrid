@@ -67,7 +67,7 @@ class FranklinExportRow(ExportRow):
 
     GERMLINE_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
@@ -77,12 +77,11 @@ class FranklinExportRow(ExportRow):
     }
     ONCOGENIC_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
         "VUS_C": "VUS",
-        # TODO should we map LP, P to Likely Oncogenic, Oncogenic too?
         "LO": "LIKELY ONCOGENIC",
         "O": "ONCOGENIC"
     }
@@ -192,8 +191,7 @@ class FranklinExportRow(ExportRow):
 
     @export_column("Classification Tags")
     def classification_tags(self):
-        # TODO make this a setting
-        return "Shariant"
+        return settings.CLASSIFICATION_FRANKLIN_EXPORT_TAGS
 
     @export_column("Genome Build")
     def genome_build(self):

@@ -6,9 +6,25 @@ from django.test import RequestFactory, TestCase, override_settings
 from rest_framework import routers
 
 from patients.views_rest import PatientViewSet
-from variantgrid.perm_path import router_urls
+from variantgrid.perm_path import get_visible_url_names, router_urls
 
 REGISTER = defaultdict(lambda: True, {"api_patient-list": False})
+
+
+class UrlNameSettingsTest(TestCase):
+    """ lab_members_tab follows LAB_HEAD_MANAGE_MEMBERS when the register is read, not when settings loaded """
+
+    def setUp(self):
+        get_visible_url_names.cache_clear()
+        self.addCleanup(get_visible_url_names.cache_clear)
+
+    @override_settings(LAB_HEAD_MANAGE_MEMBERS=False)
+    def test_setting_off_hides_url(self):
+        self.assertFalse(get_visible_url_names()["lab_members_tab"])
+
+    @override_settings(LAB_HEAD_MANAGE_MEMBERS=True)
+    def test_setting_on_shows_url(self):
+        self.assertTrue(get_visible_url_names()["lab_members_tab"])
 
 
 class RouterUrlsTest(TestCase):

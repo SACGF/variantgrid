@@ -47,7 +47,7 @@
 
         var cohortId = $("#id_cohort").find(":selected").val();
         if (cohortId) {
-            window.location = Urls.create_pedigree_from_cohort_and_ped_file_family(cohortId, family_id);
+            postUrl(Urls.create_pedigree_from_cohort_and_ped_file_family(cohortId, family_id));
         }
     });
 {% endblock jsdocumentready %}

@@ -7,7 +7,7 @@ from functools import reduce
 
 from django.conf import settings
 from django.contrib import messages
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 
@@ -112,6 +112,29 @@ def _celery_worker_status() -> dict:
     return celery_workers
 
 
+def _highest_variant_annotation_status() -> dict:
+    """ Is the highest standard variant annotated in the latest version - an incredibly quick check that
+        annotation keeps up with variant insertion. Not annotated is a warning while an AnnotationRun covers
+        it, danger when nothing does. """
+    try:
+        q = reduce(operator.and_, VariantAnnotation.VARIANT_ANNOTATION_Q)
+        highest_variant = Variant.objects.filter(q).order_by("pk").last()
+        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
+        vav = VariantAnnotationVersion.latest(genome_build)
+        if highest_variant.variantannotation_set.filter(version=vav).exists():
+            return {"status": "info", "message": "OK"}
+
+        ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
+                                             annotation_range_lock__min_variant__lte=highest_variant.pk,
+                                             annotation_range_lock__max_variant__gte=highest_variant.pk)
+        ar_qs = ar_qs.exclude(status=AnnotationStatus.ERROR)
+        if annotation_runs := [str(ar) for ar in ar_qs]:
+            return {"status": "warning", "message": f"AnnotationRuns: {', '.join(annotation_runs)}"}
+        return {"status": "danger", "message": "Not annotated, no AnnotationRun!"}
+    except Exception as e:
+        return {"status": "danger", "message": str(e)}
+
+
 @require_superuser
 def server_status(request):
     if request.method == "POST":
@@ -148,10 +171,7 @@ def server_status(request):
             messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
             logging.warning("Unrecognised action %s", action)
-
-        # return redirect(reverse('server_status'))
-
-        # TODO should redirect to read-only version of the page
+        return redirect("server_status")
 
     celery_workers = _celery_worker_status()
 
@@ -162,33 +182,7 @@ def server_status(request):
     except (KeyError, FileNotFoundError):
         can_access_reference = False
 
-    # Variant Annotation - incredibly quick check
-    highest_variant_annotated = {}
-    try:
-        q = reduce(operator.and_, VariantAnnotation.VARIANT_ANNOTATION_Q)
-        highest_variant = Variant.objects.filter(q).order_by("pk").last()
-        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
-        vav = VariantAnnotationVersion.latest(genome_build)
-        annotated = highest_variant.variantannotation_set.filter(version=vav).exists()
-        if annotated:
-            highest_variant_annotated["status"] = "info"
-            highest_variant_annotated["message"] = "OK"
-        else:
-            try:
-                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
-                                                     annotation_range_lock__min_variant__lte=highest_variant.pk,
-                                                     annotation_range_lock__max_variant__gte=highest_variant.pk)
-                ar_qs = ar_qs.exclude(status=AnnotationStatus.ERROR)
-                annotation_run_message = f"AnnotationRuns: {', '.join([str(ar) for ar in ar_qs])}"
-
-                highest_variant_annotated["status"] = "warning"
-                highest_variant_annotated["message"] = annotation_run_message
-            except AnnotationRun.DoesNotExist:
-                highest_variant_annotated["status"] = "danger"
-                highest_variant_annotated["message"] = "Not annotated, no AnnotationRun!"
-    except Exception as e:
-        highest_variant_annotated["status"] = "danger"
-        highest_variant_annotated["message"] = str(e)
+    highest_variant_annotated = _highest_variant_annotation_status()
 
     disk_messages = get_disk_messages(info_messages=True)
     disk_free = {"status": "info", "messages": []}

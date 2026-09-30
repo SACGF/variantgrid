@@ -57,3 +57,5 @@ eslint.txt
 /claude/maps/
 # Claude Code skips every AGENTS.md while this exists - see "This box" in AGENTS.md
 CLAUDE.local.md
+/.claude/hooks/post-tool-call.py
+/.claude/settings.local.json

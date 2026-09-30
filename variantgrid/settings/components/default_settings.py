@@ -1254,10 +1254,16 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_match_test": False,
     "discordance_reports": False,
     "vus": False,
-    "maps": USE_MAPS,
-    "lab_members_tab": LAB_HEAD_MANAGE_MEMBERS,
 }
+
+# URL names that also follow a feature setting - read when the register is consulted
+# (variantgrid/perm_path.py:url_name_enabled), so an env file that changes the setting need not touch the register
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
+URLS_NAME_REGISTER_SETTINGS = {
+    "maps": "USE_MAPS",
+    "lab_members_tab": "LAB_HEAD_MANAGE_MEMBERS",
+}
+
 # The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default
 MENUS = "variantgrid.menus.MENUS"
 
@@ -1355,6 +1361,7 @@ VCF_EXPORT_VERSION = "4.3"  # ##fileformat=VCFv<this> on every VCF we write (lib
 CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
 CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
 CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"
+CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "VariantGrid"  # "Classification Tags" column of the Franklin export
 
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages

@@ -405,3 +405,4 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "vcgs:proband",
     "zygosity"
 ])
+CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "Shariant"
