@@ -22,9 +22,7 @@ django_crispy_forms
 django_dag
 django_datetime_utc
 django-extensions
-django_glrm
 django-guardian
-django_htmlmin
 django-js-reverse
 django_json_widget
 # maps are optional - install django-leaflet and set INSTALLED_APPS.maps in settings_config.json, see #1410
@@ -75,17 +73,6 @@ xhtml2pdf
 # separate to django-amazon-ses
 boto3
 django-storages
-django_threadlocals
 frozendict
 pydantic>=2.4.0
-
-# --- linting & type checking (dev only) ---
-# Run: mypy --config-file mypy.ini snpdb   (or any app)
-# Lint: ./scripts/linting/run_pylint.sh   |   ruff check
-ruff
-mypy
-django-stubs
-djangorestframework-stubs
-pylint
-pylint-django
-# Import contracts are not installed here (import-linter pulls in rich): uvx --from import-linter lint-imports
+# Dev tools (ruff, mypy, pylint, stubs) are in requirements-dev.in

@@ -2,6 +2,7 @@ from collections import OrderedDict
 
 import pandas as pd
 from django.conf import settings
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.shortcuts import render
@@ -9,7 +10,6 @@ from django.urls.base import reverse
 from django.utils.html import escape
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
-from global_login_required import login_not_required
 from guardian.shortcuts import get_objects_for_group
 
 from annotation.models.models import VariantAnnotationVersion

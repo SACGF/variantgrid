@@ -52,7 +52,8 @@ notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLAC
 
 ## Deploy and upgrade
 
-`scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`), then
+`scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`, not the
+dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then
 `scripts/migrator/migrator.py`, whose standard steps (`scripts/migrator/migrator.py:Migrator.STANDARD_MIGRATIONS`) are git pull +
 install requirements, `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
 and `deployed` (records the deploy in Rollbar). It also reads `manage.py manual_outstanding` (JSON) to
@@ -161,11 +162,13 @@ loop. GitHub issues are closed by a human after that pipeline, never by a commit
 
 ## Authentication surface
 
-`global_login_required.GlobalLoginRequiredMiddleware` requires login everywhere except `PUBLIC_PATHS`
-(`variantgrid/settings/components/default_settings.py`), which exempts the API prefixes (`/classification/api/`, `/patients/api/`,
-`/seqauto/api/`, `/upload/api/`, `/mme/api/`, `/beacon/`) so DRF's `IsAuthenticated` can answer 401 instead. A plain Django
-`View` mounted under an exempt prefix is reachable anonymously (it usually 500s on `AnonymousUser`); new endpoints there must
-be `rest_framework.views.APIView` subclasses. Verify with an unauthenticated request - a 500 means the view is unprotected.
+Django's `LoginRequiredMiddleware` requires login on every view not marked `login_not_required`, redirecting to the view's
+`login_url` or else `LOGIN_URL` (OIDC on Shariant). DRF marks every `APIView` and `ViewSet` `login_not_required`, so REST
+endpoints skip it and DRF's `IsAuthenticated` default answers 401/403 instead - a DRF view with empty `permission_classes`
+(`beacon/views_rest.py`, `mme/views_rest.py`) is public. Third-party URLconfs that must work before login (registration, OIDC)
+are mounted with `library/django_utils/view_utils.py:login_not_required_include` in `variantgrid/urls.py`. Admin views name
+the admin login as their `login_url`, and Django marks it `login_not_required`, so `variantgrid/urls.py` wraps
+`admin.site.login` in `login_required` to keep the admin password form behind the site login. The URL path exempts nothing.
 `variantgrid/views_rest.py:CapabilitiesView` (`/api/v1/capabilities`) tells a client which calls this server accepts, as VG3 and
 VG4 run side by side. `API_FEATURES` is the client contract: add a name in the same change as a client-visible feature, and keep
 names once added. `upload_file_types` is derived from the import task factories, so it needs no upkeep. A server too old to have

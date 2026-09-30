@@ -13,7 +13,6 @@ from django.urls.base import reverse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
-from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.views import APIView
 
@@ -241,7 +240,6 @@ class ClassificationApiExportView(APIView):
             return export_view(request)
 
 
-@not_minified_response
 def template_report(request: HttpRequest, classification_id) -> HttpResponseBase:
     record_ref = ClassificationRef.init_from_str(request.user, classification_id)
     record_ref.check_exists()

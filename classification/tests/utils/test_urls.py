@@ -105,6 +105,7 @@ class Test(URLTestCase):
             # ("clinical_context", {"pk": self.allele.pk}, 200), # Needs clinical context on allele
         ]
         self._test_urls(ADMIN_URL_NAMES_AND_KWARGS, self.user_admin)
+        self._test_datatable_urls([("imported_allele_info_datatables", {}, 200)], self.user_admin)
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
@@ -148,7 +149,6 @@ class Test(URLTestCase):
             ("clinvar_export_batch_datatables", {}, 200),
             ("clinvar_exports_datatables", {}, 200),
             ("condition_text_datatable", {"lab_id": self.lab.pk}, 200),
-            ("imported_allele_info_datatables", {}, 200),
         ]
         self._test_datatable_urls(GRID_LIST_URLS, self.user_owner)
 

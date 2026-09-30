@@ -1,5 +1,7 @@
 #!/bin/bash
 # Install pinned dependencies. Assumes the venv is already activated.
+# Deployments install requirements.txt only. Developers pass --dev to add the lint/type-check tools
+# in requirements-dev.txt.
 # Set VG_INSTALL_REQUIREMENTS=0 to skip, so a broken install can't hold up an upgrade.
 
 VG_DIR=$(dirname "${BASH_SOURCE[0]}")/..
@@ -11,12 +13,36 @@ case "${VG_INSTALL_REQUIREMENTS:-1}" in
         ;;
 esac
 
+REQUIREMENTS=(-r "${VG_DIR}/requirements.txt")
+if [[ "$1" == "--dev" ]]; then
+    REQUIREMENTS+=(-r "${VG_DIR}/requirements-dev.txt")
+fi
+
+# uv.toml (the 7-day cooldown) needs uv 0.9.25+ - older uv fails to parse it
+UV_MIN_VERSION=0.9.25
+
 if command -v uv > /dev/null; then
+    UV_VERSION=$(uv --version | awk '{print $2}')
+    if [[ $(printf '%s\n' "${UV_MIN_VERSION}" "${UV_VERSION}" | sort -V | head -1) != "${UV_MIN_VERSION}" ]]; then
+        echo "uv ${UV_VERSION} is older than ${UV_MIN_VERSION}, which uv.toml needs - upgrade it (uv self update, or pip install -U uv if pip installed it)" >&2
+        exit 1
+    fi
     echo "Installing requirements with uv"
-    uv pip install -r "${VG_DIR}/requirements.txt"
+    uv pip install "${REQUIREMENTS[@]}"
 else
-    echo "uv not found - installing requirements with pip"
-    python3 -m pip install --quiet -r "${VG_DIR}/requirements.txt"
+    # pip can't check hashes next to the git-pinned hgvs (it refuses the whole file), so it installs the same pins
+    # with the hashes stripped - unverified, as before hashes were added
+    echo "uv not found - installing requirements with pip, without hash checking"
+    PIP_REQUIREMENTS=()
+    STRIPPED_FILES=()
+    trap 'rm -f "${STRIPPED_FILES[@]}"' EXIT
+    for ((i = 1; i < ${#REQUIREMENTS[@]}; i += 2)); do
+        STRIPPED=$(mktemp)
+        STRIPPED_FILES+=("${STRIPPED}")
+        sed -E '/^[[:space:]]+--hash=/d; s/[[:space:]]+\\$//' "${REQUIREMENTS[$i]}" > "${STRIPPED}"
+        PIP_REQUIREMENTS+=(-r "${STRIPPED}")
+    done
+    python3 -m pip install --quiet "${PIP_REQUIREMENTS[@]}"
 fi
 
 STATUS=$?

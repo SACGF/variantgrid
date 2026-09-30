@@ -1,6 +1,7 @@
 import json
 
 from celery.result import AsyncResult
+from django.contrib.auth.decorators import login_not_required
 from django.http.response import (
     HttpResponse,
     HttpResponseRedirect,
@@ -9,7 +10,6 @@ from django.http.response import (
 from django.shortcuts import get_object_or_404, render
 from django.urls.base import reverse
 from django.views.decorators.http import require_POST
-from global_login_required import login_not_required
 from termsandconditions.decorators import terms_required
 
 from library import uptime_check

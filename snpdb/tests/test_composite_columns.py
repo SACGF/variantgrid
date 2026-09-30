@@ -202,8 +202,8 @@ class CustomColumnsArrangePageTest(TestCase):
         response = client.get(url)
         self.assertEqual(200, response.status_code)
         content = response.content.decode()
-        self.assertIn('composite-column cursor-move" column_id="spliceai"', content)
-        self.assertIn('composite-member cursor-move" column_id="spliceai_max_ds"', content)
+        self.assertIn('composite-column cursor-move" id="spliceai" column_id="spliceai"', content)
+        self.assertIn('composite-member cursor-move" id="spliceai_max_ds" column_id="spliceai_max_ds"', content)
         self.assertIn("Show columns already inside a composite", content)
 
     def test_row_id_column_is_kept_out_of_both_lists(self):
@@ -220,7 +220,7 @@ class CustomColumnsArrangePageTest(TestCase):
         client.force_login(self.user)
         url = reverse("view_custom_columns", kwargs={"custom_columns_collection_id": self.ccc.pk})
         content = client.get(url).content.decode()
-        locked = re.findall(r'class="user-column mandatory [^"]*" column_id="(\w+)"', content)
+        locked = re.findall(r'class="user-column mandatory [^"]*" id="\w+" column_id="(\w+)"', content)
         self.assertEqual(["tags", "tags_global", "Sample"], locked)
         self.assertEqual(3, content.count('class="fas fa-lock mandatory-lock"'))
 

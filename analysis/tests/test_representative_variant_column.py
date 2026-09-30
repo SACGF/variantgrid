@@ -252,7 +252,7 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
             GeneSymbol.objects.get_or_create(symbol=symbol)
 
         ordered = create_gene_fusion("CD74", "ROS1")
-        self.assertContains(self._row_detail(ordered.variant), "5\u2032 CD74 \u2192 3\u2032 ROS1")
+        self.assertContains(self._row_detail(ordered.variant), "5&prime; CD74 &rarr; 3&prime; ROS1")
 
         unordered = create_gene_fusion("CD74", "ROS1", directionality_known=False)
         self.assertContains(self._row_detail(unordered.variant), "direction not asserted")

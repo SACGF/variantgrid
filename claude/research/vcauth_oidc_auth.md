@@ -17,7 +17,7 @@ labs they are in and whether they are an admin. Login and CSRF enforcement is gl
 
 `LOGIN_URL = '/oidc_login/'`, so the global login middleware sends anonymous users to `variantgrid/views.py:oidc_login`,
 which calls mozilla's `oidc_authentication_init` view directly (PKCE S256, RS256 ID tokens checked against the realm's JWKS).
-The `/oidc/` URLs are in `PUBLIC_PATHS` and are only mounted when `USE_OIDC` (`variantgrid/urls.py`). On the callback,
+The `/oidc/` URLs are mounted `login_not_required`, and only when `USE_OIDC` (`variantgrid/urls.py`). On the callback,
 mozilla fetches userinfo and calls `oidc_auth/backend.py:VariantGridOIDCAuthenticationBackend.filter_users_by_claims`:
 match on `preferred_username` first, then case-insensitive email (more than one email match is refused by mozilla).
 Found or newly created, the user goes through `create_or_update`, which rewrites the local row from the claims every login:

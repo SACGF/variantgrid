@@ -8,7 +8,6 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils.timezone import now
 from guardian.shortcuts import assign_perm
-from threadlocals.threadlocals import set_thread_variable
 
 from analysis.models import Analysis, VariantTag
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
@@ -30,6 +29,7 @@ from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.unittest_utils import frozen_cache_expiry
 from library.guardian_utils import assign_permission_to_user_and_groups
+from library.request_context import set_thread_variable
 from patients.models import Patient
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
@@ -72,8 +72,8 @@ class TaggedVariantGridTest(TestCase):
         assign_perm(VariantTag.get_read_perm(), cls.user, other_user_tag)
 
     def setUp(self):
-        # UserSettings.get_for_user caches on the thread-local request, which a client request in an
-        # earlier test leaves behind - the sort order test would then miss its tag colours collection
+        # UserSettings.get_for_user caches on the current request - start with none, so the sort order
+        # test reads its tag colours collection
         set_thread_variable('request', None)
 
     @classmethod

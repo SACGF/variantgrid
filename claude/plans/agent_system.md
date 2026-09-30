@@ -192,7 +192,7 @@ prose keeps restating and getting wrong. `vg map` writes them as Markdown tables
 
 - `models.md` – per app: model, base classes (TimeStampedModel? GuardianPermissionsMixin?
   PreviewModelMixin?), FKs out, notable managers, row count on this box (optional, `--counts`).
-- `urls.md` – URL name → view → template(s) → app; flags API endpoints and `PUBLIC_PATHS` exemptions.
+- `urls.md` – URL name → view → template(s) → app; flags API endpoints and `login_not_required` views.
 - `commands.md` – management command → category → one-line help → which apps' models it touches.
 - `tasks.md` – celery task → queue → module → what enqueues it.
 - `signals.md` – signal → sender → receivers (module:function).

@@ -1,19 +1,18 @@
 from unittest.mock import patch
 
 from django.test import TestCase
-from threadlocals.threadlocals import set_thread_variable
 
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.condition_text_matching import ConditionText, ConditionTextMatch
 from classification.tasks.condition_text_automatch_task import condition_text_automatch_task
+from library.request_context import set_thread_variable
 from snpdb.models import Country, Lab, Organization
 
 
 class ConditionTextAutomatchTest(TestCase):
 
     def setUp(self):
-        # NotificationBuilder logs an Event against the thread-local user - a client request in
-        # an earlier test leaves a rolled-back one behind
+        # NotificationBuilder logs an Event against the current request's user - start with none
         set_thread_variable('request', None)
         org = Organization.objects.create(name='InstX', group_name='instx')
         country = Country.objects.get_or_create(name='CountryA')[0]

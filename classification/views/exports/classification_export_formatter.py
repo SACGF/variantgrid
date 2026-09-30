@@ -11,7 +11,6 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from more_itertools import peekable
 from stream_zip import ZIP_64
-from threadlocals.threadlocals import get_current_request
 
 from classification.views.exports.classification_export_filter import (
     AlleleData,
@@ -19,6 +18,7 @@ from classification.views.exports.classification_export_filter import (
 )
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
+from library.request_context import get_current_request
 from snpdb.models import AlleleOriginFilterDefault, GenomeBuild
 
 
@@ -103,7 +103,6 @@ class ClassificationExportFormatter(ABC):
             self.file_count = 1
             # can stream in single file
             response = StreamingHttpResponse(streaming_content=self._yield_single_file(), content_type=self.content_type())
-            response.minify_response = False
             response['Last-Modified'] = self.classification_filter.last_modified_header
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response

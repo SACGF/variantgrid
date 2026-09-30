@@ -20,7 +20,6 @@ from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
-from threadlocals.threadlocals import get_current_request
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
@@ -39,6 +38,7 @@ from classification.models import (
 from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
+from library.request_context import get_current_request
 from library.utils import batch_iterator, http_header_date_now, local_date_string
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (

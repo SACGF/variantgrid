@@ -9,10 +9,10 @@ from django.http import HttpResponseBase, StreamingHttpResponse, HttpResponse
 from django.shortcuts import render
 from more_itertools.more import peekable
 from stream_zip import ZIP_64
-from threadlocals.threadlocals import get_current_request
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFileSettings
 from library.log_utils import report_exc_info, NotificationBuilder
+from library.request_context import get_current_request
 from library.utils import http_header_date_now
 
 
@@ -90,7 +90,6 @@ class ClassificationGroupingExportProcess:
             self.file_count = 1
             # can stream in single file
             response = StreamingHttpResponse(streaming_content=self._yield_single_file(), content_type=self.format_properties.http_content_type)
-            response.minify_response = False
             response['Last-Modified'] = self.latest_header_date
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response

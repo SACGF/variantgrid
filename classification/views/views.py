@@ -10,6 +10,7 @@ from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Field, Layout, Submit
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -25,7 +26,6 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.views.generic import TemplateView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
-from global_login_required import login_not_required
 from more_itertools import first
 from requests.models import Response
 from rest_framework.status import HTTP_200_OK
