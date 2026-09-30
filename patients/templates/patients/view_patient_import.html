@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_utils %}
 
 {% block title %}Patient Records{% endblock title %}
@@ -8,7 +8,7 @@
 }
 {% endblock css %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <script>
         function patientRecordFilter(data) {
             data.patient_records = {{ patient_records.pk }};
@@ -51,5 +51,5 @@
             <div id='upload-steps-graph'></div>
         </div>
     </div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}
 

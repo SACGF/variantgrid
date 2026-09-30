@@ -1,7 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 {% load ui_tabs_builder %}
 {% load js_tags %}
 {% load crispy_forms_tags %}
@@ -11,7 +10,6 @@
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% block title %}View Patient {{ patient }}{% endblock title %}
-{% block submenu %}{% menu_bar_patients %}{% endblock submenu %}
 {% block head %}
     <link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">
     <link href="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.css' %}" rel="stylesheet">

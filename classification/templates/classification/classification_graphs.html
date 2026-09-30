@@ -1,12 +1,10 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load js_tags %}
 {% load static %}
 {% load settings_tags %}
 {% block title %}Classification Graphs{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -78,7 +76,7 @@
             {% if acmg_by_significance %}
             let acmg_by_significance = {{ acmg_by_significance | jsonify }};
             let criteriaContainer = $("#criteria-usage-container");
-            let width = $("#submenu_page_content").width() * 0.7;
+            let width = $("#container_table_content").width() * 0.7;
 
             for (let clinSig=PATHOGENIC_LABELS.length-1; clinSig >= 0; clinSig--) {
                 let label = PATHOGENIC_LABELS[clinSig];

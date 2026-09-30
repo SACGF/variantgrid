@@ -1255,13 +1255,17 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "discordance_reports": False,
     "vus": False,
 }
-URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
+
 # URL names that also follow a feature setting - read when the register is consulted
 # (variantgrid/perm_path.py:url_name_enabled), so an env file that changes the setting need not touch the register
+URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 URLS_NAME_REGISTER_SETTINGS = {
     "maps": "USE_MAPS",
     "lab_members_tab": "LAB_HEAD_MANAGE_MEMBERS",
 }
+
+# The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default
+MENUS = "variantgrid.menus.MENUS"
 
 DEFAULT_TERMS_SLUG = 'site-terms'
 ACCEPT_TERMS_PATH = '/terms/accept/'

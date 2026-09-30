@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block title %}{{ experiment }}{% endblock %}
 {% block head %}
@@ -8,7 +8,7 @@
 {% block jsdocumentready %}
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <h2>
     Experiment: {{ experiment }}
     </h2>

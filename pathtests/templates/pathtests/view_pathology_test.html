@@ -1,4 +1,4 @@
-{% extends menu_pathtests_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load wiki_tags %}
 {% load enrichment_kit_coverage_tags %}
@@ -22,7 +22,7 @@ function showDelete() {
 }
 {% endblock jshead %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 <h3>{{ pathology_test }}</h3>
 
@@ -110,4 +110,4 @@ function showDelete() {
     {% endif %}
 {% endif %}
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

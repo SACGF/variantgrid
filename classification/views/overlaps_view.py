@@ -221,7 +221,7 @@ def view_overlap(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     context = {
         "overlap_details": overlap_details
     }
-    return render_ajax_view(request, "classification/overlap_detail.html", context, menubar="classification")
+    return render_ajax_view(request, "classification/overlap_detail.html", context)
 
 
 def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
@@ -231,7 +231,7 @@ def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseB
     context = {
         "overlap_grouping": overlap_grouping
     }
-    return render_ajax_view(request, "classification/overlap_history.html", context, menubar="classification")
+    return render_ajax_view(request, "classification/overlap_history.html", context)
 
 
 def overlap_report_review(request: HttpRequest, overlap_id: int) -> HttpResponseBase:

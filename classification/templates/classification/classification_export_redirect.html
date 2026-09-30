@@ -1,12 +1,10 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
 {% block title %}Variant Classification Record Export{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <meta http-equiv="refresh" content="1;url={% url 'classification_export_api' %}?{{ query_string | query_unquote}}" />
     <style>

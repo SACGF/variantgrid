@@ -1,4 +1,4 @@
-{% extends menu_analysis_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load js_tags %}
 
@@ -54,7 +54,7 @@ $("#show-mut-sig-info").change(function() {
 
 {% endblock jsdocumentready %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 <h3>Mutational Signature for {{ mutational_signature.sample.name }}</h3>
 
@@ -96,4 +96,4 @@ $("#show-mut-sig-info").change(function() {
 
 
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

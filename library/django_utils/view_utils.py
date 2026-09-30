@@ -5,7 +5,6 @@ login_not_required_include (a third-party URLconf that LoginRequiredMiddleware m
 """
 import inspect
 from importlib import import_module
-from typing import Optional
 
 from django.contrib.auth.decorators import login_not_required
 from django.http import HttpRequest, HttpResponse
@@ -21,8 +20,7 @@ def is_ajax(request: HttpRequest):
 def render_ajax_view(
         request: HttpRequest,
         template_name: str,
-        context: dict,
-        menubar: Optional[str] = None) -> HttpResponse:
+        context: dict) -> HttpResponse:
     if not context:
         context = {}
     if is_ajax(request):
@@ -31,7 +29,7 @@ def render_ajax_view(
     else:
         context['render_mode'] = 'embedded'
         text = render_to_string(template_name, context, request=request)
-        return render(request, "snpdb/embedded_ajax.html", {"embedded_content": text, "menubar": menubar})
+        return render(request, "snpdb/embedded_ajax.html", {"embedded_content": text})
 
 
 def view_to_string(view) -> str:

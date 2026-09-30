@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% load crispy_forms_tags %}
@@ -68,7 +68,7 @@
 
 {% endblock jsdocumentready %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <div id="pedigree-tabs">
     <ul class="nav nav-tabs mb-4" role="tablist">
         <li class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
@@ -112,4 +112,4 @@
     {% related_data_for_pedigree pedigree %}
     {% related_analyses_for_pedigree pedigree %}
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

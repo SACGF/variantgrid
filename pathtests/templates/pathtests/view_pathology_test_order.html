@@ -1,4 +1,4 @@
-{% extends menu_pathtests_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load related_data_for_pathtests_tags %}
 {% load crispy_forms_tags %}
@@ -19,7 +19,7 @@ function setCaseLink() {
 setCaseLink();
 {% endblock jsdocumentready %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <h3>Pathology Test Order {{ pathology_test_order }}</h3>
 
@@ -35,4 +35,4 @@ setCaseLink();
 
     {% related_data_for_pathology_test_order pathology_test_order %}
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

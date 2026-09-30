@@ -1,10 +1,8 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load js_tags %}
 {% block title %}Analysis Issues{% endblock title %}
-{% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>

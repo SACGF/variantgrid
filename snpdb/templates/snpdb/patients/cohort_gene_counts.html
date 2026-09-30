@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block title %}Gene Counts{% endblock %}
 
@@ -37,7 +37,7 @@ $(document).ready(function() {
 </script>
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <a href="{% url 'view_cohort' cohort.pk %}">Back to cohort {{ cohort.name }}</a>
 

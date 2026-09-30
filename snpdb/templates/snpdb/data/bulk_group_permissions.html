@@ -1,4 +1,4 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block css %}
 {{ block.super }}
@@ -51,7 +51,7 @@ function checkboxSetup(addClickHandler) {
 {% endblock %}
 
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <h3>Bulk Change Permissions</h3>
 
 <form id="group-permission-form" method="post" action="{{ request.path }}">

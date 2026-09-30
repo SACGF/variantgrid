@@ -72,26 +72,4 @@ def settings_context_processor(request):
     if settings.SOMALIER.get("enabled"):
         context['somalier_enabled'] = request.user.is_superuser or not settings.SOMALIER.get("admin_only")
 
-    if r_match := request.resolver_match:
-        context['url_name'] = r_match.url_name
-
-    # We extend templates to provide the menus
-    # For clinicians, set them all to a restricted view with less menus
-    MENU_BASE_TEMPLATES = [
-        "menu_analysis_base",
-        "menu_annotation_base",
-        "menu_classifications_base",
-        "menu_data_base",
-        "menu_genes_base",
-        "menu_help_base",
-        "menu_pathtests_base",
-        "menu_patients_base",
-        "menu_settings_base",
-        "menu_variants_base",
-    ]
-
-    DEFAULT_TEMPLATE_PATTERN = "snpdb/menu/%s.html"
-    for base_template in MENU_BASE_TEMPLATES:
-        context[base_template] = DEFAULT_TEMPLATE_PATTERN % base_template
-
     return context

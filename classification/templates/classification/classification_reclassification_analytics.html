@@ -3,10 +3,8 @@
 {% load js_tags %}
 {% load ui_help %}
 {% load ui_utils %}
-{% load ui_menu_bars %}
 {% load settings_tags %}
 {% block title %}Germline Reclassification Analytics{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 {% settings_value 'CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER' as CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
 {% settings_value 'CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY' as CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY %}
