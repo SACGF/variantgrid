@@ -208,6 +208,9 @@ USE_TZ = True
 USE_OIDC = False
 MAINTENANCE_MODE = get_secret("SECURITY.maintenance_mode")  # If true, only non-bot admin users will be able to login, currently only works for ODIC
 OIDC_REQUIRED_GROUP = None
+# DRF bearer tokens must be issued to OIDC_RP_CLIENT_ID (azp) or name it in aud. List any other Keycloak clients
+# (eg a separate API/CLI client) whose access tokens the API should accept - not another environment's client
+OIDC_API_EXTRA_CLIENT_IDS = []
 OIDC_USER_SERVICES = None
 
 VARIANTGRID_APP_DIR = os.path.join(BASE_DIR, "variantgrid")
