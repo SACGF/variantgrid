@@ -94,6 +94,14 @@ class ClassificationSyncStatusTestCase(TestCase):
         self.assertIsNotNone(status.last_synced)
         self.assertFalse(status.reasons)
 
+    def test_synced_with_unsafe_remote_pk_has_no_link(self):
+        vc = self._create_classification()
+        self._create_sync_record(vc, remote_pk="//evil.example.com/x")
+
+        status = self._only_status(vc)
+        self.assertEqual(status.state, ClassificationSyncState.SYNCED)
+        self.assertIsNone(status.remote_url)
+
     def test_changes_pending(self):
         vc = self._create_classification()
         self._create_sync_record(vc, remote_pk=1234)

@@ -1,6 +1,7 @@
 import os
 from functools import cached_property
 from typing import Optional
+from urllib.parse import urljoin, urlparse
 
 import requests
 from django.conf import settings
@@ -92,7 +93,10 @@ class ServerAuth:
             **kwargs
         )
 
-    def url(self, path: str):
-        if path[0:1] == '/':
-            path = path[1:]
-        return self.host + '/' + path
+    def url(self, path: str) -> str:
+        """ path is relative to host even with a leading '/', so a host with a sub-path keeps it """
+        scheme = urlparse(self.host).scheme
+        if scheme not in ('https', 'http'):
+            raise ValueError(f"ServerAuth host must use http(s), got scheme {scheme!r}")
+        base = self.host if self.host.endswith('/') else self.host + '/'
+        return urljoin(base, path.lstrip('/'))
