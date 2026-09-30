@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import Count, Min
 
 
-def _merge_duplicate_groupings(apps, _schema_editor):
+def _merge_duplicate_groupings(apps, schema_editor):
     """ A get_or_create race (before this constraint existed) created duplicate groupings, and put the same
         classification into both. Keep the lowest pk, left dirty for classification_groupings to rebuild (#2024) """
     ClassificationGrouping = apps.get_model("classification", "ClassificationGrouping")
@@ -25,6 +25,9 @@ def _merge_duplicate_groupings(apps, _schema_editor):
         extra_entries = ClassificationGroupingEntry.objects.filter(classification=duplicate["classification"]).exclude(pk=duplicate["keep_pk"])
         ClassificationGrouping.objects.filter(pk__in=extra_entries.values("grouping")).update(dirty=True)
         extra_entries.delete()
+
+    # FK checks are deferred to commit; fire them now so the ALTER TABLE below isn't blocked by pending trigger events
+    schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 class Migration(migrations.Migration):
