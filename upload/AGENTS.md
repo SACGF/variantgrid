@@ -37,6 +37,12 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- `--check-ref=s` silently rewrites any REF that disagrees with the fasta, so a VCF whose header names the wrong build
+  would import "cleanly" into the wrong genes. Before the pipe, upload/vcf/vcf_ref_check.py:check_vcf_ref_matches_build
+  samples the first settings.VCF_IMPORT_REF_CHECK_SNVS SNVs against the build (and the other annotated builds, to name
+  the right one): over VCF_IMPORT_REF_MISMATCH_FAIL_FRACTION the step fails, over the WARN fraction it leaves an ERROR
+  VCFImportInfo to accept, which the status API lists under `warnings`. Only uploaded genotype VCFs
+  (PreprocessAndAnnotateVCFTask) are checked - the VCFs we write from our own coordinates are not.
 - The split stage needs GNU split, bash and the bgzip binary (htslib, apt package tabix) - a missing one only fails
   inside split's --filter at import time. upload/vcf/vcf_preprocess.py:get_split_vcf_command is the one place the
   command lives; manage.py deployment_check runs it on a tiny VCF ("VCF import split pipe") so a new box fails early.
