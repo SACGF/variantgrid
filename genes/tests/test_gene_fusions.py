@@ -310,8 +310,15 @@ class TestFusionString(GeneFusionTestCase):
 
     def test_separators(self):
         expected = ("BCR", "ABL1")
-        for fusion_string in ["BCR::ABL1", "BCR-ABL1", "BCR~ABL1", "BCR/ABL1", "BCR--ABL1"]:
+        for fusion_string in ["BCR::ABL1", "BCR~ABL1", "BCR/ABL1", "BCR--ABL1"]:
             self.assertEqual(expected, GeneFusionResolver.split_fusion_string(fusion_string), fusion_string)
+        self.assertEqual(("RP11-458D21.5", "NOTCH2NL"),
+                         GeneFusionResolver.split_fusion_string("RP11-458D21.5::NOTCH2NL"))
+
+    def test_single_hyphen_is_not_a_separator(self):
+        """ HLA-A is a gene, not a fusion of HLA and A """
+        for fusion_string in ["BCR-ABL1", "HLA-A", "RP11-458D21.5"]:
+            self.assertIsNone(GeneFusionResolver.split_fusion_string(fusion_string), fusion_string)
 
     def test_resolves_to_the_coordinate_the_loader_writes(self):
         """ A classification target and the loader put the same coordinate through the pipeline, so
@@ -321,9 +328,8 @@ class TestFusionString(GeneFusionTestCase):
         self.assertEqual(from_loader.variant.coordinate, resolved.variant_coordinate)
 
     def test_unknown_genes_do_not_mint_a_fusion(self):
-        """ Otherwise any hyphenated string would become a gene fusion - the side we don't know is
-            the reason the record ends up carrying """
-        resolution = resolve_fusion_string("SOME-JUNK")
+        """ The side we don't know is the reason the record ends up carrying """
+        resolution = resolve_fusion_string("SOME::JUNK")
         self.assertFalse(resolution)
         self.assertEqual("gene 'SOME' is not a symbol we know", resolution.reason)
         self.assertFalse(resolve_fusion_string("not a fusion at all").recognised)

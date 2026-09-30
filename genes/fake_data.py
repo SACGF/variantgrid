@@ -2,7 +2,13 @@
 Fake genes and transcripts: RUNX1 (Ensembl, minus strand), GATA2 (RefSeq, minus) and PTEN (RefSeq, plus), each with
 real exon data for GRCh37 and GRCh38 - the transcripts tests build on, and the 'create_fake_data genes' step, which
 makes them for a build that has no real gene annotation to place fake variants in.
+
+The 'create_fake_data gene_level' step makes the gene-level events the search page gives as examples (fusion, copy
+number, splice), resolved from their written strings as a classification import would.
 """
+from genes.gene_copy_number import create_gene_copy_number_events_for_variants
+from genes.gene_fusions import create_gene_fusions_for_variants
+from genes.gene_level_strings import resolve_gene_level_string
 from genes.models import (
     Gene,
     GeneAnnotationImport,
@@ -17,7 +23,12 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium
 from library.fake_data import FakeData, FakeDataContext, register
-from snpdb.models import GenomeBuild
+from library.utils import sha256sum_str
+from snpdb.gene_level_variants import GENE_LEVEL_SVLEN
+from snpdb.models import Contig, GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
+
+# The examples on the search page's gene-level receivers (snpdb/signals/variant_search.py)
+GENE_LEVEL_EXAMPLES = ["BCR::ABL1", "CD74--ROS1", "EGFR amplification", "PTEN loss", "AR V7", "MET exon 14 skipping"]
 
 
 def create_fake_gene_version(genome_build: GenomeBuild, gene_id, gene_symbol_str, annotation_consortium):
@@ -235,3 +246,60 @@ class FakeGenes(FakeData):
 
     def delete(self, context: FakeDataContext, **options):
         context.stdout.write("Leaving the fake transcripts - tests and the fake annotation version build on them")
+
+
+def get_sequence(seq: str) -> Sequence:
+    """ Upper-cased, as every path that inserts a Sequence in production does """
+    seq = seq.upper()
+    sequence, _ = Sequence.objects.get_or_create(seq=seq, defaults={"seq_sha256_hash": sha256sum_str(seq)})
+    return sequence
+
+
+def create_gene_level_variant(variant_coordinate: VariantCoordinate) -> Variant:
+    """ The Variant the insert pipeline would have created for a resolved gene-level identity. Production has one
+        way in - the VCF insert pipeline (@see snpdb.gene_level_variants) - which is far more machinery than one
+        event needs; this makes the same rows from the same resolved identity """
+    locus, _ = Locus.objects.get_or_create(contig=Contig.get_gene_level(),
+                                           position=variant_coordinate.position,
+                                           ref=get_sequence(variant_coordinate.ref))
+    variant, _ = Variant.objects.get_or_create(locus=locus, alt=get_sequence(variant_coordinate.alt),
+                                               svlen=GENE_LEVEL_SVLEN,
+                                               defaults={"end": variant_coordinate.position})
+    return variant
+
+
+def _resolve_gene_level_examples(context: FakeDataContext) -> dict[str, VariantCoordinate]:
+    """ An example whose genes this database doesn't have (only the fake genes, say) is skipped """
+    variant_coordinates = {}
+    for example in GENE_LEVEL_EXAMPLES:
+        resolution = resolve_gene_level_string(example, context.genome_build)
+        if resolution:
+            variant_coordinates[example] = resolution.resolved.variant_coordinate
+        else:
+            context.stdout.write(f"Skipping '{example}': {resolution.reason}")
+    return variant_coordinates
+
+
+@register
+class FakeGeneLevelVariants(FakeData):
+    name = "gene_level"
+    help = ("The gene fusions, copy number and splice events the search page gives as examples, "
+            "resolved from their strings as a classification import would")
+    requires = ("genes",)
+
+    def create(self, context: FakeDataContext, **options):
+        variant_ids = []
+        for example, variant_coordinate in _resolve_gene_level_examples(context).items():
+            variant = create_gene_level_variant(variant_coordinate)
+            variant_ids.append(variant.pk)
+            context.stdout.write(f"{example} -> {variant}")
+        variant_qs = Variant.objects.filter(pk__in=variant_ids)
+        create_gene_fusions_for_variants(variant_qs)
+        create_gene_copy_number_events_for_variants(variant_qs)
+
+    def delete(self, context: FakeDataContext, **options):
+        for example, variant_coordinate in _resolve_gene_level_examples(context).items():
+            deleted, _ = Variant.objects.filter(locus__contig=Contig.get_gene_level(),
+                                                locus__position=variant_coordinate.position,
+                                                alt__seq=variant_coordinate.alt.upper()).delete()
+            context.stdout.write(f"{example}: deleted {deleted} rows")
