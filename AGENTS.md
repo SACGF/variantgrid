@@ -205,6 +205,13 @@ confirm with the user before proceeding - do not include them in the commit.
 ### GitHub comments
 Preface any comment on a GitHub issue or pull request with 🤖 Written by Claude. Do NOT close GitHub issues.
 
+### Which repo an issue goes in
+Raise issues in the public `SACGF/variantgrid` by default. An issue there must contain nothing identifying: no patient,
+lab or variant details, no hostnames, secrets or config values from a deployment. Raise it in `SACGF/variantgrid_private`
+instead when it describes a security problem (a missing permission check, an injection, anything an attacker could use
+before the fix ships) or when it needs patient, lab or variant details to make sense. When splitting or triaging an
+issue, apply the same test to each new one: a security item keeps its issue private; the rest go public.
+
 Suggest issues when you find something worth tracking (e.g. a related problem found while working on another), but don't
 raise them on your own without permission. Draft the title/summary in chat and ask first. Only create an issue when
 explicitly asked to. Before proposing a new one, check for an existing issue that already covers it and suggest
