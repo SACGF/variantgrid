@@ -56,7 +56,7 @@ step - rows are applied as they are read.
 Per row: `match_sample` finds the Sample by id or name among samples the user can write;
 `patients/models.py:Patient.match` looks the patient up among those the user can see on last name (required), first
 name, and DOB / sex where given - a blank DOB or Unknown sex on the stored patient still matches, and that is recorded
-as PARTIAL rather than EXACT. Several matches fail the row, naming the patients (`SACGF/variantgrid_private#3914`). No
+as PARTIAL rather than EXACT. Several matches fail the row, naming the patients (`#2037`). No
 match creates the patient (`create_patient`, upper-cased names, permissions to the user's groups). Deceased / date of death, family code, patient code, affected and consanguineous are then updated;
 phenotype text is appended under a dated "From Imported CSV" line rather than replaced. The specimen is found by
 `(patient, reference_id)`; a reference_id already used by a *different* patient fails the row with
@@ -153,7 +153,7 @@ PatientModification). The patients page graphs come from `patients/templatetags/
 - **Specimen reference_id is unique per patient in the database** (`unique_together` with patient) and the API, but the
   CSV import refuses a reference_id another patient already has. A bare reference can therefore match several
   specimens through the API / VCF path, which resolves to NEEDS_ATTENTION rather than picking one.
-- **A CSV re-import updates the specimen from filled columns only** (`SACGF/variantgrid_private#3914`): a blank
+- **A CSV re-import updates the specimen from filled columns only** (`#2037`): a blank
   column leaves the stored value alone, so it cannot clear a description or reset `tissue_status`; a filled column
   replaces what is stored.
 - **An API update does not fire reconciliation**; only a Specimen / Extraction create does, so a claim that an update
