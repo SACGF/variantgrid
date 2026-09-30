@@ -40,7 +40,8 @@ class GetSecretTest(TestCase):
                 patch.object(secret_settings, "_settings_json", {}):
             with self.assertLogs(level="WARNING") as logs:
                 self.assertEqual("localhost", get_secret("DB.host"))
-            self.assertIn("using default value 'localhost'", logs.output[0])
+            self.assertIn("using the built-in default", logs.output[0])
+            self.assertNotIn("localhost", logs.output[0])
 
     def test_env_var_wins(self):
         with patch.dict(os.environ, {"DB.host": "from-env"}), \

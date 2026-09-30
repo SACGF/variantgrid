@@ -123,11 +123,12 @@ def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     value, found = _get_nested(parts, _default_settings)
     if found:
         if key != 'DB.port':
-            root_json = value
+            # Defaults include credentials (DB.password, CELERY.broker_url) so never log the value itself
+            root_json = "<value>"
             for p in reversed(parts):
                 root_json = {p: root_json}
             root_json_str = json.dumps(root_json)
-            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using default value '{value}', please migrate e.g. {root_json_str}")
+            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using the built-in default, please migrate e.g. {root_json_str}")
         return value
 
     if not mandatory:
