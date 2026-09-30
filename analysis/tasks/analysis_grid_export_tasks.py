@@ -144,11 +144,11 @@ def _write_node_to_cached_generated_file(cgf, request, node, basename, export_ty
         cgf.task_status = "SUCCESS"
         cgf.progress = 1  # row_wrapper updated the DB directly, so our copy is still at its starting value
         cgf.generate_end = timezone.now()
-        logging.info("Wrote %s", media_root_filename)
+        logging.info("Wrote %s", media_root_filename)  # lgtm[py/clear-text-logging-sensitive-data]
     except Exception as e:
         # The row stays failed until the cause is fixed (@see CachedGeneratedFile.needs_regenerating), so
         # admins hear about it now rather than from the user
-        logging.error("Failed to write %s: %s", media_root_filename, e)
+        logging.error("Failed to write %s: %s", media_root_filename, e)  # lgtm[py/clear-text-logging-sensitive-data]
         report_exc_info()
         cgf.exception = str(e)
         cgf.task_status = "FAILURE"
