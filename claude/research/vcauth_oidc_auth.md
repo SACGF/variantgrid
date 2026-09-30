@@ -31,11 +31,16 @@ Found or newly created, the user goes through `create_or_update`, which rewrites
    `Lab.group_name` / `Organization.group_name` (`snpdb/models/models.py:Lab`), created on the fly if missing.
    `/variantgrid/admin` sets `is_superuser` and `is_staff`; `bot` and `tester` become the Django groups
    "variantgrid/bot" and "variantgrid/tester". Everyone also gets `PUBLIC_GROUP_NAME` and `LOGGED_IN_USERS_GROUP_NAME`.
-4. Under `MAINTENANCE_MODE` only testers and non-bot admins get through (the backend returns `None`).
+4. Under `MAINTENANCE_MODE` only testers and non-bot admins get through (refused, but not saved inactive).
 5. Django groups not in that computed set are removed, the Keycloak `sub` is stored on `UserSettingsOverride.oauth_sub`,
    and `snpdb/models/models_user_settings.py:UserSettingsOverride.auto_set_default_lab` drops or fills the default lab.
 
-mozilla's callback view then refuses an inactive user (`login_failure`), so steps 2 and 3 end at the login page with the message.
+Refusals go through `oidc_auth/backend.py:VariantGridOIDCAuthenticationBackend._refuse_login`, which returns the user
+inactive; mozilla's callback view then refuses it (`login_failure`), so steps 2-4 end at the login page with the message.
+Returning `None` would instead fire `user_login_failed`, which django-axes records against the IP with no username. A
+first login builds the user unsaved (`create_user`) and saves only once it is accepted, so a refused first login leaves
+no row; an existing user refused at step 2 or 3 is saved inactive. A missing `groups` claim counts as no groups; a
+missing `preferred_username` is a `SuspiciousOperation`.
 
 ### Staying logged in, logging out, stale callbacks
 
@@ -52,6 +57,14 @@ DRF on Shariant authenticates with `mozilla_django_oidc.contrib.drf.OIDCAuthenti
 `SessionAuthentication`. With no `OIDC_DRF_AUTH_BACKEND` set, mozilla uses the same `VariantGridOIDCAuthenticationBackend`,
 so every bearer-token request calls Keycloak's userinfo endpoint and re-runs `create_or_update`, group sync included (read
 from mozilla-django-oidc 5.0.2, not measured).
+
+Userinfo accepts a token issued to any client in the realm, and one realm serves every Shariant environment, so
+`oidc_auth/backend.py:VariantGridOIDCAuthenticationBackend._verify_bearer_token_client` (called from `get_userinfo` when
+there is no ID token, i.e. the DRF path) also requires the token's `azp` to be `OIDC_RP_CLIENT_ID` or one of
+`OIDC_API_EXTRA_CLIENT_IDS`, or its `aud` to include `OIDC_RP_CLIENT_ID` (a Keycloak audience mapper); otherwise 401, with
+a `report_message` naming the client. The claims are read without a signature check because userinfo has just validated
+that exact token. The DRF path has no request, so `_refuse_login` raises `PermissionDenied` (403) rather than returning an
+inactive user, which DRF's `IsAuthenticated` would accept.
 
 Users are created in Keycloak, not Django: superusers use `variantgrid/views.py:keycloak_admin` (`/system/keycloak_admin`),
 which calls `snpdb/keycloak.py:Keycloak.add_user` with username = email, the lab's two `/associations/` groups plus
@@ -83,25 +96,15 @@ built the wrong-environment message with `format_html` so the email is escaped. 
 
 ## Traps
 
-Reproduced on vg-test2 (2026-09-25) by calling the functions from `manage.py shell` with `User.save` patched out:
-
-- **Bearer token for the wrong environment gives a 500, not a 401** (bug). DRF's `OIDCAuthentication` calls
-  `get_or_create_user` without `authenticate()`, so the backend has no `self.request`; the wrong-environment, no-lab and
-  maintenance branches of `oidc_auth/backend.py:VariantGridOIDCAuthenticationBackend.create_or_update` hit
-  `messages.add_message(self.request, ...)` and raise `AttributeError`. It fails closed (no access), and the wrong-env
-  branch has already saved the user inactive.
-- **Missing `groups` claim is a 500** (minor, fails closed). `create_or_update` only reports missing claims, then
-  `OIDC_REQUIRED_GROUP not in None` raises `TypeError` (or `claims['groups']` a `KeyError` when no required group is set).
-  A missing `preferred_username` likewise fails in `_sanitize_claim_str`.
-- **Logout 500s for a session without an ID token** (bug). `oidc_auth/backend.py:provider_logout` reads
-  `request.session["oidc_id_token"]`, a `KeyError` for anyone logged in by password through `ModelBackend` (above) —
-  and the menu always posts to `oidc_logout` when `USE_OIDC`.
-
-Read, not reproduced:
-
-- Groups granted in Django admin and a locally granted `is_superuser` are silently undone at that user's next login.
-- In maintenance mode a first-time user's row is still created by mozilla's `create_user` (with a hashed username)
-  before `create_or_update` returns `None`; their next login finds it by email.
-- Bearer tokens are checked only by Keycloak's userinfo endpoint, so an access token issued to another client in the
-  same realm (eg `shariant-test`) is accepted by production; `OIDC_REQUIRED_GROUP` is the only environment gate there.
-- `VariantGridSessionRefresh` skips *any* path containing `/api/`, not just the DRF prefixes.
+- **Refusals must not return `None` or an inactive user to DRF.** Any new refusal in `create_or_update` goes through
+  `_refuse_login`: `self.request` is unset on the bearer path, and an inactive user returned there is authenticated.
+- **Groups granted in Django admin and a locally granted `is_superuser` are silently undone** at that user's next login
+  (deliberate: Keycloak is authoritative).
+- **Adding an API client in Keycloak needs a setting.** A new client that fetches tokens for the API must be listed in
+  `OIDC_API_EXTRA_CLIENT_IDS` (or given an audience mapper to this deployment's client), or every call is a 401.
+- **The required group is also a lab-less pass.** `OIDC_REQUIRED_GROUP` is itself under `/variantgrid/`, so a user with
+  only that group is not refused as "doesn't belong to any labs"; they log in with no lab.
+- `oidc_auth/backend.py:provider_logout` sends a password login (`/accounts/`, `/admin/`), which has no `oidc_id_token`,
+  straight to `LOGOUT_REDIRECT_URL`; only OIDC sessions go through Keycloak's end-session endpoint.
+- `oidc_auth/session_refresh.py:VariantGridSessionRefresh` skips `/api/` and `/<app>/api/` paths (DRF), not any path
+  containing `/api/`.
