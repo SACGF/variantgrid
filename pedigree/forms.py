@@ -25,6 +25,12 @@ class PedigreeForm(ModelForm, ROFormMixin):
         read_only_display = ('user', )
         widgets = {'name': TextInput()}
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user")
+        super().__init__(*args, **kwargs)
+        self.fields['cohort'].queryset = Cohort.filter_for_user(user)
+        self.fields['ped_file_family'].queryset = PedFileFamily.filter_for_user(user)
+
 
 class UserCohortandPedFileFamilyForm(forms.Form):
     ped_file_family = forms.ModelChoiceField(queryset=PedFileFamily.objects.all())
