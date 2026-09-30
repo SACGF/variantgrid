@@ -6,6 +6,7 @@ from django.forms.models import ModelChoiceField
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
+from django.views.decorators.http import require_POST
 
 from library.utils import full_class_name
 from pedigree import forms
@@ -73,8 +74,7 @@ def view_pedigree(request, pedigree_id):
             self.helper.form_show_labels = False
 
     CohortSamplesForPedFileRecordsFormSet = formset_factory(CohortSamplesForm, formset=BaseCohortSamplesForPedFileRecordsFormSet, extra=0)
-    # TODO: Make this non read only and save name etc.
-    pedigree_form = forms.PedigreeForm(request.POST or None, instance=pedigree)
+    pedigree_form = forms.PedigreeForm(request.POST or None, instance=pedigree, user=request.user)
     formset_initial = []
     existing_cspfr = pedigree.cohortsamplepedfilerecord_set.all()
     if existing_cspfr.exists():
@@ -88,6 +88,7 @@ def view_pedigree(request, pedigree_id):
 
     formset = CohortSamplesForPedFileRecordsFormSet(request.POST or None, initial=formset_initial)
     if request.method == "POST":
+        pedigree.check_can_write(request.user)
         if pedigree_form.is_valid() and formset.is_valid():
             pedigree = pedigree_form.save()
             # Clear all existing records
@@ -110,9 +111,10 @@ def view_pedigree(request, pedigree_id):
     return render(request, 'pedigree/view_pedigree.html', context)
 
 
+@require_POST
 def create_pedigree_from_cohort_and_ped_file_family(request, cohort_id, ped_file_family_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
-    ped_file_family = get_object_or_404(PedFileFamily, pk=ped_file_family_id)
+    ped_file_family = get_object_or_404(PedFileFamily.filter_for_user(request.user), pk=ped_file_family_id)
 
     pedigree = create_automatch_pedigree(request.user, ped_file_family, cohort)
     return HttpResponseRedirect(reverse('view_pedigree', kwargs={'pedigree_id': pedigree.pk}))
