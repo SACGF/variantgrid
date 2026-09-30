@@ -1,16 +1,16 @@
 """
-Imports work by:
+The patient records CSV import (PatientColumns are the columns):
 
     import_patient_records:
-        - Read the CSV with pandas, and create PatientRecord entries
-        - Set whether a record is valid or needs manual intervention - a value that won't parse is a
-          validation message, and a row that can't be imported at all is rolled back to an invalid record
-        - Display what's going to happen with the records (ie good, bad etc)
-        - Then, click SUBMIT button after review
+        - Read the CSV with pandas, then process_record each row in its own transaction, so a row that
+          fails leaves nothing behind but its invalid PatientRecord and the other rows still import
+        - A value that won't parse is a validation message on the row's PatientRecord; a row that can't be
+          imported at all raises InvalidPatientRecord and becomes an invalid PatientRecord
+        - Patients whose phenotype text changed are matched in bulk at the end
 
-    process_patient_records:
-        - Do the actual conversion from PatientRecord into the various samples etc etc.
-
+    process_record:
+        - Match or create the patient, update its deceased state and the fields not used to match,
+          then the specimen (a blank column leaves the stored value alone), its extraction and the sample
 """
 
 import logging
@@ -250,12 +250,12 @@ def specimen_patient_clash_message(specimen, patient, patient_match_type, user) 
            "A specimen can only belong to one patient."
 
 
-def set_fields_if_blank(obj, field_values):
-    """ returns true if change """
+def set_fields_from_row(obj, field_values) -> bool:
+    """ A blank CSV column is 'no answer' rather than 'clear it', so it leaves the stored value alone
+        and a value replaces what is stored. Returns whether anything changed """
     changed = False
     for k, v in field_values.items():
-        existing_value = getattr(obj, k)
-        if not existing_value:
+        if v is not None and getattr(obj, k) != v:
             changed = True
             setattr(obj, k, v)
 
@@ -303,7 +303,10 @@ def process_record(patient_records, record_id, row):
     sample_name = row[PatientColumns.SAMPLE_NAME]
 
     sample = match_sample(user, sample_id, sample_name, validation_messages)
-    patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user)
+    try:
+        patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user)
+    except Patient.MultipleObjectsReturned as e:
+        raise InvalidPatientRecord(str(e)) from e
     if patient is None:
         patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user)
         patient_match_type = PatientRecordMatchType.CREATED
@@ -326,7 +329,7 @@ def process_record(patient_records, record_id, row):
             if patient._deceased != patient_deceased:
                 patient.date_of_death = None
                 patient._deceased = patient_deceased
-                patient.save()
+                patient.save(check_patient_text_phenotype=False)
                 description = "Updated patient as deceased = True"
         elif patient_deceased is False:
             patient.date_of_death = None
@@ -409,27 +412,14 @@ def process_record(patient_records, record_id, row):
             specimen_match_type = PatientRecordMatchType.CREATED
 
         field_values = {
-            "reference_id": specimen_reference_id,
             "description": specimen_description,
             "collected_by": specimen_collected_by,
-            "patient": patient,
-            #tissue=tissue,
             "collection_date": specimen_collection_date,
             "received_date": specimen_received_date,
-            # tissue_status is never null - a blank column means Unknown rather than "no answer"
-            "tissue_status": specimen_tissue_status or TissueStatus.UNKNOWN,
+            "tissue_status": specimen_tissue_status,
             "_age_at_collection_date": specimen_age_at_collection
         }
-        changed = set_fields_if_blank(specimen, field_values)
-        if changed:
-            specimen.description = specimen_description
-            specimen.collected_by = specimen_collected_by
-            specimen.patient = patient
-            specimen.collection_date = specimen_collection_date
-            specimen.received_date = specimen_received_date
-            specimen.tissue_status = specimen_tissue_status or TissueStatus.UNKNOWN
-            specimen._age_at_collection_date = specimen_age_at_collection
-
+        if set_fields_from_row(specimen, field_values):
             specimen.save()
 
         # The CSV has one nucleic acid source column, so it describes a single extraction per specimen
