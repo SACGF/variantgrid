@@ -1,6 +1,8 @@
 import unittest
 
 from django.contrib.auth.models import User
+from django.test import Client
+from django.urls import reverse
 from django.utils.timezone import localdate
 
 from annotation.fake_data import get_fake_annotation_version
@@ -39,7 +41,9 @@ class Test(URLTestCase):
             ('view_uploaded_file', {"file_upload_id": file_upload.pk}, 200),
             ('view_upload_pipeline', upload_pipeline_kwargs, 200),
             ('view_upload_pipeline_warnings_and_errors', upload_pipeline_kwargs, 200),
+            ('upload_pipeline_modified_variants_datatable', upload_pipeline_kwargs, 200),
         ]
+        cls.upload_pipeline_kwargs = upload_pipeline_kwargs
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
@@ -59,7 +63,17 @@ class Test(URLTestCase):
 
     @prevent_request_warnings
     def testNoPermission(self):
-        self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+        # Skipped annotation grid only in the no-permission check, as the fake VCF has no cohort to read variants from
+        skipped_annotation = [('upload_pipeline_skipped_annotation_datatable', self.upload_pipeline_kwargs, 200)]
+        self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS + skipped_annotation, self.user_non_owner,
+                        expected_code_override=403)
+
+    @prevent_request_warnings
+    def testRetryImportNoPermission(self):
+        client = Client()
+        client.force_login(self.user_non_owner)
+        response = client.post(reverse("upload_retry_import", kwargs=self.upload_pipeline_kwargs))
+        self.assertEqual(response.status_code, 403)
 
     def testDatatableGridListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)

@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 
 from annotation.views import get_build_contigs
 from library.django_utils.view_utils import render_ajax_view
+from library.guardian_utils import check_can_write
 from upload import forms, upload_stats
 from upload.import_task_factories.import_task_factory import get_import_tasks_by_extension
 from upload.models import (
@@ -89,7 +90,7 @@ def view_upload_pipeline(request, upload_pipeline_id):
 
     filename = file_upload.get_filename()
     file_exists = filename and os.path.exists(filename)
-    allow_retry_import = (file_upload.user == request.user or request.user.is_superuser) and file_exists
+    allow_retry_import = file_upload.can_write(request.user) and file_exists
 
     if not file_exists:
         status = messages.WARNING
@@ -161,6 +162,7 @@ def view_upload_pipeline_warnings_and_errors(request, upload_pipeline_id):
 @require_POST
 def upload_retry_import(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
+    check_can_write(upload_pipeline.file_upload, request.user)
     upload_pipeline = retry_upload_pipeline(upload_pipeline)
 
     msg = 'Attempting to re-importing file'

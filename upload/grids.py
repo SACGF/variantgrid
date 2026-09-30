@@ -71,7 +71,9 @@ class UploadPipelineSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
         return upload_pipeline.uploadedvcf.vcf, upload_pipeline.genome_build
 
     def _get_upload_pipeline(self) -> UploadPipeline:
-        return get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
+        upload_pipeline = get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
+        upload_pipeline.file_upload.check_can_view(self.user)
+        return upload_pipeline
 
 
 class UploadPipelineModifiedVariantsColumns(DatatableConfig[ModifiedImportedVariant]):
@@ -93,6 +95,7 @@ class UploadPipelineModifiedVariantsColumns(DatatableConfig[ModifiedImportedVari
 
     def get_initial_queryset(self) -> QuerySet[ModifiedImportedVariant]:
         upload_pipeline = get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
+        upload_pipeline.file_upload.check_can_view(self.user)
         qs = get_queryset_for_latest_annotation_version(ModifiedImportedVariant, upload_pipeline.genome_build)
         qs = qs.filter(import_info__upload_step__upload_pipeline=upload_pipeline)
         return Variant.annotate_variant_string(qs, path_to_variant="variant__")
