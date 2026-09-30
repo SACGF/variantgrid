@@ -58,7 +58,7 @@ class FranklinExportRow(ExportRow):
 
     GERMLINE_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
@@ -68,7 +68,7 @@ class FranklinExportRow(ExportRow):
     }
     ONCOGENIC_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
