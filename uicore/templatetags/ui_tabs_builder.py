@@ -214,11 +214,11 @@ class LocalTabContent(template.Node):
             builder = TabBuilder(tab_set)
             context[tab_key] = builder
 
+        if admin_only and not context.request.user.is_superuser:
+            return ""
+
         tab_number = len(builder.tabs)
         content: str = self.nodelist.render(context)
-
-        if admin_only and not context.request.user.is_superuser:
-            return
 
         if active or check_active_tab(tab_set, tab_id, context.request, context):
             builder.active_tab = tab_number

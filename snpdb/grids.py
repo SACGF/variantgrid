@@ -54,7 +54,7 @@ from snpdb.models import (
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
-from uicore.templatetags.js_tags import jsonify_for_js
+from uicore.templatetags.js_tags import jsonify_for_html
 from variantgrid.perm_path import get_visible_url_names
 
 
@@ -872,7 +872,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 return "Swapped Ref/Alt due to SWAP=1"
         if js is None:
             return "-"
-        return jsonify_for_js(js, pretty=True)
+        return jsonify_for_html(js, pretty=True)
 
     def render_error_json(self, row: dict[str, Any]) -> JsonDataType:
         if js := row["error"]:
@@ -880,7 +880,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 return js.get("message")
         if js is None:
             return "-"
-        return jsonify_for_js(js, pretty=True)
+        return jsonify_for_html(js, pretty=True)
 
 
 class LiftoverRunAlleleLiftoverColumns(AbstractAlleleLiftoverColumns):

@@ -1,4 +1,4 @@
 {% load js_tags %}
 {% if blank %}<span class="no-value">-</span>{% else %}
-<div class="format-json {{ css_class }}">{{ data | jsonify }}</div>
+<div class="format-json {{ css_class }}">{{ data|jsonify_html }}</div>
 {% endif %}

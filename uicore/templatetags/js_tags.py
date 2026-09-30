@@ -7,10 +7,11 @@ import urllib
 from datetime import date, timedelta
 from decimal import Decimal
 from html import escape
-from typing import Optional, Union
+from typing import Optional
 
 from django import template
 from django.db.models import TextChoices
+from django.utils.html import escape as html_escape
 from django.utils.safestring import SafeString, mark_safe
 
 from library.utils import JsonDataType, format_diff_text, format_significant_digits
@@ -29,33 +30,42 @@ def dal_media():
     return mark_safe(str(ModelSelect2(url='').media))
 
 
-def jsonify_for_js(json_me, pretty=False) -> Union[SafeString, bool, int, float]:
-    if isinstance(json_me, str):
-        json_me = json_me.replace('"', '\"').replace('</script>', '<\\/script>')
-        return mark_safe(f"\"{json_me}\"")
-    if isinstance(json_me, bool):
-        if json_me:
-            return mark_safe('true')
-        return mark_safe('false')
-    if isinstance(json_me, (int, float)):
-        return json_me
-    indent = None if not pretty else 4
-    text = json.dumps(json_me, indent=indent)
-    if pretty:
-        # this stops arrays of arrays taking up too much vertical space
-        text = re.compile(r'],\s*\[', re.MULTILINE).sub('],[', text)
-    text = text.replace('</script>', '<\\/script>')
-    return mark_safe(text)
+# same escapes as Django's json_script, so a string can't close the <script> - JS reads them back unchanged
+_JSON_SCRIPT_ESCAPES = {ord('<'): '\\u003C', ord('>'): '\\u003E', ord('&'): '\\u0026'}
+_ARRAY_OF_ARRAYS_BREAK = re.compile(r'],\s*\[', re.MULTILINE)
+
+
+def _json_dumps(json_me, pretty: bool, ensure_ascii: bool = True) -> str:
+    if not pretty:
+        return json.dumps(json_me, ensure_ascii=ensure_ascii)
+    text = json.dumps(json_me, indent=4, ensure_ascii=ensure_ascii)
+    # this stops arrays of arrays taking up too much vertical space
+    return _ARRAY_OF_ARRAYS_BREAK.sub('],[', text)
+
+
+def jsonify_for_js(json_me, pretty=False) -> SafeString:
+    """ A JS literal for use inside <script> (not an HTML attribute) """
+    return mark_safe(_json_dumps(json_me, pretty).translate(_JSON_SCRIPT_ESCAPES))
+
+
+def jsonify_for_html(json_me, pretty=False) -> SafeString:
+    """ JSON text for an HTML element body, e.g. <pre> or a .format-json div """
+    return html_escape(_json_dumps(json_me, pretty, ensure_ascii=False))
 
 
 @register.filter
-def jsonify(json_me) -> Union[SafeString, bool, int, float]:
+def jsonify(json_me) -> SafeString:
     return jsonify_for_js(json_me)
 
 
 @register.filter
-def jsonify_pretty(json_me) -> Union[SafeString, bool, int, float]:
-    return jsonify_for_js(json_me, pretty=True)
+def jsonify_html(json_me) -> SafeString:
+    return jsonify_for_html(json_me)
+
+
+@register.filter
+def jsonify_pretty(json_me) -> SafeString:
+    return jsonify_for_html(json_me, pretty=True)
 
 
 @register.filter
