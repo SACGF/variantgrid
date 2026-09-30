@@ -1,9 +1,9 @@
-{% extends menu_genes_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
 {% block title %}Gene Lists{% endblock title %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <script>
         function showForm() {
             let box = $("#show-form-container");
@@ -71,6 +71,6 @@
 
     <table id="gene-lists-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_lists_datatable' %}"></table>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}
 
 

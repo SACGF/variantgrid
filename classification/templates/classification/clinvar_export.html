@@ -1,14 +1,12 @@
 {% extends "uicore/page/base.html" %}
 {% load classification_tags %}
 {% load ontology_tags %}
-{% load ui_menu_bars %}
 {% load ui_help %}
 {% load ui_utils %}
 {% load ui_tabs_builder %}
 {% load english_tags %}
 {% load js_tags %}
 {% block title %}Clinvar Export{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
         <a href="{% url 'clinvar_key_summary' clinvar_export.clinvar_allele.clinvar_key.pk %}" class="hover-link"><i class="fas fa-angle-left"></i>Back to all ClinVar Exports</a>

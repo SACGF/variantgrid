@@ -1,9 +1,9 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_tabs_builder %}
 {% load ui_utils %}
 {% load crispy_forms_tags %}
 {% block title %}Extraction {{ extraction }}{% endblock title %}
-{% block submenu_page_content %}
+{% block container_table_content %}
     <div class="container">
         <h3>Extraction: {{ extraction }} {% admin_link extraction %}</h3>
 
@@ -83,4 +83,4 @@
             {% include "analysis/classify_report_tab_counts.html" %}
         {% endif %}
     </div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

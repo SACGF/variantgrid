@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_utils %}
 
 {% block title %}Patient Records{% endblock title %}
@@ -8,7 +8,7 @@
 }
 {% endblock css %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <div>
         <div>
             From <a href="{% url 'view_patient_import' patient_record.patient_records_id %}">Patient Import {{ patient_record.patient_records_id }}</a>
@@ -55,5 +55,5 @@
                 {% labelled label="Specimen Age at collection" %}{{ patient_record.specimen_age_at_collection_date }}{% endlabelled %}
             </div>
     </div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}
 

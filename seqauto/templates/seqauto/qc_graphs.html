@@ -1,11 +1,9 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load static %}
 {% load js_tags %}
 {% load crispy_forms_tags %}
 {% block title %}QC Graphs{% endblock %}
-{% block submenu %}{% menu_bar_sequencing %}{% endblock %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>

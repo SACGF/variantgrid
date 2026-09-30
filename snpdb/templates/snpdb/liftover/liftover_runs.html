@@ -4,16 +4,8 @@
 {% load js_tags %}
 {% load ui_utils %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 {% load humanize %}
 {% block title %}Liftover{% endblock %}
-{% block submenu %}
-{% if 'variants'|is_view_enabled %}
-    {% menu_bar_variants %}
-{% else %}
-    {% menu_bar_settings %}
-{% endif %}
-{% endblock submenu %}
 {% block content %}
     <style>
         .import-table td {

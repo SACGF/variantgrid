@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
 
@@ -52,7 +52,7 @@
     });
 {% endblock jsdocumentready %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 	<div id="ped_file">
 		<h3>PED file: {{ ped_file.name }}</h3>
         <div id="ped-file-tabs">
@@ -131,4 +131,4 @@
 		</div>
 	
 	{% endfor %}
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

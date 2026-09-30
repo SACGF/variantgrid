@@ -163,7 +163,6 @@ def vcf_cohort_page_context(user, cohort: Cohort, has_write_permission: bool, vc
         cohort_samples = [cs.sample for cs in cohort.get_cohort_samples()]
 
     context = {
-        "base_template": "snpdb/menu/menu_data_base.html" if vcf else "snpdb/menu/menu_patients_base.html",
         "vcf": vcf,
         "cohort": cohort,
         "cohort_genotype_collection": cohort_genotype_collection,

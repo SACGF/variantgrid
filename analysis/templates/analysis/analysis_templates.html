@@ -1,4 +1,4 @@
-{% extends menu_analysis_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_help %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
@@ -6,7 +6,7 @@
 {% load datatable_tags %}
 {% block title %}VariantGrid: Analysis templates{% endblock title %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <script>
     $(document).ready(() => {
         $('#id_analysis').change(function () {
@@ -44,4 +44,4 @@
            data-datatable-url="{% url 'analysis_templates_datatable' %}"></table>
 </div>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

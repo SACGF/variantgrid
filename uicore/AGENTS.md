@@ -20,8 +20,11 @@ Patterns here:
 - Tabs: `{% ui_register_tab tab_set="x" label="..." url="view_name" param=obj.pk %}` then `{% ui_render_tabs tab_set="x" %}`
   (uicore/templatetags/ui_tabs_builder.py:ui_register_tab) loads the view by AJAX on first click; `url_check=True`
   hides the tab when the URL is unregistered on this deployment; `{% ui_register_tab_embedded %}` inlines content.
+- Menus are data in uicore/menus.py:MENUS. A new page gets its top-bar highlight and side bar by adding its url
+  name there (a new item, an item's `pages` if it is that item's detail page, else the menu's `pages`) - templates
+  never pick a menu; a url name in no menu renders with no side bar.
 - Deployment-visible URLs come from variantgrid/perm_path.py:get_visible_url_names - menus
-  (uicore/templatetags/ui_menus.py:menu_item) and snpdb/grids.py:url_if_visible check it; guard any link to a view
+  (uicore/menus.py:MenuItem) and snpdb/grids.py:url_if_visible check it; guard any link to a view
   a site unregisters (patients on Shariant) the same way. Only names passed through `variantgrid/perm_path.py:path`
   are enforced - a DRF router's patterns must go through `variantgrid/perm_path.py:router_urls` or the register
   does not apply to them.

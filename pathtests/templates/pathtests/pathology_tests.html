@@ -1,4 +1,4 @@
-{% extends menu_pathtests_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block title %}Test Orders{% endblock title %}
 
@@ -12,7 +12,7 @@ $('#id_external_pk').change(function() {
 {% endif %}
 
 {% endblock jsdocumentready %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     {% load ui_help %}
     {% page_help 'pathtests/pathology_tests_help' 'Pathology Test Orders' %}
@@ -27,4 +27,4 @@ $('#id_external_pk').change(function() {
 
     <table id="pathology-test-orders-grid" data-datatable-url="{% url 'pathology_test_orders_datatable' %}" class="sticky-header"></table>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

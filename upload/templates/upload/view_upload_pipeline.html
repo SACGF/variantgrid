@@ -1,14 +1,10 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load static %}
 {% load humanize %}
 {% load js_tags %}
 {% load model_helpers %}
 {% load upload_tags %}
-{% block submenu %}
-    {% menu_bar_data %}
-{% endblock %}
 {% block title %}View upload{% endblock %}
 {% block head %}
     <script>

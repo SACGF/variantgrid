@@ -15,21 +15,24 @@ section. This document is the why and the traps.
 
 ### A page request
 
-Views render a template that extends one of about ten `menu_*_base` variables rather than a fixed path:
-`snpdb/processors.py:settings_context_processor` puts `menu_variants_base` etc. into every context (each resolving to
-`snpdb/menu/<name>.html`, which extends the page base), so a deployment can swap the menu shell without
-touching page templates. About 70 templates extend a menu base and about 100 extend the page base directly; a few menu-less pages use
-`uicore/templates/uicore/page/base_external.html`, and the login pages have their own
-`variantgrid/templates/default_templates/external_abstract_base.html`. The same context processor supplies
+Page templates extend `uicore/templates/uicore/page/base.html`, or
+`uicore/templates/uicore/page/base_container_table.html` for the same page with its content in a `container-table`
+div; a few menu-less pages use `uicore/templates/uicore/page/base_external.html`, and the login pages have their own
+`variantgrid/templates/default_templates/external_abstract_base.html`. No page template chooses a menu.
+`snpdb/processors.py:settings_context_processor` supplies
 `url_name_visible` (`variantgrid/perm_path.py:get_visible_url_names`) and `form_helper`
 (`uicore/utils/form_helpers.py:FORM_HELPER_HELPER`), so templates can write `{% crispy form form_helper.horizontal_nested %}`
 and hide links without loading anything.
 
-Menus are `uicore/templatetags/ui_menus.py:menu_top` and `menu_item`: each reverses its URL only when
-`get_visible_url_names` says the name is registered on this deployment (`settings.URLS_NAME_REGISTER`), otherwise it
-renders nothing. An unregistered name is not removed from the URLconf - `variantgrid/perm_path.py:_perm_path` wraps
-the view in `require_superuser` - so the menu hides it from everyone while superusers can still reach it directly.
-The per-area menu bars are inclusion tags in `uicore/templatetags/ui_menu_bars.py`.
+Menus are data (#2007): `uicore/menus.py:MENUS` declares each top-bar entry and its sub-menu items, and which url
+names belong to it - an item, a detail page that highlights an item (`uicore/menus.py:MenuItem` `pages`), or a page in
+the menu under no item (`uicore/menus.py:Menu` `pages`). `uicore/menus.py:current_menu` finds the menu for the
+request's url name, and `base.html` renders `uicore/templatetags/ui_menus.py:menu_bar_main` and `menu_bar_sub` from
+it, so the top highlight and the side bar always agree. A page that is in no menu gets no side bar; one that must hide
+it (the analysis editor) overrides `{% block submenu %}`. An item shows only when `get_visible_url_names` says its
+name is registered on this deployment (`settings.URLS_NAME_REGISTER`). An unregistered name is not removed from the
+URLconf - `variantgrid/perm_path.py:_perm_path` wraps the view in `require_superuser` - so the menu hides it from
+everyone while superusers can still reach it directly.
 
 ### Markup that turns into behaviour
 
@@ -158,10 +161,9 @@ picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by 
   `{% ui_register_tabs tab_set="x" %}` at the outer level first (the error from `ui_render_tabs` says so).
 - **`labelled` does not escape `label` or `help`.** Both are interpolated into an f-string (`help` only has `"`
   swapped for `'`); pass user text through `|escape` first.
-- **`current_record` points at a template that does not exist** (`uicore/templatetags/ui_menus.py:current_record`
-  renders a `current_record` template under uicore/menus that is not in the tree); nothing uses it yet.
-- **`menu_item(href=...)` skips the URL register** - only the `url_name` path is checked. `menu_top` accepts
-  `a|b` and uses the first visible name.
+- **A `MenuItem` with `href` skips the URL register** - only the `url_name` path is checked (the Django admin link).
+- **A url name in two menus goes to the first visible one** in `uicore/menus.py:MENUS`: Liftover and Seq / Software
+  Versions sit in Settings with a `condition`, so they appear there only when their own menu is off.
 - **`ChoiceFieldWithOther.valid_value` is always `True`** (`uicore/widgets/radio_other_widget.py`): any posted string
   is accepted as a choice, since "other" text is legitimately anything. Validate the value downstream if it matters.
 - **global.js's initial pass ignores its skip list.** The ready-time loop does `for (const badTest in

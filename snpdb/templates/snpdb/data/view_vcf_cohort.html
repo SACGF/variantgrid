@@ -1,5 +1,5 @@
 {# Unified VCF / Cohort page (issue #933) - rendered by both view_vcf and view_cohort #}
-{% extends base_template %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load js_tags %}
 {% load settings_tags %}
@@ -333,7 +333,7 @@ $(document).ready(function() {
 {% endif %}
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <div id="vcf-cohort-page">
 
 {% if vcf %}

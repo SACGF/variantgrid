@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
 
@@ -10,7 +10,7 @@
 {% block jsdocumentready %}
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 	<div>
 	<img class='vcenter' src="{% static 'icons/bam_64.jpg' %}" /> <b>{{ bam_file }}</b>

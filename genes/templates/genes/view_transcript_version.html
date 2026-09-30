@@ -3,10 +3,8 @@
 {% load settings_tags %}
 {% load ui_help %}
 {% load ui_utils %}
-{% load ui_menu_bars %}
 {% load tz %}
 {% block title %}{{ accession }}{% endblock title %}
-{% block submenu %}{% menu_bar_genes %}{% endblock %}
 {% block content %}
 <script>
     function classificationFilter(data, type) {

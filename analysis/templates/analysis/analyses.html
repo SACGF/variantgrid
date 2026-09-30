@@ -1,5 +1,4 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
 {% load crispy_forms_tags %}
@@ -7,7 +6,6 @@
 {% load genome_build_tags %}
 {% load tag_config_tags %}
 
-{% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block title %}VariantGrid: Analyses{% endblock title %}
 {% block head %}
     {{ block.super }}
