@@ -109,7 +109,15 @@ Gotchas:
 - library/django_utils/django_file_utils.py:get_import_processing_dir creates the directory; use
   import_processing_dir_path when you only want to name one, and remove_import_processing_dir to remove it.
   manage.py import_processing_cleanup --dry-run reports what is reclaimable under settings.IMPORT_PROCESSING_DIR.
+- upload/views/views_json.py:get_remaining_annotation_runs gates the status API's annotation_complete (and so
+  whether vg_api ever calls download) and the VCF page's "still annotating" notice. It counts only unfinished
+  AnnotationRuns of the build's active VariantAnnotationVersion: two runs left CREATED on retired GRCh37 v21 held
+  every later upload at "not ready yet" for weeks (Sep 2026) before that filter existed.
 Tests:
+- Verifying the upload/annotate/download API means running the real client end to end - `vg_api annotate_vcf
+  <file> -o <dir> --export-type csv` from a scratch `uv pip install variantgrid_api` against the server - and
+  reporting its output. The client only calls download once upload_status says annotation_complete, so a
+  direct GET on the download endpoint proves nothing about what a user sees.
 - Whole pipeline in-process: create a FileUpload, then process_uploaded_file(file_upload, run_async=False) under
   CELERY_TASK_ALWAYS_EAGER (library/django_utils/unittest_utils.py:URLTestCase sets it) —
   upload/tests/test_import_patient_records.py:TestPatientUploadImport is the pattern. The VCF pipeline needs bcftools

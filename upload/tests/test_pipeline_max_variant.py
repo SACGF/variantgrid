@@ -51,6 +51,7 @@ from upload.models import (
     UploadPipeline,
 )
 from upload.vcf.vcf_import import update_uploaded_vcf_max_variant
+from upload.views.views_json import get_remaining_annotation_runs
 
 STANDARD = VariantAnnotationPipelineType.STANDARD
 STRUCTURAL = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
@@ -111,6 +112,26 @@ class PipelineMaxVariantTestCase(TestCase):
         sv_ids = set(qs.filter(pipeline_type_variant_q(STRUCTURAL)).values_list("pk", flat=True))
         self.assertEqual(standard_ids, short_ids)
         self.assertEqual(sv_ids, {self.sv_variant.pk})
+
+    # ------------------------------------------------------------------ remaining annotation runs
+    def test_remaining_runs_ignore_retired_annotation_version(self):
+        """ A run left CREATED on a retired version never executes, so it must not hold an upload at
+            "still annotating" (upload status API annotation_complete, VCF page) """
+        retired_kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.ENSEMBL, 2)
+        retired_kwargs["status"] = VariantAnnotationVersion.Status.HISTORICAL
+        retired_vav = VariantAnnotationVersion.objects.create(**retired_kwargs)
+        retired_lock = AnnotationRangeLock.objects.create(version=retired_vav, min_variant=self.short_variants[0],
+                                                          max_variant=self.short_variants[1], count=2)
+        AnnotationRun.objects.create(annotation_range_lock=retired_lock, pipeline_type=STANDARD)
+
+        uploaded_vcf = self._make_uploaded_vcf()
+        UploadedVCFPipelineMaxVariant.objects.create(uploaded_vcf=uploaded_vcf, pipeline_type=STANDARD,
+                                                     max_variant=self.short_variants[4])
+        self.assertEqual(get_remaining_annotation_runs(uploaded_vcf, self.grch37), 0)
+
+        # An unfinished run on the active version covering this VCF's variants does count
+        self._make_lock(self.short_variants[2], self.short_variants[3], unfinished_types=(STANDARD,))
+        self.assertEqual(get_remaining_annotation_runs(uploaded_vcf, self.grch37), 1)
 
     # ------------------------------------------------------------------ lowest unannotated
     def test_lowest_unannotated_is_pipeline_type_aware(self):
