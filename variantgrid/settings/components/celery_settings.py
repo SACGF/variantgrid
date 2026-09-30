@@ -139,7 +139,10 @@ CELERY_TASK_ROUTES = {
     "snpdb.tasks.sub_cohort_tasks.build_sub_cohort_any_sample_called_vc_task": DB_WORKERS,
 }
 
+# Every module defining a beat-scheduled task (variantgrid/celery.py) is listed here or is an app's `tasks`
+# module, so workers register it on their own - deployment_check's "Celery beat schedule" enforces this
 CELERY_IMPORTS = (
+    'analysis.tasks.analysis_grid_export_tasks',
     'analysis.tasks.analysis_update_tasks',
     'analysis.tasks.auto_analysis_tasks',
     'analysis.tasks.karyomapping_tasks',
@@ -154,7 +157,9 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_import_task',
     'classification.tasks.classification_candidate_search_tasks',
     'classification.tasks.classification_create_tasks',
+    'classification.tasks.classification_reclassification_tasks',
     'classification.tasks.condition_text_automatch_task',
+    'classification.views.classification_email_view',
     'genes.tasks.gene_coverage_tasks',
     'patients.tasks.extraction_matching_tasks',
     'pedigree.models',
@@ -167,6 +172,7 @@ CELERY_IMPORTS = (
     'snpdb.tasks.partition_archive_tasks',
     'snpdb.tasks.soft_delete_tasks',
     'snpdb.tasks.somalier_tasks',
+    'snpdb.tasks.user_award_tasks',
     'snpdb.tasks.vcf_zygosity_count_tasks',
     'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
@@ -186,6 +192,7 @@ CELERY_IMPORTS = (
     'upload.tasks.vcf.import_vcf_step_task',
     'upload.tasks.vcf.import_vcf_tasks',
     'upload.tasks.vcf.unknown_variants_task',
+    'variantgrid.tasks.server_monitoring_tasks',
     'variantopedia.tasks.server_status_tasks',
 )
 
