@@ -226,6 +226,9 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
     def genome_build(self) -> GenomeBuild:
         return self.franklin_formatter_details.genome_build
 
+    def extra_filename_parts(self) -> list[str]:
+        return ["franklin", self.genome_build.name]
+
     def header(self) -> list[str]:
         return [delimited_row(FranklinExportRow.csv_header(), delimiter='\t', include_new_line=False)]
 

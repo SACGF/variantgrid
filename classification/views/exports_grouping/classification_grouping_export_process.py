@@ -53,6 +53,9 @@ class ClassificationGroupingExportProcess:
         if custom_parts := self.classification_export_format.extra_filename_parts():
             filename_parts.extend(custom_parts)
 
+        if allele_origin_filter := self.classification_export_format.classification_grouping_filter.allele_origin:
+            filename_parts.append(allele_origin_filter.label)
+
         if lab_mode := self.classification_export_format.classification_grouping_filter.lab_mode:
             filename_parts.append(lab_mode)
 
@@ -66,7 +69,7 @@ class ClassificationGroupingExportProcess:
             else:
                 filename_parts.append(f"part_{part}")
 
-        filename = "_".join(filename_parts)
+        filename = "_".join(p.lower() for p in filename_parts)
 
         return f"{filename}.{extension_override or self.format_properties.extension}"
 
