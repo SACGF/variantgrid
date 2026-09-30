@@ -295,7 +295,9 @@
 		<div class="tab-pane{% if active_tab == 'experiment' %} show active{% endif %}" role="tabpanel" id='experiment'>
             <div id='experiment-info-text'>
                 <p>ExperimentID (<a href="{% url 'view_experiment' sequencing_run.experiment.pk %}">{{ sequencing_run.experiment }}</a>) was read from RunParameters.xml (or if missing, RunInfo.xml) in the Sequencing Run directory labelled <b>Path</b> above.
+                {% if user.is_superuser %}
                 <p>Change by modifying the files manually then <button id='reload-experiment-name' class="btn btn-primary">reload experiment name</button>.
+                {% endif %}
             </div>
 		</div>
 		{% endif %}
@@ -437,7 +439,7 @@
             <button id='assign-data-to-current-spreadsheet' class="btn btn-outline-danger">Assign Data to most recent SampleSheet</button>
             
             <p>
-            Otherwise, we reccomend you <a href="javascript:openDelete()">Delete </a> this SequencingRun. If data is there, it will re-generated next disk scan.
+            Otherwise, we reccomend you <a href="javascript:openDelete()">Delete </a> this SequencingRun. If the data is still there, the pipeline can re-post it.
             </div>
             {% endif %}
 
