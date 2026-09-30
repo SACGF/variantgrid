@@ -10,26 +10,52 @@ SEQAUTO_GROUP = None
 # user whose DRF token the sequencing pipeline posts with. Reads are open to any logged-in user
 SEQAUTO_API_WRITE_GROUP = "seqauto_api_write"
 
-# Path patterns derive a default path for QC / gene coverage / GOI records when the API omits one
+SEQAUTO_SKIP_FLOWCELLS_FILE = None
+SEQAUTO_SKIP_FLOWCELLS_PATTERNS = []
+SEQAUTO_SKIP_INDIVIDUAL_FLOWCELL_FILE = ".variantgrid_skip_flowcell"
+
+SEQAUTO_CONTROL_SAMPLE_REGEX = None
 SEQAUTO_ALIGNED_BASE_DIR = os.path.join(SEQAUTO_DIR, "test_data", "clinical_hg38")
+SEQAUTO_SCRATCH_BASE_DIR = "/tmp"
+SEQAUTO_GOLD_BASE_DIR = None
+
 SEQAUTO_ALIGNED_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_BASE_DIR, "%(enrichment_kit)s", "%(sequencing_run)s")
+SEQAUTO_FASTQ_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "0_fastq")
 SEQAUTO_GOI_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "0_goi")
 SEQAUTO_BAM_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "1_BAM")
+SEQAUTO_VCF_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "2_variants")
 SEQAUTO_QC_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, "4_QC")
-SEQAUTO_RUN_PARAMETERS_SUB_DIR = "4_QC/sequencing_stats"  # Subdir of SequencingRun
+_SEQUENCING_STATS_SUB_DIR = "4_QC/sequencing_stats"  # Subdir of SequencingRun
+SEQAUTO_RUN_PARAMETERS_SUB_DIR = _SEQUENCING_STATS_SUB_DIR
+SEQAUTO_SEQUENCING_RUN_INTEROP_SUB_DIR = os.path.join(_SEQUENCING_STATS_SUB_DIR, "InterOp")
+SEQAUTO_ILLUMINATE_QC_DIR_PATTERN = os.path.join(SEQAUTO_ALIGNED_DIR_PATTERN, _SEQUENCING_STATS_SUB_DIR, "Illuminate")
 
 SEQAUTO_MISEQ_ALIGNED_PATTERN = "%(sample_name_underscores)s_S%(sample_number)s"
 SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 
 SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
+SEQAUTO_VCF_PATTERNS_FOR_KIT = {
+    "default": "gatk_per_sample/%(sample_name)s.gatk.hg38.vcf.gz",
+}
+
+# If the sequencing run name ends with '_FFPE' we'll add "_ffpe" onto the end of the kit name
+SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
+    "default": ["%(sequencing_run)s.gatk.hg38.vcf.gz"],
+}
+
 SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"
+
 SEQAUTO_QC_EXEC_SUMMARY_PATTERN = "exec_stats/%(sample_name)s_qc_summary.txt"
+SEQAUTO_QC_EXEC_SUMMARY_TSV_PATTERN = "exec_stats/%(sample_name)s_stats.tsv"
 SEQAUTO_QC_GENE_COVERAGE_PATTERN = "bam_stats/samples/%(sample_name)s.per_gene_coverage.tsv.gz"
 
 SEQAUTO_QC_GENE_COVERAGE_STORE_ALL = False
 SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL = True
 
+SEQAUTO_IMPORT_VCF = False
+SEQAUTO_IMPORT_COMBO_VCF = True
 SEQAUTO_MIN_COVERAGE = 20
+SEQAUTO_LOAD_GENE_COVERAGE = True
 SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS = []
 
 SEQAUTO_COVERAGE_ENRICHMENT_KITS = []

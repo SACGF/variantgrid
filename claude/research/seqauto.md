@@ -152,7 +152,10 @@ it down to every Sample so one link call covers all of an arm's VCFs.
   threshold and only counts collections above the cached max pk on later calls, both queries restricted to
   current-sheet collections; the cache is dropped when the number of current collections at or below the max changes.
 - `sequencing_run.save()  # Re-validate ready` in `seqauto/sequencing_files/sample_sheet.py` is a leftover - the
-  `ready` field is long gone. The remaining `SEQAUTO_*` path patterns derive a default path when the API omits one
+  `ready` field is long gone. Most `SEQAUTO_*` path settings are scan-era and read by nothing in this repo, but they
+  stay: deployment settings files outside the repo extend them (`SEQAUTO_VCF_PATTERNS_FOR_KIT.update(...)`,
+  `_SEQUENCING_STATS_SUB_DIR`), so removing one is a NameError at settings load on those hosts. Only the QC,
+  gene-coverage and GOI patterns are read, to derive a default path when the API omits one
   (`QC.get_path_from_vcf`, `QCGeneList.get_path_from_qc`).
 - `SampleFromSequencingSample.sample` is one-to-one but `sequencing_sample` is not: an arm has a Sample per caller
   VCF and per re-import. `replace_existing` only decides whether an already-linked Sample is re-pointed at a new sheet
