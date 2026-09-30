@@ -140,6 +140,7 @@ def export_classifications_gene_symbol(request, gene_symbol: str, genome_build_n
     )
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
+            request=request,
             user=request.user,
             genome_build=genome_build,
             file_prefix=f"classifications_{gene_symbol}",

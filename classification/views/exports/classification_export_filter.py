@@ -8,7 +8,7 @@ the output.
 """
 import operator
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime
 from enum import Enum
 from functools import cached_property, reduce
@@ -38,7 +38,6 @@ from classification.models import (
 from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
-from library.request_context import get_current_request
 from library.utils import batch_iterator, http_header_date_now, local_date_string
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (
@@ -395,6 +394,7 @@ class ClassificationFilter:
     row_limit: Optional[int] = None
     _last_modified: str = None
     clinvar_export: bool = False
+    request: InitVar[Optional[HttpRequest]] = None
 
     @property
     def description(self):
@@ -415,11 +415,9 @@ class ClassificationFilter:
             return "No Filters"
         return ", ".join(parts)
 
-    def __post_init__(self):
+    def __post_init__(self, request: Optional[HttpRequest]):
         self._last_modified = http_header_date_now()
-        if self.path_info and self.request_params:
-            pass
-        elif request := get_current_request():
+        if request:
             self.record_request_details(request)
 
     @property
@@ -533,6 +531,7 @@ class ClassificationFilter:
             row_limit = int(row_limit_str)
 
         return ClassificationFilter(
+            request=request,
             user=user,
             exclude_sources=exclude_sources,
             include_sources=include_sources,

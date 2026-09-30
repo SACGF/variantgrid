@@ -9,6 +9,9 @@ marked login_not_required (DRF views included), which LoginRequiredMiddleware sk
 import inspect
 import re
 
+from django.contrib.auth.middleware import LoginRequiredMiddleware
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory, override_settings
 from django.urls import URLPattern, URLResolver, get_resolver
 
 from library.vg.markdown import MapTable
@@ -55,6 +58,17 @@ def _is_api(view, path: str) -> bool:
     return False
 
 
+def _is_public(pattern: URLPattern) -> bool:
+    """ Would LoginRequiredMiddleware let an anonymous request through to this view? Asked of the middleware itself
+        rather than re-implementing its rule (the login_required attribute that login_not_required sets) """
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    middleware = LoginRequiredMiddleware(lambda _request: None)
+    with override_settings(ALLOWED_HOSTS=["*"]):  # the login redirect it builds is an absolute URL
+        redirect_to_login = middleware.process_view(request, pattern.callback, (), {})
+    return redirect_to_login is None
+
+
 def _walk(resolver, prefix: str = "", namespace: str = ""):
     for entry in resolver.url_patterns:
         pattern_str = prefix + str(entry.pattern)
@@ -81,7 +95,7 @@ def generate(app: str | None = None) -> list[MapTable]:
         flags = []
         if _is_api(view, path):
             flags.append("API")
-        if getattr(pattern.callback, "login_required", True) is False:
+        if _is_public(pattern):
             flags.append("Public")
         by_app.setdefault(owner, []).append([name, f"`{path}`", f"`{_qualified_name(view)}`",
                                              _templates(view), " ".join(flags)])

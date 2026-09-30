@@ -82,6 +82,7 @@ def export_classifications_allele(request, allele_id: int):
     allele = get_object_or_404(Allele, pk=allele_id)
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
+            request=request,
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
             allele=allele_id,

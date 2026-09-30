@@ -660,6 +660,7 @@ def export_classifications_grid(request):
     qs = classification_qs(request)
     return ClassificationExportFormatterCSV(
         ClassificationFilter(
+            request=request,
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
             starting_query=qs,
@@ -674,6 +675,7 @@ def export_classifications_grid_redcap(request):
     qs = classification_qs(request)
     return ClassificationExportFormatterRedCap(
         classification_filter=ClassificationFilter(
+            request=request,
             user=request.user,
             genome_build=genome_build,
             starting_query=qs

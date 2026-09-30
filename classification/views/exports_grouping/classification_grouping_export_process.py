@@ -2,17 +2,18 @@ import zipfile
 from datetime import datetime
 from enum import Enum, auto
 from io import StringIO
-from typing import Optional, Iterator, Any
+from typing import Any, Iterator, Optional
 
 from django.contrib.auth.models import User
-from django.http import HttpResponseBase, StreamingHttpResponse, HttpResponse
-from django.shortcuts import render
+from django.http import HttpResponse, HttpResponseBase, StreamingHttpResponse
 from more_itertools.more import peekable
 from stream_zip import ZIP_64
-from classification.views.exports_grouping.classification_grouping_export_filter import \
-    ClassificationGroupingExportFormat, ClassificationGroupingExportFileSettings
-from library.log_utils import report_exc_info, NotificationBuilder
-from library.request_context import get_current_request
+
+from classification.views.exports_grouping.classification_grouping_export_filter import (
+    ClassificationGroupingExportFileSettings,
+    ClassificationGroupingExportFormat,
+)
+from library.log_utils import NotificationBuilder, report_exc_info
 from library.utils import http_header_date_now
 
 
@@ -77,13 +78,6 @@ class ClassificationGroupingExportProcess:
         """
         Start generating the data and return it in an HTTP Response
         """
-        benchmarking = False
-        if benchmarking:
-            for count, row in enumerate(self._yield_single_file()):
-                if count > 100:
-                    break
-            return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
-
         if self.export_settings.rows_per_file:
             return self._non_streaming_zip()
         else:

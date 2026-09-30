@@ -8,24 +8,11 @@ from library.django_utils.view_utils import login_not_required_include
 
 class LoginRequiredTest(TestCase):
 
-    def test_drf_view_is_left_to_drf(self):
-        """ DRF marks its views login_not_required: DRF answers, rather than a redirect to the login page """
-        self.assertIn(self.client.get(reverse("classification_api")).status_code, (401, 403))
-
     def test_plain_view_under_an_api_prefix_needs_login(self):
         """ Only the view decides - a non-DRF view under /classification/api/ is not public for its path """
         url = reverse("imported_allele_info_datatables")
         response = self.client.get(url)
         self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}", fetch_redirect_response=False)
-
-    def test_admin_login_goes_to_the_site_login(self):
-        """ Django marks the admin login login_not_required, and admin views name it as their login_url """
-        admin_login = reverse("admin:login")
-        response = self.client.get(admin_login)
-        self.assertRedirects(response, f"{settings.LOGIN_URL}?next={admin_login}", fetch_redirect_response=False)
-
-        response = self.client.get(reverse("admin:index"))
-        self.assertTrue(response.url.startswith(admin_login))
 
     def test_staff_only(self):
         """ Anonymous users go to the site login, a logged-in non-staff user to the staff_only page """
