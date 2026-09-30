@@ -24,7 +24,7 @@ from snpdb.search import HAS_3_ANY, SearchExample, SearchInputInstance, search_r
     )
 )
 def patient_search(search_input: SearchInputInstance):
-    qs = Patient.objects.annotate(
+    qs = Patient.filter_for_user(search_input.user).annotate(
         combined_name=Concat('first_name', Value(' '), 'last_name', output_field=CharField())
     )
     name_q = search_input.q_words('combined_name')
