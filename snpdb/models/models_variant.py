@@ -22,7 +22,7 @@ from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError, models, transaction
-from django.db.models import F, QuerySet, Value
+from django.db.models import Exists, F, OuterRef, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
@@ -247,6 +247,18 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
         # distinct as the variantallele join returns an allele once per build it's already in
         return alleles_with_variants_qs.filter(~Q(variantallele__genome_build=genome_build)).distinct()
+
+    @staticmethod
+    def liftover_never_attempted_for_build(genome_build) -> QuerySet['Allele']:
+        """ Alleles missing a variant in genome_build that no liftover to it has ever tried - what's left after
+            a build is added. Every attempt leaves an AlleleLiftover (ClinGen records one even when skipped), so
+            unlike missing_variants_for_build this empties once liftover has run, failures and all.
+            EXISTS rather than joins, so it stays a cheap anti-join over snpdb_allele """
+        has_variant = Exists(VariantAllele.objects.filter(allele=OuterRef("pk")))
+        has_build_variant = Exists(VariantAllele.objects.filter(allele=OuterRef("pk"), genome_build=genome_build))
+        liftover_attempted = Exists(AlleleLiftover.objects.filter(allele=OuterRef("pk"),
+                                                                  liftover__genome_build=genome_build))
+        return Allele.objects.filter(has_variant).exclude(has_build_variant).exclude(liftover_attempted)
 
     @staticmethod
     def failed_liftover_for_build(genome_build, conversion_tool) -> QuerySet['Allele']:
