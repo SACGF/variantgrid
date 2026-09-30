@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, ExternalModelManager, Patient, Specimen
+from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, TissueStatus
 
 RECONCILE_TASK = "patients.views_rest.reconcile_pending_extractions.delay"
@@ -157,7 +157,8 @@ class PatientAPITest(APITestCase):
         response = self._create_patient(user=self.other_user, patient_code="OTHER-CODE", external_pk=external_pk)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("external_pk", response.data)
-        self.assertEqual(Patient.objects.filter(external_pk__code="H12345").count(), 1)
+        self.assertNotIn("H12345", str(response.data))  # an existence oracle on external codes
+        self.assertEqual(ExternalPK.objects.filter(code="H12345").count(), 1)
         self.assertFalse(Patient.objects.filter(patient_code="OTHER-CODE").exists())
 
     def test_unknown_external_manager_is_400_naming_the_known_ones(self):
