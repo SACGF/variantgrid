@@ -1477,8 +1477,12 @@ def get_samples_by_sequencing_sample(sequencing_samples, vcf):
 
 
 def get_20x_gene_coverage(gene_symbol, min_coverage=100):
-    gcg_qs = GeneCoverageCollection.objects.filter(
-        qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
+    """ Number of current-sample-sheet gene coverage collections where gene_symbol has >= min_coverage percent 20x.
+        Cached per gene/threshold as (count, num collections, max collection pk) so a call only counts collections
+        added since; the cache is dropped when a collection at or below the cached max disappears or stops being
+        current """
+    current_sheet_filter = "qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
+    gcg_qs = GeneCoverageCollection.objects.filter(**{current_sheet_filter: False})
 
     existing_count = 0
     existing_max_pk = 0
@@ -1501,8 +1505,9 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
         logging.info("get_20x_gene_coverage - retrieving counts on %d new collections", new_num)
         # Using gene_coverage_collection__in=gcg_qs didn't save any time (SQL must evaluate inner query last)
         qs = GeneCoverageCanonicalTranscript.objects.filter(gene_symbol=gene_symbol,
-                                                            gene_coverage_collection__pk__gte=existing_max_pk,
-                                                            percent_20x__gte=min_coverage)
+                                                            gene_coverage_collection__pk__gt=existing_max_pk,
+                                                            percent_20x__gte=min_coverage,
+                                                            **{f"gene_coverage_collection__{current_sheet_filter}": False})
         count = existing_count + qs.count()
         data = gcg_qs.aggregate(max_pk=Max("pk"))
         max_pk = data["max_pk"] or existing_max_pk

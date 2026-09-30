@@ -25,6 +25,7 @@ from seqauto.models import (
     VariantCaller,
 )
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
+from seqauto.signals.signals_list import sequencing_run_created_signal
 from snpdb.models import Manufacturer
 
 
@@ -156,10 +157,12 @@ class SequencingRunSerializer(serializers.ModelSerializer):
         if ek_data := validated_data.pop('enrichment_kit', None):
             enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
             validated_data['enrichment_kit'] = enrichment_kit
-        instance, _created = SequencingRun.objects.get_or_create(
+        instance, created = SequencingRun.objects.get_or_create(
             name=name,
             defaults=validated_data
         )
+        if created:
+            sequencing_run_created_signal.send(sender=os.path.basename(__file__), sequencing_run=instance)
         return instance
 
     def get_vcf_set(self, obj) -> list[dict]:
@@ -320,11 +323,10 @@ class SampleSheetSerializer(serializers.ModelSerializer):
         return sample_sheet
 
     def update(self, instance, validated_data):
-        sequencing_samples_data = validated_data.pop('sequencing_samples')
-
+        """ Rows are matched on sample_id and updated in place, so the BAMs / VCFs / QC hanging off them are kept.
+            A sample_id no longer in the sheet stays as it is """
+        sequencing_samples_data = validated_data.pop('sequencingsample_set')
         instance = super().update(instance, validated_data)
-        # Clear existing samples and add the new ones
-        instance.sequencing_samples.all().delete()
         self._create_sequencing_samples(instance, sequencing_samples_data)
         return instance
 

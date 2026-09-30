@@ -1,6 +1,7 @@
 from typing import Union
 
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.urls.base import reverse
@@ -15,7 +16,13 @@ from pathtests.models_enums import (
     InvestigationType,
     PathologyTestGeneModificationOutcome,
 )
-from patients.models import TEST_PATIENT_KWARGS, Clinician, ExternallyManagedModel, Patient
+from patients.models import (
+    TEST_PATIENT_KWARGS,
+    Clinician,
+    ExternallyManagedModel,
+    Patient,
+    get_lead_scientist_users_for_user,
+)
 from patients.models_enums import PopulationGroup
 from seqauto.models import EnrichmentKit, Experiment, SequencingRun
 from snpdb.models import Sample, Wiki
@@ -34,6 +41,10 @@ class PathologyTest(TimeStampedModel):
     def is_curator(self, user_or_group: Union[User, Group]):
         return self.curator == user_or_group
 
+    def check_is_curator(self, user_or_group: Union[User, Group]):
+        if not self.is_curator(user_or_group):
+            raise PermissionDenied(f"You are not the curator of pathology test {self}")
+
     def get_active_test_version(self):
         active_test_version = None
         try:
@@ -41,6 +52,22 @@ class PathologyTest(TimeStampedModel):
         except Exception:
             pass
         return active_test_version
+
+    def get_latest_confirmed_version(self):
+        return self.pathologytestversion_set.filter(confirmed_date__isnull=False).order_by("-version").first()
+
+    def delete_test(self):
+        """ Soft delete - the API stops serving it until it is restored """
+        self.deleted = True
+        self.save()
+        ActivePathologyTestVersion.objects.filter(pathology_test=self).delete()
+
+    def restore_test(self):
+        """ Inverse of delete_test: the latest confirmed version becomes active again """
+        self.deleted = False
+        self.save()
+        if latest_confirmed := self.get_latest_confirmed_version():
+            latest_confirmed.set_as_active_test()
 
     def get_absolute_url(self):
         return reverse("view_pathology_test", kwargs={"name": self.name})
@@ -94,6 +121,9 @@ class PathologyTestVersion(TimeStampedModel):
     def is_curator(self, user_or_group: Union[User, Group]):
         return self.pathology_test.is_curator(user_or_group)
 
+    def check_is_curator(self, user_or_group: Union[User, Group]):
+        self.pathology_test.check_is_curator(user_or_group)
+
     def next_version(self):
         """ Clones w/new version """
 
@@ -123,19 +153,6 @@ class PathologyTestVersion(TimeStampedModel):
             self.gene_list.locked = True
             self.gene_list.save()
 
-    def replace_gene_list(self, gene_list, clone=True):
-        """ Set new list, set name/category from old one """
-        if clone:
-            gene_list = gene_list.clone()
-
-        existing_gene_list = self.gene_list
-
-        # overwrite pk of new list with data from existing gene list
-        existing_gene_list.pk = gene_list.pk
-        existing_gene_list.save()
-        self.gene_list = existing_gene_list
-        self.save()
-
     def get_absolute_url(self):
         return reverse("view_pathology_test_version", kwargs={"pk": self.pk})
 
@@ -157,10 +174,7 @@ class PathologyTestGeneModificationRequest(TimeStampedModel):
     comments = models.TextField(blank=True)
 
     def __str__(self):
-        operation = self.get_operation_display()
-        name = " ".join((self.pathology_test_version, operation, self.gene_symbol))
-        outcome = self.get_outcome_display()
-        return f"{name}: {outcome}"
+        return f"{self.pathology_test_version} {self.get_operation_display()} {self.gene_symbol}: {self.get_outcome_display()}"
 
 
 class Case(PreviewModelMixin, ExternallyManagedModel):
@@ -217,10 +231,9 @@ def get_cases_qs():
 
 
 def cases_for_user(user):
-    # TODO: this is disabled - need to re-implement show_cases()
-    return Case.objects.none()
-    #users_list = get_lead_scientist_users_for_user(user)
-    #cases_qs = get_cases_qs().filter(lead_scientist__in=users_list)
+    """ The cases the "My cases" page shows: led by the user or a lead scientist they follow """
+    users_list = get_lead_scientist_users_for_user(user)
+    return get_cases_qs().filter(lead_scientist__in=users_list)
 
 
 class PathologyTestOrder(PreviewModelMixin, ExternallyManagedModel):

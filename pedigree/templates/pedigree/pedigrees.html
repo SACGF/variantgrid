@@ -15,7 +15,7 @@
                 var pedFileFamilyId = $("#id_ped_file_family").find(":selected").val();
 
                 if (cohortId && pedFileFamilyId) {
-                    window.location = Urls.create_pedigree_from_cohort_and_ped_file_family(cohortId, pedFileFamilyId);
+                    postUrl(Urls.create_pedigree_from_cohort_and_ped_file_family(cohortId, pedFileFamilyId));
                 }
             });
         });

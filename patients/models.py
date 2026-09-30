@@ -295,9 +295,13 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             else:
                 match_type = PatientRecordMatchType.EXACT
         except Patient.DoesNotExist:
-            # TODO: Handle multiple patients - ie put in errors?
             patient = None
             match_type = None
+        except Patient.MultipleObjectsReturned as e:
+            # Name them, so whoever is importing can fix the row or merge the patients
+            matched = ", ".join(f"Patient:{p.pk} {p}" for p in patients_queryset.filter(q).order_by("pk"))
+            raise Patient.MultipleObjectsReturned(f"Matched multiple patients: {matched}. "
+                                                  "Add date of birth or sex to the row to tell them apart") from e
         return patient, match_type
 
     def save(self, *args, **kwargs):

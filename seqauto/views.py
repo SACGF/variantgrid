@@ -399,6 +399,8 @@ def delete_sequencing_run(request, sequencing_run_id):
 @require_POST
 def reload_experiment_name(request, sequencing_run_id):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    if not request.user.is_superuser:
+        raise PermissionDenied()
 
     old_experiment = sequencing_run.experiment
 
@@ -421,6 +423,9 @@ def reload_experiment_name(request, sequencing_run_id):
 @require_POST
 def assign_data_to_current_sample_sheet(request, sequencing_run_id):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    if not request.user.is_superuser:
+        raise PermissionDenied()
+
     assign_old_sample_sheet_data_to_current_sample_sheet(request.user, sequencing_run)
     return HttpResponse()
 

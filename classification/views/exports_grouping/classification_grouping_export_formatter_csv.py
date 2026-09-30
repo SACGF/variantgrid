@@ -83,7 +83,7 @@ class CSVNonEvidence(ExportRow):
                     return str(triage)
         return None
 
-    @export_column(label="Somatic Clin Sig Value")
+    @export_column(label="Somatic Clin Sig Triage")
     def somatic_clin_sig(self):
         contribution: OverlapContribution
         if contribution := self.classification_grouping.somatic_clin_sig_contribution:

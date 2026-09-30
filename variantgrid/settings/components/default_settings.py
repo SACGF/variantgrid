@@ -1357,6 +1357,7 @@ VCF_EXPORT_VERSION = "4.3"  # ##fileformat=VCFv<this> on every VCF we write (lib
 CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
 CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
 CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"
+CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "VariantGrid"  # "Classification Tags" column of the Franklin export
 
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages

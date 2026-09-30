@@ -15,7 +15,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from analysis.models import AnalysisTemplate
-from annotation.models import AnnotationRun
+from annotation.models import AnnotationRun, VariantAnnotationVersion
 from eventlog.models import create_event
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.enums.log_level import LogLevel
@@ -122,11 +122,17 @@ def uploadedfile_dict(file_upload) -> dict:
 
 
 def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
+    """ Unfinished runs of the build's active annotation version that cover this VCF's variants. Only the
+        active version counts: a run left behind on a retired version never executes, and would otherwise
+        report every later upload as still annotating (and hide its downloads) forever """
     max_variant_id = uploaded_vcf.max_variant_id
     if max_variant_id is None:
         # VCF not fully imported yet, so highest known variant is unknown - no remaining runs to report
         return 0
-    ar_qs = AnnotationRun.get_active_runs(genome_build)
+    variant_annotation_version = VariantAnnotationVersion.latest(genome_build)
+    if variant_annotation_version is None:
+        return 0
+    ar_qs = AnnotationRun.get_active_runs(genome_build).filter(annotation_range_lock__version=variant_annotation_version)
     return ar_qs.filter(annotation_range_lock__max_variant_id__lte=max_variant_id).count()
 
 

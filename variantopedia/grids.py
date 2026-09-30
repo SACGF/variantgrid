@@ -432,9 +432,6 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
             analyses_queryset = Analysis.filter_for_user(self.user).filter(pk__in=analysis_ids)
             qs = qs.filter(analysis__in=analyses_queryset)
 
-        if gene_id := self.get_query_param("gene"):
-            qs = qs.filter(variant__variantannotation__transcript_version__gene_version__gene_id=gene_id)
-
         if tag_id := self.get_query_param("tag"):
             qs = qs.filter(tag_id=tag_id)
 
