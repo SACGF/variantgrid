@@ -8,8 +8,8 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import get_resolver, reverse
 
-from uicore.chrome import menu_html
 from uicore.menus import current_menu
+from uicore.page_frame import menu_html
 from variantgrid.menus import MENUS
 
 
@@ -50,7 +50,7 @@ class MenuRegistryTest(SimpleTestCase):
             self.assertEqual(current_menu('clinvar_export').key, 'classifications')
 
 
-class PageChromeTest(TestCase):
+class PageFrameTest(TestCase):
 
     def setUp(self):
         menu_html.cache_clear()
@@ -58,25 +58,25 @@ class PageChromeTest(TestCase):
     def tearDown(self):
         menu_html.cache_clear()
 
-    def _chrome(self, url_name, user=None) -> dict:
+    def _frame(self, url_name, user=None) -> dict:
         if user:
             self.client.force_login(user)
-        return self.client.get(reverse('page_chrome'), {'url_name': url_name}).json()
+        return self.client.get(reverse('page_frame'), {'url_name': url_name}).json()
 
     def test_highlight_and_admin_only(self):
         with _visible_except():
-            user_chrome = self._chrome('variant_tags', User.objects.create_user('menu_user'))
-            self.assertRegex(user_chrome['menu_sub_html'], r'id="submenu-variant_tags"\s+class="nav-link active')
-            self.assertRegex(user_chrome['menu_main_html'], r'id="menu-top-variants"\s+class="nav-link active')
-            self.assertNotIn('submenu-liftover_runs', user_chrome['menu_sub_html'])
+            user_frame = self._frame('variant_tags', User.objects.create_user('menu_user'))
+            self.assertRegex(user_frame['menu_sub_html'], r'id="submenu-variant_tags"\s+class="nav-link active')
+            self.assertRegex(user_frame['menu_main_html'], r'id="menu-top-variants"\s+class="nav-link active')
+            self.assertNotIn('submenu-liftover_runs', user_frame['menu_sub_html'])
 
-            superuser_chrome = self._chrome('variant_tags', User.objects.create_superuser('menu_admin'))
-            self.assertIn('submenu-liftover_runs', superuser_chrome['menu_sub_html'])
+            superuser_frame = self._frame('variant_tags', User.objects.create_superuser('menu_admin'))
+            self.assertIn('submenu-liftover_runs', superuser_frame['menu_sub_html'])
 
-    def test_anonymous_gets_empty_chrome(self):
-        chrome = self._chrome('variant_tags')
-        self.assertEqual(chrome['menu_main_html'], '')
-        self.assertEqual(chrome['username'], '')
+    def test_anonymous_gets_empty_frame(self):
+        frame = self._frame('variant_tags')
+        self.assertEqual(frame['menu_main_html'], '')
+        self.assertEqual(frame['username'], '')
 
     def test_messages_from_previous_request_shown_once(self):
         user = User.objects.create_user('menu_messages')
@@ -92,5 +92,5 @@ class PageChromeTest(TestCase):
         session.save()
         self.client.cookies.update(response.cookies)
 
-        self.assertIn("Saved the thing", self._chrome('variant_tags')['messages_html'])
-        self.assertEqual(self._chrome('variant_tags')['messages_html'], '')
+        self.assertIn("Saved the thing", self._frame('variant_tags')['messages_html'])
+        self.assertEqual(self._frame('variant_tags')['messages_html'], '')

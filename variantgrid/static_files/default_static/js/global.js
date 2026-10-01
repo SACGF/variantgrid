@@ -749,29 +749,29 @@ function getCookie(name) {
     return null;
 }
 
-/* The menus and the rest of the per-user page chrome (uicore/chrome.py), requested while the page is still loading
+/* The menus and the rest of the per-user page frame (uicore/page_frame.py), requested while the page is still loading
    and filled in once it is ready - the page body itself is the same for every user. */
-function loadPageChrome(chromeUrl, urlName) {
-    const chromeRequest = $.getJSON(chromeUrl, {url_name: urlName});
-    $(() => chromeRequest.done(applyPageChrome));
+function loadPageFrame(frameUrl, urlName) {
+    const frameRequest = $.getJSON(frameUrl, {url_name: urlName});
+    $(() => frameRequest.done(applyPageFrame));
 }
 
-function applyPageChrome(chrome) {
-    window.CURRENT_USERNAME = chrome.username;
-    $('#menu-bar-main').html(chrome.menu_main_html);
-    $('#menu-bar-sub').html(chrome.menu_sub_html);
+function applyPageFrame(frame) {
+    window.CURRENT_USERNAME = frame.username;
+    $('#menu-bar-main').html(frame.menu_main_html);
+    $('#menu-bar-sub').html(frame.menu_sub_html);
     // the page's .current-record-menu-item went to the fallback spot before the side bar existed
     const currentRecordSpot = $('#current-record-spot');
     if (currentRecordSpot.length) {
         currentRecordSpot.append($('.current-record-menu-item').detach());
     }
-    $('#navbar-user').html(chrome.user_html);
-    $('#site-messages').html(chrome.site_messages_html);
-    if (chrome.messages_html) {
-        $('#django-messages').replaceWith(chrome.messages_html);
+    $('#navbar-user').html(frame.user_html);
+    $('#site-messages').html(frame.site_messages_html);
+    if (frame.messages_html) {
+        $('#django-messages').replaceWith(frame.messages_html);
     }
-    if (chrome.rollbar_person.id && typeof Rollbar !== 'undefined') {
-        Rollbar.configure({payload: {person: chrome.rollbar_person}});
+    if (frame.rollbar_person.id && typeof Rollbar !== 'undefined') {
+        Rollbar.configure({payload: {person: frame.rollbar_person}});
     }
 }
 

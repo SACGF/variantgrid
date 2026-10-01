@@ -146,8 +146,8 @@
         <script src="{% static 'js/scientific_number_widget.js' %}"></script>
         <script src="{% static 'js/tips.js' %}"></script>
     {% endcompress %}
-    {% url 'page_chrome' as page_chrome_url %}
-    <script>loadPageChrome({{ page_chrome_url|jsonify }}, {{ url_name|default:""|jsonify }});</script>
+    {% url 'page_frame' as page_frame_url %}
+    <script>loadPageFrame({{ page_frame_url|jsonify }}, {{ url_name|default:""|jsonify }});</script>
     {% block head %}{% endblock %}
 </head>
 <body>

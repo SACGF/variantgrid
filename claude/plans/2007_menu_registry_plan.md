@@ -1,7 +1,7 @@
-# #2007 / #695 — Menus as data, user chrome out of the page, cacheable public pages
+# #2007 / #695 — Menus as data, per-user page frame by AJAX, cacheable public pages
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-30; revised by Claude Opus 5.5 (claude-opus-5-5), 2026-10-01
-Status: in progress - steps 1-3 (menus as data and the chrome endpoint, #2007) done; step 4 (#695) not started
+Status: in progress - steps 1-3 (menus as data and the page frame endpoint, #2007) done; step 4 (#695) not started
 
 [#2007](https://github.com/SACGF/variantgrid/issues/2007) (sub-menu rework: menus as configuration, not templates) and
 [#695](https://github.com/SACGF/variantgrid/issues/695) (anonymous browsing of gene and variant pages). One plan because
@@ -12,7 +12,7 @@ asking, and the menu is the first of those things.
 
 Menus are data in `variantgrid/menus.py:MENUS` (`settings.MENUS`; the classes are `uicore/menus.py`); the per-area
 menu bars, the wrapper templates and the context-processor `menu_*_base` variables are gone, and no page template
-chooses a menu. The menus and the rest of the per-user chrome come from `uicore/views/chrome_view.py:page_chrome`
+chooses a menu. The menus and the rest of the per-user page frame come from `uicore/views/page_frame_view.py:page_frame`
 after the page loads, so `base.html` no longer reads the user. The how-to is in `uicore/AGENTS.md` and
 `claude/research/uicore.md`.
 
@@ -29,11 +29,11 @@ when Somalier is on. `analysis/views/views_grid.py` already pairs `cache_page` w
 
 ## Data
 
-The chrome payload, `uicore/chrome.py:PageChrome` (JSON, one request per page load):
+The frame payload, `uicore/page_frame.py:PageFrame` (JSON, one request per page load):
 
 ```python
 @dataclass
-class PageChrome:
+class PageFrame:
     menu_main_html: str
     menu_sub_html: str
     user_html: str          # inbox link and username / avatar title, '' for anonymous
@@ -45,12 +45,12 @@ class PageChrome:
 
 ## Design
 
-### Chrome endpoint (done)
+### Page frame endpoint (done)
 
-`GET /uicore/chrome?url_name=<page url name>` (`uicore/views/chrome_view.py:page_chrome`, `@login_not_required`,
-`never_cache`). The menus are `uicore/chrome.py:menu_html(url_name, MenuRole)`, memoised per process because they
+`GET /uicore/page_frame?url_name=<page url name>` (`uicore/views/page_frame_view.py:page_frame`, `@login_not_required`,
+`never_cache`). The menus are `uicore/page_frame.py:menu_html(url_name, MenuRole)`, memoised per process because they
 depend only on code and settings; the rest is built per request. Anonymous users get empty menus and no site
-messages - a `guest` flag on `MenuItem` and `Menu` comes with the first public page. `loadPageChrome` in `global.js`
+messages - a `guest` flag on `MenuItem` and `Menu` comes with the first public page. `loadPageFrame` in `global.js`
 starts the request from the head and fills the placeholders on document ready.
 
 ### Public pages
@@ -77,7 +77,7 @@ starts the request from the head and fills the placeholders on document ready.
 - No `messages.add_message` in a public view: it writes the session, which sets `Vary: Cookie`, and the decorator then
   refuses to cache. A warning derived from the page's own inputs (path and build) is the same for everyone who gets
   that cache entry, so it is rendered into the body. Django messages queued by an earlier request (after a POST) still
-  reach the user through the chrome endpoint.
+  reach the user through the page frame endpoint.
 
 #### view_gene_symbol
 
@@ -99,7 +99,7 @@ user-independent, but not entirely:
 
 1. ~~Menus as data: `variantgrid/menus.py`, rendered server-side.~~ Done.
 2. ~~Port every page, delete the menu bars, wrappers and context-processor variables.~~ Done.
-3. ~~Chrome endpoint: move the menu and the rest of the user chrome into it; strip `base.html`.~~ Done.
+3. ~~Page frame endpoint: move the menu and the rest of the per-user page frame into it; strip `base.html`.~~ Done.
 4. `public_page_cache`, the version counter and the warmer; open view_gene_symbol first (its user-dependent parts are
    the few listed above), then view_allele and view_variant once their lab-scoped sections are fragments.
 

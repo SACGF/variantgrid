@@ -1,6 +1,6 @@
 """
 absolute_url: a full URL (scheme and host) for a url name, for emails. The menus themselves are rendered by
-uicore/chrome.py and fetched by the page after it loads.
+uicore/page_frame.py and fetched by the page after it loads.
 """
 from django.template.library import Library
 from django.urls import reverse

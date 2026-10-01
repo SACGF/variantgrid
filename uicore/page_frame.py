@@ -1,13 +1,13 @@
 """
-The page chrome (#2007): everything around a page's content that depends on who is asking - the top bar and side bar,
+The page frame (#2007): everything around a page's content that depends on who is asking - the top bar and side bar,
 username, avatar title, inbox count, site messages, Django messages and the Rollbar person. A page body carries none
-of it; global.js fetches it from uicore/views/chrome_view.py:page_chrome after the page loads, so the same body can
+of it; global.js fetches it from uicore/views/page_frame_view.py:page_frame after the page loads, so the same body can
 serve every user (#695).
 
 The menus depend only on the url name and the MenuRole, never on the individual user, so menu_html is memoised per
 process (the registry and settings change only on restart). The rest is per user and built per request.
 
-Entry points: get_page_chrome(request, url_name), menu_html(url_name, role).
+Entry points: get_page_frame(request, url_name), menu_html(url_name, role).
 """
 from dataclasses import dataclass, field
 from enum import Enum
@@ -50,7 +50,7 @@ class MenuHtml:
 
 
 @dataclass
-class PageChrome:
+class PageFrame:
     menu_main_html: str
     menu_sub_html: str
     user_html: str  # inbox link and username / avatar title, '' for anonymous
@@ -132,15 +132,15 @@ def _user_html(user) -> str:
     })
 
 
-def get_page_chrome(request: HttpRequest, url_name: Optional[str]) -> PageChrome:
+def get_page_frame(request: HttpRequest, url_name: Optional[str]) -> PageFrame:
     user = request.user
     menus = menu_html(url_name, MenuRole.for_user(user))
-    chrome = PageChrome(menu_main_html=menus.main, menu_sub_html=menus.sub, user_html='', username='',
+    frame = PageFrame(menu_main_html=menus.main, menu_sub_html=menus.sub, user_html='', username='',
                         site_messages_html='', messages_html=_messages_html(request))
     if user.is_authenticated:
-        chrome.user_html = _user_html(user)
-        chrome.username = user.username
-        chrome.site_messages_html = render_to_string("uicore/site_messages/site_messages.html",
+        frame.user_html = _user_html(user)
+        frame.username = user.username
+        frame.site_messages_html = render_to_string("uicore/site_messages/site_messages.html",
                                                      {'site_messages': SiteMessage.get_site_messages()})
-        chrome.rollbar_person = {'id': user.pk, 'username': user.username, 'email': user.email}
-    return chrome
+        frame.rollbar_person = {'id': user.pk, 'username': user.username, 'email': user.email}
+    return frame
