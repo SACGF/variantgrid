@@ -98,7 +98,8 @@ Python packages: this project uses **uv** - the `.venv` is uv-created and `requi
 (`scripts/install_requirements.sh --dev`). After editing either `.in` file:
 `uv pip compile requirements.in --generate-hashes -o requirements.txt --python-version 3.12` then
 `uv pip compile requirements-dev.in --generate-hashes -o requirements-dev.txt --python-version 3.12`, and
-`uv pip sync requirements.txt requirements-dev.txt`. uv checks every hash on install (the git-pinned hgvs has none - its
+`scripts/install_requirements.sh --dev` (not `uv pip sync`, which uninstalls anything unlisted - the sibling
+`sapath` app's `django_auth_ldap` included). uv checks every hash on install (the git-pinned hgvs has none - its
 commit is the pin). `uv.toml` holds a 7-day cooldown (`exclude-newer`): uv never picks or installs a release less than a
 week old, except packages we publish (cdot), listed in `exclude-newer-package`.
 
