@@ -9,8 +9,7 @@ highlights that item, e.g. view_liftover_run under Liftover) or as one of the me
 under no item, e.g. view_allele under Variants). Per-deployment differences stay in URLS_NAME_REGISTER
 (variantgrid/perm_path.py:get_visible_url_names); `condition` is only for the few items that depend on a setting.
 
-Entry points: get_menus(), current_menu(url_name) and the menu_bar_main / menu_bar_sub tags in
-uicore/templatetags/ui_menus.py.
+Entry points: get_menus(), current_menu(url_name); uicore/page_frame.py:menu_html renders them.
 """
 from collections.abc import Callable
 from dataclasses import dataclass

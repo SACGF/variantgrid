@@ -1,7 +1,7 @@
-# #2007 / #695 — Menus as data, user chrome out of the page, cacheable public pages
+# #2007 / #695 — Menus as data, per-user page frame by AJAX, cacheable public pages
 
-Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-30; revised by Claude Opus 5.5 (claude-opus-5-5), 2026-09-30
-Status: in progress - steps 1-2 (menus as data, #2007) done; steps 3-4 (#695) not started
+Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-30; revised by Claude Opus 5.5 (claude-opus-5-5), 2026-10-01
+Status: in progress - steps 1-3 (menus as data and the page frame endpoint, #2007) done; step 4 (#695) not started
 
 [#2007](https://github.com/SACGF/variantgrid/issues/2007) (sub-menu rework: menus as configuration, not templates) and
 [#695](https://github.com/SACGF/variantgrid/issues/695) (anonymous browsing of gene and variant pages). One plan because
@@ -10,9 +10,10 @@ asking, and the menu is the first of those things.
 
 ## Where it stands
 
-Menus are data in `variantgrid/menus.py:MENUS` (`settings.MENUS`; the classes are `uicore/menus.py`), rendered server-side by `uicore/templatetags/ui_menus.py:menu_bar_main` and
-`menu_bar_sub` from the request's url name; the per-area menu bars, the wrapper templates and the context-processor
-`menu_*_base` variables are gone, and no page template chooses a menu. The how-to is in `uicore/AGENTS.md` and
+Menus are data in `variantgrid/menus.py:MENUS` (`settings.MENUS`; the classes are `uicore/menus.py`); the per-area
+menu bars, the wrapper templates and the context-processor `menu_*_base` variables are gone, and no page template
+chooses a menu. The menus and the rest of the per-user page frame come from `uicore/views/page_frame_view.py:page_frame`
+after the page loads, so `base.html` no longer reads the user. The how-to is in `uicore/AGENTS.md` and
 `claude/research/uicore.md`.
 
 The registry is in-house rather than django-sitetree: sitetree ships models and migrations even for trees declared in
@@ -20,24 +21,23 @@ code, matches the current item by exact path (we match by url name), and our adm
 needed its templates and access hooks overridden. What we kept from it is the shape: detail pages belong to a menu
 (`pages`) without being listed, which is what fixes highlighting and makes breadcrumbs a small addition later.
 
-For #695, the base page (`uicore/templates/uicore/page/base.html`) still reads the user in five places: the Rollbar
-config block (id, username, email), the inbox link and count, the username and avatar, site messages and Django
-messages, and the menu (admin-only items). Any of those forces `Vary: Cookie` (reading `request.session`, which
+For #695: anything in a response that reads the user forces `Vary: Cookie` (reading `request.session`, which
 `request.user` does lazily, is what sets it), and `cache_page` then keys per session, so a shared cache of an expensive
-page is impossible while they are in the body. `analysis/views/views_grid.py` already pairs `cache_page` with
-`vary_on_cookie` for exactly this reason.
+page needs a body that never reads the user. `base.html` is now there; the page templates themselves are the remaining
+step, along with `snpdb/processors.py:settings_context_processor`, which reads `request.user` for `somalier_enabled`
+when Somalier is on. `analysis/views/views_grid.py` already pairs `cache_page` with `vary_on_cookie` for exactly this reason.
 
 ## Data
 
-The chrome payload (JSON, one request per page load):
+The frame payload, `uicore/page_frame.py:PageFrame` (JSON, one request per page load):
 
 ```python
 @dataclass
-class Chrome:
-    menu_html: str          # top bar + sub-menu for the requested path, already rendered
+class PageFrame:
+    menu_main_html: str
+    menu_sub_html: str
+    user_html: str          # inbox link and username / avatar title, '' for anonymous
     username: str           # '' for anonymous
-    avatar_html: str
-    inbox_unread: int
     site_messages_html: str
     messages_html: str      # Django messages, consumed by this request
     rollbar_person: dict    # {} for anonymous
@@ -45,17 +45,13 @@ class Chrome:
 
 ## Design
 
-### Chrome endpoint
+### Page frame endpoint (done)
 
-`GET /uicore/chrome/?path=<page path>` in a new uicore urls module, `@login_not_required` (it decides what to show from
-`request.user` itself). It resolves `path` to a url name, renders `menu_bar_main` / `menu_bar_sub` for it and fills the
-rest of `Chrome`. Cache key: `(role bucket, url_name, CACHE_VERSION)`, where role bucket is anonymous / user /
-superuser (the only thing `uicore/menus.py:MenuItem` visibility depends on besides settings). Anonymous users see only
-items marked for guests - a `guest` flag on `MenuItem` and `Menu`, added with the first public page. Django messages
-and the inbox count are per user and excluded from the cached part. `global.js` fetches it on `DOMContentLoaded` and
-fills the top bar, side bar and the navbar right-hand side; the navbar reserves its height so nothing shifts.
-
-`base.html` then loses `{% menu_bar_main %}`, `{% block submenu %}`, the user block and `{% site_messages %}`.
+`GET /uicore/page_frame?url_name=<page url name>` (`uicore/views/page_frame_view.py:page_frame`, `@login_not_required`,
+`never_cache`). The menus are `uicore/page_frame.py:menu_html(url_name, MenuRole)`, memoised per process because they
+depend only on code and settings; the rest is built per request. Anonymous users get empty menus and no site
+messages - a `guest` flag on `MenuItem` and `Menu` comes with the first public page. `loadPageFrame` in `global.js`
+starts the request from the head and fills the placeholders on document ready.
 
 ### Public pages
 
@@ -81,7 +77,7 @@ fills the top bar, side bar and the navbar right-hand side; the navbar reserves 
 - No `messages.add_message` in a public view: it writes the session, which sets `Vary: Cookie`, and the decorator then
   refuses to cache. A warning derived from the page's own inputs (path and build) is the same for everyone who gets
   that cache entry, so it is rendered into the body. Django messages queued by an earlier request (after a POST) still
-  reach the user through the chrome endpoint.
+  reach the user through the page frame endpoint.
 
 #### view_gene_symbol
 
@@ -103,14 +99,12 @@ user-independent, but not entirely:
 
 1. ~~Menus as data: `variantgrid/menus.py`, rendered server-side.~~ Done.
 2. ~~Port every page, delete the menu bars, wrappers and context-processor variables.~~ Done.
-3. Chrome endpoint: move the menu and the rest of the user chrome into it; strip `base.html`.
+3. ~~Page frame endpoint: move the menu and the rest of the per-user page frame into it; strip `base.html`.~~ Done.
 4. `public_page_cache`, the version counter and the warmer; open view_gene_symbol first (its user-dependent parts are
    the few listed above), then view_allele and view_variant once their lab-scoped sections are fragments.
 
 ### Tests worth keeping
 
-- The chrome endpoint's cached part is the same for two users in the same role bucket and differs between anonymous
-  and superuser.
 - `public_page_cache` refuses a response with `Vary: Cookie`, two anonymous requests for the same path hit the cache
   once, and the same path on two genome builds is two entries.
 

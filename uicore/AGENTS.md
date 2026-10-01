@@ -1,6 +1,7 @@
 # uicore — agent notes
 Owns: template tags (labelled/modal/tabs/menus/help), js_tags JSON-for-JS filters, ValidatedJson, AJAX form embedding
-  (LazyRender), "other" choice widgets, crispy FormHelper builders, page chrome (uicore/page/base.html). No models, no urls.
+  (LazyRender), "other" choice widgets, crispy FormHelper builders, page frame (uicore/page/base.html and the
+  per-user parts in uicore/page_frame.py). No models; one url, `page_frame` (uicore/urls.py).
 Start with: templatetags/ui_utils.py (labelled, modal, preview, if_user_can_edit, embed), templatetags/js_tags.py
   (jsonify, format_value, timestamp, code_json), templatetags/ui_tabs_builder.py (ui_register_tab, ui_render_tabs),
   views/ajax_form_view.py (LazyRender, AjaxFormView), json/validated_json.py (ValidatedJson, JsonMessages),
@@ -24,6 +25,9 @@ Patterns here:
   mechanism). A new page gets its top-bar highlight and side bar by adding its url
   name there (a new item, an item's `pages` if it is that item's detail page, else the menu's `pages`) - templates
   never pick a menu; a url name in no menu renders with no side bar.
+- Nothing in a page body depends on the user: menus, username, inbox, site and Django messages arrive as JSON from
+  uicore/views/page_frame_view.py:page_frame after the page loads (uicore/page_frame.py:PageFrame, filled by
+  `loadPageFrame` in global.js). Something new that varies per user goes there or into an AJAX fragment.
 - Deployment-visible URLs come from variantgrid/perm_path.py:get_visible_url_names - menus
   (uicore/menus.py:MenuItem) and snpdb/grids.py:url_if_visible check it; guard any link to a view
   a site unregisters (patients on Shariant) the same way. Only names passed through `variantgrid/perm_path.py:path`
@@ -42,6 +46,8 @@ Patterns here:
   read `all_messages`/`has_errors` (uicore/json/validated_json.py:ValidatedJson). `to_json()`/`pure_json()` drop
   the messages, `serialize()`/`deserialize()` keep them - store the serialized form, send the pure form.
 Gotchas:
+- Page JS on document ready runs before the page frame arrives - the menus, `#current-record-spot` and
+  `window.CURRENT_USERNAME` are not there yet (variantgrid/static_files/default_static/js/global.js:applyPageFrame).
 - `{% load %}` names matter: labelled/modal/preview/badge/boolean live in `ui_utils`;
   jsonify/format_value/timestamp/code_json/duration/get_item live in `js_tags` (uicore/templatetags/js_tags.py:format_value).
   The wrong library only fails when the page renders.
@@ -53,7 +59,7 @@ Gotchas:
 - `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the
   pedigree symbols in uicore/templates/uicore/tags/svg_icon_sprite.html theme themselves through `style="fill: var(...)"`
   instead, which is what lets a page fill in the affected members with `--pedigree-*-fill`.
-Tests: no uicore/tests. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
+Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
   (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
   ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
   library/django_utils/unittest_utils.py:URLTestCase - `_test_urls` for pages, `_test_datatable_urls` for grid

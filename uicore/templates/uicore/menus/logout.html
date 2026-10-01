@@ -2,18 +2,7 @@
 <hr/>
 {% settings_value "USE_OIDC" as use_oidc %}
 {% if use_oidc %}
-    <script>
-        function logout() {
-            $("#logout-form").submit();
-        }
-    </script>
-    <form id="logout-form" method="POST" action="{% url 'oidc_logout' %}">
-        {% csrf_token %}
-    </form>
-    <a href="#" onclick="logout()" class="nav-link">Logout <i class="fas fa-sign-out-alt"></i></a>
+    <a href="#" onclick="postUrl('{% url 'oidc_logout' %}'); return false;" class="nav-link">Logout <i class="fas fa-sign-out-alt"></i></a>
 {% else %}
-    <form id="form-submenu-auth_logout" action="{% url 'auth_logout' %}" method="post" style="display:none">
-        {% csrf_token %}
-    </form>
-    <a id="submenu-auth_logout" class="nav-link logout" href="#" onclick="document.getElementById('form-submenu-auth_logout').submit(); return false;">Logout <i class="fas fa-sign-out-alt"></i></a>
+    <a id="submenu-auth_logout" class="nav-link logout" href="#" onclick="postUrl('{% url 'auth_logout' %}'); return false;">Logout <i class="fas fa-sign-out-alt"></i></a>
 {% endif %}

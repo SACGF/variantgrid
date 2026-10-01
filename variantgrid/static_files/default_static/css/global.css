@@ -160,6 +160,12 @@ nav .nav-link:hover {
   height: 27px;
 }
 
+#menu-bar-sub,
+#site-messages,
+#navbar-user {
+  display: contents;
+}
+
 i.fas, i.fa-solid {
   margin-right: 4px;
 }

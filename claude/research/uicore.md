@@ -27,13 +27,23 @@ and hide links without loading anything.
 Menus are data (#2007): `variantgrid/menus.py:MENUS` (the registry `settings.MENUS` names, so a deployment repo can
 supply its own built on it) declares each top-bar entry and its sub-menu items, and which url
 names belong to it - an item, a detail page that highlights an item (`uicore/menus.py:MenuItem` `pages`), or a page in
-the menu under no item (`uicore/menus.py:Menu` `pages`). `uicore/menus.py:current_menu` finds the menu for the
-request's url name, and `base.html` renders `uicore/templatetags/ui_menus.py:menu_bar_main` and `menu_bar_sub` from
-it, so the top highlight and the side bar always agree. A page that is in no menu gets no side bar; one that must hide
-it (the analysis editor) overrides `{% block submenu %}`. An item shows only when `get_visible_url_names` says its
+the menu under no item (`uicore/menus.py:Menu` `pages`). `uicore/menus.py:current_menu` finds the menu for a url
+name, and `uicore/page_frame.py:menu_html` renders the top bar and side bar from it, so the top highlight and the side bar
+always agree. A page that is in no menu gets no side bar. An item shows only when `get_visible_url_names` says its
 name is registered on this deployment (`settings.URLS_NAME_REGISTER`). An unregistered name is not removed from the
 URLconf - `variantgrid/perm_path.py:_perm_path` wraps the view in `require_superuser` - so the menu hides it from
 everyone while superusers can still reach it directly.
+
+The page body carries nothing that depends on the user (#2007, for the shared page cache in #695): `base.html` has
+empty `#menu-bar-main`, `#menu-bar-sub`, `#navbar-user`, `#site-messages` and `#django-messages` placeholders and calls
+`loadPageFrame` (`variantgrid/static_files/default_static/js/global.js`) with its url name while the head is still
+parsing. That fetches `uicore/views/page_frame_view.py:page_frame` - JSON of `uicore/page_frame.py:PageFrame`: the menus,
+username, inbox count, avatar title, site messages, the Django messages (consumed there, so a message a view queued
+reaches the user through this request) and the Rollbar person - and fills the placeholders on document ready. The
+menus depend only on url name and `uicore/page_frame.py:MenuRole`, so `menu_html` is memoised per process (~8 ms to render,
+nothing once cached); they carry no CSRF token, and their POST links go through `postUrl`, which reads the cookie the
+page frame endpoint sets. A page's `.current-record-menu-item` lands in the fallback spot first and moves under the active
+side item once the side bar arrives.
 
 ### Markup that turns into behaviour
 

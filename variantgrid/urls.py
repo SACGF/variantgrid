@@ -51,6 +51,7 @@ urlpatterns = [
     path('system/changelog', views.changelog, name='changelog'),
     path('system/keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
     path('terms/', include('termsandconditions.urls')),
+    path('uicore/', include('uicore.urls')),
     path('avatar/', include('avatar.urls')),
     path('api/schema', SpectacularAPIView.as_view(), name='openapi-schema'),
     path('api/docs', SpectacularSwaggerView.as_view(url_name='openapi-schema'), name='api-docs'),

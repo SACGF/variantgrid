@@ -1,3 +1,3 @@
 {% for item in top_items %}{% include "uicore/tags/menu_item.html" %}{% endfor %}
 <a class="nav-link" target="_blank" href="{{ help_url }}">Help</a>
-<a id="suggestion" class="nav-link" data-toggle="tooltip" title="Suggestion / Bug Report" href="javascript:suggestionDialog('{{ user.username|escapejs }}')"><i class="fas fa-bug mt-1"></i></a>
+<a id="suggestion" class="nav-link" data-toggle="tooltip" title="Suggestion / Bug Report" href="javascript:suggestionDialog()"><i class="fas fa-bug mt-1"></i></a>
