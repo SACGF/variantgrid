@@ -156,6 +156,8 @@ Patterns here:
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
 Gotchas:
+- django_dag's walks (`ancestors_set()`, `get_roots()`) return base `AnalysisNode` rows, which never `==` a subclass
+  instance - compare by pk, as `analysis/models/nodes/analysis_node.py:AnalysisNode.circular_checker` does (#2060).
 - Several subqueries combine as `pk = ANY(ARRAY(<a> UNION <b>))`
   (`analysis/models/nodes/analysis_node.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
   can't index an OR of IN-subqueries and walks all of snpdb_variant (#1894). Plain `pk IN (<union>)` fixes count() but

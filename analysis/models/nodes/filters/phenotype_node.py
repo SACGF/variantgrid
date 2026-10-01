@@ -63,7 +63,7 @@ class PhenotypeNode(AnalysisNode):
         return [cohort for _, cohort in sorted(cohorts_by_pk.items()) if cohort.can_view(user)]
 
     def _get_root_nodes(self) -> list[AnalysisNode]:
-        node_ids = [n.pk for n in self.analysisnode_ptr.get_roots()]
+        node_ids = [n.pk for n in self.get_roots()]
         return list(AnalysisNode.objects.filter(pk__in=node_ids).select_subclasses())
 
     @property

@@ -226,7 +226,7 @@ function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 	    data: data,
 	    url: Urls.node_update(ANALYSIS_ID, nodeId),
 	    success: function(data) {
-	       on_success_function(data.dirty_nodes);
+	       on_success_function(data);
         },
 	});
 }
@@ -291,27 +291,20 @@ function setupHideInvalidConnectionsOnDrag() {
 			}
 		}
 
-		function getAncestors(id) {
-			let ancestors = [id];
-			const endpoint = getEndpoint(id, 'target');
-			if (endpoint) {
-				for (let i=0 ; i<endpoint.connections.length ; ++i) {
-					const source = endpoint.connections[i].sourceId;
-					ancestors = ancestors.concat(getAncestors(source));
+		// Connections are looked up by element, not endpoint, so a VennNode's left and right inputs are both walked
+		function getAncestorIds(id, ancestorIds=new Set()) {
+			if (!ancestorIds.has(id)) {
+				ancestorIds.add(id);
+				for (const connection of jsPlumbInstance.getConnections({target: id}, true)) {
+					getAncestorIds(connection.sourceId, ancestorIds);
 				}
 			}
-			return ancestors;
+			return ancestorIds;
 		}
 
 		jsPlumbInstance.bind("connection:drag", function(connection) {
-			const ancestors = getAncestors(connection.endpoints[0].elementId);
-
-			for (let i=0 ; i<ancestors.length ; ++i) {
-				const endpoint = getEndpoint(ancestors[i], 'target');
-				if (endpoint) {
-					setEndpointInvalid(endpoint);
-				}
-			}		
+			const ancestorIds = Array.from(getAncestorIds(connection.sourceId));
+			jsPlumbInstance.selectEndpoints({target: ancestorIds}).each(setEndpointInvalid);
 		});
 
 		// There's no single "connection drag finished" event - dropping a connection back where it
@@ -994,7 +987,13 @@ const updateConnections = function (info, remove) {
 		params["side"] = getEndpointSide(ep);
 	}
 
-	const on_success_function = function () {
+	const on_success_function = function (data) {
+		if (data && data.non_fatal && !remove) {
+			// Server refused the connection (eg it would create a cycle) - don't send a removal for it
+			jsPlumbInstance.deleteConnection(info.connection, {fireEvent: false});
+			showReloadPageErrorDialog(data.message, true);
+			return;
+		}
 		const gew = getGridAndEditorWindow();
 		if (targetId == gew.getLoadedNodeId()) {
 			loadNodeData(targetId);

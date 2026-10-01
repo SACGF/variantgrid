@@ -1300,6 +1300,18 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             edge.delete()
         self.parents_changed = True
 
+    def parents(self):
+        """ django_dag queries self.__class__, so on a subclass would only find parents of that same subclass.
+            Its walks (ancestors_set, get_roots etc) all go through here """
+        return AnalysisNode.objects.filter(children=self)
+
+    @staticmethod
+    def circular_checker(parent, child):
+        """ Called by AnalysisEdge.save(). django_dag's version compares instances, and a subclass never equals
+            the base rows ancestors_set() returns (#2060) """
+        if parent.pk == child.pk or child.pk in {node.pk for node in parent.ancestors_set()}:
+            raise NonFatalNodeError(f"Not connecting node {parent.pk} to {child.pk} - it would create a cycle")
+
     def handle_ancestor_input_samples_changed(self):
         pass
 
