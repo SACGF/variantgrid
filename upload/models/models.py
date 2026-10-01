@@ -9,11 +9,13 @@ from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
+from django.contrib.postgres.indexes import HashIndex, OpClass
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
 from django.db.models import CharField, F, Func, Q, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
+from django.db.models.functions import Substr
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch.dispatcher import receiver
@@ -765,6 +767,9 @@ class ModifiedImportedVariants(VCFImportInfo):
         return ", ".join(messages)
 
 
+OLD_VARIANT_INDEX_PREFIX_LENGTH = 200
+
+
 class ModifiedImportedVariant(models.Model):
     """ Keep track of variants that were modified during import pre-processing by bcftools,
         so people can find out why a variant they expected didn't turn up.  """
@@ -790,13 +795,15 @@ class ModifiedImportedVariant(models.Model):
     operation_detail = models.TextField(null=True)
 
     class Meta:
-        # Both columns are null on most rows. text_pattern_ops lets old_variant_formatted serve startswith
-        # (LIKE 'x%') under a non-C collation as well as equality
+        # Both columns are null on most rows. Long indels make values bigger than a btree entry can hold, so
+        # old_multiallelic (only ever matched exactly) gets a hash index, and old_variant_formatted indexes a
+        # prefix - text_pattern_ops so it serves startswith (LIKE 'x%') under a non-C collation as well as equality
         indexes = [
-            models.Index(fields=["old_multiallelic"], name="upload_miv_old_multiallelic",
-                         condition=Q(old_multiallelic__isnull=False)),
-            models.Index(fields=["old_variant_formatted"], name="upload_miv_old_var_fmt",
-                         opclasses=["text_pattern_ops"], condition=Q(old_variant_formatted__isnull=False)),
+            HashIndex(fields=["old_multiallelic"], name="upload_miv_old_multi_hash",
+                      condition=Q(old_multiallelic__isnull=False)),
+            models.Index(OpClass(Substr("old_variant_formatted", 1, OLD_VARIANT_INDEX_PREFIX_LENGTH),
+                                 name="text_pattern_ops"),
+                         name="upload_miv_old_var_prefix", condition=Q(old_variant_formatted__isnull=False)),
         ]
 
     @property
@@ -866,11 +873,19 @@ class ModifiedImportedVariant(models.Model):
         return f"{vc.chrom}:{int(vc.position)}:{vc.ref}/{vc.alt}"
 
     @classmethod
+    def _filter_old_variant_formatted(cls, old_variant: str, startswith=False) -> QuerySet['ModifiedImportedVariant']:
+        """ Also filters on the indexed prefix (see Meta.indexes) so the lookup can use the index """
+        prefix = old_variant[:OLD_VARIANT_INDEX_PREFIX_LENGTH]
+        qs = cls.objects.annotate(old_variant_prefix=Substr("old_variant_formatted", 1, OLD_VARIANT_INDEX_PREFIX_LENGTH))
+        if startswith:
+            return qs.filter(old_variant_prefix__startswith=prefix, old_variant_formatted__startswith=old_variant)
+        return qs.filter(old_variant_prefix=prefix, old_variant_formatted=old_variant)
+
+    @classmethod
     def get_upload_pipeline_unnormalized_variant(cls, upload_pipeline, vc: VariantCoordinate):
         """ throws DoesNotExist """
         old_variant = cls.get_old_variant_from_variant_coordinate(vc)
-        return cls.objects.get(import_info__upload_step__upload_pipeline=upload_pipeline,
-                               old_variant_formatted=old_variant)
+        return cls._filter_old_variant_formatted(old_variant).get(import_info__upload_step__upload_pipeline=upload_pipeline)
 
     @classmethod
     def get_variant_for_unnormalized_variant(cls, upload_pipeline, variant_coordinate: VariantCoordinate) -> Variant:
@@ -880,12 +895,13 @@ class ModifiedImportedVariant(models.Model):
     @classmethod
     def get_variants_for_unnormalized_variant(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
-        return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted=old_variant).distinct()
+        return Variant.objects.filter(pk__in=cls._filter_old_variant_formatted(old_variant).values("variant_id"))
 
     @classmethod
     def get_variants_for_unnormalized_variant_any_alt(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
-        return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
+        miv_qs = cls._filter_old_variant_formatted(old_variant, startswith=True)
+        return Variant.objects.filter(pk__in=miv_qs.values("variant_id"))
 
     @classmethod
     def get_other_loci_variants_by_multiallelic(cls, variant: Variant) -> dict[str, set['ModifiedImportedVariant']]:
