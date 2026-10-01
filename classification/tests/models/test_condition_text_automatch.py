@@ -92,3 +92,9 @@ class ConditionTextAutomatchTest(TestCase):
 
         self.assertTrue(ct.pending_automatch)
         mock_search.assert_not_called()
+
+    @patch('classification.models.condition_text_matching.embedded_ids_check', side_effect=RuntimeError("boom"))
+    def test_publish_automatch_error_leaves_text_for_sweep(self, _mock_embedded):
+        ct = self._sync_classification("hereditary breast cancer")
+
+        self.assertTrue(ct.pending_automatch)

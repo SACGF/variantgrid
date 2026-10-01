@@ -323,6 +323,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             condition_text.save()
         except Exception:
             report_exc_info()
+            if defer_search:
+                # whatever failed here, the sweep still gets a go at the text
+                condition_text.pending_automatch = True
+                condition_text.save(update_fields=["pending_automatch"])
 
     @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification, update_counts=True, attempt_automatch=False):
@@ -463,10 +467,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
                 debug_timer.tick("Condition Text Matching - update count quick")
 
-        if attempt_automatch and (new_root or new_gene_level):
-            # embedded IDs are matched now so the form shows the term straight away
-            ConditionTextMatch.attempt_automatch(condition_text=ct, defer_search=True)
-            debug_timer.tick("Condition Text Matching - automatch")
+            if attempt_automatch and (new_root or new_gene_level):
+                # embedded IDs are matched now so the form shows the term straight away; local lookups only,
+                # so it stays under the row lock rather than racing a concurrent publish of the same text
+                ConditionTextMatch.attempt_automatch(condition_text=ct, defer_search=True)
+                debug_timer.tick("Condition Text Matching - automatch")
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
