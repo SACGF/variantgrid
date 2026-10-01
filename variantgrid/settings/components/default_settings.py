@@ -400,6 +400,11 @@ VCF_DOWNLOAD_ADMIN_ONLY = False
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
+# Uploaded VCFs have their first SNVs' REF bases checked against the build they're imported as (#2030). A wrong
+# build mismatches ~75% (chance). Over WARN the import carries an error to accept, over FAIL it stops.
+VCF_IMPORT_REF_CHECK_SNVS = 1000
+VCF_IMPORT_REF_MISMATCH_WARN_FRACTION = 0.05
+VCF_IMPORT_REF_MISMATCH_FAIL_FRACTION = 0.5
 # The INFO keys a CNV caller names the gene of a whole-gene call in - DRAGEN's TSO500 CNV output
 # writes SEGID. A VCF declaring one is imported as gene-level copy number events rather than
 # coordinates (@see snpdb.gene_level_variants), so this decides what claims the file at upload, the

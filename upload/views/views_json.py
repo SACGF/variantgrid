@@ -34,6 +34,7 @@ from upload.models import (
     UploadSettings,
     VCFImportInfo,
 )
+from upload.models.models_enums import VCFImportInfoSeverity
 from upload.upload_metadata import (
     UploadMetadataError,
     get_metadata_keys_for_file_type,
@@ -197,6 +198,7 @@ def get_upload_status_dict(file_upload) -> dict:
         "vcf_id": None,
         "samples": [],
         "error": None,
+        "warnings": [],
         "downloads_available": False,
     }
 
@@ -209,6 +211,9 @@ def get_upload_status_dict(file_upload) -> dict:
     data["progress_percent"] = upload_pipeline.progress_percent
     if upload_pipeline.status == ProcessingStatus.ERROR:
         data["error"] = upload_pipeline.progress_status
+    # What the VCF page asks the user to accept, eg REF bases that mostly mismatch the build (#2030)
+    data["warnings"] = [{"severity": VCFImportInfoSeverity(vii.severity).label, "message": vii.message}
+                        for vii in upload_pipeline.get_vcf_import_info()]
 
     try:
         uploaded_vcf = file_upload.uploadedvcf
