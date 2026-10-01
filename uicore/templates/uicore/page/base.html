@@ -1,7 +1,5 @@
 {% load static %}
 {% load js_tags %}
-{% load user_messages_tags %}
-{% load ui_menus %}
 {% load compress %}
 {% load settings_tags %}
 <html lang="en">
@@ -68,14 +66,7 @@
             captureUncaught: true,
             captureUnhandledRejections: true,
             payload: {
-                environment: "{{ rollbar_environment | safe }}",
-                {% if user %}
-                person: {
-                    id: {{ user.id }},
-                    username: '{{ user.username }}',
-                    email: '{{ user.email }}'
-                }
-                {% endif %}
+                environment: "{{ rollbar_environment | safe }}"
             }
         };
         // Rollbar Snippet
@@ -155,6 +146,8 @@
         <script src="{% static 'js/scientific_number_widget.js' %}"></script>
         <script src="{% static 'js/tips.js' %}"></script>
     {% endcompress %}
+    {% url 'page_chrome' as page_chrome_url %}
+    <script>loadPageChrome({{ page_chrome_url|jsonify }}, {{ url_name|default:""|jsonify }});</script>
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -167,9 +160,7 @@
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="mainNavbarNav">
-            <div class="navbar-nav mr-auto">
-                {% menu_bar_main %}
-            </div>
+            <div id="menu-bar-main" class="navbar-nav mr-auto"></div>
 
             <div class="navbar-nav ml-auto">
                 {% if debug and hostname %}
@@ -183,23 +174,7 @@
                         <button id="navbar-search-button" class="btn btn-sm btn-outline-secondary" type="submit">Go</button>
                     </div>
                 </form>
-
-                {% if inbox_enabled and user.is_authenticated %}
-                    {% inbox_count as mail_count %}
-                    {% if mail_count %}
-                        <a class="nav-link" href="{% url 'messages_inbox' %}"><i class="fas fa-inbox"></i>
-                            <span class="badge badge-danger">{{ mail_count }}</span>
-                        </a>
-                    {% else %}
-                        <a class="nav-link" href="{% url 'messages_inbox' %}"><i class="fas fa-inbox"></i></a>
-                    {% endif %}
-                {% endif %}
-
-                <a id="navbar-user-profile" href="{% url 'view_user_settings' %}" class="nav-link text-nowrap">
-                    <i class="fas fa-user-circle"></i>
-                    {{ user.username }}
-                    {% if user_properties.show_titles %}{{ user_properties.avatar_details.title_icon_html }}{% endif %}
-                </a>
+                <div id="navbar-user"></div>
             </div>
         </div>
     </nav>
@@ -208,12 +183,12 @@
             <nav class="nav navbar-light" aria-orientation="vertical">
                 <div id="global-debug-message"></div>
                 <div id="current-record-spot-fallback"></div>
-                {% block submenu %}{% menu_bar_sub %}{% endblock submenu %}
-                {% site_messages site_messages %}
+                <div id="menu-bar-sub"></div>
+                <div id="site-messages"></div>
             </nav>
         </div>
         <div class="main-content">
-            <div id="main-content-messages" class="container">{% include "uicore/messages/messages.html" %}</div>
+            <div id="main-content-messages" class="container"><div id="django-messages"></div></div>
             <div id="main-content-body">
                 {% block content %}{% endblock content %}
             </div>

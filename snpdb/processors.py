@@ -1,34 +1,12 @@
 import socket
-from functools import cached_property
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib.sites.models import Site
 
-from snpdb.models import SiteMessage
-from snpdb.user_settings_manager import UserSettingsManager
 from uicore.utils.form_helpers import FORM_HELPER_HELPER
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.forms import SearchForm
-
-
-class LazyUserProperties:
-    """
-    A class that we can send to every page that can provide access to common user values but doesn't need to
-    pre-process anything unless the details are asked for
-    """
-
-    def __init__(self, request):
-        self.request = request
-
-    @cached_property
-    def avatar_details(self):
-        return UserSettingsManager.get_avatar_details()
-
-    @cached_property
-    def show_titles(self) -> bool:
-        """ The navbar decorates the logged in user with their own title (if they hold one and want to see them) """
-        return self.avatar_details.shows_titles_for(UserSettingsManager.get_user_settings())
 
 
 def settings_context_processor(request):
@@ -47,7 +25,6 @@ def settings_context_processor(request):
         'sapath_enabled': apps.is_installed("sapath"),
         'seqauto_enabled': settings.SEQAUTO_ENABLED,
         'site': Site.objects.get_current(),
-        'site_messages': SiteMessage.get_site_messages(),
         'site_name': settings.SITE_NAME,
         'site_short_name': settings.SITE_SHORT_NAME,
         'site_description': settings.SITE_DESCRIPTION,
@@ -57,8 +34,7 @@ def settings_context_processor(request):
         'url_name_visible': get_visible_url_names(),
         'use_oidc': settings.USE_OIDC,  # whether user is managed by django or externally by open connect
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
-        "contact_us_enabled": settings.CONTACT_US_ENABLED,
-        "user_properties": LazyUserProperties(request)
+        "contact_us_enabled": settings.CONTACT_US_ENABLED
     }
 
     # This can fail on bad urls

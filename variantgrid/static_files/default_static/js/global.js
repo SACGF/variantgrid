@@ -749,6 +749,32 @@ function getCookie(name) {
     return null;
 }
 
+/* The menus and the rest of the per-user page chrome (uicore/chrome.py), requested while the page is still loading
+   and filled in once it is ready - the page body itself is the same for every user. */
+function loadPageChrome(chromeUrl, urlName) {
+    const chromeRequest = $.getJSON(chromeUrl, {url_name: urlName});
+    $(() => chromeRequest.done(applyPageChrome));
+}
+
+function applyPageChrome(chrome) {
+    window.CURRENT_USERNAME = chrome.username;
+    $('#menu-bar-main').html(chrome.menu_main_html);
+    $('#menu-bar-sub').html(chrome.menu_sub_html);
+    // the page's .current-record-menu-item went to the fallback spot before the side bar existed
+    const currentRecordSpot = $('#current-record-spot');
+    if (currentRecordSpot.length) {
+        currentRecordSpot.append($('.current-record-menu-item').detach());
+    }
+    $('#navbar-user').html(chrome.user_html);
+    $('#site-messages').html(chrome.site_messages_html);
+    if (chrome.messages_html) {
+        $('#django-messages').replaceWith(chrome.messages_html);
+    }
+    if (chrome.rollbar_person.id && typeof Rollbar !== 'undefined') {
+        Rollbar.configure({payload: {person: chrome.rollbar_person}});
+    }
+}
+
 /* Navigate to url via a POST (rather than a GET link), including the CSRF token.
    Used for state-changing actions like logout that must be POST under Django 5. */
 function postUrl(url) {
@@ -1332,9 +1358,10 @@ function createModal(id, title, body) {
 
 // Suggestions
 
-function suggestionDialog(userName) {
+function suggestionDialog() {
     let modalDialog = window.MODAL_SUGGESTION;
     if (!modalDialog) {
+        const userName = $('<span>', {text: window.CURRENT_USERNAME || ''}).html();
         const siteName = window.SITE_NAME || 'Variant Grid';
         // FIXME need to escape username, siteName, location etc
         const modalContent = createModalShell('suggestionModal', 'Suggestion / Bug Report');

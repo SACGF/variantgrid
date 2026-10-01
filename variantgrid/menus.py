@@ -1,6 +1,6 @@
 """
 The menu registry for VariantGrid deployments (#2007): the top bar and every sub-menu, declared once and picked by
-url name - see uicore/menus.py for how a url name maps to a menu and uicore/templatetags/ui_menus.py for rendering.
+url name - see uicore/menus.py for how a url name maps to a menu and uicore/chrome.py for rendering.
 `settings.MENUS` names this tuple; a deployment repo can point it at its own module built from these
 (`BASE + (Menu(...),)`, or `dataclasses.replace(menu, items=...)` to add items to one). Per-deployment hiding stays
 in URLS_NAME_REGISTER; `condition` is only for the few items that depend on a setting.

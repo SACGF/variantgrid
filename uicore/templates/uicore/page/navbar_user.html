@@ -1,0 +1,10 @@
+{% if inbox_enabled %}
+    <a class="nav-link" href="{% url 'messages_inbox' %}"><i class="fas fa-inbox"></i>
+        {% if mail_count %}<span class="badge badge-danger">{{ mail_count }}</span>{% endif %}
+    </a>
+{% endif %}
+<a id="navbar-user-profile" href="{% url 'view_user_settings' %}" class="nav-link text-nowrap">
+    <i class="fas fa-user-circle"></i>
+    {{ user.username }}
+    {{ title_icon_html }}
+</a>

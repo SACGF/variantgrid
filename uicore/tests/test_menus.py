@@ -1,11 +1,14 @@
 from collections import defaultdict
 from unittest.mock import patch
 
-from django.contrib.auth.models import AnonymousUser, User
-from django.template import RequestContext, Template
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.contrib.messages.storage import default_storage
+from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase
-from django.urls import get_resolver, resolve, reverse
+from django.urls import get_resolver, reverse
 
+from uicore.chrome import menu_html
 from uicore.menus import current_menu
 from variantgrid.menus import MENUS
 
@@ -47,19 +50,47 @@ class MenuRegistryTest(SimpleTestCase):
             self.assertEqual(current_menu('clinvar_export').key, 'classifications')
 
 
-class MenuBarSubTest(TestCase):
+class PageChromeTest(TestCase):
 
-    def _render(self, url_name, user) -> str:
-        request = RequestFactory().get(reverse(url_name))
-        request.resolver_match = resolve(request.path)
-        request.user = user
-        return Template("{% load ui_menus %}{% menu_bar_sub %}").render(RequestContext(request))
+    def setUp(self):
+        menu_html.cache_clear()
+
+    def tearDown(self):
+        menu_html.cache_clear()
+
+    def _chrome(self, url_name, user=None) -> dict:
+        if user:
+            self.client.force_login(user)
+        return self.client.get(reverse('page_chrome'), {'url_name': url_name}).json()
 
     def test_highlight_and_admin_only(self):
         with _visible_except():
-            html = self._render('variant_tags', AnonymousUser())
-            self.assertRegex(html, r'id="submenu-variant_tags"\s+class="nav-link active')
-            self.assertNotIn('submenu-liftover_runs', html)
+            user_chrome = self._chrome('variant_tags', User.objects.create_user('menu_user'))
+            self.assertRegex(user_chrome['menu_sub_html'], r'id="submenu-variant_tags"\s+class="nav-link active')
+            self.assertRegex(user_chrome['menu_main_html'], r'id="menu-top-variants"\s+class="nav-link active')
+            self.assertNotIn('submenu-liftover_runs', user_chrome['menu_sub_html'])
 
-            superuser = User.objects.create_superuser('menu_admin')
-            self.assertIn('submenu-liftover_runs', self._render('variant_tags', superuser))
+            superuser_chrome = self._chrome('variant_tags', User.objects.create_superuser('menu_admin'))
+            self.assertIn('submenu-liftover_runs', superuser_chrome['menu_sub_html'])
+
+    def test_anonymous_gets_empty_chrome(self):
+        chrome = self._chrome('variant_tags')
+        self.assertEqual(chrome['menu_main_html'], '')
+        self.assertEqual(chrome['username'], '')
+
+    def test_messages_from_previous_request_shown_once(self):
+        user = User.objects.create_user('menu_messages')
+        self.client.force_login(user)
+        request = RequestFactory().get('/')
+        # Store a message the way a view that redirects does, in this client's session
+        session = self.client.session
+        request.session = session
+        storage = default_storage(request)
+        storage.add(messages.INFO, "Saved the thing")
+        response = HttpResponse()
+        storage.update(response)
+        session.save()
+        self.client.cookies.update(response.cookies)
+
+        self.assertIn("Saved the thing", self._chrome('variant_tags')['messages_html'])
+        self.assertEqual(self._chrome('variant_tags')['messages_html'], '')

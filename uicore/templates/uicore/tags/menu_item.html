@@ -1,16 +1,10 @@
-{% if item.method == 'post' %}
-  <form id="form-{{ item.id }}" action="{{ item.url }}" method="post" style="display:none">
-    {% csrf_token %}
-  </form>
-{% endif %}
-
 <a
   {% if item.external %}target="_blank"{% endif %}
   id="{{ item.id }}"
   class="nav-link {% if item.active %}active{% endif %} {{ item.css_class }}"
   {% if item.method == 'post' %}
     href="#"
-    onclick="document.getElementById('form-{{ item.id }}').submit(); return false;"
+    onclick="postUrl('{{ item.url }}'); return false;"
   {% else %}
     href="{{ item.url }}"
   {% endif %}
