@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.forms import BoundField, DateField, Form
 from django.shortcuts import redirect, render
@@ -73,15 +74,15 @@ class ReviewForm(Form):
                 initial=DescribeDifference.from_json(question_values.get(question.key))
             )
 
-        # review_date = review.review_date or timezone.now()
-        self.fields["review_date"].initial = f"{timezone.now():%Y-%m-%d}"
+        review_date = review.review_date or timezone.now().date()
+        self.fields["review_date"].initial = f"{review_date:%Y-%m-%d}"
         self.fields["review_method"].initial = participants.get("review_method")
         self.fields["review_participants"].initial = participants.get("review_participants")
 
     def describe_difference_fields(self) -> list[BoundField]:
         return [self[key] for key, f in self.fields.items() if isinstance(f, DescribeDifferenceField)]
 
-    def save(self):
+    def save(self, user: User):
         if self.is_valid():
             review = self.review
             clean_data = self.cleaned_data
@@ -102,6 +103,7 @@ class ReviewForm(Form):
                 "answers": question_values
             }
 
+            review.user = user  # last editor, as the post-review action views also record
             review.review_date = clean_data.get("review_date")
             review.meeting_meta = full_json
             if not review.id:
@@ -114,7 +116,7 @@ class ReviewForm(Form):
             log_admin_change(
                 obj=self.review,
                 message=self.review.as_json(),
-                user=review.user
+                user=user
             )
 
             return review
@@ -134,7 +136,7 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
     if request.method == "POST":
         discussion_form = ReviewForm(review=review, data=request.POST)
         if discussion_form.is_valid():
-            discussion_form.save()
+            discussion_form.save(user=request.user)
             messages.add_message(request, level=messages.SUCCESS, message="Discussion saved successfully")
 
             return redirect(discussion_form.review.next_step_url())

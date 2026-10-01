@@ -65,15 +65,13 @@ membership came in e26588083 / e54821fba (variantgrid_private#3827).
 
 ## Traps
 
-- No migration or fixture seeds the `discordance_report` topic or its questions. On a database without it (this
-  box's test DB has no ReviewTopic rows) the "review" buttons 500 on `ReviewTopic.objects.get`; create it in the admin.
+- `review/migrations/0005_discordance_report_topic.py` seeds the `discordance_report` topic both callers hard-code,
+  with a default question set; a deployment that had already created it in the admin keeps its own name and questions.
+  Without the row the "review" buttons 500 on `ReviewTopic.objects.get`.
 - Overlaps start a new Review each time (resume is commented out), DiscordanceReports resume the first existing one.
-- `Review.user` means "last actor", not author: the action views overwrite it with whoever completed the review.
-- Bug (wrong data): `ReviewForm.__init__` sets the `review_date` initial to today even when editing, so re-saving an
-  incomplete review silently moves its date.
-- Bug (minor, audit): `review/views/review_views.py:_handle_review` never updates `review.user` on edit, and
-  `ReviewForm.save` logs with `review.user`, so a second lab member's edit is logged and shown as the original author's.
-- Bug (minor): `Review.answers` uses `ReviewQuestion.objects.get(topic=..., key=...)`; deleting a question in the admin
-  (rather than setting `enabled=False`) makes every review that answered it raise `DoesNotExist` on display.
-- `Review.review_method` returns `None`, not `[]`, when no method is stored.
+- `Review.user` means "last actor", not author: `ReviewForm.save` sets it to the editor (and logs as them), and the
+  action views overwrite it with whoever completed the review.
+- Editing a review keeps its stored `review_date`; only a new review defaults to today.
+- `Review.answers` skips answers whose question was deleted in the admin; disabling (`enabled=False`) is still the
+  way to retire a question, since a deleted one silently drops out of historical reviews.
 - Question `key` is the table-wide primary key, not per topic: prefix it with the topic when adding questions.
