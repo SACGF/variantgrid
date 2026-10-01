@@ -3,6 +3,7 @@ from django.test import RequestFactory, TestCase
 from django.urls.base import resolve, reverse
 from django.utils.timezone import now
 
+from library.guardian_utils import assign_permission_to_user_and_groups
 from seqauto.grids.sequencing_data_grids import SequencingRunColumns
 from seqauto.models import (
     DataGeneration,
@@ -43,14 +44,15 @@ class SequencingRunDatatableTests(TestCase):
             variant_caller = VariantCaller.objects.create(name=caller_name, version="1")
             vcf = VCF.objects.create(name=f"vcf_{i}", genome_build=genome_build, user=self.user,
                                      date=now(), genotype_samples=0, import_status=import_status)
+            assign_permission_to_user_and_groups(self.user, vcf)
             VCFFromSequencingRun.objects.create(vcf=vcf, sequencing_run=self.sequencing_run,
                                                 variant_caller=variant_caller)
 
-    def _rows(self, **params) -> list[dict]:
+    def _rows(self, user=None, **params) -> list[dict]:
         url = reverse('sequencing_run_datatable')
         request = RequestFactory().get(url, params)
         request.resolver_match = resolve(url)
-        request.user = self.user
+        request.user = user or self.user
         view = DatabaseTableView(column_class=SequencingRunColumns)
         view.request = request
         view.config = SequencingRunColumns(request)
@@ -66,6 +68,14 @@ class SequencingRunDatatableTests(TestCase):
                 (VCF.objects.get(name="vcf_0"), "gatk", ImportStatus.SUCCESS),
                 (VCF.objects.get(name="vcf_1"), "freebayes", ImportStatus.ERROR),
             ]])
+
+    def test_only_vcfs_the_user_can_view(self):
+        other_user = User.objects.create(username='sequencing_run_datatable_other_user')
+        vcf_1 = VCF.objects.get(name="vcf_1")
+        assign_permission_to_user_and_groups(other_user, vcf_1)
+        row = self._rows(user=other_user)[0]
+        self.assertEqual(row["vcf_ids"], [{"id": str(vcf_1.pk), "url": vcf_1.get_absolute_url(),
+                                           "variant_caller": "freebayes", "import_status": ImportStatus.ERROR}])
 
     def test_hidden_filter(self):
         SequencingRun.objects.filter(pk=self.sequencing_run.pk).update(hidden=True)

@@ -68,6 +68,11 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
 - Wire it with `path('.../datatable', DatabaseTableView.as_view(column_class=XColumns), name='x_datatable')`
   (snpdb/views/datatable_view.py:DatabaseTableView). That one endpoint answers `?dataTableDefinition=1` (columns),
   the DataTables row requests, and `?dataTableCsv=1` (server CSV).
+- The endpoint checks nothing beyond login, so the config (or its url) repeats the page's restriction: a
+  superuser-only page's grid is wrapped in `require_superuser(DatabaseTableView.as_view(...))` (a url name disabled in
+  `URLS_NAME_REGISTER` covers that name only, not the grid's), and an object id from the request goes through
+  `get_for_user` / `check_can_view`. Filter rules on a field `filter_fields()` doesn't offer are dropped
+  (snpdb/views/datatable_view.py:DatatableConfig.restrict_to_filter_fields).
 - Mount it with markup only: `<table data-datatable-url="{% url 'x_datatable' %}" data-datatable-data="jsFunc"></table>`;
   the global.js processor builds a variantgrid/static_files/default_static/js/datatable_definition.js:DataTableDefinition
   from it. `data-datatable-data` names a JS function whose return object is merged into every request.

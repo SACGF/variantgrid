@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Any
 
+from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -13,13 +14,17 @@ from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, So
 from upload.models import ModifiedImportedVariant, UploadPipeline, UploadStep, VCFPipelineStage
 
 
+def get_upload_pipeline_for_user(user: User, upload_pipeline_id) -> UploadPipeline:
+    upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
+    upload_pipeline.file_upload.check_can_view(user)
+    return upload_pipeline
+
+
 class UploadStepColumns(DatatableConfig[UploadStep]):
 
     def get_initial_queryset(self) -> QuerySet[UploadStep]:
-        upload_pipeline_id = self.get_query_param("upload_pipeline")
-        upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-        upload_pipeline.file_upload.check_can_view(self.user)
-        return UploadStep.objects.filter(upload_pipeline_id=upload_pipeline_id)
+        upload_pipeline = get_upload_pipeline_for_user(self.user, self.get_query_param("upload_pipeline"))
+        return UploadStep.objects.filter(upload_pipeline=upload_pipeline)
 
     @staticmethod
     def render_status(row: CellData):
@@ -71,7 +76,7 @@ class UploadPipelineSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
         return upload_pipeline.uploadedvcf.vcf, upload_pipeline.genome_build
 
     def _get_upload_pipeline(self) -> UploadPipeline:
-        return get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
+        return get_upload_pipeline_for_user(self.user, self.get_query_param("upload_pipeline_id"))
 
 
 class UploadPipelineModifiedVariantsColumns(DatatableConfig[ModifiedImportedVariant]):
@@ -92,7 +97,7 @@ class UploadPipelineModifiedVariantsColumns(DatatableConfig[ModifiedImportedVari
         ]
 
     def get_initial_queryset(self) -> QuerySet[ModifiedImportedVariant]:
-        upload_pipeline = get_object_or_404(UploadPipeline, pk=self.get_query_param("upload_pipeline_id"))
+        upload_pipeline = get_upload_pipeline_for_user(self.user, self.get_query_param("upload_pipeline_id"))
         qs = get_queryset_for_latest_annotation_version(ModifiedImportedVariant, upload_pipeline.genome_build)
         qs = qs.filter(import_info__upload_step__upload_pipeline=upload_pipeline)
         return Variant.annotate_variant_string(qs, path_to_variant="variant__")

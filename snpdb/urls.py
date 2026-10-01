@@ -3,6 +3,7 @@ from django.urls import include
 from django.urls.conf import path as path_standard
 from django.views.generic import RedirectView
 
+from library.django_utils import require_superuser
 from library.preview_request import preview_view
 from snpdb.grids import (
     AlleleLiftoverFailureColumns,
@@ -160,12 +161,12 @@ urlpatterns = [
          DatabaseTableView.as_view(column_class=SampleSkippedAnnotationColumns),
          name='sample_skipped_annotation_datatable'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
-    path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
+    path('liftover/liftover_runs/datatable', require_superuser(DatabaseTableView.as_view(column_class=LiftoverRunColumns)),
          name='liftover_runs_datatable'),
-    path('liftover/allele_liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns),
+    path('liftover/allele_liftover/datatable', require_superuser(DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns)),
          name='allele_liftover_datatable'),
     path('liftover/allele_liftover_failures/datatable',
-         DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns),
+         require_superuser(DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns)),
          name='allele_liftover_failures_datatable'),
     path('manual_variant_entry_collections/datatable',
          DatabaseTableView.as_view(column_class=ManualVariantEntryCollectionColumns),

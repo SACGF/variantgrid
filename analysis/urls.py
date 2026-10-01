@@ -26,6 +26,7 @@ from analysis.views import (
     views_node,
     views_wizard,
 )
+from library.django_utils import require_superuser
 from snpdb.views.datatable_dataframe import DataFrameTableView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -171,7 +172,7 @@ urlpatterns = [
     path('analysis_templates/datatable/', DatabaseTableView.as_view(column_class=AnalysisTemplatesColumns),
          name='analysis_templates_datatable'),
     path('analysis_issues/datatables/',
-         DatabaseTableView.as_view(column_class=AnalysisNodeIssuesColumns), name='analysis_node_issues_datatable'),
+         require_superuser(DatabaseTableView.as_view(column_class=AnalysisNodeIssuesColumns)), name='analysis_node_issues_datatable'),
 
     path('<int:analysis_id>/node/ontology/genes/datatable/<int:node_id>/<int:version>/',
          DataFrameTableView.as_view(column_class=NodeOntologyGenesConfig), name='node_ontology_genes_datatable'),

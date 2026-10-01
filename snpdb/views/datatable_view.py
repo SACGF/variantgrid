@@ -521,7 +521,9 @@ class DatatableConfig(Generic[DC]):
         """ The column filter rules this request carries (@see library.django_utils.filter_rules) """
         if not self.filter_builder:
             return None
-        return parse_filters(self.get_query_param(DATATABLE_FILTERS_PARAM))
+        if filters := parse_filters(self.get_query_param(DATATABLE_FILTERS_PARAM)):
+            filters = self.restrict_to_filter_fields(filters)
+        return filters
 
     @property
     def filter_rules_supplied(self) -> bool:
@@ -536,6 +538,22 @@ class DatatableConfig(Generic[DC]):
             if column_filter := rc.column_filter:
                 fields.append(column_filter.as_json(rc.name, rc.label))
         return fields
+
+    def filter_field_names(self) -> set[str]:
+        return {rc.name for rc in self.enabled_columns if rc.column_filter}
+
+    def restrict_to_filter_fields(self, filters: dict) -> Optional[dict]:
+        """ filters without the rules on a field filter_fields doesn't offer """
+        field_names = self.filter_field_names()
+        rules = []
+        for rule in filters["rules"]:
+            if rule.get("field") in field_names:
+                rules.append(rule)
+            else:
+                logger.warning("%s: ignoring filter rule on field not offered: %s", nice_class_name(self), rule)
+        if not rules:
+            return None
+        return {**filters, "rules": rules}
 
     def apply_filter_rules(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         if rules := self.filter_rules:

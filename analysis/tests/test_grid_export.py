@@ -247,7 +247,8 @@ class TestFilteredExportRowCount(GridExportTestCase):
         self.assertGreater(expected, 1)  # the relation fans out, so a second JOIN would show up
 
         request = self._request(rules=[{"op": "nn", "field": "varianttag__tag", "data": ""}])
-        header, rows = self._export_csv(node, request=request)
+        with mock.patch.object(ExportVariantGrid, "filter_field_names", return_value={"varianttag__tag"}):
+            header, rows = self._export_csv(node, request=request)
         self.assertEqual(len(rows), expected)
         variant_id_index = header.index("variant_id")
         self.assertEqual({int(row[variant_id_index]) for row in rows}, {tagged_variant.pk})
