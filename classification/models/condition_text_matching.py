@@ -288,15 +288,20 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None,
-                          suggestion: Optional['ConditionMatchingSuggestion'] = None):
+    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None, defer_search=False):
         """
         Set terms that we're effectively certain of, do not override what's already there
-        @param suggestion - an already calculated top_level_suggestion for the condition text
+        @param defer_search - only match IDs embedded in the text (local database), flagging anything else as
+        pending_automatch for the beat sweep, which can call the external Monarch search
         """
         try:
             if root := condition_text.root:
-                if match := suggestion or top_level_suggestion(condition_text.normalized_text):
+                if defer_search:
+                    match = embedded_ids_check(condition_text.normalized_text)
+                    condition_text.pending_automatch = not match
+                else:
+                    match = top_level_suggestion(condition_text.normalized_text)
+                if match:
                     if match.is_auto_assignable():
                         if not root.condition_xrefs:
                             root.condition_xrefs = match.term_str_array
@@ -448,26 +453,20 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 )
                 debug_timer.tick("Condition Text Matching - create new entry")
 
-            embedded_suggestion = None
-            if attempt_automatch and (new_root or new_gene_level):
-                # embedded IDs only need the local database so can be matched now, giving instant feedback
-                # on the form - anything else may need the external Monarch search, left for the beat sweep
-                if not (embedded_suggestion := embedded_ids_check(normalized)):
-                    ct.pending_automatch = True
-
             if update_counts:
                 ct.classifications_count += 1
                 is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance_level.is_valid or (existing and existing.is_valid)
                 if not is_valid:
                     ct.classifications_count_outstanding += 1
 
-            if update_counts or ct.pending_automatch:
+            if update_counts:
                 ct.save()
                 debug_timer.tick("Condition Text Matching - update count quick")
 
-        if embedded_suggestion:
-            ConditionTextMatch.attempt_automatch(condition_text=ct, suggestion=embedded_suggestion)
-            debug_timer.tick("Condition Text Matching - automatch embedded ids")
+        if attempt_automatch and (new_root or new_gene_level):
+            # embedded IDs are matched now so the form shows the term straight away
+            ConditionTextMatch.attempt_automatch(condition_text=ct, defer_search=True)
+            debug_timer.tick("Condition Text Matching - automatch")
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
