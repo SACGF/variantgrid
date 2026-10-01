@@ -101,8 +101,8 @@ def get_variants_qs_for_annotation(
     _check_annotation_version_archive(annotation_version)
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
-    q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \
-        [Variant.get_contigs_q(annotation_version.genome_build)]
+    q_filters = [*VariantAnnotation.get_variant_annotation_q_list(),
+                 Variant.get_contigs_q(annotation_version.genome_build)]
 
     if not annotated:
         q_filters.append(Q(variantannotation__isnull=True))
