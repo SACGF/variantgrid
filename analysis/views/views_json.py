@@ -25,6 +25,7 @@ from analysis.models import (
 from analysis.models.enums import TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import (
+    AnalysisDag,
     AnalysisEdge,
     AnalysisNode,
     NodeProband,
@@ -79,7 +80,7 @@ def node_reveal_hidden(request, analysis_id, node_id):
         node.ignore_field_errors = True
         node.queryset_dirty = True
         node.save()
-    branch_node_ids = {node.pk} | {n.pk for n in node.descendants_set()}
+    branch_node_ids = {node.pk} | AnalysisDag(node.analysis_id).descendant_ids(node.pk)
     hidden_qs = AnalysisNode.objects.filter(pk__in=branch_node_ids, visible=False)
     revealed_ids = list(hidden_qs.values_list("pk", flat=True))
     if revealed_ids:
@@ -204,7 +205,7 @@ def nodes_copy(request, analysis_id):
             clone_node.adjust_cloned_parents(old_new_map)
 
             # Parents copied alongside are swapped for their copies, the rest are shared with the original.
-            # Connecting via add_child leaves parents_changed alone, so the clone keeps cloned_from and its counts
+            # add_child leaves parents_changed alone, so the clone keeps cloned_from and its counts
             for parent in parents:
                 new_parent = old_new_map.get(parent.pk, parent)
                 new_parent.add_child(clone_node)

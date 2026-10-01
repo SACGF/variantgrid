@@ -10,7 +10,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import OntologyTerm, VariantTranscriptAnnotation
@@ -63,7 +63,7 @@ class PhenotypeNode(AnalysisNode):
         return [cohort for _, cohort in sorted(cohorts_by_pk.items()) if cohort.can_view(user)]
 
     def _get_root_nodes(self) -> list[AnalysisNode]:
-        node_ids = [n.pk for n in self.get_roots()]
+        node_ids = AnalysisDag(self.analysis_id).root_ids(self.pk)
         return list(AnalysisNode.objects.filter(pk__in=node_ids).select_subclasses())
 
     @property

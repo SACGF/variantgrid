@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from analysis.models.nodes.analysis_node import AnalysisEdge
+from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge
 from analysis.models.nodes.filters.filter_node import FilterNode
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.filters.venn_node import VennNode
@@ -56,3 +56,12 @@ class TestNodeConnectionCycles(AnalysisSetupMixin, TestCase):
         data = self._connect(self.child, merge)
         self.assertNotIn("non_fatal", data)
         self.assertTrue(self._edge_exists(self.child, merge))
+
+    def test_dag_walks(self, _update_analysis):
+        second_source = AllVariantsNode.objects.create(analysis=self.analysis)
+        self.child.add_parent(second_source)
+        dag = AnalysisDag(self.analysis.pk)
+
+        self.assertEqual(dag.root_ids(self.grandchild.pk), {self.source.pk, second_source.pk})
+        self.assertEqual(dag.root_ids(self.source.pk), set())
+        self.assertEqual(dag.descendant_ids(self.venn.pk), {self.child.pk, self.grandchild.pk})

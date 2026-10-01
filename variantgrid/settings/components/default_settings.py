@@ -1039,7 +1039,7 @@ INSTALLED_APPS = [
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'user_messages',
-    'django_dag',
+    'django_dag',  # only for old seqauto/annotation migrations - remove after squashing (#736)
     'django_js_reverse',
     'django_extensions',
     'easy_thumbnails',
