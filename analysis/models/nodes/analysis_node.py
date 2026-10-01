@@ -20,7 +20,7 @@ from celery.canvas import Signature
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.cache import cache
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, ValidationError
 from django.db import connection, models, transaction
 from django.db.models import BooleanField, F, Func, IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
@@ -30,7 +30,7 @@ from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from django_dag.models import edge_factory, node_factory
+from django_dag.models import NodeBase, edge_factory, node_factory
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
@@ -1302,26 +1302,15 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
     @staticmethod
     def circular_checker(parent, child):
-        """ Called by AnalysisEdge.save(). Replaces django_dag's check, which walks parents of the parent's
-            own subclass and compares subclass instances, so never sees a cycle through other node types
-            (#2060) """
-        if parent.pk == child.pk:
-            raise NonFatalNodeError("A node can't be connected to itself")
+        """ Called by AnalysisEdge.save(). django_dag walks parent.__class__'s parents and compares instances, so
+            given subclasses it never sees a cycle through another node type - check on the base rows (#2060) """
+        def as_base_node(node):
+            return getattr(node, "analysisnode_ptr", node)  # built from the subclass's columns, no query
 
-        parent_ids_by_child_id = defaultdict(set)
-        edges_qs = AnalysisEdge.objects.filter(child__analysis_id=parent.analysis_id)
-        for parent_id, child_id in edges_qs.values_list("parent_id", "child_id"):
-            parent_ids_by_child_id[child_id].add(parent_id)
-
-        ancestor_ids = set()
-        to_visit = [parent.pk]
-        while to_visit:
-            for ancestor_id in parent_ids_by_child_id[to_visit.pop()] - ancestor_ids:
-                ancestor_ids.add(ancestor_id)
-                to_visit.append(ancestor_id)
-
-        if child.pk in ancestor_ids:
-            raise NonFatalNodeError(f"Not connecting node {parent.pk} to {child.pk} - it would create a cycle")
+        try:
+            NodeBase.circular_checker(as_base_node(parent), as_base_node(child))
+        except ValidationError as e:
+            raise NonFatalNodeError(f"Not connecting node {parent.pk} to {child.pk}: {e.message}") from e
 
     def handle_ancestor_input_samples_changed(self):
         pass

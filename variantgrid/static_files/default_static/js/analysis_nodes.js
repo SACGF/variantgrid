@@ -268,14 +268,6 @@ function getEndpoint(id, endpoint_type, side) {
 	}		 
 }
 
-// A VennNode has 2 (left/right) input endpoints, everything else at most 1
-function getTargetEndpoints(id) {
-	const el = document.getElementById(id);
-	if (!el)
-		return [];
-	return (jsPlumbInstance.getEndpoints(el) || []).filter(ep => ep.isTarget);
-}
-
 function setupHideInvalidConnectionsOnDrag() {
 		// Endpoints we turned red for the connection drag currently in progress
 		const invalidEndpoints = [];
@@ -299,22 +291,20 @@ function setupHideInvalidConnectionsOnDrag() {
 			}
 		}
 
-		function getAncestors(id, ancestors=new Set()) {
-			if (!ancestors.has(id)) {
-				ancestors.add(id);
-				for (const endpoint of getTargetEndpoints(id)) {
-					for (const connection of endpoint.connections) {
-						getAncestors(connection.sourceId, ancestors);
-					}
+		// Connections are looked up by element, not endpoint, so a VennNode's left and right inputs are both walked
+		function getAncestorIds(id, ancestorIds=new Set()) {
+			if (!ancestorIds.has(id)) {
+				ancestorIds.add(id);
+				for (const connection of jsPlumbInstance.getConnections({target: id}, true)) {
+					getAncestorIds(connection.sourceId, ancestorIds);
 				}
 			}
-			return ancestors;
+			return ancestorIds;
 		}
 
 		jsPlumbInstance.bind("connection:drag", function(connection) {
-			for (const ancestorId of getAncestors(connection.endpoints[0].elementId)) {
-				getTargetEndpoints(ancestorId).forEach(setEndpointInvalid);
-			}
+			const ancestorIds = Array.from(getAncestorIds(connection.sourceId));
+			jsPlumbInstance.selectEndpoints({target: ancestorIds}).each(setEndpointInvalid);
 		});
 
 		// There's no single "connection drag finished" event - dropping a connection back where it
