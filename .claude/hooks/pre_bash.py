@@ -1,9 +1,11 @@
 """
 PreToolUse hook for Bash: state-changing commands on a box other people are testing on get a
 confirmation prompt with a reason, whatever the permission mode (agent_system.md §4.5). Everything
-else passes through untouched.
+else passes through untouched. A box set aside for agents opts out by setting VG_AGENT_UNGUARDED=1
+(the "env" block of that user's ~/.claude/settings.json).
 """
 import json
+import os
 import re
 import socket
 import sys
@@ -24,6 +26,8 @@ GUARDED = [
 
 
 def main() -> int:
+    if os.environ.get("VG_AGENT_UNGUARDED") == "1":
+        return 0
     try:
         payload = json.load(sys.stdin)
     except ValueError:
