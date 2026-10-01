@@ -38,7 +38,6 @@ $("button#confirm-test").click(function() {
     {% load help_tags %}
     {% page_help user 'pathtests/view_pathology_test_version_help' 'View Pathology Test Version Help' %}
 
-    {% include "messages/messages.html" %}
 
     <form id='pathology-test-version-form' name="pathology-test-version" method="post">
         {% csrf_token %}

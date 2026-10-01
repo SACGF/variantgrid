@@ -88,7 +88,6 @@ $("#new-pathology-test").click(showForm);
         {% csrf_token %}
         {{ create_pathology_test_form.as_p }}
           <button id="create-pathology-test-button" class="btn btn-primary">Create</button>
-        {% include "messages/messages.html" %}
       </form>
     </div>
 
