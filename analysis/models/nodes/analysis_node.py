@@ -45,7 +45,6 @@ from analysis.exceptions import (
 from analysis.models.enums import (
     AnalysisTemplateType,
     GroupOperation,
-    NodeColors,
     NodeErrorSource,
     NodeStatus,
 )
@@ -224,7 +223,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     visible = models.BooleanField(default=True)
     count = models.IntegerField(null=True, default=None)
     errors = models.TextField(null=True)
-    shadow_color = models.TextField(null=True)
     load_seconds = models.FloatField(null=True)
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
@@ -1012,6 +1010,13 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def flatten_errors(errors):
         return [f"{NodeErrorSource(nes).label}: {error}" for nes, error in errors]
 
+    def get_error_summaries(self) -> list[str]:
+        """ get_errors(flat=True) for the tooltip on the node card's error cross - a load's traceback
+            isn't for users, so it's only named as an internal error """
+        return [NodeErrorSource.INTERNAL_ERROR.label if source == NodeErrorSource.INTERNAL_ERROR
+                else f"{NodeErrorSource(source).label}: {error}"
+                for source, error in self.get_errors()]
+
     @staticmethod
     def get_status_from_errors(errors):
         ERROR_STATUS = {
@@ -1250,9 +1255,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return variant_ids
 
     def _get_load_data(self) -> dict:
-        """ Override to snapshot anything else the node worked out at load - merged into
-            NodeVersion.load_data alongside "counts" @see node_counts """
-        return {}
+        """ Extend (via super) to snapshot anything else the node worked out at load - merged into
+            NodeVersion.load_data alongside "counts" @see node_counts.
+            "warnings" are drawn on the node card, so they're visible without opening the editor (#347) """
+        return {"warnings": self.get_warnings()}
 
     def _load(self):
         """ Override to do anything interesting.
@@ -1328,12 +1334,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
         # TODO: This causes lots of DB queries... should we change this?
         self.valid = self.is_valid
-        if not self.valid:
-            self.shadow_color = NodeColors.ERROR
-            self.appearance_dirty = True
-        elif self.shadow_color == NodeColors.ERROR:  # Need to allow nodes to set to warning
-            self.shadow_color = NodeColors.VALID
-            self.appearance_dirty = True
 
         if self.appearance_dirty:
             self.appearance_version += 1

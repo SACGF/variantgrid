@@ -20,7 +20,7 @@ function renderAnalysisAuditLogSummary(summary, type, row) {
     }
     const changes = summary['changes'];
     if (changes) {
-        const hideValues = new Set(['valid', 'status', 'version', 'shadow_color', 'appearance_version']);
+        const hideValues = new Set(['valid', 'status', 'version', 'appearance_version']);
         let changesSummary = "<table class='table'>";
         changesSummary += "<tr><th>field</th><th>old</th><th>new</th></tr>";
         for (const [key, value] of Object.entries(changes)) {

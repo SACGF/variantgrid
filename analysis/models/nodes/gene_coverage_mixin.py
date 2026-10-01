@@ -4,7 +4,6 @@ from typing import Optional
 
 from django.conf import settings
 
-from analysis.models.enums import NodeColors
 from analysis.models.models_analysis import Analysis
 from genes.models import GeneCoverageCollection, GeneList, GeneSymbol
 from snpdb.models import Sample
@@ -28,9 +27,6 @@ class GeneCoverageMixin:
             self.has_gene_coverage = self.calculate_if_has_gene_coverage()
             logging.debug("has_gene_coverage = %s", self.has_gene_coverage)
             update_kwargs["has_gene_coverage"] = self.has_gene_coverage
-        # Keep self in sync - update_node_task clears a stale ERROR shadow after load() based on this
-        self.shadow_color = NodeColors.WARNING if self.get_warnings() else NodeColors.VALID
-        update_kwargs["shadow_color"] = self.shadow_color
         return update_kwargs
 
     def get_warnings(self) -> list[str]:

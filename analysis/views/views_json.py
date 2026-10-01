@@ -461,7 +461,7 @@ def nodes_status(request, analysis_id):
 
     qs = analysis.analysisnode_set.filter(id__in=nodes)
     node_status_list = []
-    for data in qs.values("id", "version", "status", "count", "shadow_color"):
+    for data in qs.values("id", "version", "status", "count"):
         node_id = data["id"]
         version = data["version"]
 
@@ -477,7 +477,16 @@ def nodes_status(request, analysis_id):
         sources = sources or {}
         data["deterministic"] = not sources
         data["live_data_sources"] = sources
+        data["warnings"] = load_data.get("warnings", [])
         node_status_list.append(data)
+
+    # The card's error cross explains itself on hover. Errored nodes stop being polled, so this runs once each
+    if errored_ids := [data["id"] for data in node_status_list if not data["valid"]]:
+        error_summaries = {node.pk: node.get_error_summaries()
+                           for node in qs.filter(pk__in=errored_ids).select_subclasses()}
+        for data in node_status_list:
+            if not data["valid"]:
+                data["errors"] = error_summaries.get(data["id"], [])
     return JsonResponse({"node_status": node_status_list})
 
 

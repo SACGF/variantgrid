@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
-from analysis.models import AnalysisEdge, AnalysisNode, NodeColors, NodeStatus, NodeTask
+from analysis.models import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask
 from analysis.models.nodes.analysis_node import LEASE_SECONDS, NodeCache, NodeVersion
 from analysis.models.nodes.node_utils import get_nodes_by_id
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
@@ -277,7 +277,7 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS, max_n
 def _fail_node(node, message):
     with disable_auditlog():
         AnalysisNode.objects.filter(pk=node.pk, version=node.version).update(
-            status=NodeStatus.ERROR, shadow_color=NodeColors.ERROR, errors=message)
+            status=NodeStatus.ERROR, errors=message)
     NodeTask.objects.filter(node_version__node_id=node.pk, node_version__version=node.version) \
         .update(lease_expires=None, leased_by=None)
 

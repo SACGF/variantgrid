@@ -159,12 +159,6 @@ class NodeStatus(models.TextChoices):
         return summary_state.get(status)
 
 
-class NodeColors:
-    VALID = None
-    WARNING = '#FFA500'
-    ERROR = '#ee0000'
-
-
 class ZygosityNodeZygosity(Zygosity):
     MULTIPLE_HIT = 'M'  # >=2 hits, regardless of zygosity
     CHOICES = Zygosity.CHOICES + [(MULTIPLE_HIT, "Multiple hits in gene")]
