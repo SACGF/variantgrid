@@ -71,8 +71,9 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
-    # set when a new root/gene level appears, drained by the condition_text_automatch_task beat sweep -
-    # automatching can call the external Monarch search API so it can't run in the publishing request (#1780)
+    # set when a new root/gene level appears without embedded IDs (those are automatched on publish), drained by
+    # the condition_text_automatch_task beat sweep - automatching can call the external Monarch search API so
+    # it can't run in the publishing request (#1780)
     pending_automatch = models.BooleanField(default=False)
 
     class Meta:
@@ -287,13 +288,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None):
+    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None,
+                          suggestion: Optional['ConditionMatchingSuggestion'] = None):
         """
         Set terms that we're effectively certain of, do not override what's already there
+        @param suggestion - an already calculated top_level_suggestion for the condition text
         """
         try:
             if root := condition_text.root:
-                if match := top_level_suggestion(condition_text.normalized_text):
+                if match := suggestion or top_level_suggestion(condition_text.normalized_text):
                     if match.is_auto_assignable():
                         if not root.condition_xrefs:
                             root.condition_xrefs = match.term_str_array
@@ -445,8 +448,12 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 )
                 debug_timer.tick("Condition Text Matching - create new entry")
 
+            embedded_suggestion = None
             if attempt_automatch and (new_root or new_gene_level):
-                ct.pending_automatch = True
+                # embedded IDs only need the local database so can be matched now, giving instant feedback
+                # on the form - anything else may need the external Monarch search, left for the beat sweep
+                if not (embedded_suggestion := embedded_ids_check(normalized)):
+                    ct.pending_automatch = True
 
             if update_counts:
                 ct.classifications_count += 1
@@ -457,6 +464,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             if update_counts or ct.pending_automatch:
                 ct.save()
                 debug_timer.tick("Condition Text Matching - update count quick")
+
+        if embedded_suggestion:
+            ConditionTextMatch.attempt_automatch(condition_text=ct, suggestion=embedded_suggestion)
+            debug_timer.tick("Condition Text Matching - automatch embedded ids")
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
