@@ -136,6 +136,28 @@ points there). A test that passes locally but sees `N` bases on CI fetches a reg
 `--testrunner=variantgrid.test_runner.FastaRecordingRunner` on a box with the real fastas, then
 `scripts/generate_sparse_test_fastas.py /tmp/vg_fasta_regions.jsonl variantgrid/data/reference/sparse_test_fastas`.
 
+## Checking a fix against a shared box's real data
+
+A one-off script in `manage.py shell` (not committed) can check a fix against real users, patients and analyses on a
+test box, where fixtures are thin. Writes are on the box's ask-first list (`AGENTS.md`, This box), so get the go-ahead.
+
+- Do the writes inside `transaction.atomic()` and roll back at the end (`transaction.set_rollback(True)` or a raised
+  exception). Then check the row counts you touched are what they were before.
+- A `django.test.Client(SERVER_NAME="localhost")` with `force_login` under `override_settings(ALLOWED_HOSTS=["*"])` runs
+  views on the same connection, so it sees the uncommitted rows. `library/vg/page.py:render_page` does this for a GET.
+- Celery: `on_commit` hooks never fire in a rolled-back transaction, but `update_analysis` (and so `nodes_copy`,
+  `node_update`, `clone_analysis`, template runs) calls `apply_async` straight away. A worker would then act on committed
+  state outside your transaction. Patch `celery.canvas.Signature.apply_async` and `celery.app.task.Task.apply_async`
+  to record instead, and check the DAG and node statuses rather than loaded counts.
+- A user from `User.objects.create_user` starts in the default groups, so it can already see much of the box. Call
+  `user.groups.clear()` before granting the exact object permissions an access test needs.
+- `NonFatalNodeError` from a node JSON view comes back as HTTP 200 with `{"non_fatal": true, "message": ...}`.
+  A refusal, such as a DAG cycle, is that message with no edge created, not a 4xx.
+- The `view_external_case` / `view_external_pathology_test_order` URLs take the `ExternalPK` id (what the jump-to
+  autocomplete sends), not its code.
+- `GuardianPermissionsMixin.filter_for_user` swallows `has_write_permission`. For writable objects use
+  `filter_writable_for_user` or `can_write`. Sample and VCF have their own `filter_for_user`, which does honour it.
+
 ## Slow tests / traps
 
 - `UNIT_TEST = sys.argv[1:2] == ['test']` (`default_settings.py`). Under it: the cache is in-process `LocMemCache`, the celery broker is `memory://`, Postgres JIT is off, axes and rollbar are off, passwords hash with MD5 rather than PBKDF2 (~1 s a hash, and the suite creates ~75 users), `ObjectManagerCachingImmutable` / `ObjectManagerCachingRequest` stop caching, and `admin_bot()` is uncached. Nothing in the suite should touch the dev Redis or RabbitMQ; if it does, a setting override is leaking.
