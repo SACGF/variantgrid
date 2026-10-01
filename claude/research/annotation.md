@@ -60,7 +60,7 @@ That function walks pk blocks above the highest existing lock (never a sort-and-
 the original design and stopped scaling) and returns an `annotation/models/models.py:AnnotationRangeLock` of at least
 `ANNOTATION_VEP_BATCH_MIN` and at most `ANNOTATION_VEP_BATCH_MAX` variants. "Unannotated" is defined once, in
 `annotation/annotation_version_querysets.py:get_variants_qs_for_annotation`: variants in the build's contigs passing
-`annotation/models/models.py:VariantAnnotation.VARIANT_ANNOTATION_Q` (no reference-alt, no `.`/`*` alt) with no
+`annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list` (no reference-alt, no `.`/`*` alt) with no
 VariantAnnotation row in this version's partition, restricted to a pipeline type by
 `annotation/annotation_version_querysets.py:pipeline_type_variant_q`.
 
@@ -197,7 +197,7 @@ are settings snapshots, not VEP header facts, and are excluded from the comparis
 
 `annotation/models/models.py:AnnotationRun.get_for_variant` answers "is this variant in progress" by range-lock bounds
 and pipeline type, so a variant inside a lock with no row reads as pending, not missing; an unannotated count must apply
-`VARIANT_ANNOTATION_Q` or it will count reference variants that never get rows. Range locks and ClinVar rows PROTECT
+`get_variant_annotation_q_list` or it will count reference variants that never get rows. Range locks and ClinVar rows PROTECT
 their variants (`annotation/models/models.py:AnnotationRangeLock.release_variant` is the way to move a lock's endpoint
 off a variant you need to delete).
 

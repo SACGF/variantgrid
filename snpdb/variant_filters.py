@@ -5,7 +5,7 @@
 """
 import operator
 from collections.abc import Iterable
-from functools import lru_cache, reduce
+from functools import reduce
 from typing import Any, Optional
 
 from django.conf import settings
@@ -18,7 +18,7 @@ from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
-from snpdb.models.models_variant import Sequence, Variant
+from snpdb.models.models_variant import Sequence, Variant, get_base_and_reference_sequence_ids
 
 # The smallest standard autosome - a brand new user's default, so their first page load is cheap
 DEFAULT_CONTIG_NAME = "21"
@@ -41,39 +41,13 @@ class VariantType:
 GENE_LEVEL_VARIANT_TYPES = [VariantType.FUSION, VariantType.COPY_NUMBER, VariantType.SPLICE]
 
 
-def _lookup_sequence_ids() -> dict[str, int]:
-    return Sequence.get_pk_by_seq(Q(seq__in=[*Variant.BASES, Variant.REFERENCE_ALT]))
-
-
-@lru_cache
-def _cached_sequence_ids() -> dict[str, int]:
-    return _lookup_sequence_ids()
-
-
-def _get_sequence_ids() -> dict[str, int]:
-    """ pks of the single base sequences and of the reference alt - the type filters compare these
-        against Variant.alt_id / Locus.ref_id rather than joining snpdb_sequence to test seq, which
-        collapses the planner's row estimate and costs the streaming plan (#1887).
-
-        Sequence rows are never deleted, so the pks are cached - except under test, where each
-        database builds its own (@see library.guardian_utils.admin_bot). A database that doesn't have
-        them all yet (nothing imported) is looked up again rather than cached as missing """
-    if settings.UNIT_TEST:
-        return _lookup_sequence_ids()
-    sequence_ids = _cached_sequence_ids()
-    if len(sequence_ids) <= len(Variant.BASES):
-        _cached_sequence_ids.cache_clear()
-        sequence_ids = _lookup_sequence_ids()
-    return sequence_ids
-
-
 def _base_sequence_ids() -> list[int]:
-    sequence_ids = _get_sequence_ids()
+    sequence_ids = get_base_and_reference_sequence_ids()
     return [pk for seq, pk in sequence_ids.items() if seq in Variant.BASES]
 
 
 def _base_and_reference_sequence_ids() -> list[int]:
-    return list(_get_sequence_ids().values())
+    return list(get_base_and_reference_sequence_ids().values())
 
 
 def get_snv_q() -> Q:
@@ -178,17 +152,38 @@ def get_variant_type_q(variant_type: str) -> Q:
     raise ValueError(msg)
 
 
+# SNV, indel and complex test both the ref and the alt of nearly every row, where the other types turn
+# a typical (SNV or indel) row away on their first test - so each costs about two of the others (#2062)
+_SEQUENCE_VARIANT_TYPES = {VariantType.SNV, VariantType.INDEL, VariantType.COMPLEX}
+
+
+def _variant_types_cost(variant_types: Iterable[str]) -> int:
+    return sum(2 if vt in _SEQUENCE_VARIANT_TYPES else 1 for vt in variant_types)
+
+
+def _any_variant_type_q(variant_types: Iterable[str]) -> Q:
+    return reduce(operator.or_, [get_variant_type_q(vt) for vt in sorted(variant_types)])
+
+
 def get_variant_types_q(variant_types: Optional[Iterable[str]],
                         all_variant_types: Optional[Iterable[str]] = None) -> Optional[Q]:
-    """ Returns None (ie no restriction) when the selection is empty or covers every available type """
+    """ Returns None (ie no restriction) when the selection is empty or covers every available type.
+
+        The available types cover every variant between them (as returning None for all of them already
+        assumes), so a selection can also be built as "none of the unselected types". Each row is tested
+        against the types in turn, so whichever side costs less is used - the default AllVariantsNode
+        (everything but reference) is a single alt_id exclusion rather than a 7-way OR """
     if not variant_types:
         return None
     selected = set(variant_types)
     if all_variant_types is None:
         all_variant_types = get_all_variant_types()
-    if selected.issuperset(all_variant_types):
+    unselected = set(all_variant_types) - selected
+    if not unselected:
         return None
-    return reduce(operator.or_, [get_variant_type_q(vt) for vt in sorted(selected)])
+    if _variant_types_cost(unselected) < _variant_types_cost(selected):
+        return ~_any_variant_type_q(unselected)
+    return _any_variant_type_q(selected)
 
 
 def get_gene_level_contig_ids(genome_build: GenomeBuild) -> list[int]:

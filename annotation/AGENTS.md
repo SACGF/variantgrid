@@ -61,7 +61,7 @@ Gotchas:
   get_variant_queryset_for_annotation_version raise DataArchivedError, so check data_archived before assuming rows.
 - annotation_variantannotation partitions are per VAV and huge in production: bulk work goes through COPY / temp
   tables (annotation/backfill_columns.py:import_backfill_vcf, `annotation_backfill_columns`), never per-row ORM updates.
-- annotation/models/models.py:VariantAnnotation.VARIANT_ANNOTATION_Q excludes reference (ref == alt) and '.'/'*' alt
+- annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list excludes reference (ref == alt) and '.'/'*' alt
   variants; they never get rows, so any "unannotated" count must apply it.
 - annotation/models/models.py:AnnotationRun.get_for_variant matches by range-lock bounds and pipeline_type: a variant
   inside a lock's range with no annotation row reads as "in progress", not "missing".

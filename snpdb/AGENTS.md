@@ -16,6 +16,8 @@ Patterns here:
   snpdb_sequence to test `seq` looks 4-in-97k selective on each side, so the planner drops the streaming plan off the
   locus index and full-sorts the result set (#1887).
 - Reference variants (alt == "=", models/models_variant.py:Variant.REFERENCE_ALT) exist on purpose; exclude them with models/models_variant.py:Variant.get_no_reference_q when you mean real calls.
+  It looks up the "=" Sequence pk (models/models_variant.py:get_base_and_reference_sequence_ids), so build it inside a
+  function, never in a class constant: at import it queries before the app is ready and bakes one database's pk into tests.
 - Canonicalise coordinates before lookup or insert with models/models_variant.py:VariantCoordinate.as_internal_canonical_form (alts >= settings.VARIANT_SYMBOLIC_ALT_SIZE become <DEL>/<DUP>/<INV> with svlen); models/models_variant.py:Variant.qs_from_variant_coordinate does this for you. Variant is unique on (locus, alt, svlen).
 - Bulk-insert variants through variant_pk_lookup.py:VariantPKLookup (hash to pk, COPY of unknowns in batch_check); tests/utils/vcf_testing_utils.py:slowly_create_test_variant is the one-at-a-time test version.
 - Always save Sequence via the model: models/models_variant.py:Sequence.save fills seq_sha256_hash, and the unique constraint is on the hash, not on seq.
