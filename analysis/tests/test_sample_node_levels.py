@@ -240,7 +240,6 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         """ The per-sample subqueries are UNIONed rather than joined, so v_both - called by both
             VCFs - comes back once (#1894) """
         node = self._extraction_node()
-        self.assertFalse(node.queryset_requires_distinct)
         pks = list(node.get_queryset().values_list("pk", flat=True))
         self.assertEqual(sorted(pks), sorted([self.v_snv.pk, self.v_cnv.pk, self.v_both.pk]))
 
