@@ -91,7 +91,7 @@ def node_reveal_hidden(request, analysis_id, node_id):
     edges = []
     for revealed in AnalysisNode.objects.filter(pk__in=revealed_ids).select_subclasses():
         nodes.append(get_rendering_dict(revealed))
-        for parent in revealed.analysisnode_ptr.parents():
+        for parent in revealed.parents():
             edges.append(revealed.get_connection_data(parent))
     return JsonResponse({"nodes": nodes, "edges": edges})
 
@@ -192,7 +192,7 @@ def nodes_copy(request, analysis_id):
     for group in topo_sorted:
         for node in group:
             template_node = get_node_subclass_or_404(request.user, node.id)
-            parents = list(template_node.analysisnode_ptr.parents())
+            parents = list(template_node.parents())
 
             clone_node = template_node.save_clone()
             clone_node.x += copy_x_offset

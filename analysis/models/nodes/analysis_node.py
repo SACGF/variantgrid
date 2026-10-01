@@ -20,7 +20,7 @@ from celery.canvas import Signature
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.cache import cache
-from django.core.exceptions import FieldError, ValidationError
+from django.core.exceptions import FieldError
 from django.db import connection, models, transaction
 from django.db.models import BooleanField, F, Func, IntegerField, QuerySet, Value
 from django.db.models.aggregates import Count
@@ -30,7 +30,7 @@ from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from django_dag.models import NodeBase, edge_factory, node_factory
+from django_dag.models import edge_factory, node_factory
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
@@ -1300,17 +1300,17 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             edge.delete()
         self.parents_changed = True
 
+    def parents(self):
+        """ django_dag queries self.__class__, so on a subclass would only find parents of that same subclass.
+            Its walks (ancestors_set, get_roots etc) all go through here """
+        return AnalysisNode.objects.filter(children=self)
+
     @staticmethod
     def circular_checker(parent, child):
-        """ Called by AnalysisEdge.save(). django_dag walks parent.__class__'s parents and compares instances, so
-            given subclasses it never sees a cycle through another node type - check on the base rows (#2060) """
-        def as_base_node(node):
-            return getattr(node, "analysisnode_ptr", node)  # built from the subclass's columns, no query
-
-        try:
-            NodeBase.circular_checker(as_base_node(parent), as_base_node(child))
-        except ValidationError as e:
-            raise NonFatalNodeError(f"Not connecting node {parent.pk} to {child.pk}: {e.message}") from e
+        """ Called by AnalysisEdge.save(). django_dag's version compares instances, and a subclass never equals
+            the base rows ancestors_set() returns (#2060) """
+        if parent.pk == child.pk or child.pk in {node.pk for node in parent.ancestors_set()}:
+            raise NonFatalNodeError(f"Not connecting node {parent.pk} to {child.pk} - it would create a cycle")
 
     def handle_ancestor_input_samples_changed(self):
         pass

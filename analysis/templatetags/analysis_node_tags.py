@@ -58,11 +58,8 @@ class AnalysisNodeConnectionsJSNode(template.Node):
             nodes = self.nodes_variable.resolve(context)
             connections = []
             for node in nodes:
-                # NOTE: I am not sure why I have to call analysisnode_ptr but I do...
-                if hasattr(node, "analysisnode_ptr"):
-                    for parent in node.analysisnode_ptr.parents():
-                        values = node.get_connection_data(parent)
-                        connections.append(values)
+                for parent in node.parents():
+                    connections.append(node.get_connection_data(parent))
             return json.dumps(connections)
         except template.VariableDoesNotExist:
             return ''
