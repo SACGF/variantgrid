@@ -1,6 +1,7 @@
 """
 Node graph operations that span the whole analysis: get_toposorted_nodes (parents before children),
 get_nodes_by_id, reload_analysis_nodes (bump versions and requeue, optionally only error nodes),
+get_hidden_error_node_statuses (hidden template branches that would only error, so are never loaded),
 update_analysis_tag_node_counts (tags do not bump versions, so tag nodes recount here),
 cancel_node_tasks (stop running loads) and get_rendering_dict for the DAG canvas. The per-node
 lifecycle is analysis_node.py; scheduling is analysis/tasks/.
@@ -23,8 +24,10 @@ from django.utils import timezone
 
 from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeStatus
+from analysis.models.enums import NodeErrorSource
 from analysis.models.nodes.analysis_node import (
     AnalysisEdge,
+    AnalysisNode,
     NodeTask,
     NodeVersion,
     node_query_planner_settings,
@@ -173,31 +176,75 @@ def update_analysis_tag_node_counts(analysis: Analysis, tag_labels=None):
             cursor.execute(sql, [json.dumps(tag_node_counts), now, node_version_id])
 
 
+def get_hidden_error_node_statuses(nodes_by_id, parent_ids_by_child, analysis_errors, node_ids=None) -> dict:
+    """ A template run hides a node that fails configuration and every node below it (analysis_templates.py).
+        Loading one would only set an error status, so it's set directly and the node stays in error until
+        node_reveal_hidden shows it again. Decided on the node's errors rather than visible alone - the
+        hidden analysis tags node (TagNode.get_analysis_tags_node) has none, so it keeps loading. A stored
+        load failure (NodeErrorSource.INTERNAL_ERROR) is left for a reload to retry.
+
+        node_ids - check these (default all) plus any hidden ancestors they need
+        returns {node_id: error status} for the hidden nodes that would only error """
+    error_statuses = {}
+    checked = set()
+
+    def check(node_id):
+        if node_id not in checked:
+            checked.add(node_id)
+            node = nodes_by_id.get(node_id)
+            if node is not None and not node.visible:
+                parent_ids = parent_ids_by_child.get(node_id, ())
+                node._cached_analysis_errors = analysis_errors
+                node._cached_parents = [nodes_by_id[parent_id] for parent_id in parent_ids]
+                errors = [(source, error) for source, error in node.get_errors(include_parent_errors=False)
+                          if source != NodeErrorSource.INTERNAL_ERROR]
+                if any(check(parent_id) for parent_id in parent_ids):
+                    errors.append((NodeErrorSource.PARENT, "Parent has errors"))
+                if errors:
+                    error_statuses[node_id] = AnalysisNode.get_status_from_errors(errors)
+        return error_statuses.get(node_id)
+
+    if node_ids is None:
+        node_ids = nodes_by_id
+    for node_id in node_ids:
+        check(node_id)
+    return error_statuses
+
+
 def reload_analysis_nodes(analysis_id, only_errors=False):
     """ only_errors: only reload nodes with error statuses (children of error nodes
-        have ERROR_WITH_PARENT status, so the error set is closed under descendants) """
+        have ERROR_WITH_PARENT status, so the error set is closed under descendants)
+        Hidden nodes that would only error are set to that status rather than reloaded
+        @see get_hidden_error_node_statuses """
     with disable_auditlog():
         start = time.time()
         analysis = Analysis.objects.get(pk=analysis_id)
         nodes_qs = analysis.analysisnode_set.all()
         nodes_by_id = get_nodes_by_id(nodes_qs.select_subclasses())
-        parents = defaultdict(list)
+        parent_ids_by_child = defaultdict(set)
         for parent, child in AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child"):
-            parents[child].append(nodes_by_id[parent])
+            parent_ids_by_child[child].add(parent)
 
         analysis_errors = analysis.get_errors()
+        hidden_error_statuses = get_hidden_error_node_statuses(nodes_by_id, parent_ids_by_child, analysis_errors)
+        hidden_error_nodes_by_status = defaultdict(list)
         valid_nodes = []
         invalid_nodes = []
         for node_id, node in nodes_by_id.items():
+            if error_status := hidden_error_statuses.get(node_id):
+                if node.status != error_status:
+                    hidden_error_nodes_by_status[error_status].append(node_id)
+                continue
             node._cached_analysis_errors = analysis_errors
-            node._cached_parents = parents.get(node_id, [])
+            node._cached_parents = [nodes_by_id[parent_id] for parent_id in parent_ids_by_child.get(node_id, ())]
             if only_errors and not NodeStatus.is_error(node.status):
                 continue
             if node.get_errors():
                 invalid_nodes.append(node_id)
             else:
                 valid_nodes.append(node_id)
-        num_nodes = len(valid_nodes) + len(invalid_nodes)
+        hidden_error_nodes = [node_id for node_ids in hidden_error_nodes_by_status.values() for node_id in node_ids]
+        num_nodes = len(valid_nodes) + len(invalid_nodes) + len(hidden_error_nodes)
 
         update_kwargs = {
             "status": NodeStatus.DIRTY,
@@ -211,9 +258,11 @@ def reload_analysis_nodes(analysis_id, only_errors=False):
             nodes_qs.filter(pk__in=valid_nodes).update(valid=True, **update_kwargs)
         if invalid_nodes:
             nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, **update_kwargs)
+        for error_status, node_ids in hidden_error_nodes_by_status.items():
+            nodes_qs.filter(pk__in=node_ids).update(valid=False, **(update_kwargs | {"status": error_status}))
 
         node_versions = []
-        reloaded_qs = nodes_qs.filter(pk__in=valid_nodes + invalid_nodes)
+        reloaded_qs = nodes_qs.filter(pk__in=valid_nodes + invalid_nodes + hidden_error_nodes)
         for node_id, version in reloaded_qs.values_list("pk", "version"):
             node_versions.append(NodeVersion(node_id=node_id, version=version))
         if node_versions:

@@ -221,6 +221,9 @@ Gotchas:
   URL (`analysis/views/views_node.py:node_view`).
 - A worker that dies mid-LOADING perma-fails the node on the next sweep (`lease_ready_nodes`) on the assumption it OOM'd
   the box; only QUEUED nodes are re-leased, up to `analysis/tasks/node_update_tasks.py:MAX_NODE_ATTEMPTS`.
+- A hidden (`visible=False`) node with errors is never dispatched: reload and `lease_ready_nodes` set it straight to its
+  error status (`analysis/models/nodes/node_utils.py:get_hidden_error_node_statuses`), so a template's hidden branch
+  stays in error until revealed (#2076). A hidden node that must load, like the analysis tags TagNode, needs no errors.
 - Templates run by cloning the snapshot then setting AnalysisVariable-bound fields in toposort order
   (`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments`); a source node's editor gets the variable
   widget only when `analysis.template_type == TEMPLATE` (`analysis/views/nodes/node_view.py:NodeView.get_form`).
