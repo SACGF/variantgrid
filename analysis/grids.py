@@ -186,12 +186,8 @@ class VariantGrid(AbstractVariantGrid):
             annotation_gnomad_version = self.node.analysis.annotation_version.variant_annotation_version.gnomad
         except AttributeError:
             annotation_gnomad_version = None
-        # Reuse the node's own cohort genotype joins - an intermediate node can widen them to the common
-        # collection, and the columns have to show the rows the node took from there
-        node_aliases = set(self.node.get_annotation_kwargs())
         annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants,
-                                                                            annotation_gnomad_version=annotation_gnomad_version,
-                                                                            existing_annotation_kwargs=node_aliases))
+                                                                            annotation_gnomad_version=annotation_gnomad_version))
         return annotation_kwargs
 
     def known_count(self, qs) -> Optional[int]:
