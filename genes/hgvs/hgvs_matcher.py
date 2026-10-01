@@ -31,7 +31,7 @@ from genes.hgvs.hgvs_converter import (
 from genes.hgvs.hgvs_variant import HGVSVariant
 from genes.models import (
     BadTranscript,
-    GeneAnnotationImport,
+    CdotDataVersion,
     LRGRefSeqGene,
     NoTranscript,
     Transcript,
@@ -383,16 +383,9 @@ class HGVSMatcher:
     @timed_cache(ttl=10 * MINUTE_SECS)
     def get_latest_cdot_data_version(self) -> str:
         """ Fallback: cdot data version of this genome build's most recent import
-
-            An import rewrites every TranscriptVersion in its file, so those under the build's newest
-            GeneAnnotationImport carry the latest version - and import_source is indexed, where walking
-            TranscriptVersion back by pk has to skip every build imported after this one.
             The ttl is about the length of an import, which runs in its own process """
-        latest_import = GeneAnnotationImport.objects.filter(genome_build=self.genome_build).order_by('-pk')
-        tv_qs = TranscriptVersion.objects.filter(import_source=latest_import.values('pk')[:1])
-        # Sliced rather than first(), which would order by pk and sort the whole import
-        cdot_versions = tv_qs.exclude(data__cdot=None).values_list('data__cdot', flat=True)[:1]
-        return next(iter(cdot_versions), '')
+        cdot_qs = CdotDataVersion.objects.filter(genome_build=self.genome_build).order_by("-modified")
+        return cdot_qs.values_list("cdot_version", flat=True).first() or ''
 
     def get_variant_coordinate_and_details(self, hgvs_string: str) -> VariantCoordinateAndDetails:
         """ Returns variant_coordinate and method for HGVS resolution = """

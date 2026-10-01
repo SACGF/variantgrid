@@ -3,7 +3,7 @@ import os
 from django.conf import settings
 
 from annotation.vep_annotation import VEPConfig
-from genes.models import TranscriptVersion
+from genes.models import CdotDataVersion, TranscriptVersion
 from snpdb.models import GenomeBuild
 
 _VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
@@ -97,13 +97,12 @@ def check_cdot_data() -> dict:
 
         tag_name = get_latest_data_release_tag_name()
         cdot_data_version = _get_version_from_tag_name(tag_name, data_version=True)
-        valid = False
-        if last_tv := TranscriptVersion.objects.all().order_by("pk").last():
-            our_latest_cdot = last_tv.data.get("cdot")
-            valid = cdot_data_version == our_latest_cdot
+        # Only the build/consortium combinations a deployment has imported - one never imported is cdot_{build}'s job
+        cdot_qs = CdotDataVersion.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation())
+        our_cdot_versions = set(cdot_qs.values_list("cdot_version", flat=True))
         cdot_data = {
-            "valid": valid,
-            "notes": f"data version = latest ({cdot_data_version})",
+            "valid": our_cdot_versions == {cdot_data_version},
+            "notes": f"data version ({', '.join(sorted(our_cdot_versions))}) = latest ({cdot_data_version})",
             "fix": "python3 manage.py import_cdot_latest"
         }
         cdot_checks["latest_cdot_data"] = cdot_data
