@@ -131,9 +131,13 @@ Gotchas:
   create-data-from-header tasks must stay idempotent. A retry finds the VCF the first attempt created and skips
   create_vcf_from_vcf, so the sequencing link (upload/vcf/vcf_import.py:link_uploaded_vcf_to_sequencing) is re-run
   on that path too - it is where a sample the sheet doesn't name fails, and without it the retry imports unlinked.
-- A VCF whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
-  (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask); declare genome_build/source as
-  upload metadata (upload/upload_metadata.py:validate_upload_metadata).
+- A VCF or BED whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
+  through upload/models/models.py:UploadPipeline.terminate_early_for_user_input
+  (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask; a single-shot ImportTask raises
+  upload/tasks/import_task.py:ImportRequiresUserInputException); declare genome_build/source as upload metadata
+  (upload/upload_metadata.py:validate_upload_metadata). Setting the build on the data's page finishes it - a VCF
+  re-runs its pipeline, a BED is processed in place (upload/models/models_uploaded_files.py:UploadedBed). The
+  upload page's "Requires input" icon comes off UploadData.requires_user_input, not the pipeline status.
 - Sample ImportStatus only moves with its VCF, through snpdb/import_status.py:set_vcf_and_samples_import_status
   (success from ImportGenotypeVCFSuccessTask, error from UploadPipeline.error). A finish task list that closes the
   pipeline before the success task leaves the VCF Importing forever - the success step is SKIPPED, not run.

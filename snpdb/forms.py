@@ -878,7 +878,7 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
             # Toggle REQUIRES_USER_INPUT if genome build set or not
             if instance.import_status == ImportStatus.REQUIRES_USER_INPUT:
                 if instance.genome_build is not None:
-                    instance.uploadedbed.process_bed_file()
+                    instance.uploadedbed.process_bed_file_after_user_input()
             elif instance.import_status == ImportStatus.SUCCESS:
                 if instance.genome_build is None:
                     instance.import_status = ImportStatus.REQUIRES_USER_INPUT
