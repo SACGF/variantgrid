@@ -131,14 +131,13 @@ function bottomPaneGridHidden() {
     return bottomPaneTabsEnabled() && activeBottomPaneTab !== BOTTOM_PANE_GRID;
 }
 
-// Set by node_data_grid.html when it built a grid whose rows we skipped because the Grid tab was hidden
+/* Set by node_data_grid.html when it built a grid whose rows we skipped because the Grid tab was hidden.
+   Only a node under the auto-load row count registers one - a bigger node shows its placeholder when
+   the tab comes up, and loads from its "Show grid" button. */
 let deferredGridLoad = null;
-// A big grid still sits behind its placeholder until the user picks the Grid tab themselves
-let deferredGridLoadNeedsUserRequest = false;
 
-function registerDeferredGridLoad(loadFunc, needsUserRequest) {
+function registerDeferredGridLoad(loadFunc) {
     deferredGridLoad = loadFunc;
-    deferredGridLoadNeedsUserRequest = Boolean(needsUserRequest);
 }
 
 // Editor tabs share a pane, so they're told apart by which node editor tab they point at
@@ -332,8 +331,8 @@ function updatePaneVisibility() {
     $("#node-grid-container").toggle(!docked || activeBottomPaneTab === BOTTOM_PANE_GRID);
 }
 
-function gridPaneShown(userRequestedGrid) {
-    if (deferredGridLoad && (userRequestedGrid || !deferredGridLoadNeedsUserRequest)) {
+function gridPaneShown() {
+    if (deferredGridLoad) {
         const loadFunc = deferredGridLoad;
         deferredGridLoad = null;
         loadFunc();
@@ -341,9 +340,7 @@ function gridPaneShown(userRequestedGrid) {
     resizeGrid();  // a table sized while hidden measures zero width
 }
 
-/* userRequestedGrid is the user asking for the grid itself (clicking the Grid tab) rather than the
-   pane coming up for some other reason - that's the choice the big-grid placeholder asks for */
-function showBottomPaneTab(name, userRequestedGrid) {
+function showBottomPaneTab(name) {
     if (!isHorizontalMode()) {
         return;
     }
@@ -351,7 +348,7 @@ function showBottomPaneTab(name, userRequestedGrid) {
     updatePaneVisibility();
     updateMirroredTabHighlight();
     if ($("#node-grid-container").is(":visible")) {
-        gridPaneShown(userRequestedGrid);
+        gridPaneShown();
     }
 }
 
@@ -453,7 +450,7 @@ function setupBottomPaneTabs() {
             showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);
         } else {
             setNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // clicking Grid asks for the variant grid
-            showBottomPaneTab(pane, pane === BOTTOM_PANE_GRID);
+            showBottomPaneTab(pane);
         }
     });
     $("#undock-editor-button", tabs).click(function() {
