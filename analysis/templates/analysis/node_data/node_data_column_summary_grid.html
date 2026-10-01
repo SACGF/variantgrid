@@ -1,19 +1,18 @@
 {% extends "analysis/node_data/base_node_data.html" %}
 
+{# The Summary tab stacks one of these per picked column, so ids carry the column name #}
 {% block docreadyjs %}
-		$(".loading-message").hide();
+		$("#column-summary-{{ node_id }}-{{ grid_column_name }} .loading-message").hide();
 {% endblock docreadyjs %}
 
 
 {% block content %}
-<div id='dataframe-container'>
+<div id='column-summary-{{ node_id }}-{{ grid_column_name }}'>
 
 	<div class="loading-message">Loading column summary....</div>
 
-	<div id='node-dataframe-grid' class='node-data'>
-	<table id='dataframe-grid-{{ node_id }}' class='grid sticky-header'
+	<table id='dataframe-grid-{{ node_id }}-{{ grid_column_name }}' class='grid sticky-header'
 	       data-datatable-url="{% url 'node_column_summary_datatable' analysis_id=analysis_id node_id=node_id node_version=node_version extra_filters=extra_filters variant_column=grid_column_name significant_figures=significant_figures %}"></table>
-	</div>
 
 </div>
 {% endblock content %}
