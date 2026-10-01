@@ -13,7 +13,7 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Any, Optional, Union
 
 import django
@@ -664,6 +664,32 @@ class Sequence(models.Model):
         return self.seq.startswith(prefix)
 
 
+def _lookup_base_and_reference_sequence_ids() -> dict[str, int]:
+    return Sequence.get_pk_by_seq(Q(seq__in=[*Variant.BASES, Variant.REFERENCE_ALT]))
+
+
+@lru_cache
+def _cached_base_and_reference_sequence_ids() -> dict[str, int]:
+    return _lookup_base_and_reference_sequence_ids()
+
+
+def get_base_and_reference_sequence_ids() -> dict[str, int]:
+    """ pks of the single base sequences and of the reference alt - the variant type filters compare
+        these against Variant.alt_id / Locus.ref_id rather than joining snpdb_sequence to test seq, which
+        collapses the planner's row estimate and costs the streaming plan (#1887).
+
+        Sequence rows are never deleted, so the pks are cached - except under test, where each
+        database builds its own (@see library.guardian_utils.admin_bot). A database that doesn't have
+        them all yet (nothing imported) is looked up again rather than cached as missing """
+    if settings.UNIT_TEST:
+        return _lookup_base_and_reference_sequence_ids()
+    sequence_ids = _cached_base_and_reference_sequence_ids()
+    if len(sequence_ids) <= len(Variant.BASES):
+        _cached_base_and_reference_sequence_ids.cache_clear()
+        sequence_ids = _lookup_base_and_reference_sequence_ids()
+    return sequence_ids
+
+
 class Locus(models.Model):
     """ 1 per line in a VCF file (multiple Variants with different alt alleles point to the same locus)
         There is only 1 Locus for a given chrom/position/ref per database (handled via insertion queues) """
@@ -724,7 +750,11 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_reference_q() -> Q:
-        return Q(alt__seq=Variant.REFERENCE_ALT)
+        """ On alt_id rather than alt__seq, which joins snpdb_sequence (#1887) """
+        reference_id = get_base_and_reference_sequence_ids().get(Variant.REFERENCE_ALT)
+        if reference_id is None:
+            return Q(pk__isnull=True)  # No reference alt sequence, so no reference variants
+        return Q(alt_id=reference_id)
 
     @staticmethod
     def get_no_reference_q() -> Q:

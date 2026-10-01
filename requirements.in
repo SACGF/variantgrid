@@ -19,7 +19,7 @@ django-axes[ipware]
 django_cache_memoize
 django-compressor
 django_crispy_forms
-django_dag
+django_dag  # only imported by old seqauto/annotation migrations - remove after squashing (#736)
 django_datetime_utc
 django-extensions
 django-guardian

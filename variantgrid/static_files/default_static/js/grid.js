@@ -554,12 +554,14 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
     });
 }
 
-// Fire the row query for a node whose table was built but held back (@see setupNodeGrid autoLoad)
+/* Fire the row query for a node whose table was built but held back (@see setupNodeGrid autoLoad).
+   Returns false when there's no table to load - node errors, or the pane was replaced */
 function loadNodeGridData(nodeId, unique_code) {
     const dataTable = getNodeDataTable(nodeId, unique_code);
     if (dataTable) {
         dataTable.ajax.reload();
     }
+    return Boolean(dataTable);
 }
 
 // True once the grid has actually fetched rows - a built-but-deferred table has made no request

@@ -140,9 +140,10 @@ $(document).ready(function() {
     const alreadyLoaded = aWin.loadedGridVersions[{{ node_id }}] === {{ node_version }};
     const wantsGrid = {{ grid_auto_load|yesno:"true,false" }} || alreadyLoaded;
     // Nothing to show while the Editor tab is up, so don't pay for the rows - the tab-show handler
-    // in analysis.js fires the load we register below.
-    const gridTabHidden = typeof bottomPaneGridHidden === "function" && bottomPaneGridHidden();
-    const autoLoad = wantsGrid && !gridTabHidden;
+    // in analysis.js fires the load we register below. A node over the threshold isn't deferred: its
+    // placeholder shows with the tab, and the rows wait for "Show grid".
+    const deferredForHiddenTab = wantsGrid && typeof bottomPaneGridHidden === "function" && bottomPaneGridHidden();
+    const autoLoad = wantsGrid && !deferredForHiddenTab;
 
     const showGrid = function() {
         $("#grid-placeholder-{{ node_id }}").hide();
@@ -153,8 +154,9 @@ $(document).ready(function() {
         // We have retrieved it (or are about to) - show the grid, never the placeholder.
         showGrid();
     }
-    setupNodeGrid(config_url, handler_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code,
-                  gridComplete, gridLoadError, on_error_function, autoLoad).then(function(built) {
+    const gridSetup = setupNodeGrid(config_url, handler_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }},
+                                    unique_code, gridComplete, gridLoadError, on_error_function, autoLoad);
+    gridSetup.then(function(built) {
         if (built) {
             addNodeGridExportButtons(unique_code);
         }
@@ -164,13 +166,20 @@ $(document).ready(function() {
         showGrid();
         // Double-helix over just the grid section (editor stays usable) while phase 2 runs.
         showGridLoadingOverlay("#node-grid-container");
-        loadNodeGridData({{ node_id }}, unique_code);  // fires deferred phase 2
+        // The Grid tab can come up before the table is built - the rows need the table to load into
+        const loadOnceBuilt = function() {
+            if ($("#" + unique_code, "#node-data-container").length === 0) {
+                return;  // user moved to another node - the overlay is now that node's
+            }
+            if (!loadNodeGridData({{ node_id }}, unique_code)) {  // fires deferred phase 2
+                hideGridLoadingOverlay();  // no data callback is coming to clear it
+            }
+        };
+        gridSetup.then(loadOnceBuilt, loadOnceBuilt);
     };
 
-    if (gridTabHidden) {
-        // Picking the Grid tab is itself the user asking for the rows, so it stands in for the
-        // placeholder's "Show grid" click on a node over the row-count threshold
-        registerDeferredGridLoad(loadDeferredGrid, !wantsGrid);
+    if (deferredForHiddenTab) {
+        registerDeferredGridLoad(loadDeferredGrid);
     }
     if (!autoLoad) {
         // Over the row-count threshold - the placeholder gives the user the choice

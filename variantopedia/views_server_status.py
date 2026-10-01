@@ -117,7 +117,7 @@ def _highest_variant_annotation_status() -> dict:
         annotation keeps up with variant insertion. Not annotated is a warning while an AnnotationRun covers
         it, danger when nothing does. """
     try:
-        q = reduce(operator.and_, VariantAnnotation.VARIANT_ANNOTATION_Q)
+        q = reduce(operator.and_, VariantAnnotation.get_variant_annotation_q_list())
         highest_variant = Variant.objects.filter(q).order_by("pk").last()
         genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
         vav = VariantAnnotationVersion.latest(genome_build)

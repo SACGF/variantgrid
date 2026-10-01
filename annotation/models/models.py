@@ -2067,14 +2067,17 @@ class VariantAnnotation(AbstractVariantAnnotation):
         }
     }
 
-    # List of filters to describe variants that can be annotated.
-    # Gene-level variants belong here - they get a VariantAnnotation row like anything else, just
-    # written by the GENE_LEVEL pipeline rather than VEP. Which pipeline claims them is
-    # pipeline_type_variant_q's business, and it subtracts them from both VEP types.
-    VARIANT_ANNOTATION_Q = [
-        Variant.get_no_reference_q(),
-        ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants
-    ]
+    @staticmethod
+    def get_variant_annotation_q_list() -> list[Q]:
+        """ Filters to describe variants that can be annotated - a method rather than a class constant,
+            as the reference Q looks up a Sequence pk.
+            Gene-level variants belong here - they get a VariantAnnotation row like anything else, just
+            written by the GENE_LEVEL pipeline rather than VEP. Which pipeline claims them is
+            pipeline_type_variant_q's business, and it subtracts them from both VEP types. """
+        return [
+            Variant.get_no_reference_q(),
+            ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants
+        ]
 
     @cached_property
     def is_standard_annotation(self) -> bool:
