@@ -12,9 +12,9 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
-from analysis.models import AnalysisEdge, AnalysisNode, NodeStatus, NodeTask
+from analysis.models import Analysis, AnalysisEdge, AnalysisNode, NodeStatus, NodeTask
 from analysis.models.nodes.analysis_node import LEASE_SECONDS, NodeCache, NodeVersion
-from analysis.models.nodes.node_utils import get_nodes_by_id
+from analysis.models.nodes.node_utils import get_hidden_error_node_statuses, get_nodes_by_id
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
 from library.log_utils import log_traceback, report_message
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
@@ -205,6 +205,7 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS, max_n
             .order_by("pk")
         )
         nodes_by_id, parents_by_child = _load_graph(analysis_id)
+        _set_hidden_error_node_statuses(analysis_id, candidates, nodes_by_id, parents_by_child)
         tasks_by_node = {}  # current-version lease rows only
         for nt in NodeTask.objects.filter(node_version__node__analysis_id=analysis_id).select_related("node_version"):
             node = nodes_by_id.get(nt.node_version.node_id)
@@ -213,7 +214,7 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS, max_n
 
         for candidate in candidates:
             node = nodes_by_id.get(candidate.pk)
-            if node is None:
+            if node is None or not NodeStatus.is_loading(node.status):
                 continue
             node_task = tasks_by_node.get(node.pk)
             lease_live = bool(node_task and node_task.lease_expires and node_task.lease_expires >= now)
@@ -272,6 +273,23 @@ def lease_ready_nodes(analysis_id, worker_id, lease_seconds=LEASE_SECONDS, max_n
             if max_nodes is not None and len(leased) >= max_nodes:
                 break
     return leased
+
+
+def _set_hidden_error_node_statuses(analysis_id, candidates, nodes_by_id, parents_by_child):
+    """ A save above a hidden template branch cascades DIRTY into it - set those nodes straight to the
+        error status a load would give them, rather than spend a task each (@see get_hidden_error_node_statuses) """
+    hidden_dirty_ids = [c.pk for c in candidates if c.status == NodeStatus.DIRTY and not c.visible]
+    if not hidden_dirty_ids:
+        return
+    analysis_errors = Analysis.objects.get(pk=analysis_id).get_errors()
+    hidden_error_statuses = get_hidden_error_node_statuses(nodes_by_id, parents_by_child, analysis_errors,
+                                                           node_ids=hidden_dirty_ids)
+    with disable_auditlog():
+        for node_id in hidden_dirty_ids:
+            if error_status := hidden_error_statuses.get(node_id):
+                node = nodes_by_id[node_id]
+                AnalysisNode.objects.filter(pk=node_id, version=node.version).update(status=error_status, valid=False)
+                node.status = error_status
 
 
 def _fail_node(node, message):

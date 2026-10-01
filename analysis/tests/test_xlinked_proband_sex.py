@@ -8,7 +8,13 @@ from guardian.shortcuts import assign_perm
 
 from analysis.forms.forms_nodes import TrioNodeForm
 from analysis.models import Analysis, QuadNode, TrioNode
-from analysis.models.enums import AnalysisTemplateType, QuadInheritance, TrioInheritance, TrioSample
+from analysis.models.enums import (
+    AnalysisTemplateType,
+    NodeStatus,
+    QuadInheritance,
+    TrioInheritance,
+    TrioSample,
+)
 from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
@@ -285,3 +291,4 @@ class TestRevealHiddenNodesIgnoresErrors(TestCase):
         node = self._reveal(node)
         self.assertTrue(node.visible)
         self.assertFalse(node.ignore_field_errors)
+        self.assertEqual(NodeStatus.DIRTY, node.status)  # visible again, so reloaded rather than left in error
