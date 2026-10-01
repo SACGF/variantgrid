@@ -1,7 +1,6 @@
-{% extends menu_variants_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_utils %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 {% load js_tags %}
 {% load genome_build_tags %}
 {% load tag_config_tags %}
@@ -213,7 +212,7 @@
         }
     </style>
 {% endblock head %}
-{% block submenu_page_content %}
+{% block container_table_content %}
         {% genome_build_url_arg genome_build 'genome_build_variants' %}
 
         <h3>Variants</h3>
@@ -293,4 +292,4 @@
         <table id="all-variants-datatable" class="sticky-header"
                data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name %}"
                data-datatable-data="allVariantsDatatableFilter"></table>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

@@ -137,13 +137,13 @@ class FranklinExportRow(ExportRow):
         partial_url = reverse('view_allele', kwargs={"allele_id": self.data.allele.allele_id})
         allele_url = f"{get_url_from_view_path(partial_url)}"
 
-        all_classification_values = [cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) for cm in self.data.cms]
+        all_classification_values: list[str] = [cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) for cm in self.data.cms]
         all_classification_values = [v for v in all_classification_values if v is not None]  # clear out unclassified
         classification_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         all_classification_values = list(classification_key.sort_values(set(all_classification_values)))
         formatted_classification_values = [classification_key.pretty_value(v) for v in all_classification_values]
 
-        all_clinsig_values = [cm.somatic_clinical_significance_value for cm in self.data.cms]
+        all_clinsig_values: list[SomaticClinicalSignificanceValue] = [cm.somatic_clinical_significance_value for cm in self.data.cms]
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
         all_clinsig_values = [cs.pretty_str for cs in sorted(set(all_clinsig_values))]
 

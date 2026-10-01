@@ -1,4 +1,4 @@
-{% extends menu_genes_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load tz %}
 {% load crispy_forms_tags %}
@@ -12,7 +12,7 @@
     <script src="{% static 'js/cached_generated_files.js' %}"></script>
 {% endblock head %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <div id="gene-list-tabs">
         <ul class="nav nav-tabs mb-4" role="tablist">
@@ -89,4 +89,4 @@
 
     <table id="gene-lists-genes-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=gene_list.pk %}"></table>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

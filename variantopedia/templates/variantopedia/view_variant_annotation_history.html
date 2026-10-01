@@ -1,9 +1,9 @@
-{% extends menu_variants_base %}
+{% extends "uicore/page/base_container_table.html" %}
 
 {% block title %}{{ variant }} history{% endblock %}
 
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     {% load help_tags %}
     {% page_help user 'variantopedia/view_variant_annotation_history_help' %}
 

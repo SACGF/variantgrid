@@ -45,6 +45,11 @@ class Test(URLTestCase):
         ]
         cls.upload_pipeline_kwargs = upload_pipeline_kwargs
 
+        cls.PRIVATE_DATATABLE_URL_NAMES_AND_KWARGS = [
+            ("upload_pipeline_skipped_annotation_datatable", upload_pipeline_kwargs, 200),
+            ("upload_pipeline_modified_variants_datatable", upload_pipeline_kwargs, 200),
+        ]
+
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("upload_pipeline_modified_variants_datatable", upload_pipeline_kwargs, None),
@@ -74,6 +79,10 @@ class Test(URLTestCase):
         client.force_login(self.user_non_owner)
         response = client.post(reverse("upload_retry_import", kwargs=self.upload_pipeline_kwargs))
         self.assertEqual(response.status_code, 403)
+
+    @prevent_request_warnings
+    def testDatatableNoPermission(self):
+        self._test_urls(self.PRIVATE_DATATABLE_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
 
     def testDatatableGridListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)

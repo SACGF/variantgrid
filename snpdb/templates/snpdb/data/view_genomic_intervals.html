@@ -1,4 +1,4 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load help_tags %}
 {% load crispy_forms_tags %}
@@ -8,7 +8,7 @@
 	<script src="{% static 'js/cached_generated_files.js' %}"></script>
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 	<div id="genomic_intervals">
 		<h3>Genomic Intervals: {{ gic.name }}</h3>
 

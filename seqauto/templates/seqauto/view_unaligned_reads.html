@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block title %}{{ fastq.id }}{% endblock %}
 {% block head %}
@@ -14,7 +14,7 @@
 {% block jsdocumentready %}
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 	<div>
 	<img class="vcenter" src="{% static 'icons/bases_64.png' %}" /><b>{{ unaligned_reads }}</b>

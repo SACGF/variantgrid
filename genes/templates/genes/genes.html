@@ -1,10 +1,10 @@
-{% extends menu_genes_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load help_tags %}
 {% load genome_build_tags %}
 
 {% block title %}Genes{% endblock title %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 <style>
     .horizontal-fields {
         margin: 6px 0 6px 0;
@@ -68,4 +68,4 @@
 
     </div>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

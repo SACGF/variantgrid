@@ -1,4 +1,4 @@
-{% extends menu_variants_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 
 {% block title %}Tag Stats{% endblock title %}
@@ -95,7 +95,7 @@
 </style>
 {% endblock head %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <h3>Tag Stats</h3>
 
@@ -232,4 +232,4 @@
             </div>
         </div>
     </div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_help %}
 {% block title %}Extractions{% endblock title %}
 
@@ -15,7 +15,7 @@
 }
 {% endblock css %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     {% page_help 'patients/extractions_help' 'Extractions' %}
     <div id="extraction-header">
         <div>
@@ -44,4 +44,4 @@
         </div>
     </div>
     <table id="extraction-datatable" data-datatable-url="{% url 'extraction_datatables' %}" class="sticky-header"></table>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

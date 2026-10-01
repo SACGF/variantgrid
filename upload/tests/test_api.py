@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -17,7 +18,15 @@ from annotation.fake_data import get_fake_annotation_version
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CachedGeneratedFile, GenomeBuild
 from snpdb.models.models_enums import ImportSource, ProcessingStatus
-from upload.models import FileUpload, UploadedFileTypes, UploadedVCF, UploadPipeline
+from upload.models import (
+    FileUpload,
+    SimpleVCFImportInfo,
+    UploadedFileTypes,
+    UploadedVCF,
+    UploadPipeline,
+    UploadStep,
+)
+from upload.models.models_enums import VCFImportInfoSeverity
 
 METRICS_OUTPUT_ORIG = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
                                    "MetricsOutput_orig.tsv")
@@ -314,6 +323,22 @@ class UploadStatusAPITest(UploadAPITestBase):
         self.assertTrue(data["annotation_complete"])
         # Default settings name a template that doesn't exist in tests -> downloads not available
         self.assertFalse(data["downloads_available"])
+
+    def test_status_lists_unaccepted_import_info(self):
+        file_upload = self._create_vcf_upload("status_warnings")
+        upload_step = UploadStep.objects.create(upload_pipeline=file_upload.uploadpipeline, name="Preprocess VCF",
+                                                sort_order=1)
+        SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string="warn")
+        SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string="REF mismatch",
+                                           severity=VCFImportInfoSeverity.ERROR)
+        SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string="accepted",
+                                           accepted_date=timezone.now())
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get(reverse("api_upload_status",
+                                           kwargs={"file_upload_id": file_upload.pk}))
+        self.assertEqual(response.json()["warnings"], [{"severity": "ERROR", "message": "REF mismatch"},
+                                                       {"severity": "WARNING", "message": "warn"}])
 
     def test_status_permission_denied_for_other_user(self):
         file_upload = self._create_vcf_upload("status_perm")

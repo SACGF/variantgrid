@@ -218,6 +218,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "gene_lists": False,
     "genes": False,
     "gene_grid": False,
+    "gene_wiki": False,
 
     # Variants
     "variants": False,
@@ -226,6 +227,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
     "variant_wiki": False,
+    "canonical_transcripts": False,
 
     # Settings
     "change_password": False,
@@ -259,7 +261,6 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # discordance
     "discordance_reports": True,
-
     "classification_candidate_search": False,  # This is for data mining on curation system
     "classification_upload_unmapped": True,
     "condition_matchings": True,

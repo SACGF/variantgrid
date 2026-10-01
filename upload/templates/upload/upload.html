@@ -1,4 +1,4 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load js_tags %}
 {% load crispy_forms_tags %}
@@ -290,7 +290,7 @@ img.thumbnail {
 </script>
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <div class="chunk borderless">
 	{% load ui_help %}
 	{% page_help page_id='data/upload_help' title='Upload' %}

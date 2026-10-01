@@ -5,7 +5,6 @@
 {% load js_tags %}
 {% load ui_utils %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 {% load genome_build_tags %}
 
 {% block head %}
@@ -18,7 +17,6 @@
 {% endblock %}
 
 {% block title %}{{ variant_short_label }}{% endblock %}
-{% block submenu %}{% menu_bar_variants %}{% endblock submenu %}
 
 {% block content %}
     {% if in_multiple_genome_builds %}

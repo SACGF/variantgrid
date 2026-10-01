@@ -1,7 +1,7 @@
 {% load static %}
 {% load js_tags %}
 {% load user_messages_tags %}
-{% load ui_menu_bars %}
+{% load ui_menus %}
 {% load compress %}
 {% load settings_tags %}
 <html lang="en">
@@ -208,7 +208,7 @@
             <nav class="nav navbar-light" aria-orientation="vertical">
                 <div id="global-debug-message"></div>
                 <div id="current-record-spot-fallback"></div>
-                {% block submenu %}{% endblock submenu %}
+                {% block submenu %}{% menu_bar_sub %}{% endblock submenu %}
                 {% site_messages site_messages %}
             </nav>
         </div>

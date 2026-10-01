@@ -14,6 +14,7 @@ from patients.signals.patient_search import (
     sample_preview_patient_extra,
 )
 from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
+from snpdb.search import search_data
 
 
 class TestSamplePreviewPatientExtra(TestCase):
@@ -47,3 +48,11 @@ class TestSamplePreviewPatientExtra(TestCase):
     def test_patient_preview_phenotype(self):
         extras = patient_preview_phenotype_extra(sender=Patient, user=self.user, obj=self.patient)
         self.assertEqual({kv.key: kv.value for kv in extras}, {"HPO": "Increased thyroid-stimulating hormone level"})
+
+    def test_patient_search_only_finds_viewable_patients(self):
+        def found(user) -> bool:
+            results = search_data(user, "PT-1", False).results
+            return any(r.preview.internal_url == self.patient.get_absolute_url() for r in results)
+
+        self.assertTrue(found(self.user))
+        self.assertFalse(found(self.other_user))

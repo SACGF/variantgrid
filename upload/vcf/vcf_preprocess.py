@@ -30,10 +30,12 @@ from upload.models import (
     VCFSkippedContig,
     VCFSkippedContigs,
 )
+from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.unknown_variants_task import (
     AnnotateImportedVCFTask,
     SeparateUnknownVariantsTask,
 )
+from upload.vcf.vcf_ref_check import check_vcf_ref_matches_build
 
 MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
@@ -313,13 +315,20 @@ def _reset_for_retry(files: PreprocessFiles, sub_steps: dict):
             os.remove(filename)
 
 
-def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
+def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False, check_ref=False):
+    """ check_ref: fail/flag a VCF whose REF bases mostly disagree with the build (@see vcf_ref_check) -
+        for files from outside, not the ones we write from our own coordinates """
     genome_build = upload_step.genome_build
     _ = genome_build.reference_fasta  # Fails if not available.
 
     vcf_filename = upload_step.input_filename
     if not os.path.exists(vcf_filename):
         raise FileNotFoundError(f"Can't access vcf: '{vcf_filename}'")
+
+    if check_ref:
+        if ref_mismatch_message := check_vcf_ref_matches_build(vcf_filename, genome_build):
+            SimpleVCFImportInfo.objects.create(upload_step=upload_step, severity=VCFImportInfoSeverity.ERROR,
+                                               message_string=ref_mismatch_message)
 
     upload_pipeline = upload_step.upload_pipeline
     cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
