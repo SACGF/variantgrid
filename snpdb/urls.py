@@ -80,6 +80,7 @@ urlpatterns = [
     path('duos', views_cohort.duos, name='duos'),
     path('view_duo/<int:pk>', views_cohort.view_duo, name='view_duo'),
     path('sample_files_tab/<int:sample_id>', views_data.sample_files_tab, name='sample_files_tab'),
+    path('vcf_sample_files_tab/<int:vcf_id>', views_data.vcf_sample_files_tab, name='vcf_sample_files_tab'),
     path('sample_variants_tab/<int:sample_id>', views_data.sample_variants_tab, name='sample_variants_tab'),
     path('sample_variants_gene_detail/<int:sample_id>/<gene_symbol>', views_data.sample_variants_gene_detail, name='sample_variants_gene_detail'),
     path('sample_graphs_tab/<int:sample_id>', views_data.sample_graphs_tab, name='sample_graphs_tab'),

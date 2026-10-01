@@ -676,6 +676,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         params = {
             "sample_id": self.pk,
             "sample": self.name,
+            "vcf_sample_name": self.vcf_sample_name,
         }
         if patient := self.patient:
             params["patient_id"] = patient.pk
