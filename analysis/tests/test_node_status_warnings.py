@@ -43,11 +43,11 @@ class TestNodeStatusWarnings(GridExportTestCase):
         self.assertEqual(NodeColors.VALID, node.shadow_color)
         self.assertEqual([], self._node_status(node)["warnings"])
 
-    def test_errored_node_tooltip_cuts_traceback_to_exception(self):
+    def test_errored_node_tooltip_hides_traceback(self):
         node = self._sample_node()
         traceback = 'Traceback (most recent call last):\n  File "x.py", line 1\nValueError: bad zygosity\n'
         node.update(status=NodeStatus.ERROR, errors=traceback)
 
         node_status = self._node_status(node)
         self.assertFalse(node_status["valid"])
-        self.assertEqual(["Internal Error: ValueError: bad zygosity"], node_status["errors"])
+        self.assertEqual(["Internal Error"], node_status["errors"])

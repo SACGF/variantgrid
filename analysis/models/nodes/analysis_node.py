@@ -1013,14 +1013,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return [f"{NodeErrorSource(nes).label}: {error}" for nes, error in errors]
 
     def get_error_summaries(self) -> list[str]:
-        """ get_errors(flat=True) with a load's traceback cut to its exception line - short enough for
-            the tooltip on the node card's error cross """
-        summaries = []
-        for source, error in self.get_errors():
-            if source == NodeErrorSource.INTERNAL_ERROR and error:
-                error = error.strip().splitlines()[-1]
-            summaries.append(f"{NodeErrorSource(source).label}: {error}")
-        return summaries
+        """ get_errors(flat=True) for the tooltip on the node card's error cross - a load's traceback
+            isn't for users, so it's only named as an internal error """
+        return [NodeErrorSource.INTERNAL_ERROR.label if source == NodeErrorSource.INTERNAL_ERROR
+                else f"{NodeErrorSource(source).label}: {error}"
+                for source, error in self.get_errors()]
 
     @staticmethod
     def get_status_from_errors(errors):
