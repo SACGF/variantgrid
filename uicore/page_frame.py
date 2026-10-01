@@ -21,8 +21,6 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 
 from snpdb.models.models import SiteMessage
-from snpdb.models.models_user_settings import AvatarDetails
-from snpdb.user_settings_manager import UserSettingsManager
 from uicore.menus import MenuItem, current_menu, get_menus
 from user_messages.models import inbox_count_for
 from variantgrid.perm_path import get_visible_url_names
@@ -119,16 +117,10 @@ def _messages_html(request: HttpRequest) -> str:
 
 
 def _user_html(user) -> str:
-    avatar_details = AvatarDetails.avatar_for(user)
-    title_icon_html = ''
-    # titles first: most users hold none, and their UserSettings costs several queries
-    if avatar_details.titles and avatar_details.shows_titles_for(UserSettingsManager.get_user_settings(user)):
-        title_icon_html = avatar_details.title_icon_html
     return render_to_string("uicore/page/navbar_user.html", {
         'user': user,
         'inbox_enabled': settings.INBOX_ENABLED,
         'mail_count': inbox_count_for(user) if settings.INBOX_ENABLED else 0,
-        'title_icon_html': title_icon_html,
     })
 
 

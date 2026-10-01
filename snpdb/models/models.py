@@ -46,7 +46,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import JsonObjType, import_class
-from snpdb.models.models_enums import AwardPeriod, UserAwardKind, UserAwardLevel
+from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
 
@@ -949,25 +949,22 @@ class LabHead(models.Model):
 
 
 class UserAward(TimeStampedModel):
-    """ Three kinds (see UserAwardKind). Computed rows (titles/badges) are keyed on
-        (definition_key, subject, period) and reused: 'created' is first earned, 'modified' the last
-        change of holder/tier. See snpdb.user_awards for the definitions and the computation """
+    """ Two kinds (see UserAwardKind). Computed badges are keyed on definition_key and reused:
+        'created' is first earned, 'modified' the last change of tier. See snpdb.user_awards for the
+        definitions and snpdb.user_award_updates for the computation """
     user = models.ForeignKey(User, on_delete=CASCADE)
     award_text = models.TextField(null=False, blank=False)
     award_level = models.TextField(max_length=1, choices=UserAwardLevel.choices, default=UserAwardLevel.GOLD)
     active = models.BooleanField(null=False, blank=True, default=True)
     kind = models.CharField(max_length=1, choices=UserAwardKind.choices, default=UserAwardKind.KUDOS)
     definition_key = models.TextField(null=True, blank=True)  # AwardDefinition.key, null for kudos
-    subject = models.TextField(null=True, blank=True)  # e.g. tag name for per-tag titles
-    period = models.CharField(max_length=1, choices=AwardPeriod.choices, null=True, blank=True)  # titles only
-    count = models.IntegerField(null=True, blank=True)  # score (titles) / raw progress (badges)
+    count = models.IntegerField(null=True, blank=True)  # raw progress (badges)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["user", "definition_key", "subject", "period"],
+            models.UniqueConstraint(fields=["user", "definition_key"],
                                     condition=models.Q(definition_key__isnull=False),
-                                    nulls_distinct=False,
-                                    name="user_award_unique_computed"),
+                                    name="user_award_unique_badge"),
         ]
 
     @property
@@ -977,8 +974,6 @@ class UserAward(TimeStampedModel):
     @property
     def icon_name(self) -> str:
         """ font-awesome icon (without the fa-solid prefix) """
-        if self.kind == UserAwardKind.TITLE and self.period:
-            return AwardPeriod(self.period).icon
         if self.kind == UserAwardKind.BADGE:
             if definition := self.definition:
                 return definition.icon
@@ -1000,32 +995,22 @@ class UserAward(TimeStampedModel):
     def icon(self):
         return SafeString(f"<i class='{self.icon_class}'></i>")
 
-    @property
-    def period_rank(self) -> int:
-        return AwardPeriod(self.period).rank if self.period else 0
-
     def __str__(self):
         return f"{self.get_award_level_display()} {self.user}: {self.award_text}"
 
 
 class UserAwards:
-    """ A user's awards, partitioned by kind. Only titles decorate the user elsewhere on the site
-        (see AvatarDetails) - badges and kudos live on the profile pages """
+    """ A user's awards, partitioned by kind - shown on the profile pages """
 
     def __init__(self, user: User):
         award_qs = UserAward.objects.filter(user=user).all()
-        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, -x.period_rank, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
+        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
 
         self.all_awards = award_list
         self.awards = [award for award in award_list if award.active]
 
     def __bool__(self):
         return bool(self.awards)
-
-    @cached_property
-    def titles(self) -> list[UserAward]:
-        """ Active titles, ALL_TIME -> MONTH -> DAY """
-        return [a for a in self.awards if a.kind == UserAwardKind.TITLE]
 
     @cached_property
     def badges(self) -> list[UserAward]:
@@ -1097,11 +1082,6 @@ class BadgeProgress:
         if (threshold := self.next_threshold) is None:
             return 100
         return min(100, int(100 * self.count / threshold))
-
-    @property
-    def visible(self) -> bool:
-        """ Hidden definitions (Night Owl etc) only show once earned """
-        return self.earned or not self.definition.hidden
 
 
 class LabProject(models.Model):

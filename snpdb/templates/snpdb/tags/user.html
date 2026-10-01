@@ -8,9 +8,6 @@
 
     <div class="avatar-frame avatar-frame-{{ user_details.size }}">
         {% avatar2 user_details.avatar size=user_details.size %}
-        {% if user_details.show_titles %}
-            {{ user_details.avatar.title_icon_html }}
-        {% endif %}
     </div>
 
     <div style="line-height:1.3" class="align-self-center">

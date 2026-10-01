@@ -26,6 +26,7 @@ from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Val
 from django.db.models.functions import Concat
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
+from django.utils.html import escape
 from kombu.utils import json
 
 from library.django_utils.datatable_mixins import JSONResponseView
@@ -34,7 +35,7 @@ from library.django_utils.grid_export import csv_streaming_response, grid_export
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
-from snpdb.models import AvatarDetails, UserGridConfig, UserSettings
+from snpdb.models import AvatarDetails, UserGridConfig
 
 logger = logging.getLogger(__name__)
 
@@ -437,10 +438,6 @@ class DatatableConfig(Generic[DC]):
         self._page_writable_pks: Optional[set] = None
         self._user_labels: dict[int, str] = {}
 
-    @cached_property
-    def viewer_settings(self) -> UserSettings:
-        return UserSettings.get_for_user(self.user)
-
     def user_column(self, fk: str = "user", **kwargs) -> RichColumn:
         """ The column for a User FK: sorts and exports on the username, renders through render_user,
             and the search box matches the username or the "First Last" the cell shows (#1200) """
@@ -457,14 +454,13 @@ class DatatableConfig(Generic[DC]):
 
     def render_user(self, cell: CellData) -> JsonDataType:
         """ For a "<fk>__username" column with extra_columns=["<fk>__id"] (see user_column): renders the
-            name through AvatarDetails so a title holder gets their crown (#1819). Sort/CSV stay on
-            the username """
+            "First Last" name from AvatarDetails. Sort/CSV stay on the username """
         user_id = cell.get(cell.key.removesuffix("__username") + "__id")
         if user_id is None:
             return ""
         if (label := self._user_labels.get(user_id)) is None:
             user = User.objects.filter(pk=user_id).first()
-            label = str(AvatarDetails.avatar_for(user).grid_label_html(self.viewer_settings)) if user else ""
+            label = escape(AvatarDetails.avatar_for(user).preferred_label) if user else ""
             self._user_labels[user_id] = label
         return label
 
