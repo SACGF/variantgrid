@@ -60,3 +60,7 @@ class ModelSelect2(AutocompleteReloadMixin, autocomplete.ModelSelect2):
 
 class ModelSelect2Multiple(AutocompleteReloadMixin, autocomplete.ModelSelect2Multiple):
     pass
+
+
+class Select2Multiple(AutocompleteReloadMixin, autocomplete.Select2Multiple):
+    """ select2 over the field's own choices - no autocomplete URL """

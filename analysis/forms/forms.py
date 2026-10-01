@@ -39,7 +39,7 @@ from analysis.models.nodes.node_types import (
 )
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
 from library.django_utils import get_models_dict_by_column
-from library.django_utils.autocomplete_utils import ModelSelect2
+from library.django_utils.autocomplete_utils import ModelSelect2, Select2Multiple
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models_enums import SampleSourceLevel, Sex
@@ -316,12 +316,13 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
 
 
 class ColumnSummaryForm(forms.Form):
-    column = forms.ChoiceField()
+    """ The node Summary tab shows one summary per picked column, stacked """
+    columns = forms.MultipleChoiceField(widget=Select2Multiple(attrs={'data-placeholder': 'Columns...'}))
 
     def __init__(self, rich_columns, *args, **kwargs):
         super().__init__(*args, **kwargs)
         summarisable = ColumnSummaryForm.get_summarisable_columns(rich_columns)
-        self.fields['column'].choices = [(rc.name, rc.label) for rc in summarisable]
+        self.fields['columns'].choices = [(rc.name, rc.label) for rc in summarisable]
 
     @staticmethod
     def get_summarisable_columns(rich_columns):

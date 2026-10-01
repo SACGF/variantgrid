@@ -233,6 +233,8 @@ def node_column_summary(request, analysis_id, analysis_version, node_id, node_ve
         poll_url = reverse(column_summary_boxplot, kwargs={"analysis_id": analysis_id, "node_id": node_id,
                                                            "label": label, "variant_column": variant_column})
         context["poll_url"] = poll_url
+        # The Summary tab stacks one summary per column
+        context["graph_id"] = f"node-generated-graph-{node.id}-{grid_column_name}"
         template = 'analysis/node_data/node_data_graph.html'
         return render(request, template, context)
 
@@ -307,6 +309,7 @@ def node_data_graph(request, analysis_id, analysis_version, node_id, node_versio
     poll_url = reverse(node_graph, kwargs={"analysis_id": analysis_id, "node_id": node.id,
                                            "graph_type_id": graph_type_id, "cmap": cmap})
     context["poll_url"] = poll_url
+    context["graph_id"] = f"node-generated-graph-{node.id}"
     template = 'analysis/node_data/node_data_graph.html'
     return render(request, template, context)
 
