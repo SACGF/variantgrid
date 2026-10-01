@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from classification.models.classification_import_run import ClassificationImportRun
-from classification.models.condition_text_matching import ConditionText, ConditionTextMatch
+from classification.models.condition_text_matching import ConditionMatchingSuggestion, ConditionText, ConditionTextMatch
 from classification.tasks.condition_text_automatch_task import condition_text_automatch_task
 from library.request_context import set_thread_variable
 from snpdb.models import Country, Lab, Organization
@@ -47,4 +47,13 @@ class ConditionTextAutomatchTest(TestCase):
 
         condition_text_automatch_task()
         mock_automatch.assert_called_once()
+        self.assertFalse(ConditionText.objects.filter(pending_automatch=True).exists())
+
+    @patch('classification.models.condition_text_matching.top_level_suggestion',
+           return_value=ConditionMatchingSuggestion())
+    def test_sweep_clears_flag_through_automatch_save(self, _mock_suggestion):
+        self._condition_text("free text", pending=True)
+
+        condition_text_automatch_task()
+
         self.assertFalse(ConditionText.objects.filter(pending_automatch=True).exists())

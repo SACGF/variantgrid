@@ -19,4 +19,6 @@ def condition_text_automatch_task():
     for ct in ConditionText.objects.filter(pending_automatch=True).iterator():
         # single-statement claim so overlapping sweeps can't automatch the same text twice
         if ConditionText.objects.filter(pk=ct.pk, pending_automatch=True).update(pending_automatch=False):
+            # attempt_automatch saves the whole row, so the instance must agree with the claim above
+            ct.pending_automatch = False
             ConditionTextMatch.attempt_automatch(condition_text=ct)
