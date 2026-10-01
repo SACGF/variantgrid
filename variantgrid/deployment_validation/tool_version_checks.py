@@ -8,6 +8,7 @@ import gzip
 import logging
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 
@@ -65,8 +66,8 @@ def check_vcf_split_pipe() -> bool:
         with open(records_filename, "w") as f:
             f.writelines(_SPLIT_CHECK_RECORDS)
 
-        split_cmd = " ".join(get_split_vcf_command("check", split_file_rows=2))
-        shell_command = f"set -o pipefail; cat {records_filename} | {split_cmd}"
+        split_cmd = shlex.join(get_split_vcf_command("check", split_file_rows=2))
+        shell_command = f"set -o pipefail; cat {shlex.quote(records_filename)} | {split_cmd}"
         env = {**os.environ, "VG_HEADER_FILE": header_filename, "VG_SPLIT_VCF_DIR": split_vcf_dir}
         subprocess.run(shell_command, shell=True, executable="/bin/bash", env=env, check=True,
                        capture_output=True, text=True)
