@@ -77,6 +77,7 @@
                 <th>Alignment Gap</th>
                 <th>OK for local HGVS resolution</th>
                 <th>JSON</th>
+                <th>cdot Data</th>
                 {% if user.is_staff %}
                     <th>Import Filename</th>
                 {% endif %}
@@ -139,6 +140,13 @@
                             </div>
                         </div>
                     {% endmodal %}
+                </td>
+                <td>
+                    {% with installed_cdot=installed_cdot_by_build|get_item:genome_build_id %}
+                        <span title="Imported (or last changed) in cdot {{ transcript_version.modified_cdot_version|default:'(unknown)' }}. Installed: {{ installed_cdot|default:'(unknown)' }}">
+                            {{ transcript_version.modified_cdot_version|default_if_none:"" }}
+                        </span>
+                    {% endwith %}
                 </td>
                 {% if user.is_staff %}
                     <td style="word-break: break-all">{{ transcript_version.import_source }}</td>

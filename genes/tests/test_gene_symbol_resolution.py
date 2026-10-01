@@ -34,7 +34,6 @@ def _make_transcript_version(genome_build, accession, gene_symbol, annotation_co
         build_data["tag"] = tag
     data = {
         "id": accession,
-        "cdot": "0.2.27",
         "hgnc": "1101",
         "biotype": ["protein_coding"],
         "gene_name": gene_symbol,

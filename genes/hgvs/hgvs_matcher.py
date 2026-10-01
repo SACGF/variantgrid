@@ -457,7 +457,7 @@ class HGVSMatcher:
                     if potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
                         data_version = now().date().isoformat()
                     elif isinstance(tv, TranscriptVersion):
-                        data_version = tv.data.get('cdot', '')
+                        data_version = tv.modified_cdot_version or ''
                     else:
                         data_version = ''
                     converter_info = HGVSConverterInfo(used_converter_type=potential_converter_type,
@@ -612,7 +612,7 @@ class HGVSMatcher:
                     if potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
                         data_version = now().date().isoformat()
                     elif isinstance(transcript_version, TranscriptVersion):
-                        data_version = transcript_version.data.get('cdot', '')
+                        data_version = transcript_version.modified_cdot_version or ''
                     break
 
             if hgvs_methods:

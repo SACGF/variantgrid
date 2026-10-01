@@ -104,7 +104,6 @@ def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
 
     gene_version = create_fake_gene_version(genome_build, "2624", "GATA2", AnnotationConsortium.REFSEQ)
     nm_001145661_2 = {"id": "NM_001145661.2",
-                      "cdot": "0.2.17",
                       "hgnc": "4171",
                       "biotype": ["protein_coding"],
                       "gene_name": "GATA2",
@@ -146,7 +145,6 @@ def create_gata2_as1_transcript_version(genome_build) -> TranscriptVersion:
 
     gene_version = create_fake_gene_version(genome_build, "101927167", "GATA2-AS1", AnnotationConsortium.REFSEQ)
     nr_125398_1 = {"id": "NR_125398.1",
-                   "cdot": "0.2.34",
                    "hgnc": "51108",
                    "biotype": ["lnc_RNA", "ncRNA"],
                    "gene_name": "GATA2-AS1",
@@ -167,7 +165,6 @@ def create_pten_transcript_version(genome_build) -> TranscriptVersion:
 
     gene_version = create_fake_gene_version(genome_build, "5728", "PTEN", AnnotationConsortium.REFSEQ)
     nm_000314_8 = {"id": "NM_000314.8",
-                   "cdot": "0.2.17",
                    "hgnc": "9588",
                    "biotype": ["protein_coding"],
                    "gene_name": "PTEN",

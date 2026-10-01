@@ -31,6 +31,7 @@ from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
 from genes.models import (
     CanonicalTranscriptCollection,
+    CdotDataVersion,
     Gene,
     GeneList,
     GeneListCategory,
@@ -330,8 +331,12 @@ def view_transcript_version(request, transcript_id, version):
                 if diff:
                     differences.append(((a, b), diff))
 
+        cdot_qs = CdotDataVersion.objects.filter(genome_build__in=transcript_versions_by_build,
+                                                 annotation_consortium=transcript.annotation_consortium)
+        installed_cdot_by_build = dict(cdot_qs.values_list("genome_build_id", "cdot_version"))
         context = {**context, **{"accession": accession,
                                  "transcript_versions_by_build": transcript_versions_by_build,
+                                 "installed_cdot_by_build": installed_cdot_by_build,
                                  "differences": differences,
                                  "alignment_gap": alignment_gap}}
 

@@ -377,8 +377,8 @@ class GeneAnnotationImport(TimeStampedModel):
 class CdotDataVersion(TimeStampedModel):
     """ The cdot data release of the last whole cdot file imported for a build and consortium
 
-        An import only rewrites a TranscriptVersion whose data changed, so TranscriptVersion.data["cdot"] is the
-        release that transcript last changed in - this is what's installed """
+        An import only rewrites a TranscriptVersion whose data changed, so TranscriptVersion.modified_cdot_version
+        is the release that transcript last changed in - this is what's installed """
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     cdot_version = models.TextField()
@@ -678,6 +678,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
+    # cdot release this row's data came from - an import only rewrites rows whose data changed
+    modified_cdot_version = models.TextField(null=True, blank=True)
 
     @classmethod
     def preview_icon(cls) -> str:

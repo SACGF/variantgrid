@@ -159,7 +159,7 @@ class ResolvedVariantInfo(TimeStampedModel):
     """ Tool used to generate resolved_hgvs  """
 
     hgvs_converter_data_version = TextField(blank=True, default='')
-    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when computing resolved_hgvs """
+    """ cdot data version (TranscriptVersion.modified_cdot_version) or ClinGen date used when computing resolved_hgvs """
 
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     """ The GeneSymbol of the c.HGVS """
@@ -256,7 +256,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         transcript_version = TranscriptVersion.get_for_parts(genome_build, hgvs_obj.transcript_parts)
         # Prefer data version from the transcript directly used; fall back to the hgvs_obj lookup
         data_version = (result.converter_info.hgvs_converter_data_version
-                        or (transcript_version.data.get('cdot', '') if transcript_version else ''))
+                        or ((transcript_version.modified_cdot_version or '') if transcript_version else ''))
         hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
                                                           used_converter_type=result.converter_info.used_converter_type)
         return HGVSResolution(
@@ -513,7 +513,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ Tool used to resolve hgvs  """
 
     hgvs_converter_data_version = TextField(blank=True, default='')
-    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when resolving imported HGVS """
+    """ cdot data version (TranscriptVersion.modified_cdot_version) or ClinGen date used when resolving imported HGVS """
 
     imported_transcript = TextField(null=True, blank=True)
     """

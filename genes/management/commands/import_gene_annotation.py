@@ -91,7 +91,7 @@ class Command(BaseCommand):
     # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
     # when importing large streamed files (see import_cdot_data_file).
     CDOT_CHUNK_SIZE = 10000
-    TRANSCRIPT_VERSION_UPDATE_FIELDS = ["gene_version_id", "import_source_id", "biotype", "contig_id", "data"]
+    TRANSCRIPT_VERSION_COMPARE_FIELDS = ["gene_version_id", "import_source_id", "biotype", "contig_id", "data"]
 
     @classmethod
     def read_cdot_version(cls, file_obj) -> str:
@@ -275,7 +275,6 @@ class Command(BaseCommand):
             if transcript_id not in known_transcript_ids:
                 new_transcript_ids.add(transcript_id)
 
-            tv_data["cdot"] = cdot_version
             build_data = tv_data["genome_builds"][genome_build.name]  # Should always be there as single build file
             gene_accession = fix_accession(tv_data.pop("gene_version"))
             gene_version_id = gene_version_ids_by_accession[gene_accession]
@@ -290,7 +289,8 @@ class Command(BaseCommand):
                                                    contig=contig,
                                                    import_source=import_source,
                                                    biotype=biotype,
-                                                   data=tv_data)
+                                                   data=tv_data,
+                                                   modified_cdot_version=cdot_version)
             if pk := transcript_version_ids_by_accession.get(transcript_accession):
                 transcript_version.pk = pk
                 existing_transcript_versions.append(transcript_version)
@@ -312,20 +312,15 @@ class Command(BaseCommand):
 
     @classmethod
     def _update_changed_transcript_versions(cls, transcript_versions: list[TranscriptVersion]) -> int:
-        """ Only write the TranscriptVersions whose values differ from what's stored. The 'cdot' key is left out
-            of the comparison: it's stamped with the release being imported, so would differ on every row and
-            rewrite the whole table each cdot release. Returns the number of rows changed """
-        fields = cls.TRANSCRIPT_VERSION_UPDATE_FIELDS
+        """ Only write the TranscriptVersions whose values differ from what's stored, so a changed row's
+            modified_cdot_version moves to the release being imported and the rest keep theirs.
+            Returns the number of rows changed """
+        fields = cls.TRANSCRIPT_VERSION_COMPARE_FIELDS
         tv_qs = TranscriptVersion.objects.filter(pk__in=[tv.pk for tv in transcript_versions])
         stored_by_pk = {values[0]: values[1:] for values in tv_qs.values_list("pk", *fields)}
-
-        def _comparable(values) -> tuple:
-            *columns, data = values
-            return *columns, {k: v for k, v in data.items() if k != "cdot"}
-
         changed = [tv for tv in transcript_versions
-                   if _comparable(stored_by_pk[tv.pk]) != _comparable([getattr(tv, f) for f in fields])]
-        TranscriptVersion.objects.bulk_update(changed, fields, batch_size=cls.BATCH_SIZE)
+                   if stored_by_pk[tv.pk] != tuple(getattr(tv, f) for f in fields)]
+        TranscriptVersion.objects.bulk_update(changed, [*fields, "modified_cdot_version"], batch_size=cls.BATCH_SIZE)
         return len(changed)
 
     @staticmethod

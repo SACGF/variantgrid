@@ -51,7 +51,7 @@ class ImportCdotDataTest(TestCase):
                                                         GeneAnnotationCommand.read_cdot_version(f))
 
     def _cdot_by_accession(self) -> dict[str, str]:
-        return {tv.accession: tv.data["cdot"] for tv in TranscriptVersion.objects.filter(genome_build=self.genome_build)}
+        return {tv.accession: tv.modified_cdot_version for tv in TranscriptVersion.objects.filter(genome_build=self.genome_build)}
 
     def test_only_changed_transcripts_restamped(self, _mock_gene_summaries):
         self._import(self._cdot_file("0.2.34"))
