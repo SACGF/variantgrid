@@ -36,3 +36,26 @@ def significance_chips(selected: list, field_count: int, short_labels: dict, lon
         return []
     return [NodeChip(text=short_labels[value], title=long_labels[value], css_class=css_class_func(value))
             for value in selected]
+
+
+def grouped_chips(selected: list, groups: dict[str, list], labels: dict, title_prefix: str,
+                  exclude: bool = False, icon: Optional[str] = None) -> list[NodeChip]:
+    """ One chip per group with anything selected - a whole group is named for itself, part of one lists
+        the members picked. Nothing selected isn't filtering, so says nothing """
+    negation = "not " if exclude else ""
+    chips = []
+    for group_name, members in groups.items():
+        chosen = [labels[member] for member in members if member in selected]
+        if not chosen:
+            continue
+        chosen_text = ", ".join(chosen)
+        if len(chosen) == len(members):
+            text = group_name
+            title = f"{title_prefix}: {negation}{group_name}"
+            if len(members) > 1:
+                title += f" ({chosen_text})"
+        else:
+            text = chosen_text
+            title = f"{title_prefix}: {negation}{chosen_text} ({len(chosen)} of {len(members)} {group_name})"
+        chips.append(NodeChip(text=f"{negation}{text}", icon=icon, title=title))
+    return chips

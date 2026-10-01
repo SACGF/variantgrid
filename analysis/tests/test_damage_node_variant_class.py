@@ -1,7 +1,7 @@
 import itertools
 
 from django.db.models import Q
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from analysis.models.nodes.filters.damage_node import DamageNode, StructuralFilter
 from analysis.tests.utils import AnalysisSetupMixin
@@ -43,6 +43,32 @@ class DamageNodeVariantClassTest(AnalysisSetupMixin, TestCase):
         q = node._get_node_q()
         self.assertEqual(q.connector, Q.AND)
         self.assertIn(("variantannotation__variant_class__in", [VariantClass.SNV]), q.children)
+
+
+class DamageNodeTypeChipsTest(SimpleTestCase):
+    """ One card chip per variant class group the node restricts to """
+
+    @staticmethod
+    def _chip_texts(**kwargs) -> list[str]:
+        return [chip.text for chip in DamageNode(**kwargs).get_node_chips()]
+
+    def test_no_restriction_no_chips(self):
+        self.assertEqual([], self._chip_texts(variant_class=[]))
+
+    def test_whole_groups_named_for_the_group(self):
+        indel = [vc.value for vc in VARIANT_CLASS_GROUPS["Indel"]]
+        self.assertEqual(["SNV"], self._chip_texts(variant_class=[VariantClass.SNV.value]))
+        self.assertEqual(["SNV", "Indel"], self._chip_texts(variant_class=[*indel, VariantClass.SNV.value]))
+
+    def test_partial_group_lists_its_classes(self):
+        chips = DamageNode(variant_class=[VariantClass.DELETION.value, VariantClass.INSERTION.value]).get_node_chips()
+        self.assertEqual(["insertion, deletion"], [chip.text for chip in chips])
+        self.assertIn("2 of 6 Indel", chips[0].title)
+
+    def test_exclude(self):
+        texts = self._chip_texts(variant_class=[VariantClass.SNV.value, VariantClass.DELETION.value],
+                                 variant_class_exclude=True)
+        self.assertEqual(["not SNV", "not deletion"], texts)
 
 
 class DamageNodeStructuralTest(AnalysisSetupMixin, TestCase):
