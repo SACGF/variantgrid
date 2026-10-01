@@ -23,7 +23,6 @@ from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
-from library.utils.json_utils import canonical_filter_key
 from snpdb.models import (
     VCF,
     Cohort,
@@ -37,6 +36,10 @@ from snpdb.models import (
     VCFLengthStatsCollection,
     Zygosity,
 )
+
+# Bump when a change alters what the stats count - readers treat rows from older versions as stale
+# and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
+SAMPLE_STATS_CODE_VERSION = 5
 
 
 @celery.shared_task
@@ -62,10 +65,11 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
         2 - Added VCFLengthStats
         3 - Optimisations
         4 - fusions_count, and gene-level variants left out of VCFLengthStats
+        5 - Per-sample totals and chrX hom only count the sample's own variant calls (#2087)
     """
     code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
                                                                 name="SampleStats",
-                                                                version=4,
+                                                                version=SAMPLE_STATS_CODE_VERSION,
                                                                 code_git_hash=Git(settings.BASE_DIR).hash)
     return code_version
 
@@ -293,7 +297,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     # Filter-keyed buckets to precompute (always includes None for raw aggregate).
     precompute_keys = list(get_filter_keys_to_precompute_for_cohort(cohort))
     if None not in precompute_keys:
-        precompute_keys = [None] + precompute_keys
+        precompute_keys = [None, *precompute_keys]
 
     # Trio context, if present (used to evaluate inheritance predicates per variant).
     trio = cohort.trio_set.first()
@@ -373,13 +377,22 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
         MISSING: (F_UNK, F_UNK_HM, F_UNK_OMIM, F_UNK_CV),
     }
 
+    # chrX hom/het is the sex guess (@see CohortGenotypeStats.chrx_sex_guess). A hom ref call says nothing
+    # about hemizygosity, and in a joint-called VCF it's another sample's variant, so it has no chrX field
     PER_SAMPLE_TO_F = {
         HOM_ALT: (F_HOM, F_HOM_HM, F_HOM_OMIM, F_HOM_CV, F_X_HOM),
         HET: (F_HET, F_HET_HM, F_HET_OMIM, F_HET_CV, F_X_HET),
-        HOM_REF: (F_REF, F_REF_HM, F_REF_OMIM, F_REF_CV, F_X_HOM),  # sample stats path: HOM_REF goes to X_HOM today
+        HOM_REF: (F_REF, F_REF_HM, F_REF_OMIM, F_REF_CV, None),
         UNK: (F_UNK, F_UNK_HM, F_UNK_OMIM, F_UNK_CV, F_X_UNK),
         MISSING: (F_UNK, F_UNK_HM, F_UNK_OMIM, F_UNK_CV, F_X_UNK),
     }
+
+    # A sample's totals count the rows it has a variant call on - in a multi-sample VCF the other rows
+    # are the other samples' variants. Without a GT field every call is unknown zygosity, so count them all.
+    sample_call_zygosities = []
+    for sample, sample_index in sample_index_pairs:
+        call_zygosities = HAS_VARIANT if sample.has_genotype else (*HAS_VARIANT, UNK)
+        sample_call_zygosities.append((sample.pk, sample_index, call_zygosities))
 
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     qs = qs.filter(Variant.get_no_reference_q())
@@ -405,8 +418,8 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     ]
 
     for row in qs.values_list(*columns).iterator(chunk_size=10_000):
-        (chrom, ref, alt, svlen, samples_zygosity, dbsnp, impact, transcript, gene_id,
-         omim, hgvs_g, clinvar, filters_value) = row
+        (chrom, ref, alt, _svlen, samples_zygosity, dbsnp, impact, transcript, gene_id,
+         omim, _hgvs_g, clinvar, filters_value) = row
         clinvar_path = (clinvar or 0) >= 4
         ref_len = len(ref)
         alt_len = len(alt)
@@ -443,43 +456,42 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
             elif ref_len < alt_len:
                 dbsnp_class_field = F_INS_DBSNP
 
+        pf_buckets = (False, True) if has_filters and not filters_value else (False,)
+
         # ----- Per-sample accumulation (sample IS NOT NULL rows) -----
-        for sample, sample_index in sample_index_pairs:
+        for sample_pk, sample_index, call_zygosities in sample_call_zygosities:
             zyg = samples_zygosity[sample_index]
-            for pf_pass in (False, True):
-                if pf_pass and not (has_filters and not filters_value):
-                    continue
-                counter = sample_counters[(sample.pk, pf_pass)]
-                counter[F_VARIANT] += 1
-                counter[type_field] += 1
-                if dbsnp:
-                    counter[F_VAR_DBSNP] += 1
-                    if dbsnp_class_field is not None:
-                        counter[dbsnp_class_field] += 1
-                if has_transcript:
-                    counter[F_GENE] += 1
-                if clinvar:
-                    counter[F_CLINVAR] += 1
-                # Per-zygosity tally
-                f_z, f_z_hm, f_z_omim, f_z_cv, f_z_x = PER_SAMPLE_TO_F.get(
-                    zyg, PER_SAMPLE_TO_F[UNK])
+            has_call = zyg in call_zygosities
+            f_z, f_z_hm, f_z_omim, f_z_cv, f_z_x = PER_SAMPLE_TO_F.get(zyg, PER_SAMPLE_TO_F[UNK])
+            for pf_pass in pf_buckets:
+                counter = sample_counters[(sample_pk, pf_pass)]
+                if has_call:
+                    counter[F_VARIANT] += 1
+                    counter[type_field] += 1
+                    if dbsnp:
+                        counter[F_VAR_DBSNP] += 1
+                        if dbsnp_class_field is not None:
+                            counter[dbsnp_class_field] += 1
+                    if has_transcript:
+                        counter[F_GENE] += 1
+                    if clinvar:
+                        counter[F_CLINVAR] += 1
+                # Per-zygosity tallies count every row - SampleNode reads them as cached counts for its
+                # zygosity checkboxes (@see stats_cache.get_cached_label_count_for_cohort)
                 counter[f_z] += 1
-                if impact_high_mod and zyg in (HET, HOM_ALT, HOM_REF):
+                if impact_high_mod:
                     counter[f_z_hm] += 1
-                elif impact_high_mod and zyg == UNK:
-                    counter[f_z_hm] += 1  # mirror today's behavior (unk also tallied)
                 if has_omim:
                     counter[f_z_omim] += 1
                 if clinvar_path:
                     counter[f_z_cv] += 1
-                if is_x:
+                if is_x and f_z_x is not None:
                     counter[f_z_x] += 1
 
         # ----- Aggregate accumulation (sample IS NULL, filter_key=None) -----
+        # Every cohort row counts, as a CohortNode with no zygosity filter returns every row
         agg_priority = _aggregate_zygosity_priority(samples_zygosity)
-        for pf_pass in (False, True):
-            if pf_pass and not (has_filters and not filters_value):
-                continue
+        for pf_pass in pf_buckets:
             agg_counter = aggregate_counters[(None, pf_pass)]
             agg_counter[F_VARIANT] += 1
             agg_counter[type_field] += 1
@@ -500,11 +512,11 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
             if clinvar_path:
                 agg_counter[f_z_cv] += 1
             if is_x:
-                if agg_priority == HOM_ALT or agg_priority == HOM_REF:
+                if agg_priority == HOM_ALT:
                     agg_counter[F_X_HOM] += 1
                 elif agg_priority == HET:
                     agg_counter[F_X_HET] += 1
-                else:
+                elif agg_priority == UNK:
                     agg_counter[F_X_UNK] += 1
 
         # ----- Filter-keyed accumulation (sample IS NULL, filter_key=...) -----
@@ -522,9 +534,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
                     chet_match = "mum"
                 elif mum_zyg in NO_VARIANT and dad_zyg == HET:
                     chet_match = "dad"
-            for pf_pass in (False, True):
-                if pf_pass and not (has_filters and not filters_value):
-                    continue
+            for pf_pass in pf_buckets:
                 # Per-mode buckets — counted just like aggregate, classified by proband zyg
                 proband_priority = (HOM_ALT if proband_zyg == HOM_ALT
                                     else HET if proband_zyg == HET
