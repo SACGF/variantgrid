@@ -83,7 +83,7 @@ class VCFRow(ExportVCF):
 
     @export_vcf_info_cell(
         header_id="labs",
-        number=1,
+        number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
         description="Contributing Labs",
         categories={"system": VCFTargetSystem.GENERIC}
