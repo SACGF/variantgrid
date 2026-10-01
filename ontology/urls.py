@@ -15,8 +15,6 @@ urlpatterns = [
     path('autocomplete/OMIM', views_autocomplete.OMIMAutocompleteView.as_view(), name='omim_autocomplete'),
     path('autocomplete/HGNC', views_autocomplete.HGNCAutocompleteView.as_view(), name='hgnc_autocomplete'),
     path('autocomplete/MONDO', views_autocomplete.MONDOAutocompleteView.as_view(), name='mondo_autocomplete'),
-    path('autocomplete/OntologyTerm/', views_autocomplete.OntologyTermAutocompleteView.as_view(),
-         name='ontology_term_autocomplete'),
 
     path('api/mondo/search', SearchMondoText.as_view(), name='api_mondo_search'),
     path('api/ontology_term/<slug:term>/gene_list', OntologyTermGeneListView.as_view(),

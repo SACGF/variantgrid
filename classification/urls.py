@@ -103,7 +103,7 @@ from classification.views.views_uploaded_classifications_unmapped import (
 )
 from library.django_utils import require_superuser
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import path
+from variantgrid.perm_path import deprecated_path, path
 
 router = routers.DefaultRouter()
 
@@ -201,7 +201,6 @@ urlpatterns = [
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
 
-    path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
     # Classification Candidate Searching
@@ -227,8 +226,6 @@ urlpatterns = [
 
     path('dashboard_download', issues_download, name='classification_dashboard_download'),
     path('dashboard_download/<str:lab_id>', issues_download, name='classification_dashboard_download'),
-    # legacy URL
-    path('dashboard/all', classification_dashboard_view.classification_dashboard, name="classification_dashboard_all"),
 
 
     path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
@@ -237,9 +234,9 @@ urlpatterns = [
     path('discordance_reports', discordance_reports_view, name='discordance_reports'),
 
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
-    path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
+    deprecated_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
-    path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
+    deprecated_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
 
     path('discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report'),
     path('discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export'),
