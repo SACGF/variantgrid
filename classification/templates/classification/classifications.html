@@ -122,6 +122,7 @@
         data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
+        data.sample = blankToNull($('#id_sample').val());
         data.lab_external = blankToNull($("input[name='lab-external-toggle']:checked").val());
         let column = $('#vc-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
@@ -143,7 +144,7 @@
     }
 
     $(document).ready(() => {
-        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').on("change", function() {
+        $('#id_gene_symbol, #id_lab, #id_user, #id_sample, #id_allele_origin').on("change", function() {
             filterGrid();
         });
 
@@ -157,6 +158,7 @@
 {% endblock %}
 {% block content %}
     {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
+    {% settings_value 'CLASSIFICATION_GRID_SHOW_SAMPLE' as CLASSIFICATION_GRID_SHOW_SAMPLE %}
     {% settings_value 'CLASSIFICATION_ID_FILTER' as CLASSIFICATION_ID_FILTER %}
     {% settings_value 'CLASSIFICATION_REDCAP_EXPORT' as CLASSIFICATION_REDCAP_EXPORT %}
     {% settings_value 'CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER' as CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER %}
@@ -245,6 +247,12 @@
                 <div class="col-md-4 col-lg-2">
                     <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
                     {% crispy user_form form_helper.horizontal_no_labels %}
+                </div>
+                {% endif %}
+                {% if CLASSIFICATION_GRID_SHOW_SAMPLE %}
+                <div class="col-md-4 col-lg-2">
+                    <br/>
+                    {% crispy sample_form form_helper.horizontal_no_labels %}
                 </div>
                 {% endif %}
 

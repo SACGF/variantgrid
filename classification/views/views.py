@@ -207,6 +207,7 @@ def classifications(request):
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
+        "sample_form": SampleChoiceForm(),
         "lab_form": lab_form,
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),

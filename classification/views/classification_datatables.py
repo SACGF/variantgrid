@@ -394,6 +394,10 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
 
+        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
+            if sample_id := self.get_query_param('sample'):
+                filters.append(Q(classification__sample__pk=sample_id))
+
         if lab_id := self.get_query_param('lab'):
             lab_list = lab_id.split(",")
             filters.append(Q(classification__lab__pk__in=lab_list))

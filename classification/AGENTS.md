@@ -81,6 +81,9 @@ Gotchas:
   level with a "shared_higher" warning when asked for a lower one, and the web form always republishes at the current level
   (views/views.py:create_classification_object). ShareLevel keys are user / lab / organisation / logged_in_users / public;
   there is no "institution".
+- In a template, `classification.sample_id` is the `sample_id` evidence value, not the FK: Django tries `obj[key]` before
+  the attribute and models/evidence_mixin.py:EvidenceMixin.__getitem__ answers any evidence key. Resolve model fields in
+  the view or tag (templatetags/classification_tags.py:classification_quick passes `sample` / `username`).
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
   assuming every classification has a variant.
