@@ -1300,6 +1300,29 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             edge.delete()
         self.parents_changed = True
 
+    @staticmethod
+    def circular_checker(parent, child):
+        """ Called by AnalysisEdge.save(). Replaces django_dag's check, which walks parents of the parent's
+            own subclass and compares subclass instances, so never sees a cycle through other node types
+            (#2060) """
+        if parent.pk == child.pk:
+            raise NonFatalNodeError("A node can't be connected to itself")
+
+        parent_ids_by_child_id = defaultdict(set)
+        edges_qs = AnalysisEdge.objects.filter(child__analysis_id=parent.analysis_id)
+        for parent_id, child_id in edges_qs.values_list("parent_id", "child_id"):
+            parent_ids_by_child_id[child_id].add(parent_id)
+
+        ancestor_ids = set()
+        to_visit = [parent.pk]
+        while to_visit:
+            for ancestor_id in parent_ids_by_child_id[to_visit.pop()] - ancestor_ids:
+                ancestor_ids.add(ancestor_id)
+                to_visit.append(ancestor_id)
+
+        if child.pk in ancestor_ids:
+            raise NonFatalNodeError(f"Not connecting node {parent.pk} to {child.pk} - it would create a cycle")
+
     def handle_ancestor_input_samples_changed(self):
         pass
 

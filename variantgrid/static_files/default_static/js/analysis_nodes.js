@@ -226,7 +226,7 @@ function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 	    data: data,
 	    url: Urls.node_update(ANALYSIS_ID, nodeId),
 	    success: function(data) {
-	       on_success_function(data.dirty_nodes);
+	       on_success_function(data);
         },
 	});
 }
@@ -268,6 +268,14 @@ function getEndpoint(id, endpoint_type, side) {
 	}		 
 }
 
+// A VennNode has 2 (left/right) input endpoints, everything else at most 1
+function getTargetEndpoints(id) {
+	const el = document.getElementById(id);
+	if (!el)
+		return [];
+	return (jsPlumbInstance.getEndpoints(el) || []).filter(ep => ep.isTarget);
+}
+
 function setupHideInvalidConnectionsOnDrag() {
 		// Endpoints we turned red for the connection drag currently in progress
 		const invalidEndpoints = [];
@@ -291,27 +299,22 @@ function setupHideInvalidConnectionsOnDrag() {
 			}
 		}
 
-		function getAncestors(id) {
-			let ancestors = [id];
-			const endpoint = getEndpoint(id, 'target');
-			if (endpoint) {
-				for (let i=0 ; i<endpoint.connections.length ; ++i) {
-					const source = endpoint.connections[i].sourceId;
-					ancestors = ancestors.concat(getAncestors(source));
+		function getAncestors(id, ancestors=new Set()) {
+			if (!ancestors.has(id)) {
+				ancestors.add(id);
+				for (const endpoint of getTargetEndpoints(id)) {
+					for (const connection of endpoint.connections) {
+						getAncestors(connection.sourceId, ancestors);
+					}
 				}
 			}
 			return ancestors;
 		}
 
 		jsPlumbInstance.bind("connection:drag", function(connection) {
-			const ancestors = getAncestors(connection.endpoints[0].elementId);
-
-			for (let i=0 ; i<ancestors.length ; ++i) {
-				const endpoint = getEndpoint(ancestors[i], 'target');
-				if (endpoint) {
-					setEndpointInvalid(endpoint);
-				}
-			}		
+			for (const ancestorId of getAncestors(connection.endpoints[0].elementId)) {
+				getTargetEndpoints(ancestorId).forEach(setEndpointInvalid);
+			}
 		});
 
 		// There's no single "connection drag finished" event - dropping a connection back where it
@@ -994,7 +997,13 @@ const updateConnections = function (info, remove) {
 		params["side"] = getEndpointSide(ep);
 	}
 
-	const on_success_function = function () {
+	const on_success_function = function (data) {
+		if (data && data.non_fatal && !remove) {
+			// Server refused the connection (eg it would create a cycle) - don't send a removal for it
+			jsPlumbInstance.deleteConnection(info.connection, {fireEvent: false});
+			showReloadPageErrorDialog(data.message, true);
+			return;
+		}
 		const gew = getGridAndEditorWindow();
 		if (targetId == gew.getLoadedNodeId()) {
 			loadNodeData(targetId);
