@@ -35,9 +35,9 @@
                 <label class="mt-1">Latest</label>
             {% endif %}
             {% if forloop.counter == 1 %}
-                <div>{% classification_quick record show_lab=False show_condition=True show_flags=True show_pending=True %}</div>
+                <div>{% classification_quick record show_lab=False show_sample_and_user=True show_condition=True show_flags=True show_pending=True %}</div>
             {% else %}
-                <div>{% classification_quick record show_lab=False show_condition=True show_flags=True %}</div>
+                <div>{% classification_quick record show_lab=False show_sample_and_user=True show_condition=True show_flags=True %}</div>
             {% endif %}
             {% comment %}
             <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">

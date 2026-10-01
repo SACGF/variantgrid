@@ -370,7 +370,7 @@ class ClassificationGrouping(TimeStampedModel):
         # show in date order
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
         all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
-        all_modifications = all_modifications.select_related("classification")
+        all_modifications = all_modifications.select_related("classification", "classification__sample", "classification__user")
         return sorted(all_modifications, key=lambda mod: mod.curated_date_check)
 
     @cached_property

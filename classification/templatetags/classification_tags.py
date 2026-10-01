@@ -382,6 +382,7 @@ def classification_quick(context,
                          show_imported_c_hgvs=False,
                          show_values=True,
                          show_pending: bool = False,
+                         show_sample_and_user: bool = False,
                          record_count: Optional[int] = None,
                          mode: Optional[str] = "detailed"):  # other options are "split" and "compact"
     user = context.request.user
@@ -403,6 +404,14 @@ def classification_quick(context,
         id_text = " / ".join(id_texts)
     else:
         id_text = "record"
+
+    sample = None
+    username = None
+    if show_sample_and_user and vcm:
+        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
+            sample = vcm.classification.sample
+        if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
+            username = vcm.classification.user.username
 
     category_text = None
     if show_category:
@@ -430,6 +439,8 @@ def classification_quick(context,
         "record_count": record_count,
         "show_values": show_values,
         "show_pending": show_pending,
+        "sample": sample,
+        "username": username,
         "fade_non_shared": settings.CLASSIFICATION_GRID_FADE_NON_SHARED
     }
 
