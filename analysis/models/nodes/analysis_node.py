@@ -1012,6 +1012,16 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def flatten_errors(errors):
         return [f"{NodeErrorSource(nes).label}: {error}" for nes, error in errors]
 
+    def get_error_summaries(self) -> list[str]:
+        """ get_errors(flat=True) with a load's traceback cut to its exception line - short enough for
+            the tooltip on the node card's error cross """
+        summaries = []
+        for source, error in self.get_errors():
+            if source == NodeErrorSource.INTERNAL_ERROR and error:
+                error = error.strip().splitlines()[-1]
+            summaries.append(f"{NodeErrorSource(source).label}: {error}")
+        return summaries
+
     @staticmethod
     def get_status_from_errors(errors):
         ERROR_STATUS = {
@@ -1250,9 +1260,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return variant_ids
 
     def _get_load_data(self) -> dict:
-        """ Override to snapshot anything else the node worked out at load - merged into
-            NodeVersion.load_data alongside "counts" @see node_counts """
-        return {}
+        """ Extend (via super) to snapshot anything else the node worked out at load - merged into
+            NodeVersion.load_data alongside "counts" @see node_counts.
+            "warnings" are drawn on the node card, so they're visible without opening the editor (#347) """
+        return {"warnings": self.get_warnings()}
 
     def _load(self):
         """ Override to do anything interesting.
@@ -1273,7 +1284,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if slow_seconds := settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS:
             if load_seconds > slow_seconds:
                 logging.warning("Node %d.%d slow load %.1fs: %s", self.pk, self.version, load_seconds, timings)
-        self.update(status=status, count=count, load_seconds=load_seconds, **load_update_kwargs)
+        # Set on self too - update_node_task reads it after load()
+        self.shadow_color = NodeColors.WARNING if self.node_version.load_data.get("warnings") else NodeColors.VALID
+        self.update(status=status, count=count, load_seconds=load_seconds, shadow_color=self.shadow_color,
+                    **load_update_kwargs)
 
     def add_parent(self, parent, *args, **kwargs):
         if not parent.visible:

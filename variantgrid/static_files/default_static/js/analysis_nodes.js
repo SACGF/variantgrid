@@ -87,6 +87,7 @@ function createDefaultNode() {
 	$("<div/>", {class: "node-chips"}).appendTo(nodeOverlay);
 	$("<div />", {class: "node-color-overlay"}).appendTo(nodeOverlay);
 	div.append(nodeOverlay);
+	$("<span/>", {class: "node-warning-badge", text: "!"}).appendTo(div);
 	$("<div/>", {class: "node-counts-strip"}).appendTo(div);
 	div[0].updateState = function(args) { };
 	return div;
@@ -508,6 +509,8 @@ function deleteNodesFromDOM(nodes, data) {
             clearGridAndEditor = true;
         }
 
+        // A tooltip open on the node (eg deleting with the mouse over it) would outlive it
+        clearNodeStatusTooltip($(".node-counts-strip, .node-warning-badge", node));
         fadeOutAndRemoveNode(node);
         messagePoller.delete_node(nodeId);
 
@@ -609,6 +612,35 @@ function setNodeCounts(node, data) {
 	tag_counts.toggle(tag_counts.find(".node-count:visible").length > 0);
 }
 
+// Warnings / errors as a coloured list on hover, so you can see what's wrong without opening the editor (#347)
+function setNodeStatusTooltip(element, statusClass, messages) {
+	element.data("statusMessages", messages);
+	if (!element.data("bs.tooltip")) {
+		element.tooltip({
+			html: true,
+			trigger: "hover",
+			placement: "bottom",
+			template: `<div class="tooltip node-status-tooltip ${statusClass}" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>`,
+			title: function() {
+				const ul = $("<ul/>");
+				for (const message of $(this).data("statusMessages") || []) {
+					$("<li/>", {text: message}).appendTo(ul);
+				}
+				return ul.prop("outerHTML");
+			},
+		});
+	}
+}
+
+function clearNodeStatusTooltip(elements) {
+	elements.each(function() {
+		const element = $(this);
+		if (element.data("bs.tooltip")) {
+			element.tooltip("dispose");
+		}
+	});
+}
+
 function updateDirtyNode(node, refresh) {
 	const node_id = node.attr("node_id");
 
@@ -619,7 +651,8 @@ function updateDirtyNode(node, refresh) {
 	setVariantCount(variant_count, '?');
     node.attr("loading", "true"); // #616 - Don't flash red when loading - this will stop next cycle of shadow setting
 	node.removeAttr("node_error"); // A reloading node shows the spinner, not the previous run's cross
-	$(".node-counts-strip", node).removeAttr("title");
+	node.removeAttr("node_warning");
+	clearNodeStatusTooltip($(".node-counts-strip, .node-warning-badge", node));
 
 	const asyncUpdateNode = function (data) {
 		// Flash the card border between its normal colour and shadowColor. The border is currentColor,
@@ -651,11 +684,16 @@ function updateDirtyNode(node, refresh) {
 
 		if (data.valid) {
 			setNodeCounts(node, data);
+			if (data.warnings && data.warnings.length) {
+				node.attr("node_warning", "true");
+				setNodeStatusTooltip($(".node-warning-badge", node), "node-status-warning", data.warnings);
+			}
 		} else {
 			// The counts strip is where the eye is already waiting, so mark the spot the spinner
 			// vacated with a cross rather than leaving it blank
 			node.attr("node_error", "true");
-			$(".node-counts-strip", node).attr("title", "Node failed to load - click the node to see the errors");
+			const errors = data.errors && data.errors.length ? data.errors : ["Node failed to load"];
+			setNodeStatusTooltip($(".node-counts-strip", node), "node-status-error", errors);
 			setVariantCount(variant_count, "");
 		}
 		repaintNode(node);

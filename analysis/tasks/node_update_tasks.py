@@ -128,9 +128,6 @@ def update_node_task(node_id, version):
                     # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
                     with node_query_planner_settings():
                         node.load()
-                    # Check if we need to clear shadow color
-                    if node.shadow_color == NodeColors.ERROR and node.is_valid:
-                        node.update(shadow_color=None)
                 except NodeOutOfDateException:
                     logging.warning("Node %d/%d out of date - exiting", node.pk, node.version)
                     return  # version bumped - reload_analysis_nodes already re-triggered; do NOT re-trigger here

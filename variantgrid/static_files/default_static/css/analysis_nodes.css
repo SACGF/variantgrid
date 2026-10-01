@@ -225,6 +225,7 @@ button.add-analysis-variable-button {
 			.node-name-holder > .node-name
 			.node-chips		- pills from get_node_chips()
 			.node-color-overlay - analysis variable / output node tint
+		.node-warning-badge - "!" on the opposite corner to the badge, shown when the load had warnings
 		.node-counts-strip > .node-counts > .node-count-<type>
 		.node-counts-strip > .node-counts.node-tag-counts > .node-count-<type> (tag counts, if any)
 
@@ -799,6 +800,70 @@ span.node-counts {
 	font-size: 11px;
 	font-weight: 700;
 	color: #c02b2b;
+}
+
+/* Warnings don't stop a node loading, so they get a corner badge rather than taking over the counts -
+   hover it for the list (setNodeStatusTooltip) */
+.design-a-node .node-warning-badge {
+	display: none;
+	position: absolute;
+	top: -7px;
+	right: -7px;
+	z-index: 3;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background-color: #FFA500;
+	box-shadow: 0 0 0 1px white, 0 1px 3px rgba(0, 0, 0, .3);
+	color: white;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 14px;
+	text-align: center;
+	cursor: help;
+}
+
+.design-a-node[node_warning] .node-warning-badge {
+	display: block;
+}
+
+.design-a-node[node_error] .node-counts-strip {
+	cursor: help;
+}
+
+.node-status-tooltip .tooltip-inner {
+	max-width: 320px;
+	text-align: left;
+}
+
+.node-status-tooltip ul {
+	margin: 0;
+	padding-left: 14px;
+}
+
+.node-status-warning .tooltip-inner {
+	background-color: #FFA500;
+	color: black;
+}
+
+.node-status-warning.bs-tooltip-bottom .arrow::before {
+	border-bottom-color: #FFA500;
+}
+
+.node-status-warning.bs-tooltip-top .arrow::before {
+	border-top-color: #FFA500;
+}
+
+.node-status-error .tooltip-inner {
+	background-color: #c02b2b;
+}
+
+.node-status-error.bs-tooltip-bottom .arrow::before {
+	border-bottom-color: #c02b2b;
+}
+
+.node-status-error.bs-tooltip-top .arrow::before {
+	border-top-color: #c02b2b;
 }
 
 .node-count .live-data-marker {
