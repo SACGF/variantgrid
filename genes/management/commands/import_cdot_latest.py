@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from cdot.data_release import (
     _get_version_from_tag_name,
@@ -9,21 +10,18 @@ from django.core.management import BaseCommand
 
 from genes.cdot_data_release import download_cdot_json
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
-from genes.models import TranscriptVersion
+from genes.models import CdotDataVersion
 from genes.models_enums import AnnotationConsortium
 from library.utils import get_single_element, invert_dict
 from snpdb.models import GenomeBuild
 
 
-def get_installed_cdot_data_version(genome_builds, annotation_consortia) -> str:
-    """ The cdot version that produced the most recently inserted transcripts """
+def get_installed_cdot_data_versions(genome_builds, annotation_consortia) -> set[Optional[str]]:
+    """ cdot version of each build/consortium (names/labels) combination - None for one never imported """
     ac_lookup = invert_dict(dict(AnnotationConsortium.choices))
+    builds = [GenomeBuild.get_name_or_alias(gb) for gb in genome_builds]
     ac_codes = [ac_lookup[ac] for ac in annotation_consortia]
-    tv_qs = TranscriptVersion.objects.filter(genome_build__in=genome_builds,
-                                             transcript__annotation_consortium__in=ac_codes)
-    if last_tv := tv_qs.order_by("pk").last():
-        return last_tv.data.get("cdot")
-    return "No cdot data in system"
+    return CdotDataVersion.get_installed_versions(builds, ac_codes)
 
 
 def get_latest_cdot_data_version() -> str:
@@ -32,12 +30,13 @@ def get_latest_cdot_data_version() -> str:
 
 
 def cdot_data_needs_update(genome_builds, annotation_consortia) -> tuple[bool, str, str]:
-    """ Returns (needs update, ours, latest on GitHub) """
-    our_latest_cdot = get_installed_cdot_data_version(genome_builds, annotation_consortia)
+    """ Returns (needs update, ours, latest on GitHub) - needs update unless every combination is at latest """
+    installed_versions = get_installed_cdot_data_versions(genome_builds, annotation_consortia)
+    our_cdot = ", ".join(sorted(v or "not installed" for v in installed_versions))
     cdot_data_version = get_latest_cdot_data_version()
-    logging.info("Most recent cdot data in our database: %s", our_latest_cdot)
+    logging.info("cdot data in our database: %s", our_cdot)
     logging.info("Latest cdot release on GitHub: %s", cdot_data_version)
-    return cdot_data_version != our_latest_cdot, our_latest_cdot, cdot_data_version
+    return installed_versions != {cdot_data_version}, our_cdot, cdot_data_version
 
 
 def import_latest_combo_file(genome_build: GenomeBuild, annotation_consortium: AnnotationConsortium):

@@ -24,13 +24,18 @@ holding the latest copy of every transcript, and a *per-GFF* file per gene set V
 `genes/management/commands/import_cdot_latest.py:import_latest_combo_file` downloads the combo file to disk
 (`genes/cdot_data_release.py:download_cdot_json` - a temp file, because the importer reads it twice and the larger
 builds OOMed in memory) and `genes/management/commands/import_gene_annotation.py:Command.import_cdot_data_file`
-streams genes then transcripts out of it with ijson. `genes/management/commands/import_cdot_latest.py:cdot_data_needs_update` compares the `cdot`
-key stamped into the most recently inserted TranscriptVersion's `data` with the latest GitHub release tag, so a
-re-run is a no-op unless cdot moved.
+streams genes then transcripts out of it with ijson, then records the file's release in
+`genes/models/models_gene.py:CdotDataVersion` (one row per build and consortium).
+`genes/management/commands/import_cdot_latest.py:cdot_data_needs_update` compares those rows with the latest GitHub
+release tag, so a re-run is a no-op unless cdot moved.
 
 `genes/management/commands/import_gene_annotation.py:Command._import_cdot_data` is an upsert keyed on accession: it
 loads every known symbol, gene id, transcript id and `GeneVersion.id_by_accession` /
-`TranscriptVersion.id_by_accession` map up front, then bulk-creates what is new and bulk-updates the rest. RefSeq genes have no version and are stored as version 0; a cdot
+`TranscriptVersion.id_by_accession` map up front, then bulk-creates what is new. Existing TranscriptVersions are
+compared, a streamed batch at a time, against what's stored and only those that differ are updated
+(`genes/management/commands/import_gene_annotation.py:Command._update_changed_transcript_versions`, #2029) - most
+transcripts don't change between cdot releases, and rewriting all ~2.2M JSON rows took about an hour. The `cdot` key
+in `data` is left out of that comparison, so it holds the release a transcript last changed in, not what's installed. RefSeq genes have no version and are stored as version 0; a cdot
 gene accession starting with `_` (a fake from UTA data) is renamed with `Gene.FAKE_GENE_ID_PREFIX`. Each distinct GFF
 URL in the file becomes a `genes/models/models_gene.py:GeneAnnotationImport`
 (`genes/management/commands/import_gene_annotation.py:GeneAnnotationImportManager`), and a version row keeps the

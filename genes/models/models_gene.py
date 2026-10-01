@@ -374,6 +374,37 @@ class GeneAnnotationImport(TimeStampedModel):
         return self.url
 
 
+class CdotDataVersion(TimeStampedModel):
+    """ The cdot data release of the last whole cdot file imported for a build and consortium
+
+        An import only rewrites a TranscriptVersion whose data changed, so TranscriptVersion.data["cdot"] is the
+        release that transcript last changed in - this is what's installed """
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
+    cdot_version = models.TextField()
+
+    class Meta:
+        unique_together = ("genome_build", "annotation_consortium")
+
+    def __str__(self):
+        return f"{self.genome_build}/{self.get_annotation_consortium_display()}: cdot {self.cdot_version}"
+
+    @staticmethod
+    def get_version(genome_build: GenomeBuild, annotation_consortium) -> Optional[str]:
+        qs = CdotDataVersion.objects.filter(genome_build=genome_build, annotation_consortium=annotation_consortium)
+        return qs.values_list("cdot_version", flat=True).first()
+
+    @staticmethod
+    def get_installed_versions(genome_builds: Iterable[GenomeBuild], annotation_consortia: Iterable) -> set[Optional[str]]:
+        """ The cdot version of each build/consortium combination - None for one that's never been imported """
+        genome_builds = list(genome_builds)
+        annotation_consortia = list(annotation_consortia)
+        qs = CdotDataVersion.objects.filter(genome_build__in=genome_builds, annotation_consortium__in=annotation_consortia)
+        version_by_key = {(gb_id, ac): version
+                          for gb_id, ac, version in qs.values_list("genome_build_id", "annotation_consortium", "cdot_version")}
+        return {version_by_key.get((gb.pk, ac)) for gb in genome_builds for ac in annotation_consortia}
+
+
 class Gene(PreviewModelMixin, models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3

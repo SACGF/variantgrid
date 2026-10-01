@@ -8,6 +8,7 @@ from django.db.models.functions import Upper
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
 from genes.models import (
     HGNC,
+    CdotDataVersion,
     Gene,
     GeneAnnotationImport,
     GeneSymbol,
@@ -90,6 +91,7 @@ class Command(BaseCommand):
     # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
     # when importing large streamed files (see import_cdot_data_file).
     CDOT_CHUNK_SIZE = 10000
+    TRANSCRIPT_VERSION_UPDATE_FIELDS = ["gene_version_id", "import_source_id", "biotype", "contig_id", "data"]
 
     @classmethod
     def read_cdot_version(cls, file_obj) -> str:
@@ -122,6 +124,8 @@ class Command(BaseCommand):
             return ijson.kvitems(file_obj, "transcripts")
 
         cls._import_cdot_data(genome_build, annotation_consortium, cdot_version, genes_iter, transcripts_iter)
+        CdotDataVersion.objects.update_or_create(genome_build=genome_build, annotation_consortium=annotation_consortium,
+                                                 defaults={"cdot_version": cdot_version})
 
     @classmethod
     def _import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_version,
@@ -234,8 +238,9 @@ class Command(BaseCommand):
 
         new_transcript_ids = set()
         new_transcript_versions = []
-        modified_transcript_versions = []
-        totals = {"new_transcripts": 0, "new_transcript_versions": 0, "modified_transcript_versions": 0}
+        existing_transcript_versions = []
+        totals = {"new_transcripts": 0, "new_transcript_versions": 0,
+                  "existing_transcript_versions": 0, "modified_transcript_versions": 0}
 
         def flush_transcripts():
             """ Write the pending batch to the DB and free it - keeps peak memory bounded when
@@ -254,12 +259,10 @@ class Command(BaseCommand):
                 totals["new_transcript_versions"] += len(new_transcript_versions)
                 new_transcript_versions.clear()
 
-            if modified_transcript_versions:
-                TranscriptVersion.objects.bulk_update(modified_transcript_versions,
-                                                      ["gene_version_id", "import_source", "biotype", "data", "contig"],
-                                                      batch_size=cls.BATCH_SIZE)
-                totals["modified_transcript_versions"] += len(modified_transcript_versions)
-                modified_transcript_versions.clear()
+            if existing_transcript_versions:
+                totals["existing_transcript_versions"] += len(existing_transcript_versions)
+                totals["modified_transcript_versions"] += cls._update_changed_transcript_versions(existing_transcript_versions)
+                existing_transcript_versions.clear()
 
         for transcript_accession, tv_data in transcripts_iter():
             transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
@@ -290,21 +293,40 @@ class Command(BaseCommand):
                                                    data=tv_data)
             if pk := transcript_version_ids_by_accession.get(transcript_accession):
                 transcript_version.pk = pk
-                modified_transcript_versions.append(transcript_version)
+                existing_transcript_versions.append(transcript_version)
             else:
                 new_transcript_versions.append(transcript_version)
 
-            if len(new_transcript_versions) + len(modified_transcript_versions) >= cls.CDOT_CHUNK_SIZE:
+            if len(new_transcript_versions) + len(existing_transcript_versions) >= cls.CDOT_CHUNK_SIZE:
                 flush_transcripts()
 
         flush_transcripts()  # Final partial batch
-        logging.info("Created %d new transcripts, created %d / updated %d transcript versions",
+        logging.info("Created %d new transcripts, created %d transcript versions, "
+                     "updated %d of %d existing transcript versions (the rest were unchanged)",
                      totals["new_transcripts"], totals["new_transcript_versions"],
-                     totals["modified_transcript_versions"])
+                     totals["modified_transcript_versions"], totals["existing_transcript_versions"])
 
         if has_new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
             print("Created new RefSeq genes - retrieving gene summaries via API")
             retrieve_refseq_gene_summaries()
+
+    @classmethod
+    def _update_changed_transcript_versions(cls, transcript_versions: list[TranscriptVersion]) -> int:
+        """ Only write the TranscriptVersions whose values differ from what's stored. The 'cdot' key is left out
+            of the comparison: it's stamped with the release being imported, so would differ on every row and
+            rewrite the whole table each cdot release. Returns the number of rows changed """
+        fields = cls.TRANSCRIPT_VERSION_UPDATE_FIELDS
+        tv_qs = TranscriptVersion.objects.filter(pk__in=[tv.pk for tv in transcript_versions])
+        stored_by_pk = {values[0]: values[1:] for values in tv_qs.values_list("pk", *fields)}
+
+        def _comparable(values) -> tuple:
+            *columns, data = values
+            return *columns, {k: v for k, v in data.items() if k != "cdot"}
+
+        changed = [tv for tv in transcript_versions
+                   if _comparable(stored_by_pk[tv.pk]) != _comparable([getattr(tv, f) for f in fields])]
+        TranscriptVersion.objects.bulk_update(changed, fields, batch_size=cls.BATCH_SIZE)
+        return len(changed)
 
     @staticmethod
     def get_biotype(data):
