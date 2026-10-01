@@ -107,7 +107,7 @@ $(document).ready(function() {
               <div class="card-header">Create</div>
               <div class="card-body">
                   {% crispy create_gene_list_form form_helper.horizontal %}
-                  {% include "messages/messages.html" %}
+                  {% include "uicore/messages/messages.html" %}
               </div>
               <div class="card-footer">
                   <button id='submit-button' class="btn btn-primary">Create GeneList</button>

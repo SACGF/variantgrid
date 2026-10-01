@@ -13,6 +13,7 @@ from seqauto.models import (
 )
 
 
+@staff_only
 def sequencing_software_versions(request):
     # TODO: Forms etc
     return render(request, 'seqauto/sequencing_software_versions.html')

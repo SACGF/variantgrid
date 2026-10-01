@@ -1,5 +1,6 @@
 from rest_framework import routers
 
+from library.django_utils import staff_only
 from seqauto import views, views_admin, views_autocomplete, views_qc_graphs, views_rest
 from seqauto.grids.qc_data_grids import (
     FastQCColumns,
@@ -142,12 +143,12 @@ urlpatterns = [
     path('qc_exec_summary/datatable/', DatabaseTableView.as_view(column_class=QCExecSummaryColumns),
          name='qc_exec_summary_datatable'),
     # Software/settings
-    path('sequencing_software_versions/library/datatables/', DatabaseTableView.as_view(column_class=LibraryColumns), name='library_datatable'),
-    path('sequencing_software_versions/sequencer/datatables/', DatabaseTableView.as_view(column_class=SequencerColumns), name='sequencer_datatable'),
-    path('sequencing_software_versions/assay/datatables/', DatabaseTableView.as_view(column_class=AssayColumns), name='assay_datatable'),
-    path('sequencing_software_versions/aligner/datatables/', DatabaseTableView.as_view(column_class=AlignerColumns), name='aligner_datatable'),
-    path('sequencing_software_versions/variant_caller/datatables/', DatabaseTableView.as_view(column_class=VariantCallerColumns), name='variant_caller_datatable'),
-    path('sequencing_software_versions/variant_calling_pipeline/datatables/', DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns), name='variant_calling_pipeline_datatable'),
+    path('sequencing_software_versions/library/datatables/', staff_only(DatabaseTableView.as_view(column_class=LibraryColumns)), name='library_datatable'),
+    path('sequencing_software_versions/sequencer/datatables/', staff_only(DatabaseTableView.as_view(column_class=SequencerColumns)), name='sequencer_datatable'),
+    path('sequencing_software_versions/assay/datatables/', staff_only(DatabaseTableView.as_view(column_class=AssayColumns)), name='assay_datatable'),
+    path('sequencing_software_versions/aligner/datatables/', staff_only(DatabaseTableView.as_view(column_class=AlignerColumns)), name='aligner_datatable'),
+    path('sequencing_software_versions/variant_caller/datatables/', staff_only(DatabaseTableView.as_view(column_class=VariantCallerColumns)), name='variant_caller_datatable'),
+    path('sequencing_software_versions/variant_calling_pipeline/datatables/', staff_only(DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns)), name='variant_calling_pipeline_datatable'),
 
     path('sequencing_software_versions', views_admin.sequencing_software_versions, name='sequencing_software_versions'),
     path('view_sequencer/<pk>', SequencerUpdate.as_view(), name='view_sequencer'),
