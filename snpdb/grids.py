@@ -387,7 +387,7 @@ class FamilyGroupListColumns(DatatableConfig[DC]):
     MODEL: type[DC]
     GRID_NAME: str
     # (field prefix, label, has an affected column)
-    FAMILY_MEMBERS = [("mother", "Mother", True), ("father", "Father", True), ("proband", "Proband", False)]
+    FAMILY_MEMBERS = [("father", "Father", True), ("mother", "Mother", True), ("proband", "Proband", False)]
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)

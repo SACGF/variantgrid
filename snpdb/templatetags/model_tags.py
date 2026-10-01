@@ -14,9 +14,9 @@ register = Library()
 def trio_table(trio: Trio):
     """ Trio details + a row per family member - the proband is affected by definition """
     members = [
-        {"role": "Proband", "cohort_sample": trio.proband, "affected": True},
-        {"role": "Mother", "cohort_sample": trio.mother, "affected": trio.mother_affected},
         {"role": "Father", "cohort_sample": trio.father, "affected": trio.father_affected},
+        {"role": "Mother", "cohort_sample": trio.mother, "affected": trio.mother_affected},
+        {"role": "Proband", "cohort_sample": trio.proband, "affected": True},
     ]
     return {"trio": trio, "members": members}
 
@@ -25,9 +25,9 @@ def trio_table(trio: Trio):
 def quad_table(quad: Quad):
     """ Quad details + a row per family member - the proband is affected by definition """
     members = [
-        {"role": "Proband", "cohort_sample": quad.proband, "affected": True},
-        {"role": "Mother", "cohort_sample": quad.mother, "affected": quad.mother_affected},
         {"role": "Father", "cohort_sample": quad.father, "affected": quad.father_affected},
+        {"role": "Mother", "cohort_sample": quad.mother, "affected": quad.mother_affected},
+        {"role": "Proband", "cohort_sample": quad.proband, "affected": True},
         {"role": "Sibling", "cohort_sample": quad.sibling, "affected": quad.sibling_affected},
     ]
     return {"quad": quad, "members": members}
