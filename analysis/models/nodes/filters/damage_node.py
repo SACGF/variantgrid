@@ -10,7 +10,7 @@ from django.db import models
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from analysis.models.nodes.node_display import NodeChip, NodeIcon
+from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
 from annotation.models.damage_enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
@@ -28,7 +28,7 @@ from annotation.pathogenicity_predictions import (
     PathogenicityTool,
     RawScoreDirection,
 )
-from library.genomics.vcf_enums import VariantClass
+from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS, VariantClass
 from snpdb.models.models_variant import Variant
 
 
@@ -621,18 +621,10 @@ class DamageNode(AnalysisNode):
     def get_help_text() -> str:
         return "Variant type, impact, damage predictions, conservation and splicing filter"
 
-    def get_variant_class_summary(self) -> str:
-        labels = [VariantClass(vc).label for vc in self.variant_class]
-        summary = ", ".join(labels)
-        if self.variant_class_exclude:
-            summary = f"not {summary}"
-        return summary
-
     def get_node_chips(self) -> list[NodeChip]:
         chips = super().get_node_chips()
-        if self.variant_class:
-            chips.append(NodeChip(text="type", icon="fa-solid fa-shapes",
-                                  title=f"Variant type: {self.get_variant_class_summary()}"))
+        chips += grouped_chips(self.variant_class or [], VARIANT_CLASS_GROUPS, dict(VariantClass.choices),
+                               "Variant type", exclude=self.variant_class_exclude, icon="fa-solid fa-shapes")
         if self.splice_min is not None:
             chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors",
                                   title=f"Splicing prediction score >= {self.splice_min}"))
