@@ -34,7 +34,10 @@ from annotation.models import (
 from annotation.models.models import ManualVariantEntryCollection
 from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.serializers import ManualVariantEntryCollectionSerializer
-from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from annotation.tasks.calculate_sample_stats import (
+    SAMPLE_STATS_CODE_VERSION,
+    enqueue_cohort_stats_recompute,
+)
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import (
     add_save_message,
@@ -185,7 +188,7 @@ def view_vcf(request, vcf_id):
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
 
     sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, passing_filter=False)
-    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
+    sample_stats_pass_het_hom_count, _, _ = _get_vcf_sample_stats(vcf, passing_filter=True)
     sample_genotype_stats = _get_vcf_sample_genotype_stats(vcf)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
@@ -398,7 +401,7 @@ def _sample_stats(sample) -> Optional[SampleStats]:
     variant_class_data = {}
     zygosity_data = {}
     annotated_data = {}
-    missing_stats = False
+    stale_stats = False
     for stats_klass, (variant_class_name, zygosity_name, shared_fields) in STATS.items():
         base_kwargs = {
             "cohort_genotype_collection": cgc,
@@ -410,10 +413,14 @@ def _sample_stats(sample) -> Optional[SampleStats]:
 
         objs = {}
         try:
-            objs[False] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
+            objs[False] = stats_klass.objects.select_related("code_version").get(passing_filter=False,
+                                                                                 **base_kwargs)
+            # Rows from older stats code are still shown, and recomputed for the next view
+            if objs[False].code_version.version < SAMPLE_STATS_CODE_VERSION:
+                stale_stats = True
         except ObjectDoesNotExist:
             # Stats absent for the latest annotation version (eg it was bumped since import)
-            missing_stats = True
+            stale_stats = True
 
         try:
             objs[True] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
@@ -459,7 +466,7 @@ def _sample_stats(sample) -> Optional[SampleStats]:
         zygosity_df = zygosity_df.sum().to_frame("all").T
     annotated_df = pd.DataFrame.from_dict(annotated_data).reindex(list(ANNOTATED.values()))
 
-    if missing_stats:
+    if stale_stats:
         enqueue_cohort_stats_recompute(cohort, annotation_version)
 
     return SampleStats(variant_class_df, zygosity_df, annotated_df)

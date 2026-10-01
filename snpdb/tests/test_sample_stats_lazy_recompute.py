@@ -2,7 +2,7 @@
     The sample page reads cohort stats for the latest annotation version and
     enqueues a recompute when they're absent. The "fresh" case must stay quiet —
     a cohort whose samples have no variants still needs zero-filled rows, or
-    every page view re-enqueues.
+    every page view re-enqueues. Rows from an older stats code version are stale too.
 """
 from unittest.mock import patch
 
@@ -10,9 +10,12 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_data import get_fake_annotation_version
-from annotation.tasks.calculate_sample_stats import calculate_cohort_stats
+from annotation.tasks.calculate_sample_stats import (
+    SAMPLE_STATS_CODE_VERSION,
+    calculate_cohort_stats,
+)
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import GenomeBuild
+from snpdb.models import CohortGenotypeStats, GenomeBuild, SampleStatsCodeVersion
 from snpdb.views.views_data import _sample_stats
 
 
@@ -36,3 +39,13 @@ class SampleStatsLazyRecomputeTest(TestCase):
         with patch("snpdb.views.views_data.enqueue_cohort_stats_recompute") as mock_enqueue:
             _sample_stats(self.sample)
         mock_enqueue.assert_not_called()
+
+    def test_stale_code_version_enqueues_recompute(self):
+        calculate_cohort_stats(self.cohort, self.annotation_version)
+        old_code_version = SampleStatsCodeVersion.objects.create(name="SampleStats",
+                                                                 version=SAMPLE_STATS_CODE_VERSION - 1,
+                                                                 code_git_hash="old")
+        CohortGenotypeStats.objects.filter(sample=self.sample).update(code_version=old_code_version)
+        with patch("snpdb.views.views_data.enqueue_cohort_stats_recompute") as mock_enqueue:
+            _sample_stats(self.sample)
+        mock_enqueue.assert_called_once_with(self.cohort, self.annotation_version)
