@@ -59,6 +59,9 @@ Gotchas:
 - `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the
   pedigree symbols in uicore/templates/uicore/tags/svg_icon_sprite.html theme themselves through `style="fill: var(...)"`
   instead, which is what lets a page fill in the affected members with `--pedigree-*-fill`.
+- The sprite `<svg>` is `display: none`, so a symbol drawn through `clipPath`, `mask`, a gradient or anything else
+  referenced by `url(#...)` is unreliable under `<use>` (Chrome drops the clip) - draw the shape directly
+  (`file-icon-fusion` is two paths).
 Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
   (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
   ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
