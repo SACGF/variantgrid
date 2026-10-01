@@ -314,23 +314,25 @@ class UploadPipeline(models.Model):
             vii = VCFImportError(message=f"This file failed to import due to: {self.progress_status}.",
                                  has_more_details=False)
             errors.append(vii)
-        errors.extend(self._get_vcf_import_info(VCFImportInfoSeverity.ERROR, hide_accepted=hide_accepted))
+        errors.extend(self.get_vcf_import_info(VCFImportInfoSeverity.ERROR, hide_accepted=hide_accepted))
         return errors
 
     def get_warnings(self, hide_accepted=True, include_vcf=True) -> list:
-        warnings = self._get_vcf_import_info(VCFImportInfoSeverity.WARNING, hide_accepted=hide_accepted)
+        warnings = self.get_vcf_import_info(VCFImportInfoSeverity.WARNING, hide_accepted=hide_accepted)
         if include_vcf:
             if vcf := self.vcf:
                 warnings.extend(vcf.get_warnings())
         return warnings
 
-    def _get_vcf_import_info(self, severity, hide_accepted=True):
-        kwargs = {"upload_step__upload_pipeline": self,
-                  "severity": severity}
+    def get_vcf_import_info(self, severity=None, hide_accepted=True) -> list['VCFImportInfo']:
+        """ severity None for all, errors first """
+        kwargs = {"upload_step__upload_pipeline": self}
+        if severity:
+            kwargs["severity"] = severity
         if hide_accepted:
             kwargs["accepted_date__isnull"] = True
         vcf_import_info = []
-        for import_info in VCFImportInfo.objects.filter(**kwargs).select_subclasses():
+        for import_info in VCFImportInfo.objects.filter(**kwargs).order_by("severity", "pk").select_subclasses():
             if import_info.message or import_info.has_more_details:
                 vcf_import_info.append(import_info)
         return vcf_import_info

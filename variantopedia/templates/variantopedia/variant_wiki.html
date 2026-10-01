@@ -1,9 +1,9 @@
-{% extends menu_variants_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load genome_build_tags %}
 {% block title %}Variant Wiki{% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <script>
         function datatableFilter(data) {
             data.genome_build = "{{ genome_build.name  }}";

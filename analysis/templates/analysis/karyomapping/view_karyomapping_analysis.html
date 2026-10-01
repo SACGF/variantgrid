@@ -1,4 +1,4 @@
-{% extends menu_analysis_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load model_tags %}
 {% block title %}Karyomapping{% endblock title %}
@@ -40,7 +40,7 @@
 </script>
 {% endblock head %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <script type="text/javascript" src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
 <div id='karyomapping-tabs'>
     <ul class="nav nav-tabs mb-4" role="tablist">
@@ -105,4 +105,4 @@
 <div id='karyomap-gene-container'>
 </div>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

@@ -1,5 +1,6 @@
 from annotation import views, views_annotation_runs, views_citations, views_descriptions, views_rest
 from annotation.grids import AnnotationRunColumns, VariantAnnotationVersionColumns
+from library.django_utils import require_superuser
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -23,7 +24,7 @@ urlpatterns = [
 
     path('annotation_version/datatable/<path:genome_build_name>/', DatabaseTableView.as_view(column_class=VariantAnnotationVersionColumns), name='variant_annotation_version_datatable'),
 
-    path('annotation_run/datatables', DatabaseTableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
+    path('annotation_run/datatables', require_superuser(DatabaseTableView.as_view(column_class=AnnotationRunColumns)), name='annotation_run_datatable'),
 
     path('citations_json/<path:citations_ids_list>', views_citations.citations_json, name='citations_json'),
     path('citation/<str:citation_id>', views_citations.view_citation, name='view_citation'),

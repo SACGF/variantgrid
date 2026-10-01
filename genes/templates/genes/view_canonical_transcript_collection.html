@@ -1,6 +1,6 @@
-{% extends menu_genes_base %}
+{% extends "uicore/page/base_container_table.html" %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <script>
     function datatableFilter(data) {
         data.collection_id = {{ canonical_transcript_collection.pk }}
@@ -44,4 +44,4 @@
     <table id="canonical-transcript-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'canonical_transcript_datatable' %}" data-datatable-data="datatableFilter"></table>
 
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load js_tags %}
 {% block title %}Patient Term Approvals{% endblock %}
@@ -56,7 +56,7 @@
     </script>
 	
 {% endblock head %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <div class="container">
 <h3>Phenotype Match Approval</h3>
@@ -100,4 +100,4 @@
 	No patients remaining.
 {% endif %}
 </div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

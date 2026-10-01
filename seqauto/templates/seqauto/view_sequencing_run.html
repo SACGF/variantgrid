@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load model_helpers %}
 {% load help_tags %}
@@ -144,7 +144,7 @@
 
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <div id="sequencing-run-header">
         <div title='{{ sequencing_run.sequencer }}' class='sequencer'>

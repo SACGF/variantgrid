@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from django.conf import settings
-from django.db.models import QuerySet, StringAgg, TextField, Value
+from django.db.models import Q, QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.http import HttpRequest
@@ -20,6 +20,7 @@ from seqauto.models import (
     UnalignedReads,
 )
 from snpdb.models import UserGridConfig
+from snpdb.models.models_vcf import VCF
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -110,14 +111,16 @@ class SequencingRunColumns(DatatableConfig[SequencingRun]):
         return [{"label": label, "url": url} for label, url in links]
 
     def get_initial_queryset(self) -> QuerySet[SequencingRun]:
+        visible_vcf = Q(vcffromsequencingrun__vcf__in=VCF.filter_for_user(self.user))
         return SequencingRun.objects.all().annotate(
             sample_count=Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample", distinct=True),
             vcf_ids=StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), Value(','),
-                              output_field=TextField(), order_by="vcffromsequencingrun"),
+                              output_field=TextField(), order_by="vcffromsequencingrun", filter=visible_vcf),
             vcf_variant_caller=StringAgg("vcffromsequencingrun__variant_caller__name", Value(','),
-                                         output_field=TextField(), order_by="vcffromsequencingrun"),
+                                         output_field=TextField(), order_by="vcffromsequencingrun",
+                                         filter=visible_vcf),
             vcf_import_status=StringAgg("vcffromsequencingrun__vcf__import_status", Value(','),
-                                        order_by="vcffromsequencingrun"))
+                                        order_by="vcffromsequencingrun", filter=visible_vcf))
 
     def filter_queryset(self, qs: QuerySet[SequencingRun]) -> QuerySet[SequencingRun]:
         if enrichment_kit_id := self.get_query_param("enrichment_kit_id"):

@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
 {% block title %}Patients{% endblock title %}
@@ -238,7 +238,7 @@ $(document).ready(function() {
 });
 </script>
 {% endblock head %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 	<div>
         <h3>Patients</h3>
         <div id='patient-header'>
@@ -326,7 +326,7 @@ $(document).ready(function() {
 	<table id="patient-datatable" class="sticky-header" data-datatable-url="{% url 'patient_datatables' %}" data-datatable-data="patientDatatableFilter"></table>
 
 	</div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}
 
 {% block endbody %}
 {% include "patients/patient_samplenode_svg.html" %}

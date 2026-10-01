@@ -1,5 +1,4 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% load ui_help %}
 {% load js_tags %}
@@ -7,7 +6,6 @@
 {% load static %}
 {% load classification_tags %}
 {% block title %}Variant Classification Import{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <script>
     let waitingForKeys = true;

@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.generic.edit import UpdateView
@@ -14,18 +13,9 @@ from seqauto.models import (
 )
 
 
-def get_sequencing_software_versions_template():
-    if settings.SEQAUTO_ENABLED:
-        base_template = "seqauto/menu_sequencing_data_base.html"
-    else:
-        base_template = "snpdb/menu/menu_settings_base.html"
-    return base_template
-
-
 def sequencing_software_versions(request):
     # TODO: Forms etc
-    context = {"base_template": get_sequencing_software_versions_template()}
-    return render(request, 'seqauto/sequencing_software_versions.html', context)
+    return render(request, 'seqauto/sequencing_software_versions.html')
 
 
 @method_decorator([staff_only], name='dispatch')
@@ -35,7 +25,6 @@ class SeqautoUpdateView(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['base_template'] = get_sequencing_software_versions_template()
         context['title'] = str(self.model.__name__)
         return context
 

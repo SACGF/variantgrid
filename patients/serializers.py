@@ -138,13 +138,17 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
 
     def _external_pk_for(self, instance, external_pk_data) -> ExternalPK:
         """ _get_existing only searches rows the user can see, so the ExternalPK may already belong
-            to a row of this model they cannot - a 400 rather than the one-to-one IntegrityError """
-        external_pk = ExternalPKSerializer.get_or_create(external_pk_data)
-        taken = self.Meta.model.objects.filter(external_pk=external_pk).exclude(pk=instance.pk).exists()
+            to a row of this model they cannot - a 400 rather than the one-to-one IntegrityError.
+            The message doesn't say whose it is: the row may be one they can't see, or (on update) a
+            different one they can, and confirming a code exists is more than an outsider should learn.
+            Checked before get_or_create so a rejected request leaves no orphan ExternalPK """
+        taken = self.Meta.model.objects.filter(
+            external_pk__code=external_pk_data["code"],
+            external_pk__external_type=external_pk_data["external_type"],
+            external_pk__external_manager=external_pk_data["external_manager"]).exclude(pk=instance.pk).exists()
         if taken:
-            raise serializers.ValidationError({
-                "external_pk": f"{external_pk} is already used by a record you do not have access to"})
-        return external_pk
+            raise serializers.ValidationError({"external_pk": "Cannot be used for this record"})
+        return ExternalPKSerializer.get_or_create(external_pk_data)
 
     def create(self, validated_data):
         external_pk_data = validated_data.pop("external_pk", None)

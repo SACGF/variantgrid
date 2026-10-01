@@ -1,4 +1,4 @@
-{% extends menu_pathtests_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block title %}Pathology Tests{% endblock title %}
 
@@ -60,7 +60,7 @@ $("#new-pathology-test").click(showForm);
 
 {% endblock css %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     {% load ui_help %}
     {% page_help 'pathtests/manage_pathology_tests_help' 'Manage Pathology Tests' %}
 
@@ -94,6 +94,6 @@ $("#new-pathology-test").click(showForm);
 
     <table id="pathology-tests-grid" data-datatable-url="{% url 'pathology_tests_datatable' %}" class="sticky-header"></table>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}
 
 

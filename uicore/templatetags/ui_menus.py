@@ -1,132 +1,70 @@
-from typing import Any, Optional
+"""
+Renders the menus from settings.MENUS (uicore/menus.py:get_menus): menu_bar_main (the top bar) and menu_bar_sub (the side bar for the
+current page), both picked from the request's url name. Also the page chrome's site_messages and the absolute_url tag.
+"""
+from typing import Optional
 
+from django.http import HttpRequest
 from django.template.library import Library
 from django.urls import reverse
 
 from library.django_utils import get_url_from_view_path
-from variantgrid.perm_path import get_visible_url_names
+from uicore.menus import MenuItem, current_menu, get_menus
 
 register = Library()
-UNSET = '!@#$%^&*()'
-
-def _validate_method(method: str) -> str:
-    method = method.lower()
-    valid_methods = ['get', 'post']
-    if method not in valid_methods:
-        raise ValueError(f"{method=} not in {', '.join(valid_methods)}")
-    return method
 
 
-@register.inclusion_tag("uicore/tags/menu_item.html", takes_context=True)
-def menu_top(context,
-             url_name: str,
-             app_name: str,
-             title: str = None,
-             method='get'):
-    url = None
-    for url_name_part in url_name.split('|'):
-        if get_visible_url_names().get(url_name_part):
-            url = reverse(url_name_part)
-            break
+def _current_url_name(request: HttpRequest) -> Optional[str]:
+    if rm := request.resolver_match:
+        return rm.url_name
+    return None
 
-    if not url:
-        return {'invalid': True}
 
-    is_active = False
-    request = context.request
-    app_names = app_name.split('|')
-    for app_name_part in app_names:
-        if request.get_full_path().startswith('/' + app_name_part):
-            is_active = True
-            break
-
-    if not title:
-        title = url_name.replace('_', ' ')
-    title = title[0].upper() + title[1::]
-
+def _item_context(item: MenuItem, active: bool) -> dict:
     return {
-        'url': url,
-        'active': is_active,
-        'type': 'top',
-        'title': title,
-        'id': f'menu-top-{app_names[0]}',
-        'method': _validate_method(method),
+        'url': item.href or reverse(item.url_name),
+        'css_class': item.css_class,
+        'title': item.display_title,
+        'icon': item.icon,
+        'admin_only': item.admin_only,
+        'active': active,
+        'type': 'side',
+        'id': f'submenu-{item.url_name}',
+        'external': item.external,
+        'method': item.method,
     }
 
 
-@register.inclusion_tag("uicore/tags/menu_item.html", takes_context=True)
-def menu_item(
-        context,
-        url_name: str,
-        css_class: str = '',
-        arg1: Any = UNSET,
-        arg2: Any = UNSET,
-        badge_count: Optional[int] = None,
-        title: Optional[str] = None,
-        icon: Optional[str] = None,
-        href: Optional[str] = None,
-        admin_only=False,
-        external=False,
-        method='get',
-        other_urls: Optional[str] = None):
-    """ :parameter method - get generates link, post generates form"""
-
-    request = context.request
-    if admin_only and not request.user.is_superuser:
-        return {'invalid': True}
-
-    args = []
-    if arg1 != UNSET:
-        args.append(arg1)
-        if arg2 != UNSET:
-            args.append(arg2)
-
-    url = href
-    if not url:
-        if not get_visible_url_names().get(url_name):
-            return {'invalid': True}
-        url = reverse(url_name, args=args)
-
-    current_url_name: Optional[str] = None
-    is_active = False
-    if rm := context.request.resolver_match:
-        current_url_name = rm.url_name
-        current_url_route = "/" + rm.route
-        is_active = url_name == current_url_name or current_url_route.startswith(url)
-
-    if not is_active and other_urls:
-        other_url_parts = other_urls.split(',')
-        current_url = context.request.path
-        for other_url_part in other_url_parts:
-            if current_url.startswith(other_url_part) or current_url_name == other_url_part:
-                is_active = True
-                break
-
-    if not title:
-        title = url_name.replace('_', ' ')
-        title_case = ''
-        next_capital = True
-        for letter in title:
-            if next_capital:
-                letter = letter.upper()
-                next_capital = False
-            if letter == ' ':
-                next_capital = True
-            title_case += letter
-        title = title_case
-
+@register.inclusion_tag("uicore/menus/menu_bar_main.html", takes_context=True)
+def menu_bar_main(context):
+    active_menu = current_menu(_current_url_name(context.request))
+    top_items = [{
+        'url': reverse(menu.url_name),
+        'title': menu.title,
+        'active': menu == active_menu,
+        'type': 'top',
+        'id': f'menu-top-{menu.key}',
+        'method': 'get',
+    } for menu in get_menus() if menu.in_top_bar]
     return {
-        'url': url,
-        'css_class': css_class,
-        'title': title,
-        'icon': icon,
-        'admin_only': admin_only,
-        'active': is_active,
-        'type': 'side',
-        'badge_count': badge_count,
-        'id': f'submenu-{url_name}',
-        'external': external,
-        'method': _validate_method(method),
+        'top_items': top_items,
+        'help_url': context.get('help_url'),
+        'user': context.get('user'),
+    }
+
+
+@register.inclusion_tag("uicore/menus/menu_bar_sub.html", takes_context=True)
+def menu_bar_sub(context):
+    request = context.request
+    url_name = _current_url_name(request)
+    if not (menu := current_menu(url_name)):
+        return {}
+
+    items = [_item_context(item, item.owns(url_name)) for item in menu.visible_items()
+             if request.user.is_superuser or not item.admin_only]
+    return {
+        'items': items,
+        'footer_template': menu.footer_template,
     }
 
 
@@ -135,6 +73,6 @@ def absolute_url(name, *args, **kwargs) -> str:
     return get_url_from_view_path(reverse(name, args=args, kwargs=kwargs))
 
 
-@register.inclusion_tag("uicore/menus/current_record.html", takes_context=True)
-def current_record(context, current_record: Any):
-    return {"current_record": current_record}
+@register.inclusion_tag("uicore/site_messages/site_messages.html")
+def site_messages(site_messages):
+    return {"site_messages": site_messages}

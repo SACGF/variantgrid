@@ -1,7 +1,7 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_utils %}
 {% block title %}{{ pair_id }} ({{ sequencing_run_name }}){% endblock %}
-{% block submenu_page_content %}
+{% block container_table_content %}
     {# One TSO 500 pair on one run - the DRAGEN analysis of it and the library QC of its arms #}
     <div class="container">
         <h3>TSO 500 pair: {{ pair_id }}</h3>

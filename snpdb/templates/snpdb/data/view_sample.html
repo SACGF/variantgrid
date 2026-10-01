@@ -1,4 +1,4 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
@@ -174,7 +174,7 @@ $(document).ready(function() {
 <script type="text/javascript" src="{% static 'js/analysis_downloads.js' %}"></script>
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 <div id="sample">
     {% load vcf_history_trail_tags %}

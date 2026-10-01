@@ -30,8 +30,7 @@ def email_detail(request, email_id: int):
     return render_ajax_view(
         request,
         'email_detail.html',
-        context={"email": email_log, "users": users, "unrecognised": unrecognised_email_list},
-        menubar='settings'
+        context={"email": email_log, "users": users, "unrecognised": unrecognised_email_list}
     )
 
 
