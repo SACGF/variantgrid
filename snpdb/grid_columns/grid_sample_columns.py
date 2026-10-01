@@ -84,7 +84,11 @@ def get_copy_number_annotation(cgc: CohortGenotypeCollection, sample: Sample) ->
 
 
 def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common_variants: bool,
-                                               annotation_gnomad_version=None):
+                                               annotation_gnomad_version=None,
+                                               existing_annotation_kwargs: Optional[set[str]] = None):
+    """ existing_annotation_kwargs - aliases the queryset already annotates. A cohort genotype join already
+        there is reused rather than redefined, so the columns read the same rows the queryset filtered on
+        (a different collection condition would add a second join) @see #2074 """
     available_format_columns = get_available_format_columns(cohorts)
     annotation_kwargs = {}
 
@@ -94,7 +98,9 @@ def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common
         # TODO: After we've done this - try and optimise to only doing rare if we can
         cgc = cohort.cohort_genotype_collection
         annotation_kwargs.update(cgc.get_annotation_kwargs(common_variants=common_variants,
-                                                           annotation_gnomad_version=annotation_gnomad_version))
+                                                           annotation_gnomad_version=annotation_gnomad_version,
+                                                           existing_annotation_kwargs=existing_annotation_kwargs or set(),
+                                                           override=False))
 
         for column, (is_array, empty_value) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():
             if not available_format_columns[column]:
