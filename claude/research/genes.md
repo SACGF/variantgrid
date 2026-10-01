@@ -32,7 +32,7 @@ release tag, so a re-run is a no-op unless cdot moved.
 `genes/management/commands/import_gene_annotation.py:Command._import_cdot_data` is an upsert keyed on accession: it
 loads every known symbol, gene id, transcript id and `GeneVersion.id_by_accession` /
 `TranscriptVersion.id_by_accession` map up front, then bulk-creates what is new. Existing TranscriptVersions are
-COPY'd into a temp table and only rows whose values differ are updated
+compared, a streamed batch at a time, against what's stored and only those that differ are updated
 (`genes/management/commands/import_gene_annotation.py:Command._update_changed_transcript_versions`, #2029) - most
 transcripts don't change between cdot releases, and rewriting all ~2.2M JSON rows took about an hour. The `cdot` key
 in `data` is left out of that comparison, so it holds the release a transcript last changed in, not what's installed. RefSeq genes have no version and are stored as version 0; a cdot

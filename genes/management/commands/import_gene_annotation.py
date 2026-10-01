@@ -1,12 +1,8 @@
-import csv
-import io
-import json
 import logging
 import time
 
 import ijson
 from django.core.management.base import BaseCommand
-from django.db import connection, transaction
 from django.db.models.functions import Upper
 
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
@@ -21,7 +17,6 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium
-from library.django_utils.django_postgres import copy_from_file
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
@@ -96,8 +91,7 @@ class Command(BaseCommand):
     # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
     # when importing large streamed files (see import_cdot_data_file).
     CDOT_CHUNK_SIZE = 10000
-    TRANSCRIPT_VERSION_UPDATE_TABLE = "cdot_transcript_version_update"
-    TRANSCRIPT_VERSION_UPDATE_COLUMNS = ["id", "gene_version_id", "import_source_id", "biotype", "contig_id", "data"]
+    TRANSCRIPT_VERSION_UPDATE_FIELDS = ["gene_version_id", "import_source_id", "biotype", "contig_id", "data"]
 
     @classmethod
     def read_cdot_version(cls, file_obj) -> str:
@@ -244,7 +238,7 @@ class Command(BaseCommand):
 
         new_transcript_ids = set()
         new_transcript_versions = []
-        existing_transcript_version_rows = []
+        existing_transcript_versions = []
         totals = {"new_transcripts": 0, "new_transcript_versions": 0,
                   "existing_transcript_versions": 0, "modified_transcript_versions": 0}
 
@@ -265,10 +259,10 @@ class Command(BaseCommand):
                 totals["new_transcript_versions"] += len(new_transcript_versions)
                 new_transcript_versions.clear()
 
-            if existing_transcript_version_rows:
-                totals["existing_transcript_versions"] += len(existing_transcript_version_rows)
-                totals["modified_transcript_versions"] += cls._update_changed_transcript_versions(existing_transcript_version_rows)
-                existing_transcript_version_rows.clear()
+            if existing_transcript_versions:
+                totals["existing_transcript_versions"] += len(existing_transcript_versions)
+                totals["modified_transcript_versions"] += cls._update_changed_transcript_versions(existing_transcript_versions)
+                existing_transcript_versions.clear()
 
         for transcript_accession, tv_data in transcripts_iter():
             transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
@@ -289,24 +283,24 @@ class Command(BaseCommand):
                                                                                  build_data["url"])
             contig = genome_build.chrom_contig_mappings[build_data["contig"]]
             biotype = cls.get_biotype(tv_data)
+            transcript_version = TranscriptVersion(transcript_id=transcript_id,
+                                                   version=version,
+                                                   gene_version_id=gene_version_id,
+                                                   genome_build=genome_build,
+                                                   contig=contig,
+                                                   import_source=import_source,
+                                                   biotype=biotype,
+                                                   data=tv_data)
             if pk := transcript_version_ids_by_accession.get(transcript_accession):
-                existing_transcript_version_rows.append((pk, gene_version_id, import_source.pk, biotype,
-                                                         contig.pk, json.dumps(tv_data)))
+                transcript_version.pk = pk
+                existing_transcript_versions.append(transcript_version)
             else:
-                new_transcript_versions.append(TranscriptVersion(transcript_id=transcript_id,
-                                                                 version=version,
-                                                                 gene_version_id=gene_version_id,
-                                                                 genome_build=genome_build,
-                                                                 contig=contig,
-                                                                 import_source=import_source,
-                                                                 biotype=biotype,
-                                                                 data=tv_data))
+                new_transcript_versions.append(transcript_version)
 
-            if len(new_transcript_versions) + len(existing_transcript_version_rows) >= cls.CDOT_CHUNK_SIZE:
+            if len(new_transcript_versions) + len(existing_transcript_versions) >= cls.CDOT_CHUNK_SIZE:
                 flush_transcripts()
 
         flush_transcripts()  # Final partial batch
-        cls._drop_transcript_version_update_table()
         logging.info("Created %d new transcripts, created %d transcript versions, "
                      "updated %d of %d existing transcript versions (the rest were unchanged)",
                      totals["new_transcripts"], totals["new_transcript_versions"],
@@ -317,37 +311,22 @@ class Command(BaseCommand):
             retrieve_refseq_gene_summaries()
 
     @classmethod
-    def _drop_transcript_version_update_table(cls):
-        with connection.cursor() as cursor:
-            cursor.execute(f"DROP TABLE IF EXISTS {cls.TRANSCRIPT_VERSION_UPDATE_TABLE}")
-
-    @classmethod
-    def _update_changed_transcript_versions(cls, rows: list[tuple]) -> int:
-        """ COPY the incoming (pk, gene_version_id, import_source_id, biotype, contig_id, data json) rows into
-            a temp table, then UPDATE only the TranscriptVersions whose values differ. The 'cdot' key is left out
+    def _update_changed_transcript_versions(cls, transcript_versions: list[TranscriptVersion]) -> int:
+        """ Only write the TranscriptVersions whose values differ from what's stored. The 'cdot' key is left out
             of the comparison: it's stamped with the release being imported, so would differ on every row and
             rewrite the whole table each cdot release. Returns the number of rows changed """
-        tv_table = TranscriptVersion._meta.db_table
-        update_table = cls.TRANSCRIPT_VERSION_UPDATE_TABLE
-        columns = cls.TRANSCRIPT_VERSION_UPDATE_COLUMNS
-        buffer = io.StringIO()
-        csv.writer(buffer).writerows(rows)
-        buffer.seek(0)
+        fields = cls.TRANSCRIPT_VERSION_UPDATE_FIELDS
+        tv_qs = TranscriptVersion.objects.filter(pk__in=[tv.pk for tv in transcript_versions])
+        stored_by_pk = {values[0]: values[1:] for values in tv_qs.values_list("pk", *fields)}
 
-        set_columns = [c for c in columns if c != "id"]
-        set_clause = ", ".join(f"{c} = u.{c}" for c in set_columns)
-        changed = " OR ".join([f"tv.{c} IS DISTINCT FROM u.{c}" for c in set_columns if c != "data"]
-                              + ["(tv.data - 'cdot') IS DISTINCT FROM (u.data - 'cdot')"])
-        with transaction.atomic(), connection.cursor() as cursor:
-            cursor.execute(f"CREATE TEMP TABLE IF NOT EXISTS {update_table} AS "
-                           f"SELECT {', '.join(columns)} FROM {tv_table} WITH NO DATA")
-            copy_from_file(cursor, f"COPY {update_table} ({', '.join(columns)}) FROM STDIN WITH (FORMAT csv)", buffer)
-            cursor.execute(f"ANALYZE {update_table}")
-            cursor.execute(f"UPDATE {tv_table} tv SET {set_clause} FROM {update_table} u "
-                           f"WHERE tv.id = u.id AND ({changed})")
-            num_changed = cursor.rowcount
-            cursor.execute(f"TRUNCATE {update_table}")
-        return num_changed
+        def _comparable(values) -> tuple:
+            *columns, data = values
+            return *columns, {k: v for k, v in data.items() if k != "cdot"}
+
+        changed = [tv for tv in transcript_versions
+                   if _comparable(stored_by_pk[tv.pk]) != _comparable([getattr(tv, f) for f in fields])]
+        TranscriptVersion.objects.bulk_update(changed, fields, batch_size=cls.BATCH_SIZE)
+        return len(changed)
 
     @staticmethod
     def get_biotype(data):
