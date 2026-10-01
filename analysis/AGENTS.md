@@ -202,7 +202,8 @@ Gotchas:
   DB-side (`jsonb_set` + `||`) rather than writing the whole dict.
 - Counts are sanity-checked at load (`analysis/models/nodes/analysis_node.py:AnalysisNode._raise_or_warn_count_mismatch`):
   any label count > total, or a single-parent node with more variants than its parent. A filter that fans out over a
-  multi-valued join (transcript annotation, gene lists) must set `queryset_requires_distinct` or use a subquery.
+  multi-valued join (transcript annotation, gene lists) must filter on a `pk__in` subquery - node querysets are never
+  `distinct()`.
 - A SampleNode threshold only filters when the sample's VCF carries that column
   (`analysis/models/nodes/sources/sample_node.py:SampleNode.get_applied_thresholds`) - PL<=0 against a fusion caller's
   VCF (AD, no PL) emptied the node while the cached stats still answered with its whole count, and the two disagreeing

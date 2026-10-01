@@ -605,21 +605,6 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         a_kwargs.update(self._get_annotation_kwargs_for_node(**kwargs))
         return a_kwargs
 
-    @property
-    def queryset_requires_distinct(self):
-        if self._queryset_requires_distinct():
-            return True
-
-        if self.has_input() and self.uses_parent_queryset:
-            for parent in self.get_non_empty_parents():
-                if parent.queryset_requires_distinct:
-                    return True
-        return False
-
-    def _queryset_requires_distinct(self):
-        """ Override if you need this - don't do by default as it's slow """
-        return False
-
     @staticmethod
     def q_all():
         return Q(pk__isnull=False)
@@ -802,7 +787,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         return node_contigs
 
     def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None, arg_q_dict=None,
-                     inner_query_distinct=False, disable_cache=False):
+                     disable_cache=False):
         if extra_annotation_kwargs is None:
             extra_annotation_kwargs = {}
 
@@ -822,15 +807,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
             q_list.append(extra_filters_q)
         if q_list:
             q = reduce(operator.and_, q_list)
-            filtered_qs = qs.filter(q)
-
-            if self.queryset_requires_distinct:
-                if inner_query_distinct:
-                    qs = qs.filter(pk__in=filtered_qs.values_list("pk", flat=True))
-                else:
-                    qs = filtered_qs.distinct()
-            else:
-                qs = filtered_qs
+            qs = qs.filter(q)
 
         # Clear ordering, @see
         # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by

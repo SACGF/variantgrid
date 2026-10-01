@@ -284,7 +284,7 @@ deleted: bump, cascade, then dispatch on commit so the node settles in ERROR_CON
 `_get_cached_label_count` reuses a parent's label count only when the parent was loaded with that label configured;
 adding a node-count type after the fact makes every node run the SQL once. A count bigger than the parent's is a real
 bug for a deterministic node: a filter that fans out over a multi-valued join (transcript annotation, gene lists) must
-set `queryset_requires_distinct` or use a subquery, and `_get_variant_ids_to_store` will catch the case where the pk
+filter on a `pk__in` subquery, and `_get_variant_ids_to_store` will catch the case where the pk
 list overruns the count. `AnalysisNode.load` persists only what `_load` returns and what `update()` is given - setting
 attributes on `self` inside a task is lost.
 
