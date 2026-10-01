@@ -7,7 +7,12 @@ from django.utils import timezone
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun
-from classification.models.condition_text_matching import ConditionMatchingSuggestion, ConditionText, ConditionTextMatch
+from classification.models.condition_text_matching import (
+    MANUAL_ENTRY_SEARCH_TIMEOUT,
+    ConditionMatchingSuggestion,
+    ConditionText,
+    ConditionTextMatch,
+)
 from classification.tasks.condition_text_automatch_task import condition_text_automatch_task
 from genes.models import GeneSymbol
 from library.request_context import set_thread_variable
@@ -64,13 +69,14 @@ class ConditionTextAutomatchTest(TestCase):
 
         self.assertFalse(ConditionText.objects.filter(pending_automatch=True).exists())
 
-    def _sync_classification(self, condition: str) -> ConditionText:
+    def _sync_classification(self, condition: str, source=SubmissionSource.API) -> ConditionText:
         GeneSymbol.objects.get_or_create(symbol="BRCA1")
         user = User.objects.create_user(username="sync_user")
-        vc = Classification.create(user=user, lab=self.lab, source=SubmissionSource.API, save=True,
+        vc = Classification.create(user=user, lab=self.lab, source=source, save=True,
                                    data={SpecialEKeys.GENE_SYMBOL: {"value": "BRCA1"},
                                          SpecialEKeys.CONDITION: {"value": condition}})
-        ConditionTextMatch.sync_condition_text_classification(vc.last_edited_version, attempt_automatch=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            ConditionTextMatch.sync_condition_text_classification(vc.last_edited_version, attempt_automatch=True)
         return ConditionText.objects.get(lab=self.lab)
 
     @patch('classification.models.condition_text_matching.search_suggestion')
@@ -96,5 +102,18 @@ class ConditionTextAutomatchTest(TestCase):
     @patch('classification.models.condition_text_matching.embedded_ids_check', side_effect=RuntimeError("boom"))
     def test_publish_automatch_error_leaves_text_for_sweep(self, _mock_embedded):
         ct = self._sync_classification("hereditary breast cancer")
+
+        self.assertTrue(ct.pending_automatch)
+
+    @patch('classification.models.condition_text_matching.condition_text_search', return_value=[])
+    def test_form_publish_searches_free_text_immediately(self, mock_search):
+        ct = self._sync_classification("hereditary breast cancer", source=SubmissionSource.FORM)
+
+        self.assertFalse(ct.pending_automatch)
+        mock_search.assert_called_once_with("hereditary breast cancer", timeout=MANUAL_ENTRY_SEARCH_TIMEOUT)
+
+    @patch('classification.models.condition_text_matching.condition_text_search', side_effect=TimeoutError("slow"))
+    def test_form_publish_search_failure_leaves_text_for_sweep(self, _mock_search):
+        ct = self._sync_classification("hereditary breast cancer", source=SubmissionSource.FORM)
 
         self.assertTrue(ct.pending_automatch)
