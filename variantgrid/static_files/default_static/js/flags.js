@@ -980,7 +980,7 @@ const Flags = (function () {
                     if (reportId) {
                         return $('<div>', {html: [
                             `Go to the `,
-                            $('<a>', {class: 'hover-link', text: `Discordance Report`, href:`/classification/classification/discordance_report/${reportId}`}),
+                            $('<a>', {class: 'hover-link', text: `Discordance Report`, href: Urls.discordance_report(reportId)}),
                             ` | `,
                             $('<a>', {class: 'hover-link', text: `Diff with other Classification Records`, href: `/classification/diff/?clinical_context=${clinicalContext}`})
                         ]});

@@ -7,8 +7,8 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from rest_framework import routers
 
-from patients.views_rest import PatientViewSet
 from classification.views.classification_view import ClassificationView
+from patients.views_rest import PatientViewSet
 from variantgrid.perm_path import deprecated_path, get_visible_url_names, router_urls
 
 REGISTER = defaultdict(lambda: True, {"api_patient-list": False})
@@ -77,7 +77,7 @@ class DeprecatedPathTest(SimpleTestCase):
         self.assertEqual(report_message.call_args.kwargs["extra_data"]["target"], "/old/5?x=1")
 
     def test_keeps_api_view_exemptions(self):
-        """ External clients POST to the old classification APIs without a CSRF token or session """
+        """ A deprecated DRF view stays callable by external clients without a CSRF token or session """
         url = deprecated_path("api/v2/", ClassificationView.as_view(api_version=2), name="old_api")
         self.assertTrue(url.callback.csrf_exempt)
         self.assertFalse(url.callback.login_required)

@@ -52,7 +52,9 @@ def path(route, view, **kwargs):
 
 def deprecated_path(route, view, **kwargs):
     """ A URL with no callers we know of, kept in case an external client uses it (#1475).
-        Remove once Rollbar has gone ~6 months without reporting it """
+        Remove once Rollbar has gone ~6 months without reporting it.
+        Searching for the URL name is not enough to find callers: JS, templates and sync build some paths as
+        literal strings (flags.js, the Shariant upload), so search for the route too """
     name = kwargs.get('name')
 
     @wraps(view)

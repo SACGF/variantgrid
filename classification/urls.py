@@ -290,11 +290,11 @@ urlpatterns = [
     path('api/classifications/v1/record/', ClassificationView.as_view(), name='classification_api'),
     path('api/classifications/v1/record/<record_id>', ClassificationView.as_view(), name='classification_with_record_api'),
 
-    deprecated_path('api/classifications/v2/record/', ClassificationView.as_view(api_version=2), name='classification_api_2'),
-    deprecated_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
+    path('api/classifications/v2/record/', ClassificationView.as_view(api_version=2), name='classification_api_2'),
+    path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
-    deprecated_path('api/classifications/v3/record/', ClassificationView.as_view(api_version=3), name='classification_api_3'),
-    deprecated_path('api/classifications/v3/record/<record_id>', ClassificationView.as_view(api_version=3),
+    path('api/classifications/v3/record/', ClassificationView.as_view(api_version=3), name='classification_api_3'),
+    path('api/classifications/v3/record/<record_id>', ClassificationView.as_view(api_version=3),
          name='classification_with_record_api_3'),
 
     path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
