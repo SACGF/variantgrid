@@ -11,7 +11,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import CharField, F, Func, Value
+from django.db.models import CharField, F, Func, Q, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
@@ -788,6 +788,16 @@ class ModifiedImportedVariant(models.Model):
     # SHARED_LOCUS to record the depths that were summed (so the per-record VAF stays reconstructable)
     # and by MERGED_RECORDS to list the records that were merged
     operation_detail = models.TextField(null=True)
+
+    class Meta:
+        # Both columns are null on most rows. text_pattern_ops lets old_variant_formatted serve startswith
+        # (LIKE 'x%') under a non-C collation as well as equality
+        indexes = [
+            models.Index(fields=["old_multiallelic"], name="upload_miv_old_multiallelic",
+                         condition=Q(old_multiallelic__isnull=False)),
+            models.Index(fields=["old_variant_formatted"], name="upload_miv_old_var_fmt",
+                         opclasses=["text_pattern_ops"], condition=Q(old_variant_formatted__isnull=False)),
+        ]
 
     @property
     def tool_name(self) -> Optional[str]:
