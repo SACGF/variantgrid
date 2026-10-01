@@ -103,12 +103,13 @@ class ClassificationView(APIView):
                 classification_import_run = ClassificationImportRun.record_classification_import(identifier=import_id)
 
             per_json_data = []
-            for record_data in records:
-                result = importer.insert(record_data, import_run=classification_import_run)
-                result.notify_if_required()
-                if classification_import_run:
-                    classification_import_run.increment_status(result.status)
-                per_json_data.append(result)
+            with importer.clingen_prefetch(records):
+                for record_data in records:
+                    result = importer.insert(record_data, import_run=classification_import_run)
+                    result.notify_if_required()
+                    if classification_import_run:
+                        classification_import_run.increment_status(result.status)
+                    per_json_data.append(result)
 
             if classification_import_run:
                 classification_import_run.save()

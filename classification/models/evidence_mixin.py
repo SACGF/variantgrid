@@ -309,7 +309,7 @@ class EvidenceMixin:
             return options[0].get('vg')
 
     @staticmethod
-    def _clean_key(key):
+    def clean_key(key):
         key = str(key).lower()
         # Remove all non-word characters (everything except numbers and letters)
         key = re.sub(r"[^\w\s:]", ' ', key).strip()
@@ -336,7 +336,7 @@ class EvidenceMixin:
 
         clean: VCPatch = {}
         for key, value_obj in raw.items():
-            key = EvidenceMixin._clean_key(key)
+            key = EvidenceMixin.clean_key(key)
             if ":" in key:
                 # somatic:testing_context to testing_context
                 key = keys.without_namespace_if_required(key)

@@ -147,9 +147,10 @@ class VariantGridDownloadSyncer(SyncRunner):
                     time.sleep(10)
                 first_batch = False
 
-                for record in batch:
-                    inserter.insert(record)
-                    count = count + 1
+                with inserter.clingen_prefetch(batch):
+                    for record in batch:
+                        inserter.insert(record)
+                        count = count + 1
             finally:
                 inserter.finish()
             logging.info("%s: upserted %d record(s) so far (%d skipped)", sync_destination, count, skipped)

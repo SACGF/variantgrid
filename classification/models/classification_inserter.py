@@ -1,4 +1,7 @@
+import logging
+from collections import defaultdict
 from collections.abc import Mapping
+from contextlib import AbstractContextManager
 from functools import cached_property
 from typing import Optional
 
@@ -19,10 +22,70 @@ from classification.models import (
     classification_flag_types,
 )
 from classification.models.classification_utils import ClassificationPatchStatus
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfo,
+    tidy_hgvs_whitespace,
+)
 from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
+from genes.hgvs.hgvs_matcher import HGVSMatcher
 from library.log_utils import report_exc_info
-from library.utils import DebugTimer, reset_timer
+from library.utils import DebugTimer, md5sum_str, reset_timer
+from snpdb.clingen_allele import clingen_hgvs_prefetch
+from snpdb.models.models_genome import GenomeBuild
+
+# Operations that can create a record, and so an ImportedAlleleInfo whose HGVS is resolved during insert
+_CREATE_OPERATIONS = ('create', 'upsert', 'overwrite', 'data')
+
+
+def _new_record_c_hgvs_by_genome_build(records: list[dict]) -> dict[GenomeBuild, set[str]]:
+    hgvs_keys = {SpecialEKeys.C_HGVS, SpecialEKeys.GENOME_BUILD}
+    genome_builds_by_name: dict[str, Optional[GenomeBuild]] = {}
+    c_hgvs_by_genome_build = defaultdict(set)
+    for record in records:
+        if not isinstance(record, Mapping) or record.get('test'):
+            continue
+        operation_data = next((record[op] for op in _CREATE_OPERATIONS if record.get(op)), None)
+        if not isinstance(operation_data, Mapping):
+            continue
+        # to_patch tidies values in place, so give it copies of just the keys we need
+        patch = EvidenceMixin.to_patch({key: dict(value) if isinstance(value, Mapping) else value
+                                        for key, value in operation_data.items()
+                                        if EvidenceMixin.clean_key(key) in hgvs_keys})
+        c_hgvs = (patch.get(SpecialEKeys.C_HGVS) or {}).get('value')
+        build_name = (patch.get(SpecialEKeys.GENOME_BUILD) or {}).get('value')
+        if not (isinstance(c_hgvs, str) and isinstance(build_name, str)):
+            continue
+        if build_name not in genome_builds_by_name:
+            try:
+                genome_builds_by_name[build_name] = GenomeBuild.get_name_or_alias(build_name)
+            except GenomeBuild.DoesNotExist:
+                genome_builds_by_name[build_name] = None
+        if genome_build := genome_builds_by_name[build_name]:
+            c_hgvs_by_genome_build[genome_build].add(tidy_hgvs_whitespace(c_hgvs))
+    return c_hgvs_by_genome_build
+
+
+def _new_record_clingen_lookup_hgvs(records: list[dict]) -> list[str]:
+    """ The ClinGen lookups resolving these records will make - c.HGVS with an ImportedAlleleInfo already have
+        been resolved, and those on transcripts we have resolve locally """
+    lookup_hgvs = []
+    for genome_build, c_hgvs_set in _new_record_c_hgvs_by_genome_build(records).items():
+        c_hgvs_by_md5 = {md5sum_str(c_hgvs): c_hgvs for c_hgvs in c_hgvs_set}
+        existing_qs = ImportedAlleleInfo.objects.filter(imported_md5_hash__in=list(c_hgvs_by_md5),
+                                                        imported_genome_build_patch_version__genome_build=genome_build)
+        for md5 in existing_qs.values_list("imported_md5_hash", flat=True):
+            c_hgvs_by_md5.pop(md5, None)
+
+        matcher = HGVSMatcher.instance(genome_build)
+        for c_hgvs in c_hgvs_by_md5.values():
+            try:
+                if clingen_hgvs := matcher.get_clingen_lookup_hgvs(c_hgvs):
+                    lookup_hgvs.append(clingen_hgvs)
+            except Exception as e:  # pylint: disable=broad-except
+                # Resolving the record reports why its HGVS is bad
+                logging.debug("No ClinGen prefetch for '%s': %s", c_hgvs, e)
+    return lookup_hgvs
 
 
 class BulkClassificationInserter:
@@ -52,6 +115,12 @@ class BulkClassificationInserter:
             raise ValueError(
                 'Illegal value for source, should be "' + SubmissionSource.API.value + '" or "' + SubmissionSource.FORM.value + '"')
         return source
+
+    @staticmethod
+    def clingen_prefetch(records: list[dict]) -> AbstractContextManager:
+        """ Wrap inserting a batch of records in this, so the c.HGVS the new records resolve through the ClinGen
+            Allele Registry are looked up in batched calls rather than one per record (#2079) """
+        return clingen_hgvs_prefetch(_new_record_clingen_lookup_hgvs(records))
 
     @transaction.atomic
     def insert(

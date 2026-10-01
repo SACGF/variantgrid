@@ -84,18 +84,19 @@ class Command(BaseCommand):
                         time.sleep(sleep)
                     first_batch = False
 
-                    for record in batch:
+                    with inserter.clingen_prefetch(batch):
+                        for record in batch:
 
-                        response = inserter.insert(
-                            record,
-                            # record_id=record.pop("record_id"),
-                            submission_source=SubmissionSource.API,
-                            import_run=import_run,
-                        )
-                        import_run.increment_status(response.status)
-                        count = count + 1
-                        if count >= max_records:
-                            break
+                            response = inserter.insert(
+                                record,
+                                # record_id=record.pop("record_id"),
+                                submission_source=SubmissionSource.API,
+                                import_run=import_run,
+                            )
+                            import_run.increment_status(response.status)
+                            count = count + 1
+                            if count >= max_records:
+                                break
                 except Exception:
                     log_traceback()
                     raise

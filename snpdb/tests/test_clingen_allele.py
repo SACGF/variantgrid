@@ -13,8 +13,10 @@ from snpdb.clingen_allele import (
     ClinGenAlleleAPIException,
     ClinGenAlleleServerException,
     _create_variant_allele_with_new_allele,
+    clingen_hgvs_prefetch,
     get_clingen_allele,
     get_clingen_allele_for_variant,
+    get_clingen_allele_from_hgvs,
     get_variant_allele_for_variant,
     populate_clingen_alleles_for_variants,
     variant_allele_clingen,
@@ -227,3 +229,36 @@ class ClinGenAlleleRegistryAPIRetryTestCase(SimpleTestCase):
             self._put()
         self.assertEqual(mock_put.call_count, 1)
         mock_sleep.assert_not_called()
+
+
+class ClinGenHGVSPrefetchTestCase(TestCase):
+    """ A bulk import looks its HGVS up in one batch PUT, then resolves each record from that (#2079) """
+    HGVS = "ENST00000300305.7:c.352-1G>A"
+    CLINGEN_ALLELE_ID = "CA410202793"
+
+    def setUp(self):
+        super().setUp()
+        get_hgvs_patcher = patch.object(MockClinGenAlleleRegistryAPI, "get_hgvs",
+                                        side_effect=MockClinGenAlleleRegistryAPI.get_hgvs)
+        self.mock_get_hgvs = get_hgvs_patcher.start()
+        self.addCleanup(get_hgvs_patcher.stop)
+
+    def test_prefetched_hgvs_is_not_fetched_again(self):
+        with clingen_hgvs_prefetch([self.HGVS], clingen_api=MockClinGenAlleleRegistryAPI()):
+            clingen_allele = get_clingen_allele_from_hgvs(self.HGVS, require_allele_id=False)
+        self.assertEqual(str(clingen_allele), self.CLINGEN_ALLELE_ID)
+        self.mock_get_hgvs.assert_not_called()
+
+    def test_error_entry_falls_back_to_get(self):
+        """ The GET raises the error with its status code, which the matcher needs to decide what to try next """
+        error_response = {"errorType": "UnknownReference", "description": "Unknown reference",
+                          "inputLine": self.HGVS}
+        with patch.object(MockClinGenAlleleRegistryAPI, "_put", return_value=[error_response]):
+            with clingen_hgvs_prefetch([self.HGVS], clingen_api=MockClinGenAlleleRegistryAPI()):
+                get_clingen_allele_from_hgvs(self.HGVS, require_allele_id=False)
+        self.mock_get_hgvs.assert_called_once_with(self.HGVS)
+
+    def test_failed_batch_falls_back_to_get(self):
+        with clingen_hgvs_prefetch([self.HGVS], clingen_api=MockServerErrorClinGenAlleleRegistryAPI()):
+            get_clingen_allele_from_hgvs(self.HGVS, require_allele_id=False)
+        self.mock_get_hgvs.assert_called_once_with(self.HGVS)

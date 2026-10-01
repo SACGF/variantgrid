@@ -321,6 +321,25 @@ class TestHGVS(TestCase):
             self.assertRaises(HGVSException, get_vc)
 
 
+class TestClinGenLookupHGVS(TestCase):
+    """ A bulk import prefetches the ClinGen lookups its records will make (#2079). RUNX1's transcript only has
+        GRCh38 data, so GRCh37 has to resolve it through ClinGen """
+    HGVS = "ENST00000300305.7(RUNX1):c.352-1G>A"
+    CLINGEN_HGVS = "ENST00000300305.7:c.352-1G>A"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        get_fake_annotation_version(GenomeBuild.grch37())
+        get_fake_annotation_version(GenomeBuild.grch38())
+        create_fake_transcript_version(GenomeBuild.grch38())
+
+    def test_lookup_hgvs_only_when_not_local(self):
+        self.assertEqual(HGVSMatcher(GenomeBuild.grch37()).get_clingen_lookup_hgvs(self.HGVS), self.CLINGEN_HGVS)
+        self.assertIsNone(HGVSMatcher(GenomeBuild.grch38()).get_clingen_lookup_hgvs(self.HGVS))
+        self.assertIsNone(HGVSMatcher(GenomeBuild.grch37()).get_clingen_lookup_hgvs("NC_000021.8:g.36231875C>T"))
+
+
 @override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
 class TestSymbolicHGVS(TestCase):
     """ #1571 - a ranged del/dup/inv is HGVS from coordinates alone, so symbolic CNVs resolve

@@ -438,9 +438,12 @@ class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
     }
 
     def _put(self, url, data, chunk_size=None):
+        # A batch PUT returns the same allele JSON as a GET, so also serve the recorded GET responses
+        with open(CLINGEN_HGVS_RESPONSES_FILENAME) as f:
+            recorded_responses = json.load(f)
         clingen_records = []
         for line in data.split("\n"):
-            if response := self.CACHED_HGVS_RESPONSES.get(line):
+            if response := self.CACHED_HGVS_RESPONSES.get(line) or recorded_responses.get(line):
                 clingen_records.append(response)
             else:
                 raise ValueError(f"MockClinGenAlleleRegistryAPI: unknown HGVS: '{line}'")

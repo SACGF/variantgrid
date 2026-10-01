@@ -387,6 +387,25 @@ class HGVSMatcher:
         cdot_qs = CdotDataVersion.objects.filter(genome_build=self.genome_build).order_by("-modified")
         return cdot_qs.values_list("cdot_version", flat=True).first() or ''
 
+    def get_clingen_lookup_hgvs(self, hgvs_string: str) -> Optional[str]:
+        """ The HGVS get_variant_coordinate_and_details would first look up in the ClinGen Allele Registry, or
+            None if it resolves locally. Local candidates sort first and either match or raise, so ClinGen is only
+            reached when the transcript has none. Used to prefetch a bulk import's lookups in one batch (#2079) """
+        transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
+        if not transcript_accession or transcript_is_lrg(transcript_accession):
+            return None
+        hgvs_variant = self.create_hgvs_variant(hgvs_string)
+        if hgvs_variant.kind not in ('c', 'n'):
+            return None
+        for tv, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
+            if potential_converter_type.is_internal_type:
+                return None
+            if self._clingen_allele_registry_ok(tv.accession):
+                hgvs_variant.transcript = tv.accession
+                hgvs_string_for_version = hgvs_variant.format(max_ref_length=sys.maxsize)
+                return self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string_for_version)
+        return None
+
     def get_variant_coordinate_and_details(self, hgvs_string: str) -> VariantCoordinateAndDetails:
         """ Returns variant_coordinate and method for HGVS resolution = """
 

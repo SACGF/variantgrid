@@ -31,6 +31,9 @@ Patterns here:
 - Link a classification to a variant only via ImportedAlleleInfo: models/classification.py:Classification.ensure_allele_info ->
   models/classification_variant_info_models.py:ImportedAlleleInfo.get_or_create (unique on md5 of the imported HGVS + transcript
   + build patch). allele_info_changed_signal then fans the resolution out to classifications, groupings and clinical contexts.
+- A loop inserting a batch of records wraps it in models/classification_inserter.py:BulkClassificationInserter.clingen_prefetch,
+  which looks up the c.HGVS that new records resolve through the ClinGen Allele Registry in one batch PUT rather than a GET
+  per record (#2079). A new bulk insert path should do the same.
 - Discordance is per Overlap (keyed on testing context), recalculated when a clean ClassificationGrouping saves:
   signals/classification_hooks_overlaps.py →
   services/overlaps_services.py:OverlapServices.update_classification_grouping_overlap_contribution →

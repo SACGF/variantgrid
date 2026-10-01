@@ -16,6 +16,9 @@ reference base anyway to construct it
 
 """
 import logging
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Optional
 
 from django.conf import settings
@@ -46,6 +49,10 @@ from snpdb.models.models_enums import (
     AlleleOrigin,
     ClinGenAlleleExternalRecordType,
 )
+
+# HGVS -> GET /allele?hgvs= equivalent response, set while a bulk import resolves its records
+_prefetched_hgvs_responses: ContextVar[Optional[dict[str, dict]]] = ContextVar("clingen_prefetched_hgvs_responses",
+                                                                                 default=None)
 
 
 def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
@@ -437,7 +444,9 @@ def get_clingen_allele_from_hgvs(hgvs_string, require_allele_id=True,
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI.instance()
 
-    api_response = clingen_api.get_hgvs(hgvs_string)
+    prefetched = _prefetched_hgvs_responses.get() or {}
+    if (api_response := prefetched.get(hgvs_string)) is None:
+        api_response = clingen_api.get_hgvs(hgvs_string)
     try:
         clingen_list = _store_clingen_api_response([api_response])
         return clingen_list[0]
@@ -494,3 +503,28 @@ def link_allele_to_existing_variants(allele: Allele, allele_linking_tool,
             logging.error(e)
 
     return variant_allele_by_build
+
+
+@contextmanager
+def clingen_hgvs_prefetch(hgvs_strings: Iterable[str],
+                          clingen_api: ClinGenAlleleRegistryAPI = None) -> Iterator[None]:
+    """ Looks the HGVS up in batched PUTs (/alleles?file=hgvs) so get_clingen_allele_from_hgvs reads them from
+        memory instead of a GET each (#2079). Error entries aren't kept: that HGVS takes the GET path and raises
+        as it always has, as does everything if the batch call fails """
+    responses = {}
+    if hgvs_list := list(dict.fromkeys(hgvs_strings)):
+        if clingen_api is None:
+            # The records resolve one by one if the registry is down, so don't wait on retries here
+            clingen_api = ClinGenAlleleRegistryAPI.instance(max_attempts=1)
+        try:
+            for hgvs_string, api_response in zip(hgvs_list, clingen_api.hgvs_put(hgvs_list)):
+                if "errorType" not in api_response:
+                    responses[hgvs_string] = api_response
+        except ClinGenAllele.ClinGenAlleleRegistryException as e:
+            logging.warning("ClinGen Allele Registry prefetch of %d HGVS failed: %s", len(hgvs_list), e)
+
+    token = _prefetched_hgvs_responses.set(responses)
+    try:
+        yield
+    finally:
+        _prefetched_hgvs_responses.reset(token)

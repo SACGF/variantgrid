@@ -15,6 +15,9 @@ Patterns here:
 - Transcript geometry and tags come from cdot JSON in `TranscriptVersion.data["genome_builds"][build]`; read tags via models/models_gene.py:TranscriptVersion.tags and canonical-ness via models/models_gene.py:TranscriptVersion.CANONICAL_SCORES (MANE Select 2, RefSeq Select 1; "basic" is stripped, not scored).
 - Get an HGVSMatcher with hgvs/hgvs_matcher.py:HGVSMatcher.instance (lru-cached per build; construction opens the genome fasta). Pass `clingen_resolution=False` in batch/offline code.
 - hgvs/hgvs_matcher.py:HGVSMatcher.get_variant_coordinate_and_details tries local biocommons first, then the ClinGen Allele Registry, across neighbouring transcript versions (hgvs/hgvs_matcher.py:HGVSMatcher.filter_best_transcripts_and_converter_type_by_accession); version-distance ranking is delegated to the external cdot package, so change ranking there.
+- hgvs/hgvs_matcher.py:HGVSMatcher.get_clingen_lookup_hgvs predicts the string get_variant_coordinate_and_details first sends
+  to ClinGen, so bulk imports can batch those lookups (snpdb/clingen_allele.py:clingen_hgvs_prefetch); change the candidate
+  order or the string formatting in one and change the other with it.
 - Symbol-only HGVS ("BRCA1:c.100A>G") is a search feature, not a matcher feature: snpdb/signals/variant_search.py ranks transcripts with hgvs/hgvs_matcher.py:HGVSMatcher.rank_gene_symbol_transcripts under the `SEARCH_HGVS_GENE_SYMBOL*` settings; the matcher itself raises on a transcript-less c.HGVS.
 - Parse or rewrite an HGVS string without touching the DB using hgvs/hgvs.py:HGVSComponents; use HGVSMatcher only when you need coordinates.
 - Consortium is the single-letter `AnnotationConsortium` (R/E) on Gene, Transcript, GeneAnnotationRelease and CanonicalTranscriptCollection (models_enums.py:AnnotationConsortium); infer it from an accession with `AnnotationConsortium.get_from_transcript_accession()`.
