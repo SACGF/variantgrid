@@ -170,7 +170,7 @@ img.thumbnail {
             ensure_upload_row(ufd);
             update_upload_status(ufd);
             const status = ufd['processing_status'];
-            if (!(status == 'S' || status == 'E')) {
+            if (!(status == 'S' || status == 'E' || status == 'T')) {
 				needsUpdate = true;
 			}
 		}
@@ -235,7 +235,11 @@ img.thumbnail {
         const iconData = upload_status["status_icon"];
         if (iconData && iconData.icon) {
             const css = iconData.css || '';
-            statusIconSpan.html($('<i>').addClass('fas ' + iconData.icon + ' ' + css).attr('title', iconData.title));
+            let icon = $('<i>').addClass('fas ' + iconData.icon + ' ' + css).attr('title', iconData.title);
+            if (iconData.url) {
+                icon = $('<a>').attr('href', iconData.url).append(icon);
+            }
+            statusIconSpan.html(icon);
         } else {
             statusIconSpan.empty();
         }
@@ -341,7 +345,9 @@ img.thumbnail {
 					<td>
 						<span class="status-icon">
 							{% if ufd.status_icon and ufd.status_icon.icon %}
+								{% if ufd.status_icon.url %}<a href="{{ ufd.status_icon.url }}">{% endif %}
 								<i class="fas {{ ufd.status_icon.icon }} {{ ufd.status_icon.css }}" title="{{ ufd.status_icon.title }}"></i>
+								{% if ufd.status_icon.url %}</a>{% endif %}
 							{% endif %}
 						</span>
 					</td>
@@ -356,7 +362,7 @@ img.thumbnail {
 								{% endif %}
 							</div>
 							<div class="file-type">
-								{% if ufd.processing_status == 'S' and ufd.data_url %}
+								{% if ufd.processing_status in 'ST' and ufd.data_url %}
 									<a href="{{ ufd.data_url }}">{{ ufd.file_type }}</a>
 								{% else %}
 									{{ ufd.file_type|default_if_none:"" }}

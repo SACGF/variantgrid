@@ -43,7 +43,12 @@ from upload.upload_metadata import (
 from upload.uploaded_file_type import get_uploaded_file_type, get_url_and_data_for_uploaded_file_data
 
 
-def get_status_icon(status):
+def get_status_icon(status, requires_user_input_url: Optional[str] = None) -> dict:
+    """ requires_user_input_url: the data's page, where the user sets what the import is waiting on """
+    if requires_user_input_url:
+        return {'icon': 'fa-exclamation-triangle', 'css': 'text-warning',
+                'title': 'Requires input - set genome build', 'url': requires_user_input_url}
+
     ICONS = {
         ProcessingStatus.CREATED: {'icon': 'fa-clock', 'title': 'Queued'},
         ProcessingStatus.PROCESSING: {'icon': 'fa-spinner fa-spin', 'title': 'Processing'},
@@ -68,6 +73,7 @@ def _get_basic_uploaded_file_context(file_upload) -> dict:
     }
     if upload_data:
         data["upload_data"] = upload_data.get_upload_context()
+        data["requires_user_input"] = upload_data.requires_user_input
     return data
 
 
@@ -117,7 +123,8 @@ def uploadedfile_dict(file_upload) -> dict:
         url = reverse('view_uploaded_file', kwargs={'file_upload_id': file_upload.pk})
 
     data['processing_status'] = status
-    data['status_icon'] = get_status_icon(status)
+    requires_user_input_url = data["data_url"] if data.get("requires_user_input") else None
+    data['status_icon'] = get_status_icon(status, requires_user_input_url)
     data["url"] = url
     return data
 
