@@ -45,7 +45,6 @@ from analysis.exceptions import (
 from analysis.models.enums import (
     AnalysisTemplateType,
     GroupOperation,
-    NodeColors,
     NodeErrorSource,
     NodeStatus,
 )
@@ -224,7 +223,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     visible = models.BooleanField(default=True)
     count = models.IntegerField(null=True, default=None)
     errors = models.TextField(null=True)
-    shadow_color = models.TextField(null=True)
     load_seconds = models.FloatField(null=True)
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
@@ -1281,10 +1279,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if slow_seconds := settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS:
             if load_seconds > slow_seconds:
                 logging.warning("Node %d.%d slow load %.1fs: %s", self.pk, self.version, load_seconds, timings)
-        # Set on self too - update_node_task reads it after load()
-        self.shadow_color = NodeColors.WARNING if self.node_version.load_data.get("warnings") else NodeColors.VALID
-        self.update(status=status, count=count, load_seconds=load_seconds, shadow_color=self.shadow_color,
-                    **load_update_kwargs)
+        self.update(status=status, count=count, load_seconds=load_seconds, **load_update_kwargs)
 
     def add_parent(self, parent, *args, **kwargs):
         if not parent.visible:
@@ -1339,12 +1334,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
         # TODO: This causes lots of DB queries... should we change this?
         self.valid = self.is_valid
-        if not self.valid:
-            self.shadow_color = NodeColors.ERROR
-            self.appearance_dirty = True
-        elif self.shadow_color == NodeColors.ERROR:  # Need to allow nodes to set to warning
-            self.shadow_color = NodeColors.VALID
-            self.appearance_dirty = True
 
         if self.appearance_dirty:
             self.appearance_version += 1

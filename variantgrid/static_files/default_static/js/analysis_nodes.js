@@ -649,38 +649,14 @@ function updateDirtyNode(node, refresh) {
 	$(".count-value", node_counts).empty();
 	const variant_count = $(".node-count-__total", node_counts);
 	setVariantCount(variant_count, '?');
-    node.attr("loading", "true"); // #616 - Don't flash red when loading - this will stop next cycle of shadow setting
+	node.attr("loading", "true");
 	node.removeAttr("node_error"); // A reloading node shows the spinner, not the previous run's cross
 	node.removeAttr("node_warning");
 	clearNodeStatusTooltip($(".node-counts-strip, .node-warning-badge", node));
 
 	const asyncUpdateNode = function (data) {
-		// Flash the card border between its normal colour and shadowColor. The border is currentColor,
-		// so animating the node's colour drives it - see .window.design-a-node
-		const DEFAULT_COLOR = "#aaa";
-
-		// Stopping animation ended up breaking "new node flash" so just let it time out
-		//node.stop(); // any previous colours
-
-		const nodeVersion = data["version"];
-		node.attr("version_id", nodeVersion);
+		node.attr("version_id", data["version"]);
 		node.removeAttr("loading");
-		const shadowColor = data["shadow_color"];
-
-		if (shadowColor) {
-			function flashShadowColor() {
-				const myNode = getNode(node_id); // get latest version
-				const version_id = myNode.attr("version_id");
-				const loading = myNode.attr("loading");
-
-				if (version_id == nodeVersion && !loading) {
-					myNode.animate({color: shadowColor}, 1000)
-						.animate({color: DEFAULT_COLOR}, 1000, flashShadowColor);
-				}
-			}
-
-			flashShadowColor();
-		}
 
 		if (data.valid) {
 			setNodeCounts(node, data);

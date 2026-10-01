@@ -266,7 +266,6 @@ button.add-analysis-variable-button {
 	width: 64px;
 	height: auto;
 	background-color: white;
-	/* border-color is currentColor, which updateDirtyNode animates to flash node status */
 	border: 1px solid;
 	border-radius: 8px;
 	box-shadow: 2px 2px 8px rgba(0, 0, 0, .25);
@@ -804,6 +803,11 @@ span.node-counts {
 
 /* Warnings don't stop a node loading, so they get a corner badge rather than taking over the counts -
    hover it for the list (setNodeStatusTooltip) */
+/* Same orange as the warning badge - the node editor tabs that list the uncovered genes */
+.nav-link.incomplete-coverage {
+	background-color: #FFA500;
+}
+
 .design-a-node .node-warning-badge {
 	display: none;
 	position: absolute;

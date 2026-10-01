@@ -9,7 +9,6 @@ from django.test import Client
 from django.urls import reverse
 
 from analysis.models import NodeStatus
-from analysis.models.enums import NodeColors
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.test_grid_export import GridExportTestCase
 
@@ -30,18 +29,7 @@ class TestNodeStatusWarnings(GridExportTestCase):
         with patch.object(SampleNode, "get_warnings", return_value=["Genes of interest have incomplete coverage"]):
             node.load()
 
-        node.refresh_from_db()
-        self.assertEqual(NodeColors.WARNING, node.shadow_color)
         self.assertEqual(["Genes of interest have incomplete coverage"], self._node_status(node)["warnings"])
-
-    def test_load_without_warnings_clears_the_warning_colour(self):
-        node = self._sample_node()
-        node.update(shadow_color=NodeColors.WARNING)
-        node.load()
-
-        node.refresh_from_db()
-        self.assertEqual(NodeColors.VALID, node.shadow_color)
-        self.assertEqual([], self._node_status(node)["warnings"])
 
     def test_errored_node_tooltip_hides_traceback(self):
         node = self._sample_node()

@@ -22,7 +22,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from analysis.exceptions import NonFatalNodeError
-from analysis.models import Analysis, NodeColors, NodeStatus
+from analysis.models import Analysis, NodeStatus
 from analysis.models.nodes.analysis_node import (
     AnalysisEdge,
     NodeTask,
@@ -208,9 +208,9 @@ def reload_analysis_nodes(analysis_id, only_errors=False):
             "appearance_version": F("appearance_version") + 1,
         }
         if valid_nodes:
-            nodes_qs.filter(pk__in=valid_nodes).update(valid=True, shadow_color=NodeColors.VALID, **update_kwargs)
+            nodes_qs.filter(pk__in=valid_nodes).update(valid=True, **update_kwargs)
         if invalid_nodes:
-            nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, shadow_color=NodeColors.ERROR, **update_kwargs)
+            nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, **update_kwargs)
 
         node_versions = []
         reloaded_qs = nodes_qs.filter(pk__in=valid_nodes + invalid_nodes)

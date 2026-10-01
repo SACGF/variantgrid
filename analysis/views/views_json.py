@@ -461,7 +461,7 @@ def nodes_status(request, analysis_id):
 
     qs = analysis.analysisnode_set.filter(id__in=nodes)
     node_status_list = []
-    for data in qs.values("id", "version", "status", "count", "shadow_color"):
+    for data in qs.values("id", "version", "status", "count"):
         node_id = data["id"]
         version = data["version"]
 

@@ -21,7 +21,6 @@ from analysis.exceptions import (
 from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeCache,
-    NodeColors,
     NodeStatus,
     NodeTask,
     NodeVersion,
@@ -167,8 +166,7 @@ def update_node_task(node_id, version):
             if status is not None:
                 try:
                     logging.info("Node %d/%d status: %s errored: %s", node.pk, node.version, status, errors)
-                    shadow_color = NodeColors.ERROR if NodeStatus.is_error(status) else None
-                    node.update(status=status, errors=errors, shadow_color=shadow_color)
+                    node.update(status=status, errors=errors)
                 except (IntegrityError, NodeOutOfDateException) as e:
                     logging.warning("Node %d/%d out of date: {%s} - exiting", node.pk, node.version, e)
                     pass  # out of date or deleted - just ignore
