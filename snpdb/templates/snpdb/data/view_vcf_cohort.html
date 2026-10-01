@@ -360,6 +360,7 @@ $(document).ready(function() {
         {% endif %}
         {% if vcf %}
         <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-info">VCF Info</a></li>
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-sample-files" data-href="{% url 'vcf_sample_files_tab' vcf.pk %}">Sample Files</a></li>
         {% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
         <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#vcf-relate">Relate</a></li>
         {% endif %}
@@ -648,6 +649,8 @@ $(document).ready(function() {
         </div>
         {% endif %}
     </div>
+
+    <div class="tab-pane" role="tabpanel" id="vcf-sample-files"></div>
 
     {% if somalier_enabled and vcf.cohort.somaliercohortrelate %}
         <div class="tab-pane" role="tabpanel" id="vcf-relate">

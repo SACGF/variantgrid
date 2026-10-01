@@ -75,6 +75,7 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_vcf', {"vcf_id": cls.vcf.pk}, 200),
             ('get_patient_upload_csv_for_vcf', {"pk": cls.vcf.pk}, 200),
+            ('vcf_sample_files_tab', {"vcf_id": cls.vcf.pk}, 200),
 
             # Sample related
             ('view_sample', {"sample_id": cls.sample.pk}, 200),

@@ -52,7 +52,9 @@ from snpdb.models import (
     VariantsType,
 )
 from snpdb.models.models import Lab, Organization
+from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision
 from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
@@ -432,6 +434,24 @@ SampleFilesFormSet = inlineformset_factory(Sample,
                                            extra=1)
 
 
+class VCFSampleFilesPatternForm(forms.Form):
+    """ Bulk create a file for each sample in a VCF, eg /data/%(vcf_sample_name)s.bam """
+    pattern = forms.CharField(
+        initial="/data/%(vcf_sample_name)s.bam",
+        widget=TextInput(),
+        help_text="Placeholders: " + ", ".join(f"%({k})s" for k in PATTERN_KEYS) + ". A literal '%' is written %%")
+    file_type = forms.ChoiceField(choices=[(ft.value, ft.label) for ft in (SampleFileType.BAM, SampleFileType.CRAM)])
+    label = forms.CharField(required=False, help_text="Applied to the files this save creates")
+
+    def clean_pattern(self):
+        pattern = self.cleaned_data["pattern"]
+        try:
+            validate_sample_file_path_pattern(pattern)
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
+        return pattern
+
+
 class ProjectChoiceForm(forms.Form):
     project = forms.ModelChoiceField(queryset=Project.objects.all(),
                                      required=False,
@@ -596,7 +616,7 @@ class SettingsOverrideForm(BaseModelForm):
         extraction = Extraction(pk=4, specimen=specimen)
         patient = Patient(pk=2, first_name='first_name', last_name='last_name',
                           patient_code='patient_code')
-        sample = Sample(pk=1, name="sample", patient=patient, extraction=extraction)
+        sample = Sample(pk=1, vcf_sample_name="vcf_sample_name", name="sample", patient=patient, extraction=extraction)
         params = sample._get_sample_formatter_params()
         errors = []
         for i, t in enumerate(sample_label_template.split("||")):

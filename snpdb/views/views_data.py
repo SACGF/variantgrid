@@ -9,6 +9,7 @@ import pandas as pd
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.db import transaction
 from django.forms.models import inlineformset_factory
 from django.http import HttpRequest
 from django.http.response import (
@@ -78,6 +79,11 @@ from snpdb.models.models_enums import (
     ImportStatus,
 )
 from snpdb.models.models_somalier import DUPLICATE_SAMPLE_RELATEDNESS
+from snpdb.sample_file_path import (
+    create_sample_file_paths,
+    get_vcf_samples_with_files,
+    resolve_sample_file_paths,
+)
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
 from upload.models import UploadedVCF
@@ -564,6 +570,7 @@ def view_sample(request, sample_id):
 def sample_files_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     if request.method == "POST":
+        sample.check_can_write(request.user)
         sample_files_formset = forms.SampleFilesFormSet(request.POST, instance=sample)
         valid = sample_files_formset.is_valid()
         if valid:
@@ -579,6 +586,48 @@ def sample_files_tab(request, sample_id):
         'has_write_permission': sample.can_write(request.user),
     }
     return render(request, 'snpdb/data/sample_files_tab.html', context)
+
+
+def vcf_sample_files_tab(request, vcf_id):
+    """ Bulk add a BAM/CRAM to every sample in a VCF from a pattern (#647) - preview first, then save """
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    has_write_permission = vcf.can_write(request.user)
+    resolutions = None
+    if request.method == "POST":
+        vcf.check_can_write(request.user)
+        form = forms.VCFSampleFilesPatternForm(request.POST)
+        if form.is_valid():
+            pattern = form.cleaned_data["pattern"]
+            file_type = form.cleaned_data["file_type"]
+            resolutions = resolve_sample_file_paths(vcf, pattern, file_type)
+            if request.POST.get("action") == "save":
+                with transaction.atomic():
+                    created = create_sample_file_paths(resolutions, file_type, form.cleaned_data["label"])
+                already_present = sum(r.already_exists for r in resolutions)
+                skipped = [r.sample.name for r in resolutions if r.error]
+                message = f"Added {len(created)}, {already_present} already present, {len(skipped)} skipped"
+                if skipped:
+                    message += f" ({', '.join(skipped)})"
+                messages.add_message(request, messages.INFO, message)
+                resolutions = resolve_sample_file_paths(vcf, pattern, file_type)  # show new rows as present
+        else:
+            add_save_message(request, False, "Sample Files")
+    else:
+        form = forms.VCFSampleFilesPatternForm()
+
+    if resolutions is None:
+        samples_and_resolutions = [(sample, None) for sample in get_vcf_samples_with_files(vcf)]
+    else:
+        samples_and_resolutions = [(r.sample, r) for r in resolutions]
+
+    context = {
+        "vcf": vcf,
+        "form": form,
+        "samples_and_resolutions": samples_and_resolutions,
+        "has_resolutions": resolutions is not None,
+        "has_write_permission": has_write_permission,
+    }
+    return render(request, 'snpdb/data/vcf_sample_files_tab.html', context)
 
 
 def sample_variants_tab(request, sample_id):

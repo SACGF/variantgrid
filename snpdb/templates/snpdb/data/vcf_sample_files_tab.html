@@ -1,0 +1,69 @@
+{% load crispy_forms_tags %}
+{% load ui_utils %}
+<div id="vcf-sample-files-container">
+    <script type="text/javascript">
+        var vcfSampleFilesParent = $("#vcf-sample-files-container").parent();  // var as needs to reload in place
+
+        $(document).ready(function() {
+            {% update_django_messages %}
+            $('form#vcf-sample-files-form').ajaxForm({target: vcfSampleFilesParent});
+        });
+    </script>
+    <div class="container">
+        {% if has_write_permission %}
+        <p>Add a file to every sample in this VCF from a pattern. Preview to check each sample's path, then Save.
+           Existing files are kept - remove or relabel them on each sample's Files tab.</p>
+        <form id="vcf-sample-files-form" method="post" action="{% url 'vcf_sample_files_tab' vcf.pk %}">
+            {% csrf_token %}
+            {% crispy form form_helper.horizontal %}
+            <div>
+                <button class="btn btn-secondary" name="action" value="preview">Preview</button>
+                <button class="btn btn-primary" name="action" value="save">Save</button>
+            </div>
+        </form>
+        {% else %}
+            <p>You can view but not modify this VCF.</p>
+        {% endif %}
+
+        <table class="table mt-4">
+            <thead>
+                <tr>
+                    <th>Sample</th>
+                    <th>Existing Files</th>
+                    {% if has_resolutions %}
+                    <th>Pattern Path</th>
+                    <th>Status</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for sample, resolution in samples_and_resolutions %}
+                <tr>
+                    <td><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></td>
+                    <td>
+                        {% for sample_file_path in sample.samplefilepath_set.all %}
+                            <div>{{ sample_file_path.get_file_type_display|default:"" }}
+                                {% if sample_file_path.label %}({{ sample_file_path.label }}){% endif %}
+                                <span class="text-monospace">{{ sample_file_path.file_path }}</span></div>
+                        {% empty %}
+                            <span class="no-value">-</span>
+                        {% endfor %}
+                    </td>
+                    {% if has_resolutions %}
+                    <td class="text-monospace">{{ resolution.file_path|default:"" }}</td>
+                    <td>
+                        {% if resolution.error %}
+                            <span class="badge badge-danger">{{ resolution.error }}</span>
+                        {% elif resolution.already_exists %}
+                            <span class="badge badge-secondary">Already present</span>
+                        {% else %}
+                            <span class="badge badge-success">New</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
