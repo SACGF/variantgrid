@@ -761,7 +761,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
     condition_check_text = text.lower().replace('-', '').strip()
     if condition_check_text.endswith("uncertain"):
         cms.condition_multi_operation = MultiCondition.UNCERTAIN
-    elif condition_check_text.endswith("cooccurring"):
+    elif condition_check_text.endswith("cooccurring") or condition_check_text.endswith("co-occurring"):
         cms.condition_multi_operation = MultiCondition.CO_OCCURRING
 
     db_matches = db_ref_regexes.search(text)
