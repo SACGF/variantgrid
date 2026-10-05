@@ -3,7 +3,7 @@ import operator
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from functools import cached_property, reduce
+from functools import cached_property, partial, reduce
 from operator import attrgetter
 from typing import Optional
 
@@ -19,7 +19,7 @@ from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import flag_types
 from classification.models.classification import (
     Classification,
@@ -34,6 +34,7 @@ from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
 from genes.models import GeneSymbol, GeneSymbolAlias
+from library.constants import MINUTE_SECS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.model_utils import ArrayLength
 from library.guardian_utils import admin_bot
@@ -59,6 +60,9 @@ from snpdb.models import Lab
 
 condition_set_signal = django.dispatch.Signal()  # args: "classification", "resolved_condition"
 
+# Monarch search timeout when someone has entered the condition by hand and is waiting on the publish
+MANUAL_ENTRY_SEARCH_TIMEOUT = 5
+
 
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     """
@@ -71,8 +75,11 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     classifications_count = models.IntegerField(default=0)
     classifications_count_outstanding = models.IntegerField(default=0)
-    # set when a new root/gene level appears, drained by the condition_text_automatch_task beat sweep -
-    # automatching can call the external Monarch search API so it can't run in the publishing request (#1780)
+    # set when a new root/gene level appears without embedded IDs (those are automatched on publish), drained by
+    # the condition_text_automatch_task beat sweep - automatching can call the external Monarch search API so
+    # imports can't run it in the publishing request (#1780). Text entered on the form is searched once the publish
+    # commits, with a short timeout, and stays flagged for the sweep if that search fails
+    pending_automatch = models.BooleanField(default=False)
     pending_automatch = models.BooleanField(default=False)
 
     class Meta:
@@ -287,13 +294,26 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None):
+    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None, defer_search=False,
+                          search_timeout: Optional[float] = None):
         """
         Set terms that we're effectively certain of, do not override what's already there
+        @param defer_search - only match IDs embedded in the text (local database), flagging anything else as
+        pending_automatch for the beat sweep, which can call the external Monarch search
+        @param search_timeout - someone is waiting on the result: search with this timeout, and flag the text for
+        the sweep if the search fails rather than settling for a local term
         """
         try:
             if root := condition_text.root:
-                if match := top_level_suggestion(condition_text.normalized_text):
+                if defer_search:
+                    match = embedded_ids_check(condition_text.normalized_text)
+                    condition_text.pending_automatch = not match
+                elif search_timeout:
+                    match = top_level_suggestion(condition_text.normalized_text, search_timeout=search_timeout,
+                                                 raise_search_errors=True)
+                else:
+                    match = top_level_suggestion(condition_text.normalized_text)
+                if match:
                     if match.is_auto_assignable():
                         if not root.condition_xrefs:
                             root.condition_xrefs = match.term_str_array
@@ -315,6 +335,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             condition_text.save()
         except Exception:
             report_exc_info()
+            if defer_search or search_timeout:
+                # whatever failed here, the sweep still gets a go at the text
+                condition_text.pending_automatch = True
+                condition_text.save(update_fields=["pending_automatch"])
+
+    @staticmethod
+    def automatch_manual_entry(condition_text_id: int):
+        # claim the flag as the sweep does, so the two can't automatch the same text at once
+        if ConditionText.objects.filter(pk=condition_text_id, pending_automatch=True).update(pending_automatch=False):
+            condition_text = ConditionText.objects.get(pk=condition_text_id)
+            ConditionTextMatch.attempt_automatch(condition_text=condition_text,
+                                                 search_timeout=MANUAL_ENTRY_SEARCH_TIMEOUT)
 
     @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification, update_counts=True, attempt_automatch=False):
@@ -445,18 +477,25 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 )
                 debug_timer.tick("Condition Text Matching - create new entry")
 
-            if attempt_automatch and (new_root or new_gene_level):
-                ct.pending_automatch = True
-
             if update_counts:
                 ct.classifications_count += 1
                 is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance_level.is_valid or (existing and existing.is_valid)
                 if not is_valid:
                     ct.classifications_count_outstanding += 1
 
-            if update_counts or ct.pending_automatch:
+            if update_counts:
                 ct.save()
                 debug_timer.tick("Condition Text Matching - update count quick")
+
+            if attempt_automatch and (new_root or new_gene_level):
+                # embedded IDs are matched now so the form shows the term straight away; local lookups only,
+                # so it stays under the row lock rather than racing a concurrent publish of the same text
+                ConditionTextMatch.attempt_automatch(condition_text=ct, defer_search=True)
+                debug_timer.tick("Condition Text Matching - automatch")
+                if ct.pending_automatch and cm.source_enum in (SubmissionSource.FORM, SubmissionSource.CONSENSUS):
+                    # entered by hand, so search now rather than leave it for the sweep - once the publish has
+                    # committed, so the row lock isn't held over the Monarch call
+                    transaction.on_commit(partial(ConditionTextMatch.automatch_manual_entry, ct.pk))
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
@@ -703,11 +742,12 @@ def check_for_withdrawn(sender, flag_comment: FlagComment, old_resolution: FlagR
 
 
 # @timed_cache(size_limit=2)
-def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
+def top_level_suggestion(text: str, search_timeout: float = MINUTE_SECS,
+                         raise_search_errors=False) -> ConditionMatchingSuggestion:
     """ Make a suggestion at the root level for the given normalised text """
     if suggestion := embedded_ids_check(text):
         return suggestion
-    return search_suggestion(text)
+    return search_suggestion(text, search_timeout=search_timeout, raise_search_errors=raise_search_errors)
 
 
 def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
@@ -992,9 +1032,11 @@ def find_local_term(match_text: SearchText, service: OntologyService) -> Optiona
     return merge_matches(matches)
 
 
-def search_suggestion(text: str) -> ConditionMatchingSuggestion:
+def search_suggestion(text: str, search_timeout: float = MINUTE_SECS,
+                      raise_search_errors=False) -> ConditionMatchingSuggestion:
     """
     embedded ids have already been searched for, check the MONDO search database
+    @param raise_search_errors - raise if the Monarch search fails, rather than falling back to local OMIM terms
     """
     match_text = SearchText(text)
     if local_mondo := find_local_term(match_text, OntologyService.MONDO):
@@ -1002,12 +1044,14 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
 
     try:
         matches: list[ConditionMatchingSuggestion] = []
-        for term in condition_text_search(text):
+        for term in condition_text_search(text, timeout=search_timeout):
             if cms := search_text_to_suggestion(match_text, term):
                 matches.append(cms)
         if search_match := merge_matches(matches):
             return search_match
     except Exception:
+        if raise_search_errors:
+            raise
         report_exc_info()
 
     if local_omim := find_local_term(match_text, OntologyService.OMIM):
