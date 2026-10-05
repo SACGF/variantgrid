@@ -469,10 +469,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ),
             RichColumn(
                 name="Classification",
-                sort_keys=[
-                    "latest_classification_modification__classification__summary__pathogenicity__sort",
-                    "latest_classification_modification__classification__summary__somatic__sort"
-                ],
+                sort_keys=["latest_pathogenicity_sort", "latest_somatic_sort"],
                 client_renderer='VCTable.classification',
                 renderer=self.render_pathogenic,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
@@ -488,10 +485,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 name='somatic_clinical_significances',
                 label='Somatic Clinical<br/>Significance',
                 client_renderer="VCTable.somatic_clinical_significance",
-                sort_keys=[
-                    'latest_classification_modification__classification__summary__somatic__sort',
-                    'latest_classification_modification__classification__summary__pathogenicity__sort',
-                ],
+                sort_keys=["latest_somatic_sort", "latest_pathogenicity_sort"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
@@ -521,7 +515,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
                 label='<span class="text-secondary">Latest</span><br/>Curated',
-                sort_keys=["latest_classification_modification__classification__summary__date__date"],
+                sort_keys=["latest_curated_date"],
                 client_renderer="VCTable.latest_curation_and_link",
                 renderer=self._render_date,
                 extra_columns=[

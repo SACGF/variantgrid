@@ -114,6 +114,10 @@ Gotchas:
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.
+- ClassificationGrouping caches its latest classification's summary a second time (`latest_cached_summary` plus the
+  indexed `latest_*_sort` / `latest_curated_date` columns the grouping grid sorts on), refreshed only by
+  models/classification_grouping.py:ClassificationGrouping.update. Anything that rewrites `Classification.summary` must
+  dirty the groupings too, as `classification_groupings --summary` does, or the grid sorts on stale values.
 - Condition resolution flows from ConditionTextMatch to classifications via models/condition_text_matching.py:apply_condition_resolution
   (sends condition_set_signal); Classification.condition_resolution is a cache of that match, not the source.
 - ClinVar export is one ClinVarExport per ClinVarKey + allele + condition (models/clinvar_export_models.py:ClinVarExport), built by

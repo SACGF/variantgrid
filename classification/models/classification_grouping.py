@@ -204,14 +204,40 @@ class ClassificationGrouping(TimeStampedModel):
     zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
+    # copied out of latest_cached_summary so the grouping grid can sort on an index of this table
+    latest_pathogenicity_sort = models.IntegerField(null=True, blank=True)
+    latest_somatic_sort = models.IntegerField(null=True, blank=True)
+    latest_curated_date = models.DateField(null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
     class Meta:
         unique_together = ('allele_origin_grouping', 'lab', 'share_level')
+        # The grid's ORDER BY exactly: NULLS LAST in both directions then the pk DESC tiebreaker
+        # (DatatableConfig._get_sort_tiebreaker). One index per direction, as a backward scan would put the NULLs first.
+        indexes = [
+            models.Index(F("latest_pathogenicity_sort").desc(nulls_last=True), F("latest_somatic_sort").desc(nulls_last=True),
+                         F("id").desc(), name="cg_path_sort_desc_idx"),
+            models.Index(F("latest_pathogenicity_sort").asc(nulls_last=True), F("latest_somatic_sort").asc(nulls_last=True),
+                         F("id").desc(), name="cg_path_sort_asc_idx"),
+            models.Index(F("latest_somatic_sort").desc(nulls_last=True), F("latest_pathogenicity_sort").desc(nulls_last=True),
+                         F("id").desc(), name="cg_somatic_sort_desc_idx"),
+            models.Index(F("latest_somatic_sort").asc(nulls_last=True), F("latest_pathogenicity_sort").asc(nulls_last=True),
+                         F("id").desc(), name="cg_somatic_sort_asc_idx"),
+            models.Index(F("latest_curated_date").desc(nulls_last=True), F("id").desc(), name="cg_curated_date_desc_idx"),
+            models.Index(F("latest_curated_date").asc(nulls_last=True), F("id").desc(), name="cg_curated_date_asc_idx"),
+        ]
 
     @property
     def latest_cached_summary_obj(self):
         return ClassificationSummaryCacheObj.from_dict_safe(self.latest_cached_summary)
+
+    def _set_latest_cached_summary(self, summary: dict):
+        """ Sets the summary along with the sort columns copied out of it, so the two can't drift """
+        self.latest_cached_summary = summary
+        summary_obj = self.latest_cached_summary_obj
+        self.latest_pathogenicity_sort = summary_obj.pathogenicity.sort
+        self.latest_somatic_sort = summary_obj.somatic.sort
+        self.latest_curated_date = summary_obj.date.as_date
 
     def contribution_for(self, value_type: ClassificationResultValue) -> 'OverlapContribution':
         from classification.models import OverlapContribution
@@ -417,7 +443,7 @@ class ClassificationGrouping(TimeStampedModel):
             new_summary = best_classification.classification.summary_obj
 
             self.latest_classification_modification = best_classification
-            self.latest_cached_summary = best_classification.classification.summary
+            self._set_latest_cached_summary(best_classification.classification.summary)
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values
@@ -520,7 +546,7 @@ class ClassificationGrouping(TimeStampedModel):
             self.conditions = None
             self.zygosity_values = None
             self.latest_classification_modification = None
-            self.latest_cached_summary = {}
+            self._set_latest_cached_summary({})
             # leaving the share level and allele info alone
             # latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
