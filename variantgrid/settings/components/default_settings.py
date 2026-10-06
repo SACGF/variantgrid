@@ -480,6 +480,13 @@ TSO500_PAIR_ID_PATIENT_CODE_REGEX = r"^(?:\d+_)?(?P<patient_code>[^_]+)(?:_|$)"
 TSO500_MSI_MIN_USABLE_SITES = None   # fewer 'Usable MSI Sites' than this and MSI cannot be called
 TSO500_MSI_CALL_BANDS = None         # over 'Percent Unstable MSI Sites', eg [(30, "MSI-High"), (10, "MSI-Low"), (0, "MSS")]
 TSO500_TMB_CALL_BANDS = None         # over 'Total TMB' in mut/Mb, eg [(10, "High"), (0, "Low")]
+TSO500_GIS_CALL_BANDS = None                # over 'Genomic Instability Score', eg [(42, "POSITIVE"), (0, "NEGATIVE")]
+TSO500_GIS_MIN_TUMOR_FRACTION = None        # below this caller tumour fraction a GIS under the top band gets no call, eg 0.23
+TSO500_MSI_HIGH_MIN_TUMOR_FRACTION = None   # below this caller tumour fraction the top MSI band gets no call, eg 0.20
+# AllFusions rows DRAGEN did not keep are rescued when Score is strictly above the min and Filter is exactly
+# the given string. None for either means no rescue
+TSO500_FUSION_RESCUE_MIN_SCORE = None       # eg 0.5
+TSO500_FUSION_RESCUE_FILTER = None          # eg "FAIL;LOW_MAPQ"
 # DRAGEN's MetricsOutput carries its own LSL/USL guideline per metric, and that is the policy a
 # library QC category is judged by. Where a lab's own methods paragraph quotes a different number
 # this overrides it: {(section name, metric): (lsl, usl)}, eg

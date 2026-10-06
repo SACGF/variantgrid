@@ -24,7 +24,7 @@ from guardian.shortcuts import get_objects_for_user
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
-from library.genomics.vcf_enums import VariantClass
+from library.genomics.vcf_enums import VariantClass, VCFConstant
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
@@ -253,6 +253,11 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
         return self.has_sample_columns and bool(self.allele_frequency_field or allele_depths)
 
+    @property
+    def has_copy_ratio(self) -> bool:
+        """ The copy number field is a ratio against the normal (SM, FC) rather than an absolute count """
+        return VCFConstant.COPY_NUMBER_FIELD_IS_RATIO.get(self.copy_number_field, False)
+
     @cached_property
     def samples_by_vcf_name(self) -> dict[str, 'Sample']:
         return {s.vcf_sample_name: s for s in self.sample_set.all()}
@@ -459,6 +464,10 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     @property
     def has_allele_frequency(self) -> bool:
         return self.vcf.has_allele_frequency
+
+    @property
+    def has_copy_ratio(self) -> bool:
+        return self.vcf.has_copy_ratio
 
     @property
     def data_archived(self) -> bool:

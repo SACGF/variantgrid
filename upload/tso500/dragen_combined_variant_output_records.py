@@ -261,6 +261,15 @@ def _int(values: dict, key: str) -> Optional[int]:
     return None if value is None else int(value)
 
 
+def _tumor_fraction(gis: dict) -> Optional[float]:
+    """ DRAGEN 2.6 writes a percent (55) where 2.1 wrote a fraction (0.62). A 1% written as 1 reads
+        as 1.0, which DRAGEN would not call low anyway """
+    value = _float(gis, TUMOR_FRACTION)
+    if value is not None and value > 1:
+        value /= 100
+    return value
+
+
 def combined_variant_output_values(sections: dict[str, CombinedVariantOutputSection]) -> dict:
     """ The row's columns off the file, bar its key and links """
     analysis_details = get_analysis_details(sections)
@@ -280,7 +289,7 @@ def combined_variant_output_values(sections: dict[str, CombinedVariantOutputSect
         "total_msi_sites_unstable": _int(msi, TOTAL_MSI_SITES_UNSTABLE),
         "percent_unstable_msi_sites": _float(msi, PERCENT_UNSTABLE_MSI_SITES),
         "genomic_instability_score": _float(gis, GENOMIC_INSTABILITY_SCORE),
-        "tumor_fraction": _float(gis, TUMOR_FRACTION),
+        "tumor_fraction": _tumor_fraction(gis),
         "ploidy": _float(gis, PLOIDY),
     }
 

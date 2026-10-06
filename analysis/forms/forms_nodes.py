@@ -1077,6 +1077,7 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
 
     GENOTYPE_FIELDS = ["zygosity_ref", "zygosity_het", "zygosity_hom", "zygosity_unk"]
     DEPTH_FIELDS = ["min_ad", "min_dp", "min_gq", "max_pl", "allele_frequency"]
+    COPY_RATIO_FIELDS = ["min_copy_gain_ratio", "max_copy_loss_ratio"]
     LOCKED_INPUT_FIELDS = ['source', 'restrict_to_qc_gene_list']
     # Only meaningful over a single sample - hidden at group levels rather than given an invented meaning
     SAMPLE_LEVEL_FIELDS = ["sample_gene_list", "restrict_to_qc_gene_list"]
@@ -1092,12 +1093,15 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "min_copy_gain_ratio": NumberInput(attrs={'class': 'narrow', 'min': '1', 'step': 'any'}),
+            "max_copy_loss_ratio": NumberInput(attrs={'class': 'narrow', 'min': '0', 'max': '1', 'step': 'any'}),
             "sample_gene_list": ModelSelect2Multiple(url='category_gene_list_autocomplete',
                                                      attrs={'data-placeholder': 'Sample Gene List...'},
                                                      forward=(None, 'category'),),  # Set in __init__
         }
 
-    def __init__(self, *args, has_genotype=True, has_depth=True, lock_input_sources=False, **kwargs):
+    def __init__(self, *args, has_genotype=True, has_depth=True, has_copy_ratio=True, lock_input_sources=False,
+                 **kwargs):
         super().__init__(*args, **kwargs)
 
         # A saved node has to round trip - select2 loads its options by ajax, so the current one is
@@ -1112,6 +1116,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
             remove_fields.extend(SampleNodeForm.GENOTYPE_FIELDS)
         if has_depth is False:
             remove_fields.extend(SampleNodeForm.DEPTH_FIELDS)
+        if has_copy_ratio is False:
+            remove_fields.extend(SampleNodeForm.COPY_RATIO_FIELDS)
 
         if lock_input_sources:
             remove_fields.extend(SampleNodeForm.LOCKED_INPUT_FIELDS)
