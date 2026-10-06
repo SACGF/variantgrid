@@ -6,7 +6,15 @@ from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.db import models
-from django.db.models import CASCADE, SET_NULL
+from django.db.models import CASCADE, SET_NULL, FloatField
+from django.db.models.functions import Cast
+from django.db.models.lookups import (
+    GreaterThan,
+    GreaterThanOrEqual,
+    IsNull,
+    LessThan,
+    LessThanOrEqual,
+)
 from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import (
@@ -38,6 +46,7 @@ from patients.sample_grouping import (
     get_sample_group,
     get_specimen_label,
 )
+from snpdb.grid_columns.grid_sample_columns import get_copy_number_annotation
 from snpdb.models import Sample
 
 
@@ -68,6 +77,10 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     zygosity_hom = models.BooleanField(default=True)
     zygosity_unk = models.BooleanField(default=False)
     restrict_to_qc_gene_list = models.BooleanField(default=False)
+    # Copy number calls from a VCF whose copy number field is a ratio against the normal (SM, FC).
+    # Node only - the copy number nodes are single sample, so nothing to override per sample
+    min_copy_gain_ratio = models.FloatField(null=True, blank=True)  # A gain (ratio > 1) passes at or above this
+    max_copy_loss_ratio = models.FloatField(null=True, blank=True)  # A loss (ratio < 1) passes at or below this
 
     THRESHOLD_FIELDS = ("min_ad", "min_dp", "min_gq", "max_pl")
     # What each threshold filters on - the CohortGenotype column, the lookup and how it reads in a
@@ -239,6 +252,43 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                 applied[field] = value
         return applied
 
+    def get_applied_copy_ratio_thresholds(self, sample: Sample) -> dict[str, float]:
+        """ Only a VCF whose copy number field is a ratio has anything to compare these to - an
+            absolute count (CN) or no copy number at all passes untouched """
+        if not sample.has_copy_ratio:
+            return {}
+        return {field: value for field in ("min_copy_gain_ratio", "max_copy_loss_ratio")
+                if (value := getattr(self, field)) is not None}
+
+    def _get_sample_copy_ratio_arg_q_dict(self, sample: Sample) -> dict[Optional[str], dict[str, Q]]:
+        """ A record passes with no ratio (a small variant), or as a gain or loss past its threshold.
+            Leaving one threshold blank lets every gain (or loss) through """
+        thresholds = self.get_applied_copy_ratio_thresholds(sample)
+        if not thresholds:
+            return {}
+
+        cgc = sample.cohort_genotype_collection
+        ratio = Cast(get_copy_number_annotation(cgc, sample), FloatField())
+        gain_q = Q(GreaterThan(ratio, 1))
+        if (min_gain := thresholds.get("min_copy_gain_ratio")) is not None:
+            gain_q &= Q(GreaterThanOrEqual(ratio, min_gain))
+        loss_q = Q(LessThan(ratio, 1))
+        if (max_loss := thresholds.get("max_copy_loss_ratio")) is not None:
+            loss_q &= Q(LessThanOrEqual(ratio, max_loss))
+        q = Q(IsNull(ratio, True)) | gain_q | loss_q
+        q_hash = f"copy_ratio_{sample.pk}_{min_gain}_{max_loss}"
+        return {cgc.cohortgenotype_alias: {q_hash: q}}
+
+    def _get_copy_ratio_description(self, sample: Sample) -> str:
+        thresholds = self.get_applied_copy_ratio_thresholds(sample)
+        field = sample.vcf.copy_number_field
+        parts = []
+        if (min_gain := thresholds.get("min_copy_gain_ratio")) is not None:
+            parts.append(f"gain {field}>={min_gain}")
+        if (max_loss := thresholds.get("max_copy_loss_ratio")) is not None:
+            parts.append(f"loss {field}<={max_loss}")
+        return " ".join(parts)
+
     @cached_property
     def _node_pass_only(self) -> bool:
         return NodeVCFFilter.has_pass(self)
@@ -300,6 +350,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             q = Q(**{f"{ov_path}__{lookup}": value})
             self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
+        self.merge_arg_q_dicts(arg_q_dict, self._get_sample_copy_ratio_arg_q_dict(sample))
         if sample.has_allele_frequency:
             if sample_arg_q_dict := self._get_sample_allele_frequency_arg_q_dict(sample):
                 self.merge_arg_q_dicts(arg_q_dict, sample_arg_q_dict)
@@ -376,6 +427,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         for field, value in self.get_applied_thresholds(sample).items():
             label = self.THRESHOLD_SAMPLE_FIELDS[field][2]
             sample_description += f" {label}{value}"
+        if copy_ratio_description := self._get_copy_ratio_description(sample):
+            sample_description += f" {copy_ratio_description}"
         if self.has_filters and self.get_sample_pass_only(sample):
             sample_description += " PASS"
         if (override := self.get_sample_filter(sample)) and override.has_allele_frequency:
@@ -438,6 +491,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             return True
 
         if self.restrict_to_qc_gene_list:
+            return True
+
+        if self.get_applied_copy_ratio_thresholds(self.sample):
             return True
 
         # Only the thresholds the query actually applies - one the VCF has no column for isn't in

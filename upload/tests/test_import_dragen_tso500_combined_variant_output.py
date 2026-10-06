@@ -33,8 +33,11 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     AFFECTED_EXON,
     BREAKPOINT_1,
     DNA_SAMPLE_ID,
+    GIS,
     PAIR_ID,
     RNA_SAMPLE_ID,
+    TUMOR_FRACTION,
+    CombinedVariantOutputSection,
     can_process_file,
     get_analysis_details,
     get_splice_rows,
@@ -42,6 +45,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 )
 from upload.tso500.dragen_combined_variant_output_records import (
     CombinedVariantOutputIdentityError,
+    combined_variant_output_values,
     link_samples_to_extractions,
     parse_pair_identifiers,
     resolve_pair,
@@ -261,6 +265,13 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertEqual((31.0, 0.62, 2.10), (cvo.genomic_instability_score, cvo.tumor_fraction, cvo.ploidy))
         self.assertEqual("2600000001", cvo.specimen.reference_id)
         self.assertEqual(MatchStatus.MATCHED, cvo.specimen_match_status)
+
+    def test_tumor_fraction_written_as_a_percent_is_stored_as_a_fraction(self):
+        """ DRAGEN 2.6 writes 55 where 2.1 wrote 0.55 """
+        for written, expected in [("55", 0.55), ("0.62", 0.62)]:
+            gis = CombinedVariantOutputSection(GIS, [[TUMOR_FRACTION, written]])
+            values = combined_variant_output_values({**self.sections, GIS: gis})
+            self.assertAlmostEqual(expected, values["tumor_fraction"])
 
     def test_re_analysis_of_a_run_replaces_its_row_and_a_new_run_adds_one(self):
         first = self._write("RUN_1")

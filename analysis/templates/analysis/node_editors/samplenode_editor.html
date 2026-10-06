@@ -861,6 +861,12 @@
         <span class="genotype-field"><b title='Phred-scaled Likelihoods for Genotypes'>PL</b>&le;{{ form.max_pl }}</span>
     </div>
     {% endif %}
+    {% if has_copy_ratio and form.min_copy_gain_ratio %}
+    <div class='genotype-row' title='Copy number calls whose ratio against the normal is a gain (above 1) or loss (below 1). Blank lets every gain or loss through; records without a ratio always pass'>
+        <span class="genotype-field"><b>Copy ratio gain</b>&ge;{{ form.min_copy_gain_ratio }}</span>
+        <span class="genotype-field"><b>loss</b>&le;{{ form.max_copy_loss_ratio }}</span>
+    </div>
+    {% endif %}
     <div class='genotype-row'>
     {% if has_genotype %}
         <table class='editor-table zygosity-table'>
