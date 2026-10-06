@@ -77,8 +77,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     zygosity_hom = models.BooleanField(default=True)
     zygosity_unk = models.BooleanField(default=False)
     restrict_to_qc_gene_list = models.BooleanField(default=False)
-    # Copy number calls from a VCF whose copy number field is a ratio against the normal (SM, FC).
-    # Node only - the copy number nodes are single sample, so nothing to override per sample
+    # Copy number calls from a VCF whose copy number field is a ratio against the normal (SM, FC) - other
+    # samples pass. Node only: a per sample override would only matter for two ratio callers needing
+    # different thresholds in one node
     min_copy_gain_ratio = models.FloatField(null=True, blank=True)  # A gain (ratio > 1) passes at or above this
     max_copy_loss_ratio = models.FloatField(null=True, blank=True)  # A loss (ratio < 1) passes at or below this
 
