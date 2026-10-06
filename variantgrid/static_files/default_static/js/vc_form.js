@@ -2667,6 +2667,14 @@ VCTable.alleleGroupingIdentifier = (data, type, row) => {
     return dom;
 };
 
+// The grouping grid's expand URL (TableFormat.expandAjax looks it up on window): while the grid is filtered to a
+// sample, the expanded records lead with that sample's
+function classificationGroupingDetailUrl(groupingId) {
+    const url = Urls.classification_grouping_detail(groupingId);
+    const sampleId = $('#id_sample').val();
+    return sampleId ? `${url}?sample=${sampleId}` : url;
+}
+
 VCTable.groupIdentifier = (data, type, row) => {
     const id = data.id;
     const dirty = data.dirty;
@@ -2697,37 +2705,13 @@ VCTable.groupIdentifier = (data, type, row) => {
         dom.append($('<div>', {class:'testing-context', text: data.testing_context_bucket_label}));
     }
 
-    if (data.users?.length) {
-        dom.append($('<div>', {class: 'text-secondary text-small', title: 'Users', html: [
-            $('<i>', {class: 'fa-solid fa-user mr-1'}),
-            $('<span>', {text: data.users.join(', ')})
-        ]}));
-    }
-    if (data.samples?.length) {
-        const maxSamplesShown = 3;
-        const shownSamples = data.samples.slice(0, maxSamplesShown);
-        const sampleLinks = [$('<i>', {class: 'fa-solid fa-vial mr-1'})];
-        shownSamples.forEach((sample, index) => {
-            if (index) {
-                sampleLinks.push(', ');
-            }
-            sampleLinks.push($('<a>', {href: Urls.view_sample(sample.id), class: 'hover-link', text: sample.name}));
-        });
-        const hiddenSamples = data.samples.slice(maxSamplesShown);
-        if (hiddenSamples.length) {
-            sampleLinks.push($('<span>', {
-                class: 'hover-detail ml-1',
-                title: hiddenSamples.map(sample => sample.name).join(', '),
-                text: `+${hiddenSamples.length} more`
-            }));
-        }
-        dom.append($('<div>', {class: 'text-secondary text-small', title: 'Samples', html: sampleLinks}));
-    }
-
     if (dirty) {
         dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"));
     } else if (classification_count === 0) {
         dom.append("-Invalid Record - no Classifications");
+    } else if (data.sample_record_count) {
+        // A grouping holds many samples' records - say how many of them made the sample filter match
+        dom.append($('<div>', {class:'text-muted text-small', text: `${data.sample_record_count} of ${classification_count} records from this sample`}));
     } else if (classification_count > 1) {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }

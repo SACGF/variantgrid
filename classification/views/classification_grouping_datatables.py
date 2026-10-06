@@ -4,9 +4,7 @@ from functools import cached_property, reduce
 from typing import Optional, Tuple
 
 from django.conf import settings
-from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import F, Q, QuerySet
-from django.db.models.functions import JSONObject
+from django.db.models import Count, F, Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
 from rest_framework.request import Request
@@ -92,7 +90,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "testing_context_bucket_label": testing_context_bucket_label,
             "matches": matches,
             "search": search,
-            **self._page_samples_and_users.get(row.get("id"), {})
+            "sample_record_count": self._page_sample_record_counts.get(row.get("id"))
         }
 
     # def render_latest_curation_date(self, row: CellData) -> JsonDataType:
@@ -206,7 +204,14 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             for cm in sorted(page_cms, key=lambda mod: mod.curated_date_check):
                 self._page_grouping_modifications[cm.page_grouping_id].append(cm)
 
-        self._page_samples_and_users = self._samples_and_users_for_groupings([row["id"] for row in rows])
+        self._page_sample_record_counts = {}
+        if sample_id := self.sample_filter_id:
+            self._page_sample_record_counts = dict(
+                ClassificationGroupingEntry.objects.filter(grouping_id__in=[row["id"] for row in rows],
+                                                           classification__sample_id=sample_id)
+                .values("grouping_id").annotate(sample_record_count=Count("pk"))
+                .values_list("grouping_id", "sample_record_count")
+            )
 
         overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageState] = {}
         for overlap_cont in OverlapContribution.objects.filter(
@@ -215,31 +220,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             overlap_pending[(overlap_cont.value_type, overlap_cont.classification_grouping_id)] = overlap_cont.triage_state_obj
 
         self.overlap_pending = overlap_pending
-
-    @staticmethod
-    def _samples_and_users_for_groupings(grouping_ids: list[int]) -> dict[int, dict[str, list]]:
-        """ The distinct samples and usernames behind each grouping's records, keyed by grouping id """
-        aggregates = {}
-        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
-            aggregates["samples"] = ArrayAgg(
-                JSONObject(id="classification__sample_id", name="classification__sample__name"),
-                distinct=True,
-                filter=Q(classification__sample__isnull=False)
-            )
-        if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
-            aggregates["users"] = ArrayAgg("classification__user__username", distinct=True,
-                                           order_by="classification__user__username")
-        if not aggregates or not grouping_ids:
-            return {}
-
-        samples_and_users = {}
-        for grouping_row in ClassificationGroupingEntry.objects.filter(grouping_id__in=grouping_ids) \
-                .values("grouping_id").annotate(**aggregates):
-            grouping_id = grouping_row.pop("grouping_id")
-            if samples := grouping_row.get("samples"):
-                samples.sort(key=lambda sample: sample["name"])
-            samples_and_users[grouping_id] = grouping_row
-        return samples_and_users
 
     def get_initial_queryset(self) -> QuerySet[DC]:
         qs = ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
@@ -337,11 +317,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if user_id := self.get_query_param('user'):
                 filters.append(self.classification_filter_to_grouping(Q(user__pk=user_id)))
 
-        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
-            if sample_id := self.get_query_param('sample'):
-                filters.append(self.classification_filter_to_grouping(Q(sample__pk=sample_id)))
+        if sample_id := self.sample_filter_id:
+            filters.append(self.classification_filter_to_grouping(Q(sample__pk=sample_id)))
 
         return qs.filter(*filters)
+
+    @cached_property
+    def sample_filter_id(self) -> Optional[str]:
+        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
+            return self.get_query_param('sample')
+        return None
 
     @cached_property
     def discordance_report(self) -> Optional[DiscordanceReport]:
@@ -437,12 +422,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         super().__init__(request)
         self.csv_name = "classifications"
         self.overlap_pending: dict[int, TriageState] = {}
-        self._page_samples_and_users: dict[int, dict[str, list]] = {}
+        self._page_sample_record_counts: dict[int, int] = {}
 
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classification_grouping_detail',
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classificationGroupingDetailUrl',
                                                                        expected_height=108)
         self.rich_columns = [
             RichColumn(
