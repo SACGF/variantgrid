@@ -35,7 +35,7 @@ MENUS: tuple[Menu, ...] = (
                         'view_unaligned_reads', 'view_single_sample_vcf', 'view_joint_called_vcf',
                         'view_tso500_pair')),
         MenuItem('sequencing_stats', title="Seq Stats", pages=('sequencing_stats_data',)),
-        MenuItem('sequencing_software_versions', title="Seq / Software Versions",
+        MenuItem('sequencing_software_versions', title="Seq / Software Versions", admin_only=True,
                  pages=SEQUENCING_SOFTWARE_VERSIONS_PAGES),
     )),
     Menu('data', 'Data', 'data', items=(
@@ -142,7 +142,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('custom_columns', pages=('view_custom_columns',)),
         MenuItem('tag_settings', pages=('view_tag_config_collection', 'tag_merge')),
         MenuItem('igv_integration', title="IGV Integration"),
-        MenuItem('sequencing_software_versions', title="Sequencing / Software Versions",
+        MenuItem('sequencing_software_versions', title="Sequencing / Software Versions", admin_only=True,
                  pages=SEQUENCING_SOFTWARE_VERSIONS_PAGES, condition=_seqauto_disabled),
         MenuItem('view_user_settings', title="User Settings"),
         MenuItem('changelog'),

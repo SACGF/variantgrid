@@ -47,12 +47,6 @@ class Test(URLTestCase):
             ("vcf_file_datatable", {}, 200),
             ("qc_datatable", {}, 200),
             ("enrichment_kit_datatable", {}, 200),
-            ("library_datatable", {}, 200),
-            ("sequencer_datatable", {}, 200),
-            ("assay_datatable", {}, 200),
-            ("aligner_datatable", {}, 200),
-            ("variant_caller_datatable", {}, 200),
-            ("variant_calling_pipeline_datatable", {}, 200),
             ("illumina_flowcell_qc_datatable", {}, 200),
             ("fastqc_datatable", {}, 200),
             ("flagstats_datatable", {}, 200),
@@ -61,6 +55,15 @@ class Test(URLTestCase):
             ("sequencing_samples_historical_datatable", {"time_frame": "year"}, 200),
         ]
         self._test_datatable_urls(GRID_LIST_URLS, self.user_non_owner)
+
+    def testSoftwareVersionsStaffOnly(self):
+        staff_user = User.objects.get_or_create(username='staff_user', is_staff=True)[0]
+        names = ["library_datatable", "sequencer_datatable", "assay_datatable", "aligner_datatable",
+                 "variant_caller_datatable", "variant_calling_pipeline_datatable"]
+        self._test_urls([("sequencing_software_versions", {}, 200)], staff_user)
+        self._test_datatable_urls([(name, {}, 200) for name in names], staff_user)
+        self._test_urls([("sequencing_software_versions", {}, 302)] + [(name, {}, 302) for name in names],
+                        self.user_non_owner)
 
     def testAutocompleteUrls(self):
         # panel_app_forward = json.dumps({"server_id": self.panel_app_panel.server_id})
