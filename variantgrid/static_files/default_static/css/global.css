@@ -1,7 +1,7 @@
 html,
 body {
   font-size: 14px;
-  font-family: 'Raleway', serif;
+  font-family: "Raleway", serif;
 }
 
 nav.navbar {
@@ -27,12 +27,12 @@ nav.navbar a.nav-link.active {
 .main-content {
   padding-bottom: 60px;
   overflow: auto;
-  max-width: calc(100vw);
+  max-width: 100vw;
 }
 
 .external-content {
   overflow: auto;
-  max-width: calc(100vw);
+  max-width: 100vw;
   height: 100vh;
 }
 .external-content h3 {
@@ -83,19 +83,15 @@ li.logout {
   .nav-side-bar .nav-link {
     font-weight: bold;
   }
-
   .main-content {
     padding-top: 20px;
   }
-
   #vcform-filter-wrapper {
     position: inherit !important;
   }
-
   #vcform-content {
     margin-top: 0 !important;
   }
-
   .container,
   .container-table {
     margin-left: 0 !important;
@@ -107,15 +103,13 @@ li.logout {
   body {
     overflow-y: hidden;
   }
-
   .main-content {
     padding-top: 80px;
     margin-left: 170px;
     overflow: auto;
-    max-width: calc(100vw);
-    height: calc(100vh);
+    max-width: 100vw;
+    height: 100vh;
   }
-
   .nav-side-bar {
     border-right: 1px solid #cfcfcf;
     -ms-flex: 0 0 200px;
@@ -342,10 +336,10 @@ a.no-link-style {
   text-decoration: underline;
 }
 .filter-link:after {
-  content: '\f0b0';
+  content: "\f0b0";
   position: relative;
   right: -4px;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
 }
 
@@ -362,8 +356,8 @@ a.no-link-style {
 .filter-item:after {
   position: relative;
   right: -4px;
-  content: '\f057';
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  content: "\f057";
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
 }
 
@@ -404,7 +398,7 @@ a {
 
 .admin-link {
   padding-left: 8px;
-  color: #66AA;
+  color: rgba(102, 102, 170, 0.6666666667);
   cursor: pointer;
   text-decoration: none;
   text-transform: uppercase;
@@ -416,8 +410,8 @@ a {
 .admin-link::before {
   position: relative;
   left: -4px;
-  content: '\f084';
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  content: "\f084";
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
 }
 
@@ -426,7 +420,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f35d";
   opacity: 0.4;
@@ -438,7 +432,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f044";
   opacity: 0.4;
@@ -450,7 +444,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f2d0";
   opacity: 0.4;
@@ -462,7 +456,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f2b6";
   opacity: 0.4;
@@ -475,7 +469,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f56d";
   opacity: 0.6;
@@ -487,7 +481,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f137";
   opacity: 0.6;
@@ -505,7 +499,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f15b";
   opacity: 0.6;
@@ -518,7 +512,7 @@ a {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f105";
   opacity: 0.6;
@@ -535,7 +529,7 @@ tr.shown .toggle-link:before {
   content: "\f107";
 }
 
-input[type='checkbox'], input[type='radio'] {
+input[type=checkbox], input[type=radio] {
   cursor: pointer;
 }
 
@@ -589,7 +583,7 @@ input[type='checkbox'], input[type='radio'] {
   display: inline-block;
 }
 
-.horizontal-fields input[type='text'], .horizontal-fields input[type='password'], .horizontal-fields input[type='email'], .horizontal-fields input[type='number'], .horizontal-fields input:not([type]) {
+.horizontal-fields input[type=text], .horizontal-fields input[type=password], .horizontal-fields input[type=email], .horizontal-fields input[type=number], .horizontal-fields input:not([type]) {
   min-width: 300px;
   border-radius: 4px;
   border: 1px solid #dddddd;
@@ -796,7 +790,7 @@ li.error::before {
   width: 16px;
   line-height: 16px;
   text-align: center;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   font-size: 14px;
 }
@@ -854,6 +848,7 @@ table.as_table td {
 .btn.new-classification-button {
   margin-left: 6px;
 }
+
 .rv-gene {
   font-weight: 600;
 }
@@ -1034,7 +1029,7 @@ table.variantgrid-datatable .cs-chip.allele-origin-S {
 }
 table.variantgrid-datatable .cs-chip .cs-chip-src {
   font-size: 9px;
-  opacity: .6;
+  opacity: 0.6;
   margin-right: 2px;
 }
 table.variantgrid-datatable .cs-chip .cs-chip-stars {
@@ -1178,7 +1173,7 @@ table.variantgrid-datatable .aloft-low-confidence {
   color: #999;
 }
 table.variantgrid-datatable .aloft-low-confidence .aloft-dot {
-  opacity: .45;
+  opacity: 0.45;
 }
 table.variantgrid-datatable .predictions {
   display: inline-flex;
@@ -1369,7 +1364,7 @@ table.variantgrid-datatable .add-variant-tag {
 }
 table.variantgrid-datatable .add-variant-tag::before {
   content: "\f055";
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
 }
 table.variantgrid-datatable .show-tag-autocomplete:hover .add-variant-tag {
@@ -1389,7 +1384,7 @@ table.variantgrid-datatable .quick-tag-button {
 }
 table.variantgrid-datatable .quick-tag-button::before {
   content: "\f055";
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
 }
 table.variantgrid-datatable .quick-tag:hover .quick-tag-button {
@@ -1548,7 +1543,7 @@ td.table-empty:before {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f1b2";
   opacity: 0.4;
@@ -1559,11 +1554,6 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
   cursor: pointer;
 }
 
-.dataTables_wrapper {
-  /* The variant grids trade control chrome for rows: default Bootstrap sizing puts ~60px under the
-     table (the info and length lines stack, on top of 32px pager buttons), which is three rows the
-     user can't see. @see compactControls in the definition */
-}
 .dataTables_wrapper .toolbar {
   display: flex;
   align-items: baseline;
@@ -1583,6 +1573,11 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
   align-items: center;
   gap: 8px;
   margin-right: 12px;
+}
+.dataTables_wrapper {
+  /* The variant grids trade control chrome for rows: default Bootstrap sizing puts ~60px under the
+     table (the info and length lines stack, on top of 32px pager buttons), which is three rows the
+     user can't see. @see compactControls in the definition */
 }
 .dataTables_wrapper.dt-compact .bottom .showing {
   display: flex;
@@ -1657,6 +1652,17 @@ div.dataTables_wrapper div.dataTables_filter label {
   font-weight: 600;
 }
 
+.admin-only:before,
+li.admin a:before,
+h3.admin:before {
+  font-family: "Font Awesome 6 Free", "FontAwesome";
+  font-size: 0.98rem;
+  content: "\f084";
+  right: 1rem;
+  top: 0.5rem;
+  color: #555;
+  margin-right: 4px;
+}
 .admin-only,
 li.admin a,
 h3.admin {
@@ -1667,17 +1673,6 @@ h3.admin {
   background-repeat: no-repeat;
   padding-left: 28px !important;
    */
-}
-.admin-only:before,
-li.admin a:before,
-h3.admin:before {
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
-  font-size: 0.98rem;
-  content: "\f084";
-  right: 1rem;
-  top: .5rem;
-  color: #555;
-  margin-right: 4px;
 }
 
 .box {
@@ -1878,7 +1873,6 @@ select[disabled] {
     transform: rotate(360deg);
   }
 }
-
 .list-group-item .user-award {
   text-shadow: #fff 0px 0 4px;
 }
@@ -2014,11 +2008,11 @@ hr.dashed {
   padding-left: 20px;
 }
 
-label {
-  margin-bottom: 0;
-}
 label.form-check-label, label[for] {
   cursor: pointer;
+}
+label {
+  margin-bottom: 0;
 }
 
 .inline-custom {
@@ -2038,7 +2032,7 @@ a.list-group-item-action {
   cursor: help;
 }
 .override:after {
-  content: '*';
+  content: "*";
   color: #bbbbbb;
 }
 
@@ -2063,11 +2057,11 @@ a.list-group-item-action {
   width: 100%;
 }
 
-.btn-toolbar > * {
-  height: 32px;
-}
 .btn-toolbar > *:not(:first-child) {
   margin-left: 10px;
+}
+.btn-toolbar > * {
+  height: 32px;
 }
 .btn-toolbar > * .btn {
   height: 32px;
@@ -2085,7 +2079,7 @@ a.list-group-item-action {
   margin-left: 10px;
 }
 .link-toolbar > *:not(:first-child)::before {
-  content: '|';
+  content: "|";
   margin-right: 10px;
   color: grey !important;
 }
@@ -2143,13 +2137,13 @@ a.list-group-item-action.list-group-item-light {
   position: relative;
 }
 .accordion.indicator-plus-before.round-indicator .card-header:before {
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   font-size: 12pt;
   content: "\f077";
   position: absolute;
   right: 1rem;
-  top: .5rem;
+  top: 0.5rem;
   color: #88b;
 }
 .accordion.indicator-plus-before.round-indicator .card-header.collapsed:before {
@@ -2157,7 +2151,7 @@ a.list-group-item-action.list-group-item-light {
   color: #88b;
 }
 .accordion.indicator-plus-before .card-header:before {
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f068";
   position: absolute;
@@ -2259,8 +2253,8 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
   z-index: 100;
   position: absolute;
   left: -16px;
-  content: '\f056';
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  content: "\f056";
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
 }
 
@@ -2297,14 +2291,14 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
   padding: 0 4px 0 4px;
 }
 
-label[for="id_hpo"],
+label[for=id_hpo],
 .hp,
 .hpo {
   background-color: #FF8C00;
   border-color: #FF8C00;
 }
 
-label[for="id_omim"],
+label[for=id_omim],
 .omim > a,
 .omim {
   background-color: #22529e;
@@ -2317,7 +2311,7 @@ span.select2 .omim {
   color: #444 !important;
 }
 
-label[for="id_mondo"],
+label[for=id_mondo],
 .mondo {
   background-color: #cce34c;
   border-color: #cce34c;
@@ -2373,7 +2367,7 @@ ul.compact li:before {
   text-rendering: auto;
   font-size: 0.4rem;
   font-weight: 900;
-  font-family: 'Font Awesome 6 Free';
+  font-family: "Font Awesome 6 Free";
   content: "\f111";
   line-height: 0;
 }
@@ -2529,7 +2523,6 @@ ul.compact li:before {
   border-radius: 4px;
   background-color: #F1F3F5 !important;
 }
-
 .install-instructions.not-installed {
   background-color: #F0D9ED !important;
 }
@@ -2656,7 +2649,7 @@ div.dataTables_processing div {
   border-radius: 4px;
 }
 div.dataTables_processing div::before {
-  content: 'Processing...';
+  content: "Processing...";
   color: #444;
 }
 div.dataTables_processing div * {
@@ -2693,7 +2686,7 @@ li.help-item :last-child {
   font-style: normal;
   font-variant: normal;
   text-rendering: auto;
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   content: "\f05a";
   opacity: 0.4;
@@ -2706,7 +2699,7 @@ li.help-item :last-child {
   color: #446644;
 }
 .quoted::before, .quoted::after {
-  content: "\"";
+  content: '"';
   font-weight: normal;
   opacity: 0.5;
 }
@@ -2744,8 +2737,7 @@ li.help-item :last-child {
 }
 
 .file-type-icon-bed {
-  color: #8a6d3b;
-  /* .IntersectionNode's --node-accent-color, which is scoped to the node card */
+  color: #8a6d3b; /* .IntersectionNode's --node-accent-color, which is scoped to the node card */
 }
 
 .file-type-icon-muted {
@@ -2781,8 +2773,7 @@ li.help-item :last-child {
 }
 
 .file-type-badge-gene, .file-type-badge-gene-list {
-  background-color: #6b3fa0;
-  /* .GeneListNode's --node-accent-color */
+  background-color: #6b3fa0; /* .GeneListNode's --node-accent-color */
 }
 
 /* Blackens a member of the Duo/Trio/Quad pedigree symbols - see --pedigree-*-fill in
@@ -2939,7 +2930,7 @@ body.dt-col-resizing {
 
 .gnomad-flag-label {
   display: inline;
-  padding: .2em .6em .3em;
+  padding: 0.2em 0.6em 0.3em;
   font-size: 75%;
   font-weight: bold;
   line-height: 1;
@@ -2947,7 +2938,7 @@ body.dt-col-resizing {
   text-align: center;
   white-space: nowrap;
   vertical-align: baseline;
-  border-radius: .25em;
+  border-radius: 0.25em;
   background-color: #5cb85c;
 }
 
@@ -3073,7 +3064,7 @@ a.clinical-context {
 }
 
 .sequencer-name-text {
-  font-size: .6em;
+  font-size: 0.6em;
 }
 
 .color-box {
@@ -3161,7 +3152,7 @@ a.clinical-context {
   margin-bottom: 0;
 }
 .citation .loading {
-  opacity: 1.0;
+  opacity: 1;
 }
 .citation.failed {
   background-color: #ffcccc;
@@ -3315,16 +3306,16 @@ a.clinical-context {
   padding: 4px;
   border-radius: 6px;
   background-color: #ddbbdd;
-    /*
-    all testing contexts other than Germline are somatic
+  /*
+  all testing contexts other than Germline are somatic
 
-    NON_CANCER = "N", "Non-Cancer Somatic"
-    HAEMATOLOGY = "H", "Haematology"
-    SOLID_TUMOR = "S", "Solid Tumour"
-    OTHER = "O", "Other" # FIXME Somatic Other
-    GERMLINE = "G", "Germline"
-    UNKNOWN = "U", "Unknown"
-     */
+  NON_CANCER = "N", "Non-Cancer Somatic"
+  HAEMATOLOGY = "H", "Haematology"
+  SOLID_TUMOR = "S", "Solid Tumour"
+  OTHER = "O", "Other" # FIXME Somatic Other
+  GERMLINE = "G", "Germline"
+  UNKNOWN = "U", "Unknown"
+   */
   color: #FFF;
   font-weight: bold;
 }
@@ -3460,7 +3451,6 @@ a .c-hgvs-body .c-hgvs-nomen {
   border: 1px solid rgba(255, 255, 255, 0.4);
   font-weight: 600;
 }
-
 .cs-none {
   border: none !important;
   background-color: #eeeeee;
@@ -3613,10 +3603,23 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #888;
 }
 .comment:before {
-  content: '\f27a';
-  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  content: "\f27a";
+  font-family: "Font Awesome 6 Free", "FontAwesome";
   font-weight: 900;
   padding-right: 8px;
+}
+
+table.overlaps tbody tr td {
+  height: 70px;
+}
+table.overlaps .dt-classification {
+  width: 280px;
+}
+table.overlaps .dt-testing_context {
+  width: 100px;
+}
+table.overlaps .dt-summary {
+  width: 400px;
 }
 
 table.overlap-summary th.overlap-lab {
