@@ -685,6 +685,7 @@ def view_genomic_intervals(request, genomic_intervals_collection_id):
 
     form = forms.GenomicIntervalsCollectionForm(request.POST or None, instance=gic)
     if request.method == "POST":
+        gic.check_can_write(request.user)
         valid = form.is_valid()
         if valid:
             gic = form.save()

@@ -9,6 +9,11 @@ from library.utils import format_called_process_error
 from upload.models import UploadPipeline
 
 
+class ImportRequiresUserInputException(Exception):
+    """ Raise from ImportTask.process_items when the file can't finish importing until the user sets
+        something it doesn't declare (eg a BED file's genome build) - the message says what """
+
+
 class ImportTask(Task):
     """ Subclass this to be able to perform imports """
     abstract = True
@@ -38,6 +43,8 @@ class ImportTask(Task):
             upload_pipeline.success(items_processed,
                                     processing_seconds_wall_time=processing_seconds_wall_time,
                                     processing_seconds_cpu_time=processing_seconds_cpu_time)
+        except ImportRequiresUserInputException as e:
+            upload_pipeline.terminate_early_for_user_input(str(e))
         except subprocess.CalledProcessError as e:
             error_message = format_called_process_error(e)
         except:

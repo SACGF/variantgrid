@@ -175,6 +175,12 @@ class UploadData(models.Model):
         """ Dict for displaying upload widget """
         return {}
 
+    @property
+    def requires_user_input(self) -> bool:
+        """ The import is waiting for the user to set something the file didn't declare (eg the genome build)
+            on the data's page (get_data_url), which finishes the import """
+        return False
+
     def get_data_url(self) -> Optional[str]:
         if data := self.get_data():
             if get_absolute_url := getattr(data, "get_absolute_url", None):
@@ -254,7 +260,9 @@ class UploadPipeline(models.Model):
         create_event(user, f"import_{self.file_type}_start")
 
     def success(self, items_processed=None, processing_seconds_wall_time=None, processing_seconds_cpu_time=None):
-        if self.progress_status == UploadPipeline.INITIAL_PROGRESS_STATUS:
+        # TERMINATED_EARLY: stopped for user input, now finished from the data's page - drop "Requires input"
+        waiting_for_user = self.status == ProcessingStatus.TERMINATED_EARLY
+        if waiting_for_user or self.progress_status == UploadPipeline.INITIAL_PROGRESS_STATUS:
             self.progress_status = 'Success'
         self.status = ProcessingStatus.SUCCESS
         self.items_processed = items_processed
@@ -267,6 +275,13 @@ class UploadPipeline(models.Model):
         if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
             self.remove_processing_files()
             self.remove_generated_input_file()
+
+    def terminate_early_for_user_input(self, message: str):
+        """ Stop until the user sets what the import couldn't work out - the data's page restarts or finishes
+            it. Steps still to run see status != PROCESSING and skip """
+        self.status = ProcessingStatus.TERMINATED_EARLY
+        self.progress_status = f"Requires input: {message}"
+        self.save()
 
     def error(self, error_message):
         # FIXME remove this, cause of error might not be the most recent exception
@@ -508,6 +523,10 @@ class UploadedVCF(UploadData):
 
     def get_data(self) -> VCF:
         return self.vcf
+
+    @property
+    def requires_user_input(self) -> bool:
+        return self.vcf is not None and self.vcf.import_status == ImportStatus.REQUIRES_USER_INPUT
 
     @property
     def genome_build(self) -> Optional[GenomeBuild]:

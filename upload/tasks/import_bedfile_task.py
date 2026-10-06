@@ -12,13 +12,14 @@ from snpdb.models import (
     ImportStatus,
 )
 from upload.models import UploadedBed
-from upload.tasks.import_task import ImportTask
+from upload.tasks.import_task import ImportRequiresUserInputException, ImportTask
 from variantgrid.celery import app
 
 
 class ImportBedFileTask(ImportTask):
     """ It's not always possible to know what genome build a bed file is, so this may
-        not be able to complete the processing (leaving at import_status REQUIRES_USER_INPUT) """
+        not be able to complete the processing (leaving at import_status REQUIRES_USER_INPUT and the
+        pipeline TERMINATED_EARLY until the build is set on the GenomicIntervalsCollection page) """
 
     def process_items(self, file_upload):
         logging.debug("ImportBedFileTask: process items")
@@ -35,15 +36,16 @@ class ImportBedFileTask(ImportTask):
 
         bed_file = file_upload.get_filename()
         genome_build = self._get_genome_build(user, bed_file)
-        if genome_build:
-            genomic_intervals_collection.genome_build = genome_build
-            uploaded_bed.process_bed_file()
-            processed_records = genomic_intervals_collection.processed_records
-        else:
+        if not genome_build:
             genomic_intervals_collection.import_status = ImportStatus.REQUIRES_USER_INPUT
-            processed_records = 0  # Ok, will load after user input
+            genomic_intervals_collection.save()
+            msg = "Couldn't determine genome build - set it on the genomic intervals page"
+            raise ImportRequiresUserInputException(msg)
+
+        genomic_intervals_collection.genome_build = genome_build
+        uploaded_bed.process_bed_file()
         genomic_intervals_collection.save()
-        return processed_records
+        return genomic_intervals_collection.processed_records
 
     @staticmethod
     def _get_genome_build(user: User, bed_filename) -> Optional[GenomeBuild]:

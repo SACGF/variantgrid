@@ -12,7 +12,7 @@ from library.utils import full_class_name
 from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus, ProcessingStatus, VariantsType
+from snpdb.models.models_enums import ImportStatus, VariantsType
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from snpdb.tasks.somalier_tasks import somalier_vcf_id
 from snpdb.variant_zygosity_count import (
@@ -69,9 +69,8 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
             vcf.import_status = ImportStatus.REQUIRES_USER_INPUT
             vcf.save()
 
-            # Make other tasks get skipped...
-            upload_pipeline.status = ProcessingStatus.TERMINATED_EARLY
-            upload_pipeline.save()
+            msg = "Couldn't determine genome build - set it on the VCF page"
+            upload_pipeline.terminate_early_for_user_input(msg)
             return
 
         # If past this point - we have VCF w/genome build
