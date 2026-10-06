@@ -1071,6 +1071,8 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
         "classification_grouping": grouping,
         "sample_records": sample_records[::-1],
         "other_records": other_records,
+        # from the cached count, so it agrees with the grid row's "N records" while the grouping is dirty
+        "other_record_count": grouping.classification_count - len(sample_records),
         "overlaps": overlaps
     })
 
