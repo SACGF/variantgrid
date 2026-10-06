@@ -1221,6 +1221,11 @@ def band_call(value: float, bands: list) -> Optional[str]:
     return None
 
 
+def top_band_call(bands: list) -> Optional[str]:
+    """ The call of the highest band - MSI-High, GIS POSITIVE """
+    return max(bands, key=lambda band: band[0])[1] if bands else None
+
+
 def describe_bands(bands: list, unit: str) -> str:
     """ The policy in words, as the build form shows it - 'MSI-High >= 30%, MSI-Low >= 10%, MSS < 10%' """
     ordered = sorted(bands, key=lambda band: band[0], reverse=True)
@@ -1243,7 +1248,7 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
         sheet's Sample_ID - each left null until it exists and reconciled after. The specimen is claimed
         by the accession inside the sample IDs.
 
-        The lab's MSI / TMB calls are computed from the TSO500_*_CALL_BANDS settings when read rather than
+        The lab's MSI / TMB / GIS calls are computed from the TSO500_*_CALL_BANDS settings when read rather than
         stored: this row is never overwritten by a later analysis, and a CaseReport snapshots what it printed. """
     sequencing_run_name = models.TextField()        # the upload's 'sequencing_run' metadata - a SequencingRun.name
     pair_id = models.TextField()                    # [Analysis Details] Pair ID
@@ -1316,7 +1321,10 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
                 msi = f"{msi} ({self.msi_call.call})"
             parts.append(PreviewKeyValue(key="MSI", value=msi))
         if self.genomic_instability_score is not None:
-            parts.append(PreviewKeyValue(key="GIS", value=f"{self.genomic_instability_score:g}"))
+            gis = f"{self.genomic_instability_score:g}"
+            if self.gis_call and self.gis_call.call:
+                gis = f"{gis} ({self.gis_call.call})"
+            parts.append(PreviewKeyValue(key="GIS", value=gis))
         return self.preview_with(identifier=self.pair_id, title=self.sequencing_run_name,
                                  summary_extra=parts)
 
@@ -1343,9 +1351,38 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
             return None
         threshold = f"{describe_bands(bands, '%')} unstable sites, needs >= {min_usable_sites} usable sites"
         source = "settings.TSO500_MSI_CALL_BANDS / settings.TSO500_MSI_MIN_USABLE_SITES"
+        if min_high_tumor_fraction := settings.TSO500_MSI_HIGH_MIN_TUMOR_FRACTION:
+            threshold += f", {top_band_call(bands)} needs tumour fraction >= {min_high_tumor_fraction:g}"
+            source += " / settings.TSO500_MSI_HIGH_MIN_TUMOR_FRACTION"
         if self.usable_msi_sites is None or self.usable_msi_sites < min_usable_sites:
             return MeasureCall(None, threshold, source)
-        return MeasureCall(band_call(self.percent_unstable_msi_sites, bands), threshold, source)
+        call = band_call(self.percent_unstable_msi_sites, bands)
+        # A run without the HRD arm has no tumour fraction to hold the call to
+        if call == top_band_call(bands) and self._tumor_fraction_below(min_high_tumor_fraction):
+            call = None
+        return MeasureCall(call, threshold, source)
+
+    @property
+    def gis_call(self) -> Optional[MeasureCall]:
+        """ The lab's HRD category off the Genomic Instability Score. A low score is not evaluable at low
+            purity - the instability may be diluted out - while a high one stands whatever the purity """
+        bands = settings.TSO500_GIS_CALL_BANDS
+        if not bands or self.genomic_instability_score is None:
+            return None
+        threshold = describe_bands(bands, "")
+        source = "settings.TSO500_GIS_CALL_BANDS"
+        if min_tumor_fraction := settings.TSO500_GIS_MIN_TUMOR_FRACTION:
+            threshold += f", below {top_band_call(bands)} needs tumour fraction >= {min_tumor_fraction:g}"
+            source += " / settings.TSO500_GIS_MIN_TUMOR_FRACTION"
+        call = band_call(self.genomic_instability_score, bands)
+        if call != top_band_call(bands) and self._tumor_fraction_below(min_tumor_fraction):
+            call = None
+        return MeasureCall(call, threshold, source)
+
+    def _tumor_fraction_below(self, min_tumor_fraction: Optional[float]) -> bool:
+        """ Only a known tumour fraction under a set minimum holds a call back """
+        return min_tumor_fraction is not None and self.tumor_fraction is not None \
+            and self.tumor_fraction < min_tumor_fraction
 
     @property
     def tmb_call(self) -> Optional[MeasureCall]:
@@ -1357,9 +1394,11 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
                            "settings.TSO500_TMB_CALL_BANDS")
 
     def measure_call(self, context_key: str) -> Optional[MeasureCall]:
-        """ The call for a CVO_MEASURE_CONTEXT_KEYS key - MSI and TMB are the two the lab has a policy for """
+        """ The call for a CVO_MEASURE_CONTEXT_KEYS key - MSI, TMB and GIS are the ones the lab has a policy for """
         if context_key == "msi":
             return self.msi_call
+        if context_key == "gis":
+            return self.gis_call
         if context_key == "tmb":
             return self.tmb_call
         return None
