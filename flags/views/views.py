@@ -310,8 +310,8 @@ class FlagHelper:
                 # maybe replace it with a hook that can alter the information?
                 if not (settings.CLINVAR_EXPORT or {}).get("mode") and flag_type.pk == "classification_not_public":
                     # this disables anyone from raising a new flag of this type, but wont break any existing flags
-                    json_entry["permission"] = FlagPermissionLevel.SYSTEM
-                    json_entry["raise_permission"] = FlagPermissionLevel.SYSTEM
+                    json_entry["permission"] = FlagPermissionLevel.SYSTEM.level
+                    json_entry["raise_permission"] = FlagPermissionLevel.SYSTEM.level
                     json_entry["comments_enabled"] = False
 
                 flag_types.append(json_entry)
