@@ -81,7 +81,7 @@ class AmpTierTest(TestCase):
 
 class AmplificationMagnitudeTest(TestCase):
     """ copy_number is the caller's absolute count, fold_change its ratio against the normal - an
-        amplification may carry either or both, and a template prints what it has """
+        amplification may carry either or both, and a gain with only a ratio has its copies estimated """
 
     def test_both_reach_the_context_the_templates_read(self):
         amplification = fake_report_variant("ZGENE", copy_number=12, fold_change=5.22,
@@ -94,11 +94,21 @@ class AmplificationMagnitudeTest(TestCase):
         self.assertEqual(12, as_dict["copy_number"])
         self.assertEqual(5.22, as_dict["fold_change"])
 
-    def test_a_ratio_only_call_has_no_copy_number(self):
-        amplification = fake_report_variant("ZGENE", fold_change=4.31428,
+    def test_a_ratio_only_gain_estimates_copies_against_a_diploid_normal(self):
+        amplification = fake_report_variant("ZGENE", fold_change=2.5,
                                             variant=fake_gene_level_variant("<GAIN:HGNC:9>"))
-        self.assertIsNone(amplification.copy_number)
-        self.assertEqual(4.31428, amplification.fold_change)
+        self.assertEqual(5, amplification.copy_number)
+        self.assertEqual(2.5, amplification.fold_change)
+
+    def test_a_ratio_only_loss_has_no_copy_number(self):
+        loss = fake_report_variant("ZGENE", fold_change=0.4,
+                                   variant=fake_gene_level_variant("<LOSS:HGNC:9>"))
+        self.assertIsNone(loss.copy_number)
+
+    def test_the_callers_count_wins_over_the_estimate(self):
+        amplification = fake_report_variant("ZGENE", copy_number=12, fold_change=2.5,
+                                            variant=fake_gene_level_variant("<GAIN:HGNC:9>"))
+        self.assertEqual(12, amplification.copy_number)
 
 
 class ReportVariantKindTest(TestCase):

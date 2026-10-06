@@ -235,6 +235,14 @@ def _as_int(value) -> Optional[int]:
         return None
 
 
+def _estimated_copy_number(kind: str, copy_number: Optional[int], fold_change: Optional[float]) -> Optional[int]:
+    """ The caller's count, else for a gain twice its ratio - the ratio is against a diploid normal, so a
+        fold change of 2.5 is 5 copies. Rounded half up, as the document's VAF is """
+    if copy_number is not None or kind != ReportVariantKind.COPY_NUMBER or fold_change is None:
+        return copy_number
+    return int((Decimal(str(fold_change)) * 2).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 @dataclass
 class ReportVariant:
     """ One classification as the report prints it """
@@ -248,7 +256,7 @@ class ReportVariant:
     amp_tier: str
     tier_rank: int
     vaf: Optional[float]  # allele_frequency, as a fraction
-    copy_number: Optional[int]
+    copy_number: Optional[int]  # copy_number key, else estimated from a gain's fold_change
     fold_change: Optional[float]  # fold_change key, as the caller wrote it
     reported: bool
     sample: Optional[Sample]
@@ -264,6 +272,7 @@ class ReportVariant:
         tier_label, warnings = amp_tier(record)
         if reported is None:
             reported = record.get(SpecialEKeys.VARIANT_REPORTED) != NOT_REPORTED
+        fold_change = _as_float(record.get(SpecialEKeys.FOLD_CHANGE))
         return ReportVariant(
             modification=record,
             kind=kind,
@@ -275,8 +284,8 @@ class ReportVariant:
             amp_tier=tier_label,
             tier_rank=AMP_TIER_RANK.get(tier_label, UNTIERED_RANK),
             vaf=_as_float(record.get(SpecialEKeys.ALLELE_FREQUENCY)),
-            copy_number=_as_int(record.get(SpecialEKeys.COPY_NUMBER)),
-            fold_change=_as_float(record.get(SpecialEKeys.FOLD_CHANGE)),
+            copy_number=_estimated_copy_number(kind, _as_int(record.get(SpecialEKeys.COPY_NUMBER)), fold_change),
+            fold_change=fold_change,
             reported=reported,
             sample=record.classification.sample,
             evidence=evidence if evidence is not None else evidence_row_data(record, user),
