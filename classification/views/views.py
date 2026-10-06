@@ -207,6 +207,7 @@ def classifications(request):
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
+        "sample_form": SampleChoiceForm(),
         "lab_form": lab_form,
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
@@ -1058,8 +1059,20 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
         pk__in=skews.values_list('overlap')
     )))
 
+    # Expanded from the grid while it's filtered to a sample - lead with that sample's records, which may be older
+    # than the most recent 10 shown otherwise
+    sample_records = []
+    other_records = grouping.classification_modifications
+    if settings.CLASSIFICATION_GRID_SHOW_SAMPLE and (sample_id := request.GET.get("sample")):
+        sample_records = [record for record in other_records if str(record.classification.sample_id) == sample_id]
+        other_records = [record for record in other_records if record not in sample_records]
+
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping,
+        "sample_records": sample_records[::-1],
+        "other_records": other_records,
+        # from the cached count, so it agrees with the grid row's "N records" while the grouping is dirty
+        "other_record_count": grouping.classification_count - len(sample_records),
         "overlaps": overlaps
     })
 
