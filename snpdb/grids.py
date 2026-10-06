@@ -757,7 +757,13 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
         # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
-        return qs.annotate(**self._get_grid_only_annotation_kwargs())
+        # Never redefine an alias the base queryset already carries - the columns have to read the join the
+        # rows were filtered on. A node can widen its cohort genotype join to the common collection, and
+        # re-annotating that alias with the grid's own condition adds a second join whose rows come up blank
+        # for everything the node took from the common collection @see #2074
+        grid_kwargs = self._get_grid_only_annotation_kwargs()
+        already_annotated = qs.query.annotations.keys() | qs.query._filtered_relations.keys()
+        return qs.annotate(**{k: v for k, v in grid_kwargs.items() if k not in already_annotated})
 
     def _get_grid_only_annotation_kwargs(self) -> dict:
         """ Things not used in counts etc - only to display grid """
