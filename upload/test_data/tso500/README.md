@@ -32,8 +32,10 @@ two nucleic-acid extractions taken from it — so the two arm directories are th
 RNA extractions. The pair is **the patient**, not the specimen: the pair ID carries the Omico C-number
 (`Patient.patient_code`), written either as the whole pair sample name (`5_C0000001_FCUP_2600000001`) or
 as the C-number on its own (`C0000001`) - the lab's pipeline chooses inconsistently, so both forms turn up
-in the same feed and `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads either. The sample IDs are
-`SA-<C-number>-<accession><container>-<D|R>`, eg `SA-C23755-2535115161C-D`. A patient re-analysed later
+in the same feed and `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads either. The pair ID is
+`<index>_<C-number>_<initials>_<accession>` and the sample IDs are
+`<index>_MO_TSO_<DNA|RNA>_<C-number>_<initials>_<accession><container>`, eg
+`3_MO_TSO_DNA_C0000001_FCUP_2600000001C` (invented, of the real shape). A patient re-analysed later
 comes back under the same C-number with a new accession, so one pair ID spans specimens. The test files keep the older synthetic sample names
 because a CVO's DNA/RNA Sample IDs have to equal the VCF sample names they link to; the pair ID
 (`C0000001`) has the real shape.
@@ -77,8 +79,10 @@ replaced, so:
 - `[Fusions]` is every `KeepFusion = True` row of `AllFusions.csv`: gene pair joined with `-` where
   the caller knew the direction, supporting reads as `upload/tso500/dragen_all_fusions_parser.py`
   sums them, and `Ref A Dedup` / `Ref B Dedup` as the two reference counts.
-- `[Gene Amplifications]` is the `cnv.vcf` `<DUP>` segments with `SM` ≥ 1.5, to three decimals. The
-  cutoff is a guess at the caller's; Illumina does not publish it.
+- `[Gene Amplifications]` is the `cnv.vcf` `<DUP>` segments with `SM` ≥ 1.5, to three decimals - the
+  2.1.1 section, made up to fill it. 2.6 replaces it with `[Copy Number Variants]`, which is every
+  `cnv.vcf` record with `FILTER=PASS` and ALT `<DUP>` or `<DEL>`, losses included and with no ratio
+  cutoff; a lab's reporting threshold (MO's fold change of 2.5) is applied in the analysis, not here.
 - `[Small Variants]` is one row, the first `PASS` record of the fuzzed `hard-filtered.vcf` with its
   HGVS recomputed at the shifted position. The section is the reportable subset of that VCF and is
   **not** what small variants are loaded from - see the upload table below.
@@ -86,9 +90,9 @@ replaced, so:
   with the constructed `_DragenExonCNV.vcf` records on purpose.
 - TMB, MSI and GIS values are plausible and made up. `Coding Region Size in Megabases` is the
   panel constant.
-- Module 2.1.1 writes `[Exon-Level CNVs]`; 2.6 documents that section as `Large Rearrangements` and
-  adds `Gene-level Loss of Heterozygosity`. A loader keys on section names, and tolerates a section
-  it does not know.
+- The sections are 2.1.1's. DRAGEN 2.6 names the copy number ones `[Copy Number Variants]`,
+  `[Large Rearrangements]` (2.1.1's `[Exon-Level CNVs]`) and `[Loss of Heterozygosity]`. A loader
+  keys on section names, and tolerates a section it does not know.
 
 **Some rows are reconstructions, not caller output:**
 

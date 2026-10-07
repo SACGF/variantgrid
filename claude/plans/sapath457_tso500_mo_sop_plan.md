@@ -1,7 +1,7 @@
 # TSO 500: import, filter and report the way Molecular Oncology's SOP does
 
 Written by Claude Opus 5.5 (claude-opus-5-5), 2026-10-06
-Status: in progress (§1 + tumour fraction landed #2097; §2, §3 in PR 2)
+Status: in progress (§1-3 landed #2097, #2098; §5 in GMP-TAU/NGS-pipelines#1397; §4, §7 in PR; §6 is UI data on the SA Path deployment)
 
 [sapath#457](https://github.com/SACGF/variantgrid_sapath/issues/457). SA Pathology's Molecular Oncology (MO) analyse
 TSO 500 (DRAGEN TSO 500 v2.6.2, GRCh37) by a controlled SOP, summarised in the sapath repo's

@@ -80,7 +80,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
 )
 
 # The lab accession DRAGEN carries through into the sample IDs: ten digits identifying the specimen
-# and a container suffix naming the extraction taken off it ('..._2600000001C', 'SA-C23755-2535115161C-D').
+# and a container suffix naming the extraction taken off it ('..._2600000001C', '3_MO_TSO_DNA_C0000001_FCUP_2600000001C').
 # The extraction half is what settings.PATIENT_EXTRACTION_SAMPLE_NAME_REGEX picks out of a VCF
 # sample name on deployments with nothing upstream to quote an identifier
 SAMPLE_ID_ACCESSION_PATTERN = re.compile(r"(?P<specimen>\d{10})(?P<container>[A-Za-z])")
