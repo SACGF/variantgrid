@@ -70,7 +70,7 @@ from variantopedia.interesting_nearby import (
     get_nearby_qs,
     get_nearby_summaries,
 )
-from variantopedia.variant_types import VARIANT_TYPE_COLUMNS, get_variant_type_rows
+from variantopedia.variant_types import format_bp, get_size_limits, get_variant_type_rows
 
 
 def variants(request, genome_build_name=None):
@@ -348,13 +348,11 @@ def search(request):
 
 def variant_types(request):
     context = {
-        "columns": VARIANT_TYPE_COLUMNS,
-        "rows": get_variant_type_rows(),
-        "symbolic_alt_size": settings.VARIANT_SYMBOLIC_ALT_SIZE,
-        "structural_variant_min_size": settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE,
+        "groups": get_variant_type_rows(),
+        "size_limits": get_size_limits(),
+        "symbolic_alt_size": format_bp(settings.VARIANT_SYMBOLIC_ALT_SIZE),
+        "structural_variant_min_size": format_bp(settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
         "annotsv_enabled": settings.ANNOTATION_ANNOTSV_ENABLED,
-        "liftover_max_length": settings.LIFTOVER_BCFTOOLS_MAX_LENGTH,
-        "liftover_symbolic": settings.LIFTOVER_BCFTOOLS_SYMBOLIC,
     }
     return render(request, "variantopedia/variant_types.html", context)
 
