@@ -225,6 +225,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
     "variant_wiki": False,
+    "variant_types": False,  # Storage/annotation by size is a VCF-import concern - Shariant imports classifications
     "canonical_transcripts": False,
 
     # Settings

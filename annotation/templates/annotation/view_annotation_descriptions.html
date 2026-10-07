@@ -353,7 +353,9 @@
     <ul>
     <li>To customise how these annotations appear in analysis grids, see <a class="hover-link" href="{% url 'custom_columns' %}">VariantGrid Columns</a><br>
     <li>To see an example of annotations in use, <a class="hover-link" href="{% url 'search' %}">search</a> for a variant in the top right box.
+    {% if url_name_visible.variant_types %}
     <li>Which annotation pipeline a variant goes through depends on its type and size - see <a class="hover-link" href="{% url 'variant_types' %}">Variant Types</a>. Columns marked "structural variants" are only filled by that pipeline.
+    {% endif %}
     </ul>
 
     <div>
