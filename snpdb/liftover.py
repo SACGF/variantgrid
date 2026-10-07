@@ -16,7 +16,10 @@ from django.db.models import Prefetch, QuerySet
 from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.guardian_utils import admin_bot
-from snpdb.bcftools_liftover import bcftools_pre_liftover_error_check
+from snpdb.bcftools_liftover import (
+    bcftools_liftover_variant_coordinate,
+    bcftools_pre_liftover_error_check,
+)
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import (
     AlleleConversionTool,
@@ -419,11 +422,12 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
 
     # Try tools that write other builds, then run conversion
     options = [
-        # Enabled, Tool Enum, Requires reference to match genome build
-        (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER, bcftools_pre_liftover_error_check),
+        # Enabled, Tool Enum, form of the coordinate the tool takes, Requires reference to match genome build
+        (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER,
+         bcftools_liftover_variant_coordinate, bcftools_pre_liftover_error_check),
     ]
 
-    for enabled, conversion_tool, check_liftover_errors in options:
+    for enabled, conversion_tool, tool_variant_coordinate, check_liftover_errors in options:
         if enabled:
             if conversion_tool in failed_tools:
                 continue  # Skip as already failed liftover method to desired build
@@ -432,12 +436,13 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
                 yield conversion_tool, None, variant_errors_str
                 continue
 
+            tool_vc = tool_variant_coordinate(variant_coordinate, source_genome_build)
             if check_liftover_errors is not None:
-                if error_message := check_liftover_errors(variant_coordinate, source_genome_build):
+                if error_message := check_liftover_errors(tool_vc, source_genome_build):
                     yield conversion_tool, None, error_message
                     continue
 
-            yield conversion_tool, variant_coordinate, None
+            yield conversion_tool, tool_vc, None
             break  # Just want 1st one
 
 

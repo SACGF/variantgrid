@@ -105,6 +105,11 @@ ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all 
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
 ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
+# A symbolic del/dup/inv shorter than this is annotated by the STANDARD pipeline, dumped to VEP as its
+# explicit sequence - gnomAD's short-variant callset has exact AFs for indels into the hundreds of bases,
+# where the STRUCTURAL_VARIANT pipeline only has gnomAD-SV overlap. Kept apart from
+# VARIANT_SYMBOLIC_ALT_SIZE so storage can change without re-annotating (#1358)
+ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE = 1000
 
 # Use pyBigWig as optimisation rather than VEP --custom (see #1657)
 ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED = True

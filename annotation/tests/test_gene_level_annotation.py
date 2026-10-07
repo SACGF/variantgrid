@@ -1,10 +1,8 @@
 """The GENE_LEVEL annotation pipeline - what makes gene lists and comp-het find a gene-level event."""
 from django.test import TestCase
 
-from annotation.annotation_version_querysets import (
-    get_queryset_for_annotation_version,
-    pipeline_type_variant_q,
-)
+from annotation.annotation_pipeline_routing import pipeline_type_variant_q
+from annotation.annotation_version_querysets import get_queryset_for_annotation_version
 from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (

@@ -3,7 +3,7 @@ import time
 from django.core.management.base import BaseCommand
 from django.db.models import Max
 
-from annotation.annotation_version_querysets import pipeline_type_variant_q
+from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines import blocking_pipeline_types
 from snpdb.archive import DataArchivedError

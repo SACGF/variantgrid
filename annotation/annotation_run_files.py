@@ -11,7 +11,9 @@ import os
 from bgzip import BGZipWriter
 from django.conf import settings
 
+from annotation.annotation_pipeline_routing import symbolic_annotated_as_small
 from library.utils.file_utils import name_from_filename
+from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variants_to_vcf import VARIANT_GRID_INFO_DICT, write_contig_sorted_values_to_vcf_file
 
 # Prefix of a run's scratch dir under settings.IMPORT_PROCESSING_DIR (where the bulk inserter writes the
@@ -36,8 +38,22 @@ def get_annotsv_dir(annotation_run) -> str:
     return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"annotsv_{annotation_run.pk}")
 
 
+def _small_symbolic_as_explicit(genome_build, sorted_values):
+    """ A symbolic del/dup/inv the STANDARD pipeline annotates goes to VEP as its sequence, so VEP and its
+        plugins match it as the small variant it is (@see annotation.annotation_pipeline_routing) """
+    for data in sorted_values:
+        alt = data["alt__seq"]
+        if symbolic_annotated_as_small(alt, data["svlen"]):
+            vc = VariantCoordinate(chrom=data["locus__contig__name"], position=data["locus__position"],
+                                   ref=data["locus__ref__seq"], alt=alt, svlen=data["svlen"])
+            explicit = vc.as_external_explicit(genome_build)
+            data = {**data, "locus__position": explicit.position, "locus__ref__seq": explicit.ref,
+                    "alt__seq": explicit.alt, "end": None, "svlen": None}
+        yield data
+
+
 def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False,
-                    samples=None) -> int:
+                    samples=None, small_symbolic_as_explicit=False) -> int:
     # We had an issue with writing accessions in VEP, so use chrom names and the default VEP fasta instead
     # @see https://github.com/Ensembl/ensembl-vep/issues/1635
     # Contigs are shared between builds (eg GRCh37/hg19) so the ordering join needs restricting to this
@@ -53,6 +69,10 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
     # of rows, and each is written and forgotten
     sorted_values = qs.values("id", chrom_key, "locus__position",
                               "locus__ref__seq", "alt__seq", "end", "svlen").iterator(chunk_size=10_000)
+    if small_symbolic_as_explicit:
+        if use_accession:
+            raise ValueError("small_symbolic_as_explicit reads the reference by contig name, not accession")
+        sorted_values = _small_symbolic_as_explicit(genome_build, sorted_values)
 
     # External dumps are written .vcf.gz (see AnnotationRun.get_dump_filename). bgzip rather than plain
     # gzip - reads anywhere gzip did, and tabix can index it, which is what lets a dump be the target of

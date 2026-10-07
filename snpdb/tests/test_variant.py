@@ -101,6 +101,7 @@ class VariantTestCase(TestCase):
         vc = VariantCoordinate(chrom="11", position=5247125, ref=ref, alt="T")
         self._test_coordinate_conversion(vc, self.grch37)
 
+    @override_settings(VARIANT_SYMBOLIC_ALT_SIZE=1000)  # The dup below is a real one of 999 bases
     def test_dup_threshold_matches_canonical_form(self):
         """ A dup of VARIANT_SYMBOLIC_ALT_SIZE - 1 bases is stored explicit (canonical form), so as_internal_symbolic
             - which Variant.qs_from_variant_coordinate looks up with - must leave it explicit too """

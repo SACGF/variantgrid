@@ -36,6 +36,8 @@ class AnnotationPipelineRunner(abc.ABC):
     # Sample names written into the dump as dummy heterozygous calls. None dumps sites-only, which is
     # what VEP takes - set by a pipeline whose tool rejects a VCF with no FORMAT column.
     dump_samples: list[str] = None
+    # Write a short symbolic del/dup/inv as its sequence (@see annotation.annotation_pipeline_routing)
+    dump_small_symbolic_as_explicit: bool = False
 
     def supports_genome_build(self, genome_build) -> bool:
         """ Whether this pipeline's tool can annotate this build at all. A tool only ships annotations for
@@ -116,7 +118,8 @@ class AnnotationPipelineRunner(abc.ABC):
             raise ValueError(f"Don't want to overwrite '{vcf_dump_filename}' which already exists!")
         mk_path_for_file(vcf_dump_filename)
         vcf_dump_count = write_qs_to_vcf(vcf_dump_filename, annotation_run.genome_build,
-                                         self.get_variants_qs(annotation_run), samples=self.dump_samples)
+                                         self.get_variants_qs(annotation_run), samples=self.dump_samples,
+                                         small_symbolic_as_explicit=self.dump_small_symbolic_as_explicit)
 
         annotation_run.dump_count = vcf_dump_count
         annotation_run.dump_end = timezone.now()

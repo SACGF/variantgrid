@@ -1,104 +1,159 @@
+"""
+Brings stored del/dup/inv variants into line with settings.VARIANT_SYMBOLIC_ALT_SIZE: explicit ones at or
+over it become symbolic, symbolic ones under it become explicit. Where both forms of a variant are stored
+(#982, #2109), the copy without genotypes is merged into the other - its allele, classifications, tags and
+ClinVar records moved across - and deleted.
+
+Run from migrations as a ManualOperation whenever the threshold changes (#1358). --dry-run reports the counts.
+"""
 from collections import Counter
 from functools import cache
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import ProtectedError, Q
 from django.db.models.functions import Length
 
-from annotation.models import AnnotationRangeLock, ClinVar
-from genes.hgvs import HGVSMatcher
-from snpdb.models import GenomeBuild, Locus, Sequence, Variant
+from annotation.annotation_pipeline_routing import EXPLICIT_SYMBOLIC_ALTS, pipeline_type_for_variant
+from annotation.models import AnnotationRangeLock, VariantAnnotation
+from library.utils import sha256sum_str
+from snpdb.models import AlleleConversionTool, GenomeBuild, Locus, Sequence, Variant, VariantAllele
 
 
 @cache
 def _get_sequence(seq: str) -> Sequence:
-    """ Sequences are created on first sight, so eg <DEL> won't exist yet on a legacy DB """
-    sequence, _ = Sequence.objects.get_or_create(seq=seq)
+    """ By hash - seq itself isn't indexed. Created on first sight, so eg <DEL> won't exist on a legacy DB """
+    sequence, _ = Sequence.objects.get_or_create(seq_sha256_hash=sha256sum_str(seq), defaults={"seq": seq})
     return sequence
 
 
-class Command(BaseCommand):
-    """
-        There was a bug where SVs were not converted to symbolic for a while in #982
+class _NotMerged(Exception):
+    pass
 
-        This will try and fix them
-    """
+
+class Command(BaseCommand):
     category = "one-off"
 
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true')
 
     def handle(self, *args, **options):
-        long_sequences = Sequence.objects.all().annotate(seq_length=Length("seq")).filter(seq_length__gte=1000)
-        # select_related as v.coordinate reads locus/contig/ref/alt
-        long_variants = Variant.objects.filter(Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences)) \
-            .select_related("locus__contig", "locus__ref", "alt")
-        print(f"Long variant count = {long_variants.count()}")
-
         dry_run = options["dry_run"]
-
         for genome_build in GenomeBuild.builds_with_annotation():
-            print(f"Genome build {genome_build}")
-            self._find_bad_symbolic_via_clinvar(dry_run, genome_build, "<DEL>")  # DELISN stored as DEL
-            self._find_bad_symbolic_via_clinvar(dry_run, genome_build, "<DUP>")  # INS stored as DUP
-
             stats = Counter()
-            matcher = HGVSMatcher.instance(genome_build)
-            q_contig = Variant.get_contigs_q(genome_build)
-            for v in long_variants.filter(q_contig):
-                vc = v.coordinate.as_internal_symbolic(genome_build)
+            for v in self._non_canonical_candidates(genome_build):
+                self._canonicalise(dry_run, genome_build, v, stats)
+            self._print_stats(f"{genome_build} variants around VARIANT_SYMBOLIC_ALT_SIZE="
+                              f"{settings.VARIANT_SYMBOLIC_ALT_SIZE}", stats)
 
-                try:
-                    old_hgvs = matcher.variant_coordinate_to_g_hgvs(v.coordinate)
-                    new_hgvs = matcher.variant_coordinate_to_g_hgvs(vc)
-                except Exception as e:
-                    stats[f"g.HGVS check skipped ({type(e).__name__})"] += 1
-                else:
-                    if old_hgvs != new_hgvs:
-                        stats["g.HGVS mismatch - old != new"] += 1
+    @staticmethod
+    def _non_canonical_candidates(genome_build):
+        """ Explicit variants with a sequence long enough to be symbolic, and symbolic ones short enough to
+            be explicit. Most explicit candidates are insertions or substitutions that stay as they are """
+        size = settings.VARIANT_SYMBOLIC_ALT_SIZE
+        long_sequences = Sequence.objects.annotate(seq_length=Length("seq")).filter(seq_length__gt=size)
+        q_explicit = Q(svlen__isnull=True) & (Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
+        q_short_symbolic = Q(alt__seq__in=EXPLICIT_SYMBOLIC_ALTS, svlen__gt=-size, svlen__lt=size)
+        # select_related as v.coordinate reads locus/contig/ref/alt
+        qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), q_explicit | q_short_symbolic)
+        return qs.select_related("locus__contig", "locus__ref", "alt").order_by("pk").iterator(chunk_size=1000)
 
-                if not vc.is_symbolic:
-                    stats["left explicit - no symbolic form"] += 1
-                    continue
+    def _canonicalise(self, dry_run: bool, genome_build, v: Variant, stats: Counter):
+        vc = v.coordinate
+        canonical = vc.as_internal_canonical_form(genome_build)
+        if canonical == vc:
+            stats["already canonical - no change"] += 1
+            return
 
-                try:
-                    existing = Variant.get_from_variant_coordinate(vc, genome_build)
-                    if v == existing:
-                        ref_length = len(v.locus.ref)
-                        if ref_length > 1:
-                            # It's already there as existing - but didn't have the ref trimmed down
-                            stats["ref trimmed on existing symbolic"] += 1
-                            if not dry_run:
-                                new_ref = _get_sequence(v.locus.ref.seq[0])
-                                v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=vc.position,
-                                                                      ref=new_ref)[0]
-                                v.end = vc.end
-                                v.save()
-                        else:
-                            stats["already symbolic - no change"] += 1
-                    else:
-                        # I think these came in via ClinVar import - so will try to get rid of it, if it isn't referenced
-                        # by anything else
-                        stats["merged into existing symbolic"] += 1
-                        if not dry_run:
-                            self._merge_variant_dupe(v, existing, stats)
-                except Variant.DoesNotExist:
-                    if len(vc.ref) > 1:
-                        raise ValueError(f"{v.pk} had ref length of {len(vc.ref)}")
+        direction = "symbolic" if canonical.is_symbolic else "explicit"
+        try:
+            twin = Variant.get_from_variant_coordinate(canonical, genome_build)
+        except Variant.DoesNotExist:
+            stats[f"converted to {direction}"] += 1
+            if not dry_run:
+                self._convert_in_place(v, canonical)
+            return
 
-                    stats[f"converted to {vc.alt}"] += 1
-                    if not dry_run:
-                        new_ref = _get_sequence(vc.ref)
-                        v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=vc.position, ref=new_ref)[0]
-                        v.alt = _get_sequence(vc.alt)
-                        v.svlen = vc.svlen
-                        v.end = vc.end  # Stored calculated field - nothing recalcs it on save
-                        v.save()
+        stats[f"merged with existing {direction} twin"] += 1
+        if not dry_run:
+            try:
+                self._merge_twins(genome_build, v, twin, canonical, stats)
+            except _NotMerged as e:
+                stats[f"NOT merged - {e}"] += 1
 
-            self._print_stats(f"{genome_build} long variants", stats)
+    @staticmethod
+    def _convert_in_place(v: Variant, canonical):
+        """ Same pk, so genotypes, annotation and range locks stay where they are. A converted variant
+            under ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE keeps its STANDARD annotation, as that is still
+            the pipeline it routes to """
+        v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=canonical.position,
+                                              ref=_get_sequence(canonical.ref))[0]
+        v.alt = _get_sequence(canonical.alt)
+        v.svlen = canonical.svlen
+        v.end = canonical.end  # Stored calculated field - nothing recalcs it on save
+        v.save()
 
-        # This will take ages on some systems...
-        # Locus.objects.filter(variant__isnull=True).delete()
+    def _merge_twins(self, genome_build, v: Variant, twin: Variant, canonical, stats: Counter):
+        """ Keep whichever has genotypes (the canonical twin if neither), move everything else onto it,
+            then delete the other. A kept non-canonical variant is converted once the twin is out of the way
+            of the (locus, alt, svlen) unique constraint """
+        v_has_genotypes = v.cohortgenotype_set.exists()
+        if v_has_genotypes and twin.cohortgenotype_set.exists():
+            raise _NotMerged("both have cohort genotype data")
+        if v_has_genotypes:
+            keep, dupe = v, twin
+        else:
+            keep, dupe = twin, v
+
+        with transaction.atomic():
+            self._move_allele(genome_build, keep, dupe)
+            self._move_records(keep, dupe)
+            AnnotationRangeLock.release_variant(dupe)
+            try:
+                dupe.delete()
+            except ProtectedError as e:
+                raise _NotMerged(f"protected ({e.protected_objects.model.__name__})") from e
+            if keep == v:
+                self._convert_in_place(keep, canonical)
+
+        annotated_by = set(VariantAnnotation.objects.filter(variant=keep)
+                           .values_list("annotation_run__pipeline_type", flat=True))
+        if annotated_by - {pipeline_type_for_variant(keep)}:
+            # The scheduler only annotates new pk ranges, so this stays as it is until a new annotation version
+            stats["kept variant annotated by a pipeline it no longer routes to"] += 1
+
+    @staticmethod
+    def _move_allele(genome_build, keep: Variant, dupe: Variant):
+        dupe_va = VariantAllele.objects.filter(variant=dupe, genome_build=genome_build).first()
+        if dupe_va is None:
+            return
+        keep_va = VariantAllele.objects.filter(variant=keep, genome_build=genome_build).first()
+        if keep_va is None:
+            dupe_va.variant = keep
+            dupe_va.save()
+        elif keep_va.allele != dupe_va.allele:
+            if not keep_va.allele.merge(AlleleConversionTool.SAME_CONTIG, dupe_va.allele):
+                raise _NotMerged("alleles could not be merged (both have ClinGen alleles)")
+
+    @staticmethod
+    def _move_records(keep: Variant, dupe: Variant):
+        """ What would block the delete (PROTECT) or be lost with it. Rows keyed on the variant alone -
+            annotation, genotype counts, caches - are recalculated or go with it """
+        if hasattr(dupe, "variantwiki"):
+            if hasattr(keep, "variantwiki"):
+                raise _NotMerged("both have a variant wiki")
+            dupe.variantwiki.variant = keep
+            dupe.variantwiki.save()
+        dupe.classification_set.update(variant=keep)
+        dupe.varianttag_set.update(variant=keep)
+        dupe.clinvar_set.update(variant=keep)
+        dupe.importedalleleinfo_set.update(matched_variant=keep)
+        dupe.resolvedvariantinfo_set.update(variant=keep)
+        dupe.modifiedimportedvariant_set.update(variant=keep)
+        dupe.createdmanualvariant_set.update(variant=keep)
+        dupe.variantcollectionrecord_set.update(variant=keep)
+        dupe.candidate_set.update(variant=keep)
 
     @staticmethod
     def _print_stats(label: str, stats: Counter):
@@ -107,52 +162,3 @@ class Command(BaseCommand):
             print("  (nothing)")
         for reason, count in stats.most_common():
             print(f"  {count}\t{reason}")
-
-    def _merge_variant_dupe(self, dupe_variant, original_variant, stats: Counter) -> int:
-        if dupe_variant.cohortgenotype_set.exists():
-            stats["NOT merged - has cohort genotype data"] += 1
-            return 0
-
-        dupe_variant.clinvar_set.all().update(variant=original_variant)
-        AnnotationRangeLock.release_variant(dupe_variant)
-        # Classification/Variant tags protects Variant FK, so won't delete if that exists
-        try:
-            dupe_variant.delete()
-            return 1
-        except Exception as e:
-            stats[f"NOT merged - protected ({type(e).__name__})"] += 1
-        return 0
-
-    def _find_bad_symbolic_via_clinvar(self, dry_run: bool, genome_build, alt_seq):
-        """ Due to VariantCoordinate.as_symbolic_variant bug - some historical data was incorrectly imported """
-
-        stats = Counter()
-
-        clinvar_variation_del = list(
-            ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq=alt_seq).values_list(
-                "clinvar_variation_id", flat=True))
-
-        clinvar_variation_original = {}
-
-        for cv in ClinVar.objects.filter(version__genome_build=genome_build,
-                                         clinvar_variation_id__in=clinvar_variation_del).exclude(
-                variant__alt__seq=alt_seq):
-            clinvar_variation_original[cv.clinvar_variation_id] = cv.variant
-
-        clinvar_variation_bad = {}
-        for cv in ClinVar.objects.filter(version__genome_build=genome_build,
-                                         clinvar_variation_id__in=clinvar_variation_original,
-                                         variant__alt__seq=alt_seq):
-            clinvar_variation_bad[cv.clinvar_variation_id] = cv.variant
-
-        if not clinvar_variation_bad:
-            return
-
-        for clinvar_variation_id, bad_variant in clinvar_variation_bad.items():
-            original_variant = clinvar_variation_original[clinvar_variation_id]
-            stats["merged into original representation"] += 1
-            if not dry_run:
-                self._merge_variant_dupe(bad_variant, original_variant, stats)
-
-        self._print_stats(f"{genome_build} clinvar {alt_seq} ({len(clinvar_variation_del)} records, "
-                          f"{len(clinvar_variation_bad)} bad)", stats)

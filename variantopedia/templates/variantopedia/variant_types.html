@@ -1,0 +1,76 @@
+{% extends "uicore/page/base.html" %}
+{% block title %}Variant Types{% endblock title %}
+
+{% block content %}
+    <div class="container-fluid">
+        <h3>Variant Types</h3>
+
+        <p>
+            How each kind of variant is stored, filtered, annotated, lifted over and registered, by size.
+            The table is worked out from this server's settings, by the same rules the code applies, so
+            it is accurate for this deployment.
+        </p>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Variant</th>
+                            <th>Size</th>
+                            {% for column in columns %}<th>{{ column }}</th>{% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                            <tr>
+                                <th>{{ row.kind }}</th>
+                                <td class="text-nowrap">{{ row.size }}</td>
+                                {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><b>Why these thresholds</b></div>
+            <div class="card-body">
+                <dl>
+                    <dt>Stored as symbolic from {{ symbolic_alt_size }}bp</dt>
+                    <dd>
+                        A deletion, duplication or inversion of {{ symbolic_alt_size }}bp or more is stored as a
+                        symbolic <code>&lt;DEL&gt;</code>/<code>&lt;DUP&gt;</code>/<code>&lt;INV&gt;</code> with a
+                        length (SVLEN) rather than its full sequence - {{ symbolic_alt_size }}bp is the usual
+                        definition of a structural variant. However it arrives (VCF, HGVS, symbolic or explicit),
+                        a variant has one stored form. Insertions that don't duplicate the sequence beside them
+                        have no symbolic form here and keep their sequence at any size.
+                    </dd>
+                    <dt>Annotated as a short variant below {{ structural_variant_min_size }}bp</dt>
+                    <dd>
+                        Annotation uses a separate, larger threshold. A symbolic variant under
+                        {{ structural_variant_min_size }}bp is still annotated by the short variant pipeline,
+                        given to VEP as its full sequence. gnomAD's short variant data has exact allele
+                        frequencies for indels into the hundreds of bases, while the structural variant pipeline
+                        can only match an overlapping gnomAD-SV call. From {{ structural_variant_min_size }}bp a
+                        variant is annotated as a structural variant: gene overlaps, gnomAD-SV
+                        {% if annotsv_enabled %}and AnnotSV{% endif %}, without the per-base scores (eg SpliceAI,
+                        CADD, dbNSFP) that only exist for short variants.
+                    </dd>
+                    <dt>Liftover</dt>
+                    <dd>
+                        BCFtools lifts variants of up to {{ liftover_max_length }}bp by their sequence, so a
+                        symbolic variant within that is written out in full for liftover.
+                        {% if not liftover_symbolic %}Longer symbolic variants are not lifted over by BCFtools on
+                        this server.{% endif %}
+                    </dd>
+                </dl>
+                <p class="text-muted mb-0">
+                    For what each annotation column means, see
+                    <a class="hover-link" href="{% url 'view_annotation_descriptions' %}">annotation descriptions</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

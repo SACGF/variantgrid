@@ -197,7 +197,9 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
         annotation_filter[f"variantannotation__{column}__isnull"] = False
     qs = qs.filter(**annotation_filter)
 
-    return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs)
+    # Matched by sequence against the source's file, like the STANDARD dump - an SV stays symbolic
+    return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs,
+                           small_symbolic_as_explicit=True)
 
 
 class _CSQPicker:

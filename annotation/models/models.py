@@ -36,6 +36,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from annotation.annotation_pipeline_routing import pipeline_type_for_variant
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.external_search_terms import (
     get_variant_pubmed_search_terms,
@@ -1308,12 +1309,7 @@ class AnnotationRun(TimeStampedModel):
 
     @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
-        if variant.is_gene_level:
-            pipeline_type = VariantAnnotationPipelineType.GENE_LEVEL
-        elif variant.is_symbolic:
-            pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
-        else:
-            pipeline_type = VariantAnnotationPipelineType.STANDARD
+        pipeline_type = pipeline_type_for_variant(variant)
         # For newly created variants, there will only be one per build for latest annotation version
         ar: Optional[AnnotationRun]
         ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,

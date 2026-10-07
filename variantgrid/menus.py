@@ -118,6 +118,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('manual_variant_entry', title="Enter Variants", pages=('watch_manual_variant_entry',)),
         MenuItem('variants', pages=('genome_build_variants',)),
         MenuItem('variant_wiki', title="Variant Wiki", pages=('genome_build_variant_wiki',)),
+        MenuItem('variant_types', title="Variant Types"),
     ), pages=('view_allele', 'view_allele_compact', 'view_variant', 'view_variant_genome_build',
               'view_variant_annotation_history', 'nearby_variants_annotation_version')),
     Menu('annotation', 'Annotation', 'annotation', items=(
