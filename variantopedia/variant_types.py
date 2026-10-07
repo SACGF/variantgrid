@@ -129,7 +129,7 @@ def _analysis_variant_type(vc: VariantCoordinate) -> str:
 
 
 def _annotation(vc: VariantCoordinate) -> tuple[str, str]:
-    pipeline_type = pipeline_type_for_alt(vc.alt, vc.svlen)
+    pipeline_type = pipeline_type_for_alt(vc.alt, vc.svlen, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE)
     if pipeline_type == VariantAnnotationPipelineType.STANDARD:
         return pipeline_type.label, "gnomAD - exact match"
     if settings.ANNOTATION_VEP_SV_MAX_SIZE and _length(vc) > settings.ANNOTATION_VEP_SV_MAX_SIZE:
@@ -201,7 +201,8 @@ def get_variant_type_rows() -> list[dict]:
             rows.append({"kind": kind.name, "size": _size_label(start, end), "cells": cells})
     if settings.VARIANT_GENE_LEVEL_ENABLED:
         gene_level_types = ", ".join(get_variant_type_label(t) for t in GENE_LEVEL_VARIANT_TYPES)
-        pipeline_type = pipeline_type_for_alt("", None, is_gene_level=True)
+        pipeline_type = pipeline_type_for_alt("", None, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE,
+                                          is_gene_level=True)
         # A gene id where a coordinate goes, the same in every build (@see snpdb.gene_level_variants)
         rows.append({"kind": "Gene-level event", "size": "",
                      "cells": ("Gene id + event", gene_level_types, pipeline_type.label, "-",

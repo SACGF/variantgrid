@@ -1,9 +1,11 @@
 import time
+from functools import cache
 
 from django.core.management.base import BaseCommand
 from django.db.models import Max
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
+from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines import blocking_pipeline_types
 from snpdb.archive import DataArchivedError
@@ -25,6 +27,7 @@ class Command(BaseCommand):
         total = uploaded_vcf_qs.count()
         self.stdout.write(f"Backfilling pipeline max-variant rows for {total} UploadedVCF(s)")
 
+        sv_min_size_for_build = cache(VariantAnnotationVersion.latest_structural_variant_min_size)
         processed = 0
         tally_interval_secs = 30
         last_tally = time.monotonic()
@@ -44,11 +47,12 @@ class Command(BaseCommand):
                 .filter(Variant.get_no_reference_q())
 
             max_by_pipeline_type = {}
-            sv_q = pipeline_type_variant_q(VariantAnnotationPipelineType.STRUCTURAL_VARIANT)
+            sv_min_size = sv_min_size_for_build(uploaded_vcf.vcf.genome_build)
+            sv_q = pipeline_type_variant_q(VariantAnnotationPipelineType.STRUCTURAL_VARIANT, sv_min_size)
             if variants_qs.filter(sv_q).exists():
                 # Mixed - pay the per-type scan
                 for pipeline_type in blocking_pipeline_types():
-                    q = pipeline_type_variant_q(pipeline_type)
+                    q = pipeline_type_variant_q(pipeline_type, sv_min_size)
                     max_id = variants_qs.filter(q).aggregate(m=Max("pk"))["m"]
                     if max_id is not None:
                         max_by_pipeline_type[pipeline_type.value] = max_id

@@ -113,14 +113,16 @@ class GeneLevelAnnotationTest(TestCase):
         return annotation_run
 
     def test_pipeline_type_claims_gene_level_only(self):
-        variant_qs = Variant.objects.filter(pipeline_type_variant_q(VariantAnnotationPipelineType.GENE_LEVEL))
+        variant_qs = Variant.objects.filter(pipeline_type_variant_q(VariantAnnotationPipelineType.GENE_LEVEL,
+                                                                 self.vav.structural_variant_min_size))
         self.assertIn(self.gene_fusion.variant, list(variant_qs))
 
     def test_vep_pipelines_do_not_claim_gene_level(self):
         """ svlen=0 makes a fusion look symbolic, so both VEP types have to subtract it explicitly """
         for pipeline_type in (VariantAnnotationPipelineType.STANDARD,
                               VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            variant_qs = Variant.objects.filter(pipeline_type_variant_q(pipeline_type))
+            q = pipeline_type_variant_q(pipeline_type, self.vav.structural_variant_min_size)
+            variant_qs = Variant.objects.filter(q)
             self.assertNotIn(self.gene_fusion.variant, list(variant_qs), pipeline_type)
 
     def test_writes_overlaps_for_both_partners(self):

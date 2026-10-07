@@ -10,6 +10,7 @@ from annotation.annotation_pipeline_routing import (
 )
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.fake_data import get_fake_annotation_version
+from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
@@ -23,12 +24,13 @@ STRUCTURAL = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
 
 
 class AnnotationPipelineRoutingTest(TestCase):
-    """ #1358 - a symbolic del/dup/inv under ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE is annotated as a small variant """
+    """ #1358 - a symbolic del/dup/inv under structural_variant_min_size is annotated as a small variant """
+    SV_MIN_SIZE = 1000
 
     @classmethod
     def setUpTestData(cls):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        get_fake_annotation_version(cls.grch37)
+        cls.annotation_version = get_fake_annotation_version(cls.grch37)
 
         def _symbolic(alt, svlen):
             vc = VariantCoordinate(chrom="3", position=128200125, ref="G", alt=alt, svlen=svlen)
@@ -48,16 +50,26 @@ class AnnotationPipelineRoutingTest(TestCase):
         qs = Variant.objects.filter(pk__in=[v.pk for v in self.expected])
         for pipeline_type in (STANDARD, STRUCTURAL):
             expected_ids = {v.pk for v, pt in self.expected.items() if pt == pipeline_type}
-            self.assertEqual(expected_ids, set(qs.filter(pipeline_type_variant_q(pipeline_type))
-                                               .values_list("pk", flat=True)), pipeline_type)
+            q = pipeline_type_variant_q(pipeline_type, self.SV_MIN_SIZE)
+            self.assertEqual(expected_ids, set(qs.filter(q).values_list("pk", flat=True)), pipeline_type)
         for variant, pipeline_type in self.expected.items():
-            self.assertEqual(pipeline_type, pipeline_type_for_variant(variant), variant)
+            self.assertEqual(pipeline_type, pipeline_type_for_variant(variant, self.SV_MIN_SIZE), variant)
+
+    def test_get_for_variant_routes_by_each_versions_cut_off(self):
+        """ A version pinned at a lower cut-off sent the short del to the SV pipeline """
+        vav = self.annotation_version.variant_annotation_version
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(structural_variant_min_size=50)
+        lock = AnnotationRangeLock.objects.create(version=vav, min_variant=self.short_del,
+                                                  max_variant=self.short_del, count=1)
+        for pipeline_type in (STANDARD, STRUCTURAL):
+            AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type)
+        self.assertEqual(STRUCTURAL, AnnotationRun.get_for_variant(self.short_del, self.grch37).pipeline_type)
 
     def test_dump_writes_short_symbolic_explicit(self):
         qs = Variant.objects.filter(pk__in=[self.short_del.pk, self.long_del.pk])
         with tempfile.TemporaryDirectory() as tmp_dir:
             vcf_filename = os.path.join(tmp_dir, "dump.vcf")
-            write_qs_to_vcf(vcf_filename, self.grch37, qs, small_symbolic_as_explicit=True)
+            write_qs_to_vcf(vcf_filename, self.grch37, qs, structural_variant_min_size=self.SV_MIN_SIZE)
             records = {r.INFO["variant_id"]: r for r in cyvcf2.VCF(vcf_filename)}
 
         short = records[self.short_del.pk]

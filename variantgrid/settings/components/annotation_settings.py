@@ -108,7 +108,8 @@ ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
 # A symbolic del/dup/inv shorter than this is annotated by the STANDARD pipeline, dumped to VEP as its
 # explicit sequence - gnomAD's short-variant callset has exact AFs for indels into the hundreds of bases,
 # where the STRUCTURAL_VARIANT pipeline only has gnomAD-SV overlap. Kept apart from
-# VARIANT_SYMBOLIC_ALT_SIZE so storage can change without re-annotating (#1358)
+# VARIANT_SYMBOLIC_ALT_SIZE so storage can change without re-annotating (#1358). Pinned on
+# VariantAnnotationVersion, so changing it makes a new version and re-annotates
 ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE = 1000
 
 # Use pyBigWig as optimisation rather than VEP --custom (see #1657)

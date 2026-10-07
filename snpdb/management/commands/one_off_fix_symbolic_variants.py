@@ -84,8 +84,8 @@ class Command(BaseCommand):
 
     @staticmethod
     def _convert_in_place(v: Variant, canonical):
-        """ Same pk, so genotypes, annotation and range locks stay where they are. A converted variant
-            under ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE keeps its STANDARD annotation, as that is still
+        """ Same pk, so genotypes, annotation and range locks stay where they are. A converted variant under
+            VariantAnnotationVersion.structural_variant_min_size keeps its STANDARD annotation, as that is still
             the pipeline it routes to """
         v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=canonical.position,
                                               ref=_get_sequence(canonical.ref))[0]
@@ -117,9 +117,10 @@ class Command(BaseCommand):
             if keep == v:
                 self._convert_in_place(keep, canonical)
 
-        annotated_by = set(VariantAnnotation.objects.filter(variant=keep)
-                           .values_list("annotation_run__pipeline_type", flat=True))
-        if annotated_by - {pipeline_type_for_variant(keep)}:
+        annotated_by = VariantAnnotation.objects.filter(variant=keep) \
+            .values_list("annotation_run__pipeline_type", "version__structural_variant_min_size")
+        if any(pipeline_type != pipeline_type_for_variant(keep, sv_min_size)
+               for pipeline_type, sv_min_size in annotated_by):
             # The scheduler only annotates new pk ranges, so this stays as it is until a new annotation version
             stats["kept variant annotated by a pipeline it no longer routes to"] += 1
 

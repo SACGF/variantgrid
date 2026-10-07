@@ -33,7 +33,8 @@ Patterns here:
 - Branch on pipeline via annotation/pipelines/__init__.py:PIPELINES (STANDARD, STRUCTURAL_VARIANT, GENE_LEVEL,
   ANNOTSV) and annotation/pipelines/base.py:AnnotationPipelineRunner (dump / annotate / import_results), not on
   pipeline_type. Which variants a type covers is annotation/annotation_pipeline_routing.py:pipeline_type_variant_q
-  (pipeline_type_for_variant for one): a symbolic del/dup/inv under ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE is
+  (pipeline_type_for_variant for one): a symbolic del/dup/inv under the VariantAnnotationVersion's
+  structural_variant_min_size (pinned from ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, so each version keeps its own) is
   STANDARD and dumped to VEP as its sequence, anything else symbolic is the SV pipeline, gene-level variants belong to
   neither VEP pipeline. Branch on the run's pipeline_type, never on variant.is_symbolic.
 - AnnotationRun.status is recomputed from its timestamp/error fields on every save

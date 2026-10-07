@@ -38,10 +38,6 @@ class VEPRunner(AnnotationPipelineRunner):
         return self.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
 
     @property
-    def dump_small_symbolic_as_explicit(self) -> bool:
-        return not self.is_structural_variant
-
-    @property
     def sv_conservation_enabled(self) -> bool:
         """ Whether this run must produce a pyBigWig conservation sidecar (#1657). """
         return self.is_structural_variant and settings.ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED
