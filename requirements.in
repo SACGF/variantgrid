@@ -37,7 +37,7 @@ drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
 gunicorn
-hgvs==1.5.7
+hgvs @ git+https://github.com/davmlaw/hgvs@ce8f8437aec9c630ee51d1568e2d3eca12c1da12  # fork until a biocommons release has biocommons/hgvs#899, #901 and #902 (#2103)
 html2docx
 ijson
 kombu
@@ -55,7 +55,7 @@ pandas
 ped_parser
 pillow>=12.3.0
 pronto>=2.4.7
-psycopg2
+psycopg[binary]
 pyBigWig>=0.3.22
 pypdf>=6.15.0
 pysam

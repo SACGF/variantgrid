@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 import celery
-import psycopg2
+import psycopg
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from celery.contrib.abortable import AbortableTask
@@ -66,7 +66,7 @@ def _clear_lease(node_id, version):
 
 def query_was_cancelled(e: OperationalError) -> bool:
     """ pg_cancel_backend (cancel_node_tasks) surfaces as OperationalError wrapping QueryCanceled """
-    return isinstance(e.__cause__, psycopg2.errors.QueryCanceled)
+    return isinstance(e.__cause__, psycopg.errors.QueryCanceled)
 
 
 def _backoff_node(node_id, version, analysis_id) -> bool:

@@ -6,7 +6,6 @@ from typing import Optional
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
-from hgvs.edit import Dup, Inv, NARefAlt
 from hgvs.exceptions import (
     HGVSDataNotAvailableError,
     HGVSError,
@@ -20,10 +19,8 @@ from hgvs.exceptions import (
     HGVSVerifyFailedError,
 )
 from hgvs.extras.babelfish import Babelfish
-from hgvs.location import Interval, SimplePosition
 from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
-from hgvs.posedit import PosEdit
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 from hgvs.variantmapper import VariantMapper
@@ -41,21 +38,11 @@ from genes.hgvs.hgvs_converter import (
 from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import get_refseq_type
-from library.genomics.symbolic_normalization import shuffle_interval
-from library.genomics.vcf_enums import VCFSymbolicAllele
+from snpdb.babelfish import babelfish_assembly_name
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
 
 # Parser construction is slow, so keep a single one per process
 _hgvs_parser = Parser()
-
-# A ranged del/dup/inv needs no sequence - ref='' is what hgvs.edit formats from (#1571)
-SYMBOLIC_EDITS = {
-    VCFSymbolicAllele.DEL: lambda: NARefAlt(ref='', alt=None),
-    VCFSymbolicAllele.DUP: lambda: Dup(ref=''),
-    VCFSymbolicAllele.INV: lambda: Inv(ref=''),
-}
-
-SYMBOLIC_ALT_FOR_EDIT_TYPE = {make_edit().type: alt for alt, make_edit in SYMBOLIC_EDITS.items()}
 
 
 class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
@@ -109,12 +96,9 @@ class BioCommonsHGVSConverter:
 
         self.hdp = DjangoTranscriptDataProvider(genome_build)
         assembly_name = genome_build.name
-        # GRCh37 needs the patch name to get the MT chromosome mapping
-        if genome_build.name == 'GRCh37':
-            babelfish_assembly = genome_build.get_build_with_patch()
-        else:
-            babelfish_assembly = assembly_name
-        self.babelfish = Babelfish(self.hdp, babelfish_assembly)
+        symbolic_alt_min_length = settings.VARIANT_SYMBOLIC_ALT_SIZE if settings.VARIANT_SYMBOLIC_ALT_ENABLED else None
+        self.babelfish = Babelfish(self.hdp, babelfish_assembly_name(genome_build),
+                                   symbolic_alt_min_length=symbolic_alt_min_length, vcf_version="4.3")
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=assembly_name,
                                  alt_aln_method='splign',
@@ -188,20 +172,9 @@ class BioCommonsHGVSConverter:
         sv_normalized = self.no_validate_normalizer.normalize(sv)
         return HGVSVariant(sv_normalized)
 
-    def _symbolic_to_sequence_variant(self, vc: VariantCoordinate, interval: tuple[int, int]) -> SequenceVariant:
-        """ Build the SequenceVariant straight from the interval, without ever reading the reference """
-        start, end = interval
-        pos = Interval(start=SimplePosition(start), end=SimplePosition(end))
-        edit = SYMBOLIC_EDITS[vc.alt]()
-        contig = self.genome_build.chrom_contig_mappings[vc.chrom]
-        return SequenceVariant(ac=contig.refseq_accession, type='g', posedit=PosEdit(pos, edit))
-
     def _vc_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
-        """Convert VariantCoordinate to genomic HGVS SequenceVariant via babelfish."""
-        if interval := vc.symbolic_hgvs_interval:
-            return self._symbolic_to_sequence_variant(vc, interval)
-        chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
-        return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
+        """ g. via Babelfish, normalized 3' - a symbolic <DEL>/<DUP>/<INV> comes back without its sequence """
+        return self.babelfish.vcf_coordinate_to_g_hgvs(vc.as_vcf_coordinate(self.genome_build))
 
     def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         """VG API: takes VariantCoordinate; handles mitochondria kind."""
@@ -218,9 +191,7 @@ class BioCommonsHGVSConverter:
             var_g = self._vc_to_sequence_variant(vc)  # returns normalized (default HGVS 3')
             # Biocommons HGVS doesn't normalize introns as it works with transcript sequences so doesn't have introns
             # workaround is to normalize on genome sequence first, so if it can't norm it's correct
-            # SV breakpoints are segmentation estimates (the VCF declares CIPOS/CIEND around them) so
-            # there's nothing to 3' shift - report the coordinates we were given
-            if transcript_version.strand == '-' and not symbolic:
+            if transcript_version.strand == '-' and not self._too_big_to_normalize(var_g):
                 var_g = self.norm_5p.normalize(var_g)
 
             mapper = self.am_symbolic if symbolic else self.am
@@ -240,79 +211,17 @@ class BioCommonsHGVSConverter:
             self, hgvs_string: str, transcript_version=None
     ) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         try:
-            if symbolic_result := self._symbolic_g_hgvs_to_variant_coordinate(hgvs_string):
-                return symbolic_result
             var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(hgvs_string)
             try:
-                (chrom, position, ref, alt, _typ) = self.babelfish.hgvs_to_vcf(var_g)
-                if alt == '.':
-                    alt = ref
+                vcf_coordinate = self.babelfish.hgvs_to_vcf_coordinate(var_g)
             except HGVSDataNotAvailableError as exc:
                 raise Contig.ContigNotInBuildError() from exc
         except HGVSError as hgvs_error:
             klass = self._get_exception_class(hgvs_error)
             raise klass(hgvs_error) from hgvs_error
 
-        vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
+        vc = VariantCoordinate.from_vcf_coordinate(vcf_coordinate, self.genome_build)
         return vc.as_internal_symbolic(self.genome_build), matches_reference, originally_normalized
-
-    def _symbolic_g_hgvs_to_variant_coordinate(
-            self, hgvs_string: str
-    ) -> Optional[tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]]:
-        """ A g. del/dup/inv with no sequence, big enough to be stored symbolic, straight to a VariantCoordinate.
-
-            The general path builds the explicit sequence of the whole span, and biocommons normalization
-            is quadratic in its length - a 100kb dup takes 0.5s and a whole chromosome arm never finishes (#2103).
-            This only reads bases around the breakpoints and gives the same result: del/dup left-aligned like
-            babelfish.hgvs_to_vcf, inv trimmed of palindromic ends, and originally_normalized against the
-            interval biocommons normalization would report. Returns None for anything else (general path) """
-
-        if not settings.VARIANT_SYMBOLIC_ALT_ENABLED:
-            return None
-
-        var_g = self._parser_hgvs(hgvs_string)
-        edit = var_g.posedit.edit
-        symbolic_alt = SYMBOLIC_ALT_FOR_EDIT_TYPE.get(edit.type)
-        if var_g.type != 'g' or symbolic_alt is None or edit.ref:
-            return None
-
-        pos = var_g.posedit.pos
-        if not all(isinstance(p, SimplePosition) and not p.uncertain for p in (pos.start, pos.end)):
-            return None
-        start = pos.start.base
-        end = pos.end.base
-        # Even the explicit sequence is too short to be stored symbolic (a trimmed inv is shorter still)
-        if end - start + 1 < settings.VARIANT_SYMBOLIC_ALT_SIZE:
-            return None
-
-        # NG_/LRG genomic references aren't contigs, leave those to the general path
-        contig = self.genome_build.chrom_contig_mappings.get(var_g.ac)
-        if contig is None or contig.refseq_accession != var_g.ac:
-            return None
-        if start < 1 or end > contig.length:
-            raise HGVSNomenclatureException(f"{var_g}: coordinates are out-of-bounds")
-
-        vc = VariantCoordinate.from_symbolic_interval(self.genome_build, contig.name, start, end, symbolic_alt)
-        if vc is None or abs(vc.svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
-            return None
-
-        if symbolic_alt == VCFSymbolicAllele.INV:
-            normalized_start, normalized_end = vc.symbolic_hgvs_interval
-        else:
-            # HGVS normalizes 3', the VCF coordinate is left-aligned
-            contig_sequence = self.genome_build.genome_fasta.fasta[contig.name]
-            normalized_start, normalized_end = shuffle_interval(contig_sequence, start, end, shift_right=True)
-
-        matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref='')
-        normalized_var_g = self._symbolic_g_sequence_variant(var_g.ac, symbolic_alt, normalized_start, normalized_end)
-        originally_normalized = HgvsOriginallyNormalized(original_hgvs=HGVSVariant(var_g),
-                                                         normalized_hgvs=HGVSVariant(normalized_var_g))
-        return vc, matches_reference, originally_normalized
-
-    @staticmethod
-    def _symbolic_g_sequence_variant(ac: str, symbolic_alt: str, start: int, end: int) -> SequenceVariant:
-        pos = Interval(start=SimplePosition(start), end=SimplePosition(end))
-        return SequenceVariant(ac=ac, type='g', posedit=PosEdit(pos, SYMBOLIC_EDITS[symbolic_alt]()))
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)
@@ -403,6 +312,14 @@ class BioCommonsHGVSConverter:
         # didn't provide anything so won't say anything
         return var_x, HgvsMatchRefAllele(provided_ref='', calculated_ref='')
 
+    def _too_big_to_normalize(self, var_x: SequenceVariant) -> bool:
+        """ Babelfish leaves a del/dup/inv this long as called (normalizing fetches the whole span), so do the same """
+        max_length = self.babelfish.normalize_max_length
+        if var_x.type != 'g' or max_length is None:
+            return False
+        length = Babelfish.symbolic_alt_length(var_x)
+        return length is not None and length >= max_length
+
     def _hgvs_to_g_hgvs(self, hgvs_string: str) -> tuple[SequenceVariant, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
@@ -425,7 +342,10 @@ class BioCommonsHGVSConverter:
         var_x_normalized = None
         normalization_error = None
         try:
-            var_x_normalized = self.no_validate_normalizer.normalize(var_x)
+            if self._too_big_to_normalize(var_x):
+                var_x_normalized = var_x
+            else:
+                var_x_normalized = self.no_validate_normalizer.normalize(var_x)
             originally_normalized = HgvsOriginallyNormalized(original_hgvs=HGVSVariant(var_x_original),
                                                              normalized_hgvs=HGVSVariant(var_x_normalized))
         except HGVSUnsupportedOperationError as hgvs_error:

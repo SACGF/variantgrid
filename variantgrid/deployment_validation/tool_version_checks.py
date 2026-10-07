@@ -18,6 +18,8 @@ from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
 from upload.vcf.vcf_preprocess import get_bcftools_tool_version, get_split_vcf_command
 
+# Bump to the release that fixes https://github.com/samtools/bcftools/issues/2601 - norm doesn't left-align
+# a <DUP> with END but no SVLEN, so those are stored as called and miss HGVS search
 _REQUIRED_BCFTOOLS_VERSION = (1, 20)
 _INSTALL_BCFTOOLS = "https://github.com/SACGF/variantgrid/wiki/Install-bcftools-liftover"
 _INSTALL_HTSLIB = "Install htslib bgzip/tabix (Debian/Ubuntu: 'apt install tabix', or from https://github.com/samtools/htslib)"

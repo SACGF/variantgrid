@@ -38,8 +38,10 @@ bulk path sets the hash by hand for the same reason.
 `snpdb/models/models_variant.py:VariantCoordinate` is a pydantic value object with two exit doors: `as_external_explicit`
 for VCF and HGVS, `as_internal_symbolic` for the database. `VariantCoordinate.as_internal_symbolic` turns an alt at or
 beyond `settings.VARIANT_SYMBOLIC_ALT_SIZE` (1000 in `variantgrid/settings/components/default_settings.py`) into
-`<DUP>` (single-base ref, HGVS says dup), `<DEL>` (single-base alt equal to ref[0]) or `<INV>` (equal lengths, reverse
-complement) with an `svlen`. `VariantCoordinate.as_internal_canonical_form` is the rule "one representation per
+`<DUP>` (single-base ref, the inserted sequence copies the adjacent bases - hgvs's Babelfish over the genome FASTA,
+`snpdb/babelfish.py`), `<DEL>` (single-base alt equal to ref[0]) or `<INV>` (equal lengths, reverse complement, strictly
+longer than the threshold) with an `svlen`. `VariantCoordinate.as_vcf_coordinate` / `VariantCoordinate.from_vcf_coordinate`
+convert to and from hgvs's `VCFCoordinate`, which puts a padding base before an `<INV>` (we store its first inverted base). `VariantCoordinate.as_internal_canonical_form` is the rule "one representation per
 variant": symbolic only when `abs(svlen)` clears the threshold, otherwise explicit if `VariantCoordinate.can_be_made_explicit`
 (`<CNV>` and `<INS>` cannot be), and an alt equal to the ref becomes `Variant.REFERENCE_ALT`. `Variant.qs_from_variant_coordinate`
 applies this and resolves the contig up front from `GenomeBuild.chrom_contig_mappings` so the filter lands on the

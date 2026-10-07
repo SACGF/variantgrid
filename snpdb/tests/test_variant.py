@@ -21,7 +21,7 @@ class VariantTestCase(TestCase):
 
         cls.contig_1 = cls.grch37.contigs.get(name="1")
 
-        # Need this for HGVSMatcher in VariantCoordinate - that may be removed in future
+        # GRCh37 Babelfish (as_internal_symbolic dup detection) takes its patch name from the annotation version
         get_fake_annotation_version(cls.grch37)
 
     def test_variant_string(self):
@@ -101,12 +101,18 @@ class VariantTestCase(TestCase):
         vc = VariantCoordinate(chrom="11", position=5247125, ref=ref, alt="T")
         self._test_coordinate_conversion(vc, self.grch37)
 
-    def test_one_exactly_symbolic_alt_size(self):
+    def test_dup_threshold_matches_canonical_form(self):
+        """ A dup of VARIANT_SYMBOLIC_ALT_SIZE - 1 bases is stored explicit (canonical form), so as_internal_symbolic
+            - which Variant.qs_from_variant_coordinate looks up with - must leave it explicit too """
         alt = 'AGACAGAGTCTCGCTCTGTCGCCCAGGCTGGAGTGCAGTGCACAATCTTGGCTCACTGCAAGCTCCGCCTCCCAGGTTCACACCATTCTCCTGCCTCAGCCTCCCGAGTAGCCGGGACTACAGGCGCCCACCACCACGCCCAGCTAATTTTTTGTATTTTTAGTAGAGACGGGGTTTCACCATGTTAGTTAGCCAGGATGGTCTCGATCTCCTGACCTCGTGATCCACCCACCTCGGCCTCCCAAAGCACTGGGATTACAGGCATGAGCCACCGCGCCGAGCCCCAAGACCTTTCTTTATTACCAGGGCTTCCACAGACCTGACACATGGTAGTTCCTCAATAAATAATTGCAGAATTACTGAAAAATTTTACTGTTAACTTAGGCAGTGGTAAAACCATTGTTTGGTAGCTCAGAACTCAGCAAGTAAATAGCAACATTTGCTGGAAGAACAGATAGTTTTTCAAATCCAATTCAAGGACTGGGTATGGTGGCTCATGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCAGGCGTATCCAGGAGTTCGAGACTAGCCTGACCAACATGGTGAAACTCCGTCTCTACTAAAAATACAAAATTAGCCAGGTGTGGTGGTGGGCACCTGTAATCTCAGCTACTTGGGAGGCTGAGGCAGGAGAATCGCTTGAACCTGGTAGGCGGAGGTTGTAGTGAGCTGAGATTGTGCCATTGCTCTCCAGCCTGGGAAACAAGAGCAAAACTCCGTCTCAAAAAAAAAAAAAATCCAATTCAAATGATTATGGAAGTAGTGGAGAAATAAACAGGAAAATGATAAATAATTAAGATAATATATAATATGGCTATATTTTAATCTATTGTTGATATGATTTTCTCTTTTCCCCTTGGGATTAGTATCTATCTCTCTACTGGATATTAATTTGTTATATTTTCTCATTAGAGCAAGTTACTCAGATGGAAAACTGAAAGCCCCTCCTAAACCATGTGCTGGCAATCAAGG'
+        self.assertEqual(len(alt) - 1, settings.VARIANT_SYMBOLIC_ALT_SIZE - 1)  # If this fails, the test below won't work
         vc = VariantCoordinate(chrom='3', position=37047542, ref='A', alt=alt)
-        vc_symbolic = vc.as_internal_symbolic(self.grch37)
-        self.assertEqual(len(alt), settings.VARIANT_SYMBOLIC_ALT_SIZE)  # If this fails, the test below won't work
-        self.assertEqual(vc_symbolic.alt, VCFSymbolicAllele.DUP)
+        self.assertEqual(vc, vc.as_internal_symbolic(self.grch37))
+        self.assertEqual(vc, vc.as_internal_canonical_form(self.grch37))
+
+        next_base = self.grch37.genome_fasta.fasta['3'][37047542 + len(alt) - 1:37047542 + len(alt)].upper()
+        vc_one_longer = VariantCoordinate(chrom='3', position=37047542, ref='A', alt=alt + next_base)
+        self.assertEqual(VCFSymbolicAllele.DUP, vc_one_longer.as_internal_symbolic(self.grch37).alt)
 
     def test_short_symbolic_alt(self):
         vc = VariantCoordinate(chrom='3', position=37047542, ref='A', alt="<DUP>",
@@ -145,6 +151,47 @@ class VariantTestCase(TestCase):
         vc_from_symbolic = vc_symbolic.as_internal_canonical_form(self.grch37)
         vc_from_explicit = vc_explicit.as_internal_canonical_form(self.grch37)
         self.assertEqual(vc_from_symbolic, vc_from_explicit)
+
+    def test_vcf_coordinate_round_trip(self):
+        """ <INV> gains the VCF padding base and '=' becomes '.' - and both come back """
+        vc_inv = VariantCoordinate(chrom='10', position=89714001, ref='A', alt='<INV>', svlen=9549)
+        vcf_inv = vc_inv.as_vcf_coordinate(self.grch37)
+        self.assertEqual((89714000, vc_inv.end), (vcf_inv.position, vcf_inv.end))
+
+        vc_ref = VariantCoordinate(chrom='3', position=128198980, ref='A', alt=Variant.REFERENCE_ALT)
+        self.assertEqual('.', vc_ref.as_vcf_coordinate(self.grch37).alt)
+
+        for vc in (vc_inv, vc_ref,
+                   VariantCoordinate(chrom='21', position=47532744, ref='T', alt='<DEL>', svlen=-1224),
+                   VariantCoordinate(chrom='7', position=41200841, ref='C', alt='<DUP>', svlen=2646)):
+            self.assertEqual(vc, VariantCoordinate.from_vcf_coordinate(vc.as_vcf_coordinate(self.grch37), self.grch37))
+
+    @override_settings(VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE=True)
+    def test_vcf_coordinate_del_svlen_always_positive(self):
+        vc = VariantCoordinate(chrom='21', position=47532744, ref='T', alt='<DEL>', svlen=1224)
+        self.assertEqual(vc, VariantCoordinate.from_vcf_coordinate(vc.as_vcf_coordinate(self.grch37), self.grch37))
+
+    def test_vcf_coordinate_inv_at_exactly_symbolic_alt_size_is_explicit(self):
+        size = settings.VARIANT_SYMBOLIC_ALT_SIZE
+        vc_inv = VariantCoordinate(chrom='1', position=1_000_000, ref='N', alt='<INV>', svlen=size - 1)
+        vc = VariantCoordinate.from_vcf_coordinate(vc_inv.as_vcf_coordinate(self.grch37), self.grch37)
+        self.assertEqual(vc_inv.as_external_explicit(self.grch37), vc)
+
+    def test_cnv_has_no_vcf_coordinate(self):
+        vc_cnv = VariantCoordinate(chrom='1', position=1000000, ref='T', alt=VCFSymbolicAllele.CNV, svlen=5000)
+        with self.assertRaises(ValueError):
+            vc_cnv.as_vcf_coordinate(self.grch37)
+
+    def test_insertion_copying_preceding_bases_is_dup_of_them(self):
+        """ The inserted sequence duplicates the bases before the insertion point, not after it """
+        position = 128200125
+        length = settings.VARIANT_SYMBOLIC_ALT_SIZE
+        contig_sequence = self.grch37.genome_fasta.fasta['3']
+        ref = contig_sequence[position - 1:position].upper()
+        vc = VariantCoordinate(chrom='3', position=position, ref=ref,
+                               alt=ref + contig_sequence[position - length:position].upper())
+        vc_s = vc.as_internal_symbolic(self.grch37)
+        self.assertEqual(('<DUP>', position - length, length), (vc_s.alt, vc_s.position, vc_s.svlen))
 
     def test_cnv_cannot_be_made_explicit(self):
         """ <CNV> is a copy-number-variable region with no unambiguous explicit ref/alt expansion -

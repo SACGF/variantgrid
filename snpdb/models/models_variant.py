@@ -12,13 +12,12 @@ import logging
 import re
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property, lru_cache
 from typing import Any, Optional, Union
 
 import django
 import pydantic
-from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError, models, transaction
@@ -31,6 +30,7 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
+from hgvs.extras.babelfish import VCFCoordinate
 from model_utils.managers import InheritanceManager
 from pydantic import field_validator
 
@@ -40,7 +40,6 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.symbolic_normalization import inversion_palindromic_trim, shuffle_interval
 from library.genomics.vcf_enums import (
     GENE_LEVEL_ALT_PATTERN,
     INFO_LIFTOVER_SWAPPED_REF_ALT,
@@ -50,6 +49,7 @@ from library.genomics.vcf_enums import (
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
+from snpdb.babelfish import get_genome_babelfish
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
@@ -60,6 +60,17 @@ from snpdb.models.models_enums import (
     SequenceRole,
 )
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
+
+# VCF spec's reference alt (our Variant.REFERENCE_ALT is "=")
+VCF_REFERENCE_ALT = "."
+# The symbolic alts hgvs's VCFCoordinate represents
+VCF_COORDINATE_SYMBOLIC_ALTS = {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+
+
+def internal_vcf_version() -> str:
+    """ The VCF version whose SVLEN sign we store - negative <DEL> up to 4.3, positive from 4.4 (#1344) """
+    return "4.4" if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE else "4.3"
+
 
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)$")
@@ -496,31 +507,6 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return self.position, self.end
         return None
 
-    @staticmethod
-    def from_symbolic_interval(genome_build: GenomeBuild, chrom: str, start: int, end: int,
-                               alt: str) -> Optional['VariantCoordinate']:
-        """ <DEL>/<DUP>/<INV> over a 1-based inclusive interval - the inverse of symbolic_hgvs_interval.
-            Normalized as as_internal_symbolic() would an explicit one - del/dup left-aligned, inv trimmed
-            of palindromic ends - but reading only the bases around the breakpoints, so any length works.
-            None if left-aligning reaches the start of the contig, leaving no VCF padding base """
-        contig_sequence = genome_build.genome_fasta.fasta[chrom]
-        if alt == VCFSymbolicAllele.INV:
-            trim = inversion_palindromic_trim(contig_sequence, start, end)
-            position = start + trim
-            svlen = end - trim - position
-        elif alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}:
-            left_start, left_end = shuffle_interval(contig_sequence, start, end, shift_right=False)
-            position = left_start - 1
-            span = left_end - left_start + 1
-            svlen = -span if alt == VCFSymbolicAllele.DEL else span
-        else:
-            raise ValueError(f"No interval form for symbolic alt '{alt}'")
-
-        if position < 1:
-            return None
-        ref = contig_sequence[position - 1:position].upper()
-        return VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen)
-
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
         # reference sequence is 0-based
@@ -533,25 +519,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             raise ValueError(f"{self} is gene-level - it has no coordinate to read a reference from")
 
         if self.is_symbolic:
-            if self.svlen is None:
-                raise ValueError(f"{self} has 'svlen' = None")
-
-            ref_sequence = self.calculated_reference(genome_build)
-            if self.alt == VCFSymbolicAllele.DEL:
-                ref = ref_sequence
-                alt = ref_sequence[0]
-            elif self.alt == VCFSymbolicAllele.DUP:
-                ref = ref_sequence[0]
-                alt = ref_sequence
-            elif self.alt == VCFSymbolicAllele.INV:
-                ref = ref_sequence
-                alt = reverse_complement(ref_sequence)
-            else:
-                raise ValueError(f"Unknown symbolic alt of '{self.alt}'")
-
-            vc = VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt)
-            # print(f"Symbolic = {self} -> {vc}")
-            return vc
+            babelfish = get_genome_babelfish(genome_build)
+            explicit = babelfish.vcf_coordinate_as_explicit(self.as_vcf_coordinate(genome_build))
+            return VariantCoordinate(chrom=self.chrom, position=explicit.position, ref=explicit.ref, alt=explicit.alt)
 
         if self.alt == Variant.REFERENCE_ALT:
             # Convert from our internal format (alt='=' for ref) to explicit
@@ -567,64 +537,78 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         else:
             return max(len(self.ref), len(self.alt))
 
-    def as_internal_symbolic(self, genome_build: GenomeBuild,
-                             min_symbolic_alt_size=settings.VARIANT_SYMBOLIC_ALT_SIZE) -> 'VariantCoordinate':
-        """ Internal format - alt can be <DEL> or <DUP>
-            Uses our internal reference representation
-        """
+    def as_internal_symbolic(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
+        """ Internal format - a del, dup or inv of at least VARIANT_SYMBOLIC_ALT_SIZE becomes <DEL>/<DUP>/<INV>
+            (an inv only when strictly longer - from_vcf_coordinate), and a reference alt becomes '=' """
         if self.is_symbolic:
             return self
-
-        ref = self.ref
-        alt = self.alt  # default, only change if symbolic
-        svlen = None
         if self.alt in (Variant.REFERENCE_ALT, self.ref):
-            alt = Variant.REFERENCE_ALT
-        else:
-            # Could be symbolic
-            ref_length = len(ref)
-            alt_length = len(self.alt)
-            diff = alt_length - ref_length
-            if ref_length == 1:
-                if alt_length >= min_symbolic_alt_size:
-                    # Possible dup
-                    # TODO: Can probably remove HGVS dependency from here - just look directly at sequence
-                    from genes.hgvs import HGVSMatcher
-                    matcher = HGVSMatcher.instance(genome_build)
-                    hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(self)
-                    if hgvs_variant.mutation_type == 'dup':
-                        ref = self.ref[0]
-                        alt = VCFSymbolicAllele.DUP
-                        svlen = diff
-            elif alt_length == 1 and self.alt == self.ref[0]:
-                if ref_length >= min_symbolic_alt_size:
-                    ref = self.ref[0]
-                    alt = VCFSymbolicAllele.DEL
-                    svlen = diff
+            return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref,
+                                     alt=Variant.REFERENCE_ALT)
 
-            elif ref_length == alt_length:
-                if ref_length > min_symbolic_alt_size:
-                    if self.ref == reverse_complement(self.alt):
-                        ref = self.ref[0]
-                        alt = VCFSymbolicAllele.INV
-                        svlen = len(self.ref) - 1  # explicit inv had same length ref/alt, now we have len(ref) == 1
-        return VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt, svlen=svlen)
+        babelfish = get_genome_babelfish(genome_build)
+        vcf_coordinate = babelfish.vcf_coordinate_as_symbolic(self.as_vcf_coordinate(genome_build),
+                                                              min_length=settings.VARIANT_SYMBOLIC_ALT_SIZE)
+        if vcf_coordinate.is_symbolic:
+            return VariantCoordinate.from_vcf_coordinate(vcf_coordinate, genome_build)
+        return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=self.alt)
 
     def as_internal_canonical_form(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
-        """ Make sure we only have 1 representation for a variant """
+        """ Make sure we only have 1 representation for a variant - symbolic only at or beyond
+            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be """
+        if not self.is_symbolic:
+            return self.as_internal_symbolic(genome_build)
+        if self.can_be_made_explicit and abs(self.svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
+            return self.as_external_explicit(genome_build)
+        return self
 
-        # Easiest way is to just convert to symbolic then check svlen
-        vc_symbolic = self.as_internal_symbolic(genome_build)
-        if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
-            vc = vc_symbolic
-        elif self.is_symbolic and self.can_be_made_explicit:
-            vc = self.as_external_explicit(genome_build)
+    def as_vcf_coordinate(self, genome_build: GenomeBuild) -> VCFCoordinate:
+        """ hgvs's VCF-spec form, for Babelfish. We store an <INV> from its first inverted base, so it gains
+            the VCF padding base, and our reference alt '=' becomes '.'. <CNV>, <INS> and gene-level alts
+            have no VCFCoordinate form, so raise ValueError """
+        if self.is_gene_level:
+            raise ValueError(f"{self} is gene-level - it has no VCF coordinate")
+        if not self.is_symbolic:
+            alt = VCF_REFERENCE_ALT if self.alt == Variant.REFERENCE_ALT else self.alt
+            return VCFCoordinate(self.chrom, self.position, self.ref, alt)
+
+        if self.alt not in VCF_COORDINATE_SYMBOLIC_ALTS:
+            raise ValueError(f"{self}: symbolic alt '{self.alt}' has no VCF coordinate")
+        if self.svlen is None:
+            raise ValueError(f"{self} has 'svlen' = None")
+        position = self.position
+        ref = self.ref
+        if self.alt == VCFSymbolicAllele.INV:
+            position -= 1
+            ref = genome_build.genome_fasta.fasta[self.chrom][position - 1:position].upper()
+        return VCFCoordinate(self.chrom, position, ref, self.alt, end=self.end, vcf_version=internal_vcf_version())
+
+    @staticmethod
+    def from_vcf_coordinate(vcf_coordinate: VCFCoordinate, genome_build: GenomeBuild) -> 'VariantCoordinate':
+        """ The inverse of as_vcf_coordinate. We store an <INV> symbolically only when strictly longer than
+            VARIANT_SYMBOLIC_ALT_SIZE (Babelfish's threshold is >=), so a shorter one is expanded """
+        chrom = vcf_coordinate.chrom
+        alt = vcf_coordinate.alt.upper()
+        if not vcf_coordinate.is_symbolic:
+            if alt == VCF_REFERENCE_ALT:
+                alt = Variant.REFERENCE_ALT
+            return VariantCoordinate(chrom=chrom, position=vcf_coordinate.position,
+                                     ref=vcf_coordinate.ref.upper(), alt=alt)
+
+        if alt not in VCF_COORDINATE_SYMBOLIC_ALTS:
+            raise ValueError(f"{vcf_coordinate}: symbolic alt '{alt}' has no VariantCoordinate conversion")
+        if alt == VCFSymbolicAllele.INV:
+            if vcf_coordinate.end - vcf_coordinate.position <= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                explicit = get_genome_babelfish(genome_build).vcf_coordinate_as_explicit(vcf_coordinate)
+                return VariantCoordinate.from_vcf_coordinate(explicit, genome_build)
+            position = vcf_coordinate.position + 1
+            ref = genome_build.genome_fasta.fasta[chrom][position - 1:position]
+            svlen = vcf_coordinate.end - position
         else:
-            vc = self
-
-        if vc.alt in (Variant.REFERENCE_ALT, vc.ref):
-            vc.alt = Variant.REFERENCE_ALT
-        return vc
+            position = vcf_coordinate.position
+            ref = vcf_coordinate.ref
+            svlen = replace(vcf_coordinate, vcf_version=internal_vcf_version()).svlen
+        return VariantCoordinate(chrom=chrom, position=position, ref=ref.upper(), alt=alt, svlen=svlen)
 
     def as_contig_accession(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         contig = genome_build.chrom_contig_mappings[self.chrom]

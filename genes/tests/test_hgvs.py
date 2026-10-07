@@ -378,32 +378,42 @@ class TestSymbolicHGVS(TestCase):
         self.assertGreater(biggest.max_sequence_length,
                            settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT)
 
-    def test_long_g_hgvs_symbolic_matches_general_path(self):
-        """ #2103 - a long g. del/dup/inv skips explicit-sequence normalization, so must shuffle the
-            breakpoints itself to land on the same coordinate (and report the same normalization).
-            Cases shift right, shift left and trim a palindromic inv end. A 2-base window walks the
-            shuffle across several fetches """
+    def test_long_g_hgvs_to_symbolic_coordinate(self):
+        """ #2103 - a long g. del/dup/inv resolves through Babelfish's symbolic VCF coordinate. Cases shift
+            right, shift left and trim palindromic inv ends, and an inv of exactly VARIANT_SYMBOLIC_ALT_SIZE
+            (after trimming) stays explicit. A whole chromosome arm isn't normalized at all """
         converter = HGVSMatcher(self.genome_build, clingen_resolution=False).hgvs_converter
-        HGVS_STRINGS = [
-            "NC_000003.11:g.128200126_128201326del",
-            "NC_000003.11:g.128200126_128201326dup",
-            "NC_000003.11:g.128200308_128201508del",
-            "NC_000003.11:g.128200308_128201508dup",
-            "NC_000003.11:g.128200007_128201207inv",
-        ]
+        EXPECTED = {
+            "NC_000003.11:g.128200126_128201326del": ('3', 128200125, 'G', '<DEL>', -1201),
+            "NC_000003.11:g.128200126_128201326dup": ('3', 128200125, 'G', '<DUP>', 1201),
+            "NC_000003.11:g.128200308_128201508del": ('3', 128200304, 'A', '<DEL>', -1201),
+            "NC_000003.11:g.128200308_128201508dup": ('3', 128200304, 'A', '<DUP>', 1201),
+            "NC_000003.11:g.128200007_128201207inv": ('3', 128200009, 'G', '<INV>', 1196),
+            "NC_000003.11:g.128200007_128201007inv": ('3', 128200007, 'A', '<INV>', 1000),
+            "NC_000002.11:g.1000000_224225011dup": ('2', 999999, 'G', '<DUP>', 223225012),
+        }
+        for hgvs_string, (chrom, position, ref, alt, svlen) in EXPECTED.items():
+            vc, _, _ = converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string)
+            self.assertEqual(VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen), vc,
+                             hgvs_string)
 
-        def resolve(hgvs_string):
-            vc, matches_reference, originally_normalized = converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string)
-            return vc, bool(matches_reference), originally_normalized.get_message()
+        vc, _, _ = converter.hgvs_to_variant_coordinate_reference_match_and_normalized("NC_000003.11:g.128200007_128201008inv")
+        self.assertIsNone(vc.svlen)
+        self.assertEqual(settings.VARIANT_SYMBOLIC_ALT_SIZE, len(vc.ref))
 
-        for window_size in (10_000, 2):
-            with patch("library.genomics.symbolic_normalization.SHUFFLE_WINDOW_SIZE", window_size):
-                for hgvs_string in HGVS_STRINGS:
-                    self.assertIsNotNone(converter._symbolic_g_hgvs_to_variant_coordinate(hgvs_string), hgvs_string)
-                    symbolic = resolve(hgvs_string)
-                    with patch.object(converter, "_symbolic_g_hgvs_to_variant_coordinate", return_value=None):
-                        general = resolve(hgvs_string)
-                    self.assertEqual(general, symbolic, hgvs_string)
+    def test_symbolic_g_hgvs_3_prime_shifted_and_searchable(self):
+        """ A left-aligned symbolic DEL/DUP in a repeat gets its HGVS 3'-shifted g., which searches back to it """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        EXPECTED = {
+            ('3', 128200304, '<DEL>', -1201): "NC_000003.11:g.128200308_128201508del",
+            ('3', 128200304, '<DUP>', 1201): "NC_000003.11:g.128200308_128201508dup",
+        }
+        for (chrom, position, alt, svlen), expected in EXPECTED.items():
+            vc = VariantCoordinate(chrom=chrom, position=position, ref='A', alt=alt, svlen=svlen)
+            g_hgvs = matcher.variant_coordinate_to_g_hgvs(vc)
+            self.assertEqual(expected, g_hgvs)
+            vc_searched, _, _ = matcher.hgvs_converter.hgvs_to_variant_coordinate_reference_match_and_normalized(expected)
+            self.assertEqual(vc, vc_searched)
 
     def test_c_hgvs_symbolic_del_both_strands(self):
         """ A 1kb DEL inside the transcript, projected onto a minus and a plus strand transcript """
