@@ -1165,7 +1165,7 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'allele_info',
         'genome_build',
         'variant',
-        'c_hgvs_both',
+        'resolved_hgvs',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
@@ -1174,17 +1174,7 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
 
     search_fields = (
         'resolved_hgvs',
-        'resolved_hgvs_compat'
     )
-
-    @admin_list_column(short_description="c.HGVS", order_field="resolved_hgvs")
-    def c_hgvs_both(self, obj: ResolvedVariantInfo):
-        c_hgvs = obj.resolved_hgvs
-        c_hgvs_compatible = obj.resolved_hgvs_compat
-        if c_hgvs == c_hgvs_compatible:
-            return c_hgvs
-        else:
-            return SafeString(f"<em>canonical</em><br/>{c_hgvs}<br/><em>c_hgvs_compatible</em><br/>{c_hgvs_compatible}")
 
     def has_add_permission(self, request):
         return False
