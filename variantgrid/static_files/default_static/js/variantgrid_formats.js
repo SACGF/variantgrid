@@ -835,7 +835,7 @@ VariantGridFormat.spliceCalls = (call) => {
     const text = String(call);
     const locus = _spliceJunctionLocus(text);
     // '' unless the analysis shows IGV links
-    const igvLink = locus ? createIgvLink(locus, 'getBams') : '';
+    const igvLink = locus ? createIgvLink(locus, 'getAlignmentFiles') : '';
     return igvLink + escapeHtml(text);
 };
 

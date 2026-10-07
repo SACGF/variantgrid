@@ -390,7 +390,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
 
     def get_samples(self) -> list[Sample]:
         """ Every node + ancestor sample, including those from variant-only VCFs. Sample level data
-            that doesn't come from the genotype - gene lists, coverage, BAMs, patients - and
+            that doesn't come from the genotype - gene lists, coverage, alignment files, patients - and
             restricting sample fields to ancestors @see AncestorSampleMixin """
         _, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return sorted(visibility)  # Every sample the node knows about is a key, genotype or not
@@ -398,13 +398,13 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
     def get_sample_ids(self) -> list[int]:
         return [s.pk for s in self.get_samples()]
 
-    def get_bams_dict(self):
-        bams_dict = defaultdict(set)
+    def get_alignments_dict(self):
+        alignments_dict = defaultdict(set)
         sfp_qs = SampleFilePath.objects.filter(sample__in=self.get_samples(),
                                                file_type__in=SampleFileType.ALIGNMENT_TYPES)
         for sample_id, file_path in sfp_qs.values_list("sample_id", "file_path"):
-            bams_dict[sample_id].add(file_path)
-        return {k: list(v) for k, v in bams_dict.items()}
+            alignments_dict[sample_id].add(file_path)
+        return {k: list(v) for k, v in alignments_dict.items()}
 
     def get_connection_data(self, parent):
         """ Return dict of source_id/target_id for sending as JSON """

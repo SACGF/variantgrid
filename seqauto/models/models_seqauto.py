@@ -544,7 +544,7 @@ class AlignmentFile(SeqAutoRecord):
             self.create_sample_file_path(sfss.sample)
 
     @staticmethod
-    def get_aligner_from_alignment_file(bam_path):
+    def get_aligner_from_alignment_file(path):
         # TODO: Do properly
         aligner, _ = Aligner.objects.get_or_create(name='fake_aligner', version='0.666')
         return aligner

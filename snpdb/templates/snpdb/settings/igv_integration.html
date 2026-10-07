@@ -51,14 +51,14 @@
 		<table id='example-replacement'>
         <thead>
 		<tr>
-            <th>Old BAM Directory
-            <th>New BAM Directory
+            <th>Old Directory
+            <th>New Directory
         </thead>
         <tbody>
-            {% for from_bam, to_bam in example_replacements.items %}
+            {% for from_path, to_path in example_replacements.items %}
             <tr>
-                <td style="word-break: break-all;">{{ from_bam }}</td>
-                <td style="word-break: break-all;">{{ to_bam }}</td>
+                <td style="word-break: break-all;">{{ from_path }}</td>
+                <td style="word-break: break-all;">{{ to_path }}</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -320,7 +320,7 @@
                     <li class='seqauto-record unaligned-reads'><a href="{% url 'view_unaligned_reads' unaligned_reads.pk %}">{{ unaligned_reads }}</a></li>
                 {% endfor %}
                 {% for alignment_file in ss.alignmentfile_set.all %}
-                    <li class='seqauto-record bam-file'><a href="{% url 'view_alignment_file' alignment_file.pk %}">{{ alignment_file }}</a>
+                    <li class='seqauto-record alignment-file'><a href="{% url 'view_alignment_file' alignment_file.pk %}">{{ alignment_file }}</a>
 
                     <ul>
                     {% for vcf_file in alignment_file.singlesamplevcf_set.all %}

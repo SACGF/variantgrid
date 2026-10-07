@@ -418,14 +418,14 @@ class AlignmentFileSerializer(serializers.ModelSerializer):
             unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
             if sequencing_sample:
                 if unaligned_reads.sequencing_sample_id != sequencing_sample.pk:
-                    msg = f"BAM '{path}' sequencing_sample '{sequencing_sample}' doesn't match " \
+                    msg = f"Alignment file '{path}' sequencing_sample '{sequencing_sample}' doesn't match " \
                           f"the one its unaligned_reads came from: '{unaligned_reads.sequencing_sample}'"
                     raise serializers.ValidationError(msg)
             else:
                 sequencing_sample = unaligned_reads.sequencing_sample
 
         if sequencing_sample is None:
-            msg = f"BAM '{path}' needs either 'sequencing_sample' or 'unaligned_reads' to say which sample it's from"
+            msg = f"Alignment file '{path}' needs either 'sequencing_sample' or 'unaligned_reads' to say which sample it's from"
             raise serializers.ValidationError(msg)
 
         aligner = AlignerSerializer().create(aligner_data)
@@ -533,30 +533,30 @@ class SequencingFilesSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         unaligned_reads_data = validated_data.pop('unaligned_reads', None)
-        bam_file_data = validated_data.pop('bam_file')
+        alignment_file_data = validated_data.pop('bam_file')
         vcf_file_data = validated_data.pop('vcf_file')
 
         if self.sequencing_sample is None:
             raise ValueError("SequencingSample is required for create()")
 
-        # An explicit sequencing_sample on the BAM is kept, so it can be checked against the FastQs below
-        bam_file_data.setdefault('sequencing_sample', self.sequencing_sample)
+        # An explicit sequencing_sample on the alignment file is kept, so it can be checked against the FastQs below
+        alignment_file_data.setdefault('sequencing_sample', self.sequencing_sample)
         unaligned_reads = None
         if unaligned_reads_data:
             unaligned_reads_data["sequencing_sample"] = self.sequencing_sample
             unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
-            bam_file_data['unaligned_reads'] = unaligned_reads_data
+            alignment_file_data['unaligned_reads'] = unaligned_reads_data
 
-        bam_file = AlignmentFileSerializer().create(bam_file_data)
+        alignment_file = AlignmentFileSerializer().create(alignment_file_data)
 
-        vcf_file_data['alignment_file'] = bam_file_data
+        vcf_file_data['alignment_file'] = alignment_file_data
         vcf_file = SingleSampleVCFSerializer().create(vcf_file_data)
 
         # Return the full data structure (optional depending on your needs)
         return {
             'sample_name': validated_data['sample_name'],
             'unaligned_reads': unaligned_reads,
-            'bam_file': bam_file,
+            'bam_file': alignment_file,
             'vcf_file': vcf_file
         }
 

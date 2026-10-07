@@ -129,7 +129,7 @@ function variantGridRowDetail(annotationVersionId, rowData) {
     // to open - a splice junction's own IGV link comes off its breakpoints instead
     // (@see VariantGridFormat.spliceCalls, snpdb/gene_level_variants.py)
     if (chrom != null && position != null && chrom !== GENE_LEVEL_CONTIG_NAME) {
-        const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getBams');  // null unless the analysis shows IGV links
+        const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getAlignmentFiles');  // null unless the analysis shows IGV links
         if (igvUrl) {
             actions.append($('<a>', {href: igvUrl, text: 'IGV'}));
         }

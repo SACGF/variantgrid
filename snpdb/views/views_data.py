@@ -564,7 +564,7 @@ def view_sample(request, sample_id):
         'patient_form': patient_form,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,
-        "bam_list": sample.get_alignment_files(),
+        "alignment_file_list": sample.get_alignment_files(),
         "sample_stats": sample_stats,
         "sample_genotype_stats": sample_genotype_stats,
         "skipped_annotation_count": skipped_annotation_count,
