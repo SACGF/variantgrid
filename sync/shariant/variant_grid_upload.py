@@ -254,6 +254,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         qs = self.records_to_sync(full_sync=sync_run_instance.full_sync)
 
         rows_uploaded = 0
+        rows_failed = 0
         record_count = qs.count()
         logging.info("%s: %d record(s) to upload", sync_run_instance.sync_destination, record_count)
 
@@ -302,12 +303,19 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
 
                 for record, result in zip(batch, results):
                     rows_uploaded += 1
+                    # the remote answers a record it couldn't process with {"internal_error": ...} inside the 200;
+                    # an unsuccessful sync record keeps it in the next delta run
+                    if internal_error := result.get("internal_error"):
+                        rows_failed += 1
+                        logging.warning("%s: remote failed to process %s: %s",
+                                        sync_run_instance.sync_destination, record, internal_error)
                     ClassificationModificationSyncRecord.objects.create(
                         run=sync_run_instance.sync_run,
                         classification_modification=record,
+                        success=not internal_error,
                         meta=result
                     )
                 logging.info("%s: uploaded %d/%d records (batch of %d: JSON build %.1fs, POST %.1fs)",
                              sync_run_instance.sync_destination, rows_uploaded, record_count,
                              len(batch), json_duration, post_duration)
-            sync_run_instance.run_completed(had_records=True)
+            sync_run_instance.run_completed(had_records=True, meta={"rows_uploaded": rows_uploaded, "rows_failed": rows_failed})
