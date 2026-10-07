@@ -168,6 +168,8 @@ class SampleFileType(models.TextChoices):
     BED = 'E', 'BED'
     VCF = 'V', 'VCF'
 
+    ALIGNMENT_TYPES = Constant([e[0] for e in (BAM, CRAM)])  # Reads, ie what IGV is opened with
+
 
 class SequenceRole(models.TextChoices):
     ASSEMBLED_MOLECULE = 'AM', "assembled-molecule"

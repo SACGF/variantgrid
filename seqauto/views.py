@@ -21,7 +21,7 @@ from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, S
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import (
     QC,
-    BamFile,
+    AlignmentFile,
     DragenTSO500CombinedVariantOutput,
     EnrichmentKit,
     Experiment,
@@ -68,8 +68,8 @@ def unaligned_reads(request):
     return render(request, 'seqauto/unaligned_reads.html')
 
 
-def bam_files(request):
-    return render(request, 'seqauto/bam_files.html')
+def alignment_files(request):
+    return render(request, 'seqauto/alignment_files.html')
 
 
 def vcf_files(request):
@@ -151,7 +151,7 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
             multi_sample_vcfs.append(rv)
 
     single_sample_vcfs = {}
-    ss_vcf_qs = SingleSampleVCF.objects.filter(bam_file__sequencing_sample__sample_sheet=sample_sheet)
+    ss_vcf_qs = SingleSampleVCF.objects.filter(alignment_file__sequencing_sample__sample_sheet=sample_sheet)
     for single_sample_vcf in ss_vcf_qs.select_related("backendvcf__uploaded_vcf__vcf"):
         single_sample_vcfs[single_sample_vcf.pk] = run_vcf(single_sample_vcf, single_sample_vcf.vcf)
 
@@ -449,19 +449,19 @@ def view_unaligned_reads(request, unaligned_reads_id):
     return render(request, 'seqauto/view_unaligned_reads.html', context)
 
 
-def view_bam_file(request, bam_file_id):
-    bam_file = get_object_or_404(BamFile, pk=bam_file_id)
-    form = forms.BamFileForm(instance=bam_file)
+def view_alignment_file(request, alignment_file_id):
+    alignment_file = get_object_or_404(AlignmentFile, pk=alignment_file_id)
+    form = forms.AlignmentFileForm(instance=alignment_file)
 
     try:
-        flagstats = bam_file.flagstats
+        flagstats = alignment_file.flagstats
     except Flagstats.DoesNotExist:
         flagstats = None
 
-    context = {"bam_file": bam_file,
+    context = {"alignment_file": alignment_file,
                'form': form,
                'flagstats': flagstats}
-    return render(request, 'seqauto/view_bam_file.html', context)
+    return render(request, 'seqauto/view_alignment_file.html', context)
 
 
 def view_single_sample_vcf(request, single_sample_vcf_id):

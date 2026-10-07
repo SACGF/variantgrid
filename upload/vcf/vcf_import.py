@@ -43,14 +43,13 @@ from snpdb.models import (
     CohortSample,
     ImportStatus,
     Sample,
-    SampleFilePath,
     UserSettings,
     VCFFilter,
     VCFFormat,
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, SampleFileType, VariantsType, VCFInfoTypes
+from snpdb.models.models_enums import ImportSource, VariantsType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (
@@ -608,10 +607,8 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
                 sample.extraction_match_date = sequencing_sample.extraction_match_date
                 modified_sample = True
 
-            if bam_file := sequencing_sample.get_single_bam():
-                SampleFilePath.objects.get_or_create(sample=sample, file_path=bam_file.path,
-                                                     file_type=SampleFileType.BAM)
-                modified_sample = True
+            for alignment_file in sequencing_sample.alignmentfile_set.all():
+                alignment_file.create_sample_file_path(sample)
 
             if modified_sample:
                 sample.save()
@@ -633,7 +630,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
             DragenTSO500CombinedVariantOutput.link_arm_sample(sample, sequencing_run)
 
             # Link any QCGeneLists
-            for qcgl in QCGeneList.objects.filter(qc__bam_file__sequencing_sample=sequencing_sample,
+            for qcgl in QCGeneList.objects.filter(qc__alignment_file__sequencing_sample=sequencing_sample,
                                                   custom_text_gene_list__gene_list__isnull=False,
                                                   sample_gene_list__isnull=True).distinct():
                 qcgl.create_and_assign_sample_gene_list(sample)

@@ -8,7 +8,7 @@ from patients.models import Extraction
 from patients.serializers import ExternalReferenceField
 from seqauto.models import (
     Aligner,
-    BamFile,
+    AlignmentFile,
     Experiment,
     Fastq,
     Flagstats,
@@ -389,13 +389,14 @@ class FlagstatsSerializer(serializers.ModelSerializer):
         fields = ("total", "read1", "read2", "mapped", "properly_paired")
 
 
-class BamFilePathSerializer(serializers.ModelSerializer):
+class AlignmentFilePathSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BamFile
+        model = AlignmentFile
         fields = ("path", )
 
 
-class BamFileSerializer(serializers.ModelSerializer):
+class AlignmentFileSerializer(serializers.ModelSerializer):
+    """ Sent as 'bam_file' in the API, a path ending in .cram is stored as a CRAM """
     sequencing_sample = SequencingSampleLookupSerializer(required=False)
     unaligned_reads = UnalignedReadsSerializer(required=False)
     aligner = AlignerSerializer(required=False)
@@ -403,7 +404,7 @@ class BamFileSerializer(serializers.ModelSerializer):
     name = serializers.CharField(read_only=True)
 
     class Meta:
-        model = BamFile
+        model = AlignmentFile
         fields = ("path", "sequencing_sample", "unaligned_reads", "name", "aligner", "flagstats")
 
     def create(self, validated_data):
@@ -429,17 +430,24 @@ class BamFileSerializer(serializers.ModelSerializer):
 
         aligner = AlignerSerializer().create(aligner_data)
         name = os.path.basename(path)
-        bam_file, _ = BamFile.objects.update_or_create(path=path,
-                                                       sequencing_run=sequencing_sample.sequencing_run,
-                                                       sequencing_sample=sequencing_sample,
-                                                       unaligned_reads=unaligned_reads,
-                                                       aligner=aligner,
-                                                       name=name)
+        # Looked up by path so a re-post with a different aligner etc updates rather than adds another file
+        alignment_file, _ = AlignmentFile.objects.update_or_create(
+            path=path,
+            sequencing_sample=sequencing_sample,
+            defaults={
+                "sequencing_run": sequencing_sample.sequencing_run,
+                "unaligned_reads": unaligned_reads,
+                "aligner": aligner,
+                "name": name,
+                "file_type": AlignmentFile.get_file_type_from_path(path),
+            },
+        )
+        alignment_file.link_to_samples()
 
         if flagstats_data:
-            Flagstats.objects.create(bam_file=bam_file, **flagstats_data)
+            Flagstats.objects.create(alignment_file=alignment_file, **flagstats_data)
 
-        return bam_file
+        return alignment_file
 
     def update(self, instance, validated_data):
         flagstats_data = validated_data.get('flagstats')
@@ -448,7 +456,7 @@ class BamFileSerializer(serializers.ModelSerializer):
             flagstats_instance = getattr(instance, 'flagstats', None)
             flagstats_serializer = FlagstatsSerializer(instance=flagstats_instance, data=flagstats_data)
             flagstats_serializer.is_valid(raise_exception=True)
-            flagstats_serializer.save(bam_file=instance)
+            flagstats_serializer.save(alignment_file=instance)
         return instance
 
 
@@ -487,7 +495,7 @@ def validate_unique_vcf_path(klass, path, **kwargs):
 
 
 class SingleSampleVCFSerializer(serializers.ModelSerializer):
-    bam_file = BamFileSerializer(required=False)
+    bam_file = AlignmentFileSerializer(source="alignment_file", required=False)
     variant_caller = VariantCallerSerializer()
 
     class Meta:
@@ -495,14 +503,14 @@ class SingleSampleVCFSerializer(serializers.ModelSerializer):
         fields = ("path", "bam_file", "variant_caller")
 
     def create(self, validated_data):
-        bam_file_data = validated_data['bam_file']
+        alignment_file_data = validated_data['alignment_file']
         variant_caller_data = validated_data['variant_caller']
-        bam_file = BamFileSerializer().create(bam_file_data)
+        alignment_file = AlignmentFileSerializer().create(alignment_file_data)
         variant_caller = VariantCallerSerializer().create(variant_caller_data)
         path = validated_data["path"]
         kwargs = {
-            "sequencing_run": bam_file.sequencing_run,
-            "bam_file": bam_file,
+            "sequencing_run": alignment_file.sequencing_run,
+            "alignment_file": alignment_file,
             "variant_caller": variant_caller,
         }
         validate_unique_vcf_path(SingleSampleVCF, path, **kwargs)
@@ -516,7 +524,7 @@ class SingleSampleVCFSerializer(serializers.ModelSerializer):
 class SequencingFilesSerializer(serializers.Serializer):
     sample_name = serializers.CharField()
     unaligned_reads = UnalignedReadsSerializer(required=False)
-    bam_file = BamFileSerializer()
+    bam_file = AlignmentFileSerializer()
     vcf_file = SingleSampleVCFSerializer()
 
     def __init__(self, *args, **kwargs):
@@ -539,9 +547,9 @@ class SequencingFilesSerializer(serializers.Serializer):
             unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
             bam_file_data['unaligned_reads'] = unaligned_reads_data
 
-        bam_file = BamFileSerializer().create(bam_file_data)
+        bam_file = AlignmentFileSerializer().create(bam_file_data)
 
-        vcf_file_data['bam_file'] = bam_file_data
+        vcf_file_data['alignment_file'] = bam_file_data
         vcf_file = SingleSampleVCFSerializer().create(vcf_file_data)
 
         # Return the full data structure (optional depending on your needs)

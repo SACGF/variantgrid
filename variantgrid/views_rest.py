@@ -16,6 +16,7 @@ API_FEATURES = (
     "upload_status",
     "joint_called_vcf_cross_run",
     "upload_metadata",
+    "cram_alignment_files",  # A sequencing file's 'bam_file' path can be a CRAM
 )
 
 # Import factories the server drives itself, rather than files a client uploads (UploadedFileTypes names, lower case)

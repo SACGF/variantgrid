@@ -1,5 +1,5 @@
 # seqauto — agent notes
-Owns: SequencingRun, SampleSheet/SequencingSample, the sequencing file records (UnalignedReads, BamFile, SingleSampleVCF,
+Owns: SequencingRun, SampleSheet/SequencingSample, the sequencing file records (UnalignedReads, AlignmentFile, SingleSampleVCF,
 JointCalledVCF), QC models, EnrichmentKit and gold coverage, and the seqauto REST API.
 - `LibraryQC` is per-library caller QC that arrives by upload (DRAGEN TSO500 MetricsOutput today), keyed on
   (run name, pair, category) with a nullable SequencingRun and a claimed Specimen - not a SeqAutoRecord, no path.
@@ -30,5 +30,9 @@ API:
 - Reads are open to any logged-in user; writes need a superuser or a member of `SEQAUTO_API_WRITE_GROUP` (the
   pipeline's token user). A new write endpoint subclasses `seqauto/views_rest.py:SeqAutoModelViewSet` or
   `seqauto/views_rest.py:SeqAutoWriteAPIView`; a POST that only reads (batch lookups) stays a plain `APIView`.
+- The API's `bam_file` is an `AlignmentFile`: a path ending `.cram` is stored as a CRAM, and a sequencing sample can
+  have several (one per VCF post, eg a BAM and its recalibrated BAM). They reach IGV as `SampleFilePath` rows, copied at
+  VCF import (`upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing`) and, for a file posted after that, by
+  `seqauto/models/models_seqauto.py:AlignmentFile.link_to_samples`.
 - A client-visible API change needs a name in `variantgrid/views_rest.py:API_FEATURES` (see
   claude/guides/operations.md#authentication-surface).

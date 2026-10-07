@@ -47,10 +47,10 @@
 
 		<h3>Made from this data</h3>
 		<ul>		
-			{% for bam_file in unaligned_reads.bamfile_set.all %}
-				<li class='seqauto-record bam-file'><a href="{% url 'view_bam_file' bam_file.pk %}">{{ bam_file }}</a>
+			{% for alignment_file in unaligned_reads.alignmentfile_set.all %}
+				<li class='seqauto-record bam-file'><a href="{% url 'view_alignment_file' alignment_file.pk %}">{{ alignment_file }}</a>
 				<ul>
-				{% for vcf_file in bam_file.singlesamplevcf_set.all %}
+				{% for vcf_file in alignment_file.singlesamplevcf_set.all %}
 					<li class='seqauto-record vcf-file'><a href="{% url 'view_single_sample_vcf' vcf_file.pk %}">{{ vcf_file }}</a>
 
 					<ul>

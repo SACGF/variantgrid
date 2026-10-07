@@ -31,7 +31,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('qc_data', title="QC Data", pages=('view_qc',)),
         MenuItem('qc_graphs', title="QC Graphs"),
         MenuItem('sequencing_data', title="Seq Runs",
-                 pages=('view_sequencing_run', 'view_sequencing_run_tab', 'view_experiment', 'view_bam_file',
+                 pages=('view_sequencing_run', 'view_sequencing_run_tab', 'view_experiment', 'view_alignment_file',
                         'view_unaligned_reads', 'view_single_sample_vcf', 'view_joint_called_vcf',
                         'view_tso500_pair')),
         MenuItem('sequencing_stats', title="Seq Stats", pages=('sequencing_stats_data',)),

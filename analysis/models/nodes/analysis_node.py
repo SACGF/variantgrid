@@ -80,6 +80,7 @@ from snpdb.models import (
     VCFFilter,
     Wiki,
 )
+from snpdb.models.models_enums import SampleFileType
 from snpdb.variant_collection import write_sql_to_variant_collection
 from snpdb.views.datatable_view import RichColumn
 
@@ -399,7 +400,8 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
 
     def get_bams_dict(self):
         bams_dict = defaultdict(set)
-        sfp_qs = SampleFilePath.objects.filter(sample__in=self.get_samples())
+        sfp_qs = SampleFilePath.objects.filter(sample__in=self.get_samples(),
+                                               file_type__in=SampleFileType.ALIGNMENT_TYPES)
         for sample_id, file_path in sfp_qs.values_list("sample_id", "file_path"):
             bams_dict[sample_id].add(file_path)
         return {k: list(v) for k, v in bams_dict.items()}

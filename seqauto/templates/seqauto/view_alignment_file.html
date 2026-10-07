@@ -2,7 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}{{ bam_file }}{% endblock %}
+{% block title %}{{ alignment_file }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
 {% endblock %}
@@ -13,7 +13,7 @@
 {% block container_table_content %}
 
 	<div>
-	<img class='vcenter' src="{% static 'icons/bam_64.jpg' %}" /> <b>{{ bam_file }}</b>
+	<img class='vcenter' src="{% static 'icons/bam_64.jpg' %}" /> <b>{{ alignment_file }}</b>
 	</div>
 
 		<form>
@@ -38,16 +38,16 @@
 	<div>
 		<h3>Input</h3>
 		<ul>
-		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' bam_file.sequencing_run.pk %}">{{ bam_file.sequencing_run }}</a></li>
-		<li>Sequencing Sample: {{ bam_file.sequencing_sample }}</li>
-		{% if bam_file.unaligned_reads %}
-		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' bam_file.unaligned_reads.pk %}">{{ bam_file.unaligned_reads }}</a></li>
+		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' alignment_file.sequencing_run.pk %}">{{ alignment_file.sequencing_run }}</a></li>
+		<li>Sequencing Sample: {{ alignment_file.sequencing_sample }}</li>
+		{% if alignment_file.unaligned_reads %}
+		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' alignment_file.unaligned_reads.pk %}">{{ alignment_file.unaligned_reads }}</a></li>
 		{% endif %}
 		</ul>
 
 		<h3>Made from this data</h3>
 		<ul>
-			{% for vcf_file in bam_file.singlesamplevcf_set.all %}
+			{% for vcf_file in alignment_file.singlesamplevcf_set.all %}
 				<li class='seqauto-record vcf-file'><a href="{% url 'view_single_sample_vcf' vcf_file.pk %}">{{ vcf_file }}</a>
 
 				<ul>
