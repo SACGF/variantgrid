@@ -212,6 +212,9 @@ class BioCommonsHGVSConverter:
     ) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         try:
             var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(hgvs_string)
+            # A del/dup/inv too big to normalize hasn't read any sequence, so a contig from another build gets this far
+            if var_g.ac not in self.babelfish.ac_to_name_map:
+                raise Contig.ContigNotInBuildError(f"Contig '{var_g.ac}' not in genome build '{self.genome_build.name}'")
             try:
                 vcf_coordinate = self.babelfish.hgvs_to_vcf_coordinate(var_g)
             except HGVSDataNotAvailableError as exc:
