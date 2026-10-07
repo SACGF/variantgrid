@@ -2,6 +2,7 @@ import dataclasses
 import json
 import logging
 import os
+import warnings
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
@@ -111,8 +112,16 @@ class AlignmentFile:
     file_type: Optional[str] = field(default=None, metadata=config(exclude=lambda x: x is None))
 
 
-# Backwards-compat alias (predates AlignmentFile)
-BamFile = AlignmentFile
+@dataclass_json
+@dataclass
+class BamFile(AlignmentFile):
+    """ Deprecated alias for AlignmentFile - use that instead """
+    def __post_init__(self):
+        warnings.warn(
+            "BamFile is deprecated; use AlignmentFile instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
 
 
 @dataclass_json
@@ -129,19 +138,54 @@ VCFFile = SingleSampleVCF
 @dataclass_json
 @dataclass
 class SequencingFile:
+    """ bam_file is deprecated - use alignment_files. It still works (set it and it is sent as before), and
+        get_alignment_files() gives both """
     sample_name: str
     fastq_r1: str
     fastq_r2: str
-    alignment_files: list[AlignmentFile]
-    vcf_file: SingleSampleVCF
+    bam_file: Optional[AlignmentFile] = field(default=None, metadata=config(exclude=lambda x: x is None))
+    # Required - only has a default so alignment_files can follow bam_file without breaking positional args
+    vcf_file: Optional[SingleSampleVCF] = None
+    alignment_files: Optional[list[AlignmentFile]] = \
+        field(default=None, metadata=config(exclude=lambda x: x is None))
+
+    def __post_init__(self):
+        if self.bam_file is not None:
+            warnings.warn(
+                "SequencingFile.bam_file is deprecated; use alignment_files instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+
+    def get_alignment_files(self) -> list[AlignmentFile]:
+        """ bam_file (deprecated) then alignment_files """
+        alignment_files = [self.bam_file] if self.bam_file is not None else []
+        return alignment_files + list(self.alignment_files or [])
 
 
 @dataclass_json
 @dataclass
 class QC:
     sequencing_sample_lookup: SequencingSampleLookup = field(metadata=config(field_name="sequencing_sample"))
-    alignment_files: list[AlignmentFile]
-    vcf_file: SingleSampleVCF
+    # Deprecated - use alignment_files. Still works and is sent as before
+    bam_file: Optional[AlignmentFile] = field(default=None, metadata=config(exclude=lambda x: x is None))
+    # Required - only has a default so alignment_files can follow bam_file without breaking positional args
+    vcf_file: Optional[SingleSampleVCF] = None
+    alignment_files: Optional[list[AlignmentFile]] = \
+        field(default=None, metadata=config(exclude=lambda x: x is None))
+
+    def __post_init__(self):
+        if self.bam_file is not None:
+            warnings.warn(
+                "QC.bam_file is deprecated; use alignment_files instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+
+    def get_alignment_files(self) -> list[AlignmentFile]:
+        """ bam_file (deprecated) then alignment_files """
+        alignment_files = [self.bam_file] if self.bam_file is not None else []
+        return alignment_files + list(self.alignment_files or [])
 
 
 @dataclass_json
@@ -515,7 +559,7 @@ class Command(BaseCommand):
         str, QC]:
         alignment_and_vcf_by_name = {}
         for sf in sequencing_files:
-            alignment_files = [dataclasses.replace(af, aligner=None) for af in sf.alignment_files]
+            alignment_files = [dataclasses.replace(af, aligner=None) for af in sf.get_alignment_files()]
             vcf_file = dataclasses.replace(sf.vcf_file, variant_caller=None)
             alignment_and_vcf_by_name[sf.sample_name] = (alignment_files, vcf_file)
 

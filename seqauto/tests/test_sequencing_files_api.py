@@ -26,6 +26,7 @@ from seqauto.serializers.seqauto_qc_serializers import QCSerializer
 from seqauto.serializers.sequencing_serializers import (
     AlignmentFileSerializer,
     SequencingFilesBulkCreateSerializer,
+    SingleSampleVCFSerializer,
 )
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models.models_enums import SampleFileType
@@ -149,6 +150,8 @@ class SequencingFilesBulkCreateTests(TestCase):
 
         qc = self._make_qc(sample_name)
         self.assertEqual(qc.sequencing_sample, sequencing_sample)
+        # Older clients still read the one alignment file as 'bam_file'
+        self.assertEqual(SingleSampleVCFSerializer(qc.vcf_file).data["bam_file"]["path"], bam_file.path)
 
     def test_bam_params_without_fastqs(self):
         self._bulk_create(self._record(SAMPLE_NAMES[0], fastqs=False))
