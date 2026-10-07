@@ -4,6 +4,7 @@ from functools import cached_property
 from typing import Optional, Self
 from dataclasses_json import DataClassJsonMixin
 from classification.enums import AlleleOriginBucket, SpecialEKeys, TestingContextBucket, ClassificationResultValue
+from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 
 
 @dataclass(frozen=True)
@@ -75,37 +76,6 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
             if man_sub_field not in data_copy:
                 data_copy[man_sub_field] = {}
         return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
-
-
-@dataclass(frozen=True)
-class SomaticClinicalSignificanceValue:
-    tier_level: str
-    amp_level: Optional[str] = None
-
-    @property
-    def without_amp_level(self) -> Self:
-        return SomaticClinicalSignificanceValue(tier_level=self.tier_level)
-
-    @property
-    def sort_value(self) -> int:
-        if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self):
-            return sort_value
-        elif self.amp_level:
-            if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self.without_amp_level):
-                return sort_value
-        # default to 1, so things which shouldn't even be considered somatic can be 0
-        return 1
-
-    @property
-    def pretty_value(self):
-        from classification.models import EvidenceKeyMap
-        parts = [EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)]
-        if amp_level := self.amp_level:
-            parts.append(amp_level)
-        return "".join(parts)
-
-    def __lt__(self, other):
-        return self.sort_value < other.sort_value
 
 
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {

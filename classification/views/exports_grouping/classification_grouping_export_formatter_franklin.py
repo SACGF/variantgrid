@@ -89,7 +89,7 @@ class FranklinExportRow(ExportRow):
         SomaticClinicalSignificanceValue("tier_1"): "TIER_1",
         SomaticClinicalSignificanceValue("tier_1", "A"): "TIER_1A",
         SomaticClinicalSignificanceValue("tier_1", "B"): "TIER_1B",
-        SomaticClinicalSignificanceValue("tier_1_or_2"): "TIER_1",  # TODO make sure there is a warning about this
+        SomaticClinicalSignificanceValue("tier_1_or_2"): "TIER_1",  # The summary will provide the more accurate value
         SomaticClinicalSignificanceValue("tier_2"): "TIER_2",
         SomaticClinicalSignificanceValue("tier_2", "C"): "TIER_2C",
         SomaticClinicalSignificanceValue("tier_2", "D"): "TIER_2D",
@@ -152,11 +152,10 @@ class FranklinExportRow(ExportRow):
         all_classification_values = list(classification_key.sort_values(set(all_classification_values)))
         formatted_classification_values = [classification_key.pretty_value(v) for v in all_classification_values]
 
-        # FIXME triaged values for somatic clin sig wont include amp level - A,B,C etc
         all_clinsig_values = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in
                               self.data.classification_groupings]
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
-        all_clinsig_values = [cs.pretty_value for cs in sorted(set(all_clinsig_values))]
+        all_clinsig_values = [cs.pretty_str for cs in sorted(set(all_clinsig_values))]
 
         latest_date = None
         latest_date_str = None
