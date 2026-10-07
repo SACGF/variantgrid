@@ -5,6 +5,7 @@ over it become symbolic, symbolic ones under it become explicit. Where both form
 ClinVar records moved across - and deleted.
 
 Run from migrations as a ManualOperation whenever the threshold changes (#1358). --dry-run reports the counts.
+Walks Variant pk ranges of --batch-size, printing progress after each.
 """
 from collections import Counter
 from functools import cache
@@ -12,7 +13,7 @@ from functools import cache
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models import ProtectedError, Q
+from django.db.models import Max, ProtectedError, Q
 from django.db.models.functions import Length
 
 from annotation.annotation_pipeline_routing import EXPLICIT_SYMBOLIC_ALTS, pipeline_type_for_variant
@@ -34,36 +35,50 @@ class _NotMerged(Exception):
 
 class Command(BaseCommand):
     category = "one-off"
+    ALREADY_CANONICAL = "already canonical - no change"
 
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true')
+        parser.add_argument('--batch-size', type=int, default=1_000_000,
+                            help="Span of Variant pks examined per step")
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        batch_size = options["batch_size"]
+        max_pk = Variant.objects.aggregate(m=Max("pk"))["m"] or 0
+        changed_label = "to change" if dry_run else "changed"
         for genome_build in GenomeBuild.builds_with_annotation():
             stats = Counter()
-            for v in self._non_canonical_candidates(genome_build):
-                self._canonicalise(dry_run, genome_build, v, stats)
+            for start in range(0, max_pk + 1, batch_size):
+                end = min(start + batch_size, max_pk + 1)
+                for v in self._non_canonical_candidates(genome_build, start, end):
+                    self._canonicalise(dry_run, genome_build, v, stats)
+                num_candidates = stats.total()
+                num_changed = num_candidates - stats[self.ALREADY_CANONICAL]
+                print(f"{genome_build}: pk {end - 1:,} / {max_pk:,} ({100 * end / (max_pk + 1):.0f}%) - "
+                      f"{num_candidates:,} candidates, {num_changed:,} {changed_label}", flush=True)
             self._print_stats(f"{genome_build} variants around VARIANT_SYMBOLIC_ALT_SIZE="
                               f"{settings.VARIANT_SYMBOLIC_ALT_SIZE}", stats)
 
     @staticmethod
-    def _non_canonical_candidates(genome_build):
+    def _non_canonical_candidates(genome_build, start: int, end: int) -> list[Variant]:
         """ Explicit variants with a sequence long enough to be symbolic, and symbolic ones short enough to
-            be explicit. Most explicit candidates are insertions or substitutions that stay as they are """
+            be explicit, with start <= pk < end. Most explicit candidates are insertions or substitutions that
+            stay as they are """
         size = settings.VARIANT_SYMBOLIC_ALT_SIZE
         long_sequences = Sequence.objects.annotate(seq_length=Length("seq")).filter(seq_length__gt=size)
         q_explicit = Q(svlen__isnull=True) & (Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
         q_short_symbolic = Q(alt__seq__in=EXPLICIT_SYMBOLIC_ALTS, svlen__gt=-size, svlen__lt=size)
+        qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), q_explicit | q_short_symbolic,
+                                    pk__gte=start, pk__lt=end)
         # select_related as v.coordinate reads locus/contig/ref/alt
-        qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), q_explicit | q_short_symbolic)
-        return qs.select_related("locus__contig", "locus__ref", "alt").order_by("pk").iterator(chunk_size=1000)
+        return list(qs.select_related("locus__contig", "locus__ref", "alt").order_by("pk"))
 
     def _canonicalise(self, dry_run: bool, genome_build, v: Variant, stats: Counter):
         vc = v.coordinate
         canonical = vc.as_internal_canonical_form(genome_build)
         if canonical == vc:
-            stats["already canonical - no change"] += 1
+            stats[self.ALREADY_CANONICAL] += 1
             return
 
         direction = "symbolic" if canonical.is_symbolic else "explicit"
