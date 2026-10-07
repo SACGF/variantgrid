@@ -44,7 +44,8 @@ Gotchas:
   Variant sits on the contig every build shares (`grch37_x_66905968_66914514` -> `AR GRCh37 X:66905968-66914514 splice`).
   models/models_splice_event.py:SpliceEvent has one job left: gene_splice.py:SpliceEventResolver turns the TSO 500
   caller's breakpoints into the label a classification for the same junction arrives under (seeded in
-  genes/migrations/0093_seed_splice_events.py, canonicalised in 0095), and its `display` is the wording a report gets.
+  genes/migrations/0093_seed_splice_events.py, canonicalised in 0095), and its `display` is the wording a report gets,
+  and `civic_variant_id` the CIViC link the junction shows (#1909), set by hand for a new row.
   It is never consulted on the classification path - gene_splice.py:resolve_splice_string for the string-in path,
   gene_splice.py:find_splice_events_for_string for the lookup-only one search uses.
   The label on the alt is upper-case (`<SPLICE:HGNC:7029:EXON_14_SKIPPING>`) because the alt is a Sequence and every

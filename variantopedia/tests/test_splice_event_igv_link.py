@@ -1,4 +1,5 @@
-"""The junction a gene-level splice variant offers an IGV link at, having no coordinate of its own (#1908)."""
+"""The links a gene-level splice variant offers: IGV at its junction, having no coordinate of its own (#1908),
+and CIViC for a junction CIViC records (#1909)."""
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -39,3 +40,7 @@ class TestSpliceEventIgvLink(TestCase):
                       kwargs={"variant_id": self.variant.pk,
                               "annotation_version_id": self.annotation_version.pk})
         self.assertContains(self.client.get(url), 'data-locus="X:66905968-66914514"')
+
+    def test_variant_page_links_the_junctions_civic_variant(self):
+        response = self.client.get(reverse("view_variant", kwargs={"variant_id": self.variant.pk}))
+        self.assertContains(response, 'href="https://civicdb.org/variants/362"')
