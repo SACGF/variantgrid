@@ -3,10 +3,7 @@ import os
 from collections import defaultdict
 
 from django.conf import settings
-from django.core.exceptions import (
-    MultipleObjectsReturned,
-    ObjectDoesNotExist,
-)
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.signals import pre_delete
@@ -97,14 +94,8 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         gene_coverage = None
         try:
             sequencing_sample = sample.samplefromsequencingsample.sequencing_sample
-            bam_file = sequencing_sample.get_single_bam()
-            if bam_file is None:
-                return None
-            try:
-                qc = bam_file.qc_set.get()
+            if qc := sequencing_sample.get_single_qc():
                 gene_coverage = qc.qcgenecoverage.gene_coverage_collection
-            except (ObjectDoesNotExist, MultipleObjectsReturned):
-                logging.error("Wasn't exactly 1 qc for bam_file %s", bam_file)
         except ObjectDoesNotExist:
             pass
         except Exception:
@@ -283,7 +274,7 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
 
     @staticmethod
     def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
-        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
+        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}

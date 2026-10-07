@@ -29,7 +29,7 @@ current sheet (`carry_extractions_to_new_sample_sheet`), then calls
 
 Per-sample files come in one bulk call, `seqauto/views_rest.py:SequencingFilesBulkCreateView` ->
 `SequencingFilesBulkCreateSerializer`, which resolves each record's `sample_name` on the sheet and creates
-UnalignedReads (optional since the FastQ-less pipelines, SACGF/variantgrid#357), BamFile and `SingleSampleVCF`.
+UnalignedReads (optional since the FastQ-less pipelines, SACGF/variantgrid#357), AlignmentFile and `SingleSampleVCF`.
 Joint calls post through `JointCalledVCFSerializer`; a joint call spanning runs (a trio sequenced on different
 flowcells) sends explicit `sequencing_samples`, and an empty M2M means "the whole sheet"
 (`seqauto/models/models_seqauto.py:JointCalledVCF.get_sequencing_samples`). QC hangs off a `QC` row found by

@@ -31,9 +31,9 @@ class SequencingRunForm(forms.ModelForm):
         fields = ('bad', 'hidden')
 
 
-class BamFileForm(forms.ModelForm, ROFormMixin):
+class AlignmentFileForm(forms.ModelForm, ROFormMixin):
     class Meta:
-        model = models.BamFile
+        model = models.AlignmentFile
         fields = ('path', 'aligner')
         read_only = ('path', 'aligner')
 
@@ -41,8 +41,8 @@ class BamFileForm(forms.ModelForm, ROFormMixin):
 class QCFileForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.QC
-        fields = ('path', 'bam_file', 'vcf_file')
-        read_only = ('path', 'bam_file', 'vcf_file')
+        fields = ('path', 'alignment_file', 'vcf_file')
+        read_only = ('path', 'alignment_file', 'vcf_file')
 
 
 class QCColumnForm(BaseDeclareForm):

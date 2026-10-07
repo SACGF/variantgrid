@@ -3,7 +3,7 @@ Sample files (BAM/CRAM etc, SampleFilePath) beyond the per-sample formset: mappi
 local view of them (UserDataPrefix) for IGV links, and bulk creation for every sample in a VCF from a
 %-style pattern (#647).
 
-Entry points: get_bam_paths_and_user_data_paths, get_example_replacements, validate_sample_file_path_pattern,
+Entry points: get_paths_and_user_data_paths, get_example_replacements, validate_sample_file_path_pattern,
 resolve_sample_file_paths, create_sample_file_paths
 """
 from collections import OrderedDict
@@ -22,20 +22,20 @@ PATTERN_KEYS = ("sample_id", "sample", "vcf_sample_name", "patient_id", "patient
                 "specimen_id", "specimen")
 
 
-def get_bam_paths_and_user_data_paths(user, bam_file_paths):
+def get_paths_and_user_data_paths(user, file_paths):
     replace_dict = UserDataPrefix.get_replace_dict(user)
 
-    bam_paths_and_user_data_paths = OrderedDict()
-    for from_bam in bam_file_paths:
-        to_bam = from_bam
+    paths_and_user_data_paths = OrderedDict()
+    for from_path in file_paths:
+        to_path = from_path
         for prefix, replacement in replace_dict.items():
-            if to_bam.startswith(prefix):
-                to_bam = to_bam.replace(prefix, replacement)
+            if to_path.startswith(prefix):
+                to_path = to_path.replace(prefix, replacement)
                 break
 
-        bam_paths_and_user_data_paths[from_bam] = to_bam
+        paths_and_user_data_paths[from_path] = to_path
 
-    return bam_paths_and_user_data_paths
+    return paths_and_user_data_paths
 
 
 def get_example_replacements(user):
@@ -45,7 +45,7 @@ def get_example_replacements(user):
     if file_paths.exists():
         fp_set = set(file_paths)
         prefix_dirs = get_common_prefix_dirs(fp_set)
-        example_replacements = get_bam_paths_and_user_data_paths(user, prefix_dirs)
+        example_replacements = get_paths_and_user_data_paths(user, prefix_dirs)
 
     return example_replacements
 

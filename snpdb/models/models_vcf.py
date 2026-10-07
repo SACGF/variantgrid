@@ -677,8 +677,9 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         sample_mask = vcfs_marked_for_deletion & not_already_deleting
         return Sample.objects.filter(sample_mask).update(import_status=ImportStatus.MARKED_FOR_DELETION)
 
-    def get_bam_files(self) -> list[str]:
-        sfp_qs = SampleFilePath.objects.filter(sample=self, file_type=SampleFileType.BAM)
+    def get_alignment_files(self) -> list[str]:
+        """ BAMs and CRAMs """
+        sfp_qs = SampleFilePath.objects.filter(sample=self, file_type__in=SampleFileType.ALIGNMENT_TYPES)
         return list(sfp_qs.values_list("file_path", flat=True))
 
     def _get_sample_formatter_params(self) -> dict[str, str]:

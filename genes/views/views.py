@@ -424,7 +424,7 @@ def view_canonical_transcript_collection(request, pk):
     summary = None
     qs = canonical_transcript_collection.genecoveragecanonicaltranscript_set.all()
     if qs.exists():
-        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit__name")
+        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__enrichment_kit__name")
 
     is_system_default = pk == str(settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID)
     context = {"canonical_transcript_collection": canonical_transcript_collection,

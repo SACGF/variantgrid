@@ -10,7 +10,7 @@ li.unaligned-reads {
 	background-image:url(/static/icons/bases_32.png);
 }
 
-li.bam-file {
+li.alignment-file {
 	background-image:url(/static/icons/bam_32.jpg);
 }
 

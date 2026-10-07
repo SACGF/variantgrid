@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 
 from seqauto.models import (
     Aligner,
-    BamFile,
+    AlignmentFile,
     EnrichmentKit,
     Fastq,
     JointCalledVCF,
@@ -265,7 +265,7 @@ class LinkSamplesJointCallPreservedTests(TestCase):
 
     def _make_single_sample_backend_vcf(self, path, sample_name):
         vcf, samples, uploaded_vcf = _make_vcf(self.user, sample_name, [sample_name], path)
-        # Need a BamFile to satisfy SingleSampleVCF FK. Build the chain minimally.
+        # Need a AlignmentFile to satisfy SingleSampleVCF FK. Build the chain minimally.
         seq_sample = next(s for s in self.sequencing_samples if s.sample_name == sample_name)
         fastq = Fastq.objects.create(path=f"/d/{sample_name}.fastq.gz",
                                      sequencing_sample=seq_sample,
@@ -275,7 +275,7 @@ class LinkSamplesJointCallPreservedTests(TestCase):
         unaligned = UnalignedReads.objects.create(sequencing_sample=seq_sample,
                                                   fastq_r1=fastq)
         aligner, _ = Aligner.objects.get_or_create(name="bwa", version="0.7")
-        bam_file = BamFile.objects.create(path=f"/d/{sample_name}.bam",
+        alignment_file = AlignmentFile.objects.create(path=f"/d/{sample_name}.bam",
                                           name=f"{sample_name}.bam",
                                           sequencing_run=self.sequencing_run,
                                           sequencing_sample=seq_sample,
@@ -283,7 +283,7 @@ class LinkSamplesJointCallPreservedTests(TestCase):
                                           aligner=aligner)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
-                                                           bam_file=bam_file,
+                                                           alignment_file=alignment_file,
                                                            variant_caller=self.caller)
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=None,

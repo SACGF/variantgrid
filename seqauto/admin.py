@@ -52,8 +52,8 @@ class UnalignedReadsAdmin(ModelAdminBasics):
     pass
 
 
-@admin.register(models.BamFile)
-class BamFileAdmin(ModelAdminBasics):
+@admin.register(models.AlignmentFile)
+class AlignmentFileAdmin(ModelAdminBasics):
     pass
 
 
