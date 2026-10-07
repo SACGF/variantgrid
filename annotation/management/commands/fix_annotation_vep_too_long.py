@@ -20,9 +20,6 @@ from annotation.vcf_files.import_vcf_annotations import insert_vep_too_long_skip
 from snpdb.archive import DataArchivedError
 from snpdb.models import Variant
 
-# Import processing files are named by batch - keep clear of any the run's original import left behind
-BACKFILL_BATCH_ID = 2104
-
 
 def fix_annotation_vep_too_long():
     for vav in VariantAnnotationVersion.objects.order_by("pk"):
@@ -51,8 +48,7 @@ def _fix_variant_annotation_version(vav: VariantAnnotationVersion, sv_max_size: 
         # pk-ordered first() rather than exists() so the planner only reads the range
         if filter_vep_sv_max_size(long_sv_qs, sv_max_size, too_long=True).order_by("pk").first() is None:
             continue
-        if inserted := insert_vep_too_long_skipped(annotation_run, sv_max_size=sv_max_size,
-                                                   batch_id=BACKFILL_BATCH_ID):
+        if inserted := insert_vep_too_long_skipped(annotation_run, sv_max_size=sv_max_size):
             num_runs += 1
             num_rows += inserted
             logging.info("%s: wrote %d TOO_LONG rows", annotation_run, inserted)

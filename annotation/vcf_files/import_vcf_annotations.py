@@ -187,8 +187,7 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
     _insert_vep_skipped_variants(bulk_inserter)
 
 
-def insert_vep_too_long_skipped(annotation_run: AnnotationRun, sv_max_size: Optional[int] = None,
-                                batch_id: int = 0) -> int:
+def insert_vep_too_long_skipped(annotation_run: AnnotationRun, sv_max_size: Optional[int] = None) -> int:
     """ TOO_LONG rows for the SVs in a run's range that the dump left out, for a run that never reaches
         handle_vep_skipped: one whose dump was empty, or a finished run being backfilled (#2104).
         Returns the number of rows written. """
@@ -197,7 +196,6 @@ def insert_vep_too_long_skipped(annotation_run: AnnotationRun, sv_max_size: Opti
     variants = _get_vep_too_long_variants(annotation_run, sv_max_size)
     if variants:
         bulk_inserter = BulkVEPVCFAnnotationInserter(annotation_run, validate_columns=False, vep_skipped_only=True)
-        bulk_inserter.batch_id = batch_id
         for v in variants:
             _add_vep_skipped_variant(annotation_run, bulk_inserter, v, VEPSkippedReason.TOO_LONG)
         _insert_vep_skipped_variants(bulk_inserter)
