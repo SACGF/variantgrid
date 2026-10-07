@@ -104,9 +104,15 @@ class JointCalledVCF:
 
 @dataclass_json
 @dataclass
-class BamFile:
+class AlignmentFile:
+    """ A BAM or CRAM - file_type ('BAM' / 'CRAM') is inferred from the extension when not set """
     path: str
     aligner: Optional[Aligner] = field(default=None, metadata=config(exclude=lambda x: x is None))
+    file_type: Optional[str] = field(default=None, metadata=config(exclude=lambda x: x is None))
+
+
+# Backwards-compat alias (predates AlignmentFile)
+BamFile = AlignmentFile
 
 
 @dataclass_json
@@ -126,7 +132,7 @@ class SequencingFile:
     sample_name: str
     fastq_r1: str
     fastq_r2: str
-    bam_file: BamFile
+    alignment_files: list[AlignmentFile]  # The VCF was called from the first
     vcf_file: SingleSampleVCF
 
 
@@ -134,7 +140,7 @@ class SequencingFile:
 @dataclass
 class QC:
     sequencing_sample_lookup: SequencingSampleLookup = field(metadata=config(field_name="sequencing_sample"))
-    bam_file: BamFile
+    alignment_file: AlignmentFile
     vcf_file: SingleSampleVCF
 
 
@@ -392,14 +398,14 @@ class Command(BaseCommand):
 
         aligner = Aligner(name='BWA', version="0.7.18")
         variant_caller_gatk = VariantCaller(name="GATK", version="4.1.9.0")
-        bam_file_1 = BamFile(
+        bam_file_1 = AlignmentFile(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
             aligner=aligner)
         vcf_file_1 = SingleSampleVCF(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
             variant_caller=variant_caller_gatk)
 
-        bam_file_2 = BamFile(
+        bam_file_2 = AlignmentFile(
             path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
             aligner=aligner)
         vcf_file_2 = SingleSampleVCF(
@@ -410,12 +416,12 @@ class Command(BaseCommand):
             SequencingFile(sample_name="fake_sample_1",
                            fastq_r1="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R1.fastq.gz",
                            fastq_r2="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R2.fastq.gz",
-                           bam_file=bam_file_1,
+                           alignment_files=[bam_file_1],
                            vcf_file=vcf_file_1),
             SequencingFile(sample_name="fake_sample_2",
                            fastq_r1="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz",
                            fastq_r2="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz",
-                           bam_file=bam_file_2,
+                           alignment_files=[bam_file_2],
                            vcf_file=vcf_file_2)
         ]
 
@@ -507,17 +513,17 @@ class Command(BaseCommand):
     @staticmethod
     def _get_qc_by_sample_name(sample_sheet_lookup: SampleSheetLookup, sequencing_files: list[SequencingFile]) -> dict[
         str, QC]:
-        bam_and_vcf_by_name = {}
+        alignment_and_vcf_by_name = {}
         for sf in sequencing_files:
-            bam_file = dataclasses.replace(sf.bam_file, aligner=None)
+            alignment_file = dataclasses.replace(sf.alignment_files[0], aligner=None)
             vcf_file = dataclasses.replace(sf.vcf_file, variant_caller=None)
-            bam_and_vcf_by_name[sf.sample_name] = (bam_file, vcf_file)
+            alignment_and_vcf_by_name[sf.sample_name] = (alignment_file, vcf_file)
 
         qc_by_name = {}
-        for sample_name, (bam_file, vcf_file) in bam_and_vcf_by_name.items():
+        for sample_name, (alignment_file, vcf_file) in alignment_and_vcf_by_name.items():
             sequencing_sample_lookup = SequencingSampleLookup(sample_sheet_lookup=sample_sheet_lookup,
                                                               sample_name=sample_name)
             qc_by_name[sample_name] = QC(sequencing_sample_lookup=sequencing_sample_lookup,
-                                         bam_file=bam_file,
+                                         alignment_file=alignment_file,
                                          vcf_file=vcf_file)
         return qc_by_name

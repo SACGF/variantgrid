@@ -37,34 +37,51 @@ class IlluminaFlowcellQCSerializer(serializers.ModelSerializer):
 
 
 class QCSerializer(serializers.ModelSerializer):
-    # Instead of dealing with all the bam/vcf etc - we'll just deal with sequencing_sample and
-    # assume we're using the latest ones associated with that
+    """ Finds a QC from its sequencing sample and VCF. The QC hangs off the VCF's own alignment file (the one it was
+        called from), so the alignment file sent only picks between VCFs sharing a path - it can be any of the
+        sample's alignment files, eg a CRAM sent after the BAM the VCF was called from.
+        'bam_file' is the pre 'alignment_file' name and still accepted """
     sequencing_sample = SequencingSampleLookupSerializer()
-    bam_file = AlignmentFilePathSerializer(source="alignment_file")
+    alignment_file = AlignmentFilePathSerializer(required=False)
+    bam_file = AlignmentFilePathSerializer(write_only=True, required=False)
     vcf_file = SingleSampleVCFPathSerializer()
 
     class Meta:
         model = QC
-        fields = ("sequencing_sample", "bam_file", "vcf_file")
+        fields = ("sequencing_sample", "alignment_file", "bam_file", "vcf_file")
+
+    def validate(self, attrs):
+        alignment_file = attrs.get("alignment_file")
+        if bam_file := attrs.pop("bam_file", None):
+            if alignment_file and alignment_file["path"] != bam_file["path"]:
+                raise serializers.ValidationError("'alignment_file' and deprecated 'bam_file' have different paths "
+                                                  f"('{alignment_file['path']}' / '{bam_file['path']}')")
+            attrs["alignment_file"] = bam_file
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["bam_file"] = data["alignment_file"]  # Older clients read 'bam_file'
+        return data
 
     @staticmethod
     def get_object(data):
         # We are passed "sequencing_sample" - which we can use to get what we really want
         sequencing_sample = SequencingSampleLookupSerializer.get_object(data.pop("sequencing_sample"))
         sequencing_run = sequencing_sample.sequencing_run
-        # Occasionally we could have multiple alignment and VCF files in there that match path
-        # we want to make sure we get the alignment file out that is linked to the VCF file we pull out
-        alignment_file_data = data.pop("alignment_file")
+        alignment_file_data = data.pop("alignment_file", None)
         vcf_file_data = data.pop("vcf_file")
         vcf_file_kwargs = {
             "path": vcf_file_data["path"],
-            # Make sure alignment file also matches
-            "alignment_file__path": alignment_file_data["path"],
             "alignment_file__sequencing_run": sequencing_run,
-            "alignment_file__sequencing_sample": sequencing_sample
-
+            "alignment_file__sequencing_sample": sequencing_sample,
         }
-        vcf_file = SingleSampleVCF.objects.filter(**vcf_file_kwargs).first()
+        vcf_qs = SingleSampleVCF.objects.filter(**vcf_file_kwargs)
+        if alignment_file_data:
+            called_from_alignment_qs = vcf_qs.filter(alignment_file__path=alignment_file_data["path"])
+            if called_from_alignment_qs.exists():
+                vcf_qs = called_from_alignment_qs
+        vcf_file = vcf_qs.order_by("pk").first()
         if not vcf_file:
             raise SingleSampleVCF.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
 

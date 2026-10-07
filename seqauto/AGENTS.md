@@ -30,8 +30,10 @@ API:
 - Reads are open to any logged-in user; writes need a superuser or a member of `SEQAUTO_API_WRITE_GROUP` (the
   pipeline's token user). A new write endpoint subclasses `seqauto/views_rest.py:SeqAutoModelViewSet` or
   `seqauto/views_rest.py:SeqAutoWriteAPIView`; a POST that only reads (batch lookups) stays a plain `APIView`.
-- The API's `bam_file` is an `AlignmentFile`: a path ending `.cram` is stored as a CRAM, and a sequencing sample can
-  have several (one per VCF post, eg a BAM and its recalibrated BAM). They reach IGV as `SampleFilePath` rows, copied at
+- A sequencing file record's `alignment_files` (and the older single `bam_file`, merged in first) are `AlignmentFile`s:
+  BAM or CRAM, by `file_type` or a `.cram` extension, several per sequencing sample. The record's VCF hangs off the
+  first, and a QC off its VCF's alignment file whichever one the QC post names
+  (`seqauto/serializers/sequencing_serializers.py:SequencingFilesSerializer`). They reach IGV as `SampleFilePath` rows, copied at
   VCF import (`upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing`) and, for a file posted after that, by
   `seqauto/models/models_seqauto.py:AlignmentFile.link_to_samples`.
 - A client-visible API change needs a name in `variantgrid/views_rest.py:API_FEATURES` (see
