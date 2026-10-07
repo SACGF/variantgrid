@@ -679,7 +679,6 @@ CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN = False
 
 CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
 CLASSIFICATION_REDCAP_EXPORT = True
 CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful

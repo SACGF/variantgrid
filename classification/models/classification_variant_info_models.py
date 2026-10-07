@@ -112,7 +112,6 @@ class HGVSConverterVersion(TimeStampedModel):
 @dataclass(frozen=True)
 class HGVSResolution:
     resolved_hgvs: str
-    resolved_hgvs_compat: str
     hgvs_converter_version: HGVSConverterVersion
     hgvs_converter_data_version: str
     """ cdot data version or ClinGen date used during this resolution """
@@ -151,9 +150,6 @@ class ResolvedVariantInfo(TimeStampedModel):
     def resolved_hgvs_display(self) -> Optional[HGVSDisplay]:
         if components := self.resolved_hgvs_obj:
             return HGVSDisplay(components, genome_build=self.genome_build)
-
-    resolved_hgvs_compat = TextField(null=True, blank=True)
-    """ resolved_hgvs with all bases explicit in the case of dels & dups """
 
     hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to generate resolved_hgvs  """
@@ -198,7 +194,6 @@ class ResolvedVariantInfo(TimeStampedModel):
             raise ValueError("set_variant_and_save requires a non-None variant")
 
         self.resolved_hgvs = None
-        self.resolved_hgvs_compat = None
         self.gene_symbol = None
         self.transcript_version: Optional[TranscriptVersion] = None
         self.variant = variant
@@ -216,7 +211,6 @@ class ResolvedVariantInfo(TimeStampedModel):
         try:
             hgvs_resolution = self.recalc_resolved_hgvs()
             self.resolved_hgvs = hgvs_resolution.resolved_hgvs
-            self.resolved_hgvs_compat = hgvs_resolution.resolved_hgvs_compat
             self.hgvs_converter_version = hgvs_resolution.hgvs_converter_version
             self.transcript_version = hgvs_resolution.transcript_version
             self.gene_symbol = hgvs_resolution.gene_symbol
@@ -261,7 +255,6 @@ class ResolvedVariantInfo(TimeStampedModel):
                                                           used_converter_type=result.converter_info.used_converter_type)
         return HGVSResolution(
                 resolved_hgvs=resolved_hgvs,
-                resolved_hgvs_compat=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
                 hgvs_converter_version=hgvs_converter_version,
                 hgvs_converter_data_version=data_version,
                 transcript_version=transcript_version,
@@ -1064,13 +1057,6 @@ class ImportedAlleleInfo(TimeStampedModel):
                             message_parts += diffs
                         if is_c_hgvs_same_as_imported(rvi.genome_build, recalc.resolved_hgvs):
                             message_parts.append("Now matches imported value")
-
-                    elif rvi.resolved_hgvs_compat != recalc.resolved_hgvs_compat:
-                        if message_parts:
-                            message_parts.append(" ")
-                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build} compatible\n{rvi.resolved_hgvs_compat} ->\n{recalc.resolved_hgvs_compat}")
-                        if diffs := c_hgvs_diff_if_applicable(rvi.resolved_hgvs_compat, recalc.resolved_hgvs_compat):
-                            message_parts += diffs
                 except Exception as ex:
                     # Make sure that we still fail
                     if rvi.resolved_hgvs and HGVSComponents.HGVS_REGEX.match(rvi.resolved_hgvs):

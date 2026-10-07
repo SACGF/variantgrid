@@ -772,20 +772,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
 
     @property
-    def resolved_hgvs_grch37_compat(self) -> Optional[str]:
-        try:
-            return self.allele_info.grch37.resolved_hgvs_compat
-        except AttributeError:
-            return None
-
-    @property
-    def resolved_hgvs_grch38_compat(self) -> Optional[str]:
-        try:
-            return self.allele_info.grch38.resolved_hgvs_compat
-        except AttributeError:
-            return None
-
-    @property
     def metrics_logging_key(self) -> tuple[str, Any]:
         return "classification_id", self.pk
 
@@ -2354,11 +2340,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 })
         return c_hgvs
 
-    def get_resolved_hgvs(self, genome_build: GenomeBuild, use_compat: bool = False) -> Optional[str]:
+    def get_resolved_hgvs(self, genome_build: GenomeBuild) -> Optional[str]:
         if genome_build == genome_build.grch37():
-            return self.resolved_hgvs_grch37 if not use_compat else self.resolved_hgvs_grch37_compat
+            return self.resolved_hgvs_grch37
         if genome_build == genome_build.grch38():
-            return self.resolved_hgvs_grch38 if not use_compat else self.resolved_hgvs_grch38_compat
+            return self.resolved_hgvs_grch38
         return self._generate_resolved_hgvs(genome_build)
 
     def __str__(self) -> str:
