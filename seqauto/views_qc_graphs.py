@@ -110,7 +110,7 @@ def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
 
 def _qc_column_box_data(qc_column: QCColumn, use_percent: bool) -> dict[str, list]:
     """ QC values per enrichment kit (full name), optionally as a percentage of the QC type's total field """
-    sequencing_sample_path = 'alignment_file__sequencing_sample'
+    sequencing_sample_path = 'sequencing_sample'
     enrichment_kit_path = sequencing_sample_path + '__enrichment_kit'
 
     def get_field(f):
@@ -191,7 +191,7 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     # Create a new label based on sequencing_run + sample
     current_label = get_label(qc_exec_summary.sequencing_run.name, qc_exec_summary.sample_name)
     sequencing_run_names = qc_exec_summary_data[sequencing_run_column]
-    sample_names = qc_exec_summary_data["qc__alignment_file__sequencing_sample__sample_name"]
+    sample_names = qc_exec_summary_data["qc__sequencing_sample__sample_name"]
     labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 

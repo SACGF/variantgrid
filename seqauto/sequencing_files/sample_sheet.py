@@ -48,8 +48,8 @@ def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
 
 
 def _reassign_sequencing_data_to_current_samples(old_samples_by_name, current_samples_by_name):
-    """ Reassign the existing Fastq / UnalignedReads / AlignmentFile records onto the current sheet's
-        SequencingSample with the same sample name (match by name).
+    """ Reassign the existing Fastq / UnalignedReads / AlignmentFile / SingleSampleVCF / QC records onto the
+        current sheet's SequencingSample with the same sample name (match by name).
         Used when a newer SampleSheet replaces an old one. """
     for sequencing_sample_name, old_sequencing_sample in old_samples_by_name.items():
         current_ss = current_samples_by_name.get(sequencing_sample_name)
@@ -70,6 +70,9 @@ def _reassign_sequencing_data_to_current_samples(old_samples_by_name, current_sa
             logging.info("Updating BAM file with current sequencing sample")
             alignment_file.sequencing_sample = current_ss
             alignment_file.save()
+
+        old_sequencing_sample.singlesamplevcf_set.update(sequencing_sample=current_ss)
+        old_sequencing_sample.qc_set.update(sequencing_sample=current_ss)
 
 
 def _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, new_sample_sheet) -> bool:

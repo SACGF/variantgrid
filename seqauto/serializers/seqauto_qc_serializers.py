@@ -3,6 +3,7 @@ from rest_framework import serializers
 from genes.serializers import GeneCoverageCollectionSerializer, SampleGeneListSerializer
 from seqauto.models import (
     QC,
+    AlignmentFile,
     FastQC,
     IlluminaFlowcellQC,
     QCExecSummary,
@@ -16,6 +17,9 @@ from seqauto.serializers.sequencing_serializers import (
     SampleSheetLookupSerializer,
     SequencingSampleLookupSerializer,
     SingleSampleVCFPathSerializer,
+    add_deprecated_bam_file,
+    merge_deprecated_bam_file,
+    resolve_sequencing_sample,
 )
 
 
@@ -37,38 +41,42 @@ class IlluminaFlowcellQCSerializer(serializers.ModelSerializer):
 
 
 class QCSerializer(serializers.ModelSerializer):
-    # Instead of dealing with all the bam/vcf etc - we'll just deal with sequencing_sample and
-    # assume we're using the latest ones associated with that
+    """ A QC is keyed on (sequencing sample, VCF). Its alignment files are the ones sent, each of which must be one
+        of the sequencing sample's, else the VCF's. A re-post sending alignment files replaces them """
     sequencing_sample = SequencingSampleLookupSerializer()
-    bam_file = AlignmentFilePathSerializer(source="alignment_file")
+    bam_file = AlignmentFilePathSerializer(write_only=True, required=False)
+    alignment_files = AlignmentFilePathSerializer(many=True, required=False)
     vcf_file = SingleSampleVCFPathSerializer()
 
     class Meta:
         model = QC
-        fields = ("sequencing_sample", "bam_file", "vcf_file")
+        fields = ("sequencing_sample", "bam_file", "alignment_files", "vcf_file")
+
+    def validate(self, attrs):
+        return merge_deprecated_bam_file(attrs)
+
+    def to_representation(self, instance):
+        return add_deprecated_bam_file(super().to_representation(instance))
 
     @staticmethod
     def get_object(data):
-        # We are passed "sequencing_sample" - which we can use to get what we really want
-        sequencing_sample = SequencingSampleLookupSerializer.get_object(data.pop("sequencing_sample"))
-        sequencing_run = sequencing_sample.sequencing_run
-        # Occasionally we could have multiple alignment and VCF files in there that match path
-        # we want to make sure we get the alignment file out that is linked to the VCF file we pull out
-        alignment_file_data = data.pop("alignment_file")
+        sequencing_sample = resolve_sequencing_sample(data.pop("sequencing_sample"))
+        alignment_file_paths = [af["path"] for af in data.pop("alignment_files", None) or []]
         vcf_file_data = data.pop("vcf_file")
         vcf_file_kwargs = {
             "path": vcf_file_data["path"],
-            # Make sure alignment file also matches
-            "alignment_file__path": alignment_file_data["path"],
-            "alignment_file__sequencing_run": sequencing_run,
-            "alignment_file__sequencing_sample": sequencing_sample
-
+            "sequencing_sample": sequencing_sample,
         }
         vcf_file = SingleSampleVCF.objects.filter(**vcf_file_kwargs).first()
         if not vcf_file:
             raise SingleSampleVCF.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
 
-        defaults = {}
+        alignment_files = list(AlignmentFile.objects.filter(sequencing_sample=sequencing_sample,
+                                                            path__in=alignment_file_paths))
+        if missing := set(alignment_file_paths) - {af.path for af in alignment_files}:
+            raise AlignmentFile.DoesNotExist(f"{sequencing_sample} has no alignment files: {', '.join(sorted(missing))}")
+
+        defaults = {"sequencing_run": sequencing_sample.sequencing_run}
         qc_path = data.get("path")
         if qc_path is None:
             # We currently require path to define QC (in sequencing scans)
@@ -76,12 +84,15 @@ class QCSerializer(serializers.ModelSerializer):
             qc_path = QC.get_path_from_vcf(vcf_file)
         defaults["path"] = qc_path
 
-        qc, _ = QC.objects.get_or_create(
-            sequencing_run=sequencing_run,
-            alignment_file=vcf_file.alignment_file,
+        qc, created = QC.objects.get_or_create(
+            sequencing_sample=sequencing_sample,
             vcf_file=vcf_file,
             defaults=defaults
         )
+        if alignment_files:
+            qc.alignment_files.set(alignment_files)
+        elif created:
+            qc.alignment_files.set(vcf_file.alignment_files.all())
         return qc
 
 

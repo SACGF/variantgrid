@@ -155,7 +155,7 @@ class ExtractionCarriedDownToSamplesTest(TestCase):
         uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload, vcf=vcf)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
-                                                           alignment_file=self.alignment_file,
+                                                           sequencing_sample=self.sequencing_sample,
                                                            variant_caller=variant_caller or self.variant_caller)
         backend_vcf = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                                 single_sample_vcf=single_sample_vcf)

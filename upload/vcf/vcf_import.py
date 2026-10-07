@@ -630,7 +630,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
             DragenTSO500CombinedVariantOutput.link_arm_sample(sample, sequencing_run)
 
             # Link any QCGeneLists
-            for qcgl in QCGeneList.objects.filter(qc__alignment_file__sequencing_sample=sequencing_sample,
+            for qcgl in QCGeneList.objects.filter(qc__sequencing_sample=sequencing_sample,
                                                   custom_text_gene_list__gene_list__isnull=False,
                                                   sample_gene_list__isnull=True).distinct():
                 qcgl.create_and_assign_sample_gene_list(sample)

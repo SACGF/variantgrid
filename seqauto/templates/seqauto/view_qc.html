@@ -51,10 +51,12 @@
 		<ul>
 		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' qc.sequencing_run.pk %}">{{ qc.sequencing_run }}</a></li>
 		<li>Sequencing Sample: {{ qc.sequencing_sample }}</li>
-		{% if qc.alignment_file.unaligned_reads %}
-		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' qc.alignment_file.unaligned_reads.pk %}">{{ qc.alignment_file.unaligned_reads }}</a></li>
-		{% endif %}
-		<li>{{ qc.alignment_file.get_file_type_display }}: <a href="{% url 'view_alignment_file' qc.alignment_file.pk %}">{{ qc.alignment_file }}</a></li>
+		{% for unaligned_reads in qc.sequencing_sample.unalignedreads_set.all %}
+		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' unaligned_reads.pk %}">{{ unaligned_reads }}</a></li>
+		{% endfor %}
+		{% for alignment_file in qc.alignment_files.all %}
+		<li>{{ alignment_file.get_file_type_display }}: <a href="{% url 'view_alignment_file' alignment_file.pk %}">{{ alignment_file }}</a></li>
+		{% endfor %}
 		<li>VCF: <a href="{% url 'view_single_sample_vcf' qc.vcf_file.pk %}">{{ qc.vcf_file }}</a></li>
 		</ul>
 	</div>

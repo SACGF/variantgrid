@@ -151,7 +151,7 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
             multi_sample_vcfs.append(rv)
 
     single_sample_vcfs = {}
-    ss_vcf_qs = SingleSampleVCF.objects.filter(alignment_file__sequencing_sample__sample_sheet=sample_sheet)
+    ss_vcf_qs = SingleSampleVCF.objects.filter(sequencing_sample__sample_sheet=sample_sheet)
     for single_sample_vcf in ss_vcf_qs.select_related("backendvcf__uploaded_vcf__vcf"):
         single_sample_vcfs[single_sample_vcf.pk] = run_vcf(single_sample_vcf, single_sample_vcf.vcf)
 

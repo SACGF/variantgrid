@@ -27,6 +27,7 @@ from seqauto.models import (
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from seqauto.signals.signals_list import sequencing_run_created_signal
 from snpdb.models import Manufacturer
+from snpdb.models.models_enums import SampleFileType
 
 
 class ManufacturerSerializer(serializers.ModelSerializer):
@@ -395,27 +396,49 @@ class AlignmentFilePathSerializer(serializers.ModelSerializer):
         fields = ("path", )
 
 
+class AlignmentFileTypeField(serializers.ChoiceField):
+    """ 'BAM' or 'CRAM' on the wire (any case), stored as a SampleFileType """
+    FILE_TYPES = {
+        "BAM": SampleFileType.BAM,
+        "CRAM": SampleFileType.CRAM,
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(choices=list(self.FILE_TYPES), **kwargs)
+
+    def to_internal_value(self, data):
+        return self.FILE_TYPES[super().to_internal_value(str(data).upper())]
+
+    def to_representation(self, value):
+        return SampleFileType(value).label
+
+
 class AlignmentFileSerializer(serializers.ModelSerializer):
-    """ Sent as 'bam_file' in the API, a path ending in .cram is stored as a CRAM """
+    """ A sequencing file record's 'alignment_files' entry, or its deprecated single 'bam_file'.
+        file_type is inferred from a .bam / .cram extension when not sent. aligner can be left off a re-post
+        of a known path, which keeps the aligner it has """
     sequencing_sample = SequencingSampleLookupSerializer(required=False)
     unaligned_reads = UnalignedReadsSerializer(required=False)
     aligner = AlignerSerializer(required=False)
+    file_type = AlignmentFileTypeField(required=False)
     flagstats = FlagstatsSerializer(read_only=True, required=False)  # 1-to-1 field
     name = serializers.CharField(read_only=True)
 
     class Meta:
         model = AlignmentFile
-        fields = ("path", "sequencing_sample", "unaligned_reads", "name", "aligner", "flagstats")
+        fields = ("path", "sequencing_sample", "unaligned_reads", "name", "aligner", "file_type", "flagstats")
 
     def create(self, validated_data):
-        aligner_data = validated_data["aligner"]
         flagstats_data = validated_data.get('flagstats')
         path = validated_data["path"]
 
         sequencing_sample = resolve_sequencing_sample(validated_data.get("sequencing_sample"))
         unaligned_reads = None
         if unaligned_reads_data := validated_data.get("unaligned_reads"):
-            unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
+            if isinstance(unaligned_reads_data, UnalignedReads):
+                unaligned_reads = unaligned_reads_data
+            else:
+                unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
             if sequencing_sample:
                 if unaligned_reads.sequencing_sample_id != sequencing_sample.pk:
                     msg = f"Alignment file '{path}' sequencing_sample '{sequencing_sample}' doesn't match " \
@@ -428,19 +451,22 @@ class AlignmentFileSerializer(serializers.ModelSerializer):
             msg = f"Alignment file '{path}' needs either 'sequencing_sample' or 'unaligned_reads' to say which sample it's from"
             raise serializers.ValidationError(msg)
 
-        aligner = AlignerSerializer().create(aligner_data)
-        name = os.path.basename(path)
+        defaults = {
+            "sequencing_run": sequencing_sample.sequencing_run,
+            "unaligned_reads": unaligned_reads,
+            "name": os.path.basename(path),
+            "file_type": validated_data.get("file_type") or AlignmentFile.get_file_type_from_path(path),
+        }
+        if aligner_data := validated_data.get("aligner"):
+            defaults["aligner"] = AlignerSerializer().create(aligner_data)
+        elif not AlignmentFile.objects.filter(path=path, sequencing_sample=sequencing_sample).exists():
+            raise serializers.ValidationError(f"Alignment file '{path}' is new, so needs an 'aligner'")
+
         # Looked up by path so a re-post with a different aligner etc updates rather than adds another file
         alignment_file, _ = AlignmentFile.objects.update_or_create(
             path=path,
             sequencing_sample=sequencing_sample,
-            defaults={
-                "sequencing_run": sequencing_sample.sequencing_run,
-                "unaligned_reads": unaligned_reads,
-                "aligner": aligner,
-                "name": name,
-                "file_type": AlignmentFile.get_file_type_from_path(path),
-            },
+            defaults=defaults,
         )
         alignment_file.link_to_samples()
 
@@ -494,23 +520,56 @@ def validate_unique_vcf_path(klass, path, **kwargs):
             })
 
 
+def merge_deprecated_bam_file(attrs: dict) -> dict:
+    """ 'bam_file' is the single alignment file of the API before 'alignment_files', and still accepted -
+        an old client's bam_file is [bam_file]. Sent together, bam_file is added to alignment_files """
+    alignment_files = attrs.get("alignment_files") or []
+    if bam_file := attrs.pop("bam_file", None):
+        alignment_files = [bam_file, *alignment_files]
+    attrs["alignment_files"] = alignment_files
+    return attrs
+
+
+def add_deprecated_bam_file(data: dict) -> dict:
+    """ Older clients read 'bam_file', which only means something for a record with 1 alignment file """
+    alignment_files = data.get("alignment_files") or []
+    data["bam_file"] = alignment_files[0] if len(alignment_files) == 1 else None
+    return data
+
+
 class SingleSampleVCFSerializer(serializers.ModelSerializer):
-    bam_file = AlignmentFileSerializer(source="alignment_file", required=False)
+    """ Keyed on (sequencing sample, variant caller): a re-post replaces the path and alignment files """
+    bam_file = AlignmentFileSerializer(write_only=True, required=False)
+    alignment_files = AlignmentFileSerializer(many=True, required=False)
     variant_caller = VariantCallerSerializer()
 
     class Meta:
         model = SingleSampleVCF
-        fields = ("path", "bam_file", "variant_caller")
+        fields = ("path", "bam_file", "alignment_files", "variant_caller")
+
+    def validate(self, attrs):
+        return merge_deprecated_bam_file(attrs)
+
+    def to_representation(self, instance):
+        return add_deprecated_bam_file(super().to_representation(instance))
 
     def create(self, validated_data):
-        alignment_file_data = validated_data['alignment_file']
-        variant_caller_data = validated_data['variant_caller']
-        alignment_file = AlignmentFileSerializer().create(alignment_file_data)
-        variant_caller = VariantCallerSerializer().create(variant_caller_data)
+        """ alignment_files are validated data, or AlignmentFiles a parent serializer has already created """
         path = validated_data["path"]
+        alignment_files = [af if isinstance(af, AlignmentFile) else AlignmentFileSerializer().create(af)
+                           for af in validated_data.get("alignment_files", [])]
+        if not alignment_files:
+            raise serializers.ValidationError({"alignment_files": f"VCF '{path}' needs at least one alignment file"})
+        sequencing_samples = {af.sequencing_sample for af in alignment_files}
+        if len(sequencing_samples) != 1:
+            names = ", ".join(sorted(str(ss) for ss in sequencing_samples))
+            raise serializers.ValidationError({"alignment_files": f"VCF '{path}' alignment files are from more "
+                                                                  f"than one sequencing sample: {names}"})
+        sequencing_sample = sequencing_samples.pop()
+        variant_caller = VariantCallerSerializer().create(validated_data['variant_caller'])
         kwargs = {
-            "sequencing_run": alignment_file.sequencing_run,
-            "alignment_file": alignment_file,
+            "sequencing_run": sequencing_sample.sequencing_run,
+            "sequencing_sample": sequencing_sample,
             "variant_caller": variant_caller,
         }
         validate_unique_vcf_path(SingleSampleVCF, path, **kwargs)
@@ -518,45 +577,56 @@ class SingleSampleVCFSerializer(serializers.ModelSerializer):
             **kwargs,
             defaults={"path": path},
         )
+        single_sample_vcf.alignment_files.set(alignment_files)
         return single_sample_vcf
 
 
 class SequencingFilesSerializer(serializers.Serializer):
+    """ One sample's FastQs, alignment files and a VCF called from them """
     sample_name = serializers.CharField()
     unaligned_reads = UnalignedReadsSerializer(required=False)
-    bam_file = AlignmentFileSerializer()
+    bam_file = AlignmentFileSerializer(required=False)
+    alignment_files = AlignmentFileSerializer(many=True, required=False)
     vcf_file = SingleSampleVCFSerializer()
 
     def __init__(self, *args, **kwargs):
         self.sequencing_sample = kwargs.pop("sequencing_sample", None)
         super().__init__(*args, **kwargs)
 
+    def validate(self, attrs):
+        attrs = merge_deprecated_bam_file(attrs)
+        if not attrs["alignment_files"]:
+            raise serializers.ValidationError({"alignment_files": "Needs at least one alignment file"})
+        return attrs
+
     def create(self, validated_data):
         unaligned_reads_data = validated_data.pop('unaligned_reads', None)
-        alignment_file_data = validated_data.pop('bam_file')
+        alignment_files_data = validated_data.pop('alignment_files')
         vcf_file_data = validated_data.pop('vcf_file')
 
         if self.sequencing_sample is None:
             raise ValueError("SequencingSample is required for create()")
 
-        # An explicit sequencing_sample on the alignment file is kept, so it can be checked against the FastQs below
-        alignment_file_data.setdefault('sequencing_sample', self.sequencing_sample)
         unaligned_reads = None
         if unaligned_reads_data:
             unaligned_reads_data["sequencing_sample"] = self.sequencing_sample
             unaligned_reads = UnalignedReadsSerializer().create(unaligned_reads_data)
-            alignment_file_data['unaligned_reads'] = unaligned_reads_data
 
-        alignment_file = AlignmentFileSerializer().create(alignment_file_data)
+        alignment_files = []
+        for alignment_file_data in alignment_files_data:
+            # An explicit sequencing_sample on the alignment file is kept, so it can be checked against the FastQs
+            alignment_file_data.setdefault('sequencing_sample', self.sequencing_sample)
+            if unaligned_reads:
+                alignment_file_data['unaligned_reads'] = unaligned_reads
+            alignment_files.append(AlignmentFileSerializer().create(alignment_file_data))
 
-        vcf_file_data['alignment_file'] = alignment_file_data
+        vcf_file_data['alignment_files'] = alignment_files
         vcf_file = SingleSampleVCFSerializer().create(vcf_file_data)
 
-        # Return the full data structure (optional depending on your needs)
         return {
             'sample_name': validated_data['sample_name'],
             'unaligned_reads': unaligned_reads,
-            'bam_file': alignment_file,
+            'alignment_files': alignment_files,
             'vcf_file': vcf_file
         }
 

@@ -185,9 +185,9 @@ class SingleSampleVCFColumns(DatatableConfig[SingleSampleVCF]):
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
                        renderer=self._render_vcf_file, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="alignment_file__sequencing_sample__sample_sheet__sequencing_run__name",
+            RichColumn(key="sequencing_sample__sample_sheet__sequencing_run__name",
                        label="Sequencing Run", orderable=True),
-            RichColumn(key="alignment_file__sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="sequencing_sample__sample_id", label="Sample", orderable=True),
             RichColumn(key="path", label="Path", orderable=True),
             RichColumn(key="variant_caller__name", label="Variant Caller", orderable=True),
         ]
@@ -207,9 +207,9 @@ class QCColumns(DatatableConfig[QC]):
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
                        renderer=self._render_qc, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="alignment_file__sequencing_sample__sample_sheet__sequencing_run__name",
+            RichColumn(key="sequencing_sample__sample_sheet__sequencing_run__name",
                        label="Sequencing Run", orderable=True),
-            RichColumn(key="alignment_file__sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="sequencing_sample__sample_id", label="Sample", orderable=True),
             RichColumn(key="path", label="Path", orderable=True),
         ]
 

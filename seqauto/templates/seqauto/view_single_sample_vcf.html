@@ -24,11 +24,13 @@
 		<h3>Input</h3>
 		<ul>
 		<li>Sequencing Run: <a href="{% url 'view_sequencing_run' single_sample_vcf.sequencing_run.pk %}">{{ single_sample_vcf.sequencing_run }}</a></li>
-		<li>Sequencing Sample: {{ single_sample_vcf.alignment_file.sequencing_sample }}</li>
-		{% if single_sample_vcf.alignment_file.unaligned_reads %}
-		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' single_sample_vcf.alignment_file.unaligned_reads.pk %}">{{ single_sample_vcf.alignment_file.unaligned_reads }}</a></li>
-		{% endif %}
-		<li>{{ single_sample_vcf.alignment_file.get_file_type_display }}: <a href="{% url 'view_alignment_file' single_sample_vcf.alignment_file.pk %}">{{ single_sample_vcf.alignment_file }}</a></li>
+		<li>Sequencing Sample: {{ single_sample_vcf.sequencing_sample }}</li>
+		{% for unaligned_reads in single_sample_vcf.sequencing_sample.unalignedreads_set.all %}
+		<li>Unaligned Reads: <a href="{% url 'view_unaligned_reads' unaligned_reads.pk %}">{{ unaligned_reads }}</a></li>
+		{% endfor %}
+		{% for alignment_file in single_sample_vcf.alignment_files.all %}
+		<li>{{ alignment_file.get_file_type_display }}: <a href="{% url 'view_alignment_file' alignment_file.pk %}">{{ alignment_file }}</a></li>
+		{% endfor %}
 		</ul>
 
 		{% if single_sample_vcf.upload_pipeline %}
