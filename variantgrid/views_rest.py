@@ -17,7 +17,7 @@ API_FEATURES = (
     "joint_called_vcf_cross_run",
     "upload_metadata",
     "cram_alignment_files",  # A sequencing file's 'bam_file' path can be a CRAM
-    "alignment_files",  # A sequencing file takes 'alignment_files' (list, BAM/CRAM), a QC 'alignment_file'
+    "alignment_files",  # SequencingFile, SingleSampleVCF and QC take an 'alignment_files' list (BAM/CRAM)
 )
 
 # Import factories the server drives itself, rather than files a client uploads (UploadedFileTypes names, lower case)

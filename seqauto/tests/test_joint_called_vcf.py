@@ -283,7 +283,7 @@ class LinkSamplesJointCallPreservedTests(TestCase):
                                           aligner=aligner)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
-                                                           alignment_file=alignment_file,
+                                                           sequencing_sample=seq_sample,
                                                            variant_caller=self.caller)
         backend = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                             joint_called_vcf=None,

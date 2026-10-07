@@ -132,7 +132,7 @@ class SequencingFile:
     sample_name: str
     fastq_r1: str
     fastq_r2: str
-    alignment_files: list[AlignmentFile]  # The VCF was called from the first
+    alignment_files: list[AlignmentFile]
     vcf_file: SingleSampleVCF
 
 
@@ -140,7 +140,7 @@ class SequencingFile:
 @dataclass
 class QC:
     sequencing_sample_lookup: SequencingSampleLookup = field(metadata=config(field_name="sequencing_sample"))
-    alignment_file: AlignmentFile
+    alignment_files: list[AlignmentFile]
     vcf_file: SingleSampleVCF
 
 
@@ -515,15 +515,15 @@ class Command(BaseCommand):
         str, QC]:
         alignment_and_vcf_by_name = {}
         for sf in sequencing_files:
-            alignment_file = dataclasses.replace(sf.alignment_files[0], aligner=None)
+            alignment_files = [dataclasses.replace(af, aligner=None) for af in sf.alignment_files]
             vcf_file = dataclasses.replace(sf.vcf_file, variant_caller=None)
-            alignment_and_vcf_by_name[sf.sample_name] = (alignment_file, vcf_file)
+            alignment_and_vcf_by_name[sf.sample_name] = (alignment_files, vcf_file)
 
         qc_by_name = {}
-        for sample_name, (alignment_file, vcf_file) in alignment_and_vcf_by_name.items():
+        for sample_name, (alignment_files, vcf_file) in alignment_and_vcf_by_name.items():
             sequencing_sample_lookup = SequencingSampleLookup(sample_sheet_lookup=sample_sheet_lookup,
                                                               sample_name=sample_name)
             qc_by_name[sample_name] = QC(sequencing_sample_lookup=sequencing_sample_lookup,
-                                         alignment_file=alignment_file,
+                                         alignment_files=alignment_files,
                                          vcf_file=vcf_file)
         return qc_by_name

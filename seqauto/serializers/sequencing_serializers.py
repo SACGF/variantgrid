@@ -520,24 +520,56 @@ def validate_unique_vcf_path(klass, path, **kwargs):
             })
 
 
+def merge_deprecated_bam_file(attrs: dict) -> dict:
+    """ 'bam_file' is the single alignment file of the API before 'alignment_files', and still accepted -
+        an old client's bam_file is [bam_file]. Sent together, bam_file is added to alignment_files """
+    alignment_files = attrs.get("alignment_files") or []
+    if bam_file := attrs.pop("bam_file", None):
+        alignment_files = [bam_file, *alignment_files]
+    attrs["alignment_files"] = alignment_files
+    return attrs
+
+
+def add_deprecated_bam_file(data: dict) -> dict:
+    """ Older clients read 'bam_file', which only means something for a record with 1 alignment file """
+    alignment_files = data.get("alignment_files") or []
+    data["bam_file"] = alignment_files[0] if len(alignment_files) == 1 else None
+    return data
+
+
 class SingleSampleVCFSerializer(serializers.ModelSerializer):
-    bam_file = AlignmentFileSerializer(source="alignment_file", required=False)
+    """ Keyed on (sequencing sample, variant caller): a re-post replaces the path and alignment files """
+    bam_file = AlignmentFileSerializer(write_only=True, required=False)
+    alignment_files = AlignmentFileSerializer(many=True, required=False)
     variant_caller = VariantCallerSerializer()
 
     class Meta:
         model = SingleSampleVCF
-        fields = ("path", "bam_file", "variant_caller")
+        fields = ("path", "bam_file", "alignment_files", "variant_caller")
+
+    def validate(self, attrs):
+        return merge_deprecated_bam_file(attrs)
+
+    def to_representation(self, instance):
+        return add_deprecated_bam_file(super().to_representation(instance))
 
     def create(self, validated_data):
-        alignment_file = validated_data['alignment_file']
-        if not isinstance(alignment_file, AlignmentFile):
-            alignment_file = AlignmentFileSerializer().create(alignment_file)
-        variant_caller_data = validated_data['variant_caller']
-        variant_caller = VariantCallerSerializer().create(variant_caller_data)
+        """ alignment_files are validated data, or AlignmentFiles a parent serializer has already created """
         path = validated_data["path"]
+        alignment_files = [af if isinstance(af, AlignmentFile) else AlignmentFileSerializer().create(af)
+                           for af in validated_data.get("alignment_files", [])]
+        if not alignment_files:
+            raise serializers.ValidationError({"alignment_files": f"VCF '{path}' needs at least one alignment file"})
+        sequencing_samples = {af.sequencing_sample for af in alignment_files}
+        if len(sequencing_samples) != 1:
+            names = ", ".join(sorted(str(ss) for ss in sequencing_samples))
+            raise serializers.ValidationError({"alignment_files": f"VCF '{path}' alignment files are from more "
+                                                                  f"than one sequencing sample: {names}"})
+        sequencing_sample = sequencing_samples.pop()
+        variant_caller = VariantCallerSerializer().create(validated_data['variant_caller'])
         kwargs = {
-            "sequencing_run": alignment_file.sequencing_run,
-            "alignment_file": alignment_file,
+            "sequencing_run": sequencing_sample.sequencing_run,
+            "sequencing_sample": sequencing_sample,
             "variant_caller": variant_caller,
         }
         validate_unique_vcf_path(SingleSampleVCF, path, **kwargs)
@@ -545,15 +577,12 @@ class SingleSampleVCFSerializer(serializers.ModelSerializer):
             **kwargs,
             defaults={"path": path},
         )
+        single_sample_vcf.alignment_files.set(alignment_files)
         return single_sample_vcf
 
 
 class SequencingFilesSerializer(serializers.Serializer):
-    """ One sample's FastQs, alignment files and a VCF.
-
-        'bam_file' (one alignment file) is the pre 'alignment_files' API and still accepted. Sent together they are
-        merged, 'bam_file' first. The VCF is called from the first alignment file of that merged list, so a client
-        lists the one the caller ran on first, then eg its CRAM or recalibrated BAM """
+    """ One sample's FastQs, alignment files and a VCF called from them """
     sample_name = serializers.CharField()
     unaligned_reads = UnalignedReadsSerializer(required=False)
     bam_file = AlignmentFileSerializer(required=False)
@@ -565,12 +594,9 @@ class SequencingFilesSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
 
     def validate(self, attrs):
-        alignment_files = attrs.get("alignment_files") or []
-        if bam_file := attrs.pop("bam_file", None):
-            alignment_files = [bam_file, *alignment_files]
-        if not alignment_files:
+        attrs = merge_deprecated_bam_file(attrs)
+        if not attrs["alignment_files"]:
             raise serializers.ValidationError({"alignment_files": "Needs at least one alignment file"})
-        attrs["alignment_files"] = alignment_files
         return attrs
 
     def create(self, validated_data):
@@ -594,7 +620,7 @@ class SequencingFilesSerializer(serializers.Serializer):
                 alignment_file_data['unaligned_reads'] = unaligned_reads
             alignment_files.append(AlignmentFileSerializer().create(alignment_file_data))
 
-        vcf_file_data['alignment_file'] = alignment_files[0]
+        vcf_file_data['alignment_files'] = alignment_files
         vcf_file = SingleSampleVCFSerializer().create(vcf_file_data)
 
         return {
