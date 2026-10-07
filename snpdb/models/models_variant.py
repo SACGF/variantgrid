@@ -40,6 +40,7 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
+from library.genomics.symbolic_normalization import inversion_palindromic_trim, shuffle_interval
 from library.genomics.vcf_enums import (
     GENE_LEVEL_ALT_PATTERN,
     INFO_LIFTOVER_SWAPPED_REF_ALT,
@@ -494,6 +495,31 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         if self.alt == VCFSymbolicAllele.INV:
             return self.position, self.end
         return None
+
+    @staticmethod
+    def from_symbolic_interval(genome_build: GenomeBuild, chrom: str, start: int, end: int,
+                               alt: str) -> Optional['VariantCoordinate']:
+        """ <DEL>/<DUP>/<INV> over a 1-based inclusive interval - the inverse of symbolic_hgvs_interval.
+            Normalized as as_internal_symbolic() would an explicit one - del/dup left-aligned, inv trimmed
+            of palindromic ends - but reading only the bases around the breakpoints, so any length works.
+            None if left-aligning reaches the start of the contig, leaving no VCF padding base """
+        contig_sequence = genome_build.genome_fasta.fasta[chrom]
+        if alt == VCFSymbolicAllele.INV:
+            trim = inversion_palindromic_trim(contig_sequence, start, end)
+            position = start + trim
+            svlen = end - trim - position
+        elif alt in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}:
+            left_start, left_end = shuffle_interval(contig_sequence, start, end, shift_right=False)
+            position = left_start - 1
+            span = left_end - left_start + 1
+            svlen = -span if alt == VCFSymbolicAllele.DEL else span
+        else:
+            raise ValueError(f"No interval form for symbolic alt '{alt}'")
+
+        if position < 1:
+            return None
+        ref = contig_sequence[position - 1:position].upper()
+        return VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen)
 
     def calculated_reference(self, genome_build) -> str:
         contig_sequence = genome_build.genome_fasta.fasta[self.chrom]

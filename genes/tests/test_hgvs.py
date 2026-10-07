@@ -397,7 +397,7 @@ class TestSymbolicHGVS(TestCase):
             return vc, bool(matches_reference), originally_normalized.get_message()
 
         for window_size in (10_000, 2):
-            with patch("genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons.SHUFFLE_WINDOW_SIZE", window_size):
+            with patch("library.genomics.symbolic_normalization.SHUFFLE_WINDOW_SIZE", window_size):
                 for hgvs_string in HGVS_STRINGS:
                     self.assertIsNotNone(converter._symbolic_g_hgvs_to_variant_coordinate(hgvs_string), hgvs_string)
                     symbolic = resolve(hgvs_string)
