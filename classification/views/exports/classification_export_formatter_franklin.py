@@ -212,7 +212,7 @@ class ClassificationExportFormatterFranklin(ClassificationExportFormatter):
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterFranklin':
         classification_filter = ClassificationFilter.from_request(request)
         if classification_filter.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE:
-            raise InvalidExportParameter("Fraknlin export requires Allele Origin to be set to Germline.")
+            raise InvalidExportParameter("Franklin export requires Allele Origin to be set to Germline.")
         return ClassificationExportFormatterFranklin(
             classification_filter=classification_filter
         )
