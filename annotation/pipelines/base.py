@@ -115,8 +115,11 @@ class AnnotationPipelineRunner(abc.ABC):
         if os.path.exists(vcf_dump_filename):
             raise ValueError(f"Don't want to overwrite '{vcf_dump_filename}' which already exists!")
         mk_path_for_file(vcf_dump_filename)
+        # Only the STANDARD queryset holds short symbolic variants, so this leaves the SV pipelines' dumps symbolic
+        sv_min_size = annotation_run.variant_annotation_version.structural_variant_min_size
         vcf_dump_count = write_qs_to_vcf(vcf_dump_filename, annotation_run.genome_build,
-                                         self.get_variants_qs(annotation_run), samples=self.dump_samples)
+                                         self.get_variants_qs(annotation_run), samples=self.dump_samples,
+                                         structural_variant_min_size=sv_min_size)
 
         annotation_run.dump_count = vcf_dump_count
         annotation_run.dump_end = timezone.now()

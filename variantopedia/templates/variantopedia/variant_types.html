@@ -1,0 +1,96 @@
+{% extends "uicore/page/base.html" %}
+{% block title %}Variant Types{% endblock title %}
+
+{% block content %}
+    <div class="container-fluid">
+        <h3>Variant Types</h3>
+
+        <p>
+            How each kind of variant is stored and annotated, by size. The table is worked out from this
+            server's settings, by the same rules the code applies, so it is accurate for this deployment.
+        </p>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Variant</th>
+                            <th>Size</th>
+                            <th>Stored as</th>
+                            <th>Annotation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in groups %}
+                            {% for band in group.bands %}
+                                <tr>
+                                    {% if forloop.first %}<th rowspan="{{ group.bands|length }}">{{ group.kind }}</th>{% endif %}
+                                    <td class="text-nowrap">
+                                        {{ band.name }}
+                                        {% if band.range %}<span class="text-muted">{{ band.range }}</span>{% endif %}
+                                    </td>
+                                    <td>{{ band.stored_as }}</td>
+                                    <td>
+                                        {{ band.pipeline }}
+                                        <div class="text-muted small">{{ band.population }}</div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <p class="text-muted small mb-0">
+                    Sizes are the length of the deleted, duplicated, inverted or inserted sequence, and a limit
+                    includes the size stated. An inversion has no padding base, so it is stored symbolic one base
+                    later than a deletion of the same size.
+                </p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><b>Size limits</b></div>
+            <div class="card-body">
+                <dl class="mb-0">
+                    {% for limit in size_limits %}
+                        <dt>{{ limit.name }}</dt>
+                        <dd>{{ limit.text }}</dd>
+                    {% endfor %}
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><b>Why these thresholds</b></div>
+            <div class="card-body">
+                <dl>
+                    <dt>Stored as symbolic from {{ symbolic_alt_size }}</dt>
+                    <dd>
+                        A deletion, duplication or inversion of {{ symbolic_alt_size }} or more is stored as a
+                        symbolic <code>&lt;DEL&gt;</code>/<code>&lt;DUP&gt;</code>/<code>&lt;INV&gt;</code> with a
+                        length (SVLEN) rather than its full sequence - {{ symbolic_alt_size }} is the usual
+                        definition of a structural variant. However it arrives (VCF, HGVS, symbolic or explicit),
+                        a variant has one stored form, and analyses filter symbolic variants under the
+                        "Structural" variant type rather than "Indel". Insertions that don't duplicate the
+                        sequence beside them have no symbolic form here and keep their sequence at any size.
+                    </dd>
+                    <dt>Annotated as a short variant below {{ structural_variant_min_size }}</dt>
+                    <dd>
+                        Annotation uses a separate, larger threshold. A symbolic variant under
+                        {{ structural_variant_min_size }} is still annotated by the short variant pipeline,
+                        given to VEP as its full sequence. gnomAD's short variant data has exact allele
+                        frequencies for indels into the hundreds of bases, while the structural variant pipeline
+                        can only match an overlapping gnomAD-SV call. From {{ structural_variant_min_size }} a
+                        variant is annotated as a structural variant: gene overlaps, gnomAD-SV
+                        {% if annotsv_enabled %}and AnnotSV{% endif %}, without the per-base scores (eg SpliceAI,
+                        CADD, dbNSFP) that only exist for short variants.
+                    </dd>
+                </dl>
+                <p class="text-muted mb-0">
+                    For what each annotation column means, see
+                    <a class="hover-link" href="{% url 'view_annotation_descriptions' %}">annotation descriptions</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

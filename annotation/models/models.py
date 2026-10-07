@@ -36,6 +36,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from annotation.annotation_pipeline_routing import pipeline_type_for_variant
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.external_search_terms import (
     get_variant_pubmed_search_terms,
@@ -805,6 +806,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
     sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
     sv_max_size = models.IntegerField(null=True, blank=True)  # ANNOTATION_VEP_SV_MAX_SIZE
+    # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - a symbolic del/dup/inv shorter than this went to the STANDARD
+    # pipeline (@see annotation.annotation_pipeline_routing)
+    structural_variant_min_size = models.IntegerField()
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
@@ -894,6 +898,13 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             status = VariantAnnotationVersion.Status.ACTIVE
         qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, status=status)
         return qs.order_by("annotation_date").last()
+
+    @staticmethod
+    def latest_structural_variant_min_size(genome_build) -> int:
+        """ For routing variants not annotated yet - the setting, until a build has an active version """
+        if vav := VariantAnnotationVersion.latest(genome_build):
+            return vav.structural_variant_min_size
+        return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     @staticmethod
     def latest_for_all_builds(status: 'VariantAnnotationVersion.Status' = None) -> QuerySet:
@@ -1308,19 +1319,16 @@ class AnnotationRun(TimeStampedModel):
 
     @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
-        if variant.is_gene_level:
-            pipeline_type = VariantAnnotationPipelineType.GENE_LEVEL
-        elif variant.is_symbolic:
-            pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
-        else:
-            pipeline_type = VariantAnnotationPipelineType.STANDARD
-        # For newly created variants, there will only be one per build for latest annotation version
-        ar: Optional[AnnotationRun]
-        ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
+        # For newly created variants, there will only be one per build for latest annotation version.
+        # Each version routes by its own cut-off, so the pipeline is decided per run
+        qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
                                           annotation_range_lock__min_variant__lte=variant.pk,
-                                          annotation_range_lock__max_variant__gte=variant.pk,
-                                          pipeline_type=pipeline_type).first()
-        return ar
+                                          annotation_range_lock__max_variant__gte=variant.pk)
+        for ar in qs.select_related("annotation_range_lock__version").order_by("pk"):
+            sv_min_size = ar.annotation_range_lock.version.structural_variant_min_size
+            if ar.pipeline_type == pipeline_type_for_variant(variant, sv_min_size):
+                return ar
+        return None
 
     @staticmethod
     def get_active_runs(genome_build):

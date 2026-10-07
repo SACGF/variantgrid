@@ -493,6 +493,7 @@ LIFTOVER_BATCH_SIZE = 10_000
 LIFTOVER_BCFTOOLS_ENABLED = True
 # 2025-02-13 - bcftools liftover currently gives a warning about symbolic variants
 LIFTOVER_BCFTOOLS_SYMBOLIC = False
+# Also lets a symbolic del/dup/inv shorter than this through, lifted over as its explicit sequence (#1358)
 LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
 # When False (default), BCFTools liftover SWAP=1 variants are rejected and the AlleleLiftover
@@ -1282,10 +1283,11 @@ VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 
-# Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
-# structural variants and use symbolic
+# A del/dup/inv of at least this size is stored as a symbolic <DEL>/<DUP>/<INV> with svlen rather than
+# ref/alt sequences - 50bp is the usual definition of a structural variant (#1358). Which annotation
+# pipeline it goes to is a separate cut-off, ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 VARIANT_SYMBOLIC_ALT_ENABLED = True
-VARIANT_SYMBOLIC_ALT_SIZE = 1000
+VARIANT_SYMBOLIC_ALT_SIZE = 50
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
                                     VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
 

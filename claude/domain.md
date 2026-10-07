@@ -23,7 +23,11 @@ locus); exclude them with `Variant.get_no_reference_q` when you mean real calls.
 
 **Symbolic variant / SVLEN** - alts at or beyond `settings.VARIANT_SYMBOLIC_ALT_SIZE` are stored as `<DEL>` / `<DUP>` /
 `<INV>` with `svlen`; `snpdb/models/models_variant.py:VariantCoordinate.as_internal_canonical_form` does the conversion, and
-`Variant.qs_from_variant_coordinate` applies it for you. Gene-level events are Variants on a fake contig - guard
+`Variant.qs_from_variant_coordinate` applies it for you. Symbolic is a storage form, not "a structural variant" for
+annotation: one under the annotation version's `structural_variant_min_size` (pinned from
+`settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE`) goes through the STANDARD pipeline
+(`annotation/annotation_pipeline_routing.py`), and the Variant Types page (`variantopedia/variant_types.py`) tabulates
+every such rule by size. Gene-level events are Variants on a fake contig - guard
 coordinate code with `Variant.get_gene_level_q`.
 
 **Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its

@@ -195,6 +195,7 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
     # Real COSMIC release from the (test-pinned) vep_config, as the sample count INFO field is
     # gated on it - see the cosmic_count VEPColumnDefs
     fake_version["cosmic"] = VEPConfig(genome_build).cosmic_version
+    fake_version["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
     return fake_version
 
 

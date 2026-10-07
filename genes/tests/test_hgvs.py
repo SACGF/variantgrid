@@ -378,6 +378,7 @@ class TestSymbolicHGVS(TestCase):
         self.assertGreater(biggest.max_sequence_length,
                            settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT)
 
+    @override_settings(VARIANT_SYMBOLIC_ALT_SIZE=1000)  # The inv cases below sit either side of 1000 bases
     def test_long_g_hgvs_to_symbolic_coordinate(self):
         """ #2103 - a long g. del/dup/inv resolves through Babelfish's symbolic VCF coordinate. Cases shift
             right, shift left and trim palindromic inv ends, and an inv of exactly VARIANT_SYMBOLIC_ALT_SIZE

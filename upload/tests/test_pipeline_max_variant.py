@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import pipeline_type_variant_q
+from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
@@ -108,8 +108,9 @@ class PipelineMaxVariantTestCase(TestCase):
         short_ids = {v.pk for v in self.short_variants}
         all_ids = short_ids | {self.sv_variant.pk}
         qs = Variant.objects.filter(pk__in=all_ids)
-        standard_ids = set(qs.filter(pipeline_type_variant_q(STANDARD)).values_list("pk", flat=True))
-        sv_ids = set(qs.filter(pipeline_type_variant_q(STRUCTURAL)).values_list("pk", flat=True))
+        sv_min_size = self.vav.structural_variant_min_size
+        standard_ids = set(qs.filter(pipeline_type_variant_q(STANDARD, sv_min_size)).values_list("pk", flat=True))
+        sv_ids = set(qs.filter(pipeline_type_variant_q(STRUCTURAL, sv_min_size)).values_list("pk", flat=True))
         self.assertEqual(standard_ids, short_ids)
         self.assertEqual(sv_ids, {self.sv_variant.pk})
 

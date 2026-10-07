@@ -9,21 +9,44 @@ from library.utils import execute_cmd
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 
-def bcftools_pre_liftover_error_check(variant_coordinate: VariantCoordinate, source_genome_build) -> Optional[str]:
-    """ Return non-null (string reason) if you want to skip bcftools liftover """
-    # BCFTools requires ref match
+def bcftools_lifts_symbolic_as_explicit(variant_coordinate: VariantCoordinate) -> bool:
+    """ A del/dup/inv stored symbolic but within LIFTOVER_BCFTOOLS_MAX_LENGTH goes to bcftools as its
+        sequence - symbolic storage starts at VARIANT_SYMBOLIC_ALT_SIZE, well below the length bcftools
+        lifts explicitly, and its symbolic support is off by default (#1358) """
+    if not (variant_coordinate.is_symbolic and variant_coordinate.can_be_made_explicit):
+        return False  # explicit already, or <CNV>/<INS> with no sequence to write
+    max_length = settings.LIFTOVER_BCFTOOLS_MAX_LENGTH
+    return bool(max_length) and abs(variant_coordinate.svlen) < max_length
+
+
+def bcftools_liftover_variant_coordinate(variant_coordinate: VariantCoordinate, source_genome_build) -> VariantCoordinate:
+    """ The form written to the bcftools source VCF. The lifted record is re-imported through the upload
+        pipeline, which stores it symbolic again (as_internal_canonical_form) """
+    if bcftools_lifts_symbolic_as_explicit(variant_coordinate):
+        return variant_coordinate.as_external_explicit(source_genome_build)
+    return variant_coordinate
+
+
+def bcftools_liftover_skip_reason(variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ The rules on the coordinate's form and size - those that need no reference """
     if variant_coordinate.is_symbolic:
         if not settings.LIFTOVER_BCFTOOLS_SYMBOLIC:
             return f"Liftover of symbolic variants disabled via {settings.LIFTOVER_BCFTOOLS_SYMBOLIC=}"
-    else:
-        # Symbolics will pull out reference from build so always match, no point testing
+    elif settings.LIFTOVER_BCFTOOLS_MAX_LENGTH:
+        if variant_coordinate.max_sequence_length > settings.LIFTOVER_BCFTOOLS_MAX_LENGTH:
+            return f"Variant max sequence length > {settings.LIFTOVER_BCFTOOLS_MAX_LENGTH=}"
+    return None
+
+
+def bcftools_pre_liftover_error_check(variant_coordinate: VariantCoordinate, source_genome_build) -> Optional[str]:
+    """ Return non-null (string reason) if you want to skip bcftools liftover """
+    if skip_reason := bcftools_liftover_skip_reason(variant_coordinate):
+        return skip_reason
+    # BCFTools requires ref match. Symbolics will pull out reference from build so always match, no point testing
+    if not variant_coordinate.is_symbolic:
         calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
         if calculated_ref != variant_coordinate.ref:
             return f"Reference='{variant_coordinate.ref}' not equal to calculated ref from genome {calculated_ref}"
-
-        if settings.LIFTOVER_BCFTOOLS_MAX_LENGTH:
-            if variant_coordinate.max_sequence_length > settings.LIFTOVER_BCFTOOLS_MAX_LENGTH:
-                return f"Variant max sequence length > {settings.LIFTOVER_BCFTOOLS_MAX_LENGTH=}"
     return None
 
 

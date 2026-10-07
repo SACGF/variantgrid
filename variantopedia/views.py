@@ -70,6 +70,7 @@ from variantopedia.interesting_nearby import (
     get_nearby_qs,
     get_nearby_summaries,
 )
+from variantopedia.variant_types import format_bp, get_size_limits, get_variant_type_rows
 
 
 def variants(request, genome_build_name=None):
@@ -160,9 +161,10 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
             .select_related("classification", "classification__lab").order_by("classification__pk")
         classifications = list(cm_qs[:VARIANT_GRID_ROW_DETAIL_MAX_CLASSIFICATIONS])
 
-    # Symbolic variants span genes rather than sitting in one, so name what they hit
+    # Structural variants span genes rather than sitting in one, so name what they hit - a short symbolic
+    # variant is annotated as a small one, which doesn't record them
     overlapping_symbols = None
-    if variant.is_symbolic and variant_annotation:
+    if variant_annotation and variant_annotation.is_structural_variant_annotation:
         overlapping_symbols = variant_annotation.overlapping_symbols
 
     # What the Classifications column's ClinVar chips summarise
@@ -342,6 +344,17 @@ def search(request):
         # "external_codes": external_codes,
     }
     return render(request, "variantopedia/search.html", context)
+
+
+def variant_types(request):
+    context = {
+        "groups": get_variant_type_rows(),
+        "size_limits": get_size_limits(),
+        "symbolic_alt_size": format_bp(settings.VARIANT_SYMBOLIC_ALT_SIZE),
+        "structural_variant_min_size": format_bp(settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
+        "annotsv_enabled": settings.ANNOTATION_ANNOTSV_ENABLED,
+    }
+    return render(request, "variantopedia/variant_types.html", context)
 
 
 def variant_wiki(request, genome_build_name=None):
