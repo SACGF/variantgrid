@@ -4,9 +4,13 @@ import os
 from typing import Optional
 
 from django.conf import settings
+from django.db.models import QuerySet
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.annotation_version_querysets import (
+    filter_vep_sv_max_size,
+    get_variants_qs_for_annotation,
+)
 from annotation.models import AnnotationRun, VEPSkippedReason
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
@@ -16,7 +20,7 @@ from annotation.vep_warnings import (
     parse_skipped_variants_file,
     parse_vep_warnings,
 )
-from snpdb.models import VariantCoordinate
+from snpdb.models import Variant, VariantCoordinate
 
 
 def import_vcf_annotations(
@@ -158,42 +162,89 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
 
         Uses bulk_inserter as that handles DB partitions """
 
+    sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
     annotation_run.vep_skipped_count = _vep_skipped_count(annotation_run)
     if annotation_run.vep_skipped_count:
-        # These will be skipped by VEP (but also we don't write out ones we know will be skipped (eg too long)
         vep_warnings = parse_vep_warnings(load_vep_warnings(annotation_run))
         incomplete_variant_ids = vep_warnings.incomplete_variant_ids
         skipped_contigs = vep_warnings.skipped_contigs
 
-        version = annotation_run.annotation_range_lock.version
-        annotation_version = version.get_any_annotation_version()
         # This pulls down any un-annotated variants (which after running VEP + inserting means were skipped)
-        for v in get_variants_qs_for_annotation(annotation_version,
-                                                pipeline_type=annotation_run.pipeline_type,
-                                                min_variant_id=annotation_run.annotation_range_lock.min_variant_id,
-                                                max_variant_id=annotation_run.annotation_range_lock.max_variant_id):
-            if v.locus.contig.name in skipped_contigs:
+        for v in _get_unannotated_variants_qs(annotation_run):
+            if _is_vep_too_long(annotation_run, v, sv_max_size):
+                reason = VEPSkippedReason.TOO_LONG  # Never dumped, so VEP can't have said anything about it
+            elif v.locus.contig.name in skipped_contigs:
                 reason = VEPSkippedReason.UNKNOWN_CONTIG
             elif v.pk in incomplete_variant_ids:
                 reason = VEPSkippedReason.INCOMPLETE
-            elif v.length > settings.ANNOTATION_VEP_SV_MAX_SIZE:
-                reason = VEPSkippedReason.TOO_LONG
             else:
                 reason = VEPSkippedReason.UNKNOWN
+            _add_vep_skipped_variant(annotation_run, bulk_inserter, v, reason)
+    else:
+        # vep_skipped_count only counts what was dumped, which leaves out the too-long SVs (#2104)
+        for v in _get_vep_too_long_variants(annotation_run, sv_max_size):
+            _add_vep_skipped_variant(annotation_run, bulk_inserter, v, VEPSkippedReason.TOO_LONG)
+    _insert_vep_skipped_variants(bulk_inserter)
 
-            va = {"version_id": version.pk, "variant_id": v.pk,
-                  "annotation_run_id": annotation_run.pk, "vep_skipped_reason": reason,
-                  "predictions_num_pathogenic": 0, "predictions_num_benign": 0}
-            if (annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
-                    and reason == VEPSkippedReason.TOO_LONG):
-                variant_coordinate = VariantCoordinate(chrom=v.locus.contig.name,
-                                                       position=v.locus.position,
-                                                       ref=v.locus.ref.seq,
-                                                       alt=v.alt.seq,
-                                                       svlen=v.svlen)
-                bulk_inserter.add_sv_gene_overlaps(v.pk, variant_coordinate, va)
-            bulk_inserter.variant_annotation_list.append(va)
 
+def insert_vep_too_long_skipped(annotation_run: AnnotationRun, sv_max_size: Optional[int] = None,
+                                batch_id: int = 0) -> int:
+    """ TOO_LONG rows for the SVs in a run's range that the dump left out, for a run that never reaches
+        handle_vep_skipped: one whose dump was empty, or a finished run being backfilled (#2104).
+        Returns the number of rows written. """
+    if sv_max_size is None:
+        sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
+    variants = _get_vep_too_long_variants(annotation_run, sv_max_size)
+    if variants:
+        bulk_inserter = BulkVEPVCFAnnotationInserter(annotation_run, validate_columns=False, vep_skipped_only=True)
+        bulk_inserter.batch_id = batch_id
+        for v in variants:
+            _add_vep_skipped_variant(annotation_run, bulk_inserter, v, VEPSkippedReason.TOO_LONG)
+        _insert_vep_skipped_variants(bulk_inserter)
+        if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
+            bulk_inserter.remove_processing_files()
+    return len(variants)
+
+
+def _get_unannotated_variants_qs(annotation_run: AnnotationRun) -> QuerySet[Variant]:
+    range_lock = annotation_run.annotation_range_lock
+    annotation_version = range_lock.version.get_any_annotation_version()
+    qs = get_variants_qs_for_annotation(annotation_version,
+                                        pipeline_type=annotation_run.pipeline_type,
+                                        min_variant_id=range_lock.min_variant_id,
+                                        max_variant_id=range_lock.max_variant_id)
+    return qs.select_related("locus__contig", "locus__ref", "alt")
+
+
+def _is_vep_too_long(annotation_run: AnnotationRun, variant: Variant, sv_max_size: Optional[int]) -> bool:
+    return (annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+            and bool(sv_max_size) and variant.svlen is not None and abs(variant.svlen) > sv_max_size)
+
+
+def _get_vep_too_long_variants(annotation_run: AnnotationRun, sv_max_size: Optional[int]) -> list[Variant]:
+    """ Unannotated SVs in range that VEPRunner.get_variants_qs left out of the dump """
+    if annotation_run.pipeline_type != VariantAnnotationPipelineType.STRUCTURAL_VARIANT or not sv_max_size:
+        return []
+    return list(filter_vep_sv_max_size(_get_unannotated_variants_qs(annotation_run), sv_max_size, too_long=True))
+
+
+def _add_vep_skipped_variant(annotation_run: AnnotationRun, bulk_inserter, v: Variant, reason: VEPSkippedReason):
+    va = {"version_id": annotation_run.annotation_range_lock.version_id, "variant_id": v.pk,
+          "annotation_run_id": annotation_run.pk, "vep_skipped_reason": reason,
+          "predictions_num_pathogenic": 0, "predictions_num_benign": 0}
+    if reason == VEPSkippedReason.TOO_LONG:
+        # VEP never saw it, so resolve gene overlaps locally (#1271)
+        variant_coordinate = VariantCoordinate(chrom=v.locus.contig.name,
+                                               position=v.locus.position,
+                                               ref=v.locus.ref.seq,
+                                               alt=v.alt.seq,
+                                               svlen=v.svlen)
+        bulk_inserter.add_sv_gene_overlaps(v.pk, variant_coordinate, va)
+    bulk_inserter.variant_annotation_list.append(va)
+
+
+def _insert_vep_skipped_variants(bulk_inserter):
+    if bulk_inserter.variant_annotation_list:
         # Only insert the columns we care about
         bulk_inserter.all_variant_columns = ["vep_skipped_reason"]
         bulk_inserter.finish()

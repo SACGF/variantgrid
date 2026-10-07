@@ -94,6 +94,12 @@ class AnnotationPipelineRunner(abc.ABC):
                                               max_variant_id=range_lock.max_variant_id,
                                               annotated=not self.selects_unannotated)
 
+    def handle_empty_dump(self, annotation_run):
+        """ The run has nothing to dump, so it finishes without the tool or import_results ever seeing it.
+            A pipeline whose import writes rows for variants it deliberately left out of the dump (VEP's
+            too-long SVs, #2104) writes them here instead. """
+        return
+
     def dump(self, annotation_run, dump_dir=None, task_token=None) -> int:
         """ Write this run's variants to a VCF and set the dump_* fields; returns the dump count.
 

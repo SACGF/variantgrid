@@ -15,6 +15,7 @@ from functools import reduce
 from typing import Optional, TypeVar
 
 from django.db.models import Model, QuerySet
+from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 
 from annotation.models.models import AnnotationVersion, VariantAnnotation
@@ -47,6 +48,15 @@ def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType) -> Q:
     elif pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
         return q_gene_level
     raise ValueError(f"Unrecognised {pipeline_type=}")
+
+
+def filter_vep_sv_max_size(qs: QuerySet[Variant], sv_max_size: int, too_long: bool) -> QuerySet[Variant]:
+    """ Split variants on VEP's SV size cap (ANNOTATION_VEP_SV_MAX_SIZE). The dump leaves the too-long ones
+        out (VEP would only skip them), and they get vep_skipped_reason=TOO_LONG rows instead (#2104) """
+    qs = qs.annotate(abs_svlen=Abs("svlen"))
+    if too_long:
+        return qs.filter(abs_svlen__gt=sv_max_size)
+    return qs.filter(Q(svlen__isnull=True) | Q(abs_svlen__lte=sv_max_size))
 
 
 def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild) -> QuerySet[Variant]:
