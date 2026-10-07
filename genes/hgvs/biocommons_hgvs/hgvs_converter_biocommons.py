@@ -1,9 +1,11 @@
 import copy
+import os
 import re
 from importlib import metadata
 from typing import Optional
 
 from bioutils.sequences import reverse_complement
+from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import Dup, Inv, NARefAlt
 from hgvs.exceptions import (
@@ -52,6 +54,15 @@ SYMBOLIC_EDITS = {
     VCFSymbolicAllele.DUP: lambda: Dup(ref=''),
     VCFSymbolicAllele.INV: lambda: Inv(ref=''),
 }
+
+SYMBOLIC_ALT_FOR_EDIT_TYPE = {
+    'del': VCFSymbolicAllele.DEL,
+    'dup': VCFSymbolicAllele.DUP,
+    'inv': VCFSymbolicAllele.INV,
+}
+
+# Bases read per fetch when shuffling a long SV's breakpoints along a repeat
+SHUFFLE_WINDOW_SIZE = 10_000
 
 
 class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
@@ -236,6 +247,8 @@ class BioCommonsHGVSConverter:
             self, hgvs_string: str, transcript_version=None
     ) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         try:
+            if symbolic_result := self._symbolic_g_hgvs_to_variant_coordinate(hgvs_string):
+                return symbolic_result
             var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(hgvs_string)
             try:
                 (chrom, position, ref, alt, _typ) = self.babelfish.hgvs_to_vcf(var_g)
@@ -249,6 +262,109 @@ class BioCommonsHGVSConverter:
 
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
         return vc.as_internal_symbolic(self.genome_build), matches_reference, originally_normalized
+
+    def _symbolic_g_hgvs_to_variant_coordinate(
+            self, hgvs_string: str
+    ) -> Optional[tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]]:
+        """ A g. del/dup/inv with no sequence, big enough to be stored symbolic, straight to a VariantCoordinate.
+
+            The general path builds the explicit sequence of the whole span, and biocommons normalization
+            is quadratic in its length - a 100kb dup takes 0.5s and a whole chromosome arm never finishes (#2103).
+            This only reads bases around the breakpoints and gives the same result: del/dup left-aligned like
+            babelfish.hgvs_to_vcf, inv trimmed of palindromic ends, and originally_normalized against the
+            interval biocommons normalization would report. Returns None for anything else (general path) """
+
+        if not settings.VARIANT_SYMBOLIC_ALT_ENABLED:
+            return None
+
+        var_g = self._parser_hgvs(hgvs_string)
+        edit = var_g.posedit.edit
+        symbolic_alt = SYMBOLIC_ALT_FOR_EDIT_TYPE.get(edit.type)
+        if var_g.type != 'g' or symbolic_alt is None or edit.ref:
+            return None
+
+        pos = var_g.posedit.pos
+        if not all(isinstance(p, SimplePosition) and not p.uncertain for p in (pos.start, pos.end)):
+            return None
+        start = pos.start.base
+        end = pos.end.base
+        # Even the explicit sequence is too short to be stored symbolic (a trimmed inv is shorter still)
+        if end - start + 1 < settings.VARIANT_SYMBOLIC_ALT_SIZE:
+            return None
+
+        # NG_/LRG genomic references aren't contigs, leave those to the general path
+        contig = self.genome_build.chrom_contig_mappings.get(var_g.ac)
+        if contig is None or contig.refseq_accession != var_g.ac:
+            return None
+        if start < 1 or end > contig.length:
+            raise HGVSNomenclatureException(f"{var_g}: coordinates are out-of-bounds")
+
+        if symbolic_alt == VCFSymbolicAllele.INV:
+            trim = self._inversion_palindromic_trim(contig, start, end)
+            normalized_start, normalized_end = start + trim, end - trim
+            # VCF ref is the first inverted base, as as_internal_symbolic converts an explicit inv
+            position = normalized_start
+            svlen = normalized_end - normalized_start
+        else:
+            normalized_start, normalized_end = self._shuffle_interval(contig, start, end, shift_right=True)
+            left_start, left_end = self._shuffle_interval(contig, start, end, shift_right=False)
+            position = left_start - 1  # VCF padding base
+            span = left_end - left_start + 1
+            svlen = -span if symbolic_alt == VCFSymbolicAllele.DEL else span
+
+        if position < 1 or abs(svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
+            return None
+
+        ref = self.hdp.seqfetcher.fetch_seq(var_g.ac, position - 1, position).upper()
+        vc = VariantCoordinate(chrom=contig.name, position=position, ref=ref, alt=symbolic_alt, svlen=svlen)
+        matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref='')
+        normalized_var_g = self._symbolic_g_sequence_variant(var_g.ac, symbolic_alt, normalized_start, normalized_end)
+        originally_normalized = HgvsOriginallyNormalized(original_hgvs=HGVSVariant(var_g),
+                                                         normalized_hgvs=HGVSVariant(normalized_var_g))
+        return vc, matches_reference, originally_normalized
+
+    @staticmethod
+    def _symbolic_g_sequence_variant(ac: str, symbolic_alt: str, start: int, end: int) -> SequenceVariant:
+        pos = Interval(start=SimplePosition(start), end=SimplePosition(end))
+        return SequenceVariant(ac=ac, type='g', posedit=PosEdit(pos, SYMBOLIC_EDITS[symbolic_alt]()))
+
+    def _shuffle_interval(self, contig: Contig, start: int, end: int, shift_right: bool) -> tuple[int, int]:
+        """ Slide a deleted/duplicated 1-based interval along the reference while the base leaving one end
+            equals the base entering the other - ie as far as normalization would move it """
+        ac = contig.refseq_accession
+        shift = 0
+        while True:
+            if shift_right:
+                # bases from start leave as bases from end+1 enter
+                n = min(SHUFFLE_WINDOW_SIZE, contig.length - end - shift)
+                leaving = self.hdp.seqfetcher.fetch_seq(ac, start - 1 + shift, start - 1 + shift + n)
+                entering = self.hdp.seqfetcher.fetch_seq(ac, end + shift, end + shift + n)
+            else:
+                # bases from end leave as bases from start-1 enter, read outwards from the breakpoints
+                n = min(SHUFFLE_WINDOW_SIZE, start - 1 - shift)
+                leaving = self.hdp.seqfetcher.fetch_seq(ac, end - shift - n, end - shift)[::-1]
+                entering = self.hdp.seqfetcher.fetch_seq(ac, start - 1 - shift - n, start - 1 - shift)[::-1]
+            matched = len(os.path.commonprefix([leaving.upper(), entering.upper()]))
+            shift += matched
+            if n <= 0 or matched < n:
+                break
+        if not shift_right:
+            shift = -shift
+        return start + shift, end + shift
+
+    def _inversion_palindromic_trim(self, contig: Contig, start: int, end: int) -> int:
+        """ Bases normalization trims off each end of an inversion - while the first base is the
+            complement of the last, inverting them changes nothing """
+        ac = contig.refseq_accession
+        trim = 0
+        while True:
+            n = min(SHUFFLE_WINDOW_SIZE, (end - start + 1) // 2 - trim)
+            leading = self.hdp.seqfetcher.fetch_seq(ac, start - 1 + trim, start - 1 + trim + n)
+            trailing = self.hdp.seqfetcher.fetch_seq(ac, end - trim - n, end - trim)
+            matched = len(os.path.commonprefix([leading.upper(), reverse_complement(trailing).upper()]))
+            trim += matched
+            if n <= 0 or matched < n:
+                return trim
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)

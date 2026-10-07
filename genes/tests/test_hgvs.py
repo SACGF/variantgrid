@@ -378,6 +378,33 @@ class TestSymbolicHGVS(TestCase):
         self.assertGreater(biggest.max_sequence_length,
                            settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT)
 
+    def test_long_g_hgvs_symbolic_matches_general_path(self):
+        """ #2103 - a long g. del/dup/inv skips explicit-sequence normalization, so must shuffle the
+            breakpoints itself to land on the same coordinate (and report the same normalization).
+            Cases shift right, shift left and trim a palindromic inv end. A 2-base window walks the
+            shuffle across several fetches """
+        converter = HGVSMatcher(self.genome_build, clingen_resolution=False).hgvs_converter
+        HGVS_STRINGS = [
+            "NC_000003.11:g.128200126_128201326del",
+            "NC_000003.11:g.128200126_128201326dup",
+            "NC_000003.11:g.128200308_128201508del",
+            "NC_000003.11:g.128200308_128201508dup",
+            "NC_000003.11:g.128200007_128201207inv",
+        ]
+
+        def resolve(hgvs_string):
+            vc, matches_reference, originally_normalized = converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string)
+            return vc, bool(matches_reference), originally_normalized.get_message()
+
+        for window_size in (10_000, 2):
+            with patch("genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons.SHUFFLE_WINDOW_SIZE", window_size):
+                for hgvs_string in HGVS_STRINGS:
+                    self.assertIsNotNone(converter._symbolic_g_hgvs_to_variant_coordinate(hgvs_string), hgvs_string)
+                    symbolic = resolve(hgvs_string)
+                    with patch.object(converter, "_symbolic_g_hgvs_to_variant_coordinate", return_value=None):
+                        general = resolve(hgvs_string)
+                    self.assertEqual(general, symbolic, hgvs_string)
+
     def test_c_hgvs_symbolic_del_both_strands(self):
         """ A 1kb DEL inside the transcript, projected onto a minus and a plus strand transcript """
         matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
