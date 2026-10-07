@@ -251,7 +251,10 @@ class BulkVEPVCFAnnotationInserter:
                  annotation_run: AnnotationRun,
                  infos: Optional[dict] = None,
                  insert_variants: bool = True,
-                 validate_columns: bool = True):
+                 validate_columns: bool = True,
+                 vep_skipped_only: bool = False):
+        """ vep_skipped_only: writing just the vep_skipped_reason rows of variants VEP never annotated, with
+            no annotated VCF behind them - skips the conservation sidecar and the dbNSFP resolver """
         self.annotation_run = annotation_run
         self.genome_build = self.annotation_run.variant_annotation_version.genome_build
         self.vep_config = VEPConfig(self.genome_build)
@@ -274,7 +277,10 @@ class BulkVEPVCFAnnotationInserter:
         )
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
-        self._load_sv_conservation()
+        self.sv_conservation: dict[int, dict[str, float]] = {}
+        self.sv_conservation_columns: set[str] = set()
+        if not vep_skipped_only:
+            self._load_sv_conservation()
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
                                         # We only want exact transcript version for annotation
                                         allow_alternative_transcript_version=False)
@@ -295,7 +301,7 @@ class BulkVEPVCFAnnotationInserter:
         # score fields). Persist the resolver name on the VAV so we have provenance for
         # which strategy populated the scores.
         self.transcript_resolver = None
-        if self.vep_config.columns_version >= 4:
+        if self.vep_config.columns_version >= 4 and not vep_skipped_only:
             self.transcript_resolver = DBNSFPGeneResolver()
             vav = self.annotation_run.variant_annotation_version
             if vav.transcript_resolver != self.transcript_resolver.name:
@@ -446,8 +452,6 @@ class BulkVEPVCFAnnotationInserter:
 
             An SV run with the stage enabled must have one: importing without it writes nulls that read as
             real "no conservation here" values, and only a re-annotation can correct them. """
-        self.sv_conservation: dict[int, dict[str, float]] = {}
-        self.sv_conservation_columns: set[str] = set()
         vcf_annotated_filename = self.annotation_run.vcf_annotated_filename
         if not vcf_annotated_filename:
             return

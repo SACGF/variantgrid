@@ -97,7 +97,11 @@ class VariantTranscriptSelections:
         vav = annotation_version.variant_annotation_version
         try:
             self.variant_annotation = variant.variantannotation_set.get(version=vav)
-            if self.variant_annotation.vep_skipped_reason:
+            if self.variant_annotation.vep_skipped_reason == VEPSkippedReason.TOO_LONG:
+                # Deliberate - gene overlaps were still resolved locally (#1271)
+                sv_max_size = vav.sv_max_size or settings.ANNOTATION_VEP_SV_MAX_SIZE
+                self.warning_messages.append(f"Not annotated by VEP: SV longer than {sv_max_size:,} bp")
+            elif self.variant_annotation.vep_skipped_reason:
                 annotation_error = "Unable to annotate variant"
                 if self.variant_annotation.vep_skipped_reason != VEPSkippedReason.UNKNOWN:
                     annotation_error += ": " + self.variant_annotation.get_vep_skipped_reason_display()

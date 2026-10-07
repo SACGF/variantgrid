@@ -69,6 +69,10 @@ Gotchas:
   annotation/vep_annotation.py passes lead_variants_only=0 so a variant that is merely a member still gets its GWAS L2G
   score. The open_targets_* columns are '&'-joined parallel arrays zipped by
   annotation/models/models.py:VariantAnnotation.open_targets_records, so they are only ever written together.
+- SVs over ANNOTATION_VEP_SV_MAX_SIZE are never dumped, so VEP's skip count never includes them: their TOO_LONG rows
+  are written by annotation/vcf_files/import_vcf_annotations.py:handle_vep_skipped and, for a run with an empty dump,
+  annotation/pipelines/base.py:AnnotationPipelineRunner.handle_empty_dump (#2104). Change the cap in one place:
+  annotation/annotation_version_querysets.py:filter_vep_sv_max_size.
 - SVGeneOverlapResolver now lives in genes/gene_overlaps.py (the fusion breakpoint resolver needs it and `genes` cannot import the inserter); build it with `SVGeneOverlapResolver.for_variant_annotation_version(vav)`.
 - An SV can overlap several gnomAD-SV records. annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:SVOverlapProcessor
   picks one (ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD) and copies its values onto the ordinary gnomad_af / gnomad_ac /
