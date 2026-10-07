@@ -193,7 +193,7 @@ const Flags = (function () {
                     {
                         watch: !watching
                     },
-                    this.db.flagsUrl + this.id
+                    Urls.flags_api(this.id)
                 );
             }
         };
@@ -350,9 +350,9 @@ const Flags = (function () {
                 let url = null;
                 if (flag.creating) {
                     sendParams.flag_type = flag.flag_type;
-                    url = flag.db.flagsUrl + flag.collectionObj().id;
+                    url = Urls.flags_api(flag.collectionObj().id);
                 } else {
-                    url = flag.db.flagUrl + flag.id;
+                    url = Urls.flag_api(flag.id);
                 }
 
                 if (resolution || flag.creating) {
@@ -980,7 +980,7 @@ const Flags = (function () {
                     if (reportId) {
                         return $('<div>', {html: [
                             `Go to the `,
-                            $('<a>', {class: 'hover-link', text: `Discordance Report`, href:`/classification/classification/discordance_report/${reportId}`}),
+                            $('<a>', {class: 'hover-link', text: `Discordance Report`, href: Urls.discordance_report(reportId)}),
                             ` | `,
                             $('<a>', {class: 'hover-link', text: `Diff with other Classification Records`, href: `/classification/diff/?clinical_context=${clinicalContext}`})
                         ]});
@@ -1116,9 +1116,6 @@ const Flags = (function () {
     const Flags = function (
         props
     ) {
-        this.flagsUrl = '/flags/api/flags/';
-        this.flagUrl = '/flags/api/flag/';
-
         this.userId = null;
         this.users = new DataCollection(() => new User(this));
         this.flagResolutions = new DataCollection(() => new FlagResolution(this));
@@ -1344,12 +1341,12 @@ const Flags = (function () {
                     collection = this.dialogState.collection;
                 }
                 if (collection) {
-                    url = this.flagsUrl + collection.id;
+                    url = Urls.flags_api(collection.id);
                     if (collection.since) {
                         params.since = collection.since;
                     }
                 } else {
-                    url = this.flagsUrl + this.collections.all().filter(c => !!c.dom).map(c => c.id).join(',');
+                    url = Urls.flags_api(this.collections.all().filter(c => !!c.dom).map(c => c.id).join(','));
                 }
                 
                 params = Object.assign({}, params);
