@@ -188,9 +188,8 @@ def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
 
 
 def insert_vep_too_long_skipped(annotation_run: AnnotationRun, sv_max_size: Optional[int] = None) -> int:
-    """ TOO_LONG rows for the SVs in a run's range that the dump left out, for a run that never reaches
-        handle_vep_skipped: one whose dump was empty, or a finished run being backfilled (#2104).
-        Returns the number of rows written. """
+    """ TOO_LONG rows for the SVs in a run's range that the dump left out, for a run whose dump was empty
+        so never reaches handle_vep_skipped. Returns the number of rows written. """
     if sv_max_size is None:
         sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
     variants = _get_vep_too_long_variants(annotation_run, sv_max_size)

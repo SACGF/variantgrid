@@ -9,7 +9,6 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.fake_data import get_fake_vep_version, retire_seeded_annotation_version
-from annotation.management.commands.fix_annotation_vep_too_long import fix_annotation_vep_too_long
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_enums import (
@@ -34,7 +33,9 @@ SV_MAX_SIZE = 1000
 
 
 @override_settings(ANNOTATION_VEP_SV_MAX_SIZE=SV_MAX_SIZE)
-class VEPTooLongTestCase(TestCase):
+class VEPTooLongTestBase(TestCase):
+    """ A too-long SV between an SNV and a short SV, all on one active VEP annotation version """
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -64,6 +65,8 @@ class VEPTooLongTestCase(TestCase):
         qs = VariantAnnotation.objects.filter(annotation_run=annotation_run)
         return dict(qs.values_list("variant_id", "vep_skipped_reason"))
 
+
+class VEPTooLongTestCase(VEPTooLongTestBase):
     def test_empty_dump_writes_too_long(self):
         """ Range holding only a too-long SV - the count lane finishes it without a dump """
         sv_run = self._sv_run(self.long_sv)
@@ -86,14 +89,6 @@ class VEPTooLongTestCase(TestCase):
         self.assertEqual(sv_run.vep_skipped_count, 0)
         # Under UNIT_TEST the inserter writes to the base table, so short_sv still reads as unannotated -
         # it must not be written off as UNKNOWN
-        self.assertEqual(self._skipped_reasons(sv_run), {self.long_sv.pk: VEPSkippedReason.TOO_LONG})
-
-    def test_backfill_finished_run(self):
-        sv_run = self._sv_run(self.long_sv)
-        sv_run.dump_count = 0
-        sv_run.save()
-
-        fix_annotation_vep_too_long()
         self.assertEqual(self._skipped_reasons(sv_run), {self.long_sv.pk: VEPSkippedReason.TOO_LONG})
 
     def test_variant_page_too_long_is_a_warning(self):
