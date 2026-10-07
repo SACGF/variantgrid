@@ -117,11 +117,11 @@ class Command(BaseCommand):
             them), then we seek back to the start and stream the transcripts. """
         def genes_iter():
             file_obj.seek(0)
-            return ijson.kvitems(file_obj, "genes")
+            return ijson.kvitems(file_obj, "genes", use_float=True)
 
         def transcripts_iter():
             file_obj.seek(0)
-            return ijson.kvitems(file_obj, "transcripts")
+            return ijson.kvitems(file_obj, "transcripts", use_float=True)
 
         cls._import_cdot_data(genome_build, annotation_consortium, cdot_version, genes_iter, transcripts_iter)
         CdotDataVersion.objects.update_or_create(genome_build=genome_build, annotation_consortium=annotation_consortium,
