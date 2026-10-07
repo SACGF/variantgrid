@@ -293,7 +293,9 @@ urlpatterns = [
     path('api/classifications/v2/record/', ClassificationView.as_view(api_version=2), name='classification_api_2'),
     path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
-    path('api/classifications/v3/record/', ClassificationView.as_view(api_version=3), name='classification_api_3'),
+    # v3 currently behaves exactly as v2. Reserved for splitting a record into "meta" and "evidence" (uploads would put
+    # evidence under "evidence" with an operation param rather than "data"/"upsert"/"insert") - kept, not deprecated, #1475
+    path('api/classifications/v3/record/',ClassificationView.as_view(api_version=3), name='classification_api_3'),
     path('api/classifications/v3/record/<record_id>', ClassificationView.as_view(api_version=3),
          name='classification_with_record_api_3'),
 
