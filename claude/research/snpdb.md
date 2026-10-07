@@ -43,7 +43,7 @@ beyond `settings.VARIANT_SYMBOLIC_ALT_SIZE` (1000 in `variantgrid/settings/compo
 longer than the threshold) with an `svlen`. `VariantCoordinate.as_vcf_coordinate` / `VariantCoordinate.from_vcf_coordinate`
 convert to and from hgvs's `VCFCoordinate`, which puts a padding base before an `<INV>` (we store its first inverted base). `VariantCoordinate.as_internal_canonical_form` is the rule "one representation per
 variant": symbolic only when `abs(svlen)` clears the threshold, otherwise explicit if `VariantCoordinate.can_be_made_explicit`
-(`<CNV>` and `<INS>` cannot be), and an alt equal to the ref becomes `Variant.REFERENCE_ALT`. `Variant.qs_from_variant_coordinate`
+(`<CNV>` and `<INS>` cannot be - and no `<INS>` is stored, as import drops it: `settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES`), and an alt equal to the ref becomes `Variant.REFERENCE_ALT`. `Variant.qs_from_variant_coordinate`
 applies this and resolves the contig up front from `GenomeBuild.chrom_contig_mappings` so the filter lands on the
 leading edge of the `(contig, position, ref)` unique index instead of joining GenomeBuildContig (#1720). `Variant` is
 unique on `(locus, alt, svlen)`: two CNVs can share an alt and differ only in length. `Variant.end` is stored, not

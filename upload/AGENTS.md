@@ -37,6 +37,9 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- Symbolic alts outside settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES (`<CNV>`/`<DEL>`/`<DUP>`/`<INV>`) never become
+  Variants: management/commands/vcf_clean_alts.py:Command skips them into the upload's skipped-record stats. `<INS>` is
+  one of them - the `<INS>` branches in snpdb, annotation and genes are written ahead of any `<INS>` Variant existing.
 - `--check-ref=s` silently rewrites any REF that disagrees with the fasta, so a VCF whose header names the wrong build
   would import "cleanly" into the wrong genes. Before the pipe, upload/vcf/vcf_ref_check.py:check_vcf_ref_matches_build
   samples the first settings.VCF_IMPORT_REF_CHECK_SNVS SNVs against the build (and the other annotated builds, to name

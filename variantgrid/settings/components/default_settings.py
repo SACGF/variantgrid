@@ -1288,6 +1288,8 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 # pipeline it goes to is a separate cut-off, ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 VARIANT_SYMBOLIC_ALT_ENABLED = True
 VARIANT_SYMBOLIC_ALT_SIZE = 50
+# Any other symbolic ALT is dropped at import (vcf_clean_alts). <INS> is left out on purpose: Manta's often has no
+# SVLEN and END=POS, so it would store with svlen 0 and unrelated insertions would collapse into one Variant
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
                                     VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
 
