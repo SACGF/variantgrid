@@ -14,11 +14,12 @@ leading it changes when the patient is re-sequenced, so the code is what one pat
 under and the whole pair ID is not (settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX reads it, so a lab
 naming pairs some other way says so there). The ten-digit accession inside each sample ID is the
 specimen, and the container suffix on it names that arm's extraction. Each level is resolved against what is
-already there and created when absent, so a CVO arriving before anything has been accessioned
-leaves a stub Patient holding only its code, a Specimen and two named Extractions - the patients
-API keeps what the file lacks (name, DOB, sex, tissue, dates) and fills the stub in. In practice
-the patient is pushed before sequencing starts, so the stub is the exception this tolerates rather
-than the path it is built for.
+already there and created when absent. A patient with no code that the arms' samples are already
+linked to (eg by the sample sheet's order number) is the pair's patient, and takes the code. Only a
+CVO arriving before anything has been accessioned leaves a stub Patient holding only its code, a
+Specimen and two named Extractions - the patients API keeps what the file lacks (name, DOB, sex,
+tissue, dates) and fills the stub in. In practice the patient is pushed before sequencing starts,
+so the stub is the exception this tolerates rather than the path it is built for.
 
 The same two sample IDs are the join to everything else: DRAGEN writes them from the SampleSheet's
 Sample_ID, so each is exactly a Sample.vcf_sample_name and exactly a SequencingSample.sample_name.
@@ -36,7 +37,7 @@ from typing import Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Model
+from django.db.models import Model, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -46,7 +47,13 @@ from patients.external_references import (
     ResolvedReference,
     resolve_reference,
 )
-from patients.models import Extraction, Patient, Specimen
+from patients.models import (
+    Extraction,
+    Patient,
+    PatientModification,
+    PatientRecordOriginType,
+    Specimen,
+)
 from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
@@ -178,10 +185,30 @@ def _resolve(model: type[Model], reference_id: str, user: User) -> Optional[Mode
     return resolved.obj
 
 
+def _arm_samples_uncoded_patient(identifiers: PairIdentifiers, user: User) -> Optional[Patient]:
+    """ The patient the arms' samples are already linked to (eg by the sample sheet's order number), if it
+        has no code yet - so the pair is accessioned against it rather than a stub made beside it """
+    sample_ids = [arm.sample_id for arm in identifiers.arms]
+    samples = Sample.filter_for_user(user, has_write_permission=True).filter(vcf_sample_name__in=sample_ids)
+    patient_ids = set(samples.filter(patient__isnull=False).values_list("patient_id", flat=True))
+    if len(patient_ids) > 1:
+        logging.warning("'%s' arm samples are linked to several patients (%s) - not taking one as the pair's",
+                        identifiers.pair_id, ", ".join(map(str, sorted(patient_ids))))
+    if len(patient_ids) != 1:
+        return None
+    # One with a code that isn't the pair's is left alone - _resolve would have found it otherwise
+    return Patient.objects.filter(Q(patient_code__isnull=True) | Q(patient_code=""), pk=patient_ids.pop()).first()
+
+
 @transaction.atomic
 def resolve_pair(identifiers: PairIdentifiers, user: User) -> ResolvedPair:
     """ The pair's Patient / Specimen / Extraction rows, creating whichever are not there yet """
     patient = _resolve(Patient, identifiers.patient_code, user)
+    if patient is None and (patient := _arm_samples_uncoded_patient(identifiers, user)):
+        patient.patient_code = identifiers.patient_code
+        patient.save(update_fields=["patient_code"])
+        PatientModification.objects.create(patient=patient, user=user, origin=PatientRecordOriginType.INTERNAL_VG,
+                                           description=f"Set patient code from TSO500 Pair ID '{identifiers.pair_id}'")
     if patient is None:
         patient = Patient.objects.create(patient_code=identifiers.patient_code)
         assign_permission_to_user_and_groups(user, patient)

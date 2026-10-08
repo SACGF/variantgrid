@@ -244,6 +244,27 @@ class TestCombinedVariantOutputRecords(TestCase):
             self.assertEqual(resolved.extractions[sample_id], sample.extraction)
             self.assertEqual(MatchStatus.MATCHED, sample.extraction_match_status)
 
+    def test_patient_the_arm_samples_are_linked_to_takes_the_code(self):
+        """ The sheet's order number linked the samples to their patient before it had a code -
+            that patient is the pair's, rather than a stub made beside it """
+        patient = Patient.objects.create(last_name="Linked")
+        sample = self._make_sample(self.identifiers.dna.sample_id)
+        sample.patient = patient
+        sample.save()
+        resolved = resolve_pair(self.identifiers, self.user)
+        self.assertEqual(patient, resolved.patient)
+        patient.refresh_from_db()
+        self.assertEqual("C0000001", patient.patient_code)
+
+    def test_arm_samples_patient_with_another_code_is_not_taken(self):
+        patient = Patient.objects.create(patient_code="C0009999")
+        sample = self._make_sample(self.identifiers.dna.sample_id)
+        sample.patient = patient
+        sample.save()
+        resolved = resolve_pair(self.identifiers, self.user)
+        self.assertNotEqual(patient, resolved.patient)
+        self.assertEqual("C0000001", resolved.patient.patient_code)
+
     def _write(self, sequencing_run_name="TSO500_CVO", sequencing_run=None, resolve=True):
         resolved = resolve_pair(self.identifiers, self.user) if resolve else None
         return write_combined_variant_output(self.sections, self.identifiers.pair_id, sequencing_run,
