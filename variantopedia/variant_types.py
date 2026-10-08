@@ -6,8 +6,9 @@ in settings, so the page changes with them. Entry points: get_variant_type_rows,
 
 Two of the thresholds are deliberately apart (#1358): a del/dup/inv is stored symbolic from
 VARIANT_SYMBOLIC_ALT_SIZE, but annotated as a structural variant only from ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE.
-Those two are the only sizes that split the table; a feature's own ceiling (liftover, ClinGen, VEP) is a
-line under it, as it is the same for every kind.
+Those two, and VEP's ceiling on a structural variant (ANNOTATION_VEP_SV_MAX_SIZE - above it a variant is
+annotated with its overlapping genes only), are the sizes that split the table; a feature's own ceiling (liftover,
+ClinGen) is a line under it, as it is the same for every kind.
 """
 import itertools
 from collections.abc import Callable
@@ -99,6 +100,7 @@ class Outcome:
     """ What the table shows for a kind at a size - the key adjacent bands are merged on """
     symbolic: bool
     pipeline: VariantAnnotationPipelineType
+    vep_too_long: bool = False
 
     @property
     def name(self) -> str:
@@ -106,6 +108,8 @@ class Outcome:
             return "Short"
         if self.pipeline == VariantAnnotationPipelineType.STANDARD:
             return "Small SV"
+        if self.vep_too_long:
+            return "Large SV"
         return "SV"
 
 
@@ -115,16 +119,22 @@ class Band:
     end: Optional[int]  # exclusive, None = open
     outcome: Outcome
     alts: tuple[str, ...]  # symbolic alts of the kinds in the band, for the Stored as cell
+    end_inclusive: bool = False  # VEP's ceiling is the one limit a variant must be longer than, not reach
 
 
 def _outcome(vc: VariantCoordinate) -> Outcome:
     pipeline_type = pipeline_type_for_alt(vc.alt, vc.svlen, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE)
-    return Outcome(symbolic=vc.is_symbolic, pipeline=pipeline_type)
+    # As annotation_version_querysets.filter_vep_sv_max_size - VEP is never given these
+    sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
+    vep_too_long = (pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+                    and bool(sv_max_size) and vc.svlen is not None and abs(vc.svlen) > sv_max_size)
+    return Outcome(symbolic=vc.is_symbolic, pipeline=pipeline_type, vep_too_long=vep_too_long)
 
 
 def _size_thresholds() -> list[int]:
     """ The lengths where storage or annotation changes """
-    thresholds = {settings.VARIANT_SYMBOLIC_ALT_SIZE, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE}
+    thresholds = {settings.VARIANT_SYMBOLIC_ALT_SIZE, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE,
+                  settings.ANNOTATION_VEP_SV_MAX_SIZE}
     return sorted(t for t in thresholds if t and t > 1)
 
 
@@ -143,7 +153,8 @@ def _kind_bands(kind: VariantKind) -> list[Band]:
     for outcome, group in itertools.groupby(coordinates, key=lambda sc: _outcome(sc[1])):
         start, vc = next(group)
         bands.append(Band(start, None, outcome, (vc.alt,) if vc.is_symbolic else ()))
-    return [Band(band.start, next_band.start if next_band else None, band.outcome, band.alts)
+    return [Band(band.start, next_band.start if next_band else None, band.outcome, band.alts,
+                 end_inclusive=bool(next_band and next_band.outcome.vep_too_long))
             for band, next_band in itertools.zip_longest(bands, bands[1:])]
 
 
@@ -157,7 +168,7 @@ def _merge_bands(kinds_bands: list[list[Band]]) -> Optional[list[Band]]:
     merged = []
     for bands in zip(*kinds_bands):
         alts = tuple(dict.fromkeys(alt for band in bands for alt in band.alts))
-        merged.append(Band(bands[0].start, bands[0].end, bands[0].outcome, alts))
+        merged.append(Band(bands[0].start, bands[0].end, bands[0].outcome, alts, bands[0].end_inclusive))
     return merged
 
 
@@ -168,14 +179,20 @@ def _size_label(band: Band, sized: bool, first: bool, last: bool) -> tuple[str, 
     if first and last:
         return "Any size", ""
     if first:
-        return band.outcome.name, f"< {format_bp(band.end)}"
+        return band.outcome.name, f"{'≤' if band.end_inclusive else '<'} {format_bp(band.end)}"
     if last:
-        return band.outcome.name, f"≥ {format_bp(band.start)}"
+        comparison = ">" if band.outcome.vep_too_long else "≥"
+        return band.outcome.name, f"{comparison} {format_bp(band.start)}"
     return band.outcome.name, f"{format_bp(band.start)} to {format_bp(band.end)}"
 
 
 def _annotation_cells(outcome: Outcome) -> tuple[str, str]:
-    """ (pipeline, population frequency) """
+    """ (pipeline, detail - population frequency, or what a variant VEP skips still gets) """
+    if outcome.vep_too_long:
+        detail = "Overlapping genes only - no consequence, transcripts, HGVS or gnomAD-SV"
+        if settings.ANNOTATION_ANNOTSV_ENABLED:
+            detail += " (AnnotSV still runs)"
+        return f"{outcome.pipeline.label} - not annotated by VEP", detail
     if outcome.pipeline == VariantAnnotationPipelineType.STANDARD:
         pipeline = outcome.pipeline.label
         if outcome.symbolic:
@@ -189,9 +206,8 @@ def _annotation_cells(outcome: Outcome) -> tuple[str, str]:
 def _band_row(band: Band, sized: bool, first: bool, last: bool) -> dict:
     name, size_range = _size_label(band, sized, first, last)
     stored_as = f"Symbolic {'/'.join(band.alts)} + SVLEN" if band.outcome.symbolic else "Sequence (ref/alt)"
-    pipeline, population = _annotation_cells(band.outcome)
-    return {"name": name, "range": size_range, "stored_as": stored_as, "pipeline": pipeline,
-            "population": population}
+    pipeline, detail = _annotation_cells(band.outcome)
+    return {"name": name, "range": size_range, "stored_as": stored_as, "pipeline": pipeline, "detail": detail}
 
 
 def _kind_groups() -> list[tuple[str, list[VariantKind]]]:
@@ -218,7 +234,7 @@ def get_variant_type_rows() -> list[dict]:
         # A gene id where a coordinate goes, the same in every build (@see snpdb.gene_level_variants)
         groups.append({"kind": "Gene-level event (fusion, copy number, splicing)",
                        "bands": [{"name": "", "range": "", "stored_as": "Gene id + event",
-                                  "pipeline": pipeline_type.label, "population": "-"}]})
+                                  "pipeline": pipeline_type.label, "detail": "-"}]})
     return groups
 
 
@@ -242,12 +258,6 @@ def _clingen_limit() -> str:
             f"its sequence twice. {_no_g_hgvs_kinds()} are not registered.")
 
 
-def _vep_sv_limit() -> Optional[str]:
-    if not settings.ANNOTATION_VEP_SV_MAX_SIZE:
-        return None
-    return f"Structural variants up to {format_bp(settings.ANNOTATION_VEP_SV_MAX_SIZE)}; larger ones are not annotated."
-
-
 def _no_g_hgvs_kinds() -> str:
     alts = [kind.coordinate(1).alt for _, kinds in _kind_groups() for kind in kinds
             if not kind.coordinate(1).can_be_made_explicit]
@@ -268,7 +278,6 @@ def get_size_limits() -> list[dict]:
     limits = [
         ("Liftover (BCFtools)", _liftover_limit()),
         ("ClinGen Allele", _clingen_limit()),
-        ("VEP structural variants", _vep_sv_limit()),
         ("g.HGVS", _g_hgvs_limit()),
     ]
     return [{"name": name, "text": text} for name, text in limits if text]

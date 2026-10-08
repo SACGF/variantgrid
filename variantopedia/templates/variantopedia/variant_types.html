@@ -33,7 +33,7 @@
                                     <td>{{ band.stored_as }}</td>
                                     <td>
                                         {{ band.pipeline }}
-                                        <div class="text-muted small">{{ band.population }}</div>
+                                        <div class="text-muted small">{{ band.detail }}</div>
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -85,6 +85,16 @@
                         {% if annotsv_enabled %}and AnnotSV{% endif %}, without the per-base scores (eg SpliceAI,
                         CADD, dbNSFP) that only exist for short variants.
                     </dd>
+                    {% if vep_sv_max_size %}
+                        <dt>Not annotated by VEP over {{ vep_sv_max_size }}</dt>
+                        <dd>
+                            VEP won't annotate a structural variant longer than {{ vep_sv_max_size }}, so these
+                            are not sent to it, and show "Not annotated by VEP" on the variant page. Their
+                            overlapping genes are still worked out here from the transcripts, so gene filters and
+                            gene lists still find them, but they have no consequence, transcript annotation, HGVS
+                            or gnomAD-SV frequency.
+                        </dd>
+                    {% endif %}
                 </dl>
                 <p class="text-muted mb-0">
                     For what each annotation column means, see

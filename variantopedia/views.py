@@ -353,6 +353,7 @@ def variant_types(request):
         "size_limits": get_size_limits(),
         "symbolic_alt_size": format_bp(settings.VARIANT_SYMBOLIC_ALT_SIZE),
         "structural_variant_min_size": format_bp(settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
+        "vep_sv_max_size": format_bp(settings.ANNOTATION_VEP_SV_MAX_SIZE) if settings.ANNOTATION_VEP_SV_MAX_SIZE else None,
         "annotsv_enabled": settings.ANNOTATION_ANNOTSV_ENABLED,
     }
     return render(request, "variantopedia/variant_types.html", context)

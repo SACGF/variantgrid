@@ -5,7 +5,7 @@ from variantopedia.variant_types import get_size_limits, get_variant_type_rows
 
 
 @override_settings(VARIANT_SYMBOLIC_ALT_ENABLED=True, VARIANT_SYMBOLIC_ALT_SIZE=50,
-                   ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE=1000)
+                   ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE=1000, ANNOTATION_VEP_SV_MAX_SIZE=None)
 class VariantTypesTest(SimpleTestCase):
 
     def test_del_dup_inv_share_bands_split_at_thresholds(self):
@@ -20,6 +20,17 @@ class VariantTypesTest(SimpleTestCase):
         self.assertEqual("Standard Short Variant (given to VEP as its sequence)", bands[1]["pipeline"])
         self.assertEqual("Structural Variant", bands[2]["pipeline"])
         self.assertEqual([("Any size", "")], [(b["name"], b["range"]) for b in groups["Insertion, complex substitution"]])
+
+    @override_settings(ANNOTATION_VEP_SV_MAX_SIZE=10_000_000)
+    def test_vep_sv_max_size_splits_structural_variants(self):
+        """ VEP is never given an SV over its ceiling, so the table must not imply it is annotated as one """
+        groups = {g["kind"]: g["bands"] for g in get_variant_type_rows()}
+        bands = groups["Deletion, duplication, inversion"]
+        self.assertEqual([("SV", "1 kb to 10 Mb"), ("Large SV", "> 10 Mb")],
+                         [(b["name"], b["range"]) for b in bands[2:]])
+        self.assertIn("not annotated by VEP", bands[3]["pipeline"])
+        cnv_bands = groups["Copy number <CNV>, insertion <INS>"]
+        self.assertEqual([("SV", "≤ 10 Mb"), ("Large SV", "> 10 Mb")], [(b["name"], b["range"]) for b in cnv_bands])
 
     @override_settings(VARIANT_SYMBOLIC_ALT_ENABLED=False)
     def test_no_symbolic_storage_is_one_band(self):
