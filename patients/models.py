@@ -13,7 +13,7 @@ import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Case, F, Q, TextField, Value, When
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Concat
@@ -214,6 +214,57 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     def allow_group_permission_delete(cls) -> bool:
         # Deletable via the group_permissions delete view (can_write() still blocks externally-managed ones)
         return True
+
+    def _merge_values(self) -> dict:
+        """ attname -> value for each field that has been set (not empty, not its default) """
+        values = {}
+        for field in Patient._meta.concrete_fields:
+            if field.primary_key or field.name in ("created", "modified"):
+                continue
+            value = getattr(self, field.attname)
+            if value in (None, "") or (field.has_default() and value == field.get_default()):
+                continue
+            values[field.attname] = value
+        return values
+
+    def get_merge_conflicts(self, other: 'Patient') -> list[str]:
+        """ Why other can't be merged into this patient - empty if it can """
+        conflicts = []
+        values = self._merge_values()
+        other_values = other._merge_values()
+        for attname in sorted(values.keys() & other_values.keys()):
+            if values[attname] != other_values[attname]:
+                conflicts.append(f"{attname} {values[attname]!r} vs {other_values[attname]!r}")
+
+        # Specimen reference_id is unique per patient
+        other_specimens = other.specimen_set.values_list("reference_id", flat=True)
+        for reference_id in self.specimen_set.filter(reference_id__in=other_specimens) \
+                .values_list("reference_id", flat=True):
+            conflicts.append(f"both have specimen '{reference_id}'")
+        return conflicts
+
+    @transaction.atomic
+    def merge(self, other: 'Patient', description: str, origin: str, user: Optional[User] = None):
+        """ Folds other into this patient: everything pointing at it moves here, any field set only on
+            other is copied, and other is deleted. Raises ValueError if get_merge_conflicts finds any """
+        if conflicts := self.get_merge_conflicts(other):
+            raise ValueError(f"Can't merge {other}({other.pk}) into {self}({self.pk}): {', '.join(conflicts)}")
+
+        for rel in Patient._meta.related_objects:
+            # One to one (PatientTextPhenotype) goes with other, and is redone on save if phenotype is copied
+            if rel.one_to_many:
+                rel.related_model._base_manager.filter(**{rel.field.name: other}).update(**{rel.field.name: self})
+
+        values = self._merge_values()
+        copied = {attname: value for attname, value in other._merge_values().items() if attname not in values}
+        other_description = f"{other}({other.pk})"
+        other.delete()  # before copying, as external_pk is unique
+        if copied:
+            for attname, value in copied.items():
+                setattr(self, attname, value)
+            self.save(update_fields=list(copied))
+        PatientModification.objects.create(patient=self, user=user, origin=origin,
+                                           description=f"Merged {other_description}: {description}")
 
     @property
     def code(self):
