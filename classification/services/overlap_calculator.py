@@ -29,14 +29,21 @@ class OverlapCalculatorBase(ABC):
 
     @classmethod
     def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
+        """
+        Given an iterable of OverlapContributions that apply to the same allele
+        calculate what should be the current OverlapState
+        :param entries: OverlapContributions of any status
+        :return: Calculated OverlapState
+        """
+
         override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
         non_comparable_values: int = 0
         contributing: list[OverlapContribution] = []
         involved_labs: list[str] = []
         overlap_status: OverlapStatus
 
+        # work out which contributions actually contribute to the overlap
         for entry in entries:
-
             match entry.contribution_status:
                 case OverlapContributionStatus.CONTRIBUTING:
                     contributing.append(entry)
@@ -51,45 +58,51 @@ class OverlapCalculatorBase(ABC):
         involved_labs.sort()
         has_pending_values = any(con.is_amending for con in contributing)
         if len(contributing) == 0:
+            # no valid contributions
             if non_comparable_values > 0:
                 overlap_status = OverlapStatus.NO_COUNTING_CONTRIBUTIONS
             else:
                 overlap_status = OverlapStatus.NO_CONTRIBUTIONS
         elif len(contributing) == 1:
+            # only one valid contribution, nothing to compare to
             overlap_status = OverlapStatus.SINGLE_SUBMITTER
         else:
-            override_value: OverlapOverrideStatus = OverlapOverrideStatus.NO_OVERRIDE
+            # multiple valid contributions, need to do some work to actually compare
             all_values = set(con.effective_value for con in contributing)
             if len(all_values) == 1:
                 overlap_status = OverlapStatus.EXACT_AGREEMENT
             else:
+                # we have multiple distinct values, now actually call the implementation to determine
+                # exactly what level of difference there is
                 overlap_status = cls.calculate_status_for_multiple_entries(all_values)
 
-            third_party = [con for con in contributing if con.triage_state_obj.status == TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
-            interactive_contributors = [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
+                third_party = [con for con in contributing if con.triage_state_obj.status == TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
+                interactive_contributors = [con for con in contributing if con.triage_state_obj.status != TriageStatus.NON_INTERACTIVE_THIRD_PARTY]
 
-            if interactive_contributors:
-                all_matching_reviewed_value = all(con.is_review_agreed_value_met for con in interactive_contributors)
-                all_complex = all(con.triage_state_obj.status == TriageStatus.COMPLEX for con in interactive_contributors)
+                # now check things like if it's been triaged as complex, reviewed as continued discordance
+                # if ClinVar is the only thing causing the discordance
+                if interactive_contributors:
+                    all_matching_reviewed_value = all(con.is_review_agreed_value_met for con in interactive_contributors)
+                    all_complex = all(con.triage_state_obj.status == TriageStatus.COMPLEX for con in interactive_contributors)
 
-                if all_complex:
-                    override_status = OverlapOverrideStatus.COMPLEX
-                elif overlap_status.is_discordant:
-                    if all_matching_reviewed_value:
-                        override_status = OverlapOverrideStatus.CONTINUED_DISCORDANCE
-                    else:
-                        # see if it's ClinVar that's making the over discordant
-                        non_clinvar_values = set(con.effective_value for con in interactive_contributors)
-                        if third_party:
-                            clinvar_causing_discordant = len(non_clinvar_values) == 1 or not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
+                    if all_complex:
+                        override_status = OverlapOverrideStatus.COMPLEX
+                    elif overlap_status.is_discordant:
+                        if all_matching_reviewed_value:
+                            override_status = OverlapOverrideStatus.CONTINUED_DISCORDANCE
+                        else:
+                            # see if it's ClinVar that's making the over discordant
+                            non_clinvar_values = set(con.effective_value for con in interactive_contributors)
+                            if third_party:
+                                clinvar_causing_discordant = len(non_clinvar_values) == 1 or not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
 
-                            if clinvar_causing_discordant:
-                                max_clinvar_date = max(con.effective_date_obj for con in third_party)
-                                max_classification_date = max(con.effective_date_obj for con in interactive_contributors)
-                                if max_clinvar_date < max_classification_date:
-                                    override_status = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
-                                elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors):  # all confident
-                                    override_status = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
+                                if clinvar_causing_discordant:
+                                    max_clinvar_date = max(con.effective_date_obj for con in third_party)
+                                    max_classification_date = max(con.effective_date_obj for con in interactive_contributors)
+                                    if max_clinvar_date < max_classification_date:
+                                        override_status = OverlapOverrideStatus.IGNORING_OLD_CLINVAR
+                                    elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors):  # all confident
+                                        override_status = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
         return OverlapState(status=overlap_status, has_pending_values=has_pending_values, override_status=override_status, lab_groups=involved_labs)
 
@@ -152,6 +165,8 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
     @classmethod
     def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
         overlap_state = super().calculate_entries(entries)
+        # do the normal calculation but also do a check for ALL VUS
+        # as that gets its own property on OverlapState for quick lookup
         if OverlapStatus.SINGLE_SUBMITTER <= overlap_state.status <= OverlapStatus.RESOLUTION_DIFFERENCES:
             all_vus = True
             for entry in entries:
