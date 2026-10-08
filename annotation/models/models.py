@@ -2658,10 +2658,11 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.get_gnomad_sv_overlap(self.__dict__, self.version.gnomad_sv)
 
     def get_short_label(self) -> str:
-        """ Falls back to g.HGVS, which only this (per-variant) annotation has """
+        """ Falls back to g.HGVS, which only this (per-variant) annotation has - calculated for a row
+            VEP skipped (eg an SV over its size cap), which has none of its own """
         if self.hgvs_p or self.has_hgvs_c:
             return super().get_short_label()
-        return self.hgvs_g or str(self.variant)
+        return self.hgvs_g or VariantAnnotation.get_hgvs_g(self.variant) or str(self.variant)
 
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
@@ -2692,9 +2693,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @staticmethod
     def _generate_hgvs_g(variant: Variant) -> Optional[str]:
         """ Reference variants have no annotation - so we'll have to fall back to generating it.
-            Not for gene-level, which has no coordinate to write a g.HGVS from - it is annotated, so
-            a null here means it predates the column being filled rather than "generate one" """
-        if variant.is_gene_level:
+            None for what has no g.HGVS to write - <CNV>/<INS> and gene-level """
+        if not variant.can_make_g_hgvs:
             return None
         from genes.hgvs import HGVSMatcher
         matcher = HGVSMatcher.instance(variant.any_genome_build)

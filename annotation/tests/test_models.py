@@ -1,6 +1,8 @@
 from django.test import TestCase
 
 from annotation.models import VariantAnnotation
+from snpdb.models import GenomeBuild, VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant_from_coordinate
 
 
 class TestAnnotationModels(TestCase):
@@ -32,3 +34,16 @@ class TestAnnotationModels(TestCase):
     def test_get_short_label_falls_back_to_g_hgvs(self):
         va = VariantAnnotation(hgvs_g="NC_000021.9:g.34859474G>A")
         self.assertEqual("NC_000021.9:g.34859474G>A", va.get_short_label())
+
+    def test_get_short_label_calculates_g_hgvs_for_skipped_row(self):
+        """ VEP skips SVs over its size cap, leaving a row with no hgvs_g """
+        vc = VariantCoordinate(chrom="2", position=99999, ref="N", alt="<DEL>", svlen=-124251)
+        variant = slowly_create_test_variant_from_coordinate(vc, GenomeBuild.grch37())
+        va = VariantAnnotation(variant=variant)
+        self.assertEqual("NC_000002.11:g.100001_224251del", va.get_short_label())
+
+    def test_get_short_label_without_g_hgvs_form(self):
+        vc = VariantCoordinate(chrom="2", position=99999, ref="N", alt="<CNV>", svlen=124251)
+        variant = slowly_create_test_variant_from_coordinate(vc, GenomeBuild.grch37())
+        va = VariantAnnotation(variant=variant)
+        self.assertEqual(str(variant), va.get_short_label())
