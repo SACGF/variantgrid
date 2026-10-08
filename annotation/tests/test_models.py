@@ -37,10 +37,11 @@ class TestAnnotationModels(TestCase):
 
     def test_get_short_label_calculates_g_hgvs_for_skipped_row(self):
         """ VEP skips SVs over its size cap, leaving a row with no hgvs_g """
-        vc = VariantCoordinate(chrom="2", position=99999, ref="N", alt="<DEL>", svlen=-124251)
+        # Over Babelfish's normalize cap so no sequence is read - CI's sparse test FASTA is all N here
+        vc = VariantCoordinate(chrom="2", position=99999, ref="N", alt="<DEL>", svlen=-1_124_251)
         variant = slowly_create_test_variant_from_coordinate(vc, GenomeBuild.grch37())
         va = VariantAnnotation(variant=variant)
-        self.assertEqual("NC_000002.11:g.100001_224251del", va.get_short_label())
+        self.assertEqual("NC_000002.11:g.100000_1224250del", va.get_short_label())
 
     def test_get_short_label_without_g_hgvs_form(self):
         vc = VariantCoordinate(chrom="2", position=99999, ref="N", alt="<CNV>", svlen=124251)
