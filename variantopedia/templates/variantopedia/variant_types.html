@@ -61,6 +61,19 @@
         </div>
 
         <div class="card mt-3">
+            <div class="card-header"><b>Not supported</b></div>
+            <div class="card-body">
+                <p>Dropped from a VCF at import - the upload lists how many of each were skipped.</p>
+                <dl class="mb-0">
+                    {% for unsupported_type in unsupported %}
+                        <dt>{{ unsupported_type.name }}</dt>
+                        <dd>{{ unsupported_type.text }}</dd>
+                    {% endfor %}
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-3">
             <div class="card-header"><b>Why these thresholds</b></div>
             <div class="card-body">
                 <dl>

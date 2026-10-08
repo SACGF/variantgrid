@@ -2,7 +2,8 @@
 The variant types page: how each kind of variant is stored and annotated, by size, and the size limits
 of the features that have one. Every cell is computed by the rule the code itself uses
 (annotation.annotation_pipeline_routing, snpdb.bcftools_liftover, snpdb.clingen_allele) at the thresholds
-in settings, so the page changes with them. Entry points: get_variant_type_rows, get_size_limits.
+in settings, so the page changes with them. Entry points: get_variant_type_rows, get_size_limits,
+get_unsupported.
 
 Two of the thresholds are deliberately apart (#1358): a del/dup/inv is stored symbolic from
 VARIANT_SYMBOLIC_ALT_SIZE, but annotated as a structural variant only from ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE.
@@ -34,7 +35,7 @@ class VariantKind:
     coordinate: Callable[[int], VariantCoordinate]
     sized: bool = True
     min_length: int = 1
-    symbolic_only: bool = False  # has no sequence form, so does not exist when VARIANT_SYMBOLIC_ALT_ENABLED is off
+    symbolic_only: bool = False  # has no sequence form - stored only if its alt is in VARIANT_SYMBOLIC_ALT_VALID_TYPES
 
 
 def _symbolic(alt: str, svlen: int) -> VariantCoordinate:
@@ -93,6 +94,12 @@ VARIANT_KIND_GROUPS = [
     ("Insertion, complex substitution", [INSERTION, COMPLEX_SUBSTITUTION]),
     ("Copy number <CNV>, insertion <INS>", [CNV, SYMBOLIC_INSERTION]),
 ]
+
+# Symbolic alts left out of VARIANT_SYMBOLIC_ALT_VALID_TYPES for a reason worth giving
+UNSUPPORTED_SYMBOLIC_REASONS = {
+    VCFSymbolicAllele.INS: "Callers (eg Manta) often give no SVLEN and END=POS, so it would be stored with no "
+                           "length and unrelated insertions at a position would become one variant.",
+}
 
 
 @dataclass(frozen=True)
@@ -210,10 +217,20 @@ def _band_row(band: Band, sized: bool, first: bool, last: bool) -> dict:
     return {"name": name, "range": size_range, "stored_as": stored_as, "pipeline": pipeline, "detail": detail}
 
 
+def _is_stored(kind: VariantKind) -> bool:
+    """ As vcf_clean_alts - a symbolic-only kind is dropped at import unless its alt is a valid type """
+    if not kind.symbolic_only:
+        return True
+    return settings.VARIANT_SYMBOLIC_ALT_ENABLED and kind.coordinate(1).alt in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES
+
+
 def _kind_groups() -> list[tuple[str, list[VariantKind]]]:
-    if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
-        return VARIANT_KIND_GROUPS
-    return [(name, kinds) for name, kinds in VARIANT_KIND_GROUPS if not any(k.symbolic_only for k in kinds)]
+    groups = []
+    for name, kinds in VARIANT_KIND_GROUPS:
+        stored = [k for k in kinds if _is_stored(k)]
+        if stored:
+            groups.append((name if stored == kinds else ", ".join(k.name for k in stored), stored))
+    return groups
 
 
 def get_variant_type_rows() -> list[dict]:
@@ -281,3 +298,21 @@ def get_size_limits() -> list[dict]:
         ("g.HGVS", _g_hgvs_limit()),
     ]
     return [{"name": name, "text": text} for name, text in limits if text]
+
+
+def get_unsupported() -> list[dict]:
+    """ What VCF import drops (vcf_clean_alts) - the table above is only what can be stored """
+    if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
+        valid_types = settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES
+        unsupported = [{"name": alt, "text": reason} for alt, reason in UNSUPPORTED_SYMBOLIC_REASONS.items()
+                       if alt not in valid_types]
+        unsupported.append({"name": "Other symbolic ALTs",
+                            "text": f"Only {', '.join(sorted(valid_types))} are stored, so eg <BND>, <INS:ME> and "
+                                    f"<DEL:ME> are dropped. <DUP:TANDEM> is stored as <DUP>."})
+    else:
+        unsupported = [{"name": "Symbolic ALTs",
+                        "text": "Symbolic variants are disabled on this server, so eg <DEL> and <CNV> are dropped."}]
+    unsupported.append({"name": "Other bases",
+                        "text": "An ALT with anything but A, C, G and T is dropped - eg N, IUPAC ambiguity codes "
+                                "or breakend notation."})
+    return unsupported
