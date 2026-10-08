@@ -7,9 +7,11 @@ from typing import Any, Optional
 
 import Levenshtein
 from cache_memoize import cache_memoize
+from nltk.corpus import words as nltk_words
 
 from library.log_utils import log_traceback
 from library.utils import is_not_none
+from library.utils.nltk_utils import ensure_nltk_data
 from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
 
 # There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
@@ -25,6 +27,17 @@ HGNC_PATTERN = re.compile(r"HGNC:(\d+)$")
 
 MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
+MIN_LENGTH_PLURAL = 5
+MIN_LENGTH_SPELLING_VARIANT = 5  # Short words are acronyms (haem -> "HEM dysplasia")
+HYPHEN_IN_WORD_PATTERN = re.compile(r"(?<=\w)-(?=\w)")  # Not a lone "-" token, which would join a match
+
+# British -> American, applied per word: anaemia, oedema, diarrhoea (not vertebrae, toes), tumour, generalised, leucopenia
+AMERICAN_SPELLINGS = [
+    (re.compile(r"[ao]e(?!s?$)"), "e"),
+    (re.compile(r"our(s?)$"), r"or\1"),
+    (re.compile(r"is(e|ed|es|ing|ation)$"), r"iz\1"),
+    (re.compile(r"^leuc"), "leuk"),
+]
 
 AMBIGUOUS_ACRONYM_MAX_LEN = 5
 AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS = frozenset({"exact", "exact_synonym", "xref"})
@@ -195,7 +208,14 @@ class PhenotypeMatcher:
             self._break_up_terms(pks_by_term)
             word_lookup = self._create_word_lookups(pks_by_term)
             single_words_by_length = self._get_single_words_by_length(pks_by_term, 5)
-            self.ontology[ontology_service] = (pks_by_term, single_words_by_length, word_lookup)
+            spelling_lookup = self._get_spelling_lookup(pks_by_term)
+            self.ontology[ontology_service] = (pks_by_term, single_words_by_length, word_lookup, spelling_lookup)
+
+        # A correctly spelled word isn't a typo, so is never fuzzy matched (table -> "Stable") #2125
+        ensure_nltk_data('corpora/words')
+        self.dictionary_words = {w.lower() for w in nltk_words.words()}
+        for _, _, word_lookup, _ in self.ontology.values():
+            self.dictionary_words.update(word_lookup)
 
         hgnc_aliases = {}
         hgnc_names = {}
@@ -238,22 +258,24 @@ class PhenotypeMatcher:
             if self._skip_word(lower_text):
                 return []
 
-            for _, (term_pks, single_words_by_length, word_lookup) in self.ontology.items():
-                ontology_term_pks = term_pks.get(lower_text)
-                if not ontology_term_pks:
-                    if len(words) == 1:
-                        w = words[0]
-                        if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
-                            ontology_term_pks = self.get_id_from_single_word_fuzzy_match(single_words_by_length,
-                                                                                         lower_text)
-                    else:
-                        lower_words = [w.lower() for w in words]
-                        distance = self.calculate_match_distance(lower_words)
-                        ontology_term_pks = self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words, lower_text,
-                                                                                    distance=distance)
-
-                if ontology_term_pks:
+            exact_pks = [self._get_exact_match(term_pks, spelling_lookup, lower_text)
+                         for term_pks, _, _, spelling_lookup in self.ontology.values()]
+            if any(exact_pks):
+                # Fuzzy matching other ontologies here only finds different terms (macrocephaly -> acrocephaly)
+                for ontology_term_pks in exact_pks:
                     ontology_term_ids.extend(ontology_term_pks)
+            elif len(words) == 1:
+                if len(lower_text) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH and not self._is_dictionary_word(lower_text):
+                    for _, single_words_by_length, _, _ in self.ontology.values():
+                        ontology_term_ids.extend(self.get_id_from_single_word_fuzzy_match(single_words_by_length,
+                                                                                          lower_text))
+            else:
+                lower_words = [w.lower() for w in words]
+                distance = self.calculate_match_distance(lower_words)
+                for _, _, word_lookup, _ in self.ontology.values():
+                    if ontology_term_pks := self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words,
+                                                                                    lower_text, distance=distance):
+                        ontology_term_ids.extend(ontology_term_pks)
 
             if len(words) == 1:
                 # Don't do fuzzy for genes as likely to get false positives
@@ -304,6 +326,49 @@ class PhenotypeMatcher:
         #            raise ValueError(msg)
 
         return ontology_term_ids
+
+    @staticmethod
+    def _spelling_key(text: str) -> str:
+        """ American spelling with hyphens as spaces, so either spelling of a term gives the same key """
+        words = []
+        for word in HYPHEN_IN_WORD_PATTERN.sub(" ", text).split():
+            if len(word) >= MIN_LENGTH_SPELLING_VARIANT:
+                for pattern, replacement in AMERICAN_SPELLINGS:
+                    word = pattern.sub(replacement, word)
+            words.append(word)
+        return " ".join(words)
+
+    @staticmethod
+    def _plural_variants(text: str) -> list[str]:
+        """ text, then text without a trailing plural 's' (kidneys -> kidney, but not class/virus/crisis) """
+        variants = [text]
+        last_word = text.rsplit(" ", 1)[-1]
+        if len(last_word) >= MIN_LENGTH_PLURAL and last_word.endswith("s") and last_word[-2] not in "siu":
+            variants.append(text[:-1])
+        return variants
+
+    @classmethod
+    def _get_spelling_lookup(cls, term_pks: CodePKLookups) -> CodePKLookups:
+        """ Ontology terms keyed by _spelling_key, where that differs (paraproteinaemia, rod-cone dystrophy) """
+        spelling_lookup = defaultdict(set)
+        for term, pk_set in term_pks.items():
+            spelling_key = cls._spelling_key(term)
+            if spelling_key != term:
+                spelling_lookup[spelling_key].update(pk_set)
+        return spelling_lookup
+
+    def _get_exact_match(self, term_pks: CodePKLookups, spelling_lookup: CodePKLookups, lower_text: str) -> set[CodePK]:
+        """ Exact match, allowing British/American spelling, hyphens and plurals (anaemia -> Anemia, kidneys -> Kidney) """
+        for text in self._plural_variants(lower_text):
+            if ontology_term_pks := term_pks.get(text):
+                return ontology_term_pks
+            spelling_key = self._spelling_key(text)
+            if ontology_term_pks := term_pks.get(spelling_key) or spelling_lookup.get(spelling_key):
+                return ontology_term_pks
+        return set()
+
+    def _is_dictionary_word(self, lower_word: str) -> bool:
+        return any(w in self.dictionary_words for w in self._plural_variants(lower_word))
 
     @classmethod
     def _skip_word(cls, lower_text):

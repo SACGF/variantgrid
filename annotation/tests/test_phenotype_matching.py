@@ -27,12 +27,12 @@ class TestPhenotypeMatching(TestCase):
     def setUpTestData(cls):
         create_ontology_test_data()
         create_test_ontology_version()
-        cls._create_skip_word_test_terms()
+        cls._create_common_word_test_terms()
         cls.phenotype_matcher = PhenotypeMatcher()
 
     @staticmethod
-    def _create_skip_word_test_terms():
-        """ Real terms whose aliases a common word matches (variantgrid_com#60) """
+    def _create_common_word_test_terms():
+        """ Real terms that a common word matches (variantgrid_com#60, #2125) """
         ontology_import, _ = OntologyImport.objects.get_or_create(import_source="test", filename="test_skip_words",
                                                                   context="test",
                                                                   defaults={"processed_date": timezone.now()})
@@ -40,6 +40,11 @@ class TestPhenotypeMatching(TestCase):
             ("OMIM:614813", OntologyService.OMIM, "SHORT STATURE, ONYCHODYSPLASIA, FACIAL DYSMORPHISM, AND HYPOTRICHOSIS",
              ["SOFT", "SOFT SYNDROME"]),
             ("HP:0032198", OntologyService.HPO, "Decreased prothrombin time", ["Decreased INR"]),
+            ("HP:0031915", OntologyService.HPO, "Stable", []),
+            ("HP:0000256", OntologyService.HPO, "Macrocephaly", []),
+            ("MONDO:0018971", OntologyService.MONDO, "isolated oxycephaly", ["acrocephaly"]),
+            ("HP:0001903", OntologyService.HPO, "Anemia", ["Anaemia"]),
+            ("MONDO:0002280", OntologyService.MONDO, "anemia (disease)", ["anemia"]),
         ]
         for term_id, ontology_service, name, aliases in terms:
             OntologyTerm.objects.get_or_create(id=term_id, defaults={
@@ -101,6 +106,20 @@ class TestPhenotypeMatching(TestCase):
                       "Decreased INR": (OntologyService.HPO, "HP:0032198")}
 
         self.check_expected_results_for_description(SKIP_WORDS)
+
+    def _match_ids(self, text) -> set[str]:
+        return set(self.phenotype_matcher.get_matches([(w, None) for w in text.split()]))
+
+    def test_dictionary_word_not_fuzzy_matched(self):
+        """ "table" is 1 edit from HPO "Stable" but is spelled correctly, so isn't a typo """
+        self.assertEqual(self._match_ids("table"), set())
+        self.assertEqual(self._match_ids("macrocephaky"), {"HP:0000256"})
+
+    def test_exact_match_stops_fuzzy_match_in_other_ontologies(self):
+        """ macrocephaly is 1 edit from MONDO "acrocephaly", but other spellings of the same term still match """
+        self.assertEqual(self._match_ids("macrocephaly"), {"HP:0000256"})
+        self.assertEqual(self._match_ids("anaemia"), {"HP:0001903", "MONDO:0002280"})
+        self.assertEqual(self._match_ids("anaemias"), {"HP:0001903", "MONDO:0002280"})
 
     @override_settings(PATIENT_PHENOTYPE_EXCLUDE_STRING="----needs human review")
     def test_exclude_string_skips_persistence(self):
