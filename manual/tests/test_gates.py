@@ -1,4 +1,3 @@
-import json
 from contextlib import redirect_stdout
 from importlib import import_module
 from io import StringIO
@@ -17,7 +16,14 @@ from manual.models import (
     ManualMigrationTask,
 )
 from manual.operations.manual_operations import ManualOperation
-from scripts.migrator.migrator import MigrationStatus, Migrator, ObsoleteSubMigration, run_scheduler
+from manual.upgrader import (
+    ObsoleteStep,
+    StepStatus,
+    Upgrader,
+    outstanding_tasks_json,
+    record_attempt,
+    run_scheduler,
+)
 
 # Migration module names start with a digit, so they can't be imported with normal import syntax.
 complete_obsolete_tasks = import_module(
@@ -68,16 +74,13 @@ class GateResolutionTest(TestCase):
 
 
 class OutstandingRunnableTest(TestCase):
-    """ manual_outstanding's per-task runnable/blocked_by/command_exists - what the migrator acts on. """
+    """ outstanding_tasks_json's per-task runnable/blocked_by/command_exists - what the upgrader acts on. """
 
     def _request(self, task):
         ManualMigrationRequired.objects.create(task=task)
 
     def _outstanding_by_id(self):
-        out = StringIO()
-        with redirect_stdout(out):  # command print()s its JSON (migrator reads it via Popen)
-            call_command("manual_outstanding")
-        return {t["id"]: t for t in json.loads(out.getvalue())["tasks"]}
+        return {t["id"]: t for t in outstanding_tasks_json()}
 
     def test_runnable_only_when_manage_command_exists_and_ungated(self):
         ready = ManualMigrationTask.objects.create(id="manage*migrate")  # real command, no gate
@@ -100,10 +103,10 @@ class OutstandingRunnableTest(TestCase):
 
     def test_menu_status_line_flags_only_missing_manage_commands(self):
         # Regression: 'other' human steps have command_exists=None and must NOT read as "obsolete command".
-        missing = Migrator.subcommand_for_json(
+        missing = Upgrader.step_for_task(
             {"id": "manage*deleted_cmd", "category": "manage", "line": "deleted_cmd",
              "command_exists": False, "blocked_by": []})
-        human = Migrator.subcommand_for_json(
+        human = Upgrader.step_for_task(
             {"id": 'other*"do a thing"', "category": "other", "line": '"do a thing"',
              "command_exists": None, "blocked_by": []})
         self.assertEqual(missing.status_tag(), "[OBSOLETE]")
@@ -113,7 +116,7 @@ class OutstandingRunnableTest(TestCase):
     def test_menu_tags_blocked_task_on_its_own_line(self):
         # The tag has to sit on the task's own menu line - an indented detail line alone reads as
         # belonging to whichever task is printed next.
-        blocked = Migrator.subcommand_for_json(
+        blocked = Upgrader.step_for_task(
             {"id": "manage*calculate_sample_stats", "category": "manage", "line": "calculate_sample_stats",
              "command_exists": True, "blocked_by": ["variant-annotation-current"]})
         self.assertEqual(blocked.status_tag(), "[BLOCKED]")
@@ -124,30 +127,30 @@ class OutstandingRunnableTest(TestCase):
         # with no way to retire it from the upgrader.
         task = ManualMigrationTask.objects.create(id="manage*deleted_cmd")
         self._request(task)
-        obsolete = Migrator.subcommand_for_json(
+        obsolete = Upgrader.step_for_task(
             {"id": task.id, "category": "manage", "line": "deleted_cmd",
              "command_exists": False, "blocked_by": []})
-        self.assertIsInstance(obsolete, ObsoleteSubMigration)
+        self.assertIsInstance(obsolete, ObsoleteStep)
 
         out = StringIO()
         with redirect_stdout(out), patch("builtins.input", return_value="y"):
             result = obsolete.run()
-        self.assertEqual(result.status, MigrationStatus.SUCCESS)
+        self.assertEqual(result.status, StepStatus.SUCCESS)
         self.assertTrue(result.note)
 
-        # what the migrator does with that success - records it, which retires the task
-        call_command("manual_complete", "--id", task.id, "--note", result.note)
+        # what the upgrader does with that success - records it, which retires the task
+        record_attempt(task.id, note=result.note)
         self.assertIsNone(ManualMigrationOutstanding.outstanding_task(task))
 
     def test_backing_out_of_an_obsolete_task_leaves_it_outstanding(self):
         task = ManualMigrationTask.objects.create(id="manage*deleted_cmd")
         self._request(task)
-        obsolete = ObsoleteSubMigration("deleted_cmd").using(task_id=task.id)
+        obsolete = ObsoleteStep("deleted_cmd").using(task_id=task.id)
 
         out = StringIO()
         with redirect_stdout(out), patch("builtins.input", return_value="x"):
             result = obsolete.run()
-        self.assertEqual(result.status, MigrationStatus.SKIP)  # SKIP -> migrator records no attempt
+        self.assertEqual(result.status, StepStatus.SKIP)  # SKIP -> upgrader records no attempt
         self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(task))
 
 
@@ -186,7 +189,7 @@ class ObsoleteCleanupTest(TestCase):
 
 
 class SchedulerTest(TestCase):
-    """ The auto-manage scheduler: run unblocked tasks, re-evaluate between passes, stop on failure. """
+    """ The auto-manage scheduler: run unblocked tasks, re-evaluate between passes, carry on past failure. """
 
     def _request(self, task):
         ManualMigrationRequired.objects.create(task=task)
@@ -204,27 +207,32 @@ class SchedulerTest(TestCase):
             done.add(task)
             return True
 
-        completed, failed = run_scheduler(fetch, run_ok)
+        _, failed = run_scheduler(fetch, run_ok)
         self.assertEqual(ran, ["A", "B", "C"])
-        self.assertIsNone(failed)
+        self.assertEqual(failed, [])
 
-    def test_run_scheduler_stops_on_first_failure(self):
+    def test_run_scheduler_carries_on_past_failure_without_retrying(self):
+        # X fails and stays outstanding (so fetch keeps offering it); Z is gated after X so never offered
+        done, graph = set(), {"X": set(), "Y": set(), "Z": {"X"}}
         attempted = []
 
         def fetch():
-            return ["X", "Y"] if "X" not in attempted else []
+            return [t for t in ("X", "Y", "Z") if t not in done and graph[t] <= done]
 
         def run(task):
             attempted.append(task)
-            return task != "X"  # X fails
+            if task == "X":
+                return False
+            done.add(task)
+            return True
 
-        completed, failed = run_scheduler(fetch, run)
-        self.assertEqual(attempted, ["X"])  # Y in the same pass is not attempted after X fails
-        self.assertEqual(failed, "X")
+        _, failed = run_scheduler(fetch, run)
+        self.assertEqual(attempted, ["X", "Y"])
+        self.assertEqual(failed, ["X"])
 
     def test_after_chain_runs_in_insertion_order_end_to_end(self):
         # Backfilled after-gates (see 0005) must make the fix_variant_matching-style chain run strictly
-        # in order. Uses the real run_scheduler + manual_outstanding + gate resolution; no gates besides
+        # in order. Uses the real run_scheduler + outstanding_tasks_json + gate resolution; no gates besides
         # the after-chain, so nothing external blocks it.
         a = ManualMigrationTask.objects.create(id="manage*migrate")
         b = ManualMigrationTask.objects.create(
@@ -236,11 +244,7 @@ class SchedulerTest(TestCase):
         chain_ids = {a.id, b.id, c.id}  # the migrated test DB has other outstanding tasks - ignore them
 
         def fetch_runnable():
-            out = StringIO()
-            with redirect_stdout(out):
-                call_command("manual_outstanding")
-            return [t for t in json.loads(out.getvalue())["tasks"]
-                    if t["runnable"] and t["id"] in chain_ids]
+            return [t for t in outstanding_tasks_json() if t["runnable"] and t["id"] in chain_ids]
 
         ran = []
 
@@ -250,5 +254,5 @@ class SchedulerTest(TestCase):
                 task=ManualMigrationTask.objects.get(pk=task["id"]), requires_retry=False)
             return True
 
-        run_scheduler(fetch_runnable, run_task)
+        run_scheduler(fetch_runnable, run_task, key=lambda task: task["id"])
         self.assertEqual(ran, ["migrate", "showmigrations", "makemigrations"])

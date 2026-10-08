@@ -1,13 +1,11 @@
 from django.core.management import CommandParser
 from django.core.management.base import BaseCommand
 
-from manual.models import ManualMigrationAttempt, ManualMigrationTask
+from manual.upgrader import record_attempt
 
 
 class Command(BaseCommand):
-    """
-    To be called via the migrator.py program
-    """
+    """ Record an attempt at a manual task by hand (the upgrader records its own) """
     category = "ops"
 
     def add_arguments(self, parser: CommandParser):
@@ -17,18 +15,6 @@ class Command(BaseCommand):
         parser.add_argument('--ver', help="Version of the code this was run against")
 
     def handle(self, *args, **options):
-        task_id = options["id"]
-        success = not options.get("failed")
-        note = options.get("note")
-        version = options.get("ver")
-
-        mmt, _ = ManualMigrationTask.objects.get_or_create(id=task_id)
-
-        ManualMigrationAttempt.objects.create(
-            task=mmt,
-            note=note,
-            source_version=version,
-            requires_retry=not success
-        )
-
+        record_attempt(options["id"], success=not options["failed"], note=options.get("note"),
+                       version=options.get("ver"))
         print("Attempt added")

@@ -227,7 +227,7 @@ finish. `UploadedVCF` and the other `Uploaded*` satellites link the pipeline to 
 
 **ManualMigrationTask** - `manual/models/manual_migration_models.py:ManualMigrationTask`. A deploy-time step a migration
 registered (`manual/operations/manual_operations.py:ManualOperation`): a management command or a human action, gated by
-`requires`, surfaced by `manage.py manual_outstanding` and the migrator.
+`requires`, surfaced by `manage.py manual_outstanding` and the upgrader (`scripts/upgrade.sh`).
 
 **Flag** - `flags/models/models.py:Flag`. A typed, commentable flag on any model (`FlagsMixin`), used for classification
 workflow states (suggestions, discordance, withdrawn) as much as for data quality.

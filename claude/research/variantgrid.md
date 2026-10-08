@@ -92,7 +92,7 @@ Source assets are under `variantgrid/static_files/<site>_static/`; each env file
 
 `variantopedia/management/commands/deployment_check.py:Command` runs the checks in `variantgrid/deployment_validation/`
 (annotation data and versions, VEP and its column registry, tool and library versions, cdot, Celery routes/imports,
-somalier) and logs each failure with its fix; `scripts/upgrade.sh` runs it with `--die-if-invalid` through `scripts/migrator/migrator.py`. The same modules
+somalier) and logs each failure with its fix; `scripts/upgrade.sh` runs it with `--die-if-invalid` through `manual/upgrader.py`. The same modules
 back the annotation-runs page and the disk health check. `VARIANTGRID_VERSION` comes from
 `library/git.py:Git.version` (`git describe` against `vg<major>.*` tags) at settings load, and
 `variantgrid/views.py:version` compares the running hash with `manual` Deployment rows.
@@ -151,4 +151,4 @@ entry whose module isn't.
 
 Anything cached in Redis is keyed by `CACHE_VERSION`; bump it when renaming a pickled class (root `AGENTS.md`). Static
 URLs need `collectstatic` after a pull or `{% static %}` raises for files missing from the manifest - part of
-`scripts/upgrade.sh` (via the migrator), and why tests use the plain backend.
+`scripts/upgrade.sh` (via `manage.py upgrade`), and why tests use the plain backend.
