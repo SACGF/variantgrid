@@ -1185,6 +1185,11 @@ class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
                 for name, metric in self.metrics.items()]
 
     @property
+    def failed_metrics(self) -> list['LibraryQCMetric']:
+        """ The metrics outside their guideline - what the build form names beside a failed category """
+        return [metric for metric in self.metric_rows if metric.passed is False]
+
+    @property
     def metrics_description(self) -> str:
         """ Each metric against the guideline it was judged by - 'GENE_SCALED_MAD 0.059 (<= 0.134)' - so a
             scientist looking at a failed category can see which number failed rather than just that it did """

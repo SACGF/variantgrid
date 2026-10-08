@@ -521,7 +521,7 @@ def case_combined_variant_output(samples: list[Sample],
                                  specimen: Optional[Specimen]) -> Optional[DragenTSO500CombinedVariantOutput]:
     """ The one analysis a case's TMB, MSI and GIS come off - the one whose arm is one of the case's samples,
         directly or through the sequencing sample it came off. Where none is linked yet, the newest
-        analysis claiming the specimen, as specimen_library_qc picks """
+        analysis claiming the specimen """
     by_output = [F("output_datetime").desc(nulls_last=True), "-pk"]
     if samples:
         arm_q = Q()
@@ -560,14 +560,19 @@ def case_measures(cvo: Optional[DragenTSO500CombinedVariantOutput],
     return measures
 
 
-def specimen_library_qc(specimen: Optional[Specimen]) -> dict[str, LibraryQC]:
-    """ What the caller's QC said about the specimen's libraries, by context key - the newest run
-        per category wins, since a repeat sequencing supersedes the QC of the one it replaced """
-    if specimen is None:
+def case_library_qc(cvo: Optional[DragenTSO500CombinedVariantOutput],
+                    specimen: Optional[Specimen]) -> dict[str, LibraryQC]:
+    """ What the caller's QC said about the case's libraries, by context key - the QC of the pair the
+        case's analysis came off, so a patient case has it too. Without an analysis, the specimen's: the
+        newest run per category wins, since a repeat sequencing supersedes the QC of the one it replaced """
+    if cvo:
+        qs = LibraryQC.objects.filter(sequencing_run_name=cvo.sequencing_run_name, pair_id=cvo.pair_id)
+    elif specimen:
+        qs = LibraryQC.objects.filter(specimen=specimen)
+    else:
         return {}
     library_qc = {}
-    qs = LibraryQC.objects.filter(specimen=specimen) \
-        .order_by(F("measured_date").asc(nulls_first=True), "pk")
+    qs = qs.order_by(F("measured_date").asc(nulls_first=True), "pk")
     for qc in qs:
         if key := LIBRARY_QC_CONTEXT_KEYS.get(qc.category):
             library_qc[key] = qc

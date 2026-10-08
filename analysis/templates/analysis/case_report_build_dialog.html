@@ -30,6 +30,9 @@
         {% labelled label="Lab" %}{{ lab_form.lab }}{{ lab_form.media }}{% endlabelled %}
     {% endif %}
 
+    {% if measure_notes %}
+        <p class="text-muted small mt-2 mb-0">Assay flags start from the case's measures and library QC; untick or tick to override.</p>
+    {% endif %}
     {% for group in template.case_field_groups %}
         {% if group.name %}<h6 class="mt-3">{{ group.name }}</h6>{% endif %}
         {% for field in group.fields %}
@@ -43,9 +46,10 @@
                         {% with measure=measures|get_item:field.measure %}
                             <span class="text-muted small ml-1">{% if measure %}{{ measure.value_description }}{% else %}no measure{% endif %}</span>
                         {% endwith %}
-                    {% elif field.qc %}
+                    {% endif %}
+                    {% if field.qc %}
                         {% with qc=library_qc|get_item:field.qc %}
-                            <span class="text-muted small ml-1">{% if qc %}{{ qc.status_description }}{% else %}no QC{% endif %}</span>
+                            <span class="{% if qc.passed == False %}text-danger{% else %}text-muted{% endif %} small ml-1">{% if qc %}{{ qc.status_description }}{% else %}no QC{% endif %}</span>
                         {% endwith %}
                     {% endif %}
                 </div>
@@ -71,18 +75,35 @@
                 <li>
                     <b>{{ note.label }}</b>:
                     {% if note.measure %}
-                        {{ note.measure.value_description|default:"no value" }}{% if note.rule %} &middot; {{ note.rule }}{% endif %}{% if note.measure.threshold %} &middot; policy {{ note.measure.threshold }}{% if note.measure.threshold_source %} ({{ note.measure.threshold_source }}){% endif %}{% endif %}
-                    {% elif note.qc %}
-                        {{ note.qc.metrics_description }} &middot; {{ note.qc.status_description }}{% if note.rule %} &middot; {{ note.rule }}{% endif %}
-                    {% else %}
-                        no measure for this case{% if note.rule %} &middot; {{ note.rule }}{% endif %}
+                        {{ note.measure.value_description|default:"no value" }}{% if note.measure.threshold %} &middot; policy {{ note.measure.threshold }}{% if note.measure.threshold_source %} ({{ note.measure.threshold_source }}){% endif %}{% endif %}
+                    {% elif note.has_measure %}
+                        no measure for this case
                     {% endif %}
+                    {% if note.qc %}
+                        {% if note.has_measure %} &middot; {% endif %}{{ note.qc.metrics_description }} &middot; {% if note.qc.passed == False %}<span class="text-danger">{{ note.qc.status_description }}</span>{% else %}{{ note.qc.status_description }}{% endif %}
+                    {% elif note.has_qc %}
+                        {% if note.has_measure %} &middot; {% endif %}no library QC for this case
+                    {% endif %}
+                    {% if note.rule %} &middot; {{ note.rule }}{% endif %}
                 </li>
             {% endfor %}
             </ul>
         {% endif %}
         {% endwith %}
     {% endfor %}
+
+    {% if library_qc_rows %}
+        <h6 class="mt-3">Library QC</h6>
+        <ul class="list-unstyled small mb-2 library-qc">
+        {% for qc in library_qc_rows %}
+            <li>
+                <a href="{{ qc.get_absolute_url }}#library-qc-{{ qc.nucleic_acid }}" target="_blank">{{ qc.get_category_display }}</a>:
+                {% if qc.passed == False %}<span class="text-danger">{{ qc.status_description }}</span>{% else %}{{ qc.status_description }}{% endif %}
+                {% for metric in qc.failed_metrics %}{% if forloop.first %} &middot; {% endif %}<span class="text-danger">{{ metric.name }} {{ metric.value_text }}{% if metric.guideline %} ({{ metric.guideline }}){% endif %}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
+            </li>
+        {% endfor %}
+        </ul>
+    {% endif %}
 
     {% labelled label="Summary interpretation" hint="the case level paragraph the report opens with" %}
         <textarea class="form-control form-control-sm" rows="4" name="summary">{{ summary }}</textarea>
