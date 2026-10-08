@@ -63,7 +63,8 @@ class FileUploadColumns(DatatableConfig[FileUpload]):
         self.rich_columns = [
             RichColumn(key="id", visible=False, search=False),
             RichColumn(key="uploadpipeline__status", name="status", label="Status", orderable=True, search=False,
-                       extra_columns=["id", "file_type"], renderer=self.render_status,
+                       extra_columns=["id", "file_type", "uploadpipeline__error_summary",
+                                      "uploadpipeline__progress_status"], renderer=self.render_status,
                        client_renderer="renderUploadStatus"),
             RichColumn(key="name", label="Name", orderable=True, extra_columns=["id", "uploadpipeline__id"],
                        renderer=self.render_name, client_renderer="TableFormat.linkUrl"),
@@ -107,6 +108,9 @@ class FileUploadColumns(DatatableConfig[FileUpload]):
         status_icon = get_status_icon(status, requires_user_input_url)
         if not row["file_type"]:
             status_icon["title"] = "Could not determine how to read file"
+        if error_summary := row["uploadpipeline__error_summary"]:
+            status_icon["summary"] = error_summary
+            status_icon["title"] = row["uploadpipeline__progress_status"]
         return {"status": status, **status_icon}
 
     @staticmethod

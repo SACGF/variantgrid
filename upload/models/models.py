@@ -187,6 +187,17 @@ class UploadData(models.Model):
         return None
 
 
+class UploadUserError(Exception):
+    """ The uploaded file (or what was sent with it) is wrong, not our code - the import fails showing the user
+        this message, and summary on the upload grid, without a traceback or an error report """
+    summary = "Problem with uploaded file"
+
+    def __init__(self, message: str, summary: Optional[str] = None):
+        super().__init__(message)
+        if summary:
+            self.summary = summary
+
+
 class PipelineFailedJobTerminateEarlyException(Exception):
     """ Throw this if pipeline fails elsewhere, and want to exit early but not log exception """
 
@@ -205,6 +216,7 @@ class UploadPipeline(models.Model):
     progress_status = models.TextField(null=True)
     progress_percent = models.FloatField(default=0)
     celery_task = models.CharField(max_length=36, null=True)
+    error_summary = models.TextField(null=True)  # Set for an UploadUserError, shown next to the upload grid's cross
 
     @property
     def file_type(self):
@@ -286,7 +298,18 @@ class UploadPipeline(models.Model):
         # FIXME remove this, cause of error might not be the most recent exception
         report_exc_info()
         logging.error("upload_pipeline.error(%s, %s)", self, error_message)
+        self._fail(error_message)
+        message = f"UploadPipeline {self.pk} failed. " \
+            f"Filename: {self.get_file_type_display()} Error: {error_message}"
+        report_message(message, level='error')
 
+    def user_error(self, user_error: UploadUserError):
+        """ The file is wrong, not our code - so nothing to report """
+        logging.warning("upload_pipeline.user_error(%s, %s)", self, user_error)
+        self.error_summary = user_error.summary
+        self._fail(str(user_error))
+
+    def _fail(self, error_message: str):
         self.status = ProcessingStatus.ERROR
         self.progress_status = f"Error: {error_message}"
         self.save()
@@ -297,9 +320,6 @@ class UploadPipeline(models.Model):
         name = f"import_{self.file_type}_failed"
         filename = self.file_upload.get_filename()
         create_event(user, name, error_message, filename=filename, severity=LogLevel.ERROR)
-        message = f"UploadPipeline {self.pk} failed. " \
-            f"Filename: {self.get_file_type_display()} Error: {error_message}"
-        report_message(message, level='error')
 
     def _set_related_data_import_status(self, import_status: ImportStatus):
         if vcf := self.vcf:
@@ -434,6 +454,9 @@ class UploadStep(models.Model):
         status = ProcessingStatus.ERROR
         self.status = status
         self.error_message = str(e)
+        if isinstance(e, UploadUserError):
+            self.upload_pipeline.user_error(e)
+            return
         try:
             # self.error_message += "\n" + get_traceback()
             # try just regular traceback as the fancy one above isn't working

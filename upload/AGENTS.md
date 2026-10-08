@@ -68,6 +68,10 @@ Patterns here:
   upload/tasks/vcf/genotype_vcf_tasks.py:ImportGenotypeVCFSuccessTask sets ImportStatus.SUCCESS and sends
   upload/signals/signals.py:vcf_import_success_signal (analysis/signals/signal_handlers.py:handle_vcf_import_success
   auto-creates analyses off it; connect further consumers in an AppConfig.ready).
+- A failure the user fixes by changing the file or its metadata (wrong build, contradicting metadata) raises a
+  subclass of upload/models/models.py:UploadUserError with a short `summary`: the pipeline fails with the message and
+  no traceback or Rollbar report (UploadPipeline.user_error), and the upload grid shows the summary next to the cross.
+  Anything else is treated as our bug and keeps its traceback.
 Gotchas:
 - A killed worker child (SIGTERM/SIGKILL, `revoke(terminate=True)`) never reaches `ImportVCFStepTask.run`'s except
   blocks; the master's `task_failure`/`task_revoked` receivers in `upload/tasks/vcf/import_vcf_step_task.py` fail the

@@ -68,6 +68,7 @@ from upload.models import (
     UploadStepTaskType,
     VCFPipelineStage,
 )
+from upload.models.models import UploadUserError
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.upload_metadata import (
     SAMPLE_EXTRACTIONS,
@@ -674,13 +675,15 @@ class GenomeBuildDetectionException(Exception):
     pass
 
 
-class GenomeBuildMismatchException(Exception):
+class GenomeBuildMismatchException(UploadUserError):
     """ Declared genome build contradicts the one detected from the header - fail rather than guess """
+    summary = "Genome build disagrees with upload metadata"
 
 
-class ExtractionMismatchException(Exception):
+class ExtractionMismatchException(UploadUserError):
     """ A file's declared extraction contradicts the one its sequencing sample was linked to, or names
         a sample the VCF doesn't have - fail rather than guess, as no later arrival fixes either """
+    summary = "Extraction disagrees with upload metadata"
 
 
 class ContigMismatchException(GenomeBuildDetectionException):
