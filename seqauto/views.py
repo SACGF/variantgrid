@@ -218,11 +218,31 @@ def _get_sequencing_run_patients(sample_sheet, user) -> dict:
         else:
             unmatched.append(row)
 
-    run_patients = [
-        {"patient": patient, "extractions": list(rows_by_extraction.items())}
-        for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0]))
-    ]
+    pair_urls_by_sequencing_sample = _tso500_pair_urls_by_sequencing_sample(sample_sheet.sequencing_run)
+    run_patients = []
+    for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0])):
+        tso500_pairs = {}
+        for rows_for_extraction in rows_by_extraction.values():
+            for row in rows_for_extraction:
+                tso500_pairs.update(pair_urls_by_sequencing_sample.get(row.sequencing_sample.pk, {}))
+        run_patients.append({"patient": patient, "extractions": list(rows_by_extraction.items()),
+                             "tso500_pairs": sorted(tso500_pairs.items())})
     return {"run_patients": run_patients, "unmatched_run_samples": unmatched}
+
+
+def _tso500_pair_urls_by_sequencing_sample(sequencing_run) -> dict[int, dict[str, str]]:
+    """ {sequencing_sample_id: {pair_id: url}} - joined on the arms' sheet rows rather than the specimen, as the
+        pair's accession can be a different specimen of the patient than the one the sheet row was claimed for """
+    pair_urls = defaultdict(dict)
+    cvo_qs = DragenTSO500CombinedVariantOutput.objects.filter(sequencing_run_name=sequencing_run.name)
+    for cvo in cvo_qs.only("sequencing_run_name", "pair_id", "dna_sequencing_sample", "rna_sequencing_sample"):
+        for sequencing_sample_id in (cvo.dna_sequencing_sample_id, cvo.rna_sequencing_sample_id):
+            if sequencing_sample_id:
+                pair_urls[sequencing_sample_id][cvo.pair_id] = cvo.get_absolute_url()
+    qc_qs = LibraryQC.objects.filter(sequencing_run_name=sequencing_run.name, sequencing_sample__isnull=False)
+    for qc in qc_qs.only("sequencing_run_name", "pair_id", "sequencing_sample"):
+        pair_urls[qc.sequencing_sample_id][qc.pair_id] = qc.get_absolute_url()
+    return pair_urls
 
 
 def view_sequencing_run(request, sequencing_run_id, tab=None):

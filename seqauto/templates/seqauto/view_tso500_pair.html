@@ -23,18 +23,22 @@
         <hr/>
         <h4>Arms</h4>
         <table class="table">
-            <thead><tr><th>Arm<th>Sample ID<th>Sequencing sample<th>Sample<th>Library QC</tr></thead>
+            <thead><tr><th>Arm<th>Sample ID<th>Sample<th>Library QC</tr></thead>
             <tbody>
             {% for arm in arms %}
                 <tr>
                     <td>{{ arm.nucleic_acid }}
-                    <td>{{ arm.sample_name|default:"-" }}
-                    <td>{% if arm.sequencing_sample %}{{ arm.sequencing_sample.sample_name }}{% else %}<span class="text-muted">waiting on the run's sample sheet</span>{% endif %}
+                    <td>
+                        {% if arm.sequencing_sample and sequencing_run %}
+                            <a href="{% url 'view_sequencing_run_tab' sequencing_run.pk 'sample-sheet' %}">{{ arm.sample_name }}</a>
+                        {% else %}
+                            {{ arm.sample_name|default:"-" }} <span class="text-muted">(waiting on the run's sample sheet)</span>
+                        {% endif %}
                     <td>{% if arm.sample %}<a href="{% url 'view_sample' arm.sample.pk %}">{{ arm.sample.name }}</a>{% else %}<span class="text-muted">waiting on the arm's VCF</span>{% endif %}
-                    <td>{% if arm.library_qc %}{{ arm.library_qc|length }} categor{{ arm.library_qc|length|pluralize:"y,ies" }}{% else %}-{% endif %}
+                    <td>{% if arm.library_qc %}<a href="#library-qc-{{ arm.nucleic_acid }}">{{ arm.library_qc|length }} categor{{ arm.library_qc|length|pluralize:"y,ies" }}</a>{% else %}-{% endif %}
                 </tr>
             {% empty %}
-                <tr><td colspan="5">Neither arm of this pair is named yet.</td></tr>
+                <tr><td colspan="4">Neither arm of this pair is named yet.</td></tr>
             {% endfor %}
             </tbody>
         </table>
@@ -44,8 +48,6 @@
         {% if cvo %}
             <h5>Analysis details</h5>
             {% labelled label="Pair ID" %}{{ cvo.pair_id }}{% endlabelled %}
-            {% labelled label="DNA sample ID" %}{{ cvo.dna_sample_name|default:"-" }}{% endlabelled %}
-            {% labelled label="RNA sample ID" %}{{ cvo.rna_sample_name|default:"-" }}{% endlabelled %}
             {% labelled label="Output" %}{{ cvo.output_datetime|default_if_none:"-" }}{% endlabelled %}
             {% labelled label="Module version" %}{{ cvo.module_version|default:"-" }}{% endlabelled %}
             {% labelled label="Pipeline version" %}{{ cvo.pipeline_version|default:"-" }}{% endlabelled %}
@@ -91,40 +93,40 @@
         <h4>Library QC</h4>
         {% for arm in arms %}
             {% if arm.library_qc %}
-                <h5>{{ arm.nucleic_acid }}</h5>
+                <h5 id="library-qc-{{ arm.nucleic_acid }}">{{ arm.nucleic_acid }}</h5>
                 <table class="table">
-                    <thead><tr><th>Category<th>QC<th>Run completed<th>Metrics<th>Measured</tr></thead>
+                    <thead><tr><th>Category<th>QC<th>Run completed<th>Measured</tr></thead>
                     <tbody>
                     {% for qc in arm.library_qc %}
                         <tr>
                             <td>{{ qc.get_category_display }}
                             <td>{{ qc.status_description }}
                             <td>{{ qc.completed|default_if_none:"-" }}
-                            <td>
-                                {% if qc.metric_rows %}
-                                    <a data-toggle="collapse" href="#metrics-{{ qc.pk }}">{{ qc.metric_rows|length }} metric{{ qc.metric_rows|length|pluralize }}</a>
-                                    <div class="collapse" id="metrics-{{ qc.pk }}">
-                                        <table class="table table-sm">
-                                            <thead><tr><th>Metric<th>Value<th>Unit<th>LSL<th>USL<th>Guideline<th>Source<th>QC</tr></thead>
-                                            <tbody>
-                                            {% for metric in qc.metric_rows %}
-                                                <tr>
-                                                    <td>{{ metric.name }}
-                                                    <td>{{ metric.value_text }}
-                                                    <td>{{ metric.unit|default:"-" }}
-                                                    <td>{{ metric.lsl|default_if_none:"-" }}
-                                                    <td>{{ metric.usl|default_if_none:"-" }}
-                                                    <td>{{ metric.guideline|default:"-" }}
-                                                    <td class="small">{{ metric.guideline_source|default:"-" }}
-                                                    <td>{% if metric.passed == None %}-{% elif metric.passed %}passed{% else %}<span class="text-danger">failed</span>{% endif %}
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                {% else %}-{% endif %}
                             <td>{{ qc.measured_date|default_if_none:"-" }}
                         </tr>
+                        {% if qc.metric_rows %}
+                            <tr>
+                                <td colspan="4" class="border-top-0">
+                                    <table class="table table-sm mb-0">
+                                        <thead><tr><th>Metric<th>Value<th>Unit<th>LSL<th>USL<th>Guideline<th>Source<th>QC</tr></thead>
+                                        <tbody>
+                                        {% for metric in qc.metric_rows %}
+                                            <tr>
+                                                <td>{{ metric.name }}
+                                                <td>{{ metric.value_text }}
+                                                <td>{{ metric.unit|default:"-" }}
+                                                <td>{{ metric.lsl|default_if_none:"-" }}
+                                                <td>{{ metric.usl|default_if_none:"-" }}
+                                                <td>{{ metric.guideline|default:"-" }}
+                                                <td class="small">{{ metric.guideline_source|default:"-" }}
+                                                <td>{% if metric.passed == None %}-{% elif metric.passed %}passed{% else %}<span class="text-danger">failed</span>{% endif %}
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        {% endif %}
                     {% endfor %}
                     </tbody>
                 </table>
