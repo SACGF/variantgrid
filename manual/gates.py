@@ -1,6 +1,6 @@
 """
 Gates are named prerequisites a manual `manage` task can declare via
-`ManualOperation(..., requires=["gate-name"])`. The migrator only auto-runs a task once all
+`ManualOperation(..., requires=["gate-name"])`. The upgrader only auto-runs a task once all
 of its gates are satisfied, so a step can't run before its prerequisite (e.g. an external
 data upgrade) is done.
 

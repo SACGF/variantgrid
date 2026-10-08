@@ -12,12 +12,13 @@ Migrations register manual steps with `ManualOperation` (see `operations/manual_
 - `operation_other([...])` — a free-text human step (category `other`).
 
 Each registers a `ManualMigrationTask` (PK = the command string) plus a `ManualMigrationRequired`
-row. `manage.py manual_outstanding` reports everything still outstanding as JSON, which the upgrader
-(`scripts/migrator/migrator.py`) surfaces. Completion is recorded as a `ManualMigrationAttempt`.
+row. `manual/upgrader.py:outstanding_tasks_json` lists everything still outstanding (`manage.py manual_outstanding`
+prints it), which the upgrader (`scripts/upgrade.sh` -> `manage.py upgrade`) surfaces. Completion is recorded as a
+`ManualMigrationAttempt`.
 
 ## Dependency gates (auto-running manage steps)
 
-`manage` steps can be auto-run by the migrator, but some must not run until a prerequisite is met
+`manage` steps can be auto-run by the upgrader, but some must not run until a prerequisite is met
 (e.g. ontology/annotation upgraded, transcripts in current cdot format). A step declares this at the
 call site:
 
@@ -33,11 +34,22 @@ keyed by gate name (not command):
   (e.g. `variant-annotation-current`).
 - **`after:<task_id>`** — depends on another manual task completing.
 
-`manual_outstanding` emits `requires` / `blocked_by` / `runnable` / `command_exists` per task. The
-migrator's auto-manage pass (`am` menu option or `migrator.py --auto-manage`) runs every unblocked
-`manage` task, re-evaluating between passes so `after:` gates unblock as prerequisites finish, and
-stopping on the first failure. Blocked steps, obsolete steps (command no longer exists), and `other`
-steps are reported for a human rather than run.
+Each outstanding task carries `requires` / `blocked_by` / `runnable` / `command_exists`. The
+upgrader's auto-manage pass (`am` menu option or `upgrade.sh --auto-manage`) runs every unblocked
+`manage` task, re-evaluating between passes so `after:` gates unblock as prerequisites finish. It carries
+on past a failure without retrying it: the failed task stays outstanding, so anything gated `after:` it
+stays blocked. Blocked steps, obsolete steps (command no longer exists), and `other` steps are reported
+for a human rather than run.
+
+## The upgrader
+
+`scripts/upgrade.sh` installs requirements, then execs `manage.py upgrade`
+(`manual/upgrader.py:Upgrader`), which runs every step in that one process with `call_command` - a
+Django start per step was most of the upgrade's time. The menu takes several keys or ranges at once
+(`m c 2-5`, or `upgrade.sh --steps m,c,2-5`), runs them in order and carries on past a failure, skipping a
+step gated `after:` one that failed. `--quick` runs the standard steps and stops at the first failure.
+A git pull that moves HEAD installs the new requirements and re-execs the process with the rest of the
+selection, so nothing after the pull runs on the old code.
 
 Use `manage.py manual_gate` to list gate status.
 

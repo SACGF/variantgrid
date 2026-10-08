@@ -100,7 +100,7 @@ jobs:
 
       - name: Generate js_reverse static file
         # django-compressor resolves it from STATIC_ROOT when rendering templates;
-        # deploys generate it via the migrator, a fresh checkout doesn't have it
+        # deploys generate it via the upgrader, a fresh checkout doesn't have it
         run: .venv/bin/python manage.py collectstatic_js_reverse
 
       - name: Run unit tests
