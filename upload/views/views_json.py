@@ -1,17 +1,9 @@
 import logging
-import operator
-from datetime import date, timedelta
-from functools import reduce
-from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.db.models import Q
 from django.http.response import HttpResponse, JsonResponse
-from django.urls.base import reverse
 from django.utils import timezone
-from django.utils.timesince import timesince
-from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from analysis.models import AnalysisTemplate
@@ -23,15 +15,12 @@ from library.log_utils import log_traceback
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus
 from upload import upload_processing
-from upload.file_type_icons import file_type_icon_html
 from upload.models import (
     FileUpload,
     ImportSource,
     ProcessingStatus,
-    TimeFilterMethod,
     UploadedFileTypes,
     UploadPipeline,
-    UploadSettings,
     VCFImportInfo,
 )
 from upload.models.models_enums import VCFImportInfoSeverity
@@ -43,22 +32,6 @@ from upload.upload_metadata import (
 from upload.uploaded_file_type import get_uploaded_file_type, get_url_and_data_for_uploaded_file_data
 
 
-def get_status_icon(status, requires_user_input_url: Optional[str] = None) -> dict:
-    """ requires_user_input_url: the data's page, where the user sets what the import is waiting on """
-    if requires_user_input_url:
-        return {'icon': 'fa-exclamation-triangle', 'css': 'text-warning',
-                'title': 'Requires input - set genome build', 'url': requires_user_input_url}
-
-    ICONS = {
-        ProcessingStatus.CREATED: {'icon': 'fa-clock', 'title': 'Queued'},
-        ProcessingStatus.PROCESSING: {'icon': 'fa-spinner fa-spin', 'title': 'Processing'},
-        ProcessingStatus.ERROR: {'icon': 'fa-times-circle', 'css': 'text-danger', 'title': 'Error'},
-        ProcessingStatus.SUCCESS: {'icon': 'fa-check-circle', 'css': 'text-success', 'title': 'Success'},
-        ProcessingStatus.TERMINATED_EARLY: {'icon': 'fa-exclamation-triangle', 'css': 'text-warning', 'title': 'Terminated early'},
-    }
-    return ICONS.get(status, {})
-
-
 def _get_basic_uploaded_file_context(file_upload) -> dict:
     data_url, upload_data = get_url_and_data_for_uploaded_file_data(file_upload)
     file_type = None
@@ -68,64 +41,11 @@ def _get_basic_uploaded_file_context(file_upload) -> dict:
     data = {
         'file_type': file_type,
         'file_type_code': file_upload.file_type,
-        'file_type_icon': file_type_icon_html(file_upload.file_type),
         'data_url': data_url,
     }
     if upload_data:
         data["upload_data"] = upload_data.get_upload_context()
         data["requires_user_input"] = upload_data.requires_user_input
-    return data
-
-
-def uploadedfile_dict(file_upload) -> dict:
-    try:
-        size = file_upload.file_field.size
-    except Exception:
-        size = None
-
-    time_since = timesince(file_upload.created)
-
-    file_upload_id = file_upload.pk
-    data = {
-        'file_upload_id': file_upload_id,
-        'uploaded_file_id': file_upload_id,  # deprecated alias
-        'name': file_upload.name,
-        'size': size,
-        'user': file_upload.user.get_full_name(),
-        'time_since': f"{time_since} ago",
-        'deleteUrl': reverse('upload_file_delete', kwargs={'pk': file_upload.pk}),
-        'deleteType': 'POST',
-    }
-    data.update(_get_basic_uploaded_file_context(file_upload))
-
-    if not file_upload.file_type:
-        data['error'] = f'Could not determine how to read file: "{file_upload.name}"'
-
-    try:
-        upload_pipeline = UploadPipeline.objects.get(file_upload=file_upload)
-        data["upload_pipeline_id"] = upload_pipeline.pk
-        try:
-            if upload_pipeline.genome_build:
-                data["genome_build"] = str(upload_pipeline.genome_build)
-                if upload_pipeline.status == ProcessingStatus.PROCESSING:
-                    try:
-                        uploaded_vcf = file_upload.uploadedvcf
-                        data['remaining_annotation_runs'] = get_remaining_annotation_runs(uploaded_vcf, upload_pipeline.genome_build)
-                    except ObjectDoesNotExist:
-                        pass
-        except Exception:
-            pass  # Genome build is optional
-
-        status = upload_pipeline.status
-        url = reverse('view_upload_pipeline', kwargs={'upload_pipeline_id': upload_pipeline.pk})
-    except Exception:
-        status = ProcessingStatus.ERROR
-        url = reverse('view_uploaded_file', kwargs={'file_upload_id': file_upload.pk})
-
-    data['processing_status'] = status
-    requires_user_input_url = data["data_url"] if data.get("requires_user_input") else None
-    data['status_icon'] = get_status_icon(status, requires_user_input_url)
-    data["url"] = url
     return data
 
 
@@ -282,52 +202,6 @@ def upload_file_delete(request, pk):
 
     instance.delete()
     return HttpResponse(status=200)
-
-
-def get_file_dicts_list(upload_settings, always_show_file_upload_ids=None):
-    """ always_show_file_upload_ids: files uploaded during this page session, shown whatever the
-        filters say - a file whose type the user isn't showing would otherwise vanish on upload """
-    file_types = upload_settings.uploadsettingsfiletype_set.values_list("file_type", flat=True)
-    filters = [Q(file_type__in=file_types)]
-    if not upload_settings.user.is_superuser:
-        filters.append(Q(user=upload_settings.user))
-
-    if upload_settings.time_filter_method == TimeFilterMethod.DAYS:
-        start_date = date.today() - timedelta(days=upload_settings.time_filter_value)
-        filters.append(Q(created__gte=start_date))
-
-    q = reduce(operator.and_, filters)
-    qs = FileUpload.objects.filter(q).order_by("-created")
-    if upload_settings.time_filter_method == TimeFilterMethod.RECORDS:
-        qs = qs[:upload_settings.time_filter_value]
-
-    file_uploads = list(qs)
-    if always_show_file_upload_ids:
-        extra_ids = set(always_show_file_upload_ids) - {fu.pk for fu in file_uploads}
-        extra_qs = FileUpload.objects.filter(pk__in=extra_ids)
-        if not upload_settings.user.is_superuser:
-            extra_qs = extra_qs.filter(user=upload_settings.user)
-        file_uploads.extend(extra_qs)
-        file_uploads.sort(key=lambda fu: fu.created, reverse=True)
-
-    file_dicts = [uploadedfile_dict(file_upload) for file_upload in file_uploads]
-    file_dicts = list(reversed(file_dicts))  # render newest-first
-    return file_dicts
-
-
-@never_cache
-def upload_poll(request):
-    upload_settings, _ = UploadSettings.objects.get_or_create(user=request.user)
-    always_show = _get_int_list(request.GET.get("always_show_file_upload_ids"))
-    return JsonResponse(get_file_dicts_list(upload_settings, always_show), safe=False)
-
-
-def _get_int_list(csv_ids: Optional[str]) -> list[int]:
-    ids = []
-    for value in (csv_ids or "").split(","):
-        if value.strip().isdigit():
-            ids.append(int(value))
-    return ids
 
 
 @require_POST

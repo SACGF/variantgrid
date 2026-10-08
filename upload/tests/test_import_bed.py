@@ -5,15 +5,16 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 
 from snpdb.forms import GenomicIntervalsCollectionForm
 from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import datatable_response
+from upload.grids import FileUploadColumns
 from upload.models import FileUpload, UploadedBed, UploadedFileTypes, UploadPipeline
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.upload_processing import process_uploaded_file
-from upload.views.views_json import uploadedfile_dict
 
 NO_HEADER_BED = os.path.join(settings.BASE_DIR, "upload", "test_data", "bed", "test_no_header.bed")
 
@@ -48,8 +49,10 @@ class TestImportBedRequiresGenomeBuild(TestCase):
         gic = UploadedBed.objects.get(file_upload=upload_pipeline.file_upload).genomic_intervals_collection
         self.assertEqual(ImportStatus.REQUIRES_USER_INPUT, gic.import_status)
 
-        status_icon = uploadedfile_dict(upload_pipeline.file_upload)["status_icon"]
-        self.assertEqual(gic.get_absolute_url(), status_icon["url"])
+        request = RequestFactory().get("/")
+        request.user = self.user
+        [row] = datatable_response(FileUploadColumns(request))["data"]
+        self.assertEqual(gic.get_absolute_url(), row["status"]["url"])
 
     @patch("upload.models.models_uploaded_files.process_bed_file", return_value=2)  # bedtools isn't on CI
     def test_setting_genome_build_finishes_pipeline(self, _process_bed_file, _get_genome_build):

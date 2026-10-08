@@ -50,11 +50,6 @@ class VCFPipelineStage(models.TextChoices):
     FINISH = 'F', 'Finish'
 
 
-class TimeFilterMethod(models.TextChoices):
-    DAYS = 'D', "days"
-    RECORDS = 'R', "records"
-
-
 class VCFImportInfoSeverity(models.TextChoices):
     WARNING = 'W', 'WARNING'
     ERROR = 'E', 'ERROR'

@@ -1,5 +1,6 @@
 from snpdb.views.datatable_view import DatabaseTableView
 from upload.grids import (
+    FileUploadColumns,
     UploadPipelineModifiedVariantsColumns,
     UploadPipelineSkippedAnnotationColumns,
     UploadStepColumns,
@@ -11,13 +12,12 @@ from variantgrid.perm_path import path
 
 urlpatterns = [
     path('', views.upload, name='upload'),
-    path('upload_poll', views_json.upload_poll, name='upload_poll'),
     path('view_uploaded_file/<int:file_upload_id>', views.view_uploaded_file, name='view_uploaded_file'),
     path('view_upload_pipeline/<int:upload_pipeline_id>', views.view_upload_pipeline, name='view_upload_pipeline'),
     path('view_upload_pipeline/warnings_and_errors/<int:upload_pipeline_id>', views.view_upload_pipeline_warnings_and_errors, name='view_upload_pipeline_warnings_and_errors'),
     path('upload_retry_import/<int:upload_pipeline_id>', views.upload_retry_import, name='upload_retry_import'),
     # Grids
-
+    path('file_uploads/datatable/', DatabaseTableView.as_view(column_class=FileUploadColumns), name='file_upload_datatable'),
     path('upload_pipeline/steps/datatables/', DatabaseTableView.as_view(column_class=UploadStepColumns), name='upload_step_datatables'),
     path('upload_pipeline/step/<int:upload_step_id>', view_upload_step_detail, name='upload_step_detail'),
     path('upload_pipeline/skipped_annotation/datatable/<int:upload_pipeline_id>/',
