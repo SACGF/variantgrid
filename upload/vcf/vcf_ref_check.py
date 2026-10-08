@@ -15,13 +15,14 @@ import cyvcf2
 from django.conf import settings
 
 from snpdb.models.models_genome import GenomeBuild
+from upload.models.models import UploadUserError
 
 REF_MISMATCH_MIN_SNVS_TO_FAIL = 10  # A handful of hand-typed records with wrong REFs isn't a wrong build
 SNV_BASES = frozenset("ACGT")
 
 
-class VCFRefMismatchError(ValueError):
-    pass
+class VCFRefMismatchError(UploadUserError):
+    summary = "REF bases don't match genome build"
 
 
 @dataclass
@@ -78,6 +79,11 @@ def _count_ref_mismatches_for_build(snvs, genome_build: GenomeBuild) -> Optional
     return count_ref_mismatches(snvs, genome_build, fasta)
 
 
+def get_better_builds(other_build_counts: list[RefMismatchCount]) -> list[RefMismatchCount]:
+    return [obc for obc in other_build_counts
+            if obc.num_checked and obc.fraction <= settings.VCF_IMPORT_REF_MISMATCH_WARN_FRACTION]
+
+
 def get_ref_mismatch_message(build_count: RefMismatchCount,
                              other_build_counts: list[RefMismatchCount]) -> Optional[tuple[str, bool]]:
     """ (message, fail) when build_count is over a threshold, else None """
@@ -89,9 +95,7 @@ def get_ref_mismatch_message(build_count: RefMismatchCount,
             and build_count.num_checked >= REF_MISMATCH_MIN_SNVS_TO_FAIL)
     message = f"SNV REF bases: {build_count} reference."
     if other_build_counts:
-        better_builds = [obc for obc in other_build_counts
-                         if obc.num_checked and obc.fraction <= settings.VCF_IMPORT_REF_MISMATCH_WARN_FRACTION]
-        if better_builds:
+        if better_builds := get_better_builds(other_build_counts):
             message += " The VCF looks to have been called against " + \
                 ", ".join(f"{obc.genome_build} ({obc.fraction:.0%} mismatch)" for obc in better_builds) + "."
         else:
@@ -121,5 +125,8 @@ def check_vcf_ref_matches_build(vcf_filename: str, genome_build: GenomeBuild) ->
 
     message, fail = get_ref_mismatch_message(build_count, other_build_counts)
     if fail:
-        raise VCFRefMismatchError(message)
+        summary = None
+        if better_builds := get_better_builds(other_build_counts):
+            summary = "Wrong genome build - looks like " + ", ".join(str(bb.genome_build) for bb in better_builds)
+        raise VCFRefMismatchError(message, summary=summary)
     return message

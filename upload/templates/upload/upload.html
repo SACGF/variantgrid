@@ -81,6 +81,9 @@
         if (data.url) {
             icon = $('<a>', {href: data.url}).append(icon);
         }
+        if (data.summary) {
+            return $('<span>', {title: data.title}).append(icon, $('<span>', {class: 'text-danger small ml-1', text: data.summary}));
+        }
         return icon;
     }
 
