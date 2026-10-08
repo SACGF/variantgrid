@@ -213,7 +213,12 @@
             </table>
             {% endif %}
             {% if sample_relatedness.not_checked %}
-            <table class="table" id="sample-relatedness-not-checked-table">
+            <p>
+                <a href="#sample-relatedness-not-checked-table" class="toggle-link" data-toggle="collapse">
+                    {{ sample_relatedness.not_checked|length }} sample{{ sample_relatedness.not_checked|length|pluralize }} not checked
+                </a>
+            </p>
+            <table class="table collapse" id="sample-relatedness-not-checked-table">
                 <tr>
                     <th>Not checked</th>
                     <th>Reason</th>
