@@ -85,7 +85,6 @@ urlpatterns = [
     path('autocomplete/Specimen/', views_autocomplete.SpecimenAutocompleteView.as_view(), name='specimen_autocomplete'),
     path('autocomplete/Extraction/', views_autocomplete.ExtractionAutocompleteView.as_view(), name='extraction_autocomplete'),
     path('autocomplete/SampleSource/', views_autocomplete.SampleSourceAutocompleteView.as_view(), name='sample_source_autocomplete'),
-    path('autocomplete/Clinician/', views_autocomplete.ClinicianAutocompleteView.as_view(), name='clinician_autocomplete'),
     path('autocomplete/ExternalPKAutocompleteView', views_autocomplete.ExternalPKAutocompleteView.as_view(), name='external_pk_autocomplete'),
 ]
 

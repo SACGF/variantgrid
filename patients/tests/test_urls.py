@@ -5,10 +5,8 @@ from django.contrib.auth.models import User
 
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from library.enums.titles import Title
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import (
-    Clinician,
     ExternalModelManager,
     ExternalPK,
     Extraction,
@@ -38,7 +36,6 @@ class Test(URLTestCase):
         cls.specimen = Specimen.objects.create(reference_id="funny bone biopsy", patient=cls.patient)
         cls.extraction = Extraction.objects.create(specimen=cls.specimen, reference_id="funny bone DNA")
 
-        cls.clinician = Clinician.objects.get_or_create(title=Title.DR, first_name='Nick', last_name='Riviera')[0]
         emm = ExternalModelManager.objects.get_or_create(name="fake_model_manager", details="blah")[0]
         cls.external_pk = ExternalPK.objects.get_or_create(code="XYZZY", external_type="foo", external_manager=emm)[0]
 
@@ -116,7 +113,6 @@ class Test(URLTestCase):
     def testAutocompleteUrls(self):
         """ Autocompletes w/o permissions """
         AUTOCOMPLETE_URLS = [
-            # ('clinician_autocomplete', self.clinician, {"q": self.clinician.last_name}),
             ('external_pk_autocomplete', self.external_pk, {"q": self.external_pk.code}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user_non_owner, True)
