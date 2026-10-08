@@ -54,12 +54,6 @@ print_purple = partial(print_color, "\033[95m")
 print_cyan = partial(print_color, "\033[96m")
 
 
-def print_restart_reminder():
-    print_yellow("If this upgrade pulled new code, restart the services so they pick it up:")
-    print_yellow("    ctrl-d (back to an admin user)")
-    print_yellow("    sudo ./scripts/restart_services.sh")
-
-
 def outstanding_tasks_json() -> list[dict[str, Any]]:
     """ Each outstanding task's to_json() plus 'command_exists', 'blocked_by' and 'runnable' """
     known_commands = set(get_commands())
@@ -313,6 +307,7 @@ class Upgrader:
 
     def __init__(self):
         self.git_version = Git(settings.BASE_DIR).hash
+        self.pulled_new_code = False  # set once a pull moves HEAD: the running services are then on older code
 
     def standard_steps(self) -> list[UpgradeStep]:
         return [
@@ -462,6 +457,7 @@ class Upgrader:
         return steps
 
     def resume(self, resume_json: str) -> int:
+        self.pulled_new_code = True  # only a pull that moved HEAD resumes us
         resume = json.loads(resume_json)
         failed = self.run_selection(self.resolve_refs(resume["refs"]), then=resume["then"],
                                     stop_on_failure=resume["stop_on_failure"])
@@ -476,11 +472,17 @@ class Upgrader:
             outstanding = outstanding_tasks_json()
             if not failed and not outstanding:
                 print_light_purple("Quick migration was successful")
-                print_restart_reminder()
+                self.print_restart_reminder()
                 return 0
             if outstanding:
                 print_red("Outstanding custom migrations, remember you can mark them all as skipped using VGs version page")
         return self.prompt()
+
+    def print_restart_reminder(self):
+        if self.pulled_new_code:
+            print_yellow("Pulled new code - restart the services so they pick it up:")
+            print_yellow("    ctrl-d (back to an admin user)")
+            print_yellow("    sudo ./scripts/restart_services.sh")
 
     @staticmethod
     def report_failed(failed: list[UpgradeStep]) -> int:
@@ -561,7 +563,7 @@ class Upgrader:
 
             try:
                 if selection == "q":
-                    print_restart_reminder()
+                    self.print_restart_reminder()
                     return 0
                 if selection == "a":
                     self.run_selection(self.standard_steps(), then="menu", stop_on_failure=True)
