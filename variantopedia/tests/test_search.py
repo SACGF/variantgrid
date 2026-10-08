@@ -46,6 +46,12 @@ class TestSearch(TestCase):
         self.assertIn(obj, [sr.preview.obj for sr in matches],
                       f"{obj} not found in {search_type} search results")
 
+    def test_search_unsupported_symbolic_alt(self):
+        """ <INS> is dropped at VCF import, so search must not offer to create one (#2119) """
+        search_results = search_data(self.user, f"{VARIANT_CHROM}:{VARIANT_POSITION}-{VARIANT_POSITION + 100} <INS>", False)
+        self.assertFalse(search_results.results)
+        self.assertTrue(any("<INS> variants are not supported" in m.message for m in search_results.messages_overall))
+
     def test_search_hgvs(self):
         HGVS_NAMES = [
             "ENST00000300305.7(RUNX1):c.352-1G>A",
