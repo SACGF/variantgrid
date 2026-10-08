@@ -91,53 +91,37 @@
 
         <hr/>
         <h4>Library QC</h4>
-        {% for arm in arms %}
-            {% if arm.library_qc %}
-                <h5 id="library-qc-{{ arm.nucleic_acid }}">{{ arm.nucleic_acid }}</h5>
-                <table class="table">
-                    <thead><tr><th>Category<th>QC<th>Run completed<th>Measured</tr></thead>
-                    <tbody>
-                    {% for qc in arm.library_qc %}
-                        <tr>
-                            <td>{{ qc.get_category_display }}
-                            <td>{{ qc.status_description }}
-                            <td>{{ qc.completed|default_if_none:"-" }}
-                            <td>{{ qc.measured_date|default_if_none:"-" }}
-                        </tr>
-                        {% if qc.metric_rows %}
-                            <tr>
-                                <td colspan="4" class="border-top-0">
-                                    <table class="table table-sm mb-0">
-                                        <thead><tr><th>Metric<th>Value<th>Unit<th>LSL<th>USL<th>Guideline<th>Source<th>QC</tr></thead>
-                                        <tbody>
-                                        {% for metric in qc.metric_rows %}
-                                            <tr>
-                                                <td>{{ metric.name }}
-                                                <td>{{ metric.value_text }}
-                                                <td>{{ metric.unit|default:"-" }}
-                                                <td>{{ metric.lsl|default_if_none:"-" }}
-                                                <td>{{ metric.usl|default_if_none:"-" }}
-                                                <td>{{ metric.guideline|default:"-" }}
-                                                <td class="small">{{ metric.guideline_source|default:"-" }}
-                                                <td>{% if metric.passed == None %}-{% elif metric.passed %}passed{% else %}<span class="text-danger">failed</span>{% endif %}
-                                            </tr>
-                                        {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
+        {% if library_qc %}
+            {% labelled label="Run completed" %}{{ library_qc.completed|yesno:"yes,no,-" }}{% endlabelled %}
+            {% labelled label="Measured" %}{{ library_qc.measured_date|default_if_none:"-" }}{% endlabelled %}
+            <table class="table">
+                <thead><tr><th>Arm<th>Category<th>QC<th>Metric<th>Value<th>Guideline<th>Source<th>Metric QC</tr></thead>
+                <tbody>
+                {% for row in library_qc_rows %}
+                    <tr>
+                        {% if row.arm %}
+                            <td rowspan="{{ row.arm_rowspan }}" id="library-qc-{{ row.arm.nucleic_acid }}">{{ row.arm.nucleic_acid }}
                         {% endif %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% endif %}
-        {% endfor %}
-        {% if qc_file_upload %}
-            {% labelled label="Uploaded file" %}
-                <a href="{% url 'view_uploaded_file' qc_file_upload.pk %}">{{ qc_file_upload.name }}</a>
-            {% endlabelled %}
-        {% endif %}
-        {% if not has_library_qc %}
+                        {% if row.qc %}
+                            <td rowspan="{{ row.qc_rowspan }}">{{ row.qc.get_category_display }}
+                            <td rowspan="{{ row.qc_rowspan }}">{% if row.qc.passed == False %}<span class="text-danger">{{ row.qc.status_description }}</span>{% else %}{{ row.qc.status_description }}{% endif %}
+                        {% endif %}
+                        {% with metric=row.metric %}
+                            {% if metric %}
+                                <td>{{ metric.name }}
+                                <td>{{ metric.value_text }}
+                                <td>{{ metric.guideline|default:"-" }}
+                                <td class="small">{{ metric.guideline_source|default:"-" }}
+                                <td>{% if metric.passed == None %}-{% elif metric.passed %}passed{% else %}<span class="text-danger">failed</span>{% endif %}
+                            {% else %}
+                                <td colspan="5" class="text-muted">no metrics</td>
+                            {% endif %}
+                        {% endwith %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
             <p>No MetricsOutput has been uploaded for this pair.</p>
         {% endif %}
     </div>

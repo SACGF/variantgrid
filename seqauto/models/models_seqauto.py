@@ -1057,6 +1057,16 @@ def _number_text(value) -> str:
     return f"{value:g}" if isinstance(value, (int, float)) else "no value"
 
 
+def _number_with_unit_text(value, unit: str) -> str:
+    """ '184 bp', '98.1%'. 'Count' is what DRAGEN writes for a metric with no unit at all, so it is not shown """
+    text = _number_text(value)
+    if unit == "%":
+        return text + unit
+    if unit in ("", "Count"):
+        return text
+    return f"{text} {unit}"
+
+
 def library_qc_guideline(lsl, usl) -> str:
     """ A metric's guideline in words. A zero lower bound is no bound in practice - none of these
         metrics can go negative - so it is left off rather than read as policy """
@@ -1083,7 +1093,7 @@ class LibraryQCMetric(NamedTuple):
 
     @property
     def value_text(self) -> str:
-        return _number_text(self.value)
+        return _number_with_unit_text(self.value, self.unit)
 
     @property
     def guideline(self) -> str:
@@ -1179,15 +1189,9 @@ class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
         """ Each metric against the guideline it was judged by - 'GENE_SCALED_MAD 0.059 (<= 0.134)' - so a
             scientist looking at a failed category can see which number failed rather than just that it did """
         parts = []
-        for name, metric in self.metrics.items():
-            described = f"{name} {_number_text(metric.get('value'))}"
-            # 'Count' is what DRAGEN writes for a metric with no unit at all, so it is not shown
-            unit = metric.get("unit") or ""
-            if unit == "%":
-                described += unit
-            elif unit not in ("", "Count"):
-                described += f" {unit}"
-            if guideline := library_qc_guideline(metric.get("lsl"), metric.get("usl")):
+        for metric in self.metric_rows:
+            described = f"{metric.name} {metric.value_text}"
+            if guideline := metric.guideline:
                 described = f"{described} ({guideline})"
             parts.append(described)
         return ", ".join(parts)

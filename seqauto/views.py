@@ -31,6 +31,7 @@ from seqauto.models import (
     GoldReference,
     JointCalledVCF,
     LibraryQC,
+    LibraryQCMetric,
     QCGeneCoverage,
     QCType,
     SequencingRun,
@@ -337,6 +338,34 @@ def _tso500_pair_arms(cvo: Optional[DragenTSO500CombinedVariantOutput],
     return arms
 
 
+@dataclass
+class LibraryQCRow:
+    """ One line of the pair page's Library QC table - a metric under the arm and category it belongs to.
+        The arm and category cells span their metrics' lines, so are set on the first line of each only """
+    metric: Optional[LibraryQCMetric]
+    arm: Optional[TSO500PairArm] = None
+    arm_rowspan: int = 0
+    qc: Optional[LibraryQC] = None
+    qc_rowspan: int = 0
+
+
+def _library_qc_rows(arms: list[TSO500PairArm]) -> list[LibraryQCRow]:
+    """ Every arm's categories and their metrics as one table. A category with no metrics still gets a line
+        so its call is shown """
+    rows = []
+    for arm in arms:
+        arm_rows = []
+        for qc in arm.library_qc:
+            metrics = qc.metric_rows or [None]
+            arm_rows.append(LibraryQCRow(metric=metrics[0], qc=qc, qc_rowspan=len(metrics)))
+            arm_rows.extend(LibraryQCRow(metric=metric) for metric in metrics[1:])
+        if arm_rows:
+            arm_rows[0].arm = arm
+            arm_rows[0].arm_rowspan = len(arm_rows)
+            rows.extend(arm_rows)
+    return rows
+
+
 def view_tso500_pair(request, sequencing_run_name, pair_id):
     """ One sequenced TSO 500 pair on one run: the DRAGEN analysis of it and the library QC of its arms,
         which are keyed the same way and are the two halves of what a scientist asks about a case """
@@ -357,6 +386,7 @@ def view_tso500_pair(request, sequencing_run_name, pair_id):
         # Nothing to read it through - the pair claims no specimen and names no run we have registered
         raise PermissionDenied(f"'{pair_id}' is attached to no specimen or sequencing run")
 
+    arms = _tso500_pair_arms(cvo, library_qc, request.user)
     context = {
         "sequencing_run_name": sequencing_run_name,
         "pair_id": pair_id,
@@ -367,10 +397,10 @@ def view_tso500_pair(request, sequencing_run_name, pair_id):
         "cvo": cvo,
         "cvo_file_upload": cvo.file_upload if cvo and cvo.file_upload and
                            cvo.file_upload.can_view(request.user) else None,
-        "qc_file_upload": next((qc.file_upload for qc in library_qc
-                                if qc.file_upload and qc.file_upload.can_view(request.user)), None),
-        "has_library_qc": bool(library_qc),
-        "arms": _tso500_pair_arms(cvo, library_qc, request.user),
+        # [Analysis Status] and the measured date are the pair's, carried by each of its QC rows
+        "library_qc": library_qc[0] if library_qc else None,
+        "arms": arms,
+        "library_qc_rows": _library_qc_rows(arms),
     }
     return render(request, 'seqauto/view_tso500_pair.html', context)
 
