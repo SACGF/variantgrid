@@ -12,6 +12,7 @@ from django.urls import reverse
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap, ClassificationGrouping
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
+from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
     ClassificationGroupingExportFilter, ClassificationGroupingByAlleleAndOrigin
@@ -211,6 +212,8 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
                  ):
         self.franklin_formatter_details = franklin_formatter_details
         super().__init__(classification_grouping_filter)
+        if classification_grouping_filter.allele_origin != AlleleOriginBucket.GERMLINE:
+            raise InvalidExportParameter("Franklin export requires Allele Origin to be set to Germline.")
 
     @classmethod
     def format_properties(cls) -> ClassificationGroupingExportFormatProperties:
