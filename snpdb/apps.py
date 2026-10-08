@@ -34,6 +34,7 @@ class SnpdbConfig(AppConfig):
             quad_search,
             sample_search,
             scv_search,
+            somalier_patient_relate,
             trio_search,
             user_search,
             variant_search,

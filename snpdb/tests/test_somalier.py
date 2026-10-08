@@ -6,12 +6,14 @@ a failing stage never takes the import down.
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import cyvcf2
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from patients.models import Patient
 from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
 from snpdb.models import (
     CohortGenotype,
@@ -22,13 +24,22 @@ from snpdb.models import (
     SomalierAllSamplesRelate,
     SomalierCohortRelate,
     SomalierConfig,
+    SomalierPatientRelate,
+    SomalierPatientRelatePair,
     SomalierRelatePairs,
     SomalierSampleExtract,
     SomalierVCFExtract,
     Zygosity,
 )
 from snpdb.models.models_somalier import get_same_individual_relatedness
-from snpdb.tasks.somalier_tasks import _load_somalier_pairs, somalier_vcf_id
+from snpdb.tasks.somalier_tasks import (
+    SOMALIER_PAIRS_FILENAME,
+    _create_somalier_pairs,
+    _load_somalier_pairs,
+    _read_somalier_pairs,
+    somalier_patient_relate,
+    somalier_vcf_id,
+)
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from snpdb.variants_to_vcf import _allele_depths, vcf_export_to_file
 
@@ -315,6 +326,29 @@ class SomalierAllSamplesPairsTest(TestCase):
         self.assertFalse(relatedness.mismatch)
 
 
+    def test_patient_relate_pair_used_while_newer_than_extracts(self):
+        """ A patient relate keeps every pair, so a low one is a different individual rather than missing """
+        vcf_extract = SomalierVCFExtract.objects.create(vcf=self.cohort.vcf, status=ProcessingStatus.SUCCESS)
+        for sample in [self.proband, self.mother]:
+            SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample,
+                                                 het_count=5000, hom_count=5000)
+        patient_relate = SomalierPatientRelate.objects.create(patient=Patient.objects.create(),
+                                                              status=ProcessingStatus.SUCCESS)
+        _create_somalier_pairs(SomalierPatientRelatePair, patient_relate, _read_somalier_pairs(self._write_pairs([
+            _pairs_row(self._name(self.proband), self._name(self.mother), 0.02, 10, 5)])))
+
+        sample_pair = get_same_individual_relatedness([self.proband, self.mother]).sample_pairs[0]
+        self.assertIsInstance(sample_pair.pair, SomalierPatientRelatePair)
+        self.assertFalse(sample_pair.same_individual)
+
+        vcf_extract.save()  # re-extracted since the patient relate, but not the nightly one after it
+        all_samples_relate = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.SUCCESS)
+        _load_somalier_pairs(all_samples_relate, self._write_pairs([
+            _pairs_row(self._name(self.proband), self._name(self.mother), 0.98, 4000, 3000)]))
+        sample_pair = get_same_individual_relatedness([self.proband, self.mother]).sample_pairs[0]
+        self.assertIsInstance(sample_pair.pair, SomalierRelatePairs)
+        self.assertTrue(sample_pair.same_individual)
+
 @override_settings(SOMALIER={"enabled": True, "admin_only": False,
                              "vcf_base_dir": "/tmp/somalier_test", "report_base_dir": "/tmp/somalier_test",
                              "annotation_base_dir": "/tmp/somalier_test",
@@ -346,3 +380,49 @@ class SomalierVCFTaskTest(TestCase):
         vcf_extract = SomalierVCFExtract.objects.get(vcf=self.vcf)
         self.assertEqual(processing.pk, vcf_extract.pk)
         self.assertEqual(ProcessingStatus.PROCESSING, vcf_extract.status)
+
+
+class SomalierPatientRelateTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get_or_create(username='somalier_patient_user')[0]
+        cohort = create_fake_cohort(cls.user, GenomeBuild.get_name_or_alias("GRCh37"))
+        cls.patient = Patient.objects.create(patient_code="SOMALIER-1")
+        vcf_extract = SomalierVCFExtract.objects.create(vcf=cohort.vcf, status=ProcessingStatus.SUCCESS)
+        cls.samples = list(cohort.vcf.sample_set.order_by("pk"))
+        for sample in cls.samples:
+            sample.patient = cls.patient
+            sample.save()
+            SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample,
+                                                 het_count=5000, hom_count=5000)
+
+    def _fake_relate(self, relate) -> Path:
+        """ Pairs of whatever samples the relate was handed """
+        related_dir = Path(tempfile.mkdtemp())
+        names = [f"{s.name}_{s.pk}" for s in relate.get_samples()]
+        rows = [_pairs_row(a, b, 0.01, 10, 5) for i, a in enumerate(names) for b in names[i + 1:]]
+        (related_dir / SOMALIER_PAIRS_FILENAME).write_text("\n".join([PAIRS_HEADER, *rows]) + "\n")
+        return related_dir
+
+    def test_relates_once_per_change_of_samples(self):
+        with patch("snpdb.tasks.somalier_tasks._somalier_relate", side_effect=self._fake_relate) as mock_relate:
+            somalier_patient_relate(self.patient.pk)
+            somalier_patient_relate(self.patient.pk)
+            self.assertEqual(1, mock_relate.call_count, "Already a relate of these samples")
+            self.assertEqual(3, SomalierPatientRelatePair.objects.count(), "Unrelated pairs are kept")
+
+            self.samples[0].no_dna_control = True
+            self.samples[0].save()
+            somalier_patient_relate(self.patient.pk)
+            self.assertEqual(2, mock_relate.call_count)
+
+        relate = SomalierPatientRelate.objects.get()  # the earlier one was replaced
+        self.assertEqual(ProcessingStatus.SUCCESS, relate.status)
+        self.assertEqual(1, relate.somalierpatientrelatepair_set.count())
+
+    @override_settings(SOMALIER={**settings.SOMALIER, "enabled": True})
+    def test_saving_an_extracted_sample_queues_its_patient(self):
+        with patch("snpdb.signals.somalier_patient_relate.somalier_patient_relate") as mock_task:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.samples[0].save()
+        mock_task.si.assert_called_once_with(self.patient.pk)

@@ -177,8 +177,8 @@
             <h4>Sample Relatedness</h4>
             <p>
                 Each pair of this patient's samples should be the same individual: <a href="https://github.com/brentp/somalier">Somalier</a>
-                relatedness &ge; {{ duplicate_sample_relatedness }} in the nightly all-samples relate.
-                A sample is only compared once that relate has run on enough of its HET/HOM sites.
+                relatedness &ge; {{ duplicate_sample_relatedness }}. This patient's samples are related whenever one is imported
+                or linked to them, falling back on the nightly all-samples relate. A sample needs enough HET/HOM sites to be compared.
             </p>
             {% if sample_relatedness.sample_pairs %}
             <table class="table" id="sample-relatedness-table">
@@ -203,7 +203,7 @@
                             {% if sp.same_individual %}
                                 <span class="badge badge-success">Same individual</span>
                             {% elif sp.pair %}
-                                <span class="badge badge-danger" title="Related, but not the same DNA">Different individual</span>
+                                <span class="badge badge-danger" title="Not the same DNA">Different individual</span>
                             {% else %}
                                 <span class="badge badge-danger" title="Too little in common for the all-samples relate to keep the pair">Unrelated</span>
                             {% endif %}

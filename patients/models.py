@@ -17,7 +17,7 @@ from django.db import models, transaction
 from django.db.models import Case, F, Q, TextField, Value, When
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Concat
-from django.dispatch.dispatcher import receiver
+from django.dispatch.dispatcher import Signal, receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
@@ -150,6 +150,10 @@ def patient_name_surname_first(first_name, last_name):
 # But as this isn't always available - hardcode age etc using _underscore prefixed fields
 
 
+# kwargs: patient - sent after Patient.merge() moves everything across
+patient_merged_signal = Signal()
+
+
 class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel, PreviewModelMixin):
     LOCAL_REFERENCE_FIELD = "patient_code"
 
@@ -265,6 +269,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             self.save(update_fields=list(copied))
         PatientModification.objects.create(patient=self, user=user, origin=origin,
                                            description=f"Merged {other_description}: {description}")
+        patient_merged_signal.send(sender=Patient, patient=self)
 
     @property
     def code(self):

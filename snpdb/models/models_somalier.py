@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import uuid
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from subprocess import CalledProcessError
@@ -10,7 +11,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.db import models
-from django.db.models import CASCADE, Count, Q
+from django.db.models import CASCADE, Count, Q, QuerySet
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
@@ -19,6 +20,7 @@ from model_utils.managers import InheritanceManager
 
 from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
+from patients.models import Patient
 from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
 from snpdb.models.models_cohort import Cohort
@@ -116,6 +118,8 @@ def somalier_vcf_extract_pre_delete_handler(sender, instance, **kwargs):  # pyli
 
 
 class SomalierSampleExtract(models.Model):
+    MIN_HET_HOM_COUNT = 1000
+
     vcf_extract = models.ForeignKey(SomalierVCFExtract, on_delete=CASCADE)
     sample = models.OneToOneField(Sample, on_delete=CASCADE)
     ref_count = models.IntegerField(default=0)
@@ -125,7 +129,7 @@ class SomalierSampleExtract(models.Model):
 
     @property
     def has_sufficient_data(self) -> bool:
-        return self.het_count >= 1000 and self.hom_count >= 1000
+        return self.het_count >= self.MIN_HET_HOM_COUNT and self.hom_count >= self.MIN_HET_HOM_COUNT
 
 
 class SomalierAncestryRun(AbstractSomalierModel):
@@ -267,8 +271,38 @@ class SomalierAllSamplesRelate(SomalierRelate):
         return False  # Samples from different VCFs are never jointly called
 
 
+class SomalierPatientRelate(SomalierRelate):
+    """ One patient's samples, related as soon as one is extracted or linked to them rather than waiting on
+        the nightly all-samples relate (#196). Every pair is kept, whatever its relatedness """
+    patient = models.ForeignKey(Patient, on_delete=CASCADE)
+
+    @staticmethod
+    def relatable_samples(patient: Patient) -> QuerySet[Sample]:
+        min_count = SomalierSampleExtract.MIN_HET_HOM_COUNT
+        return patient.get_samples().filter(no_dna_control=False,
+                                            somaliersampleextract__vcf_extract__status=ProcessingStatus.SUCCESS,
+                                            somaliersampleextract__het_count__gte=min_count,
+                                            somaliersampleextract__hom_count__gte=min_count)
+
+    def get_samples(self) -> Iterable[Sample]:
+        return self.relatable_samples(self.patient)
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        """ A patient's samples can span builds - @see SomalierAllSamplesRelate.genome_build """
+        build_counts = Counter(sample.vcf.genome_build for sample in self.get_samples())
+        return build_counts.most_common(1)[0][0]
+
+    @property
+    def has_hom_ref_calls(self) -> bool:
+        if self.get_samples().values("vcf").distinct().count() > 1:
+            return False  # Samples from different VCFs are never jointly called
+        return super().has_hom_ref_calls
+
+
 @receiver(pre_delete, sender=SomalierAllSamplesRelate)
 @receiver(pre_delete, sender=SomalierCohortRelate)
+@receiver(pre_delete, sender=SomalierPatientRelate)
 @receiver(pre_delete, sender=SomalierTrioRelate)
 def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     related_dir = instance.get_related_dir()
@@ -277,11 +311,10 @@ def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: d
         shutil.rmtree(related_dir)
 
 
-class SomalierRelatePairs(models.Model):
-    relate = models.ForeignKey(SomalierAllSamplesRelate, on_delete=CASCADE)
-    # Sample A always has a lower PK than B
-    sample_a = models.ForeignKey(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_a")
-    sample_b = models.ForeignKey(Sample, on_delete=CASCADE, related_name="somalierrelatepairs_b")
+class AbstractSomalierRelatePair(models.Model):
+    """ A row of somalier's pairs TSV """
+    sample_a = models.ForeignKey(Sample, on_delete=CASCADE, related_name="%(class)s_a")
+    sample_b = models.ForeignKey(Sample, on_delete=CASCADE, related_name="%(class)s_b")
     relatedness = models.FloatField()
     ibs0 = models.IntegerField()
     ibs2 = models.IntegerField()
@@ -298,6 +331,14 @@ class SomalierRelatePairs(models.Model):
     x_ibs2 = models.IntegerField()
 
     class Meta:
+        abstract = True
+
+
+class SomalierRelatePairs(AbstractSomalierRelatePair):
+    """ Only the pairs over SOMALIER["relatedness"] """
+    relate = models.ForeignKey(SomalierAllSamplesRelate, on_delete=CASCADE)
+
+    class Meta:
         unique_together = ('sample_a', 'sample_b')
 
     @staticmethod
@@ -309,13 +350,17 @@ class SomalierRelatePairs(models.Model):
         return SomalierRelatePairs.objects.filter(sample_a__in=samples, sample_b__in=samples)
 
 
+class SomalierPatientRelatePair(AbstractSomalierRelatePair):
+    relate = models.ForeignKey(SomalierPatientRelate, on_delete=CASCADE)
+
+
 @dataclass
 class SamplePairRelatedness:
-    """ Two samples that were both in the last all-samples relate. No pair means it fell under
-        SOMALIER["relatedness"], ie unrelated """
+    """ No pair means both samples were in the last all-samples relate, which dropped the pair for falling
+        under SOMALIER["relatedness"], ie unrelated """
     sample_a: Sample
     sample_b: Sample
-    pair: Optional[SomalierRelatePairs]
+    pair: Optional[AbstractSomalierRelatePair]
 
     @property
     def same_individual(self) -> bool:
@@ -332,48 +377,70 @@ class SameIndividualRelatedness:
         return any(not sp.same_individual for sp in self.sample_pairs)
 
 
-def _not_checked_reason(sample_extract: Optional[SomalierSampleExtract],
-                        all_samples_relate: Optional[SomalierAllSamplesRelate]) -> Optional[str]:
-    if sample_extract is None:
-        return "No somalier extract"
-    if not sample_extract.has_sufficient_data:
-        return "Too few HET/HOM sites"
-    if all_samples_relate is None or all_samples_relate.created < sample_extract.vcf_extract.modified:
-        return "Not yet in the nightly all-samples relate"
-    return None
+def _pair_key(sample_a_id: int, sample_b_id: int) -> frozenset[int]:
+    """ Pairs are loaded in somalier's sample order, which needn't be pk order """
+    return frozenset((sample_a_id, sample_b_id))
 
 
 def get_same_individual_relatedness(samples: Iterable[Sample]) -> Optional[SameIndividualRelatedness]:
-    """ Samples that should all be one individual (eg one patient's), paired up. The all-samples relate only
-        keeps pairs over SOMALIER["relatedness"], which two samples of one individual with enough data always
-        clear, so only samples that were in that run are paired - a missing pair between them is unrelated DNA.
+    """ Samples that should all be one individual (eg one patient's), paired up. A patient relate newer than
+        both samples' extracts gives the pair, otherwise the nightly all-samples relate does if it's newer -
+        that only keeps pairs over SOMALIER["relatedness"], which two samples of one individual with enough
+        data always clear, so a pair missing from it is unrelated DNA.
         None when there aren't 2 samples to compare """
-    samples = [s for s in samples if not s.no_dna_control]
+    samples = sorted((s for s in samples if not s.no_dna_control), key=lambda s: s.pk)
     if len(samples) < 2:
         return None
 
     sample_extracts = {sse.sample_id: sse for sse in SomalierSampleExtract.objects.filter(sample__in=samples)
                        .select_related("vcf_extract")}
+    not_checked = []
+    relatable = []
+    for sample in samples:
+        sample_extract = sample_extracts.get(sample.pk)
+        if sample_extract is None:
+            not_checked.append((sample, "No somalier extract"))
+        elif not sample_extract.has_sufficient_data:
+            not_checked.append((sample, "Too few HET/HOM sites"))
+        else:
+            relatable.append(sample)
+
+    patient_pairs = {}
+    patient_pairs_qs = SomalierPatientRelatePair.objects.filter(sample_a__in=relatable, sample_b__in=relatable,
+                                                                relate__status=ProcessingStatus.SUCCESS)
+    for pair in patient_pairs_qs.select_related("relate").order_by("relate__created"):
+        patient_pairs[_pair_key(pair.sample_a_id, pair.sample_b_id)] = pair  # newest relate wins
+
     all_samples_relate = SomalierAllSamplesRelate.objects.filter(status=ProcessingStatus.SUCCESS) \
         .order_by("-created").first()
-
-    checked = []
-    not_checked = []
-    for sample in sorted(samples, key=lambda s: s.pk):
-        if reason := _not_checked_reason(sample_extracts.get(sample.pk), all_samples_relate):
-            not_checked.append((sample, reason))
-        else:
-            checked.append(sample)
+    all_samples_pairs = {_pair_key(pair.sample_a_id, pair.sample_b_id): pair
+                         for pair in SomalierRelatePairs.get_between_samples(relatable)}
 
     sample_pairs = []
-    if len(checked) >= 2:
-        # Pairs are loaded in somalier's sample order, which needn't be pk order
-        pairs = {frozenset((p.sample_a_id, p.sample_b_id)): p
-                 for p in SomalierRelatePairs.get_between_samples(checked)}
-        for sample_a, sample_b in itertools.combinations(checked, 2):
-            pair = pairs.get(frozenset((sample_a.pk, sample_b.pk)))
-            sample_pairs.append(SamplePairRelatedness(sample_a, sample_b, pair))
+    paired_sample_ids = set()
+    for sample_a, sample_b in itertools.combinations(relatable, 2):
+        key = _pair_key(sample_a.pk, sample_b.pk)
+        last_extracted = max(sample_extracts[sample_a.pk].vcf_extract.modified,
+                             sample_extracts[sample_b.pk].vcf_extract.modified)
+        patient_pair = patient_pairs.get(key)
+        if patient_pair and patient_pair.relate.created >= last_extracted:
+            pair = patient_pair
+        elif all_samples_relate and all_samples_relate.created >= last_extracted:
+            pair = all_samples_pairs.get(key)
+        else:
+            continue
+        sample_pairs.append(SamplePairRelatedness(sample_a, sample_b, pair))
+        paired_sample_ids.update(key)
+
+    not_checked.extend((sample, "Not yet related") for sample in relatable if sample.pk not in paired_sample_ids)
+    not_checked.sort(key=lambda sample_reason: sample_reason[0].pk)
     return SameIndividualRelatedness(sample_pairs, not_checked)
+
+
+def get_sample_patient_ids(samples: Iterable[Sample]) -> set[int]:
+    """ The patients whose Patient.get_samples() reach these - through the sample or its extraction """
+    reaches_sample = Q(sample__in=samples) | Q(specimen__extraction__sample__in=samples)
+    return set(Patient.objects.filter(reaches_sample).values_list("pk", flat=True).distinct())
 
 
 class SomalierConfig:
