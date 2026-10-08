@@ -310,6 +310,8 @@ function populateVariantAllele(data) {
 
     $("#variant_coordinate").text(data.link_data.variant_string);
     data.link_data.igv_links_enabled = {{ igv_links_enabled | jsonify }};
+    data.link_data.igv_locus = {{ gene_level_igv_locus | jsonify }};
+    data.link_data.civic_variant_url = {{ splice_event_civic_url | jsonify }};
     if (data.link_data.variant_string !== data.link_data.variant_coordinate) {
         const link = $("<a />").text("show all bases").attr({
             id: "show-variant-coordinate-link",
@@ -393,9 +395,6 @@ function variantDetailsShowTagAutocomplete() {
 
 $(document).ready(function() {
 	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id genome_build.pk %}');
-
-    // A splice event's junction is the one coordinate a gene-level variant has - @see splice_event.html
-    renderIgvLocusLinks(document);
 
     let variantAllele = {{ variant_allele | jsonify }};
     if (variantAllele) {
@@ -530,7 +529,7 @@ function applyVariantValues() {
                 {% elif gene_copy_number_event %}
                     {% labelled label="Copy number" %}{% gene_copy_number gene_copy_number_event %}{% endlabelled %}
                 {% elif splice_event_variant %}
-                    {% labelled label="Splice" %}{% splice_event splice_event_variant genome_build %}{% endlabelled %}
+                    {% labelled label="Splice" %}{% splice_event splice_event_variant %}{% endlabelled %}
                 {% else %}
                     {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% endif %}

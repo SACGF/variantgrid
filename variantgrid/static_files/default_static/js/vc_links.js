@@ -110,6 +110,9 @@ const VCLinks = (function() {
             //links.push(this.generateBeacon());
             links.push(this.makeLink('cBioPortal (Gene)', 'https://www.cbioportal.org', '/ln?q=@@:MUT', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('CIViC (Gene)', 'https://civicdb.org', '/links/entrez_name/@@', SpecialEKeys.GENE_SYMBOL));
+            if (data.civic_variant_url) {
+                links.push(new VCLink({text: 'CIViC (Variant)', href: data.civic_variant_url}));
+            }
             // not sure why, but this straight up doesn't work
             // links.push(this.makeLink('CIViC (Variant)', 'https://civicdb.org', '/links/allele_registry/@@', SpecialEKeys.CLINGEN_ALLELE_ID));
             links.push(this.makeLink('ClinGen Allele Reg.', 'http://reg.clinicalgenome.org', '/redmine/projects/registry/genboree_registry/by_caid?caid=@@', SpecialEKeys.CLINGEN_ALLELE_ID, 'Clingen Allele Registry'));
@@ -363,7 +366,9 @@ const VCLinks = (function() {
                 return null;
             }
             let locus = null;
-            if (this.variant_coordinate_parts) {
+            if (this.data.igv_locus) {
+                locus = this.data.igv_locus;
+            } else if (this.variant_coordinate_parts) {
                 locus = this.variant_coordinate_parts[1] + ':' + this.variant_coordinate_parts[2];
             } else if (this.variant_coordinate_symbolic_parts) {
                 // Can do a range

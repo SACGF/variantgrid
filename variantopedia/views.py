@@ -46,7 +46,7 @@ from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.forms import TagForm, UserSelectForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Sample, Tag, Variant, VariantGridColumn, get_igv_data
+from snpdb.models import GenomeBuild, Sample, Tag, Variant, VariantGridColumn, get_igv_data
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
@@ -207,6 +207,20 @@ def _get_splice_event_variant(variant: Variant) -> Optional[SpliceEventVariant]:
     """ The third kind - the gene and the junction's label, which the alt carries rather than a row
         of its own (@see genes.gene_splice) """
     return get_splice_event_variant(variant)
+
+
+def _get_gene_level_igv_locus(genome_build: GenomeBuild, gene_fusion: Optional[GeneFusion],
+                              gene_copy_number_event: Optional[GeneCopyNumberEvent],
+                              splice_event_variant: Optional[SpliceEventVariant]) -> Optional[str]:
+    """ What the Quick Links IGV link opens for a gene-level variant, whose own locus is a gene ID
+        on a fake contig rather than a coordinate (@see snpdb.gene_level_variants) """
+    if gene_fusion:
+        return gene_fusion.igv_locus
+    if gene_copy_number_event:
+        return gene_copy_number_event.igv_locus
+    if splice_event_variant:
+        return splice_event_variant.junction_locus(genome_build)
+    return None
 
 
 def view_variant(request, variant_id, genome_build_name=None):
@@ -447,7 +461,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
+    gene_fusion = _get_gene_fusion(variant)
+    gene_copy_number_event = _get_gene_copy_number_event(variant)
     splice_event_variant = _get_splice_event_variant(variant)
+    splice_event = splice_event_variant.splice_event if splice_event_variant else None
 
     if variant_annotation and variant_annotation.hgvs_g:
         hgvs_g = variant_annotation.hgvs_g
@@ -472,9 +489,12 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "gene_fusion": _get_gene_fusion(variant),
-        "gene_copy_number_event": _get_gene_copy_number_event(variant),
+        "gene_fusion": gene_fusion,
+        "gene_copy_number_event": gene_copy_number_event,
         "splice_event_variant": splice_event_variant,
+        "gene_level_igv_locus": _get_gene_level_igv_locus(genome_build, gene_fusion, gene_copy_number_event,
+                                                          splice_event_variant),
+        "splice_event_civic_url": splice_event.civic_url if splice_event else None,
         # Names the page and the analysis' variant details tab, which have no room for a transcript.
         # A splice event is called by its name ("AR-V7 splice variant"), not by a c.HGVS it has none of
         "variant_short_label": splice_event_variant.display if splice_event_variant else

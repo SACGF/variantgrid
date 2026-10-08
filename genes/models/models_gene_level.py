@@ -162,6 +162,11 @@ class GeneCopyNumberEvent(models.Model):
             fusion's partners """
         return [self.gene]
 
+    @property
+    def igv_locus(self) -> str:
+        """ The gene by name, which IGV resolves itself - the segment is per observation """
+        return self.gene.symbol_str
+
     def clean(self):
         super().clean()
         parsed = GeneLevelSymbolicAlt.parse(self.variant.alt.seq)
