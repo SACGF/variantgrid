@@ -478,6 +478,15 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return Sequence.allele_is_symbolic(self.alt)
 
     @property
+    def unsupported_symbolic_alt_message(self) -> Optional[str]:
+        """ VCF import keeps only VARIANT_SYMBOLIC_ALT_VALID_TYPES (vcf_clean_alts), and a manual variant is
+            created by import, so a symbolic variant with any other alt can never be created (#2119) """
+        valid_types = settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES
+        if self.is_symbolic and not self.is_gene_level and self.alt not in valid_types:
+            return f"{self.alt} variants are not supported - a symbolic variant must be one of {', '.join(sorted(valid_types))}"
+        return None
+
+    @property
     def is_gene_level(self) -> bool:
         """ Coordinate-level twin of Variant.is_gene_level - keyed on the alt, since a bare coordinate
             has no contig role to read. No coordinate means nothing can be read off a reference """

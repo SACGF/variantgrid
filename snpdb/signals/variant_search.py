@@ -328,6 +328,9 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
         if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.position):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
             continue
+        if message := variant_coordinate.unsupported_symbolic_alt_message:
+            yield SearchMessageOverall(message, genome_builds=[genome_build])
+            continue
 
         search_messages = []
         if not variant_coordinate.is_symbolic:
