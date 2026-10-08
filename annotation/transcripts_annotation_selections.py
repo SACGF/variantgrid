@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.forms.models import model_to_dict
+from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.timesince import timesince
 
 from annotation.models import AnnotationStatus, VEPSkippedReason
@@ -18,8 +20,10 @@ from annotation.models.models_enums import NMDEscapeStatus
 from genes.hgvs import HGVSException, HGVSMatcher
 from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
+from library.genomics import format_bp
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
+from variantgrid.perm_path import get_visible_url_names
 
 
 class VariantTranscriptSelections:
@@ -100,7 +104,7 @@ class VariantTranscriptSelections:
             if self.variant_annotation.vep_skipped_reason == VEPSkippedReason.TOO_LONG:
                 # Deliberate - gene overlaps were still resolved locally (#1271)
                 sv_max_size = vav.sv_max_size or settings.ANNOTATION_VEP_SV_MAX_SIZE
-                self.warning_messages.append(f"Not annotated by VEP: SV longer than {sv_max_size:,} bp")
+                self.warning_messages.append(self._too_long_warning(sv_max_size))
             elif self.variant_annotation.vep_skipped_reason:
                 annotation_error = "Unable to annotate variant"
                 if self.variant_annotation.vep_skipped_reason != VEPSkippedReason.UNKNOWN:
@@ -134,6 +138,13 @@ class VariantTranscriptSelections:
                 self.error_messages.append(msg)
         except InvalidAnnotationVersionError as e:
             self.error_messages.append(str(e))
+
+    @staticmethod
+    def _too_long_warning(sv_max_size: int) -> str:
+        msg = f"Not annotated by VEP: SV longer than {format_bp(sv_max_size)}"
+        if get_visible_url_names()["variant_types"]:
+            msg = format_html('{} - see <a href="{}">Variant Types</a>', msg, reverse("variant_types"))
+        return msg
 
     def _get_transcript_data(self, obj: VariantTranscriptAnnotation, representative_transcript: Transcript) -> dict:
         data = model_to_dict(obj)

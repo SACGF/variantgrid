@@ -866,12 +866,13 @@ function _contigLabel(chrom) {
     return name.toLowerCase().startsWith('chr') ? name : `chr${name}`;
 }
 
+// Matches format_bp in library/genomics/__init__.py - up to 2 decimals, trailing zeros dropped
 function _formatBases(bases) {
     if (bases >= 1e6) {
-        return (bases / 1e6).toFixed(2) + " Mb";
+        return parseFloat((bases / 1e6).toFixed(2)) + " Mb";
     }
     if (bases >= 1e3) {
-        return (bases / 1e3).toFixed(1) + " kb";
+        return parseFloat((bases / 1e3).toFixed(2)) + " kb";
     }
     return bases + " bp";
 }

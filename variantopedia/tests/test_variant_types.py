@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase, override_settings
 
-from variantopedia.variant_types import format_bp, get_size_limits, get_variant_type_rows
+from library.genomics import format_bp
+from variantopedia.variant_types import get_size_limits, get_variant_type_rows
 
 
 @override_settings(VARIANT_SYMBOLIC_ALT_ENABLED=True, VARIANT_SYMBOLIC_ALT_SIZE=50,
@@ -26,7 +27,8 @@ class VariantTypesTest(SimpleTestCase):
         self.assertEqual(["Any size"], [b["name"] for b in groups["Deletion, duplication, inversion"]])
 
     def test_format_bp(self):
-        self.assertEqual(["50 bp", "1 kb", "1.5 kb", "10 Mb"], [format_bp(n) for n in (50, 1000, 1500, 10_000_000)])
+        self.assertEqual(["50 bp", "1 kb", "1.5 kb", "55.12 kb", "10 Mb", "224.23 Mb"],
+                         [format_bp(n) for n in (50, 1000, 1500, 55_123, 10_000_000, 224_225_011)])
 
     @override_settings(LIFTOVER_BCFTOOLS_ENABLED=True, LIFTOVER_BCFTOOLS_MAX_LENGTH=1000, LIFTOVER_BCFTOOLS_SYMBOLIC=False)
     def test_size_limits(self):

@@ -18,6 +18,7 @@ from django.conf import settings
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_alt
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from library.genomics import format_bp
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import ClinGenAllele, VariantCoordinate
 
@@ -91,14 +92,6 @@ VARIANT_KIND_GROUPS = [
     ("Insertion, complex substitution", [INSERTION, COMPLEX_SUBSTITUTION]),
     ("Copy number <CNV>, insertion <INS>", [CNV, SYMBOLIC_INSERTION]),
 ]
-
-
-def format_bp(length: int) -> str:
-    """ 50 -> '50 bp', 1000 -> '1 kb', 1500 -> '1.5 kb', 10_000_000 -> '10 Mb' """
-    for unit, scale in (("Mb", 1_000_000), ("kb", 1_000)):
-        if length >= scale:
-            return f"{length / scale:g} {unit}"
-    return f"{length:,} bp"
 
 
 @dataclass(frozen=True)

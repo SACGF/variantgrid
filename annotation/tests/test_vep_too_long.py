@@ -97,4 +97,4 @@ class VEPTooLongTestCase(VEPTooLongTestBase):
                                          vep_skipped_reason=VEPSkippedReason.TOO_LONG)
         vts = VariantTranscriptSelections(self.long_sv, self.grch37, annotation_version=self.av)
         self.assertEqual(vts.error_messages, [])
-        self.assertIn(f"SV longer than {SV_MAX_SIZE:,} bp", " ".join(vts.warning_messages))
+        self.assertIn("SV longer than 1 kb", " ".join(vts.warning_messages))

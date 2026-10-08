@@ -36,6 +36,7 @@ from genes.models import (
 )
 from library.django_utils import get_field_counts
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
+from library.genomics import format_bp
 from library.git import Git
 from library.log_utils import log_traceback
 from library.utils import StashFile
@@ -70,7 +71,7 @@ from variantopedia.interesting_nearby import (
     get_nearby_qs,
     get_nearby_summaries,
 )
-from variantopedia.variant_types import format_bp, get_size_limits, get_variant_type_rows
+from variantopedia.variant_types import get_size_limits, get_variant_type_rows
 
 
 def variants(request, genome_build_name=None):
