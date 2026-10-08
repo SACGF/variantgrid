@@ -12,6 +12,7 @@ from django.urls import reverse
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap, ClassificationGrouping
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
+from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObjDate
 from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
@@ -62,7 +63,7 @@ class FranklinExportRow(ExportRow):
 
     @export_column("Classification Date")
     def classification_date(self):
-        # hardcoded to 2000-01-01 so as to not change and cause duplicate records
+        # hardcoded to 2000-01-01 to not change and cause duplicate records
         # as well as be old enough that it shouldn't be suggested to copy the details into a new record
         return "2000-01-01"
 
@@ -153,13 +154,13 @@ class FranklinExportRow(ExportRow):
         all_classification_values = list(classification_key.sort_values(set(all_classification_values)))
         formatted_classification_values = [classification_key.pretty_value(v) for v in all_classification_values]
 
-        all_clinsig_values = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in
+        all_clinsig_values: list[SomaticClinicalSignificanceValue | None] = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in
                               self.data.classification_groupings]
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
         all_clinsig_values = [cs.pretty_str for cs in sorted(set(all_clinsig_values))]
 
-        latest_date = None
-        latest_date_str = None
+        latest_date: Optional[ClassificationSummaryCacheObjDate] = None
+        latest_date_str: Optional[str] = None
 
         all_labs = set()
         for cms in self.data.classification_groupings:
@@ -236,7 +237,8 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
         return self.classification_grouping_filter.queryset(genome_build=genome_build).prefetch_related("overlapcontribution_set")
 
     def single_row_generator(self) -> Iterator[str]:
-
+        # loop through each allele and see if it has the relevant output value for
+        # germline, somatic and oncogenic, if so, actually produce the row
         def data_iterator():
             for allele_grouping in self.allele_group_iterator():
                 for allele_origin_grouping in allele_grouping.sub_by_allele_origin():

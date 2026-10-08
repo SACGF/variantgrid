@@ -1,5 +1,5 @@
 from functools import cached_property, reduce
-from typing import Any, Optional
+from typing import Any, Optional, Self
 
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
@@ -38,7 +38,7 @@ from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices
 from library.django_utils.model_utils import AuditSingleChange, AuditUtils
-from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.preview_request import PreviewKeyValue, PreviewModelMixin, PreviewData
 from library.utils import first
 from ontology.models import OntologyTerm
 from review.models import Review, ReviewableModelMixin
@@ -234,17 +234,18 @@ class OverlapContribution(TimeStampedModel):
         else:
             return 0
 
-    def __lt__(self, other):
+    def __lt__(self, other: Self):
         if value_sort_diff := self.value_sort_index - other.value_sort_index:
             return value_sort_diff < 0
-        if self.lab is None or other.lab is None:
-            if self.lab is None and other.lab is None:
-                return False
-            if self.lab is None:
-                return True
-            else:
-                return False
-        return self.lab < other.lab
+
+        if self.lab and other.lab:
+            return self.lab < other.lab
+        elif self.lab is None and other.lab is None:
+            return False
+        elif self.lab is None:
+            return True
+        else:
+            return False
 
     @staticmethod
     def pretty_value_for(value: Optional[str], value_type: ClassificationResultValue):
@@ -336,7 +337,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return settings.DISCORDANCE_ENABLED
 
     @property
-    def preview(self) -> 'PreviewData':
+    def preview(self) -> PreviewData:
         summary_extra = []
         if not self.valid:
             summary_extra.append(PreviewKeyValue(value="Invalid Overlap - ignore", dedicated_row=True))
@@ -488,7 +489,6 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     @property
     def testing_context_full(self) -> TestingContextFull:
-        # TOD
         return TestingContextFull(
             testing_context_bucket=TestingContextBucket(self.testing_context_bucket),
             tumor_type_category=self.tumor_type_category
@@ -499,6 +499,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return (
             self.allele_id,
             OverlapType(self.overlap_type).priority_order,
+            # y is actually TestingContextBucket not int that PyCharm thinks it is
             reduce(lambda x, y: x*100 + y.priority_order, self.testing_contexts_objs, 0),
             ClassificationResultValue(self.value_type).priority_order,
             self.tumor_type_category or "",
@@ -575,7 +576,6 @@ class TriageNextStep(IntegerChoices):
             case TriageNextStep.AWAITING_YOUR_TRIAGE:
                 return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
             case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED:
-                # TODO show a more impatient clock
                 return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
             case TriageNextStep.AWAITING_YOUR_AMEND:
                 return mark_safe('<i class="fa-solid fa-square-pen mr-1" style="opacity:0.6"></i>')
@@ -584,7 +584,6 @@ class TriageNextStep(IntegerChoices):
             case _: return ""
 
 
-# this should be the model that links Contributions to Overlaps to reduce redundancy
 class OverlapContributionNextStep(TimeStampedModel):
     overlap = models.ForeignKey(Overlap, on_delete=CASCADE)
     contribution = models.ForeignKey(OverlapContribution, on_delete=CASCADE)

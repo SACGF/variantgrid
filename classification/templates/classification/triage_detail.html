@@ -27,7 +27,7 @@
     <script>
         function triage_status_updated() {
             let value = $('input[name="triage_status"]:checked').val();
-            let willAmend = value == "F";
+            let willAmend = value === "F";
             if (willAmend) {
                 $('#div_id_new_value').show();
             } else {
