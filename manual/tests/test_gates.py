@@ -17,8 +17,8 @@ from manual.models import (
 )
 from manual.operations.manual_operations import ManualOperation
 from manual.upgrader import (
-    MigrationStatus,
-    ObsoleteSubMigration,
+    ObsoleteStep,
+    StepStatus,
     Upgrader,
     outstanding_tasks_json,
     record_attempt,
@@ -103,10 +103,10 @@ class OutstandingRunnableTest(TestCase):
 
     def test_menu_status_line_flags_only_missing_manage_commands(self):
         # Regression: 'other' human steps have command_exists=None and must NOT read as "obsolete command".
-        missing = Upgrader.subcommand_for_json(
+        missing = Upgrader.step_for_task(
             {"id": "manage*deleted_cmd", "category": "manage", "line": "deleted_cmd",
              "command_exists": False, "blocked_by": []})
-        human = Upgrader.subcommand_for_json(
+        human = Upgrader.step_for_task(
             {"id": 'other*"do a thing"', "category": "other", "line": '"do a thing"',
              "command_exists": None, "blocked_by": []})
         self.assertEqual(missing.status_tag(), "[OBSOLETE]")
@@ -116,7 +116,7 @@ class OutstandingRunnableTest(TestCase):
     def test_menu_tags_blocked_task_on_its_own_line(self):
         # The tag has to sit on the task's own menu line - an indented detail line alone reads as
         # belonging to whichever task is printed next.
-        blocked = Upgrader.subcommand_for_json(
+        blocked = Upgrader.step_for_task(
             {"id": "manage*calculate_sample_stats", "category": "manage", "line": "calculate_sample_stats",
              "command_exists": True, "blocked_by": ["variant-annotation-current"]})
         self.assertEqual(blocked.status_tag(), "[BLOCKED]")
@@ -127,15 +127,15 @@ class OutstandingRunnableTest(TestCase):
         # with no way to retire it from the upgrader.
         task = ManualMigrationTask.objects.create(id="manage*deleted_cmd")
         self._request(task)
-        obsolete = Upgrader.subcommand_for_json(
+        obsolete = Upgrader.step_for_task(
             {"id": task.id, "category": "manage", "line": "deleted_cmd",
              "command_exists": False, "blocked_by": []})
-        self.assertIsInstance(obsolete, ObsoleteSubMigration)
+        self.assertIsInstance(obsolete, ObsoleteStep)
 
         out = StringIO()
         with redirect_stdout(out), patch("builtins.input", return_value="y"):
             result = obsolete.run()
-        self.assertEqual(result.status, MigrationStatus.SUCCESS)
+        self.assertEqual(result.status, StepStatus.SUCCESS)
         self.assertTrue(result.note)
 
         # what the upgrader does with that success - records it, which retires the task
@@ -145,12 +145,12 @@ class OutstandingRunnableTest(TestCase):
     def test_backing_out_of_an_obsolete_task_leaves_it_outstanding(self):
         task = ManualMigrationTask.objects.create(id="manage*deleted_cmd")
         self._request(task)
-        obsolete = ObsoleteSubMigration("deleted_cmd").using(task_id=task.id)
+        obsolete = ObsoleteStep("deleted_cmd").using(task_id=task.id)
 
         out = StringIO()
         with redirect_stdout(out), patch("builtins.input", return_value="x"):
             result = obsolete.run()
-        self.assertEqual(result.status, MigrationStatus.SKIP)  # SKIP -> upgrader records no attempt
+        self.assertEqual(result.status, StepStatus.SKIP)  # SKIP -> upgrader records no attempt
         self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(task))
 
 

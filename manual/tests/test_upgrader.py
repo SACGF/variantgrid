@@ -6,16 +6,16 @@ from django.test import TestCase
 
 from manual.models import ManualMigrationAttempt, ManualMigrationRequired, ManualMigrationTask
 from manual.upgrader import (
-    MigrationResult,
-    MigrationStatus,
-    PythonSubMigration,
+    PythonStep,
+    StepResult,
+    StepStatus,
     Upgrader,
     parse_selection,
 )
 
 
-def _step(task_id: str, method, requires=None) -> PythonSubMigration:
-    step = PythonSubMigration(method, task_id).using(task_id=task_id)
+def _step(task_id: str, method, requires=None) -> PythonStep:
+    step = PythonStep(method, task_id).using(task_id=task_id)
     step.requires = requires
     return step
 
@@ -27,7 +27,7 @@ def _fail():
 class ParseSelectionTest(TestCase):
 
     def test_keys_and_ranges_in_order_given(self):
-        migrations = [PythonSubMigration(MigrationResult.success, key).using(key=key)
+        migrations = [PythonStep(StepResult.success, key).using(key=key)
                       for key in ("m", "c", "1", "2", "3", "4")]
         selected = parse_selection("c, 2-3 m", migrations)
         self.assertEqual([m.key for m in selected], ["c", "2", "3", "m"])
@@ -49,8 +49,8 @@ class RunSelectionTest(TestCase):
             ManualMigrationRequired.objects.create(task=ManualMigrationTask.objects.create(id=task_id))
         ran = []
         a = _step("manage*a", _fail)
-        b = _step("manage*b", lambda: ran.append("b") or MigrationResult.success(), requires=["after:manage*a"])
-        c = _step("manage*c", lambda: ran.append("c") or MigrationResult.success())
+        b = _step("manage*b", lambda: ran.append("b") or StepResult.success(), requires=["after:manage*a"])
+        c = _step("manage*c", lambda: ran.append("c") or StepResult.success())
 
         failed = self._run(Upgrader(), [a, b, c])
 
@@ -63,7 +63,7 @@ class RunSelectionTest(TestCase):
     def test_stop_on_failure(self):
         ran = []
         failed = self._run(Upgrader(), [_step("manage*a", _fail),
-                                        _step("manage*c", lambda: ran.append("c") or MigrationResult.success())],
+                                        _step("manage*c", lambda: ran.append("c") or StepResult.success())],
                            stop_on_failure=True)
         self.assertEqual(len(failed), 1)
         self.assertEqual(ran, [])
@@ -73,5 +73,5 @@ class RunSelectionTest(TestCase):
         with redirect_stdout(StringIO()):
             ok = upgrader.run_step(_step("manage*a", lambda: sys.exit(0)))
             bad = upgrader.run_step(_step("manage*b", lambda: sys.exit(2)))
-        self.assertEqual(ok.status, MigrationStatus.SUCCESS)
-        self.assertEqual(bad.status, MigrationStatus.FAILURE)
+        self.assertEqual(ok.status, StepStatus.SUCCESS)
+        self.assertEqual(bad.status, StepStatus.FAILURE)

@@ -54,7 +54,7 @@ notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLAC
 
 `scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`, not the
 dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then it execs `manage.py upgrade`
-(`manual/upgrader.py:Upgrader`), which runs everything in one process. Its standard steps (`manual/upgrader.py:Upgrader.standard_migrations`)
+(`manual/upgrader.py:Upgrader`), which runs everything in one process. Its standard steps (`manual/upgrader.py:Upgrader.standard_steps`)
 are git pull (re-execing on new code), `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
 and `deployed` (records the deploy in Rollbar). It also surfaces the deploy-time steps migrations registered with
 `manual/operations/manual_operations.py:ManualOperation` (`manual/__manual_readme.md`).
