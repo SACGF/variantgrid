@@ -247,7 +247,8 @@ def node_cache_task(node_id, version):
                 variant_collection.status = ProcessingStatus.ERROR
                 variant_collection.save()
                 return
-            log_traceback()
+            errors = get_traceback()
+            logging.error(errors)
             processing_status = ProcessingStatus.ERROR
 
         variant_collection.status = processing_status
@@ -257,6 +258,7 @@ def node_cache_task(node_id, version):
         if processing_status == ProcessingStatus.ERROR and node.status != NodeStatus.READY:
             with disable_auditlog():
                 node.status = NodeStatus.ERROR
+                node.errors = errors
                 node.save()
     finally:
         if analysis_id is not None:
