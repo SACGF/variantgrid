@@ -110,7 +110,8 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
 
     context = {"node": node,
                "node_data": dict(sorted(serializer.data.items()))}
-    if node.valid:
+    # A node that needs its NodeCache (eg a BED intersection) can't build its SQL until that's built
+    if node.valid and (node.node_cache or not node.use_cache):
         grid = VariantGrid(request, node, extra_filters)
         try:
             node_sql_, grid_sql = get_node_sql(grid)
