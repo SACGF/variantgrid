@@ -307,12 +307,12 @@ def get_unsupported() -> list[dict]:
         unsupported = [{"name": alt, "text": reason} for alt, reason in UNSUPPORTED_SYMBOLIC_REASONS.items()
                        if alt not in valid_types]
         unsupported.append({"name": "Other symbolic ALTs",
-                            "text": f"Only {', '.join(sorted(valid_types))} are stored, so eg <BND>, <INS:ME> and "
-                                    f"<DEL:ME> are dropped. <DUP:TANDEM> is stored as <DUP>."})
+                            "text": "eg <BND>, <INS:ME> and <DEL:ME> - any symbolic ALT not in the table above. "
+                                    "<DUP:TANDEM> is stored as <DUP>."})
     else:
         unsupported = [{"name": "Symbolic ALTs",
                         "text": "Symbolic variants are disabled on this server, so eg <DEL> and <CNV> are dropped."}]
     unsupported.append({"name": "Other bases",
-                        "text": "An ALT with anything but A, C, G and T is dropped - eg N, IUPAC ambiguity codes "
-                                "or breakend notation."})
+                        "text": "eg N, IUPAC ambiguity codes or breakend notation - any ALT with a base other "
+                                "than A, C, G or T."})
     return unsupported
