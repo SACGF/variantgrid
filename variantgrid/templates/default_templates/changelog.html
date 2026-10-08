@@ -15,7 +15,7 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 17 September 2026 (includes features up to the 17 September 2026 deploy) -->
+        <!-- Last audited/updated: 8 October 2026 (includes features up to the 8 October 2026 deploy) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0 - FAQ</div>
@@ -99,6 +99,8 @@
                     <li>A node count badge per tag - click it to filter the grid or make a TagNode</li>
                     <li>Analysis templates - reveal a node hidden by ignorable errors (eg a trio where part stopped due to detected sex)</li>
                     <li>Phenotype node can take its terms from a cohort as well as a patient</li>
+                    <li>Node warnings - a badge on the node card, eg out of date PanelApp panels, or new variants / classifications since the analysis was saved</li>
+                    <li>Copying nodes keeps their parent connections, so the copy keeps the original's counts</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -165,12 +167,13 @@
                         or whose classification has since changed</li>
                     <li>Setting to highlight research classifications</li>
                     <li>Reclassification analytics - reclassification rates, VUS rate over time, gene burden</li>
-                    <li>Classify &amp; Report tab on the sample and patient pages, with outstanding counts</li>
+                    <li>Classify &amp; Report tab on the sample and patient pages, with outstanding counts - classified tags drop out as you go</li>
                     <li>Reuse prior curation at gene level, grouped by distinct gene-scope content</li>
-                    <li>Gene page - clinical significance summary counts above the groupings grid, click one to filter</li>
+                    <li>Gene page - clinical significance summary counts above the groupings grid, click one to filter (also on allele / variant pages)</li>
                     <li>Multi-variant case reports - DRAFT preview then finalise, with copy number losses, splice calls and CNV fold change</li>
                     <li>Classifications for gene-level events and splice events (eg "AR-V7") can be imported</li>
                     <li>Classification report warns when it was generated from an older submitted version</li>
+                    <li>Classification groupings grid shows the samples and users behind each grouping, with a sample filter</li>
                 </ul>
 
                 <h4>Data</h4>
@@ -183,6 +186,8 @@
                     <li>File upload widget replaced with Filepond (the old jQuery File Upload had been abandoned upstream)</li>
                     <li>Cohort page - tick samples to launch a Duo/Trio/Quad, or to spawn a sub cohort</li>
                     <li>TSO 500 CombinedVariantOutput import - splice calls, patient / specimen / extraction links and TMB / MSI measures</li>
+                    <li>TSO 500 pair page - CombinedVariantOutput and Library QC (from MetricsOutput) together</li>
+                    <li>BAM or CRAM files (several per sample) for IGV, bulk added to a VCF's samples from a filename pattern</li>
                 </ul>
 
                 <h4>Data Sharing</h4>
@@ -201,6 +206,7 @@
                     <li>Switch to BioCommons HGVS library (includes adding support for 'inv')</li>
                     <li>Gene Symbol page has been rearranged/updated with new annotation fields</li>
                     <li>Gene/Disease - use GenCC (includes ClinGen) instead of just ClinGen on Gene page, Gene Grid column</li>
+                    <li>Gene page variants grid - "Include ClinVar variants" toggle</li>
                     <li>PanelApp panels are matched on HGNC ID rather than the gene symbol from a dated snapshot, and deleted panels are handled</li>
                     <li>Gene Lists - faster grid, copy/paste genes in, and a graphs tab showing gene locations</li>
                     <li>A mitochondrial 'm.' HGVS on a non-MT reference now warns rather than silently resolving as 'g.'</li>
@@ -227,6 +233,7 @@
                     <li>Patients - phenotype text also matched for MONDO terms</li>
                     <li>Update ontologies to latest versions (and will be able to do this going forward)</li>
                     <li>Ontology term page shows classifications and patients linked to term</li>
+                    <li>Ontology autocomplete matches words in any order (eg "muscular dystrophy duchenne")</li>
                 </ul>
 
                 <h4>Patients / Phenotypes</h4>
@@ -238,6 +245,8 @@
                     <li>New Specimen and Extraction records - pages, grids and an API</li>
                     <li>Cohorts have a phenotype (can be copied from their patients), and patient phenotype terms are shown beside samples</li>
                     <li>Patients show their de-identified code only, never the name</li>
+                    <li>Patient page warns when its samples don't look like the same individual (likely sample swap)</li>
+                    <li>Sample and patient previews show matched HPO / OMIM / MONDO terms</li>
                 </ul>
 
                 <h4>Search</h4>
@@ -263,6 +272,10 @@
                     <li>Gene level amplifications and losses (TSO 500 CNV VCFs) imported as gene level variants</li>
                     <li>Variant kind badge (FUSION/AMP/LOSS, DEL/DUP/INV/CNV/INS with size) on every grid</li>
                     <li>Analysis grid - copy number per sample, and a fusion calls column</li>
+                    <li>Deletions / duplications / inversions stored as symbolic from 50bp and annotated as SVs from 1000bp.
+                        A new Variant Types page (Variants menu) shows what each kind / size of variant gets</li>
+                    <li>SpliceGirl splice VCFs imported as gene level splice variants</li>
+                    <li>Gene level variants have IGV and CIViC quick links (splice breakpoints, fusion partners)</li>
                 </ul>
 
                 <h4>Tagging</h4>
@@ -280,9 +293,10 @@
                     <li>Every grid on the site has been converted from jqGrid to DataTables - sorting, filtering and downloads throughout</li>
                     <li>Grid download filenames include a date suffix, and analysis exports record the node version</li>
                     <li>Lab heads can add and remove members on their lab page</li>
-                    <li>Faster page loads - related data, ontology versions and contigs no longer run a query per row</li>
+                    <li>Faster page loads - related data, ontology versions and contigs no longer run a query per row, grid permissions checked per page</li>
                     <li>Page titles prefixed with the site name, variant / allele pages named by short label</li>
                     <li>Dashboard - germline vs somatic sequencing graph</li>
+                    <li>"Top X" user titles and night owl / early bird awards removed (encouraged competition / working late)</li>
                 </ul>
 
                 <h4>Variant Details</h4>
@@ -322,6 +336,7 @@
                     <li>Manual variant entry import handles partial failures gracefully</li>
                     <li>Unsorted VCFs are sorted during import (with a warning) rather than failing</li>
                     <li>Imports record their timings and clean up their temp files, and deleting an import removes them</li>
+                    <li>SNV reference bases checked against the genome build on import</li>
                 </ul>
             </div>
         </div>
@@ -329,6 +344,103 @@
 
 
     {% else %}
+       <div class="card mt-4">
+            <div class="card-header">8 October 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#347 - Node cards show a warning badge, and error tooltips say what went wrong</li>
+                    <li>Gene list nodes warn of out of date PanelApp panels, All Variants / Classifications nodes of new data since saved</li>
+                    <li>#362 - Copying nodes keeps their parent connections, so the copy keeps the original's counts</li>
+                    <li>#2063 - Node Summary tab can summarise several columns at once</li>
+                    <li>#2060 - Block cycles in the analysis graph through a Venn node's right input</li>
+                    <li>#2074 - Node grid zygosity columns show values for variants from the common collection</li>
+                    <li>#2077 - Trio/Quad family lists show Father, Mother then Proband, matching the pedigree icon</li>
+                    <li>Cohort node on a full cohort always filters to variants in the cohort</li>
+                    <li>Pedigree node - unaffected members use the same zygosity rules as the Trio node</li>
+                    <li>Tags node classify tab removed - classifications now shown against input samples</li>
+                    <li>Running node loads are cancelled before their caches are dropped</li>
+                    <li>#1894 - Faster patient / specimen level SampleNode filters</li>
+                </ul>
+                <h4>Classification</h4>
+                <ul>
+                    <li>#1905 - Overlaps take over from discordance reports, grouped by testing context (germline / somatic)</li>
+                    <li>#2078 - Classification groupings grid shows the samples and users behind each grouping, with a sample filter</li>
+                    <li>#1368 - Clinical significance summary counts on the allele and variant pages</li>
+                    <li>Classify &amp; Report - classified tags drop out of the queue as you go ("Hide classified" checkbox)</li>
+                    <li>Classify &amp; Report - classifying a patient level tag shows each sample's call and picks the one that called it</li>
+                    <li>#2059 - Ontology IDs in condition text are automatched at publish, "co-occurring" also recognised</li>
+                    <li>#1780 - Condition matching runs in the background, so uploads don't wait on the Monarch search</li>
+                    <li>#1313 - Records matched without a c.HGVS are labelled, showing the imported value and its build</li>
+                    <li>Gene level targets read as "CCND1 amplification" / "EGFRvIVa splice"</li>
+                    <li>"Compare with other classifications" counts somatic tiers alongside germline</li>
+                    <li>A ClinGen Allele Registry outage no longer holds up classification create / autopopulate</li>
+                    <li>Flag popup title names the record its flags are for</li>
+                    <li>#1992 - Public evidence keys page shows last updated and created/modified dates</li>
+                    <li>Grouping export - grouping ID, clearer filenames, fix labs per allele</li>
+                    <li>Franklin export - fix Likely Benign being exported as Likely Pathogenic, somatic records not exported</li>
+                    <li>Alissa MVL export removed</li>
+                </ul>
+                <h4>Somatic / TSO 500</h4>
+                <ul>
+                    <li>#1904 - CombinedVariantOutput stored per pair, with a TSO 500 pair page showing the analysis and Library QC</li>
+                    <li>Library QC imported from DRAGEN TSO 500 MetricsOutput</li>
+                    <li>SpliceGirl SpliceVariants.vcf imports as gene level splice variants</li>
+                    <li>GIS call, MSI-High tumour fraction, estimated copies, and SampleNode copy ratio thresholds</li>
+                    <li>Case report MSI / TMB calls use lab-configured bands, assay ticks start from the specimen's measures</li>
+                    <li>#1908 #1909 - Gene level variants put IGV and CIViC in Quick Links (splice breakpoints, fusion partners)</li>
+                </ul>
+                <h4>Structural Variants</h4>
+                <ul>
+                    <li>#1358 - Deletions / duplications / inversions stored as symbolic from 50bp, annotated as SVs from 1000bp</li>
+                    <li>#1358 - New Variant Types page (Variants menu) - what each kind / size of variant gets</li>
+                    <li>#2104 - SVs too long for VEP are marked as such, and the variant page says why</li>
+                    <li>#2103 - Long g.HGVS del/dup/inv resolves straight to a symbolic variant</li>
+                </ul>
+                <h4>Data / Upload</h4>
+                <ul>
+                    <li>BAM or CRAM alignment files (several per sample) reach the sample for IGV</li>
+                    <li>#647 - VCF page "Sample Files" tab - bulk add BAM/CRAMs to every sample from a pattern</li>
+                    <li>Single sample VCFs link to their sequencing sample by filename</li>
+                    <li>#2030 - VCF import checks SNV reference bases against the genome build</li>
+                    <li>#2088 - BED upload needing a genome build says so on the upload page</li>
+                    <li>Failed / killed CSV/VCF exports are retried rather than stuck on "Error retrieving download"</li>
+                    <li>#2087 - Sample stats count only the sample's own variant calls</li>
+                    <li>Exported VCFs are VCFv4.3</li>
+                </ul>
+                <h4>Patients / Phenotype</h4>
+                <ul>
+                    <li>#196 - Patient page warns when its samples don't look like the same individual (likely sample swap)</li>
+                    <li>#1380 - Sample and patient previews show matched HPO / OMIM / MONDO terms</li>
+                    <li>#426 - Ontology autocomplete matches words in any order ("muscular dystrophy duchenne")</li>
+                    <li>Patient form - Deceased yes/no/unknown, creating a patient goes to its page</li>
+                    <li>#2037 - Patient CSV import fixes, clearer message when a specimen belongs to another patient</li>
+                    <li>Phenotype matching skips words that gave false matches ("soft", "healthy", "stable")</li>
+                    <li>PED import validates every family and reports all the invalid ones</li>
+                </ul>
+                <h4>Search</h4>
+                <ul>
+                    <li>Variants without a canonical c.HGVS preview their g./m.HGVS and gene rather than "intergenic"</li>
+                    <li>#1876 - Gene level search - a single hyphen doesn't split fusion partners</li>
+                </ul>
+                <h4>Genes</h4>
+                <ul>
+                    <li>Gene page variants grid - "Include ClinVar variants" toggle</li>
+                    <li>#2029 - Faster cdot transcript import</li>
+                </ul>
+                <h4>User Interface</h4>
+                <ul>
+                    <li>#2007 - Top menu highlight always matches the side menu (eg VCF pages highlight Data)</li>
+                    <li>#1819 - "Top X" titles and night owl / early bird awards removed</li>
+                    <li>#495 - Organisation page has the initial group permission form, like the lab page</li>
+                    <li>#1432 - Faster grids - write permissions checked for just the page's rows</li>
+                    <li>Annotation run page explains its Retry / Subdivide / Make Local buttons</li>
+                    <li>Nearby variants only count tags you can see</li>
+                    <li>Permission checks tightened across uploads, pedigrees, pathology tests, reviews and graphs</li>
+                </ul>
+            </div>
+       </div>
+
        <div class="card mt-4">
             <div class="card-header">22 September 2026</div>
             <div class="card-body">

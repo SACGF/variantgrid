@@ -1,23 +1,145 @@
 from functools import partial
-from typing import Any
+from typing import Any, Optional
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
 from snpdb.grids import AbstractSkippedAnnotationColumns
 from snpdb.models import GenomeBuild, ProcessingStatus
 from snpdb.models.models_variant import Variant
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
-from upload.models import ModifiedImportedVariant, UploadPipeline, UploadStep, VCFPipelineStage
+from upload.file_type_icons import file_type_icon_html
+from upload.models import (
+    FileUpload,
+    ModifiedImportedVariant,
+    UploadedFileTypes,
+    UploadedVCF,
+    UploadPipeline,
+    UploadStep,
+    VCFPipelineStage,
+)
+from upload.uploaded_file_type import get_upload_data_by_file_upload_id
+from upload.views.views_json import get_remaining_annotation_runs
 
 
 def get_upload_pipeline_for_user(user: User, upload_pipeline_id) -> UploadPipeline:
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
     upload_pipeline.file_upload.check_can_view(user)
     return upload_pipeline
+
+
+def get_status_icon(status, requires_user_input_url: Optional[str] = None) -> dict:
+    """ requires_user_input_url: the data's page, where the user sets what the import is waiting on """
+    if requires_user_input_url:
+        return {'icon': 'fa-exclamation-triangle', 'css': 'text-warning',
+                'title': 'Requires input - set genome build', 'url': requires_user_input_url}
+
+    ICONS = {
+        ProcessingStatus.CREATED: {'icon': 'fa-clock', 'title': 'Queued'},
+        ProcessingStatus.PROCESSING: {'icon': 'fa-spinner fa-spin', 'title': 'Processing'},
+        ProcessingStatus.ERROR: {'icon': 'fa-times-circle', 'css': 'text-danger', 'title': 'Error'},
+        ProcessingStatus.SUCCESS: {'icon': 'fa-check-circle', 'css': 'text-success', 'title': 'Success'},
+        ProcessingStatus.TERMINATED_EARLY: {'icon': 'fa-exclamation-triangle', 'css': 'text-warning', 'title': 'Terminated early'},
+    }
+    return ICONS.get(status, {})
+
+
+class FileUploadColumns(DatatableConfig[FileUpload]):
+    """ The upload page's files - the user's own, or everyone's for a superuser """
+    grid_name = "File Uploads"
+    search_box_enabled = True
+    # Files the system makes for itself - shown only when picked from the page's file type select
+    INTERNAL_FILE_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
+                           UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY}
+    ALL_FILE_TYPES = "all"
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self._upload_data_by_file_upload_id = {}
+        self.rich_columns = [
+            RichColumn(key="id", visible=False, search=False),
+            RichColumn(key="uploadpipeline__status", name="status", label="Status", orderable=True, search=False,
+                       extra_columns=["id", "file_type"], renderer=self.render_status,
+                       client_renderer="renderUploadStatus"),
+            RichColumn(key="name", label="Name", orderable=True, extra_columns=["id", "uploadpipeline__id"],
+                       renderer=self.render_name, client_renderer="TableFormat.linkUrl"),
+            RichColumn(key="file_type", label="File Type", orderable=True, search=False,
+                       extra_columns=["id", "uploadpipeline__status"], renderer=self.render_file_type,
+                       client_renderer="renderUploadFileType"),
+            RichColumn(name="genome_build", label="Genome Build", extra_columns=["id", "uploadpipeline__status"],
+                       renderer=self.render_genome_build),
+            self.user_column(label="User", enabled=self.user.is_superuser),
+            RichColumn(key="created", label="Uploaded", orderable=True, search=False,
+                       default_sort=SortOrder.DESC, client_renderer="TableFormat.timeAgo"),
+            RichColumn(key="id", name="delete", label="", search=False, include_in_csv=False,
+                       renderer=self.render_delete_url, client_renderer="TableFormat.deleteRow"),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[FileUpload]:
+        qs = FileUpload.objects.all()
+        if not self.user.is_superuser:
+            qs = qs.filter(user=self.user)
+        return qs
+
+    def filter_queryset(self, qs: QuerySet[FileUpload]) -> QuerySet[FileUpload]:
+        file_type = self.get_query_param("file_type")
+        if not file_type:
+            qs = qs.exclude(file_type__in=self.INTERNAL_FILE_TYPES)
+        elif file_type != self.ALL_FILE_TYPES:
+            qs = qs.filter(file_type=file_type)
+        return qs
+
+    def pre_render(self, qs: QuerySet[FileUpload], rows: list[dict]):
+        super().pre_render(qs, rows)
+        file_type_by_file_upload_id = {row["id"]: row["file_type"] for row in rows}
+        self._upload_data_by_file_upload_id = get_upload_data_by_file_upload_id(file_type_by_file_upload_id)
+
+    def render_status(self, row: CellData) -> dict:
+        status = row["uploadpipeline__status"] or ProcessingStatus.ERROR
+        requires_user_input_url = None
+        upload_data = self._upload_data_by_file_upload_id.get(row["id"])
+        if upload_data and upload_data.requires_user_input:
+            requires_user_input_url = upload_data.get_data_url()
+        status_icon = get_status_icon(status, requires_user_input_url)
+        if not row["file_type"]:
+            status_icon["title"] = "Could not determine how to read file"
+        return {"status": status, **status_icon}
+
+    @staticmethod
+    def render_name(row: CellData) -> dict:
+        if upload_pipeline_id := row["uploadpipeline__id"]:
+            url = reverse('view_upload_pipeline', kwargs={'upload_pipeline_id': upload_pipeline_id})
+        else:
+            url = reverse('view_uploaded_file', kwargs={'file_upload_id': row["id"]})
+        return {"text": row["name"], "url": url}
+
+    def render_file_type(self, row: CellData) -> dict:
+        file_type = row["file_type"]
+        data = {"icon": file_type_icon_html(file_type)}
+        if file_type:
+            data["label"] = UploadedFileTypes(file_type).label
+        if row["uploadpipeline__status"] in (ProcessingStatus.SUCCESS, ProcessingStatus.TERMINATED_EARLY):
+            if upload_data := self._upload_data_by_file_upload_id.get(row["id"]):
+                data["url"] = upload_data.get_data_url()
+        return data
+
+    def render_genome_build(self, row: CellData) -> str:
+        upload_data = self._upload_data_by_file_upload_id.get(row["id"])
+        if not (upload_data and (genome_build := upload_data.genome_build)):
+            return ""
+        text = str(genome_build)
+        if row["uploadpipeline__status"] == ProcessingStatus.PROCESSING and isinstance(upload_data, UploadedVCF):
+            if remaining_annotation_runs := get_remaining_annotation_runs(upload_data, genome_build):
+                text += f" (annotating: {remaining_annotation_runs} runs remaining)"
+        return text
+
+    @staticmethod
+    def render_delete_url(row: CellData) -> str:
+        return reverse('upload_file_delete', kwargs={'pk': row.value})
 
 
 class UploadStepColumns(DatatableConfig[UploadStep]):

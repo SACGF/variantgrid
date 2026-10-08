@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from typing import Optional
 
 from library.utils.file_utils import get_extension_without_gzip
@@ -32,14 +33,18 @@ def get_url_and_data_for_uploaded_file_data(file_upload):
     return url, upload_data
 
 
-def get_upload_data_for_uploaded_file(file_upload) -> Optional[UploadData]:
-    """ The UploadData created by processing file_upload - factories list their classes most specific first """
+def _get_data_classes_by_file_type() -> dict[str, list[type[UploadData]]]:
+    """ factories list their classes most specific first """
     data_classes_by_file_type = {}
     for itf in get_import_task_factories():
         file_type = itf.get_uploaded_file_type()
         data_classes_by_file_type[file_type] = itf.get_data_classes()
+    return data_classes_by_file_type
 
-    classes = data_classes_by_file_type.get(file_upload.file_type)
+
+def get_upload_data_for_uploaded_file(file_upload) -> Optional[UploadData]:
+    """ The UploadData created by processing file_upload """
+    classes = _get_data_classes_by_file_type().get(file_upload.file_type)
     if classes:
         for klazz in classes:
             try:
@@ -48,6 +53,31 @@ def get_upload_data_for_uploaded_file(file_upload) -> Optional[UploadData]:
                 pass
 
     return None
+
+
+def get_upload_data_by_file_upload_id(file_type_by_file_upload_id: dict[int, str]) -> dict[int, UploadData]:
+    """ get_upload_data_for_uploaded_file for many files - a query per data class rather than per file """
+    data_classes_by_file_type = _get_data_classes_by_file_type()
+    classes_by_file_upload_id = {file_upload_id: data_classes_by_file_type.get(file_type, [])
+                                 for file_upload_id, file_type in file_type_by_file_upload_id.items()}
+    file_upload_ids_by_class = defaultdict(set)
+    for file_upload_id, classes in classes_by_file_upload_id.items():
+        for klazz in classes:
+            file_upload_ids_by_class[klazz].add(file_upload_id)
+
+    upload_data_by_class_and_id = {}
+    for klazz, file_upload_ids in file_upload_ids_by_class.items():
+        data_fields = [f.name for f in klazz._meta.concrete_fields if f.is_relation and f.name != "file_upload"]
+        for upload_data in klazz.objects.filter(file_upload_id__in=file_upload_ids).select_related(*data_fields):
+            upload_data_by_class_and_id.setdefault((klazz, upload_data.file_upload_id), upload_data)
+
+    upload_data_by_file_upload_id = {}
+    for file_upload_id, classes in classes_by_file_upload_id.items():
+        for klazz in classes:
+            if upload_data := upload_data_by_class_and_id.get((klazz, file_upload_id)):
+                upload_data_by_file_upload_id[file_upload_id] = upload_data
+                break
+    return upload_data_by_file_upload_id
 
 
 def reloads_vcf_in_place(upload_data) -> bool:

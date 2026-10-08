@@ -53,12 +53,12 @@ class Test(URLTestCase):
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("upload_pipeline_modified_variants_datatable", upload_pipeline_kwargs, None),
+            ("file_upload_datatable", {}, file_upload),
         ]
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("upload", {}, 200),
-            ("upload_poll", {}, 200),
             ("view_upload_stats_detail", {}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)

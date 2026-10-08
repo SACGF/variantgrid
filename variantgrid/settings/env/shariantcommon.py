@@ -245,7 +245,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # Upload - list all URLS (only want them visible by admin)
     "upload": False,
-    "upload_poll": False,
+    "file_upload_datatable": False,
     "view_uploaded_file": False,
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,

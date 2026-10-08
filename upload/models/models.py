@@ -17,7 +17,7 @@ from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Substr
 from django.db.models.query import QuerySet
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -50,7 +50,6 @@ from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
 from upload.models.models_enums import (
     ModifiedImportedVariantOperation,
-    TimeFilterMethod,
     UploadedFileTypes,
     UploadStepOrigin,
     UploadStepTaskType,
@@ -958,53 +957,3 @@ class VCFSkippedContig(models.Model):
     import_info = models.ForeignKey(VCFSkippedContigs, on_delete=CASCADE, null=True)
     contig = models.TextField()
     num_skipped = models.IntegerField()
-
-
-class UploadSettings(models.Model):
-    user = models.OneToOneField(User, on_delete=CASCADE)
-    time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
-    time_filter_value = models.IntegerField(default=5)
-
-    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
-                      UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY}
-
-    @cached_property
-    def file_types(self) -> set:
-        return set(self.uploadsettingsfiletype_set.values_list("file_type", flat=True))
-
-    def file_types_description(self) -> str:
-        description = "Custom"
-        if self.file_types == set(UploadedFileTypes):
-            description = "All"
-        elif self.file_types == self.non_internal_types:
-            description = "Non internal"
-        return description
-
-    @property
-    def non_internal_types(self) -> set:
-        return set(UploadedFileTypes) - self.INTERNAL_TYPES
-
-    def create_default_visible_file_types(self):
-        self.uploadsettingsfiletype_set.all().delete()
-        records = []
-        for uft in self.non_internal_types:
-            records.append(UploadSettingsFileType(upload_settings=self, file_type=uft))
-        if records:
-            UploadSettingsFileType.objects.bulk_create(records)
-
-    def __str__(self):
-        return f"User: {self.user}, {self.time_filter_value} {self.time_filter_method}"
-
-
-class UploadSettingsFileType(models.Model):
-    upload_settings = models.ForeignKey(UploadSettings, null=False, on_delete=CASCADE)
-    file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
-
-    class Meta:
-        unique_together = ('upload_settings', 'file_type')
-
-
-@receiver(post_save, sender=UploadSettings)
-def upload_settings_post_save_handler(sender, instance, **kwargs):
-    if kwargs.get("created"):
-        instance.create_default_visible_file_types()
