@@ -1,15 +1,17 @@
 """
-The search engine: SearchInput sends search_signal, every function decorated with
-`@search_receiver(...)` answers with a SearchResponse, and SearchResponsesCombined ranks and merges
-them (single_preferred_result is the auto-jump). The decorator owns the shared behaviour - admin
-gating, preview_enabled, the regex pattern, result caps, error capture and the variant-to-allele
-conversion under settings.PREFER_ALLELE_LINKS. Receivers live in each app's signals/ package
-(snpdb/signals/variant_search.py is the largest) and register on import.
+The search engine: each search is a SearchReceiver, declared with `@search_receiver(...)` and
+registered from its owning app's AppConfig.ready() via `search_registry.register(...)`.
+SearchInput.search runs every receiver visible to the input and SearchResponsesCombined ranks and
+merges their SearchResponses (single_preferred_result is the auto-jump). SearchReceiver owns the
+shared behaviour - admin gating, preview_enabled, the regex pattern, result caps, error capture,
+timing and the variant-to-allele conversion under settings.PREFER_ALLELE_LINKS. Receivers live in
+each app's signals/ package (snpdb/signals/variant_search.py is the largest).
 """
 import itertools
 import logging
 import operator
 import re
+import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -21,7 +23,6 @@ from typing import Any, Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
-from django.dispatch import Signal
 from django.utils.safestring import SafeString
 from more_itertools import take
 
@@ -30,7 +31,6 @@ from library.log_utils import (
     log_level_to_bootstrap,
     log_level_to_int,
     report_exc_info,
-    report_message,
 )
 from library.preview_request import (
     PreviewCoordinator,
@@ -42,7 +42,6 @@ from library.preview_request import (
 from library.utils import clean_string, first, remove_duplicates_from_list
 from snpdb.models import Allele, GenomeBuild, UserSettings, Variant
 
-search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
 HAS_ANYTHING = re.compile(r".")
 HAS_3_ALPHA_MIN = re.compile(r"[a-zA-Z]{3,}")
@@ -54,6 +53,7 @@ CB_SEARCH = re.compile(r"CB_\d+", re.IGNORECASE)
 
 MAX_VARIANT_RESULTS = 100
 MAX_RESULTS_PER_SEARCH = 25
+SLOW_SEARCH_SECONDS = 1.0
 
 
 """
@@ -111,25 +111,8 @@ class SearchInput:
             raise ValueError("No tokens found in search, can't generate q_words")
 
     def search(self) -> list['SearchResponse']:
-        """
-        Execute the search by firing off the search_signal (which is connected to via @search_receiver)
-        :return:
-        """
-        valid_responses: list[SearchResponse] = []
-        response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
-        for caller, response in response_tuples:
-            if response:
-                if response is None:
-                    # we may occasionally skip searches for some reasons, such as we're here from classify
-                    # so we only care about variant matches
-                    continue
-                if isinstance(response, SearchResponse):
-                    valid_responses.append(response)
-                else:
-                    # note this doesn't happen as exceptions during search are handled by the search_receiver
-                    report_message("Error during search", 'error', extra_data={"target": str(response), "caller": str(caller)})
-
-        return valid_responses
+        """ Runs every registered SearchReceiver visible to this input. SearchReceiver.search captures errors """
+        return [receiver.search(self) for receiver in search_registry.receivers if receiver.visible_to(self)]
 
     def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
         """ Shariant wants to restrict search to only classified variants """
@@ -654,6 +637,11 @@ class SearchResponse:
     How many search results were calculated (should be equal to or larger than the length of results)
     """
 
+    duration_seconds: float = 0.0
+    """
+    Wall time the receiver took, 0 when the pattern did not match
+    """
+
     def __post_init__(self):
         # once you create a SearchResponse, don't mutate it as __post_init__ fixes a few things
         # can't make it frozen due to
@@ -750,7 +738,8 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         sub_name=variant_response.sub_name,
         admin_only=variant_response.admin_only,
         results=all_results,
-        total_count=len(all_results)
+        total_count=len(all_results),
+        duration_seconds=variant_response.duration_seconds,
     )
 
 
@@ -830,7 +819,13 @@ class SearchResponsesCombined:
     @property
     def summary(self) -> str:
         # is recorded in the EventLog
-        return f"{self.search_input.search_string}' calculated {len(self.results)} results."
+        summary = f"{self.search_input.search_string}' calculated {len(self.results)} results."
+        if self.responses:
+            slowest = max(self.responses, key=lambda r: r.duration_seconds)
+            if slowest.duration_seconds > SLOW_SEARCH_SECONDS:
+                name = "/".join(filter(None, [slowest.preview_category, slowest.sub_name]))
+                summary += f" slowest: {name} {slowest.duration_seconds:.1f}s"
+        return summary
 
 
 def search_data(user: User, search_string: str, classify: bool = False) -> SearchResponsesCombined:
@@ -857,15 +852,139 @@ INVALID_INPUT = object()
 Return this (and only this) from a search if you want to act as if the search pattern wasn't met 
 """
 
+
+@dataclass(frozen=True, eq=False)
+class SearchReceiver:
+    """ One search, as declared by @search_receiver. Registered from the owning app's AppConfig.ready() """
+    func: Callable[[SearchInputInstance], Iterable]
+    search_type: PreviewCoordinator
+    pattern: Pattern
+    admin_only: bool
+    sub_name: Optional[str]
+    example: Optional[SearchExample]
+    match_strength: Optional[SearchResultMatchStrength]
+    enabled: bool
+
+    def __str__(self):
+        return f"{self.func.__module__}.{self.func.__name__}"
+
+    def visible_to(self, search_input: SearchInput) -> bool:
+        """ Whether this search runs (or is listed as an accepted input) for the input at all """
+        if not self.enabled:
+            return False
+        if self.admin_only and not search_input.user.is_superuser:
+            return False
+        if not self.search_type.preview_enabled():
+            return False
+        if search_input.classify and self.search_type.preview_category() != "Variant":
+            return False
+        return True
+
+    def search(self, search_input: SearchInput) -> SearchResponse:
+        """ Runs the search, capturing any exception as an ERROR SearchMessageOverall on the response """
+        search_type = self.search_type
+        overall_messages: set[SearchMessageOverall] = set()
+
+        matched_pattern = False
+        results = []
+        total_count = 0
+        duration_seconds = 0.0
+
+        match = None
+        start = time.perf_counter()
+        try:
+            if match := self.pattern.search(search_input.search_string):
+                matched_pattern = True
+                # as Variants get merged into Alleles, we want to avoid limiting them (except under extreme conditions)
+                limit = MAX_VARIANT_RESULTS if search_type.preview_category() == "Variant" else MAX_RESULTS_PER_SEARCH
+                for result in self.func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
+                    if result == INVALID_INPUT:
+                        matched_pattern = False
+                        break
+                    if result is None:
+                        raise ValueError(f"Search {self.func.__name__} returned None")
+                    if isinstance(result, SearchMessageOverall):
+                        overall_messages.add(result)
+                    else:
+
+                        # need to make sure Variable is allowed to return more results as they get halved into alleles
+                        factory = _SearchResultFactory.convert(result)
+
+                        total_count += len(factory)
+
+                        if limit > 0:
+                            for search_result in factory.iterate(limit=limit):
+                                if self.match_strength and not search_result.match_strength:
+                                    search_result.match_strength = self.match_strength
+
+                                results.append(search_result)
+                                limit -= 1
+
+        except Exception as e:
+            message = str(e)
+            # Maybe all ValueErrors don't have user-friendly messages, but haven't gone through the code to check
+            if "invalid literal" in message:
+                message = f"Unexpected error processing \"{search_input.search_string}\""
+
+            # TODO, determine if the Exception type is valid for users or not
+            overall_messages.add(SearchMessageOverall(message, severity=LogLevel.ERROR))
+            logging.error("Error handling search_receiver on %s", self.func)
+            report_exc_info()
+
+        if match:
+            duration_seconds = time.perf_counter() - start
+
+        response = SearchResponse(
+            search_input=search_input,
+            search_type=search_type,
+            admin_only=self.admin_only,
+            sub_name=self.sub_name,
+            example=self.example,
+            matched_pattern=matched_pattern,
+            results=results,
+            messages_overall=sorted(overall_messages),
+            total_count=total_count,
+            duration_seconds=duration_seconds,
+        )
+
+        if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
+            try:
+                response = _convert_variant_search_response_to_allele_search_response(response)
+            except Exception:
+                report_exc_info()
+                response.messages_overall.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
+
+        return response
+
+
+class SearchRegistry:
+    """ Every SearchReceiver, in registration (INSTALLED_APPS) order - responses are sorted later """
+
+    def __init__(self):
+        self._receivers: list[SearchReceiver] = []
+
+    def register(self, *receivers: SearchReceiver):
+        for receiver in receivers:
+            if any(existing is receiver for existing in self._receivers):
+                raise ValueError(f"Search receiver {receiver} is already registered")
+            self._receivers.append(receiver)
+
+    @property
+    def receivers(self) -> tuple[SearchReceiver, ...]:
+        return tuple(self._receivers)
+
+
+search_registry = SearchRegistry()
+
 def search_receiver(
-        search_type: Optional[PreviewCoordinator],
+        search_type: PreviewCoordinator,
         pattern: Pattern = HAS_ANYTHING,
         admin_only: bool = False,
         sub_name: Optional[str] = None,
         example: Optional[SearchExample] = None,
         match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH,
         enabled: bool = True,
-    ) -> Callable[[Callable], Callable[[SearchInput], SearchResponse]]:
+    ) -> Callable[[Callable], 'SearchReceiver']:
     """
     Wrap around a Callable[[SearchInputInstance], Generator[Any]]
     The wrapped method can return:
@@ -899,7 +1018,9 @@ def search_receiver(
     validation messages. This is useful for lazily validating only relevant results when we're going to limit the results
     returned to 50 for example.
 
-    Note that after the decoration, the wrapped method signature will take a SearchInput and return a SearchResponse object.
+    The decorated name is a SearchReceiver (call .search(search_input) to get a SearchResponse). It is not registered
+    until the owning app's AppConfig.ready() passes it to search_registry.register(...) - the registry test fails until
+    it does.
 
     :param search_type: Something that has preview_category(), preview_icon() and preview_enabled() for overall properties of the search
     :param pattern: A regex pattern that must be met for the search to be invoked. The search will be passed a SearchInputInstance with the match result
@@ -907,89 +1028,19 @@ def search_receiver(
     :param sub_name: Are there multiple search implementations for the same search_type, if so give them a sub_name
     :param example: An example (to be presented to the user) of how to use this search
     :param match_strength: Provide an overall match strength to be used if the individual search results don't set it
-    :return: A wrapped call that will obey the above (e.g. preview_enabled(), admin_only) and return a SearchResponse
+    :param enabled: False (usually from a setting) leaves the receiver registered but never run
+    :return: A decorator producing a SearchReceiver that obeys the above (e.g. preview_enabled(), admin_only)
     """
-    def _decorator(func):
-        def search_func(sender: Any, search_input: SearchInput, **kwargs):
-
-            if admin_only and not search_input.user.is_superuser:
-                # if only for admin users, don't include it for non admin
-                return None
-            if search_type and not search_type.preview_enabled():
-                #
-                return None
-
-            overall_messages: set[SearchMessageOverall] = set()
-
-            matched_pattern = False
-            results = []
-            total_count = 0
-
-            if search_input.classify and search_type.preview_category() != "Variant":
-                return None
-
-            try:
-                if match := pattern.search(search_input.search_string):
-                    matched_pattern = True
-                    # as Variants get merged into Alleles, we want to avoid limiting them (except under extreme conditions)
-                    limit = MAX_VARIANT_RESULTS if search_type.preview_category() == "Variant" else MAX_RESULTS_PER_SEARCH
-                    for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
-                        if result == INVALID_INPUT:
-                            matched_pattern = False
-                            break
-                        if result is None:
-                            raise ValueError(f"Search {sender.__name__} returned None")
-                        if isinstance(result, SearchMessageOverall):
-                            overall_messages.add(result)
-                        else:
-
-                            # need to make sure Variable is allowed to return more results as they get halved into alleles
-                            factory = _SearchResultFactory.convert(result)
-
-                            total_count += len(factory)
-
-                            if limit > 0:
-                                for search_result in factory.iterate(limit=limit):
-                                    if match_strength and not search_result.match_strength:
-                                        search_result.match_strength = match_strength
-
-                                    results.append(search_result)
-                                    limit -= 1
-
-            except Exception as e:
-                message = str(e)
-                # Maybe all ValueErrors don't have user-friendly messages, but haven't gone through the code to check
-                if "invalid literal" in message:
-                    message = f"Unexpected error processing \"{search_input.search_string}\""
-
-                # TODO, determine if the Exception type is valid for users or not
-                overall_messages.add(SearchMessageOverall(message, severity=LogLevel.ERROR))
-                logging.error("Error handling search_receiver on %s", func)
-                report_exc_info()
-
-            response = SearchResponse(
-                search_input=search_input,
-                search_type=search_type,
-                admin_only=admin_only,
-                sub_name=sub_name,
-                example=example,
-                matched_pattern=matched_pattern,
-                results=results,
-                messages_overall=sorted(overall_messages),
-                total_count=total_count
-            )
-
-            if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
-                try:
-                    response = _convert_variant_search_response_to_allele_search_response(response)
-                except Exception:
-                    report_exc_info()
-                    response.messages_overall.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
-
-            return response
-
-        if enabled:
-            search_signal.connect(search_func)
-            return search_func
+    def _decorator(func) -> SearchReceiver:
+        return SearchReceiver(
+            func=func,
+            search_type=search_type,
+            pattern=pattern,
+            admin_only=admin_only,
+            sub_name=sub_name,
+            example=example,
+            match_strength=match_strength,
+            enabled=enabled,
+        )
 
     return _decorator

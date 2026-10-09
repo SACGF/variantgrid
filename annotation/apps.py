@@ -20,7 +20,6 @@ class AnnotationConfig(AppConfig):
         from annotation.signals import (  # noqa: F401
             ambiguous_acronym_denylist,
             citation_preview,
-            citation_search,
             clinvar_annotation_health_check,
         )
         from annotation.signals.annotation_run_cleanup import (
@@ -28,6 +27,7 @@ class AnnotationConfig(AppConfig):
             annotation_run_discarded_cleanup_handler,
             annotation_run_post_delete_handler,
         )
+        from annotation.signals.citation_search import search_citations
         from annotation.signals.manual_signals import (
             annotation_run_complete_signal,
             annotation_run_discarded_signal,
@@ -40,7 +40,10 @@ class AnnotationConfig(AppConfig):
             classification_post_publish_signal,
             classification_withdraw_signal,
         )
+        from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
+
+        search_registry.register(search_citations)
 
         # Entrez wants both email and API key
         if entrez_api_key := getattr(settings, "ANNOTATION_ENTREZ_API_KEY", None):

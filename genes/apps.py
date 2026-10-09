@@ -12,10 +12,9 @@ class GenesConfig(AppConfig):
         from annotation.models.models import CachedWebResource
         from genes.models import CachedThirdPartyGeneList
 
-        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
-        # silently unregistering them
-        from genes.signals import gene_search, gene_symbol_search, transcript_search  # noqa: F401
         from genes import user_awards  # noqa: F401  # registers award definitions on import
+        from genes.signals.gene_search import gene_search, gene_version_search
+        from genes.signals.gene_symbol_search import gene_symbol_alias_search
         from genes.signals.manual_signals import (
             cached_third_part_gene_list_pre_delete_handler,
             gnomad_gene_constraint_post_save_handler,
@@ -31,7 +30,11 @@ class GenesConfig(AppConfig):
             refseq_sequence_info_post_save_handler,
             uniprot_post_save_handler,
         )
+        from genes.signals.transcript_search import search_transcript
+        from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
+
+        search_registry.register(gene_search, gene_version_search, gene_symbol_alias_search, search_transcript)
 
         post_save.connect(gnomad_gene_constraint_post_save_handler, sender=CachedWebResource)
         post_save.connect(hgnc_post_save_handler, sender=CachedWebResource)

@@ -27,7 +27,7 @@ Patterns here:
 - Resolve which build a request is for with genome_build_manager.py:GenomeBuildManager.get_current_genome_build (GET param, URL path, user default, first annotated build, in that order).
 - `settings.TAG_REQUIRES_CLASSIFICATION` is seed data - the name a fresh install's classify queue tag gets. What behaves as one is `Tag.requires_classification`, set per tag on the tag settings page; ask `models/models.py:Tag.classify_queue_qs` (or `classify_queue_qs_for_bucket`), never a tag name.
 - Read user preferences through models/models_user_settings.py:UserSettings.get_for_user — Global, Organization, Lab then User overrides, later wins.
-- Search handlers register with search.py:search_receiver (see signals/variant_search.py); every other receiver is connected in apps.py:SnpdbConfig.ready, not at import.
+- Every receiver, search included, is connected in `snpdb/apps.py:SnpdbConfig.ready`, not at import. A search is declared with `snpdb/search.py:search_receiver` (see signals/variant_search.py) and registered there by name with `search_registry.register`; `snpdb/tests/test_search_registry.py` fails when one is declared and not registered.
 
 Gotchas:
 - Some contigs are shared between builds (MT, unplaced scaffolds), so one Variant can carry a VariantAllele per build; filter the variantallele join by genome_build or rows duplicate (grids.py:AbstractVariantGrid.get_initial_queryset, #1626).

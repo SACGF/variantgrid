@@ -326,8 +326,8 @@ def search(request):
         if mode := form.cleaned_data.get('mode'):
             preview_mode = mode == "preview"
 
-    # always perform a "search" so we can get told what kind of searches are enabled
-    # note that searching on "" doesn't actually invoke any of the other search logic
+    # always perform a "search" so we can get told what kind of searches are enabled - every visible receiver
+    # returns a response, and as no pattern matches "" those are unmatched responses listing the accepted inputs
 
     search_results = search_data(user=request.user, search_string=search_string, classify=classify)
 
