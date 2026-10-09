@@ -1,6 +1,6 @@
 """  The cohort's own phenotype text (issue #1426).
 
-     Owns: that saving a Cohort matches its phenotype text to ontology terms through CohortTextPhenotype,
+     Owns: that saving a Cohort matches its phenotype text to ontology terms through its PhenotypeDescription,
      and that the cohort and VCF pages carry the editor.
 """
 from django.contrib.auth.models import User
@@ -12,7 +12,6 @@ from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
-from patients.models.models_phenotype import CohortTextPhenotype
 from patients.phenotype_matcher import PhenotypeMatcher
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import Cohort, GenomeBuild, ImportStatus
@@ -42,9 +41,9 @@ class CohortPhenotypeTest(TestCase):
         cohort.phenotype = RAISED_TSH
         cohort.save(phenotype_matcher=PhenotypeMatcher(), phenotype_approval_user=self.user)
 
-        link = CohortTextPhenotype.objects.get(cohort=cohort)
-        self.assertEqual(link.approved_by, self.user)
-        self.assertEqual(link.phenotype_description.original_text, RAISED_TSH)
+        phenotype_description = Cohort.objects.get(pk=cohort.pk).phenotype_description
+        self.assertEqual(phenotype_description.approved_by, self.user)
+        self.assertEqual(phenotype_description.original_text, RAISED_TSH)
         self.assertIn(RAISED_TSH_HPO, cohort.get_ontology_term_ids())
 
     def test_cohort_page_saves_the_phenotype(self):
@@ -55,7 +54,7 @@ class CohortPhenotypeTest(TestCase):
 
         cohort = Cohort.objects.get(pk=self.cohort.pk)
         self.assertEqual(cohort.phenotype, RAISED_TSH)
-        self.assertEqual(CohortTextPhenotype.objects.get(cohort=cohort).approved_by, self.user)
+        self.assertEqual(cohort.phenotype_description.approved_by, self.user)
 
     def test_vcf_page_edits_its_cohorts_phenotype(self):
         self.client.force_login(self.user)

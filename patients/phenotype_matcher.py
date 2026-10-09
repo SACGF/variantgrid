@@ -1,3 +1,8 @@
+"""
+PhenotypeMatcher: lookups from words to HPO / OMIM / MONDO / HGNC terms, built from the latest ontology (exact, then
+one typo inside one long word), plus hand-written special cases. PHENOTYPE_MATCHER_VERSION versions the result.
+Also the ambiguous-acronym denylist (get_ambiguous_acronym_denylist): short strings that name several unrelated terms.
+"""
 import functools
 import logging
 import re
@@ -256,7 +261,7 @@ class PhenotypeMatcher:
         else:
             # Ambiguous acronyms (short strings matching multiple distinct concept
             # clusters) are matched here but dropped before persistence by
-            # filter_ambiguous_acronym_matches(), and surfaced as warning-only
+            # without_ambiguous_acronyms(), and surfaced as warning-only
             # results by TextPhenotypeSentence.get_results().
             if len(lower_text) < MIN_MATCH_LENGTH:
                 return []

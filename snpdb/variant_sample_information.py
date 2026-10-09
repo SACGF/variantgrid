@@ -16,8 +16,7 @@ from classification.models.evidence_mixin_summary_cache import clinical_signific
 from library.log_utils import log_traceback
 from library.unit_percent import format_af
 from ontology.models import OntologyService
-from patients.models import Patient
-from patients.models.models_phenotype import PATIENT_ONTOLOGY_TERM_PATH
+from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH, Patient
 from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
 from snpdb.models import (
     CohortGenotype,

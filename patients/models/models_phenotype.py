@@ -1,26 +1,33 @@
+"""
+Phenotype text matched to ontology terms. A PhenotypeDescription is one owner's text (a Patient's or a Cohort's,
+through its owner field), split into TextPhenotypeSentences; each points at the TextPhenotype for that sentence,
+shared by every description containing it and matched once per PhenotypeMatchVersion into TextPhenotypeMatches.
+
+Entry points: PhenotypeDescription.get_results (the JSON pages highlight from), get_ontology_term_ids,
+patient_phenotype_terms / patient_phenotypes_for_samples (many patients in one query). Matching is
+patients/phenotype_matching.py.
+"""
 import re
-from collections import defaultdict
-from collections.abc import Iterable
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Count, F, OuterRef, QuerySet, Subquery
+from django.db.models import F, Prefetch, Q, QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL
 from model_utils.models import TimeStampedModel
 
 from library.constants import DAY_SECS
 from ontology.models import OntologyService, OntologyTerm, OntologyVersion
-from patients.models import Patient
+from patients.models.has_phenotype_description_mixin import PHENOTYPE_DESCRIPTION
+from patients.models.models_patient import Patient
 from patients.phenotype_matcher import PHENOTYPE_MATCHER_VERSION, get_ambiguous_acronym_denylist
-from snpdb.models import Cohort
 
-PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
-PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
-
-# The same relation from the other end - TextPhenotypeMatch back to the patient it was matched for
-TPM_PATIENT_PATH = "text_phenotype__textphenotypesentence__phenotype_description__patienttextphenotype__patient"
+# TextPhenotypeMatch back to the patient it was matched for
+TPM_PATIENT_PATH = "text_phenotype__textphenotypesentence__phenotype_description__patient"
 TPM_DESCRIPTION_TEXT_PATH = "text_phenotype__textphenotypesentence__phenotype_description__original_text"
 
 # The 3 ontologies a phenotype description matches to, labelled as OntologyTerm.split_hpo_omim_mondo_as_dict has them
@@ -30,81 +37,40 @@ PHENOTYPE_ONTOLOGY_SERVICE_LABELS = {
     OntologyService.MONDO: "MONDO",
 }
 
+AmbiguousAcronymDenylist = Mapping[str, tuple[tuple[str, str], ...]]
 
-def filter_ambiguous_acronym_matches(matches: list["TextPhenotypeMatch"]) -> list["TextPhenotypeMatch"]:
-    """Drop unsaved TextPhenotypeMatch instances whose matched text is an ambiguous
-    acronym (one short string mapping to multiple distinct concept clusters). These
-    are surfaced as warning-only entries by TextPhenotypeSentence.get_results()
-    rather than persisted, so downstream ontology-term queries can't silently pick
-    the wrong concept."""
-    denylist = get_ambiguous_acronym_denylist()
+
+def ambiguous_acronym_pattern(denylist: AmbiguousAcronymDenylist) -> Optional[re.Pattern]:
+    """ Finds the denylisted acronyms in a sentence - compile once per description, there are a lot of them """
     if not denylist:
-        return matches
-    return [m for m in matches if m.match_text.lower().replace(",", "") not in denylist]
+        return None
+    return re.compile(r"\b(" + "|".join(re.escape(k) for k in denylist) + r")\b", re.IGNORECASE)
 
 
-class DescriptionProcessingStatus(models.Model):
-    CREATED = 'C'
-    TOKENIZED = 'T'
-    ERROR = 'E'
-    SUCCESS = 'S'
-
-    CHOICES = [
-        (CREATED, 'Created'),
-        (TOKENIZED, 'Tokenized'),
-        (ERROR, 'Error'),
-        (SUCCESS, 'Success'),
-    ]
+def without_ambiguous_acronyms(matches: Iterable['TextPhenotypeMatch'],
+                               denylist: AmbiguousAcronymDenylist) -> list['TextPhenotypeMatch']:
+    """ Matches (saved or not) whose text is not an ambiguous acronym - one short string mapping to multiple
+        distinct concept clusters, which downstream ontology-term queries can't use without picking the wrong one """
+    return [m for m in matches if not m.is_ambiguous_acronym(denylist)]
 
 
-class PhenotypeDescription(models.Model):
-    """ This represents a whole phenotype description - body of text which is broken up into multiple sentences
-        If an object uses PhenotypeDescription - @see HasPhenotypeDescriptionMixin
-    """
-
-    original_text = models.TextField()
-    status = models.CharField(max_length=1, choices=DescriptionProcessingStatus.CHOICES)
-
-    def get_results(self):
-        results = []
-        for sentence in self.textphenotypesentence_set.all():
-            results.extend(sentence.get_results())
-        return results
-
-    @cache_memoize(timeout=DAY_SECS, args_rewrite=lambda s: (s.pk, ))
-    def get_ontology_term_ids(self) -> list[int]:
-        denylist = get_ambiguous_acronym_denylist()
-        ot_qs = (self.textphenotypesentence_set
-                 .filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
-                 .select_related("text_phenotype")
-                 .prefetch_related("text_phenotype__textphenotypematch_set"))
-        term_ids = set()
-        for sentence in ot_qs:
-            sentence_text = sentence.text_phenotype.text
-            for tpm in sentence.text_phenotype.textphenotypematch_set.all():
-                match_text = sentence_text[tpm.offset_start:tpm.offset_end].lower()
-                if match_text in denylist:
-                    continue  # Ambiguous acronym - refuse to feed downstream queries
-                term_ids.add(tpm.ontology_term_id)
-        return sorted(term_ids)
-
-    def get_gene_symbols(self, ontology_version) -> QuerySet:
-        terms = tuple(self.get_ontology_term_ids())
-        gene_symbols = ontology_version.cached_gene_symbols_for_terms_tuple(terms)
-        return gene_symbols
-
-    def __str__(self):
-        text = self.original_text[:50]
-        status = self.get_status_display()
-        name = f"Text: {text} ({status})"
-        name += '\n'.join(map(str, self.get_results()))
-        return name
+def _ambiguous_alias_result(match_text: str, offset_start: int, offset_end: int,
+                            denylist: AmbiguousAcronymDenylist) -> dict:
+    """ A warning-only entry: the UI lists the concepts the acronym could be rather than picking one """
+    entry = {
+        "ambiguous_alias": match_text,
+        "offset_start": offset_start,
+        "offset_end": offset_end,
+    }
+    if candidates := denylist.get(TextPhenotypeMatch.ambiguous_acronym_key(match_text)):
+        entry["ambiguous_alias_candidates"] = [{"accession": acc, "name": name} for acc, name in candidates]
+    return entry
 
 
 class PhenotypeMatchVersion(TimeStampedModel):
     """ What a sentence's matches were produced with: the matcher code (PHENOTYPE_MATCHER_VERSION) and the ontology
         its lookups were built from. One row per pair, made the first time that pair matches a sentence (#2131).
-        Deleting an OntologyVersion cascades here and leaves its sentences unstamped, so stale. """
+        Deleting an OntologyVersion cascades here and leaves its sentences unstamped, so awaiting a rematch. """
     matcher_version = models.IntegerField()
     ontology_version = models.ForeignKey(OntologyVersion, null=True, blank=True, on_delete=CASCADE)
 
@@ -129,42 +95,79 @@ class PhenotypeMatchVersion(TimeStampedModel):
 
     @staticmethod
     def current_qs() -> QuerySet['PhenotypeMatchVersion']:
-        """ Empty until something has been matched with the current pair - every processed sentence is stale then """
+        """ Empty until something has been matched with the current pair - every matched sentence is stale then """
         return PhenotypeMatchVersion.objects.filter(**PhenotypeMatchVersion._current_kwargs())
 
 
 class TextPhenotype(models.Model):
-    """ This is a sentence, that has matches hanging off it """
-
-    text = models.TextField(primary_key=True)
-    processed = models.BooleanField(default=False)
-    # What the matches hanging off this sentence were produced with. Null = matched before #2131, so stale.
+    """ One row per distinct sentence - the unit of matching, shared by every description containing it """
+    text = models.TextField(unique=True)
+    # Null = awaiting matching; stamped when matched, set back to null to requeue
     match_version = models.ForeignKey(PhenotypeMatchVersion, null=True, blank=True, on_delete=SET_NULL)
 
     def __str__(self):
-        return f"{self.text} (processed: {self.processed})"
+        return f"{self.text} (matched with: {self.match_version})"
 
-    def mark_processed(self, match_version: PhenotypeMatchVersion):
-        self.processed = True
+    def mark_matched(self, match_version: PhenotypeMatchVersion):
         self.match_version = match_version
-        self.save(update_fields=["processed", "match_version"])
+        self.save(update_fields=["match_version"])
+
+    @staticmethod
+    def awaiting_qs() -> QuerySet['TextPhenotype']:
+        """ Never matched, or requeued - bulk_patient_phenotype_matching matches these """
+        return TextPhenotype.objects.filter(match_version__isnull=True)
 
     @staticmethod
     def stale_qs() -> QuerySet['TextPhenotype']:
         """ Matched with an older matcher or ontology - `match_patient_phenotypes --stale` rematches these """
-        return TextPhenotype.objects.filter(processed=True).exclude(match_version__in=PhenotypeMatchVersion.current_qs())
+        return (TextPhenotype.objects.filter(match_version__isnull=False)
+                .exclude(match_version__in=PhenotypeMatchVersion.current_qs()))
 
-    def get_ambiguous_matches(self):
-        """ Where an Ontology Service has multiple matches to the exact same text """
 
-        tpm_qs = self.textphenotypematch_set.all()
-        outer = {
-            "ontology_term__ontology_service": OuterRef('ontology_term__ontology_service'),
-            "offset_start": OuterRef('offset_start'),
-            "offset_end": OuterRef('offset_end'),
-        }
-        sub_query = tpm_qs.filter(**outer).values(*outer.keys()).annotate(num_terms=Count("pk")).filter(num_terms__gte=2)
-        return tpm_qs.annotate(num_terms=Subquery(sub_query.values("num_terms"))).filter(num_terms__gte=2)
+class PhenotypeDescription(models.Model):
+    """ A patient's or cohort's phenotype text, split into sentences. Owned by its patient or its cohort, so it
+        goes when they do; owned by neither only for the moment a live preview needs one.
+        The owner field is named after the owner's model - @see HasPhenotypeDescriptionMixin """
+    original_text = models.TextField()
+    patient = models.OneToOneField("patients.Patient", null=True, blank=True, related_name=PHENOTYPE_DESCRIPTION,
+                                   on_delete=CASCADE)
+    cohort = models.OneToOneField("snpdb.Cohort", null=True, blank=True, related_name=PHENOTYPE_DESCRIPTION,
+                                  on_delete=CASCADE)
+    approved_by = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(patient__isnull=True) | Q(cohort__isnull=True),
+                                   name="phenotype_description_one_owner"),
+        ]
+
+    def __str__(self):
+        owner = self.patient or self.cohort or "Preview"
+        return f"{owner}: {self.original_text[:50]}"
+
+    def get_results(self) -> list[dict]:
+        """ The matches of every sentence, offset into the whole text - what pages highlight from """
+        match_qs = TextPhenotypeMatch.objects.select_related("ontology_term")
+        sentences = list(self.textphenotypesentence_set.select_related("text_phenotype")
+                         .prefetch_related(Prefetch("text_phenotype__textphenotypematch_set", queryset=match_qs)))
+        ontology_version = None
+        if any(sentence.text_phenotype.textphenotypematch_set.all() for sentence in sentences):
+            ontology_version = OntologyVersion.latest()
+        denylist = get_ambiguous_acronym_denylist()
+        acronym_pattern = ambiguous_acronym_pattern(denylist)
+
+        results = []
+        for sentence in sentences:
+            results.extend(sentence.get_results(ontology_version, denylist, acronym_pattern))
+        return results
+
+    @cache_memoize(timeout=DAY_SECS, args_rewrite=lambda s: (s.pk, ))
+    def get_ontology_term_ids(self) -> list[str]:
+        denylist = get_ambiguous_acronym_denylist()
+        tpm_qs = (TextPhenotypeMatch.objects
+                  .filter(text_phenotype__textphenotypesentence__phenotype_description=self)
+                  .select_related("text_phenotype"))
+        return sorted({tpm.ontology_term_id for tpm in without_ambiguous_acronyms(tpm_qs, denylist)})
 
 
 class TextPhenotypeSentence(models.Model):
@@ -173,47 +176,41 @@ class TextPhenotypeSentence(models.Model):
     text_phenotype = models.ForeignKey(TextPhenotype, on_delete=CASCADE)
     sentence_offset = models.IntegerField()
 
-    def get_results(self):
+    def __str__(self):
+        return f"{self.sentence_offset}: {self.text_phenotype_id}"
+
+    def get_results(self, ontology_version: Optional[OntologyVersion], denylist: AmbiguousAcronymDenylist,
+                    acronym_pattern: Optional[re.Pattern]) -> list[dict]:
+        """ ontology_version may be None only when the sentence has no matches.
+            Ambiguous acronyms come back as warning-only entries rather than terms """
+        all_matches = self.text_phenotype.textphenotypematch_set.all()
+        matches = without_ambiguous_acronyms(all_matches, denylist)
+        # Where an Ontology Service has multiple matches to the exact same text
+        span_counts = Counter(tpm.service_span for tpm in matches)
+
         results = []
-        ambiguous = set(self.text_phenotype.get_ambiguous_matches())
-        denylist = get_ambiguous_acronym_denylist()
-        sentence_text = self.text_phenotype.text
-        for tpm in self.text_phenotype.textphenotypematch_set.all():
-            tpm.offset_start += self.sentence_offset
-            tpm.offset_end += self.sentence_offset
-            data = tpm.to_dict()
-            if tpm in ambiguous:
+        for tpm in matches:
+            data = tpm.to_dict(ontology_version)
+            data["offset_start"] += self.sentence_offset
+            data["offset_end"] += self.sentence_offset
+            if span_counts[tpm.service_span] >= 2:
                 data["ambiguous"] = tpm.match_text
             results.append(data)
 
-        # Ambiguous acronyms are no longer persisted as TextPhenotypeMatch rows,
-        # so synthesize warning-only entries by rescanning the sentence text.
-        results.extend(self._ambiguous_acronym_results(sentence_text, denylist))
+        # Ambiguous acronyms aren't saved as matches, so find them by rescanning the sentence text
+        warned_spans = set()
+        if acronym_pattern:
+            for m in acronym_pattern.finditer(self.text_phenotype.text):
+                warned_spans.add((m.start(), m.end()))
+                results.append(_ambiguous_alias_result(m.group(0), m.start() + self.sentence_offset,
+                                                       m.end() + self.sentence_offset, denylist))
+        # A row matched before its text joined the denylist
+        for tpm in all_matches:
+            if (tpm.offset_start, tpm.offset_end) not in warned_spans and tpm.is_ambiguous_acronym(denylist):
+                warned_spans.add((tpm.offset_start, tpm.offset_end))
+                results.append(_ambiguous_alias_result(tpm.match_text, tpm.offset_start + self.sentence_offset,
+                                                       tpm.offset_end + self.sentence_offset, denylist))
         return results
-
-    def _ambiguous_acronym_results(self, sentence_text, denylist):
-        if not denylist:
-            return []
-        pattern = re.compile(
-            r"\b(" + "|".join(re.escape(k) for k in denylist) + r")\b",
-            re.IGNORECASE,
-        )
-        out = []
-        for m in pattern.finditer(sentence_text):
-            match_text = m.group(0)
-            key = match_text.lower()
-            candidates = denylist.get(key) or ()
-            entry = {
-                "ambiguous_alias": match_text,
-                "offset_start": m.start() + self.sentence_offset,
-                "offset_end": m.end() + self.sentence_offset,
-            }
-            if candidates:
-                entry["ambiguous_alias_candidates"] = [
-                    {"accession": acc, "name": name} for acc, name in candidates
-                ]
-            out.append(entry)
-        return out
 
 
 class TextPhenotypeMatch(models.Model):
@@ -222,17 +219,31 @@ class TextPhenotypeMatch(models.Model):
     offset_start = models.IntegerField()
     offset_end = models.IntegerField()
 
+    def __str__(self):
+        return f"{self.ontology_term} from ({self.offset_start}-{self.offset_end})"
+
     @property
     def match_text(self) -> str:
         txt = self.text_phenotype.text
         return txt[self.offset_start:self.offset_end]
 
-    def to_dict(self):
-        """ This is what's sent as JSON back to client for highlighting and grids """
+    @property
+    def service_span(self) -> tuple:
+        return self.ontology_term.ontology_service, self.offset_start, self.offset_end
 
-        ontology_version = OntologyVersion.latest()
-        gene_symbols_qs = ontology_version.cached_gene_symbols_for_terms_tuple((self.ontology_term.pk,))
-        gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
+    @staticmethod
+    def ambiguous_acronym_key(match_text: str) -> str:
+        """ How match text is looked up in get_ambiguous_acronym_denylist() """
+        return match_text.lower().replace(",", "")
+
+    def is_ambiguous_acronym(self, denylist: AmbiguousAcronymDenylist) -> bool:
+        return bool(denylist) and self.ambiguous_acronym_key(self.match_text) in denylist
+
+    def to_dict(self, ontology_version: OntologyVersion) -> dict:
+        """ This is what's sent as JSON back to client for highlighting and grids """
+        # Iterate the memoized QuerySet (its pickle holds the rows) rather than querying it again
+        gene_symbols = [gene_symbol.pk for gene_symbol in
+                        ontology_version.cached_gene_symbols_for_terms_tuple((self.ontology_term.pk,))]
         accession = str(self.ontology_term)
         return {
             "accession": accession,
@@ -244,29 +255,6 @@ class TextPhenotypeMatch(models.Model):
             "offset_end": self.offset_end,
             "pk": self.ontology_term.pk,
         }
-
-    def __str__(self):
-        return f"{self.ontology_term} from ({self.offset_start}-{self.offset_end})"
-
-
-class PatientTextPhenotype(models.Model):
-    """ Used to link patient & phenotype """
-    patient = models.OneToOneField(Patient, related_name='patient_text_phenotype', on_delete=CASCADE)
-    phenotype_description = models.OneToOneField(PhenotypeDescription, on_delete=CASCADE)
-    approved_by = models.ForeignKey(User, null=True, on_delete=SET_NULL)
-
-    def __str__(self):
-        return f"{self.patient}: {self.phenotype_description}"
-
-
-class CohortTextPhenotype(models.Model):
-    """ Used to link cohort & phenotype - the shared condition a cohort was assembled around """
-    cohort = models.OneToOneField(Cohort, related_name='cohort_text_phenotype', on_delete=CASCADE)
-    phenotype_description = models.OneToOneField(PhenotypeDescription, on_delete=CASCADE)
-    approved_by = models.ForeignKey(User, null=True, on_delete=SET_NULL)
-
-    def __str__(self):
-        return f"{self.cohort}: {self.phenotype_description}"
 
 
 @dataclass(frozen=True)
@@ -300,8 +288,8 @@ def patient_phenotype_terms(patients: Iterable[Patient]) -> dict[int, PatientPhe
     match_texts_by_patient_id = defaultdict(dict)
     for tpm in tpm_qs:
         text_by_patient_id[tpm.patient_id] = tpm.phenotype_text
-        if tpm.match_text.lower() in denylist:
-            continue  # Ambiguous acronym - @see PhenotypeDescription.get_ontology_term_ids
+        if tpm.is_ambiguous_acronym(denylist):
+            continue
         terms_by_patient_id[tpm.patient_id].add(tpm.ontology_term)
         match_texts_by_patient_id[tpm.patient_id].setdefault(tpm.ontology_term_id, tpm.match_text)
 
@@ -325,7 +313,3 @@ def patient_phenotypes_for_samples(user, samples: Iterable) -> dict[int, dict]:
     patients = Patient.filter_for_user(user).filter(pk__in=patient_ids)
     return {patient_id: phenotype_terms.to_json()
             for patient_id, phenotype_terms in patient_phenotype_terms(patients).items()}
-
-
-def patients_qs_for_ontology_term(user, ontology_term):
-    return Patient.filter_for_user(user).filter(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term}).order_by("id")

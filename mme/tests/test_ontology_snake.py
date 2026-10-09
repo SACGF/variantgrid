@@ -59,8 +59,7 @@ class OntologySnakeTestCase(TestCase):
 
         phenotype_description = MagicMock()
         phenotype_description.get_ontology_term_ids.return_value = [seizure.pk]
-        ptp = SimpleNamespace(phenotype_description=phenotype_description)
-        patient = SimpleNamespace(patient_text_phenotype=ptp)
+        patient = SimpleNamespace(phenotype_description=phenotype_description)
         sample = SimpleNamespace(patient=patient)
 
         classification = FakeClassification(terms=[condition_term])

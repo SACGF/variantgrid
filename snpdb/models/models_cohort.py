@@ -79,16 +79,6 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         CohortVersion.objects.get_or_create(cohort=self, version=self.version)
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
-    def _get_phenotype_input_text_field(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        return "phenotype"
-
-    def _get_phenotype_description_relation_class_and_kwargs(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        # Stop circular import
-        from patients.models.models_phenotype import CohortTextPhenotype
-        return CohortTextPhenotype, {"cohort": self}
-
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """
         if self.vcf and self.vcf.can_view(user_or_group):

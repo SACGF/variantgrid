@@ -13,7 +13,7 @@ from ontology.models import (
     OntologyTermRelation,
 )
 from ontology.panel_app_ontology import update_gene_relations
-from patients.models.models_phenotype import patients_qs_for_ontology_term
+from patients.models.models_patient import Patient
 
 
 def ontology_term_text(request, ontology_service, name):
@@ -72,7 +72,7 @@ class OntologyTermView(TemplateView):
                         # though currently gene symbols don't do reverse gene_relationships, so still show everything that links in gene_symbol
                         regular_relationships.append(relationship)
 
-            patients_qs = patients_qs_for_ontology_term(self.request.user, term)
+            patients_qs = Patient.for_ontology_term(self.request.user, term)
             has_hierarchy = term.ontology_service in {OntologyService.MONDO, OntologyService.HPO}
             return {
                 "term": term,

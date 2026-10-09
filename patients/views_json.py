@@ -12,9 +12,7 @@ from patients.models import (
     PatientRecordOriginType,
 )
 from patients.models.models_phenotype import PatientPhenotypeTerms
-from patients.models.models_phenotype import (
-    patient_phenotype_terms as bulk_patient_phenotype_terms,
-)
+from patients.models.models_phenotype import patient_phenotype_terms as bulk_patient_phenotype_terms
 from patients.phenotype_matching import create_phenotype_description
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_sample_tree
 from snpdb.models import GenomeBuild, Sample
@@ -131,8 +129,8 @@ def phenotypes_matches(request):
 def approve_patient_term(request):
     patient_id = request.POST["patient_id"]
     patient = Patient.get_for_user(request.user, patient_id)
-    patient.patient_text_phenotype.approved_by = request.user
-    patient.patient_text_phenotype.save()
+    patient.phenotype_description.approved_by = request.user
+    patient.phenotype_description.save(update_fields=["approved_by"])
 
     PatientModification.objects.create(patient=patient,
                                        user=request.user,

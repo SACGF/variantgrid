@@ -1,5 +1,22 @@
+"""
+HasPhenotypeDescriptionMixin: a model with a `phenotype` TextField whose text is split into sentences and
+matched to ontology terms. Its PhenotypeDescription points back at it through the one-to-one named after the
+model (PhenotypeDescription.patient, PhenotypeDescription.cohort), so deleting the owner deletes it.
+
+Entry points: save_phenotype (from the owner's save), process_phenotype_if_changed (bulk matching).
+New text goes out on phenotype_description_wanted_signal, and patients/signals/phenotype_description.py builds
+the description: the matcher needs ontology, which sits above snpdb, and snpdb imports this module.
+"""
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import QuerySet
+from django.dispatch import Signal
+
+# The reverse accessor PhenotypeDescription's owner fields give the owner
+PHENOTYPE_DESCRIPTION = "phenotype_description"
+
+# Sent (owner, text, approved_by, phenotype_matcher, defer_processing) when owner's text needs a new description
+phenotype_description_wanted_signal = Signal()
 
 
 def phenotype_text_is_excluded(text: str) -> bool:
@@ -10,96 +27,48 @@ def phenotype_text_is_excluded(text: str) -> bool:
 
 
 class HasPhenotypeDescriptionMixin:
+    """ For a model with a `phenotype` TextField that PhenotypeDescription has an owner field for, named after the
+        model (self._meta.model_name) """
 
-    def _get_phenotype_input_text_field(self):
-        """ Each subclass needs to implement - returns a string """
-        raise NotImplementedError()
-
-    def _get_phenotype_description_relation_class_and_kwargs(self):
-        """ Each subclass needs to implement the way to get their PhenotypeDescription object """
-        raise NotImplementedError()
-
-    @property
-    def phenotype_input_text(self):
-        return getattr(self, self._get_phenotype_input_text_field())
-
-    @phenotype_input_text.setter
-    def phenotype_input_text(self, value):
-        setattr(self, self._get_phenotype_input_text_field(), value)
-
-    @property
-    def phenotype_description_relation(self):
+    def get_phenotype_description(self):
+        """ The PhenotypeDescription of the current text, or None - cached on the instance either way """
         try:
-            klass, kwargs = self._get_phenotype_description_relation_class_and_kwargs()
-            _phenotype_description_relation = klass.objects.get(**kwargs)
-        except Exception:
-            _phenotype_description_relation = None
-        return _phenotype_description_relation
-
-    @property
-    def phenotype_description(self):
-        if self.phenotype_description_relation:
-            return self.phenotype_description_relation.phenotype_description
-        return None
+            return getattr(self, PHENOTYPE_DESCRIPTION)
+        except ObjectDoesNotExist:
+            return None
 
     def get_ontology_term_ids(self) -> list[str]:
-        if self.phenotype_description:
-            terms = self.phenotype_description.get_ontology_term_ids()
-        else:
-            terms = []
-        return terms
+        if phenotype_description := self.get_phenotype_description():
+            return phenotype_description.get_ontology_term_ids()
+        return []
 
     def get_gene_symbols(self, ontology_version) -> QuerySet:
-        from genes.models import Gene
-
-        if self.phenotype_description:
-            gene_qs = self.phenotype_description.get_gene_symbols(ontology_version)
-        else:
-            gene_qs = Gene.objects.none()
-        return gene_qs
+        return ontology_version.cached_gene_symbols_for_terms_tuple(tuple(self.get_ontology_term_ids()))
 
     def process_phenotype_if_changed(self, phenotype_matcher=None, phenotype_approval_user=None,
-                                     defer_processing=False):
+                                     defer_processing=False) -> bool:
         """ pass in phenotype_matcher to save re-loading
             if you don't pass in phenotype_approval_user assumed it is done automatically and thus needs user approval
             if defer_processing is True the PhenotypeDescription/TextPhenotype rows are created but NLP matching is
             skipped (used by bulk_patient_phenotype_matching to batch the heavy work for parallel execution)
-            returns whether phenotype changed """
+            returns whether a new description was made """
 
-        # Stop circular import
-        from patients.phenotype_matching import create_phenotype_description
+        phenotype_description = self.get_phenotype_description()
+        if phenotype_description and phenotype_description.original_text != self.phenotype:
+            phenotype_description.delete()  # Its sentences and approval go with it
+            self._state.fields_cache.pop(PHENOTYPE_DESCRIPTION, None)
+            phenotype_description = None
 
-        phenotype_input_text = self.phenotype_input_text
-        phenotype_description_relation = self.phenotype_description_relation
-        phenotype_description = None
+        if phenotype_description or not self.phenotype:
+            return False
+        if phenotype_text_is_excluded(self.phenotype):
+            return False  # Marker present — defer persistence until a human cleans up the text.
 
-        if phenotype_description_relation:
-            phenotype_description = phenotype_description_relation.phenotype_description
-            changed = phenotype_description and phenotype_description.original_text != phenotype_input_text
-            if changed:
-                phenotype_description.delete()
-                phenotype_description = None
-        else:
-            klass, kwargs = self._get_phenotype_description_relation_class_and_kwargs()
-            phenotype_description_relation = klass(**kwargs)  # Create a new one
-
-        parsed_phenotypes = False
-        if phenotype_input_text:
-            if phenotype_description:  # Not deleted - so no change needed
-                pass
-            elif phenotype_text_is_excluded(phenotype_input_text):
-                # Marker present — defer persistence until a human cleans up the text.
-                pass
-            else:
-                # TODO: Do as async job??
-                phenotype_description_relation.phenotype_description = create_phenotype_description(
-                    phenotype_input_text, phenotype_matcher, defer_processing=defer_processing)
-                phenotype_description_relation.approved_by = phenotype_approval_user
-                phenotype_description_relation.save()
-
-                parsed_phenotypes = True
-
-        return parsed_phenotypes
+        phenotype_description_wanted_signal.send(sender=type(self), owner=self, text=self.phenotype,
+                                                 approved_by=phenotype_approval_user,
+                                                 phenotype_matcher=phenotype_matcher,
+                                                 defer_processing=defer_processing)
+        return True
 
     @staticmethod
     def pop_kwargs(kwargs_dict):
@@ -115,8 +84,8 @@ class HasPhenotypeDescriptionMixin:
 
         # Some browsers send Text inputs with \r\n - while AJAX sends it as \n
         # strip \r to keep it consistent so that highlighting offsets line up
-        if self.phenotype_input_text:
-            self.phenotype_input_text = self.phenotype_input_text.replace('\r', '')
+        if self.phenotype:
+            self.phenotype = self.phenotype.replace('\r', '')
 
         kwargs = HasPhenotypeDescriptionMixin.pop_kwargs(kwargs_dict)
         if kwargs.pop("check_patient_text_phenotype", False):
