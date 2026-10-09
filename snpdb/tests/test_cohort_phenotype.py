@@ -7,13 +7,13 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from annotation.models.models_phenotype_match import CohortTextPhenotype
-from annotation.phenotype_matcher import PhenotypeMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
+from patients.models.models_phenotype import CohortTextPhenotype
+from patients.phenotype_matcher import PhenotypeMatcher
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import Cohort, GenomeBuild, ImportStatus
 

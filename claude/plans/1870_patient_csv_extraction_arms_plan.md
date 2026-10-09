@@ -10,8 +10,8 @@ cannot *name* them, so it cannot describe the arms the API (#1707) and the sampl
 
 ## The problem
 
-A CSV row is one sample. Its `SPECIMEN_*` columns (`patients/models.py:PatientColumns`) carry the specimen plus one
-`Specimen Nucleic acid source (DNA/RNA)` value, and `patients/models.py:Specimen.get_or_create_extraction` turns that
+A CSV row is one sample. Its `SPECIMEN_*` columns (`patients/models/models_patient.py:PatientColumns`) carry the specimen plus one
+`Specimen Nucleic acid source (DNA/RNA)` value, and `patients/models/models_patient.py:Specimen.get_or_create_extraction` turns that
 into the row's `Extraction`: the sample's current extraction if it is on this specimen, else the specimen's extraction
 with that nucleic acid, else an unnamed one it can fill in, else a new one. Nothing in the file sets
 `Extraction.reference_id` or `Extraction.extraction_date`, so:
@@ -61,7 +61,7 @@ two-arm case. The CSV gets the same three fields and the same matching rule.
 
 ## Data
 
-### `patients/models.py:PatientRecord` - three columns and one FK
+### `patients/models/models_patient.py:PatientRecord` - three columns and one FK
 
 The row's raw extraction values sit beside the raw specimen values it already keeps, and the matched extraction
 beside the matched specimen, so the import page can show what each row named and what it landed on.
@@ -86,7 +86,7 @@ Migration patients/migrations/0019_patientrecord_extraction.py: `RenameField` fo
 x3. No `Extraction` change - `reference_id`, `nucleic_acid_source`, `extraction_date` and `unique_together
 ("specimen", "reference_id")` are what the CSV writes to.
 
-### `patients/models.py:PatientColumns` - the column set
+### `patients/models/models_patient.py:PatientColumns` - the column set
 
 ```python
 class PatientColumns:
@@ -125,7 +125,7 @@ The nucleic acid column is renamed from `Specimen Nucleic acid source (DNA/RNA)`
 and has described the extraction since #1704; the old header is gone, so a file still carrying it fails the header
 check. The constant
 `SPECIMEN_NUCLEIC_ACID_SOURCE` becomes `EXTRACTION_NUCLEIC_ACID_SOURCE` (`grep` shows its users are
-`patients/import_records.py`, the two test modules and `patients/models.py` itself).
+`patients/import_records.py`, the two test modules and `patients/models/models_patient.py` itself).
 
 A row with a `Specimen Reference id` and blank extraction columns means what it means today. A row with an
 `Extraction Reference id` and no `Specimen Reference id` is a validation error (an extraction has nowhere to live;
@@ -158,7 +158,7 @@ extraction_date=None)`, in this order, first hit wins:
 3. **No `reference_id`**: discriminate on what the row does give. Candidates are the specimen's extractions filtered
    by `nucleic_acid_source` when given and by `extraction_date__date` when given (dates are stored as midnight
    datetimes by `patients/import_records.py:parse_date`, the way specimen dates are). One candidate: it. Several:
-   `AmbiguousExtraction` (a `ValueError` subclass in `patients/models.py`) naming them - "Specimen 2600000001 has 2
+   `AmbiguousExtraction` (a `ValueError` subclass in `patients/models/models_patient.py`) naming them - "Specimen 2600000001 has 2
    DNA extractions (2600000001C, 2600000001D): name one with Extraction Reference id or Extraction date". None, and
    the row gave an acid: an extraction with no acid yet is the row's to fill in (today's rule). None, and the row gave
    nothing: whatever is there, if exactly one (today's rule). Otherwise create.
@@ -198,7 +198,7 @@ edit -> upload is the round trip: every row names its extraction, so step 1 matc
 
 ## Code changes
 
-- `patients/models.py`: `PatientColumns` and `PatientRecord` as above; `Specimen.get_or_create_extraction` gains
+- `patients/models/models_patient.py`: `PatientColumns` and `PatientRecord` as above; `Specimen.get_or_create_extraction` gains
   `reference_id` and `extraction_date` and the order in "Matching rules"; its docstring is the one place the rule is
   written down. `AmbiguousExtraction`.
 - `patients/import_records.py`: the three columns join the required header set; `process_record`

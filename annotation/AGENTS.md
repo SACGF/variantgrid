@@ -49,13 +49,13 @@ Patterns here:
   GeneAnnotationRelease (annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release) →
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
-- annotation/phenotype_matcher.py:get_ambiguous_acronym_denylist reads every ontology term and relation (~230MB) on a cache
+- patients/phenotype_matcher.py:get_ambiguous_acronym_denylist reads every ontology term and relation (~230MB) on a cache
   miss - 100s on a cold disk inside a page render. It is cached with no expiry and prebuilt on a new
-  OntologyVersion (annotation/tasks/ambiguous_acronym_denylist_task.py); a Redis flush means one slow rebuild.
-- annotation/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups patches HPO gaps by name or ID, and goes
+  OntologyVersion (patients/tasks/ambiguous_acronym_denylist_task.py); a Redis flush means one slow rebuild.
+- patients/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups patches HPO gaps by name or ID, and goes
   stale as HPO adds and renames terms ("distal hypermobility" pointed at its opposite). After an HPO upgrade, compare
   each entry with the matcher's result without it; drop entries HPO now matches and repoint ones it contradicts.
-- A change to phenotype lookups or matching logic bumps annotation/phenotype_matcher.py `PHENOTYPE_MATCHER_VERSION` and
+- A change to phenotype lookups or matching logic bumps patients/phenotype_matcher.py `PHENOTYPE_MATCHER_VERSION` and
   adds a migration registering `match_patient_phenotypes --stale` as a ManualOperation, or deployments keep the old
   matches (sentences are matched once and cached). Each sentence points at the PhenotypeMatchVersion (matcher +
   OntologyVersion pair) it was matched with; stale sentences show in `vg status`.

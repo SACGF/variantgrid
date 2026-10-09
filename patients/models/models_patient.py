@@ -22,7 +22,6 @@ from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from library.django_utils import (
     ensure_mutally_exclusive_fields_not_set,
     single_string_to_first_last_name_q,
@@ -34,6 +33,7 @@ from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
 from patients.external_references import ResolvedReference
+from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import (
     MatchStatus,
     NucleicAcid,
@@ -316,7 +316,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     def _get_phenotype_description_relation_class_and_kwargs(self):
         # Implemented for HasPhenotypeDescriptionMixin
         # Stop circular import
-        from annotation.models.models_phenotype_match import PatientTextPhenotype
+        from patients.models.models_phenotype import PatientTextPhenotype
         return PatientTextPhenotype, {"patient": self}
 
     def get_json_dict(self):

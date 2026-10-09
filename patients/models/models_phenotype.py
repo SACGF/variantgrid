@@ -10,10 +10,10 @@ from django.db.models import Count, F, OuterRef, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 from model_utils.models import TimeStampedModel
 
-from annotation.phenotype_matcher import PHENOTYPE_MATCHER_VERSION, get_ambiguous_acronym_denylist
 from library.constants import DAY_SECS
 from ontology.models import OntologyService, OntologyTerm, OntologyVersion
 from patients.models import Patient
+from patients.phenotype_matcher import PHENOTYPE_MATCHER_VERSION, get_ambiguous_acronym_denylist
 from snpdb.models import Cohort
 
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
