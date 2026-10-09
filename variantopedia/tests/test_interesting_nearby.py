@@ -64,7 +64,7 @@ class InterestingNearbyTest(TestCase):
         _, tag_counts = interesting_summary(self._variant_qs(), self.other_user, self.genome_build)
         self.assertEqual({}, tag_counts)
 
-    def test_transcript_lookups_use_the_given_annotation_version(self):
+    def test_transcript_lookups_use_the_given_annotation_version_and_matched_transcripts(self):
         transcript = create_fake_transcript_version(self.genome_build).transcript
         annotation_run = AnnotationRun.objects.create()
         VariantTranscriptAnnotation.objects.create(version=self.old_vav, variant=self.variant,
@@ -75,6 +75,11 @@ class InterestingNearbyTest(TestCase):
                                                    annotation_run=annotation_run, transcript=transcript,
                                                    exon="5/10", hgvs_c="NM_1.1:c.200A>G",
                                                    interpro_domain="Domain1&Domain2")
+        # Unmatched transcript (eg VEP 116 MT) - a None key would filter on transcript_id IS NULL (#2137)
+        VariantTranscriptAnnotation.objects.create(version=self.vav, variant=self.variant,
+                                                   annotation_run=annotation_run, transcript=None,
+                                                   exon="1/1", hgvs_c="ND4.1:c.290A>G",
+                                                   interpro_domain="Domain3")
         self.assertEqual({transcript.pk: ":c.200"}, get_transcripts_and_codons(self.variant, self.vav))
         self.assertEqual({transcript.pk: "5/10"}, get_transcript_and_exons(self.variant, self.vav))
         self.assertEqual({transcript.pk: {"Domain1", "Domain2"}},

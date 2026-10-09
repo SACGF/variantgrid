@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db.utils import OperationalError
 from django.forms import model_to_dict
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,6 +36,7 @@ from genes.models import (
     GeneSymbol,
 )
 from library.django_utils import get_field_counts
+from library.django_utils.database_utils import pg_settings, query_was_cancelled
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
 from library.genomics import format_bp
 from library.git import Git
@@ -552,8 +554,14 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
         "distance": distance,
         "distance_str": str(distance)
     }
-    context.update(get_nearby_summaries(request.user, variant, annotation_version,
-                                        distance=distance, clinical_significance=True))
+    try:
+        with pg_settings(statement_timeout=settings.VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS * 1000):
+            context.update(get_nearby_summaries(request.user, variant, annotation_version,
+                                                distance=distance, clinical_significance=True))
+    except OperationalError as e:
+        if not query_was_cancelled(e):
+            raise
+        context["timed_out"] = True
     return render(request, "variantopedia/nearby_variants_tab.html", context)
 
 
