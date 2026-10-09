@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import operator
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self
+from typing import TYPE_CHECKING, Optional, Self, Iterable
 
 import django
-from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -47,6 +48,10 @@ from classification.models.evidence_mixin_summary_cache import ClassificationSum
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
 from snpdb.models import Allele, Lab
+from django.contrib.auth.models import User
+
+if TYPE_CHECKING:
+    from classification.models.overlaps_model import OverlapContribution
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
 classification_grouping_summary_signal = django.dispatch.Signal()  # args: "instance", expects ClassificationGrouping, old_summary, new_summary
@@ -103,7 +108,7 @@ class AlleleOriginGrouping(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
 
     @staticmethod
-    def allele_origin_dict(allele: Allele) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
+    def allele_origin_dict(allele: Allele) -> dict[AlleleOriginBucket, AlleleOriginGrouping]:
         by_bucket = {}
         for ao in AlleleOriginGrouping.objects.filter(allele=allele).prefetch_related("classificationgrouping_set"):
             by_bucket[ao.allele_origin_bucket] = ao
@@ -239,7 +244,7 @@ class ClassificationGrouping(TimeStampedModel):
         self.latest_somatic_sort = summary_obj.somatic.sort
         self.latest_curated_date = summary_obj.date.as_date
 
-    def contribution_for(self, value_type: ClassificationResultValue) -> 'OverlapContribution':
+    def contribution_for(self, value_type: ClassificationResultValue) -> OverlapContribution:
         from classification.models import OverlapContribution
         return OverlapContribution.objects.filter(classification_grouping=self, value_type=value_type).first()
 
@@ -296,7 +301,7 @@ class ClassificationGrouping(TimeStampedModel):
             raise PermissionDenied("You do not have permission to view this classification grouping.")
 
     @staticmethod
-    def filter_for_user(user: User, qs: QuerySet['ClassificationGrouping']) -> QuerySet['ClassificationGrouping']:
+    def filter_for_user(user: User, qs: QuerySet[ClassificationGrouping]) -> QuerySet[ClassificationGrouping]:
         # TODO, consider making the groups GuardianPermission rather than this manual security check
         if not user.is_superuser:
             permission_q: list[Q] = []
@@ -323,7 +328,7 @@ class ClassificationGrouping(TimeStampedModel):
         return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})
 
     @staticmethod
-    def _desired_grouping_for_classification(classification: Classification) -> tuple[Optional['ClassificationGrouping'], bool]:
+    def _desired_grouping_for_classification(classification: Classification) -> tuple[Optional[ClassificationGrouping], bool]:
         # withdrawn classifications are removed from groupings
         if classification.withdrawn:
             return None, False
@@ -408,7 +413,7 @@ class ClassificationGrouping(TimeStampedModel):
         return list(self.overlapcontribution_set.all())
 
     @cached_property
-    def onc_path_contribution(self) -> Optional['OverlapContribution']:
+    def onc_path_contribution(self) -> Optional[OverlapContribution]:
         """
         Written to optimize for prefetch_related
         """
@@ -418,7 +423,7 @@ class ClassificationGrouping(TimeStampedModel):
         return None
 
     @cached_property
-    def somatic_clin_sig_contribution(self) -> Optional['OverlapContribution']:
+    def somatic_clin_sig_contribution(self) -> Optional[OverlapContribution]:
         """
         Written to optimize for prefetch_related
         """
@@ -491,7 +496,7 @@ class ClassificationGrouping(TimeStampedModel):
 
             evidence_map = EvidenceKeyMap.instance()
 
-            # the below shouldn't happen but has in development environemnts
+            # the below shouldn't happen but has in development environments
             if None in all_zygosities:
                 all_zygosities.remove(None)
 
@@ -527,6 +532,7 @@ class ClassificationGrouping(TimeStampedModel):
             self.somatic_difference = somatic_difference
 
             all_term_stubs: list[ClassificationGroupingSearchTermStub] = []
+            term_stubs: Optional[Iterable[ClassificationGroupingSearchTermStub]]
             for _, term_stubs in classification_grouping_search_term_signal.send(sender=ClassificationGrouping, grouping=self):
                 if term_stubs:
                     all_term_stubs += [ts.to_search_term(grouping=self) for ts in term_stubs]
@@ -566,11 +572,11 @@ class ClassificationGrouping(TimeStampedModel):
     """ Filter value for the "No Data" summary count, as the significance itself is absent """
 
     @staticmethod
-    def clinical_significance_counts(qs: QuerySet['ClassificationGrouping']) -> list['ClassificationGroupingCount']:
+    def clinical_significance_counts(qs: QuerySet[ClassificationGrouping]) -> list[ClassificationGroupingCount]:
         """
-        Counts groupings by the clinical significance of their latest classification, VUS sub-levels merged into VUS.
+        Counts groupings by the clinical significance of their latest classification, VUS sublevels merged into VUS.
         Ordered most significant first, with values the evidence key doesn't rank (and No Data) last.
-        :param qs: Groupings to summarise - already filtered for the user
+        :param qs: Groupings to summarize - already filtered for the user
         """
         clin_sig_column = ClassificationGrouping.CLINICAL_SIGNIFICANCE_COLUMN
         counts: dict[Optional[str], int] = defaultdict(int)
@@ -666,7 +672,7 @@ class ClassificationGroupingSearchTermStub:
     term: str
     extra: Optional[frozendict] = None
 
-    def to_search_term(self, grouping: ClassificationGrouping) -> 'ClassificationGroupingSearchTerm':
+    def to_search_term(self, grouping: ClassificationGrouping) -> ClassificationGroupingSearchTerm:
         return ClassificationGroupingSearchTerm(
             grouping=grouping,
             term=self.term,
