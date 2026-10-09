@@ -120,7 +120,9 @@ The matcher lives in `patients/phenotype_matcher.py` and the splitting, matching
 sentence points at the `patients/models/models_phenotype.py:PhenotypeMatchVersion` (the `PHENOTYPE_MATCHER_VERSION`
 and OntologyVersion pair) it was matched with; `--stale` requeues those not on the current pair (`vg status` counts
 them, and the awaiting ones) and `--clear` requeues every sentence. A requeued sentence keeps its matches until it is
-rematched, and descriptions and approvals are untouched (#2131). Ambiguous acronyms are one rule,
+rematched, and descriptions and approvals are untouched (#2131). `--rebuild` first splits every description that has
+no sentences (`patients/phenotype_matching.py:register_unsplit_descriptions`): patients 0024 recreated the sentence
+tables empty with integer keys (#2135). Ambiguous acronyms are one rule,
 `patients/models/models_phenotype.py:TextPhenotypeMatch.is_ambiguous_acronym`, for matching and every read path.
 Curators approve a patient's matched text on the term approvals page (`patients/views.py:patient_term_approvals`,
 `patients/views_json.py:approve_patient_term`, which records a PatientModification). The patients page graphs come
