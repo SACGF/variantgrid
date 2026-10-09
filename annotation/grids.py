@@ -15,7 +15,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
-class AnnotationRunColumns(DatatableConfig):
+class AnnotationRunColumns(DatatableConfig[AnnotationRun]):
 
     @staticmethod
     def status(row: dict[str, Any]):
