@@ -16,12 +16,18 @@ links and approvals survive. #2130 (fuzzy matching) lands on top of it and is th
 
 ```python
 # annotation/models/models_phenotype_match.py
+class PhenotypeMatchVersion(TimeStampedModel):
+    """ The matcher code and the ontology its lookups were built from - one row per pair, like VariantAnnotationVersion """
+    matcher_version = models.IntegerField()
+    ontology_version = models.ForeignKey(OntologyVersion, null=True, blank=True, on_delete=CASCADE)
+    # unique on (matcher_version, ontology_version), nulls not distinct
+
+
 class TextPhenotype(models.Model):
     text = models.TextField(primary_key=True)
     processed = models.BooleanField(default=False)
     # What the matches hanging off this sentence were produced with. Null = matched before #2131, so stale.
-    matcher_version = models.IntegerField(null=True, blank=True)
-    ontology_version = models.ForeignKey(OntologyVersion, null=True, blank=True, on_delete=SET_NULL)
+    match_version = models.ForeignKey(PhenotypeMatchVersion, null=True, blank=True, on_delete=SET_NULL)
 ```
 
 ```python
@@ -35,22 +41,23 @@ PHENOTYPE_MATCHER_VERSION = 1
 
 Migrations, both in `annotation/`: one adding the two fields, one one-off registering
 `ManualOperation(task_id=ManualOperation.task_id_manage(["match_patient_phenotypes", "--stale"]), requires=["ontology-imported"], test=...)`
-where the test is "any processed `TextPhenotype` exists" (at that point they all have a null `matcher_version`).
+where the test is "any processed `TextPhenotype` exists" (at that point they all have a null `match_version`).
 `ManualMigrationOutstanding.outstanding_task` treats one successful run as satisfying every registration before it,
 so later bumps re-register the same task id in their own migration and a deployment that picks up several bumps at
 once rematches once.
 
 ## Behaviour
 
-1. **Stamping.** `annotation/phenotype_matcher.py:PhenotypeMatcher` captures `OntologyVersion.latest(validate=False)`
-   at `__init__` (the ontology its lookups were built from). `annotation/phenotype_matching.py:_process_text_phenotype`
-   sets `matcher_version = PHENOTYPE_MATCHER_VERSION` and `ontology_version` from the matcher when it sets `processed`.
-   The sentences `create_phenotype_description` marks processed without matching (no alphanumerics) are stamped the
-   same way, so they are never reported stale. A `TextPhenotype.mark_processed(ontology_version)` method is the one
-   place that sets the three fields.
-2. **Stale.** `TextPhenotype.stale_qs()` (static): `processed=True` and not
-   (`matcher_version=PHENOTYPE_MATCHER_VERSION` and `ontology_version=OntologyVersion.latest(validate=False)`). With no
-   ontology imported the current stamp is `None`, so the queryset compares against that.
+1. **Stamping.** `PhenotypeMatchVersion.get_or_create_current()` (`PHENOTYPE_MATCHER_VERSION` against
+   `OntologyVersion.latest(validate=False)`) is taken once wherever a `PhenotypeMatcher` is built - the pool worker
+   initialiser, the single-core bulk loop and `create_phenotype_description` - and passed to
+   `annotation/phenotype_matching.py:_process_text_phenotype`, which stamps it via `TextPhenotype.mark_processed`
+   when it sets `processed`. The sentences `create_phenotype_description` marks processed without matching (no
+   alphanumerics) are stamped the same way, so they are never reported stale.
+2. **Stale.** `TextPhenotype.stale_qs()` (static): `processed=True` and `match_version` not in
+   `PhenotypeMatchVersion.current_qs()` (a filter, so reporting never creates the row; until something has been
+   matched with the current pair every processed sentence is stale). With no ontology imported the pair's
+   `ontology_version` is `None`; the unique constraint treats nulls as equal so there is still one row.
 3. **Requeue.** `annotation/phenotype_matching.py:requeue_sentences(text_phenotype_qs) -> int`, in one transaction:
    delete the `TextPhenotypeMatch` rows of those sentences, `update(processed=False)`, and invalidate the day-long
    `PhenotypeDescription.get_ontology_term_ids` memo for every description holding one of them (cache_memoize's
@@ -76,7 +83,7 @@ once rematches once.
 
 ## Tests (`annotation/tests/test_phenotype_matching.py`)
 
-- A matched sentence carries the current `matcher_version` and the test `OntologyVersion`; an alphanumeric-free one
+- A matched sentence points at the current `PhenotypeMatchVersion` (test `OntologyVersion`); an alphanumeric-free one
   is stamped too.
 - `stale_qs`: a sentence stamped with an older matcher version, or another ontology version, is stale; a current one
   is not.

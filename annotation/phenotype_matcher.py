@@ -203,8 +203,6 @@ class PhenotypeMatcher:
     }
 
     def __init__(self):
-        # The ontology the lookups below are built from, stamped on each sentence matched (#2131)
-        self.ontology_version = OntologyVersion.latest(validate=False)
         ONTOLOGY_PK = {
             OntologyService.HPO: self._get_ontology_pks_by_term(OntologyService.HPO),
             OntologyService.MONDO: self._get_ontology_pks_by_term(OntologyService.MONDO),

@@ -6,14 +6,14 @@ from manual.operations.manual_operations import ManualOperation
 
 
 def _has_matched_phenotype_sentences(apps):
-    """ Every sentence matched before #2131 has no matcher_version, so is stale """
+    """ Every sentence matched before #2131 has no match_version, so is stale """
     TextPhenotype = apps.get_model("annotation", "TextPhenotype")
     return TextPhenotype.objects.filter(processed=True).exists()
 
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("annotation", "0190_textphenotype_matcher_version"),
+        ("annotation", "0190_phenotypematchversion"),
     ]
 
     operations = [

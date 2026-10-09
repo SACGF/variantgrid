@@ -2,13 +2,13 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Count, F, OuterRef, Q, QuerySet, Subquery
+from django.db.models import Count, F, OuterRef, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
+from model_utils.models import TimeStampedModel
 
 from annotation.phenotype_matcher import PHENOTYPE_MATCHER_VERSION, get_ambiguous_acronym_denylist
 from library.constants import DAY_SECS
@@ -101,30 +101,58 @@ class PhenotypeDescription(models.Model):
         return name
 
 
+class PhenotypeMatchVersion(TimeStampedModel):
+    """ What a sentence's matches were produced with: the matcher code (PHENOTYPE_MATCHER_VERSION) and the ontology
+        its lookups were built from. One row per pair, made the first time that pair matches a sentence (#2131).
+        Deleting an OntologyVersion cascades here and leaves its sentences unstamped, so stale. """
+    matcher_version = models.IntegerField()
+    ontology_version = models.ForeignKey(OntologyVersion, null=True, blank=True, on_delete=CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["matcher_version", "ontology_version"], nulls_distinct=False,
+                                    name="phenotype_match_version_unique"),
+        ]
+
+    def __str__(self):
+        return f"matcher v{self.matcher_version} / {self.ontology_version}"
+
+    @staticmethod
+    def _current_kwargs() -> dict:
+        return {"matcher_version": PHENOTYPE_MATCHER_VERSION, "ontology_version": OntologyVersion.latest(validate=False)}
+
+    @staticmethod
+    def get_or_create_current() -> 'PhenotypeMatchVersion':
+        """ The current matcher against the latest ontology - what a PhenotypeMatcher built now stamps """
+        phenotype_match_version, _ = PhenotypeMatchVersion.objects.get_or_create(**PhenotypeMatchVersion._current_kwargs())
+        return phenotype_match_version
+
+    @staticmethod
+    def current_qs() -> QuerySet['PhenotypeMatchVersion']:
+        """ Empty until something has been matched with the current pair - every processed sentence is stale then """
+        return PhenotypeMatchVersion.objects.filter(**PhenotypeMatchVersion._current_kwargs())
+
+
 class TextPhenotype(models.Model):
     """ This is a sentence, that has matches hanging off it """
 
     text = models.TextField(primary_key=True)
     processed = models.BooleanField(default=False)
     # What the matches hanging off this sentence were produced with. Null = matched before #2131, so stale.
-    matcher_version = models.IntegerField(null=True, blank=True)
-    ontology_version = models.ForeignKey(OntologyVersion, null=True, blank=True, on_delete=SET_NULL)
+    match_version = models.ForeignKey(PhenotypeMatchVersion, null=True, blank=True, on_delete=SET_NULL)
 
     def __str__(self):
         return f"{self.text} (processed: {self.processed})"
 
-    def mark_processed(self, ontology_version: Optional[OntologyVersion]):
-        """ ontology_version is the one the matcher's lookups were built from """
+    def mark_processed(self, match_version: PhenotypeMatchVersion):
         self.processed = True
-        self.matcher_version = PHENOTYPE_MATCHER_VERSION
-        self.ontology_version = ontology_version
-        self.save(update_fields=["processed", "matcher_version", "ontology_version"])
+        self.match_version = match_version
+        self.save(update_fields=["processed", "match_version"])
 
     @staticmethod
     def stale_qs() -> QuerySet['TextPhenotype']:
         """ Matched with an older matcher or ontology - `match_patient_phenotypes --stale` rematches these """
-        current = Q(matcher_version=PHENOTYPE_MATCHER_VERSION, ontology_version=OntologyVersion.latest(validate=False))
-        return TextPhenotype.objects.filter(processed=True).exclude(current)
+        return TextPhenotype.objects.filter(processed=True).exclude(match_version__in=PhenotypeMatchVersion.current_qs())
 
     def get_ambiguous_matches(self):
         """ Where an Ontology Service has multiple matches to the exact same text """

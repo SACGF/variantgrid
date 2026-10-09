@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from annotation.models.models_phenotype_match import (
     PatientTextPhenotype,
+    PhenotypeMatchVersion,
     TextPhenotype,
     TextPhenotypeMatch,
     patient_phenotype_terms,
@@ -280,8 +281,9 @@ class TestPhenotypeMatcherVersion(TestCase):
         cls.phenotype_matcher = PhenotypeMatcher()
 
     def _stamp(self, text, matcher_version, ontology_version):
-        TextPhenotype.objects.filter(text=text).update(matcher_version=matcher_version,
-                                                       ontology_version=ontology_version)
+        match_version, _ = PhenotypeMatchVersion.objects.get_or_create(matcher_version=matcher_version,
+                                                                       ontology_version=ontology_version)
+        TextPhenotype.objects.filter(text=text).update(match_version=match_version)
 
     def test_matched_sentences_are_stamped(self):
         create_phenotype_description("Raised TSH", self.phenotype_matcher)
@@ -289,8 +291,9 @@ class TestPhenotypeMatcherVersion(TestCase):
         for text in ["Raised TSH", "..."]:
             text_phenotype = TextPhenotype.objects.get(text=text)
             self.assertTrue(text_phenotype.processed)
-            self.assertEqual(text_phenotype.matcher_version, PHENOTYPE_MATCHER_VERSION)
-            self.assertEqual(text_phenotype.ontology_version, self.ontology_version)
+            self.assertEqual(text_phenotype.match_version.matcher_version, PHENOTYPE_MATCHER_VERSION)
+            self.assertEqual(text_phenotype.match_version.ontology_version, self.ontology_version)
+        self.assertEqual(PhenotypeMatchVersion.objects.count(), 1)
         self.assertFalse(TextPhenotype.stale_qs().exists())
 
     def test_stale_qs(self):
@@ -320,15 +323,14 @@ class TestPhenotypeMatcherVersion(TestCase):
         expected_term_ids = patient_description.get_ontology_term_ids()
         self.assertTrue(expected_term_ids)
 
-        self._stamp(text, None, None)  # Matched before #2131
+        TextPhenotype.objects.filter(text=text).update(match_version=None)  # Matched before #2131
         self.assertEqual(requeue_sentences(TextPhenotype.stale_qs()), 1)
         self.assertEqual(patient_description.get_ontology_term_ids(), [])  # memo invalidated
 
         bulk_patient_phenotype_matching(patients=[patient])
 
         text_phenotype = TextPhenotype.objects.get(text=text)
-        self.assertEqual(text_phenotype.matcher_version, PHENOTYPE_MATCHER_VERSION)
-        self.assertEqual(text_phenotype.ontology_version, self.ontology_version)
+        self.assertEqual(text_phenotype.match_version, PhenotypeMatchVersion.get_or_create_current())
         patient_text_phenotype = PatientTextPhenotype.objects.get(patient=patient)
         self.assertEqual(patient_text_phenotype.phenotype_description, patient_description)
         self.assertEqual(patient_text_phenotype.approved_by, user)
