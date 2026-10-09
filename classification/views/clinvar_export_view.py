@@ -56,7 +56,7 @@ from snpdb.models import Allele, ClinVarKey, GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
-class ClinVarExportBatchColumns(DatatableConfig):
+class ClinVarExportBatchColumns(DatatableConfig[ClinVarExportBatch]):
 
     def render_status(self, row: CellData):
         return ClinVarExportBatchStatus(row['status']).label

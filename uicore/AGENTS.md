@@ -74,6 +74,9 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   snpdb/views/datatable_view.py:RichColumn) in `__init__`, implement `get_initial_queryset`, and put per-request
   narrowing in `filter_queryset` reading `self.get_query_param(...)` (URL kwargs first, then GET/POST). Worked
   example with tests: snpdb/tests/test_datatable_server_csv.py:CohortCsvColumns.
+- Always subscript the base: `class XColumns(DatatableConfig[X])`. The model behind pk links, delete permissions
+  and the default CSV name is read off that declaration (`_declared_model`); a bare `DatatableConfig` falls back to
+  building `get_initial_queryset()` for it, with a warning in the log (#1913).
 - Wire it with `path('.../datatable', DatabaseTableView.as_view(column_class=XColumns), name='x_datatable')`
   (snpdb/views/datatable_view.py:DatabaseTableView). That one endpoint answers `?dataTableDefinition=1` (columns),
   the DataTables row requests, and `?dataTableCsv=1` (server CSV).
