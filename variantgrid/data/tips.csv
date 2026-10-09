@@ -31,7 +31,7 @@ Searching for a contig or chromosome name like 'chrX' takes you to a dedicated g
 You can manually enter a novel variant through Search → and create + annotate it if it doesn't exist in the database yet,snpdb,manual_variant_entry,VARIANT_MANUAL_CREATE
 Variant tags are lifted over between genome builds. A tag you apply in GRCh37 analysis will show up in GRCh38 views of the same allele.,variantopedia,variant_tags,
 You can view all of your variant tags across every analysis in one place from the Variant Tags grid.,variantopedia,variant_tags,
-Tag colour schemes can be shared across your lab. Create a colour collection in Settings → Tags and share it with your group.,snpdb,tag_settings,
+"A tag config sets tag colours, sort order, 1-click tags and how long before a tag goes stale. Create one in Settings → Tags and share it with your group.",snpdb,tag_settings,
 The Variant Details page shows 'Nearby Variants' with tag and classification counts. You can use this to spot if variant in same region/domain etc have been tagged or classified,variantopedia,view_variant,
 "Variant Details shows all other samples in your database that carry the same variant, including other genome builds. Filterable by zygosity.",variantopedia,variant_sample_information,VARIANT_DETAILS_SHOW_SAMPLES
 The Gene Symbol page has a hotspot graph showing where classifications cluster across the transcript. Click through to see the underlying records.,genes,view_gene_symbol,VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS
@@ -43,7 +43,7 @@ The annotation descriptions page documents every column available in the grids a
 MANE transcripts are indicated and selected as the default on variant detail pages and during classification. Look for the MANE badge on transcripts.,variantopedia,view_variant,
 "On the variant details page, you can toggle between genome builds if the variant exists in multiple builds. The switcher only shows builds where it's actually present.",variantopedia,view_variant,
 "The Classification Dashboard shows pathogenicity distribution, discordance summaries, and per-gene classification counts for your lab.",classification,classification_dashboard,
-Discordance Reports highlight variants where your lab and another lab have conflicting pathogenicity calls. Review and triage them from the Discordance Reports page.,classification,discordance_reports,DISCORDANCE_ENABLED
+"The Overlaps page shows variants classified by your lab and other labs, grouped by testing context (germline / somatic), so you can see where you agree and where you differ.",classification,overlaps,
 You can create a classification directly from an HGVS string. Useful when you want to classify a variant you haven't uploaded yet.,classification,create_classification_from_hgvs,CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT
 "Condition text in classifications is automatically matched to MONDO, OMIM, and HPO terms. Check the Condition Matchings page to review and fix any unresolved terms.",classification,condition_matchings,
 The Candidate Search feature can find existing classifications across your database that might be relevant to a sample you're currently analysing.,classification,classification_candidate_search,
@@ -81,7 +81,7 @@ Analyses can have “Horizontal mode” which lays nodes out left to right with 
 Big nodes no longer load their grid automatically. Change the variant count threshold in User Settings,snpdb,view_user_settings,ANALYSIS_NODE_GRID_AUTO_LOAD_MAX_VARIANTS
 Analysis Population node can exclude variants that fail gnomAD filters to drop low quality population records,analysis,analysis,
 The Effect node uses the new pathogenicity prediction columns and automatically switches based on the annotation version your analysis is using.,analysis,analysis,
-"The Tag node has a 'tagged within days' filter, so you can look at just recent tagging activity. Tags marked stale are flagged too.",analysis,analysis,
+"The Tag node has a 'tagged within days' filter, so you can look at just recent tagging activity. Tags older than the tag config's stale window are flagged too.",analysis,analysis,
 "Structural variants get AnnotSV, plus gnomAD SV, conservation and RepeatMasker annotation, shown on the variant details page and in grids.",variantopedia,view_variant,VARIANT_SYMBOLIC_ALT_ENABLED
 "MAVEdb links are shown on the variant page, so you can check whether a variant has functional assay data.",variantopedia,view_variant,
 denovoDB annotation is available for checking whether a variant has been seen as de novo in published studies.,annotation,view_annotation_descriptions,
@@ -101,7 +101,25 @@ If you visit the gene list page (genes → gene lists) there is a graphs tab tha
 Lab heads can add and remove members from the lab page without needing an admin.,snpdb,lab_members_tab,LAB_HEAD_MANAGE_MEMBERS
 Your user page shows your tags and your classifications in one place.,snpdb,view_user,
 "The Tag Stats page shows tag counts over time, broken down by user, lab and gene, plus which tags co-occur.",variantopedia,tag_stats,
-Tag sort order is set on the tag colors page. Artifact tags sort last by default so they stay out of your way.,snpdb,tag_settings,
+Tag sort order is set in the tag config (Settings → Tags). Artifact tags sort last by default so they stay out of your way.,snpdb,tag_settings,
 The Tags for Variants grid is back in VG4 - one row per variant showing all its tags across analyses.,variantopedia,tagged_variant_grid,
 Ontologies can have multiple versions now. Term pages tell you which version you're looking at so upgrades don't silently change meanings.,ontology,ontology_term,
 "Phenotype text matching handles aliases that map to multiple terms, warns when a match is ambiguous, and lets you skip or disable auto-matched terms.",patients,view_patient,
+The Duo Wizard sets up a proband plus one sequenced relative (a parent or a sibling) when the rest of the family isn't available. Inheritance modes follow the relationship.,analysis,duo_wizard,
+"Trio, Duo and Quad nodes have a 'Dominant (mosaic parent)' mode, which finds a parent carrying the variant in a fraction of cells by their low allele frequency rather than the caller's genotype.",analysis,analysis,
+Each tag gets a count badge under the node. Click it to filter the grid to that tag or to make a Tag node.,analysis,analysis,
+"The Intersection node accepts pasted variants or regions as text (anything search understands), so you don't need a BED file for a quick list.",analysis,analysis,
+"An analysis has its own tag config, so everyone opening it sees the same tag colours and 1-click tags.",analysis,analysis,
+"On the VCF / cohorts page, tick samples to launch a Duo, Trio or Quad analysis or to spawn a sub-cohort.",snpdb,view_cohort,
+"Cohorts can have a phenotype, which can be copied from their samples' patients.",snpdb,view_cohort,
+"The clinical significance counts on the gene page are clickable, filtering the classification groupings grid below.",genes,view_gene_symbol,
+The gene page variants grid has an 'Include ClinVar variants' toggle.,genes,view_gene_symbol,
+The patient page warns when its samples don't look like they came from the same individual (a likely sample swap).,patients,view_patient,
+"Ontology autocomplete matches words in any order (""muscular dystrophy duchenne"") and also matches term IDs (eg ""HPO:1061"").",patients,view_patient,
+You can tag a variant against a patient when the sample isn't known. Tag grids and Classify & Report follow it.,patients,view_patient,
+"The VCF page's Sample Files tab bulk adds BAM/CRAM files to every sample from a filename pattern, so IGV can open them.",snpdb,vcf_sample_files_tab,
+"The Variant Types page (Variants menu) shows what annotation each kind and size of variant gets, and which records import drops and why.",snpdb,variant_types,
+"Tag variants SomaticReportable, then use the Classify & Report tab on the sample or patient page to work through them and build a case report.",analysis,sample_classify_report_tab,
+"The patient page's Classify & Report tab gathers tags waiting to be classified across all of the patient's samples, including tags made at patient level. Tick 'Hide classified' to work through the queue, then build a multi-variant case report (PDF / Word).",patients,patient_classify_report_tab,
+"Mark a tag as 1-click in the tag config (Settings → Tags) and it gets its own (+) button in the analysis grid's tags column, so tagging with it takes one click.",snpdb,tag_settings,
+"The Pathogenicity Thresholds page (Annotation menu) lists the cutoffs behind the colours on the variant page - the ClinGen-calibrated PP3/BP4 scores the Damage node filters on, rankscore bands, and conservation / splicing bands - with references.",annotation,pathogenicity_thresholds,
