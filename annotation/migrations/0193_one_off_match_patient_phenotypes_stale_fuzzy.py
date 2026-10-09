@@ -13,7 +13,7 @@ def _has_stale_phenotype_sentences(apps):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("annotation", "0191_one_off_match_patient_phenotypes_stale"),
+        ("annotation", "0192_one_off_fix_annotation_mitochondrial_transcripts"),
     ]
 
     operations = [
