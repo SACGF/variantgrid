@@ -8,7 +8,7 @@ from manual.operations.manual_operations import ManualOperation
 def _has_stale_phenotype_sentences(apps):
     """ Sentences matched before PHENOTYPE_MATCHER_VERSION 2 """
     TextPhenotype = apps.get_model("annotation", "TextPhenotype")
-    return TextPhenotype.objects.filter(processed=True).exclude(matcher_version=2).exists()
+    return TextPhenotype.objects.filter(processed=True).exclude(match_version__matcher_version=2).exists()
 
 
 class Migration(migrations.Migration):
