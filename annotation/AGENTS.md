@@ -2,7 +2,8 @@
 Owns: AnnotationVersion + sub-versions (VariantAnnotationVersion, GeneAnnotationVersion, ClinVarVersion, HPA); the VEP
 pipeline (AnnotationRangeLock → AnnotationRun → partitioned VariantAnnotation / VariantTranscriptAnnotation /
 VariantGeneOverlap); AnnotSV and gene-level pipelines via AnnotationPipelineVersion; ClinVar import + ClinVarRecordCollection
-XML cache; GeneAnnotation / DBNSFPGeneAnnotation; citations; cohort annotation stats; phenotype text matching.
+XML cache; GeneAnnotation / DBNSFPGeneAnnotation; citations; cohort annotation stats. Phenotype text matching is
+patients' (patients/AGENTS.md).
 Start with:
 - models/models.py — every version model, AnnotationRun, VariantAnnotation (~3,000 lines: outline with grep)
 - models/models_enums.py — AnnotationStatus, VariantAnnotationPipelineType, VEPPlugin / VEPCustom
@@ -49,16 +50,6 @@ Patterns here:
   GeneAnnotationRelease (annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release) →
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
-- patients/phenotype_matcher.py:get_ambiguous_acronym_denylist reads every ontology term and relation (~230MB) on a cache
-  miss - 100s on a cold disk inside a page render. It is cached with no expiry and prebuilt on a new
-  OntologyVersion (patients/tasks/ambiguous_acronym_denylist_task.py); a Redis flush means one slow rebuild.
-- patients/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups patches HPO gaps by name or ID, and goes
-  stale as HPO adds and renames terms ("distal hypermobility" pointed at its opposite). After an HPO upgrade, compare
-  each entry with the matcher's result without it; drop entries HPO now matches and repoint ones it contradicts.
-- A change to phenotype lookups or matching logic bumps patients/phenotype_matcher.py `PHENOTYPE_MATCHER_VERSION` and
-  adds a migration registering `match_patient_phenotypes --stale` as a ManualOperation, or deployments keep the old
-  matches (sentences are matched once and cached). Each sentence points at the PhenotypeMatchVersion (matcher +
-  OntologyVersion pair) it was matched with; stale sentences show in `vg status`.
 - VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id) and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
