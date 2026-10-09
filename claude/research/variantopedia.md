@@ -86,6 +86,15 @@ are a separate count. Only tags the user can see are counted, and an allele orig
 ClinVar counts by clinical significance, DB zygosity sums) plus tag counts. `variantopedia/grids.py:NearbyVariantsGrid`
 shows one region's queryset.
 
+The nearby tab (`variantopedia/views.py:nearby_variants_tab`) loads with every variant page, so a slow query here once
+took production down: one user browsing MT variants held every sync gunicorn worker on a VTA partition seq scan until the
+10-minute global statement timeout (#2137). The tab now runs under `VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS`
+and shows a message when cancelled. The codon / exon / domain lookups skip rows with no transcript
+(`variantopedia/interesting_nearby.py:_variant_transcript_annotation_qs`) - MT tRNA/rRNA still have none after #2139 -
+because a NULL key becomes `transcript_id IS NULL`, which scans the partition and counts every unmatched transcript.
+Per-gene rows are off by default (`VARIANT_DETAILS_NEARBY_SHOW_GENE`, #771) at seconds per gene (#765). Cancelling
+on client disconnect and short timeouts for the other variant page tabs are still open on #2137.
+
 ### Server status (superuser)
 
 `variantopedia/views_server_status.py:server_status` pings celery workers by the names in `CELERY_WORKER_NAMES` (plus
