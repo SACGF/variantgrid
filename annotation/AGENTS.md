@@ -52,6 +52,9 @@ Gotchas:
 - annotation/phenotype_matcher.py:get_ambiguous_acronym_denylist reads every ontology term and relation (~230MB) on a cache
   miss - 100s on a cold disk inside a page render. It is cached with no expiry and prebuilt on a new
   OntologyVersion (annotation/tasks/ambiguous_acronym_denylist_task.py); a Redis flush means one slow rebuild.
+- annotation/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups patches HPO gaps by name or ID, and goes
+  stale as HPO adds and renames terms ("distal hypermobility" pointed at its opposite). After an HPO upgrade, compare
+  each entry with the matcher's result without it; drop entries HPO now matches and repoint ones it contradicts.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.

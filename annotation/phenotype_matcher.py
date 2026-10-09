@@ -598,7 +598,7 @@ class PhenotypeMatcher:
         PIERRE_ROBIN = (load_hpo_by_name, "Pierre-Robin sequence")
         PAVM = (load_hpo_by_name, "Pulmonary arteriovenous malformation")
         CMS = (load_hpo_by_name, "Fatigable weakness")
-        HYDROPS_FETALIS = (load_hpo_by_name, "Nonimmune hydrops fetalis")
+        HYDROPS_FETALIS = (load_hpo_by_name, "Hydrops fetalis")
         AFEBRILE = (load_hpo_by_id, 7359)  # Focal seizures, afebrile (HP:0040168) is obsolete, links to "Focal-onset seizure"
         FEBRILE_SEIZURES = (load_hpo_by_id, 11171)
         GEFS = FEBRILE_SEIZURES  # GEFS+ is a multi-type OMIM disease (febrile seizures links to all)
@@ -631,13 +631,13 @@ class PhenotypeMatcher:
             "GEFS+": GEFS,
             "GSD": GLYCOGEN_STORAGE_DISEASE,
             "GTOP": (load_hpo_by_name, "Spontaneous abortion"),  # Genetic Termination of Pregnancy
-            "HCM": (load_hpo_by_name, "Concentric hypertrophic cardiomyopathy"),
+            "HCM": (load_hpo_by_name, "Hypertrophic cardiomyopathy"),
             "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
             'HUS': HUS,
             "IBD": (load_omim_by_id, 266600),  # IBD1
             "ID": (load_hpo_by_name, 'intellectual disability'),
             "LGA": (load_hpo_by_name, "Large for gestational age"),
-            "LQTS": (load_hpo_by_id, 31547),  # Long QT syndrome
+            "LQTS": (load_hpo_by_id, 1657),  # Prolonged QT interval
             "MM": (load_hpo_by_name, 'Multiple myeloma'),
             "NCS": (load_hpo_by_id, 12668),  # "Neurocardiogenic syncope" aka Vasovagal syncope
             "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
@@ -645,7 +645,7 @@ class PhenotypeMatcher:
             "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
             'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
             "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
-            "SUDEP": (load_hpo_list_by_names, ["Sudden death", "Epilepsy"]),
+            "SUDEP": (load_hpo_by_id, 33258),  # Sudden unexpected death in epilepsy
         }
 
         CASE_INSENSITIVE_LOOKUPS = {
@@ -682,7 +682,7 @@ class PhenotypeMatcher:
             "crowded dentition": (load_hpo_by_id, 678),
             "development delay": DEVELOPMENTAL_DELAY,
             "dev issues": DEVELOPMENTAL_DELAY,
-            "distal hypermobility": (load_hpo_by_name, "Limitation of joint mobility"),
+            "distal hypermobility": (load_hpo_by_id, 20152),  # Distal joint hypermobility
             "duane syndrome": (load_hpo_by_id, 9921),
             "dystrophin": (load_gene_by_name, 'DMD'),
             "dysmorphic feature": DYSMORPHIC_FACE,
@@ -711,7 +711,7 @@ class PhenotypeMatcher:
             "hereditary neuralgic amyotrophy": (load_omim_by_id, 162100),
             "high ketones": KETOSIS,
             "high acth": (load_hpo_by_name, "Increased circulating ACTH level"),
-            "hot flushes": (load_hpo_by_id, 32324),  # Episodic, so going for "Non-periodic recurrent fever"
+            "hot flushes": (load_hpo_by_name, "Hot flashes"),
             "hyperinsulinism": (load_hpo_by_id, 842),
             "hypoca": (load_hpo_by_name, "Hypocalcemia"),
             "hypoferritinaemia": (load_hpo_by_name, "Decreased serum ferritin"),  # hyper is there, hypo is not...
@@ -725,11 +725,11 @@ class PhenotypeMatcher:
             "increased renin": (load_hpo_by_id, 848),  # Increased circulating renin level
             "intellectual delay": (load_hpo_by_id, 1249),  # Intellectual disability (no delay anymore)
             "impaired consciousness": (load_hpo_by_name, "Reduced consciousness/confusion"),
-            "iron deficiency": (load_hpo_by_id, 40130),  # Abnormal serum iron concentration
+            "iron deficiency": (load_hpo_by_id, 40303),  # Decreased circulating iron concentration
             "kneist dysplasia": (load_omim_by_name, "KNIEST DYSPLASIA"),
             "learning difficulties": COGNITIVE_IMPAIRMENT,
             "learning disability": COGNITIVE_IMPAIRMENT,
-            "leg pains": (load_hpo_by_name, "Limb pain"),
+            "leg pains": (load_hpo_by_name, "Lower limb pain"),
             "limb abnormalities": ABNORMALITY_OF_LIMBS,
             "low arylsulphatase": ARYLSULFATASE_A_DEFICIENCY,
             "low arylsulphatase A": ARYLSULFATASE_A_DEFICIENCY,
@@ -760,8 +760,7 @@ class PhenotypeMatcher:
             "pierre robin": PIERRE_ROBIN,
             "pierre-robin": PIERRE_ROBIN,
             'pig genes': PIG_GENES,
-            "polysyndactyly": (load_hpo_by_id, 5873),
-            "poor sleep": (load_hpo_by_id, 2360),
+            "polysyndactyly": (load_hpo_list_by_names, ["Polydactyly", "Syndactyly"]),  # HPO only has foot/hallux-specific terms
             "prolonged qt": (load_hpo_by_name, "Prolonged QT interval"),
             "prostate ca": (load_hpo_by_name, "Prostate cancer"),
             "pulmonary avms": PAVM,
@@ -782,9 +781,9 @@ class PhenotypeMatcher:
             "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
             "t1 diabetes": DIBETES_TYPE_1,
             "two hair whorls": (load_hpo_by_id, 10813),
-            "uncoordinated": (load_hpo_by_id, 2406),
+            "uncoordinated": (load_hpo_by_name, "Incoordination"),
             "urea cycle": (load_genes_by_name, ["ARG1", "ASL", "ASS1", "CPS1", "NAGS", "OTC"]),
-            "urogenital sinus": (load_hpo_by_id, 119),
+            "urogenital sinus": (load_hpo_by_id, 100779),  # Urogenital sinus anomaly
             "waardenburg type ii": (load_omim_pks_containing_name, "waardenburg syndrome, type 2"),
             "widespread eyes": (load_hpo_by_id, 316),
         }
