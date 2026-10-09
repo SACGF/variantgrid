@@ -1,38 +1,8 @@
 {% load static %}
+{% load js_tags %}
 <div id="permissions-embedded-page">
-<script>
-function openDelete() {
-   $("#delete-confirm-box").slideDown();
-}
-
-$(document).ready(function() {
-    $("button#delete-object").click(function() {
-        let delete_obj_url = "{% url 'group_permissions_object_delete' class_name instance.pk %}"; 
-        $.ajax({
-            type: "POST",
-            url: delete_obj_url,
-            success: function(data) {
-                window.location = "{{ delete_redirect_url }}";
-            },
-            error: function(data) {
-                let errorMessageUl = createMessage("error", data.responseText);
-                $("#delete-container").empty().append(errorMessageUl);
-            }
-        });    
-
-    });
-
-    
-    $("button#no-delete").click(function() {
-       $("#delete-confirm-box").slideUp();
-    });
-
-    let options = {
-        target: '#permissions-embedded-page'
-    };
-    $('form#group-permission-form').ajaxForm(options); 
-});
-</script>
+{% json_data "group-permissions-data" class_name=class_name instance_id=instance.pk delete_redirect_url=delete_redirect_url %}
+<script src="{% static 'js/snpdb/group_permissions.js' %}"></script>
 
 
 <div id="permissions">

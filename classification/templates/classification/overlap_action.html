@@ -8,65 +8,8 @@
 {% load ui_help %}
 {% block title %}Overlap Discussion{% endblock %}
 {% block head %}
-    <script>
-        function updateCalculator() {
-            let selectedValues = $('.value-change option:selected').map(function() {
-                return this.value;
-            }).get();
-            let nonInteractiveValues = $('.non-interactive').map(function() {
-                return this.value;
-            }).get();
-
-            let uniqueValues = [...new Set(selectedValues.concat(nonInteractiveValues))];
-            let valueStr = uniqueValues.join(',');
-            let valueType = '{{ overlap.value_type.value }}';
-            let baseUrl = "{% url 'overlap_calc' %}?value_type={{ overlap.value_type.value }}";
-            let ajaxDiv = $('<div>', {'data-toggle': 'ajax', 'href': `${baseUrl}&values=${valueStr}`});
-            let parentDiv = $('#resulting-status');
-            parentDiv.html(ajaxDiv);
-        }
-
-        $(document).ready(() => {
-            $('.value-change').change(() => {updateCalculator()})
-            updateCalculator();
-        });
-
-        function submitCheck() {
-            let warnings = [];
-            if (notesVal() == null) {
-                warnings.push("Please provide text in the notes field.");
-            }
-            if (!isConfirmed()) {
-                warnings.push("All changes must be marked as agreed upon.");
-            }
-            if (warnings.length > 0) {
-                let warning = warnings.join("\n");
-                window.alert(`Before submitting:\n${warning}`)
-                return false;  // don't submit if checkbox isn't ticked
-            }
-        }
-
-        function showFormCheck() {
-            let value = $("input[name='outcome']:checked").val();
-            let allValues = {
-                "#pending-changes": value == "agree",
-                "#postponed-changes": value == "postpone"
-            }
-            Object.entries(allValues).forEach(entry => {
-                let [key, value] = entry;
-                if (value) {
-                    $(key).slideDown();
-                } else {
-                    $(key).slideUp();
-                }
-            })
-        }
-
-        $(document).ready(() => {
-           $("input[name='outcome']").change(showFormCheck);
-           showFormCheck();
-        });
-    </script>
+    {% json_data "overlap-action-data" value_type=overlap.value_type.value %}
+    <script src="{% static 'js/classification/overlap_action.js' %}"></script>
 {% endblock %}
 {% block content %}
     <div class="container">

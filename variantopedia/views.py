@@ -95,7 +95,6 @@ def variants(request, genome_build_name=None):
         "standard_contigs": genome_build.standard_contigs,
         "variant_types": [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()],
         "initial_filters": initial_filters,
-        "initial_filters_json": json.dumps(initial_filters),
         "default_contig_id": default_contig_ids[0] if default_contig_ids else None,
         "gene_symbol_form": gene_symbol_form,
         "gene_symbol_aliases": gene_symbol_aliases,

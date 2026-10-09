@@ -1,37 +1,8 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
+{% load static %}
 
 {% block content %}
-<script>
-    function setupClinVarStars(bifSelect) {
-        // StarsWidget renders the zero option itself - we only show/hide the whole thing
-        let starsRow = $("#clinvar-stars-row");
-
-        function checkClinVarStarsVisibility() {
-            starsRow.toggle(bifSelect.val() == 'C');
-        }
-
-        bifSelect.change(checkClinVarStarsVisibility);
-        checkClinVarStarsVisibility();
-    }
-
-    function setupCOSMICCount(bifSelect) {
-        function checkCOSMICCount() {
-            $("#cosmic-count-widget").toggle(bifSelect.val() === 'M');
-        }
-
-        bifSelect.change(checkCOSMICCount);
-        checkCOSMICCount();
-    }
-
-    $(document).ready(function() {
-        let bifForm = $("form#built-in-filter");
-        let bifSelect = $("#id_built_in_filter", bifForm);
-        setupClinVarStars(bifSelect);
-        setupCOSMICCount(bifSelect);
-        setupSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"));
-        ajaxForm(bifForm);
-    });
-</script>
+<script src="{% static 'js/analysis/builtinfilternode_editor.js' %}"></script>
 <form id="built-in-filter" method="post" action="{{ request.path }}">
     {% csrf_token %}
     {{ form.non_field_errors }}

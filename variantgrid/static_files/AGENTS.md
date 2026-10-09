@@ -25,3 +25,10 @@ most grid and flag names still need reading the code that builds them. A class w
 (`SequencerModel.css_class`) goes in `DATA_DERIVED` there, or the scan calls it unused.
 
 Bootstrap 4: `data-toggle` / `data-target`, not the Bootstrap 5 `data-bs-*` forms.
+
+Page JS lives in `default_static/js/<app>/<template_name>.js`, not in an inline `<script>` (#2021): the template keeps
+a `<script src>` where the block was, and passes values with `{% json_data "<name>-data" key=value %}`
+(`uicore/templatetags/js_tags.py`), read by `readJsonData("<name>-data")` (`variantgrid/static_files/default_static/js/global.js`); URLs come from
+`Urls.<name>(...)` (django_js_reverse). New files start with `// @ts-check` and must pass `npx eslint`. A new static
+file 500s every page that references it until `collectstatic` has added it to the manifest
+(`ManifestStaticFilesStorage`), so it ships via `scripts/upgrade.sh`, never a bare checkout on a served tree.

@@ -14,38 +14,8 @@
 {% block content %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
-<script>
-    // for showing issues
-    function classificationReviews(data) {
-        // data.flags = JSON.stringify(['classification_pending_changes', 'classification_internal_review', 'classification_suggestion']);
-        data.pending = "true";
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
-
-    function classificationSigChanges(data) {
-        data.flags = JSON.stringify(['classification_significance_change']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
-
-    function classificationMatchingVariant(data) {
-        data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
-
-    function classificationUnshared(data) {
-        data.flags = JSON.stringify(['classification_unshared']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
-    function classificationWithdrawn(data) {
-        data.flags = JSON.stringify(['classification_withdrawn']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
-    function classificationExcludeClinVar(data) {
-        data.flags = JSON.stringify(['classification_not_public']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
-
-</script>
+{% json_data "classification-dashboard-data" lab_ids_str=dlab.lab_ids_str %}
+<script src="{% static 'js/classification/classification_dashboard.js' %}"></script>
 <div class="container">
     {% lab_picker data=dlab.lab_picker %}
 </div>

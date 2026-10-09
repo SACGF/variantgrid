@@ -93,6 +93,9 @@ export default [
                 VariantGridFilterBuilder: "readonly", // variantgrid_filter_builder.js
                 VariantGridFormat: "readonly", // variantgrid_formats.js
                 getValue: "readonly", // global.js
+                readJsonData: "readonly", // global.js
+                setAutocompleteValue: "readonly", // global.js
+                setCrossLink: "readonly", // global.js
                 removeItemFromArray: "readonly", // global.js
                 checkLoggedIn: "readonly", // global.js
                 convertTimestamp: "readonly", // global.js
@@ -139,12 +142,12 @@ export default [
                 panelResizeUpdateDelay: "readonly", // analysis.html
                 variantTags: "readonly", // analysis.html
                 loadInitialGridEditor: "readonly", // analysis.html
-                registerComponent: "readonly", // analysis_editor_and_grid.html
-                EDITOR: "readonly", // analysis_editor_and_grid.html
-                reloadNodes: "readonly", // analysis_settings.html
+                registerComponent: "readonly", // analysis/analysis_editor_and_grid.js
+                EDITOR: "writable", // analysis/analysis_editor_and_grid.js, reassigned on fragment reload
+                reloadNodes: "readonly", // analysis/analysis_settings.js
                 variantTagStaleDays: "writable", // analysis.html, reassigned in analysis_nodes.js
-                nodeProbandSampleId: "readonly", // node_data_grid.html, sample_variants_tab.html
-                nodeProbandPatientId: "readonly", // node_data_grid.html
+                nodeProbandSampleId: "writable", // analysis/node_data_grid.js, snpdb/sample_variants_tab.js
+                nodeProbandPatientId: "writable", // analysis/node_data_grid.js
             },
         },
         rules: {

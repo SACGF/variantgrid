@@ -3,57 +3,8 @@
 {% load ui_tabs_builder %}
 {% load js_tags %}
 <div id='analysis-settings-container'>
-<script>
-	IN_ANALYSIS = $("#analysis-and-toolbar-container").length > 0;
-    
-	function reloadNodes(onlyErrors) {
-		$.ajax({
-		    type: "POST",
-		    url: "{% url 'analysis_reload' analysis.pk %}",
-		    data: 'only_errors=' + encodeURIComponent(JSON.stringify(!!onlyErrors)),
-		    success: function(data) {
-		    	if (IN_ANALYSIS) {
-                    checkAndMarkDirtyNodes();
-		    	}
-		    }
-		});
-	}
-
-    function lockAnalysis(lock) {
-	    if (typeof(lock) === 'undefined') {
-	        lock = true;
-        }
-		$.ajax({
-		    type: "POST",
-		    url: "{% url 'analysis_settings_lock' analysis.pk %}",
-            data: 'lock=' + encodeURIComponent(JSON.stringify(lock)),
-		    success: function(data) {
-                // force a reload of the page - either analysis or analyses listing
-                window.location.reload();
-		    }
-		});
-    }
-
-	$(document).ready(function() {
-        ANALYSIS_SETTINGS = {{ new_analysis_settings|jsonify }};
-
-        $('button#close-analysis-settings').click(function() {
-            $("#analysis-settings-container").parent().empty();            
-        });
-
-		if (!IN_ANALYSIS) {
-		  $("#force-reload-nodes-button").hide();
-		  $("#force-reload-error-nodes-button").hide();
-		}
-
-        $('#force-reload-nodes-button').click(function() { reloadNodes(false); });
-        $('#force-reload-error-nodes-button').click(function() { reloadNodes(true); });
-        $("button#lock-analysis-button").click(function() { lockAnalysis(); });
-        $("button#unlock-analysis-button").click(function() { lockAnalysis(false); });
-        // TODO: Lock history...
-
-	});
-</script>
+{% json_data "analysis-settings-data" analysis_id=analysis.pk new_analysis_settings=new_analysis_settings %}
+<script src="{% static 'js/analysis/analysis_settings.js' %}"></script>
 <style>
     #lock-details {
         padding-right: 10px;

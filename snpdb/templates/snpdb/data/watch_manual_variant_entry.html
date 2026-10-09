@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load static %}
 {% load js_tags %}
 {% load crispy_forms_field %}
 {% load ui_utils %}
@@ -17,48 +18,8 @@
           }
     }
     </style>
-    <script>
-        function populatePage(data) {
-            console.log(data);
-            $("#variant-status").text(data["first_variant_annotation_status"]);
-            $("#created-date").empty().append(createTimestampDom(data["created"], true));
-        }
-
-        function displayError(message) {
-            $("#glowing-cloud").remove();
-            $("#variant-status").addClass("error").text(message);
-        }
-
-        function handleMVECData(data) {
-            // if we can redirect - do so
-            // otherwise populate screen
-            if (data["is_ready"]) {
-                window.location.href = Urls.view_variant(data["first_variant_id"]);
-            } else {
-                if (data["import_status"] == 'E') {
-                    displayError("Variant import failed.");
-                } else {
-                    populatePage(data);
-                    setTimeout(pollServer, 2000);
-                }
-            }
-        }
-
-        function pollServer() {
-            $.ajax({
-                url: Urls.api_manual_variant_entry_collection({{ mvec.pk }}),
-                success: handleMVECData,
-                error: function() {
-                    displayError("Error contacting server - please reload page.");
-                }
-            });
-        }
-
-        $(document).ready(function() {
-            handleMVECData({{ initial_json|safe }});
-        });
-
-    </script>
+    {% json_data "watch-manual-variant-entry-data" mvec_id=mvec.pk initial_json=initial_json %}
+    <script src="{% static 'js/snpdb/watch_manual_variant_entry.js' %}"></script>
 {% endblock %}
 {% block content %}
     <div class="container">

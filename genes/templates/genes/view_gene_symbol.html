@@ -478,39 +478,7 @@
                     <span class="filter-message" id="gene-variants-grid-filtering-message"></span>
                     <a class='hover-link' href="javascript:clearGeneVariantsGrid()">Show all...</a>
                 </span>
-                <script>
-                    // Called by DataTables before each ajax call - the grid class reads them as extra_filters
-                    function geneVariantsDatatableFilter(data) {
-                        data["extra_filters"] = JSON.stringify(geneVariantsGridParams);
-                        data["show_clinvar"] = $("#gene-variants-show-clinvar").is(":checked");
-                    }
-
-                    function reloadGeneVariantsTable() {
-                        const table = $("#gene-variants-datatable");
-                        if ($.fn.DataTable.isDataTable(table)) {
-                            table.DataTable().ajax.reload();
-                        }
-                    }
-
-                    function clearGeneVariantsGrid() {
-                        geneVariantsGridParams = {};
-                        clearTagCountsSummary(GENE_VARIANTS_TAG_COUNTS);
-                        reloadGeneVariantsTable();
-                        $("#gene-variants-grid-filtering-message").empty().parent().hide();
-                    }
-
-                    function geneVariantsTagsChanged(tagIds) {
-                        geneVariantsGridParams = tagIds.length ? {"tags": tagIds} : {};
-                        reloadGeneVariantsTable();
-                    }
-
-                    const GENE_VARIANTS_TAG_COUNTS = "[data-tag-counts-summary]";
-
-                    $(document).ready(() => {
-                        setupTagCountsSummary(GENE_VARIANTS_TAG_COUNTS, geneVariantsTagsChanged);
-                        $("#gene-variants-show-clinvar").change(reloadGeneVariantsTable);
-                    });
-                </script>
+                <script src="{% static 'js/genes/view_gene_symbol_variants.js' %}"></script>
                 {% tag_counts_summary genome_build=genome_build gene_symbol=gene_symbol %}
                 <table id="gene-variants-datatable" class="sticky-header"
                        data-datatable-url="{% url 'gene_symbol_variants_grid' gene_symbol=gene_symbol.pk genome_build_name=genome_build.name %}"

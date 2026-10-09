@@ -1,3 +1,4 @@
+{% load static %}
 {% load tz %}
 {% load crispy_forms_tags %}
 {% load js_tags %}
@@ -10,79 +11,8 @@
         font-size: 1.5em;
     }
 </style>
-<script>
-// Note: This is a tab so can be re-loaded (ie don't use global let/const)
-SAMPLE_GENE_LIST_DATA = {{ sample_gene_lists_data | jsonify }};
-
-function populateSampleGeneListFromJSON(data) {
-    let sampleGeneListContainer = $(".sample-gene-list-container[sample-gene-list-id=" + data.pk + "]");
-    let details = $(".sample-gene-list-details", sampleGeneListContainer);
-    let analysisTemplates = $(".sample-gene-list-analysis-templates", sampleGeneListContainer);
-    let toggle = $("a.show-sample-gene-list-toggle", sampleGeneListContainer);
-
-    if (data.visible) {
-        toggle.hide();
-        details.addClass("show");
-        $("button.hide", details).show();
-        $("button.un-hide", details).hide();
-        analysisTemplates.show();
-    } else {
-        toggle.show();
-        details.removeClass("show");
-        $("button.hide", details).hide();
-        $("button.un-hide", details).show();
-        analysisTemplates.hide();
-    }
-
-    let myActiveIcon = $(".active-sample-gene-list", details);
-    if (data.active) {
-        $(".active-sample-gene-list").hide();  // hide all others
-        myActiveIcon.show();
-        $("button.make-active", details).hide();
-    } else {
-        myActiveIcon.hide();
-        $("button.make-active", details).show();
-    }
-}
-
-function drawInitialSampleGeneLists() {
-    for (let i=0 ; i<SAMPLE_GENE_LIST_DATA.length ; i++) {
-        populateSampleGeneListFromJSON(SAMPLE_GENE_LIST_DATA[i]);
-    }
-    $("#sample-gene-lists").show();
-}
-
-function modifySampleGeneList(that, data) {
-    let sampleGeneListContainer = $(that).parents(".sample-gene-list-container");
-    let sampleGeneListId = sampleGeneListContainer.attr("sample-gene-list-id");
-
-    $.ajax({
-        type: "POST",
-        data: data,
-        url: Urls.api_sample_gene_list(sampleGeneListId),
-        success: populateSampleGeneListFromJSON,
-    });
-}
-
-$(document).ready(function() {
-    drawInitialSampleGeneLists();
-
-    $("button.make-active").click(function() {
-        modifySampleGeneList(this, {active: true});
-    });
-
-    $("button.hide").click(function() {
-        modifySampleGeneList(this, {visible: false});
-    });
-
-    $("button.un-hide").click(function() {
-        modifySampleGeneList(this, {visible: true});
-    });
-
-    $("form#new-gene-list-form").ajaxForm({target: "#sample-gene-list-tab-container"});
-
-});
-</script>
+{% json_data "sample-gene-lists-tab-data" sample_gene_lists_data=sample_gene_lists_data %}
+<script src="{% static 'js/genes/sample_gene_lists_tab.js' %}"></script>
 
 <p>If you have more than one sample gene list, you must manually set one as active.
     The active one is automatically used in analyses templates and gene list nodes.

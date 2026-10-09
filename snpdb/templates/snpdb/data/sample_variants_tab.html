@@ -1,4 +1,5 @@
 {% load static %}
+{% load js_tags %}
 {% load tag_config_tags %}
 {% render_tag_styles_and_formatter %}
 <style>
@@ -15,58 +16,9 @@
     {% include "uicore/messages/messages.html" %}
 
     {% if analysis %}
-        <script>
-        // Tags are shown read only here - they are added/removed in the analysis itself
-        variantTags = {% render_variant_tags_dict analysis %};
-        analysisSamples = {% render_analysis_samples_dict analysis %};
-        variantTagOrder = {% render_variant_tag_order %};
-        variantTagsReadOnly = true;
-        // Every grid on this page is this sample's, so its pills are read against them
-        var nodeProbandSampleId = {{ sample.pk }};
-
-        function gridLoadError() {
-            console.log("gridLoadError");
-        }
-
-        function on_error_function() {
-            console.log("on_error_function");
-        }
-
-        function showNodeGrid(nodeStatus) {
-            let analysisId = {{ analysis.id }};
-            let analysisVersion = {{ analysis.version }};
-            let nodeId = nodeStatus.id;
-            let version = nodeStatus.version;
-
-            let config_url = Urls.node_grid_config(analysisId, analysisVersion, nodeId, version, "default");
-            let handler_url = Urls.node_grid_handler(analysisId);
-            let unique_code = "sample-variants-grid";  // ok to be constant on this page
-            function noOp() {};
-            setupNodeGrid(config_url, handler_url, analysisId, nodeId, version, unique_code,
-                          noOp, gridLoadError, on_error_function);
-        }
-
-        $(document).ready(function() {
-            // The CSV/VCF exports run as Celery jobs then hand back a file - see analysis_downloads.js
-            analysisDownloadTracker = new AnalysisDownloadTracker({{ analysis.pk }}, "#sample-variants-downloads");
-
-            let messagePoller = new AnalysisMessagePoller(Urls.nodes_status({{ analysis.pk }}));
-            let gridContainer = $("#node-data-grid");
-
-            $("#id_node").change(function() {
-                let nodeId = $(this).val();
-                gridContainer.empty();
-                if (nodeId) {
-                    $("<table/>").attr({
-                        id: 'grid-' + nodeId,
-                        class: 'grid'
-                    }).appendTo(gridContainer);
-                    messagePoller.observe_node(nodeId, "ready", showNodeGrid);
-                }
-            });
-            messagePoller.update_loop();
-        });
-        </script>
+        <script type="application/json" id="sample-variants-tab-tags-data">{"variant_tags": {% render_variant_tags_dict analysis %}, "analysis_samples": {% render_analysis_samples_dict analysis %}, "variant_tag_order": {% render_variant_tag_order %}}</script>
+        {% json_data "sample-variants-tab-data" sample_id=sample.pk analysis_id=analysis.pk analysis_version=analysis.version %}
+        <script src="{% static 'js/snpdb/sample_variants_tab.js' %}"></script>
         <h3>Analysis: {{ analysis }}</h3>
         {{ output_node_form.as_p }}
 
