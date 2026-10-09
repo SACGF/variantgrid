@@ -321,11 +321,6 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
     return results
 
 
-def _locus_ref_alt(vc: VariantCoordinate) -> tuple:
-    """ Search formats chrom for the build's fasta, which needn't match the contig name """
-    return vc.position, vc.ref, vc.alt, vc.svlen
-
-
 def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
     for genome_build in search_input.genome_builds:
         variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
@@ -352,9 +347,10 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
         visible_variants_qs = search_input.get_visible_variants(genome_build)
         results = get_results_from_variant_coordinate(genome_build, visible_variants_qs, variant_coordinate)
         if results.exists():
+            search_coordinate = variant_coordinate.as_contig_accession(genome_build)
             for v in results:
                 messages = search_messages
-                if _locus_ref_alt(v.coordinate) != _locus_ref_alt(variant_coordinate):  # found via ModifiedImportedVariant
+                if v.coordinate.as_contig_accession(genome_build) != search_coordinate:  # found via ModifiedImportedVariant
                     msg = f'"{variant_coordinate.format_short()}" was normalised to this variant during VCF import'
                     messages = [*search_messages, SearchMessage(msg, LogLevel.WARNING, substituted=True)]
                 yield SearchResult(v.preview, messages=messages)
