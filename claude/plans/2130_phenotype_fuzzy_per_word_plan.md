@@ -54,7 +54,7 @@ accepted candidate is equally close and "first wins" stays deterministic.
 `PHENOTYPE_MATCHER_VERSION = 2` with a changelog line `# 2: fuzzy matching is one typo in one word (#2130)`, and a new
 `annotation/` migration registering `match_patient_phenotypes --stale` with `requires=["ontology-imported"]` and a
 test of "any stale `TextPhenotype` exists" expressed on the historical model (`processed=True` and not
-`matcher_version=2`).
+`match_version__matcher_version=2`).
 
 ## Tests (`annotation/tests/test_phenotype_matching.py`)
 
