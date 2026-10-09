@@ -55,6 +55,10 @@ class TestPhenotypeMatching(TestCase):
             ("MONDO:0018971", OntologyService.MONDO, "isolated oxycephaly", ["acrocephaly"]),
             ("HP:0001903", OntologyService.HPO, "Anemia", ["Anaemia"]),
             ("MONDO:0002280", OntologyService.MONDO, "anemia (disease)", ["anemia"]),
+            ("HP:0008151", OntologyService.HPO, "Prolonged prothrombin time", ["Prolonged PT"]),
+            ("HP:0000010", OntologyService.HPO, "Recurrent urinary tract infections", ["Recurrent UTIs"]),
+            ("HP:0002373", OntologyService.HPO, "Febrile seizure", ["Febrile seizures"]),
+            ("HP:0012514", OntologyService.HPO, "Lower limb pain", ["Leg pain"]),
         ]
         for term_id, ontology_service, name, aliases in terms:
             OntologyTerm.objects.get_or_create(id=term_id, defaults={
@@ -109,7 +113,8 @@ class TestPhenotypeMatching(TestCase):
         self.check_expected_results_for_description(SYNDROME_ABBREV)
 
     def test_skip_words(self):
-        """ "soft" is an exact alias of SOFT syndrome and "decreased in" is 1 edit from "Decreased INR" """
+        """ "soft" is an exact alias of SOFT syndrome, "decreased in" is 1 edit from "Decreased INR" but in a
+            2-letter word, which is an abbreviation rather than a typo """
         SKIP_WORDS = {"soft": None,
                       "decreased in": None,
                       "SOFT syndrome": (OntologyService.OMIM, "OMIM:614813"),
@@ -117,13 +122,33 @@ class TestPhenotypeMatching(TestCase):
 
         self.check_expected_results_for_description(SKIP_WORDS)
 
-    def _match_ids(self, text) -> set[str]:
-        return set(self.phenotype_matcher.get_matches([(w, None) for w in text.split()]))
+    def _match_ids(self, text, phenotype_matcher=None) -> set[str]:
+        phenotype_matcher = phenotype_matcher or self.phenotype_matcher
+        return set(phenotype_matcher.get_matches([(w, None) for w in text.split()]))
 
     def test_dictionary_word_not_fuzzy_matched(self):
         """ "table" is 1 edit from HPO "Stable" but is spelled correctly, so isn't a typo """
         self.assertEqual(self._match_ids("table"), set())
         self.assertEqual(self._match_ids("macrocephaky"), {"HP:0000256"})
+
+    def test_fuzzy_match_is_one_typo_in_one_word(self):
+        """ Without the special-case overrides, 1 edit in an abbreviation or a negation prefix isn't a typo #2130 """
+        matcher = PhenotypeMatcher()
+        matcher.hardcoded_lookups = {}
+        matcher.case_insensitive_lookups = {}
+        matcher.disease_families = {}
+        expected_ids_by_phrase = {
+            "prolonged qt": set(),
+            "recurrent urtis": set(),
+            "afebrile seizures": set(),
+            "decreased in": set(),
+            "leg pains": {"HP:0012514"},
+            "febrile seizres": {"HP:0002373"},
+            "recurrent urinary tract infectons": {"HP:0000010"},
+        }
+        for phrase, expected_ids in expected_ids_by_phrase.items():
+            with self.subTest(phrase=phrase):
+                self.assertEqual(self._match_ids(phrase, matcher), expected_ids)
 
     def test_exact_match_stops_fuzzy_match_in_other_ontologies(self):
         """ macrocephaly is 1 edit from MONDO "acrocephaly", but other spellings of the same term still match """
