@@ -55,6 +55,10 @@ Gotchas:
 - annotation/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups patches HPO gaps by name or ID, and goes
   stale as HPO adds and renames terms ("distal hypermobility" pointed at its opposite). After an HPO upgrade, compare
   each entry with the matcher's result without it; drop entries HPO now matches and repoint ones it contradicts.
+- A change to phenotype lookups or matching logic bumps annotation/phenotype_matcher.py `PHENOTYPE_MATCHER_VERSION` and
+  adds a migration registering `match_patient_phenotypes --stale` as a ManualOperation, or deployments keep the old
+  matches (sentences are matched once and cached). Each sentence points at the PhenotypeMatchVersion (matcher +
+  OntologyVersion pair) it was matched with; stale sentences show in `vg status`.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.
