@@ -20,13 +20,13 @@ from django.utils import timezone
 
 from annotation.models import AnnotationRun, VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus
-from annotation.models.models_phenotype_match import TextPhenotype
 from eventlog.models import Event
 from library.django_utils.database_utils import get_table_row_estimates
 from library.enums.log_level import LogLevel
 from library.vg.repo import REPO_ROOT, git
 from library.vg.settings_chain import resolved_settings_module
 from manual.models import ManualMigrationOutstanding
+from patients.models.models_phenotype import TextPhenotype
 from snpdb.models import GenomeBuild
 from variantgrid.celery import app as celery_app
 

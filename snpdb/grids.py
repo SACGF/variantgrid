@@ -5,7 +5,17 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Case, F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value, When
+from django.db.models import (
+    Case,
+    F,
+    IntegerField,
+    OuterRef,
+    QuerySet,
+    StringAgg,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import TextField
 from django.db.models.query_utils import Q
@@ -15,14 +25,18 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
+from annotation.models import AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
+from patients.models.models_phenotype import PATIENT_ONTOLOGY_TERM_PATH
 from patients.models_enums import GnomADPopulation, Sex
-from snpdb.grid_columns.custom_columns import get_variant_grid_columns, get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import (
+    get_variant_grid_columns,
+    get_variantgrid_extra_annotate,
+)
 from snpdb.models import (
     VCF,
     Allele,

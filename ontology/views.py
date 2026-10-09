@@ -3,7 +3,6 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import TemplateView
 
-from annotation.models import patients_qs_for_ontology_term
 from library.utils import LimitedCollection
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER,
@@ -14,6 +13,7 @@ from ontology.models import (
     OntologyTermRelation,
 )
 from ontology.panel_app_ontology import update_gene_relations
+from patients.models.models_phenotype import patients_qs_for_ontology_term
 
 
 def ontology_term_text(request, ontology_service, name):
