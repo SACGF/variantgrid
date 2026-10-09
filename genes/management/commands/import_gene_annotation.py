@@ -290,7 +290,8 @@ class Command(BaseCommand):
                                                    biotype=biotype,
                                                    data=tv_data,
                                                    modified_cdot_version=cdot_version)
-            if pk := transcript_version_ids_by_accession.get(transcript_accession):
+            # Keyed 'transcript_id.version' - a cdot fake transcript's accession has no version to match on
+            if pk := transcript_version_ids_by_accession.get(f"{transcript_id}.{version}"):
                 transcript_version.pk = pk
                 existing_transcript_versions.append(transcript_version)
             else:

@@ -71,7 +71,8 @@ class ImportCdotDataTest(TestCase):
         self.assertEqual("0.2.36", CdotDataVersion.get_version(self.genome_build, AnnotationConsortium.REFSEQ))
 
     def test_mitochondrial_fake_transcript_imported(self, _mock_gene_summaries):
-        """ cdot's versionless 'fake-rna-ND4' is stored as version 1 so MT annotation can link to it (#2139) """
+        """ cdot's versionless 'fake-rna-ND4' is stored as version 1 so MT annotation can link to it, and
+            matched on re-import (#2139) """
         cdot_data = json.loads(gzip.decompress(self._cdot_file("0.2.34").getvalue()))
         cdot_data["genes"]["4538"] = {"gene_symbol": "ND4", "url": self.URL, "biotype": ["protein_coding"]}
         cdot_data["transcripts"]["fake-rna-ND4"] = {
@@ -83,7 +84,9 @@ class ImportCdotDataTest(TestCase):
                                          "exons": [[10759, 12137, 0, 1, 1378, None]]}
             },
         }
-        self._import(io.BytesIO(gzip.compress(json.dumps(cdot_data).encode())))
+        cdot_file = gzip.compress(json.dumps(cdot_data).encode())
+        self._import(io.BytesIO(cdot_file))
+        self._import(io.BytesIO(cdot_file))  # Re-import matches the existing fake transcript version
         tv = TranscriptVersion.objects.get(genome_build=self.genome_build, transcript_id="fake-rna-ND4")
         self.assertEqual(1, tv.version)
         self.assertTrue(tv.is_cdot_fake)
