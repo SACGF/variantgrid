@@ -17,6 +17,7 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium
+from genes.transcript_parts import get_cdot_transcript_id_and_version
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
@@ -265,11 +266,9 @@ class Command(BaseCommand):
                 existing_transcript_versions.clear()
 
         for transcript_accession, tv_data in transcripts_iter():
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            transcript_id, version = get_cdot_transcript_id_and_version(transcript_accession)
             if version is None:
-                # cdot has some fake transcripts - ok to skip these
-                if not transcript_accession.startswith("fake"):
-                    logging.info("Warning: Skipping transcript accession '%s' w/o version", transcript_accession)
+                logging.info("Warning: Skipping transcript accession '%s' w/o version", transcript_accession)
                 continue
 
             if transcript_id not in known_transcript_ids:
