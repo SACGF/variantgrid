@@ -29,22 +29,27 @@ def dal_media():
     return mark_safe(str(ModelSelect2(url='').media))
 
 
-def jsonify_for_js(json_me, pretty=False) -> Union[SafeString, bool, int, float]:
-    if isinstance(json_me, str):
-        return mark_safe(json.dumps(json_me).replace('</script>', '<\\/script>'))
+# As Django's json_script, so no "</script>" (in any case) or "<!--" can end the <script> block
+JS_SCRIPT_ESCAPES = str.maketrans({'<': '\\u003C', '>': '\\u003E', '&': '\\u0026'})
+
+
+def jsonify_for_js(json_me) -> Union[SafeString, bool, int, float]:
+    """ A JS literal that is safe inside a <script> block """
     if isinstance(json_me, bool):
         if json_me:
             return mark_safe('true')
         return mark_safe('false')
     if isinstance(json_me, (int, float)):
         return json_me
-    indent = None if not pretty else 4
-    text = json.dumps(json_me, indent=indent)
-    if pretty:
-        # this stops arrays of arrays taking up too much vertical space
-        text = re.compile(r'],\s*\[', re.MULTILINE).sub('],[', text)
-    text = text.replace('</script>', '<\\/script>')
-    return mark_safe(text)
+    return mark_safe(json.dumps(json_me).translate(JS_SCRIPT_ESCAPES))
+
+
+def jsonify_pretty_for_html(json_me) -> SafeString:
+    """ Indented JSON, HTML escaped, for display in a page (eg <pre>) """
+    text = json.dumps(json_me, indent=4)
+    # this stops arrays of arrays taking up too much vertical space
+    text = re.compile(r'],\s*\[', re.MULTILINE).sub('],[', text)
+    return mark_safe(escape(text))
 
 
 @register.filter
@@ -53,8 +58,8 @@ def jsonify(json_me) -> Union[SafeString, bool, int, float]:
 
 
 @register.filter
-def jsonify_pretty(json_me) -> Union[SafeString, bool, int, float]:
-    return jsonify_for_js(json_me, pretty=True)
+def jsonify_pretty(json_me) -> SafeString:
+    return jsonify_pretty_for_html(json_me)
 
 
 @register.filter
