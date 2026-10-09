@@ -59,6 +59,7 @@ from snpdb.variant_filters import (
     get_variant_type_label,
     resolve_gene_symbols,
 )
+from upload.models.models import ModifiedImportedVariant
 from variantopedia import forms
 from variantopedia.grids import (
     VariantTagsColumns,
@@ -438,8 +439,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         except Exception:  # May not have been annotated?
             log_traceback()
 
-    modified_normalised_variants = variant.modifiedimportedvariant_set.filter(old_variant__isnull=False)
-    modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
+    old_variants_qs = variant.modifiedimportedvariant_set.filter(ModifiedImportedVariant.q_normalised())
+    old_variants_qs = old_variants_qs.order_by("old_variant_formatted").distinct("old_variant_formatted")
+    modified_normalised_variants = [ModifiedImportedVariant.get_variant_coordinate_from_old_variant(ov).format_short()
+                                    for ov in old_variants_qs.values_list("old_variant_formatted", flat=True)]
 
     variant_allele_data = None
     # We don't really handle very rare case with having multiple VariantAlleles for a variant

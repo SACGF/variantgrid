@@ -125,3 +125,32 @@ class TestModifiedImportedVariantLongValueLookup(TestCase):
         vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="")
         variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(vc)
         self.assertEqual(set(variants), {self.variant1, self.variant2})
+
+
+class TestModifiedImportedVariantNormalised(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for base in "GATC":
+            Sequence.objects.get_or_create(seq=base, seq_sha256_hash=sha256sum_str(base))
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(grch37)
+
+        user = User.objects.create_user(username="miv_normalised_test_user", password="x")
+        mivs = ModifiedImportedVariants.objects.create(upload_step=_make_upload_step(user))
+        variant = slowly_create_test_variant("1", 100, "A", "T", grch37)
+        # Imports before #2126 left old_variant null when bcftools trimmed an indel in place
+        cls.trimmed = ModifiedImportedVariant.objects.create(
+            import_info=mivs, variant=variant, operation=ModifiedImportedVariantOperation.NORMALIZATION,
+            old_variant_formatted="1:100:AC/TC")
+        cls.split_only = ModifiedImportedVariant.objects.create(
+            import_info=mivs, variant=variant, operation=ModifiedImportedVariantOperation.NORMALIZATION,
+            old_multiallelic="1|100|A|G,T|2", old_variant_formatted="1:100:A/T")
+
+    def test_q_normalised_compares_with_variant(self):
+        qs = ModifiedImportedVariant.objects.filter(ModifiedImportedVariant.q_normalised())
+        self.assertEqual(list(qs), [self.trimmed])
+
+    def test_variant_coordinate_from_old_variant_alt_contig(self):
+        vc = ModifiedImportedVariant.get_variant_coordinate_from_old_variant("HLA-A*01:01:01:01:100:AC/A")
+        self.assertEqual(vc.as_tuple, ("HLA-A*01:01:01:01", 100, "AC", "A", None))

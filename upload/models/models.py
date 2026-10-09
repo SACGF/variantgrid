@@ -12,10 +12,10 @@ from django.contrib.auth.models import Group, User
 from django.contrib.postgres.indexes import HashIndex, OpClass
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import CharField, F, Func, Q, Value
+from django.db.models import CharField, F, Func, Q, TextField, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
-from django.db.models.functions import Substr
+from django.db.models.functions import Concat, Substr
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
@@ -826,7 +826,7 @@ class ModifiedImportedVariant(models.Model):
     # Set from bcftools --old-rec-tag when the record was a multi-allelic
     # Legacy rows hold vt OLD_MULTIALLELIC: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
     old_multiallelic = models.TextField(null=True)
-    # Set from bcftools --old-rec-tag when the record was normalized
+    # Set from bcftools --old-rec-tag when the record was normalized (moved or trimmed)
     # Legacy rows hold vt OLD_VARIANT: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
@@ -912,6 +912,22 @@ class ModifiedImportedVariant(models.Model):
     def get_old_variant_from_variant_coordinate(vc: VariantCoordinate) -> str:
         # This doesn't handle symbolic alts with SVLEN but BCF tools don't record SVLEN in old tag anyway
         return f"{vc.chrom}:{int(vc.position)}:{vc.ref}/{vc.alt}"
+
+    @staticmethod
+    def get_variant_coordinate_from_old_variant(old_variant_formatted: str) -> VariantCoordinate:
+        """ Inverse of get_old_variant_from_variant_coordinate (rsplit as alt contig names can contain ':') """
+        chrom, position, ref_alt = old_variant_formatted.rsplit(":", 2)
+        ref, alt = ref_alt.split("/")
+        return VariantCoordinate.model_construct(chrom=chrom, position=int(position), ref=ref, alt=alt)
+
+    @staticmethod
+    def q_normalised() -> Q:
+        """ Records bcftools changed, rather than only split from a multi-allelic. Compares the original with
+            the variant it became, as imports before #2126 only set old_variant when the position moved """
+        variant_formatted = Concat("variant__locus__contig__name", Value(":"), "variant__locus__position", Value(":"),
+                                   "variant__locus__ref__seq", Value("/"), "variant__alt__seq", output_field=TextField())
+        return Q(operation=ModifiedImportedVariantOperation.NORMALIZATION, old_variant_formatted__isnull=False) & \
+            ~Q(old_variant_formatted=variant_formatted)
 
     @classmethod
     def _filter_old_variant_formatted(cls, old_variant: str, startswith=False) -> QuerySet['ModifiedImportedVariant']:

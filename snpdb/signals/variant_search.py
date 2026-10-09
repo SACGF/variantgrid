@@ -347,8 +347,13 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
         visible_variants_qs = search_input.get_visible_variants(genome_build)
         results = get_results_from_variant_coordinate(genome_build, visible_variants_qs, variant_coordinate)
         if results.exists():
+            search_coordinate = variant_coordinate.as_contig_accession(genome_build)
             for v in results:
-                yield SearchResult(v.preview, messages=search_messages)
+                messages = search_messages
+                if v.coordinate.as_contig_accession(genome_build) != search_coordinate:  # found via ModifiedImportedVariant
+                    msg = f'"{variant_coordinate.format_short()}" was normalised to this variant during VCF import'
+                    messages = [*search_messages, SearchMessage(msg, LogLevel.WARNING, substituted=True)]
+                yield SearchResult(v.preview, messages=messages)
         else:
             yield from _yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
                                                                 variant_coordinate, search_messages)

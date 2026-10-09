@@ -113,8 +113,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
     def add_modified_imported_variant(self, variant: cyvcf2.Variant, variant_hash, miv_hash_list=None, miv_list=None):
         # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only
         if bcftools_old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
-            _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(variant,
-                                                                                      old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(variant,
+                                                                                    old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             # svlen = variant.INFO.get("SVLEN")
 
             if miv_hash_list is None:
@@ -127,13 +127,13 @@ class AbstractBulkVCFProcessor(abc.ABC):
             else:
                 old_multiallelic = None
 
-            old_position = int(bcftools_old_variant.split("|")[1])
-            if old_position != variant.POS:
-                old_variant = bcftools_old_variant
-            else:
-                old_variant = None  # Wasn't normalized
+            contig = self.genome_build.chrom_contig_mappings[variant.CHROM]
+            record = VariantCoordinate(chrom=contig.name, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
+            record_formatted = ModifiedImportedVariant.get_old_variant_from_variant_coordinate(record)
 
             for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, self.genome_build):
+                # Normalized (moved or trimmed), not only split from a multi-allelic
+                old_variant = bcftools_old_variant if ov != record_formatted else None
                 # These 2 need to be in sync
                 miv_hash_list.append(variant_hash)
                 miv_list.append((ModifiedImportedVariantOperation.NORMALIZATION, old_multiallelic, old_variant,

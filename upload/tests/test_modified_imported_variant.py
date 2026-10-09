@@ -1,7 +1,10 @@
+from types import SimpleNamespace
+
 from django.test import TestCase
 
 from snpdb.models import GenomeBuild
 from upload.models import ModifiedImportedVariant
+from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
 
 
 class TestModifiedImportedVariant(TestCase):
@@ -37,3 +40,27 @@ class TestModifiedImportedVariant(TestCase):
         with self.assertRaises(ValueError):
             ModifiedImportedVariant.bcftools_format_old_variant("1|100|A|C,T|0", svlen=None, genome_build=grch37)
 
+
+class TestAddModifiedImportedVariant(TestCase):
+    """ old_variant is set when bcftools moved or trimmed the record, not when it only split a multi-allelic """
+
+    def _old_variant(self, pos: int, ref: str, alt: str, old_rec: str):
+        processor = SimpleNamespace(genome_build=GenomeBuild.get_name_or_alias("GRCh37"))
+        record = SimpleNamespace(CHROM="1", POS=pos, REF=ref, ALT=[alt],
+                                 INFO={ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG: old_rec})
+        miv_list = []
+        AbstractBulkVCFProcessor.add_modified_imported_variant(processor, record, "hash", miv_hash_list=[],
+                                                               miv_list=miv_list)
+        (_operation, _old_multiallelic, old_variant, _old_variant_formatted, _detail), = miv_list
+        return old_variant
+
+    def test_trimmed_in_place(self):
+        old_rec = "1|100|GATAT|GATATAT,G|1"
+        self.assertEqual(self._old_variant(100, "G", "GAT", old_rec), old_rec)
+
+    def test_moved(self):
+        old_rec = "1|104|T|TAT"
+        self.assertEqual(self._old_variant(100, "G", "GAT", old_rec), old_rec)
+
+    def test_split_only(self):
+        self.assertIsNone(self._old_variant(100, "G", "GAT", "1|100|G|GAT,C|1"))
