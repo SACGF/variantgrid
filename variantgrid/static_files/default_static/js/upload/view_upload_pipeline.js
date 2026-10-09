@@ -143,8 +143,7 @@ $(document).ready(function() {
 
     });
 
-
-    const step_order = pageData.step_order;
-    const step_start_end_lines = pageData.step_start_end_lines;
-    plotIntervalsGraph('upload-steps-graph', "Job Times", step_order, step_start_end_lines);
+    if (!$.isEmptyObject(pageData.step_start_end_lines)) {
+        plotIntervalsGraph('upload-steps-graph', "Job Times", pageData.step_order, pageData.step_start_end_lines);
+    }
 });

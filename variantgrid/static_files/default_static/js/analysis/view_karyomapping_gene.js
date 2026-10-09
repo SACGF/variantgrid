@@ -34,7 +34,7 @@ function showKaryotypeScatter() {
     }
 
     const description = 'Karyomapping ' + escapeHtml(pageData.proband_sample);
-    const geneDescription = escapeHtml(pageData.gene_symbol) + " ('" + escapeHtml(pageData.strand) + "' strand) Up: " + pageData.upstream_kb + "KB, Down: " + pageData.downstream_kb + ")KB";
+    const geneDescription = escapeHtml(pageData.gene_symbol) + " ('" + escapeHtml(pageData.strand) + "' strand) Up: " + pageData.upstream_kb + "KB, Down: " + pageData.downstream_kb + "KB";
     const coordinates = escapeHtml(pageData.iv);
 
     const layout = {

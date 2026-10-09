@@ -554,7 +554,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 class TriageNextStep(IntegerChoices):
     NOT_INVOLVED = 0, "Not Involved"
     PENDING_CALCULATION = 1, "Pending Calculation"
-    AWAITING_OTHER_LAB = 2, "Awaiting Other Lab"
+    AWAITING_OTHER_LAB = 2, "Waiting on Other Lab" # changed text to Waiting on Other, so Awaiting means waiting on you
     AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
     AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting Your Triage - others have triaged"
     AWAITING_YOUR_AMEND = 5, "Awaiting Your Amendment"

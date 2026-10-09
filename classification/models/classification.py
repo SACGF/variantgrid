@@ -7,6 +7,7 @@ is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also
 ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
 ClassificationConsensus and CuratedDate.
 """
+from __future__ import annotations
 import copy
 import json
 import logging
@@ -24,7 +25,7 @@ from typing import (
     Any,
     Optional,
     TypedDict,
-    Union,
+    Union, TYPE_CHECKING,
 )
 
 from typing_extensions import deprecated
@@ -120,6 +121,9 @@ from snpdb.models import Lab, Sample, Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
+
+if TYPE_CHECKING:
+    from classification.models import MultiCondition, ClinicalContext, ClassificationSummaryCacheObj, ConditionText
 
 ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
@@ -257,7 +261,7 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
-class ConditionResolvedReferenceDict(TypedDict):
+class ConditionResolvedReferenceDict(TypedDict, total=False):
     term_id: Optional[str]
     name: str  # name of the term if term_id is provided, otherwise from a plain text condition
     count: Optional[int]  # assumed to be 1 if not provided
@@ -339,7 +343,7 @@ class ConditionResolved:
     # terms: list[OntologyTerm]
     # plain_text_terms: list[str] = None
     references: list[ConditionReference]
-    join: Optional['MultiCondition'] = None
+    join: Optional[MultiCondition] = None
     plain_text: Optional[str] = None  # fallback, not populated in all contexts
 
     def __hash__(self) -> int:
@@ -387,14 +391,14 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
+        from classification.models import MultiCondition
         if not condition_dict:
             return ConditionResolved(references=[])
 
-        join: Optional['MultiCondition'] = None
+        join: Optional[MultiCondition] = None
         plain_text = condition_dict.get("display_text")
 
         if resolved_join_text := condition_dict.get("resolved_join"):
-            from classification.models import MultiCondition
             join = MultiCondition(resolved_join_text)
 
         if references_list := condition_dict.get("references"):
@@ -439,13 +443,13 @@ class ConditionResolved:
         else:
             return None
 
-    def as_mondo_if_possible(self) -> 'ConditionResolved':
+    def as_mondo_if_possible(self) -> ConditionResolved:
         if mondo_term := self.mondo_term:
             return ConditionResolved.from_uncounted_terms(terms=[mondo_term])
         else:
             return self
 
-    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+    def is_same_or_more_specific(self, other: ConditionResolved) -> bool:
         """
         Returns the number of steps to go from this condition to the specific other condition
         Returns None if self doesn't appear to be a descendant of other
@@ -553,7 +557,7 @@ class ConditionResolved:
                 pass
         return None
 
-    def __eq__(self, other: 'ConditionResolved') -> bool:
+    def __eq__(self, other: ConditionResolved) -> bool:
         if (s_terms := self.terms) and (o_terms := other.terms):
             return s_terms == o_terms and self.join == other.join
         elif self.terms or other.terms:
@@ -561,7 +565,7 @@ class ConditionResolved:
         else:
             return self.plain_text == other.plain_text
 
-    def __lt__(self, other: 'ConditionResolved') -> bool:
+    def __lt__(self, other: ConditionResolved) -> bool:
         self_terms = self.terms or []
         other_terms = other.terms or []
         if len(self_terms) != len(other_terms):
@@ -674,7 +678,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
 
     @property
-    def summary_obj(self) -> 'ClassificationSummaryCacheObj':
+    def summary_obj(self) -> ClassificationSummaryCacheObj:
         from classification.models import ClassificationSummaryCacheObj
         return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
@@ -784,7 +788,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return 'not-matched'
 
     @property
-    def condition_text_record(self) -> 'ConditionText':
+    def condition_text_record(self) -> ConditionText:
         try:
             if ctm := self.conditiontextmatch:
                 return ctm.condition_text
@@ -2519,7 +2523,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         variant: Optional[Union[Variant, Iterable[Variant]]] = None,
                         allele: Allele = None,
                         published: bool = None,
-                        clinical_context: Optional['ClinicalContext'] = None,
+                        clinical_context: Optional[ClinicalContext] = None,
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
                         allele_origin_bucket: Optional[AlleleOriginBucket] = None,

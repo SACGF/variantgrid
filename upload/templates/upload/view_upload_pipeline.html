@@ -14,9 +14,9 @@
     </script>
     {% if has_upload_steps and step_start_end_lines %}
         <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
-        {% json_data "view-upload-pipeline-data" file_upload_id=upload_pipeline.file_upload_id step_order=step_order step_start_end_lines=step_start_end_lines %}
-        <script src="{% static 'js/upload/view_upload_pipeline.js' %}"></script>
     {% endif %}
+    {% json_data "view-upload-pipeline-data" file_upload_id=upload_pipeline.file_upload_id step_order=step_order step_start_end_lines=step_start_end_lines %}
+    <script src="{% static 'js/upload/view_upload_pipeline.js' %}"></script>
     <style>
         .import-message {
           white-space: pre;

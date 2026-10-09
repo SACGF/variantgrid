@@ -5,7 +5,7 @@ function deleteSelectedMessages() {
     $("input.message-checkbox:checked").each(function() {
         selectedMessages.push($(this).attr("message_id"));
     });
-    if (selectedMessages) {
+    if (selectedMessages.length) {
         const data = 'message_ids=' + JSON.stringify(selectedMessages);;
 
         $.ajax({

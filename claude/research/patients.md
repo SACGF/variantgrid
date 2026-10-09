@@ -110,7 +110,11 @@ call arrived after the VCF. NEEDS_ATTENTION is what the health check
 Patient is a `annotation/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`: `Patient.save` pops
 the phenotype kwargs and matches the text to HPO / OMIM / MONDO terms unless `check_patient_text_phenotype=False`.
 The matcher and the bulk path live in `annotation/phenotype_matching.py`; `manage.py match_patient_phenotypes`
-reruns it for everyone (`--clear` drops cached matches first). Curators approve a patient's matched text on the term
+reruns it for everyone. Each matched sentence (`annotation/models/models_phenotype_match.py:TextPhenotype`) points at
+the `annotation/models/models_phenotype_match.py:PhenotypeMatchVersion` (the `PHENOTYPE_MATCHER_VERSION` and
+OntologyVersion pair) it was matched with; `--stale` rematches those not on the current pair (`vg status` counts them)
+and `--clear` rematches every sentence. Both drop only the sentence's matches, so patient
+and cohort links and approvals are kept (#2131). Curators approve a patient's matched text on the term
 approvals page (`patients/views.py:patient_term_approvals`, `patients/views_json.py:approve_patient_term`, which records a
 PatientModification). The patients page graphs come from `patients/templatetags/patient_graph_tags.py`.
 

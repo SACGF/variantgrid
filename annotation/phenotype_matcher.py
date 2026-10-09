@@ -14,6 +14,12 @@ from library.utils import is_not_none
 from library.utils.nltk_utils import ensure_nltk_data
 from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
 
+# Bump when a change to the lookups or matching logic would change the matches of an already matched sentence.
+# TextPhenotype records the version a sentence was matched with; `match_patient_phenotypes --stale` redoes older ones.
+# Every bump also registers that command as a ManualOperation in a new migration so deployments rematch (#2131).
+# 1: special-case lookups repointed after the HPO review (2026-10)
+PHENOTYPE_MATCHER_VERSION = 1
+
 # There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
 CodePK = Any
 CodePKLookups = dict[CodePK, set[str]]
