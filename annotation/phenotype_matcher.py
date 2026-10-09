@@ -616,8 +616,6 @@ class PhenotypeMatcher:
             'aHUS': HUS,
             "aCLL": (load_hpo_by_name, "chronic lymphocytic leukemia"),
             "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
-            # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
-            "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
             "ADPCKD": (load_omim_by_id, 600273),  # Autosomal dominant polycystic kidney disease
             "AVSD": (load_hpo_by_name, "Atrioventricular canal defect"),  # aka Atrioventricular septal defect
             "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
@@ -629,7 +627,6 @@ class PhenotypeMatcher:
             "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
             "FTT": (load_hpo_by_name, "Failure to thrive"),
             "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
-            "GDD": DEVELOPMENTAL_DELAY,
             "GEFS": GEFS,
             "GEFS+": GEFS,
             "GSD": GLYCOGEN_STORAGE_DISEASE,
@@ -649,7 +646,6 @@ class PhenotypeMatcher:
             'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
             "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
             "SUDEP": (load_hpo_list_by_names, ["Sudden death", "Epilepsy"]),
-            "VSD": (load_hpo_by_name, "Ventricular septal defect"),
         }
 
         CASE_INSENSITIVE_LOOKUPS = {
@@ -733,7 +729,6 @@ class PhenotypeMatcher:
             "kneist dysplasia": (load_omim_by_name, "KNIEST DYSPLASIA"),
             "learning difficulties": COGNITIVE_IMPAIRMENT,
             "learning disability": COGNITIVE_IMPAIRMENT,
-            "legius": (load_omim_by_name, "Legius Syndrome"),
             "leg pains": (load_hpo_by_name, "Limb pain"),
             "limb abnormalities": ABNORMALITY_OF_LIMBS,
             "low arylsulphatase": ARYLSULFATASE_A_DEFICIENCY,
@@ -758,7 +753,6 @@ class PhenotypeMatcher:
             "no speech": (load_hpo_by_id, 1344),
             "ohtahara syndrome": (load_omim_by_id, 308350),
             "opisthoclonus": (load_hpo_by_name, "opisthotonus"),
-            "opitz gbbb": (load_omim_by_id, 300000),
             "parkinson's disease": PARKINSONISM,
             "parkinsons": PARKINSONISM,
             "parkinson's": PARKINSONISM,
@@ -786,7 +780,6 @@ class PhenotypeMatcher:
             "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
             "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
             "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
-            "type 1 diabetes": DIBETES_TYPE_1,
             "t1 diabetes": DIBETES_TYPE_1,
             "two hair whorls": (load_hpo_by_id, 10813),
             "uncoordinated": (load_hpo_by_id, 2406),
@@ -832,7 +825,6 @@ class PhenotypeMatcher:
             "ehler danlos": EHLER_DANOS,
             "gaucher disease":  (load_omim_pks_containing_name, "GAUCHER DISEASE"),
             "glycogen storage disease": GLYCOGEN_STORAGE_DISEASE,
-            "glut1 deficiency": (load_omim_pks_containing_name, "GLUT1 DEFICIENCY SYNDROME"),
             "hemophagocytic lymphohistiocytosis": HLH,
             "hlh": HLH,
             "hht": (load_omim_pks_containing_name, "Hereditary hemorrhagic telangiectasia"),
