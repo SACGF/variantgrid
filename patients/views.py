@@ -383,13 +383,14 @@ def patient_term_matches(request):
 
 
 def patient_term_approvals(request, patient_id_offset=0, num_patients_per_page=20, show_approved=False):
-    filter_kwargs = {"patient_text_phenotype__phenotype_description__isnull": False}
+    filter_kwargs = {"phenotype_description__isnull": False}
     if not show_approved:
-        filter_kwargs["patient_text_phenotype__approved_by__isnull"] = True
+        filter_kwargs["phenotype_description__approved_by__isnull"] = True
 
     if patient_id_offset:
         filter_kwargs["pk__gt"] = patient_id_offset
-    patients_qs = Patient.filter_for_user(request.user).filter(**filter_kwargs).order_by("pk")
+    patients_qs = (Patient.filter_for_user(request.user).filter(**filter_kwargs)
+                   .select_related("phenotype_description").order_by("pk"))
     num_total = patients_qs.count()
 
     end = min(num_patients_per_page, num_total)
@@ -400,7 +401,7 @@ def patient_term_approvals(request, patient_id_offset=0, num_patients_per_page=2
     patient_results = {}
     max_patient_id = 0
     for p in patients:
-        patient_results[p.pk] = p.patient_text_phenotype.phenotype_description.get_results()
+        patient_results[p.pk] = p.phenotype_description.get_results()
         max_patient_id = p.pk
 
     context = {"patients": patients,

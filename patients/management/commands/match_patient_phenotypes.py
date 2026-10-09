@@ -3,6 +3,7 @@ from collections import Counter
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 
+from patients.models.models_patient import Patient
 from patients.models.models_phenotype import TextPhenotype, TextPhenotypeMatch
 from patients.phenotype_matching import bulk_patient_phenotype_matching, requeue_sentences
 
@@ -33,11 +34,11 @@ class Command(BaseCommand):
 
         num_requeued = 0
         if options["clear"]:
-            num_requeued = requeue_sentences(TextPhenotype.objects.filter(processed=True))
+            num_requeued = requeue_sentences(TextPhenotype.objects.filter(match_version__isnull=False))
         elif options["stale"]:
             num_requeued = requeue_sentences(TextPhenotype.stale_qs())
 
-        bulk_patient_phenotype_matching(cores=options["cores"])
+        bulk_patient_phenotype_matching(Patient.with_phenotype_text(), cores=options["cores"])
 
         print(f"Sentences requeued: {num_requeued:,}")
         # This is a very blunt count (ie individual stuff may have changed)

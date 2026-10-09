@@ -454,7 +454,7 @@ HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrie
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # If set, patient phenotype text containing this string is treated as unreviewed:
-# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# matched ontology terms will not be persisted to the DB (PhenotypeDescription / TextPhenotypeMatch).
 # Users can still see live preview matches on the patient page along with a warning.
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"

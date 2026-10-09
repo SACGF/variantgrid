@@ -1,3 +1,11 @@
+"""
+Splits phenotype text into sentences and matches each new sentence to ontology terms with PhenotypeMatcher,
+stamping it with the PhenotypeMatchVersion it was matched with.
+
+Entry points: create_phenotype_description (one owner's text, or an unowned live preview),
+bulk_patient_phenotype_matching (register many patients' sentences, then match the awaiting ones once each,
+optionally in parallel), requeue_sentences (mark sentences for rematching).
+"""
 import logging
 import multiprocessing as mp
 import time
@@ -5,20 +13,23 @@ from collections.abc import Iterable
 from typing import Optional
 
 import nltk
-from django.conf import settings
 from django.db import connections, transaction
 from django.db.models import QuerySet
 
-from patients.models import Patient
 from patients.models.models_phenotype import (
+    AmbiguousAcronymDenylist,
     PhenotypeDescription,
     PhenotypeMatchVersion,
     TextPhenotype,
     TextPhenotypeMatch,
     TextPhenotypeSentence,
-    filter_ambiguous_acronym_matches,
+    without_ambiguous_acronyms,
 )
-from patients.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
+from patients.phenotype_matcher import (
+    PhenotypeMatcher,
+    SkipAllPhenotypeMatchException,
+    get_ambiguous_acronym_denylist,
+)
 from patients.phenotype_tokenizer import PhenotypeTokenizer
 
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
@@ -39,7 +50,8 @@ def _get_word_combos_and_spans(words_and_spans: list, max_combo_length: Optional
 
 def _get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length: Optional[int] = None) -> Iterable:
     word_combos_and_spans = _get_word_combos_and_spans(words_and_spans, max_combo_length)
-    return reversed(sorted(word_combos_and_spans, key=lambda item: sum(len(i[0]) for i in item)))
+    # reversed() rather than reverse=True: ties keep the order matching has always used
+    return reversed(sorted(word_combos_and_spans, key=lambda item: sum(len(i[0]) for i in item)))  # noqa: C413
 
 
 def _get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: PhenotypeMatcher):
@@ -119,8 +131,9 @@ def _transform_words(words, tags, spans):
 
 
 def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher,
-                            match_version: PhenotypeMatchVersion):
-    """ match_version is PhenotypeMatchVersion.get_or_create_current() taken when phenotype_matcher was built """
+                            match_version: PhenotypeMatchVersion, denylist: AmbiguousAcronymDenylist):
+    """ Replaces the sentence's matches and stamps it, so a rematch is idempotent.
+        match_version is PhenotypeMatchVersion.get_or_create_current() taken when phenotype_matcher was built """
     tokenized_text_and_spans = phenotype_tokenizer.word_tokenise_and_spans(text_phenotype.text)
 
     tokenized_text = []
@@ -151,14 +164,17 @@ def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_match
 
     try:
         matches = parse_words(text_phenotype, words_and_spans, phenotype_matcher)
-        matches = filter_ambiguous_acronym_matches(matches)
-        if matches:
-            TextPhenotypeMatch.objects.bulk_create(matches)
+        matches = without_ambiguous_acronyms(matches, denylist)
     except SkipAllPhenotypeMatchException:
         logging.info("Completely skipping: %s", text_phenotype.text)
+        matches = []
 
-    text_phenotype.mark_processed(match_version)
-    # A requeued sentence's descriptions may have cached their term ids while it had no matches
+    with transaction.atomic():
+        TextPhenotypeMatch.objects.filter(text_phenotype=text_phenotype).delete()
+        if matches:
+            TextPhenotypeMatch.objects.bulk_create(matches)
+        text_phenotype.mark_matched(match_version)
+    # A rematched sentence's descriptions cached their term ids from the old matches
     _invalidate_ontology_term_ids(TextPhenotype.objects.filter(pk=text_phenotype.pk))
 
 
@@ -170,12 +186,11 @@ def _invalidate_ontology_term_ids(text_phenotype_qs: QuerySet[TextPhenotype]):
 
 
 def requeue_sentences(text_phenotype_qs: QuerySet[TextPhenotype]) -> int:
-    """ Drop the matches of these sentences and mark them unprocessed, so bulk_patient_phenotype_matching rematches
-        them. Patient/cohort links, descriptions and approvals are kept (#2131). Returns the number requeued """
+    """ Mark these sentences awaiting, so bulk_patient_phenotype_matching rematches them. Their matches stay
+        visible until then; descriptions and approvals are kept (#2131). Returns the number requeued """
     with transaction.atomic():
-        TextPhenotypeMatch.objects.filter(text_phenotype__in=text_phenotype_qs).delete()
         _invalidate_ontology_term_ids(text_phenotype_qs)
-        return text_phenotype_qs.update(processed=False)
+        return text_phenotype_qs.update(match_version=None)
 
 
 def _replace_comments_with_spaces(text):
@@ -201,14 +216,18 @@ def _replace_comments_with_spaces(text):
     return ''.join(cleaned_chars)
 
 
-def create_phenotype_description(text, phenotype_matcher=None, defer_processing=False):
-    """ PhenotypeMatcher takes a while to initialize, so is only built if there are sentences we haven't
+def create_phenotype_description(text, owner=None, approved_by=None, phenotype_matcher=None,
+                                 defer_processing=False) -> PhenotypeDescription:
+    """ owner is the Patient or Cohort the text belongs to - None only for a live preview, which deletes it.
+        PhenotypeMatcher takes a while to initialize, so is only built if there are sentences we haven't
         already matched - pass one in to re-use it for bulk processing.
         If defer_processing is True the PhenotypeDescription/TextPhenotype rows are created but NLP matching is
         skipped (used by bulk_patient_phenotype_matching to batch the heavy work for parallel execution). """
     phenotype_tokenizer = PhenotypeTokenizer()
     match_version = PhenotypeMatchVersion.get_or_create_current()
-    phenotype_description = PhenotypeDescription.objects.create(original_text=text)
+    owner_kwargs = {owner._meta.model_name: owner} if owner else {}
+    phenotype_description = PhenotypeDescription.objects.create(original_text=text, approved_by=approved_by,
+                                                                **owner_kwargs)
     known_sentences = []
     unknown_sentences = []
 
@@ -224,7 +243,7 @@ def create_phenotype_description(text, phenotype_matcher=None, defer_processing=
         if tp_created:
             has_alpha_numeric = any(x.isalnum() for x in sentence)
             if not has_alpha_numeric:  # Impossible to match anything so skip
-                text_phenotype.mark_processed(match_version)
+                text_phenotype.mark_matched(match_version)
                 known_sentences.append(tps)
             else:
                 unknown_sentences.append(tps)
@@ -234,9 +253,11 @@ def create_phenotype_description(text, phenotype_matcher=None, defer_processing=
     if not defer_processing and unknown_sentences:
         if phenotype_matcher is None:
             phenotype_matcher = PhenotypeMatcher()
+        denylist = get_ambiguous_acronym_denylist()
         for sentence in unknown_sentences:
             try:
-                _process_text_phenotype(sentence.text_phenotype, phenotype_tokenizer, phenotype_matcher, match_version)
+                _process_text_phenotype(sentence.text_phenotype, phenotype_tokenizer, phenotype_matcher, match_version,
+                                        denylist)
             except Exception:
                 logging.error("Problem processing phenotype for '%s'", sentence.text_phenotype.text)
                 raise
@@ -248,6 +269,7 @@ def create_phenotype_description(text, phenotype_matcher=None, defer_processing=
 _WORKER_PHENOTYPE_TOKENIZER: Optional[PhenotypeTokenizer] = None
 _WORKER_PHENOTYPE_MATCHER: Optional[PhenotypeMatcher] = None
 _WORKER_MATCH_VERSION: Optional[PhenotypeMatchVersion] = None
+_WORKER_DENYLIST: Optional[AmbiguousAcronymDenylist] = None
 
 
 def _phenotype_worker_init():
@@ -256,24 +278,22 @@ def _phenotype_worker_init():
     # Warm NLTK so the averaged-perceptron tagger + tokenizer aren't loaded
     # lazily on the first sentence each worker processes.
     nltk.pos_tag(nltk.word_tokenize("warm up"))
-    global _WORKER_PHENOTYPE_TOKENIZER, _WORKER_PHENOTYPE_MATCHER, _WORKER_MATCH_VERSION
+    global _WORKER_PHENOTYPE_TOKENIZER, _WORKER_PHENOTYPE_MATCHER, _WORKER_MATCH_VERSION, _WORKER_DENYLIST
     _WORKER_PHENOTYPE_TOKENIZER = PhenotypeTokenizer()
     _WORKER_PHENOTYPE_MATCHER = PhenotypeMatcher()
     _WORKER_MATCH_VERSION = PhenotypeMatchVersion.get_or_create_current()
+    _WORKER_DENYLIST = get_ambiguous_acronym_denylist()
 
 
 def _process_text_phenotype_by_pk(text_phenotype_pk):
     text_phenotype = TextPhenotype.objects.get(pk=text_phenotype_pk)
-    _process_text_phenotype(text_phenotype, _WORKER_PHENOTYPE_TOKENIZER, _WORKER_PHENOTYPE_MATCHER, _WORKER_MATCH_VERSION)
+    _process_text_phenotype(text_phenotype, _WORKER_PHENOTYPE_TOKENIZER, _WORKER_PHENOTYPE_MATCHER, _WORKER_MATCH_VERSION,
+                            _WORKER_DENYLIST)
 
 
-def bulk_patient_phenotype_matching(patients=None, cores=1):
-    if patients is None:
-        patients = Patient.objects.filter(phenotype__isnull=False).exclude(phenotype='')
-        exclude_string = getattr(settings, "PATIENT_PHENOTYPE_EXCLUDE_STRING", None)
-        if exclude_string:
-            patients = patients.exclude(phenotype__contains=exclude_string)
-
+def bulk_patient_phenotype_matching(patients: Iterable, cores=1):
+    """ Registers the sentences of these patients' (or cohorts') phenotype text, then matches every awaiting
+        sentence - Patient.with_phenotype_text() is everyone whose text is matched """
     patients = list(patients)
     num_patients = len(patients)
     if not num_patients:
@@ -292,11 +312,11 @@ def bulk_patient_phenotype_matching(patients=None, cores=1):
             logging.info("Registering patient sentences: %d/%d (%0.2f%%)", i, num_patients, perc_complete)
     logging.info("bulk_patient_phenotype_matching: register sentences took %.2f secs", time.time() - start)
 
-    # Phase 2: NLP-process each unique unprocessed sentence exactly once, optionally in parallel.
-    unprocessed_pks = list(TextPhenotype.objects.filter(processed=False).values_list("pk", flat=True))
-    num_sentences = len(unprocessed_pks)
+    # Phase 2: NLP-process each unique awaiting sentence exactly once, optionally in parallel.
+    awaiting_pks = list(TextPhenotype.awaiting_qs().values_list("pk", flat=True))
+    num_sentences = len(awaiting_pks)
     if not num_sentences:
-        logging.info("No unprocessed sentences to match")
+        logging.info("No sentences awaiting matching")
         return
 
     logging.info("Matching %d unique sentences across %d core(s)", num_sentences, cores)
@@ -306,7 +326,7 @@ def bulk_patient_phenotype_matching(patients=None, cores=1):
         ctx = mp.get_context("fork")
         with ctx.Pool(cores, initializer=_phenotype_worker_init) as pool:
             for done, _ in enumerate(
-                pool.imap_unordered(_process_text_phenotype_by_pk, unprocessed_pks, chunksize=10),
+                pool.imap_unordered(_process_text_phenotype_by_pk, awaiting_pks, chunksize=10),
                 start=1,
             ):
                 if not done % 50:
@@ -316,9 +336,10 @@ def bulk_patient_phenotype_matching(patients=None, cores=1):
         phenotype_tokenizer = PhenotypeTokenizer()
         phenotype_matcher = PhenotypeMatcher()
         match_version = PhenotypeMatchVersion.get_or_create_current()
-        for j, pk in enumerate(unprocessed_pks):
+        denylist = get_ambiguous_acronym_denylist()
+        for j, pk in enumerate(awaiting_pks):
             text_phenotype = TextPhenotype.objects.get(pk=pk)
-            _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher, match_version)
+            _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher, match_version, denylist)
             if not j % 50:
                 perc_complete = 100.0 * j / num_sentences
                 logging.info("Sentences processed: %d/%d (%0.2f%%)", j, num_sentences, perc_complete)

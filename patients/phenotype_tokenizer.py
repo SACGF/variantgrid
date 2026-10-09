@@ -1,3 +1,4 @@
+""" PhenotypeTokenizer: splits phenotype text into sentences and words with their character offsets (NLTK) """
 import nltk
 
 from library.utils import invert_dict_of_lists
