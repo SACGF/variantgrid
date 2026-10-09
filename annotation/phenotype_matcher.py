@@ -18,7 +18,8 @@ from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation,
 # TextPhenotype records the version a sentence was matched with; `match_patient_phenotypes --stale` redoes older ones.
 # Every bump also registers that command as a ManualOperation in a new migration so deployments rematch (#2131).
 # 1: special-case lookups repointed after the HPO review (2026-10)
-PHENOTYPE_MATCHER_VERSION = 1
+# 2: fuzzy matching is one typo in one word (#2130)
+PHENOTYPE_MATCHER_VERSION = 2
 
 # There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
 CodePK = Any
@@ -182,7 +183,7 @@ class PhenotypeMatcher:
         'acc', 'acute', 'adult', 'agu', 'all', 'auditory',
         'bad', 'bilateral', 'blood', 'borderline', 'brain', 'brainstem',
         'can', 'central', 'charge', 'child', 'chronic', 'common', 'complete', 'cord', 'cousin', 'cousins',
-        'decreased in', 'disease', 'disorder', 'distal',
+        'disease', 'disorder', 'distal',
         'ear',
         'face', 'familial', 'focal', 'frequent', 'frequency', "ft 4",
         'generalized', "generalised",
@@ -270,17 +271,12 @@ class PhenotypeMatcher:
                 for ontology_term_pks in exact_pks:
                     ontology_term_ids.extend(ontology_term_pks)
             elif len(words) == 1:
-                if len(lower_text) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH and not self._is_dictionary_word(lower_text):
-                    for _, single_words_by_length, _, _ in self.ontology.values():
-                        ontology_term_ids.extend(self.get_id_from_single_word_fuzzy_match(single_words_by_length,
-                                                                                          lower_text))
+                for _, single_words_by_length, _, _ in self.ontology.values():
+                    ontology_term_ids.extend(self._get_single_word_fuzzy_match(single_words_by_length, lower_text))
             else:
-                lower_words = [w.lower() for w in words]
-                distance = self.calculate_match_distance(lower_words)
+                lower_words = lower_text.split()
                 for _, _, word_lookup, _ in self.ontology.values():
-                    if ontology_term_pks := self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words,
-                                                                                    lower_text, distance=distance):
-                        ontology_term_ids.extend(ontology_term_pks)
+                    ontology_term_ids.extend(self._get_multi_word_fuzzy_match(word_lookup, lower_words, lower_text))
 
             if len(words) == 1:
                 # Don't do fuzzy for genes as likely to get false positives
@@ -397,45 +393,42 @@ class PhenotypeMatcher:
 
         return lower_text in cls.COMMON_WORDS
 
-    @staticmethod
-    def calculate_match_distance(words: list[str]) -> int:
-        """ by default we match on 1 - however we may want to be a bit lax sometimes """
-        num_ae_words = 0
-        for w in words:
-            num_ae_words += "ae" in w
-        distance = max(1, num_ae_words)
-        return distance
+    def _is_typo_of(self, word: str, term_word: str) -> bool:
+        """ One edit inside a long misspelled word. Short words are abbreviations (QT/PT, URTI/UTI) and the one
+            negation prefix reachable in one edit flips the meaning (afebrile/febrile, areflexia/reflexia) #2130 """
+        if len(word) < MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH or len(term_word) < MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
+            return False
+        if self._is_dictionary_word(word):
+            return False
+        if word == "a" + term_word or term_word == "a" + word:
+            return False
+        return Levenshtein.distance(word, term_word) == 1
 
-    @staticmethod
-    def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: list[str], text: str, distance: int = 1) -> Optional[CodePK]:
-        potentials: CodePKLookups = defaultdict(set)
-        min_length = len(text) - distance
-        max_length = len(text) + distance
-        for w in words:
-            for term, pk_set in lookup[w].items():
-                if min_length <= len(term) <= max_length:
-                    potentials[term].update(pk_set)
-        if not potentials:
-            return None
-        return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
+    def _get_single_word_fuzzy_match(self, single_words_by_length: dict[int, CodePKLookups], word: str) -> set[CodePK]:
+        word_length = len(word)
+        for length in range(word_length - 1, word_length + 2):
+            for term, pk_set in single_words_by_length.get(length, {}).items():
+                if self._is_typo_of(word, term):
+                    return pk_set
+        return set()
 
-    @staticmethod
-    def get_id_from_single_word_fuzzy_match(single_words_by_length: dict[int, CodePKLookups], text: str,
-                                            distance: int = 1) -> Optional[CodePK]:
-        text_length = len(text)
+    def _get_multi_word_fuzzy_match(self, word_lookup: dict[str, CodePKLookups], words: list[str],
+                                    text: str) -> set[CodePK]:
+        """ A term with the same words as the text bar one, which is a typo (infectons -> infections) """
         potentials: CodePKLookups = {}
-        # Can quickly exclude words that are greater than +/- distance away
-        for l in range(text_length - distance, text_length + distance + 1):
-            if words := single_words_by_length.get(l):
-                potentials.update(words)
-        return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
+        min_length = len(text) - 1
+        max_length = len(text) + 1
+        for w in words:
+            for term, pk_set in word_lookup.get(w, {}).items():
+                if min_length <= len(term) <= max_length:
+                    potentials[term] = pk_set
 
-    @staticmethod
-    def get_id_from_fuzzy_match(lookup: CodePKLookups, text: str, max_distance: int) -> set[CodePK]:
-        for description, pk_set in lookup.items():
-            distance = Levenshtein.distance(description, text)  # @UndefinedVariable
-            # print("'%s' <-> '%s' distance: %d" % (description, text, distance))
-            if distance <= max_distance:
+        for term, pk_set in potentials.items():
+            term_words = term.split()
+            if len(term_words) != len(words):
+                continue
+            differing = [(w, tw) for w, tw in zip(words, term_words) if w != tw]
+            if len(differing) == 1 and self._is_typo_of(*differing[0]):
                 return pk_set
         return set()
 
