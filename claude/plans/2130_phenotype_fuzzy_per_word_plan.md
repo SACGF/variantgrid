@@ -6,7 +6,7 @@ Status: in progress
 Builds on `claude/plans/2131_phenotype_matcher_version_plan.md`: the change here alters stored matches, so it bumps
 `PHENOTYPE_MATCHER_VERSION` to 2 and registers the rematch.
 
-`PhenotypeMatcher.get_id_from_fuzzy_match` (`annotation/phenotype_matcher.py`) accepted any term within Levenshtein
+`PhenotypeMatcher.get_id_from_fuzzy_match` (`patients/phenotype_matcher.py`) accepted any term within Levenshtein
 distance 1 of the whole joined text and returns the first one in dictionary order. One edit is enough to flip the
 meaning of a clinical phrase when it lands in an abbreviation or a prefix:
 
@@ -56,7 +56,7 @@ accepted candidate is equally close and "first wins" stays deterministic.
 test of "any stale `TextPhenotype` exists" expressed on the historical model (`processed=True` and not
 `match_version__matcher_version=2`).
 
-## Tests (`annotation/tests/test_phenotype_matching.py`)
+## Tests (`patients/tests/test_phenotype_matching.py`)
 
 Test terms added alongside the existing ones (the real HPO aliases): HP:0008151 Prolonged prothrombin time
 ["Prolonged PT"], HP:0000010 Recurrent urinary tract infections ["Recurrent UTIs"], HP:0002373 Febrile seizure

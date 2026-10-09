@@ -10,7 +10,7 @@ extraction grids — and the two are independent.
 
 ## The problem
 
-`Tissue` (`patients/models.py:315`) is inert. `Specimen.tissue` is a nullable FK to it, and both
+`Tissue` (`patients/models/models_patient.py:315`) is inert. `Specimen.tissue` is a nullable FK to it, and both
 `SpecimenForm` (`patients/forms.py:137`) and `PatientSpecimenFormSet` (`patients/forms.py:122`) render
 a tissue `<select>` that is empty on every deployment. There is no creation path outside
 `patients/admin.py:13`, no seed data (`Tissue` appears only in `patients/migrations/0001_initial.py`), no
@@ -101,7 +101,7 @@ term is the interpretation**:
 
 Two precedents to follow rather than invent against:
 
-- **`ExtractionMatchMixin`** (`patients/models.py:478`) — already in this app, already the shape: a
+- **`ExtractionMatchMixin`** (`patients/models/models_patient.py:478`) — already in this app, already the shape: a
   claim that may not be resolvable yet, carrying status, error and the date the claim was parked, with
   a settled link left alone so it never flaps back.
 - **`ConditionText` / `ConditionTextMatch`** (`classification/models/condition_text_matching.py:61`) —
@@ -123,8 +123,8 @@ the model with the FK.
 
 - **Specimen page** — the autocomplete above. This is the path that makes the field usable at all.
 - **Patient CSV** — no tissue column exists. `PatientRecord` has `specimen_tissue_status` but no
-  `specimen_tissue` (`patients/models.py:835`), and `PatientColumns.COLUMN_DETAILS`
-  (`patients/models.py:661`) has no entry, which is why `patients/import_records.py:360` is commented
+  `specimen_tissue` (`patients/models/models_patient.py:835`), and `PatientColumns.COLUMN_DETAILS`
+  (`patients/models/models_patient.py:661`) has no entry, which is why `patients/import_records.py:360` is commented
   out. Adding one is a column constant, a `PatientRecord` field, a migration and a match attempt —
   cheap once §3 exists, because an unmatched name parks as text instead of failing the row.
 - **API** — `SpecimenSerializer` (`patients/serializers.py:184`) omits tissue. Same story: accept the

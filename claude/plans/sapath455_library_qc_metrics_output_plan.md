@@ -94,7 +94,7 @@ class LibraryQC(ExtractionMatchMixin, TimeStampedModel):
 **Superseded by the revision below**, which is what landed: a file column turned out to be a pair carrying both arms,
 so the row is keyed on (run, pair, category) and claims a Specimen rather than an Extraction.
 
-`ExtractionMatchMixin` (`patients/models.py:ExtractionMatchMixin`) gives it `extraction` (nullable), `extraction_reference`,
+`ExtractionMatchMixin` (`patients/models/models_patient.py:ExtractionMatchMixin`) gives it `extraction` (nullable), `extraction_reference`,
 `extraction_match_status`, `extraction_match_error`, `extraction_match_date`.
 `patients/tasks/extraction_matching_tasks.py:reconcile_pending_extractions` adds `LibraryQC` to the models it
 re-resolves (its `user` is the row's own `user`), so a file that lands before the CVO or Mocha has made the

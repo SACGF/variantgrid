@@ -4,30 +4,30 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from annotation.models.models_phenotype_match import (
-    PatientTextPhenotype,
-    PhenotypeMatchVersion,
-    TextPhenotype,
-    TextPhenotypeMatch,
-    patient_phenotype_terms,
-)
-from annotation.phenotype_matcher import (
-    PHENOTYPE_MATCHER_VERSION,
-    PhenotypeMatcher,
-    _build_ambiguous_acronym_denylist,
-    get_ambiguous_acronym_denylist,
-)
-from annotation.phenotype_matching import (
-    bulk_patient_phenotype_matching,
-    create_phenotype_description,
-    requeue_sentences,
-)
 from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
 from patients.models import Patient
+from patients.models.models_phenotype import (
+    PatientTextPhenotype,
+    PhenotypeMatchVersion,
+    TextPhenotype,
+    TextPhenotypeMatch,
+    patient_phenotype_terms,
+)
+from patients.phenotype_matcher import (
+    PHENOTYPE_MATCHER_VERSION,
+    PhenotypeMatcher,
+    _build_ambiguous_acronym_denylist,
+    get_ambiguous_acronym_denylist,
+)
+from patients.phenotype_matching import (
+    bulk_patient_phenotype_matching,
+    create_phenotype_description,
+    requeue_sentences,
+)
 from snpdb.models import Cohort, GenomeBuild
 
 
@@ -170,7 +170,7 @@ class TestPhenotypeMatching(TestCase):
         already_matched_text = "Failure to thrive"
         Patient(phenotype=already_matched_text).save(phenotype_matcher=self.phenotype_matcher)
 
-        with mock.patch("annotation.phenotype_matching.PhenotypeMatcher") as mock_matcher:
+        with mock.patch("patients.phenotype_matching.PhenotypeMatcher") as mock_matcher:
             Patient(patient_code="no phenotype").save()
             Patient(phenotype=already_matched_text).save()
             mock_matcher.assert_not_called()
@@ -197,7 +197,7 @@ class TestPhenotypeMatching(TestCase):
             ),
         }
         with mock.patch(
-            "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
+            "patients.models.models_phenotype.get_ambiguous_acronym_denylist",
             return_value=denylist,
         ):
             # Rebuild the matcher inside the patch so its ambiguous_acronyms
@@ -266,7 +266,7 @@ class TestPhenotypeMatching(TestCase):
             "raised tsh": (("HP:0002925", "Raised TSH"), ("OMIM:000000", "Something else")),
         }
         with mock.patch(
-            "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
+            "patients.models.models_phenotype.get_ambiguous_acronym_denylist",
             return_value=denylist,
         ):
             phenotype_terms = patient_phenotype_terms([patient])
@@ -286,7 +286,7 @@ class TestPhenotypeMatching(TestCase):
             "some_truly_ambiguous_token": (("HP:0000001", "All"), ("MONDO:0000001", "disease")),
         }
         with mock.patch(
-            "annotation.phenotype_matcher._build_ambiguous_acronym_denylist",
+            "patients.phenotype_matcher._build_ambiguous_acronym_denylist",
             return_value=raw,
         ):
             # bust cache_memoize so our patch is used

@@ -67,7 +67,7 @@ class HasPhenotypeDescriptionMixin:
             returns whether phenotype changed """
 
         # Stop circular import
-        from annotation.phenotype_matching import create_phenotype_description
+        from patients.phenotype_matching import create_phenotype_description
 
         phenotype_input_text = self.phenotype_input_text
         phenotype_description_relation = self.phenotype_description_relation

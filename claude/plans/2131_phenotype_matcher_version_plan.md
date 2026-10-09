@@ -3,7 +3,7 @@
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-10-09
 Status: in progress
 
-Phenotype matches are stored once per unique sentence (`annotation/models/models_phenotype_match.py:TextPhenotype`,
+Phenotype matches are stored once per unique sentence (`patients/models/models_phenotype.py:TextPhenotype`,
 one row per sentence text, `processed` once matched) and never redone, so a matcher change or a new ontology import
 only affects sentences first seen afterwards. The only rematch today is `match_patient_phenotypes --clear`, which deletes
 every `TextPhenotype` and `PatientTextPhenotype` (losing `approved_by`) and cascades away the sentences under
@@ -15,7 +15,7 @@ links and approvals survive. #2130 (fuzzy matching) lands on top of it and is th
 ## Data
 
 ```python
-# annotation/models/models_phenotype_match.py
+# patients/models/models_phenotype.py
 class PhenotypeMatchVersion(TimeStampedModel):
     """ The matcher code and the ontology its lookups were built from - one row per pair, like VariantAnnotationVersion """
     matcher_version = models.IntegerField()
@@ -31,7 +31,7 @@ class TextPhenotype(models.Model):
 ```
 
 ```python
-# annotation/phenotype_matcher.py
+# patients/phenotype_matcher.py
 # Bump when a change to the lookups or matching logic would change the matches of an already matched sentence.
 # TextPhenotype records the version a sentence was matched with; `match_patient_phenotypes --stale` redoes older ones.
 # Every bump also registers that command as a ManualOperation in a new migration so deployments rematch (#2131).
@@ -51,14 +51,14 @@ once rematches once.
 1. **Stamping.** `PhenotypeMatchVersion.get_or_create_current()` (`PHENOTYPE_MATCHER_VERSION` against
    `OntologyVersion.latest(validate=False)`) is taken once wherever a `PhenotypeMatcher` is built - the pool worker
    initialiser, the single-core bulk loop and `create_phenotype_description` - and passed to
-   `annotation/phenotype_matching.py:_process_text_phenotype`, which stamps it via `TextPhenotype.mark_processed`
+   `patients/phenotype_matching.py:_process_text_phenotype`, which stamps it via `TextPhenotype.mark_processed`
    when it sets `processed`. The sentences `create_phenotype_description` marks processed without matching (no
    alphanumerics) are stamped the same way, so they are never reported stale.
 2. **Stale.** `TextPhenotype.stale_qs()` (static): `processed=True` and `match_version` not in
    `PhenotypeMatchVersion.current_qs()` (a filter, so reporting never creates the row; until something has been
    matched with the current pair every processed sentence is stale). With no ontology imported the pair's
    `ontology_version` is `None`; the unique constraint treats nulls as equal so there is still one row.
-3. **Requeue.** `annotation/phenotype_matching.py:requeue_sentences(text_phenotype_qs) -> int`, in one transaction:
+3. **Requeue.** `patients/phenotype_matching.py:requeue_sentences(text_phenotype_qs) -> int`, in one transaction:
    delete the `TextPhenotypeMatch` rows of those sentences, `update(processed=False)`, and invalidate the day-long
    `PhenotypeDescription.get_ontology_term_ids` memo for every description holding one of them (cache_memoize's
    `.invalidate(description)`; it applies `args_rewrite`). Patient and cohort links, `PhenotypeDescription`,
@@ -81,7 +81,7 @@ once rematches once.
 - `manual/__manual_readme.md` example and `claude/research/patients.md` "Phenotype text" paragraph now describe
   `--stale` (and that `--clear` rematches everything, keeping approvals).
 
-## Tests (`annotation/tests/test_phenotype_matching.py`)
+## Tests (`patients/tests/test_phenotype_matching.py`)
 
 - A matched sentence points at the current `PhenotypeMatchVersion` (test `OntologyVersion`); an alphanumeric-free one
   is stamped too.

@@ -3,14 +3,14 @@ from django.db.models import CharField, Count, Value
 from django.db.models.functions import Concat, Lower
 from django.dispatch import receiver
 
-from annotation.models.models_phenotype_match import (
+from library.preview_request import PreviewKeyValue, preview_extra_signal
+from ontology.models import OntologyTerm
+from patients.models import Patient
+from patients.models.models_phenotype import (
     PHENOTYPE_ONTOLOGY_SERVICE_LABELS,
     patient_phenotype_terms,
     patients_qs_for_ontology_term,
 )
-from library.preview_request import PreviewKeyValue, preview_extra_signal
-from ontology.models import OntologyTerm
-from patients.models import Patient
 from snpdb.models import Sample
 from snpdb.search import HAS_3_ANY, SearchExample, SearchInputInstance, search_receiver
 

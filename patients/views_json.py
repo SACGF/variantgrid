@@ -3,11 +3,6 @@ from django.http import Http404
 from django.http.response import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 
-from annotation.models.models_phenotype_match import PatientPhenotypeTerms
-from annotation.models.models_phenotype_match import (
-    patient_phenotype_terms as bulk_patient_phenotype_terms,
-)
-from annotation.phenotype_matching import create_phenotype_description
 from library.utils import invert_dict
 from patients import forms
 from patients.models import (
@@ -16,6 +11,11 @@ from patients.models import (
     PatientModification,
     PatientRecordOriginType,
 )
+from patients.models.models_phenotype import PatientPhenotypeTerms
+from patients.models.models_phenotype import (
+    patient_phenotype_terms as bulk_patient_phenotype_terms,
+)
+from patients.phenotype_matching import create_phenotype_description
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_sample_tree
 from snpdb.models import GenomeBuild, Sample
 
