@@ -3,7 +3,8 @@ Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a
 text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
 cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first),
 postgres_arrays formats array literals, long_running_sql / get_active_backend_pids / signal_backends /
-wait_for_backends_to_stop find and cancel other connections' running queries, pg_settings / get_pg_setting set
+wait_for_backends_to_stop find and cancel other connections' running queries, query_was_cancelled tells a
+cancel or statement_timeout apart from other OperationalErrors, pg_settings / get_pg_setting set
 and read this connection's run-time settings, and get_table_row_estimates / get_queryset_row_estimate give planner
 row counts without scanning.
 """
@@ -16,9 +17,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional, TypeVar, Generic, Type, Callable
 
+import psycopg
 import sqlparse
 from dataclasses_json import DataClassJsonMixin
 from django.db import connection, transaction, models
+from django.db.utils import OperationalError
 
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
@@ -137,6 +140,11 @@ def pg_settings(local: bool = False, **values):
     finally:
         if previous:
             _set_pg_settings(previous, local=False)
+
+
+def query_was_cancelled(e: OperationalError) -> bool:
+    """ pg_cancel_backend and statement_timeout both surface as OperationalError wrapping QueryCanceled """
+    return isinstance(e.__cause__, psycopg.errors.QueryCanceled)
 
 
 def get_table_row_estimates(table_names: Optional[Iterable[str]] = None) -> dict[str, int]:
