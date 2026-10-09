@@ -1,24 +1,33 @@
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from annotation.models.models_phenotype_match import (
     PatientTextPhenotype,
+    TextPhenotype,
     TextPhenotypeMatch,
     patient_phenotype_terms,
 )
 from annotation.phenotype_matcher import (
+    PHENOTYPE_MATCHER_VERSION,
     PhenotypeMatcher,
     _build_ambiguous_acronym_denylist,
     get_ambiguous_acronym_denylist,
 )
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from annotation.phenotype_matching import (
+    bulk_patient_phenotype_matching,
+    create_phenotype_description,
+    requeue_sentences,
+)
+from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
 from patients.models import Patient
+from snpdb.models import Cohort, GenomeBuild
 
 
 class TestPhenotypeMatching(TestCase):
@@ -259,3 +268,69 @@ class TestPhenotypeMatching(TestCase):
             effective = get_ambiguous_acronym_denylist()
             self.assertNotIn("ftt", effective, "FTT has a HARDCODED_LOOKUP - must not be flagged")
             self.assertIn("some_truly_ambiguous_token", effective)
+
+
+class TestPhenotypeMatcherVersion(TestCase):
+    """ Sentences record what they were matched with, so stale ones can be rematched in place (#2131) """
+
+    @classmethod
+    def setUpTestData(cls):
+        create_ontology_test_data()
+        cls.ontology_version = create_test_ontology_version()
+        cls.phenotype_matcher = PhenotypeMatcher()
+
+    def _stamp(self, text, matcher_version, ontology_version):
+        TextPhenotype.objects.filter(text=text).update(matcher_version=matcher_version,
+                                                       ontology_version=ontology_version)
+
+    def test_matched_sentences_are_stamped(self):
+        create_phenotype_description("Raised TSH", self.phenotype_matcher)
+        create_phenotype_description("...")  # Nothing to match, so marked processed without a matcher
+        for text in ["Raised TSH", "..."]:
+            text_phenotype = TextPhenotype.objects.get(text=text)
+            self.assertTrue(text_phenotype.processed)
+            self.assertEqual(text_phenotype.matcher_version, PHENOTYPE_MATCHER_VERSION)
+            self.assertEqual(text_phenotype.ontology_version, self.ontology_version)
+        self.assertFalse(TextPhenotype.stale_qs().exists())
+
+    def test_stale_qs(self):
+        for text in ["current", "old matcher", "old ontology", "never stamped"]:
+            TextPhenotype.objects.create(text=text, processed=True)
+        TextPhenotype.objects.create(text="unprocessed")
+        imports = {f: getattr(self.ontology_version, f) for f in OntologyVersion.ONTOLOGY_IMPORTS}
+        imports["gencc_import"] = OntologyImport.objects.create(import_source="test", filename="older_gencc",
+                                                                processed_date=timezone.now())
+        other_ontology_version = OntologyVersion.objects.create(**imports)
+        self._stamp("current", PHENOTYPE_MATCHER_VERSION, self.ontology_version)
+        self._stamp("old matcher", PHENOTYPE_MATCHER_VERSION - 1, self.ontology_version)
+        self._stamp("old ontology", PHENOTYPE_MATCHER_VERSION, other_ontology_version)
+        stale = set(TextPhenotype.stale_qs().values_list("text", flat=True))
+        self.assertEqual(stale, {"old matcher", "old ontology", "never stamped"})
+
+    def test_requeue_keeps_links_and_approvals(self):
+        text = "Raised TSH"
+        user = User.objects.get_or_create(username="phenotype_approver")[0]
+        patient = Patient(phenotype=text)
+        patient.save(phenotype_matcher=self.phenotype_matcher, phenotype_approval_user=user)
+        cohort = Cohort(name="phenotype cohort", user=user, genome_build=GenomeBuild.get_name_or_alias("GRCh37"),
+                        phenotype=text)
+        cohort.save(phenotype_matcher=self.phenotype_matcher)
+        patient_description = patient.phenotype_description
+        cohort_description = cohort.phenotype_description
+        expected_term_ids = patient_description.get_ontology_term_ids()
+        self.assertTrue(expected_term_ids)
+
+        self._stamp(text, None, None)  # Matched before #2131
+        self.assertEqual(requeue_sentences(TextPhenotype.stale_qs()), 1)
+        self.assertEqual(patient_description.get_ontology_term_ids(), [])  # memo invalidated
+
+        bulk_patient_phenotype_matching(patients=[patient])
+
+        text_phenotype = TextPhenotype.objects.get(text=text)
+        self.assertEqual(text_phenotype.matcher_version, PHENOTYPE_MATCHER_VERSION)
+        self.assertEqual(text_phenotype.ontology_version, self.ontology_version)
+        patient_text_phenotype = PatientTextPhenotype.objects.get(patient=patient)
+        self.assertEqual(patient_text_phenotype.phenotype_description, patient_description)
+        self.assertEqual(patient_text_phenotype.approved_by, user)
+        self.assertEqual(Cohort.objects.get(pk=cohort.pk).phenotype_description, cohort_description)
+        self.assertEqual(patient_description.get_ontology_term_ids(), expected_term_ids)

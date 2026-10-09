@@ -23,8 +23,11 @@ prints it), which the upgrader (`scripts/upgrade.sh` -> `manage.py upgrade`) sur
 call site:
 
 ```python
-ManualOperation.operation_manage(["match_patient_phenotypes", "--clear"], requires=["ontology-imported"])
+ManualOperation.operation_manage(["match_patient_phenotypes", "--stale"], requires=["ontology-imported"])
 ```
+
+(`--stale` rematches only the phenotype sentences matched with an older `PHENOTYPE_MATCHER_VERSION` or ontology;
+each matcher version bump re-registers it, and one successful run satisfies every registration before it.)
 
 `requires` is persisted on `ManualMigrationTask.requires`. Gate *definitions* live in `gates.py`,
 keyed by gate name (not command):

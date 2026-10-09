@@ -6,7 +6,8 @@ from typing import Optional
 
 import nltk
 from django.conf import settings
-from django.db import connections
+from django.db import connections, transaction
+from django.db.models import QuerySet
 
 from annotation.models.models_phenotype_match import (
     PhenotypeDescription,
@@ -17,6 +18,7 @@ from annotation.models.models_phenotype_match import (
 )
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from annotation.phenotype_tokenizer import PhenotypeTokenizer
+from ontology.models import OntologyVersion
 from patients.models import Patient
 
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
@@ -153,8 +155,25 @@ def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_match
     except SkipAllPhenotypeMatchException:
         logging.info("Completely skipping: %s", text_phenotype.text)
 
-    text_phenotype.processed = True
-    text_phenotype.save()
+    text_phenotype.mark_processed(phenotype_matcher.ontology_version)
+    # A requeued sentence's descriptions may have cached their term ids while it had no matches
+    _invalidate_ontology_term_ids(TextPhenotype.objects.filter(pk=text_phenotype.pk))
+
+
+def _invalidate_ontology_term_ids(text_phenotype_qs: QuerySet[TextPhenotype]):
+    """ Drop the day-long PhenotypeDescription.get_ontology_term_ids memo of every description holding these sentences """
+    description_qs = PhenotypeDescription.objects.filter(textphenotypesentence__text_phenotype__in=text_phenotype_qs)
+    for phenotype_description in description_qs.distinct():
+        PhenotypeDescription.get_ontology_term_ids.invalidate(phenotype_description)
+
+
+def requeue_sentences(text_phenotype_qs: QuerySet[TextPhenotype]) -> int:
+    """ Drop the matches of these sentences and mark them unprocessed, so bulk_patient_phenotype_matching rematches
+        them. Patient/cohort links, descriptions and approvals are kept (#2131). Returns the number requeued """
+    with transaction.atomic():
+        TextPhenotypeMatch.objects.filter(text_phenotype__in=text_phenotype_qs).delete()
+        _invalidate_ontology_term_ids(text_phenotype_qs)
+        return text_phenotype_qs.update(processed=False)
 
 
 def _replace_comments_with_spaces(text):
@@ -202,8 +221,11 @@ def create_phenotype_description(text, phenotype_matcher=None, defer_processing=
         if tp_created:
             has_alpha_numeric = any(x.isalnum() for x in sentence)
             if not has_alpha_numeric:  # Impossible to match anything so skip
-                text_phenotype.processed = True
-                text_phenotype.save()
+                if phenotype_matcher:
+                    ontology_version = phenotype_matcher.ontology_version
+                else:
+                    ontology_version = OntologyVersion.latest(validate=False)
+                text_phenotype.mark_processed(ontology_version)
                 known_sentences.append(tps)
             else:
                 unknown_sentences.append(tps)

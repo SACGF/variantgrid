@@ -2,14 +2,15 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Count, F, OuterRef, QuerySet, Subquery
+from django.db.models import Count, F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 
-from annotation.phenotype_matcher import get_ambiguous_acronym_denylist
+from annotation.phenotype_matcher import PHENOTYPE_MATCHER_VERSION, get_ambiguous_acronym_denylist
 from library.constants import DAY_SECS
 from ontology.models import OntologyService, OntologyTerm, OntologyVersion
 from patients.models import Patient
@@ -105,9 +106,25 @@ class TextPhenotype(models.Model):
 
     text = models.TextField(primary_key=True)
     processed = models.BooleanField(default=False)
+    # What the matches hanging off this sentence were produced with. Null = matched before #2131, so stale.
+    matcher_version = models.IntegerField(null=True, blank=True)
+    ontology_version = models.ForeignKey(OntologyVersion, null=True, blank=True, on_delete=SET_NULL)
 
     def __str__(self):
         return f"{self.text} (processed: {self.processed})"
+
+    def mark_processed(self, ontology_version: Optional[OntologyVersion]):
+        """ ontology_version is the one the matcher's lookups were built from """
+        self.processed = True
+        self.matcher_version = PHENOTYPE_MATCHER_VERSION
+        self.ontology_version = ontology_version
+        self.save(update_fields=["processed", "matcher_version", "ontology_version"])
+
+    @staticmethod
+    def stale_qs() -> QuerySet['TextPhenotype']:
+        """ Matched with an older matcher or ontology - `match_patient_phenotypes --stale` rematches these """
+        current = Q(matcher_version=PHENOTYPE_MATCHER_VERSION, ontology_version=OntologyVersion.latest(validate=False))
+        return TextPhenotype.objects.filter(processed=True).exclude(current)
 
     def get_ambiguous_matches(self):
         """ Where an Ontology Service has multiple matches to the exact same text """
