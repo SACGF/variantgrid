@@ -29,7 +29,6 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
-from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.database_utils import get_active_backend_pids, signal_backends
@@ -39,6 +38,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import invert_dict
+from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
@@ -78,16 +78,6 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         # calls save() so version bumps create new rows here too. @see issue #1551
         CohortVersion.objects.get_or_create(cohort=self, version=self.version)
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
-
-    def _get_phenotype_input_text_field(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        return "phenotype"
-
-    def _get_phenotype_description_relation_class_and_kwargs(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        # Stop circular import
-        from annotation.models.models_phenotype_match import CohortTextPhenotype
-        return CohortTextPhenotype, {"cohort": self}
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """

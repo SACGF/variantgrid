@@ -15,7 +15,7 @@ register = Library()
 
 
 def match_graph(user, title, qs, field_label, color, graph_width, graph_height, max_records, click_handler=None, patient_ids=None, heading=None):
-    patient_path = "textphenotypematch__text_phenotype__textphenotypesentence__phenotype_description__patienttextphenotype__patient"
+    patient_path = "textphenotypematch__text_phenotype__textphenotypesentence__phenotype_description__patient"
     filter_kwargs = {patient_path + "__isnull": False}
     patients_qs = Patient.filter_for_user(user)
     if patient_ids:

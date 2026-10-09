@@ -80,7 +80,7 @@
 			<td>
 			<div class='results'></div>
 			<td>
-			{% if not patient.patient_text_phenotype.approved_by %}
+			{% if not patient.phenotype_description.approved_by %}
 			<button class='accept-phenotype btn btn-primary' patient_id={{ patient.pk }}>Accept</button>
 			{% endif %}
 	{% endfor %}

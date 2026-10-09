@@ -128,7 +128,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 56  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 57  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -454,7 +454,7 @@ HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrie
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # If set, patient phenotype text containing this string is treated as unreviewed:
-# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# matched ontology terms will not be persisted to the DB (PhenotypeDescription / TextPhenotypeMatch).
 # Users can still see live preview matches on the patient page along with a warning.
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
