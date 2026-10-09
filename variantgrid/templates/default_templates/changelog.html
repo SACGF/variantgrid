@@ -15,7 +15,7 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 8 October 2026 (includes features up to the 8 October 2026 deploy) -->
+        <!-- Last audited/updated: 9 October 2026 (includes features up to the 9 October 2026 deploy) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0 - FAQ</div>
@@ -170,7 +170,8 @@
                     <li>Classify &amp; Report tab on the sample and patient pages, with outstanding counts - classified tags drop out as you go</li>
                     <li>Reuse prior curation at gene level, grouped by distinct gene-scope content</li>
                     <li>Gene page - clinical significance summary counts above the groupings grid, click one to filter (also on allele / variant pages)</li>
-                    <li>Multi-variant case reports - DRAFT preview then finalise, with copy number losses, splice calls and CNV fold change</li>
+                    <li>Multi-variant case reports - DRAFT preview then finalise, with copy number losses, splice calls and CNV fold change.
+                        The build form shows the pair's library QC, failed metrics in red</li>
                     <li>Classifications for gene-level events and splice events (eg "AR-V7") can be imported</li>
                     <li>Classification report warns when it was generated from an older submitted version</li>
                     <li>Classification groupings grid shows the samples and users behind each grouping, with a sample filter</li>
@@ -186,8 +187,9 @@
                     <li>File upload widget replaced with Filepond (the old jQuery File Upload had been abandoned upstream)</li>
                     <li>Cohort page - tick samples to launch a Duo/Trio/Quad, or to spawn a sub cohort</li>
                     <li>TSO 500 CombinedVariantOutput import - splice calls, patient / specimen / extraction links and TMB / MSI measures</li>
-                    <li>TSO 500 pair page - CombinedVariantOutput and Library QC (from MetricsOutput) together</li>
+                    <li>TSO 500 pair page - CombinedVariantOutput and Library QC (from MetricsOutput) together, linked from the sequencing run</li>
                     <li>BAM or CRAM files (several per sample) for IGV, bulk added to a VCF's samples from a filename pattern</li>
+                    <li>Upload page - sortable, searchable grid of files, with a short reason for failures you can fix</li>
                 </ul>
 
                 <h4>Data Sharing</h4>
@@ -211,6 +213,7 @@
                     <li>Gene Lists - faster grid, copy/paste genes in, and a graphs tab showing gene locations</li>
                     <li>A mitochondrial 'm.' HGVS on a non-MT reference now warns rather than silently resolving as 'g.'</li>
                     <li>Gene Lists - a symbol only matches genes through a single alias hop, so genes sharing an alias string (eg MT-TS2 / PDCD2 via "RP8") are no longer linked</li>
+                    <li>RefSeq mitochondrial transcripts give m.HGVS</li>
                 </ul>
 
                 <h4>Genome Builds</h4>
@@ -245,8 +248,10 @@
                     <li>New Specimen and Extraction records - pages, grids and an API</li>
                     <li>Cohorts have a phenotype (can be copied from their patients), and patient phenotype terms are shown beside samples</li>
                     <li>Patients show their de-identified code only, never the name</li>
-                    <li>Patient page warns when its samples don't look like the same individual (likely sample swap)</li>
+                    <li>Patient page warns when its samples don't look like the same individual (likely sample swap) - checked as soon as a sample is extracted or linked</li>
                     <li>Sample and patient previews show matched HPO / OMIM / MONDO terms</li>
+                    <li>Phenotype matching - correctly spelled words aren't treated as typos, British spellings handled (eg anaemia),
+                        and existing matches are redone when the matcher or ontology is updated</li>
                 </ul>
 
                 <h4>Search</h4>
@@ -259,6 +264,7 @@
                     <li>Search for EnrichmentKit, Trios and Quads, and versioned Ensembl genes (eg "ENSG00000243646.11")</li>
                     <li>COSMIC variants we don't already have can be created from search (uses the COSMIC API)</li>
                     <li>The analysis shortcut prefix is now "an" (eg "an42") as it conflicted with allele</li>
+                    <li>Coordinate search says when it found the variant via its pre-normalisation (VCF) form</li>
                 </ul>
 
                 <h4>Structural Variants</h4>
@@ -345,7 +351,7 @@
 
     {% else %}
        <div class="card mt-4">
-            <div class="card-header">8 October 2026</div>
+            <div class="card-header">9 October 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
                 <ul>
@@ -361,6 +367,7 @@
                     <li>Tags node classify tab removed - classifications now shown against input samples</li>
                     <li>Running node loads are cancelled before their caches are dropped</li>
                     <li>#1894 - Faster patient / specimen level SampleNode filters</li>
+                    <li>#2120 - Intersection node with a BED file missing from disk shows an error naming the file</li>
                 </ul>
                 <h4>Classification</h4>
                 <ul>
@@ -384,10 +391,13 @@
                 <h4>Somatic / TSO 500</h4>
                 <ul>
                     <li>#1904 - CombinedVariantOutput stored per pair, with a TSO 500 pair page showing the analysis and Library QC</li>
+                    <li>Sequencing run Patients tab links each patient's TSO 500 pair page, Library QC shown as one table</li>
+                    <li>CombinedVariantOutput import uses the patient its samples are already linked to, rather than making a stub</li>
                     <li>Library QC imported from DRAGEN TSO 500 MetricsOutput</li>
                     <li>SpliceGirl SpliceVariants.vcf imports as gene level splice variants</li>
                     <li>GIS call, MSI-High tumour fraction, estimated copies, and SampleNode copy ratio thresholds</li>
                     <li>Case report MSI / TMB calls use lab-configured bands, assay ticks start from the specimen's measures</li>
+                    <li>Case report build form shows the pair's library QC, failed categories and metrics in red</li>
                     <li>#1908 #1909 - Gene level variants put IGV and CIViC in Quick Links (splice breakpoints, fusion partners)</li>
                 </ul>
                 <h4>Structural Variants</h4>
@@ -396,6 +406,8 @@
                     <li>#1358 - New Variant Types page (Variants menu) - what each kind / size of variant gets</li>
                     <li>#2104 - SVs too long for VEP are marked as such, and the variant page says why</li>
                     <li>#2103 - Long g.HGVS del/dup/inv resolves straight to a symbolic variant</li>
+                    <li>#2119 - Search and manual variant entry refuse symbolic alts VCF import would drop (eg &lt;INS&gt;)</li>
+                    <li>#2111 - Variant Types page lists what import drops and why</li>
                 </ul>
                 <h4>Data / Upload</h4>
                 <ul>
@@ -407,26 +419,33 @@
                     <li>Failed / killed CSV/VCF exports are retried rather than stuck on "Error retrieving download"</li>
                     <li>#2087 - Sample stats count only the sample's own variant calls</li>
                     <li>Exported VCFs are VCFv4.3</li>
+                    <li>#2114 - Upload page lists files in a sortable, searchable grid</li>
+                    <li>#2030 - Upload grid shows a short reason for failures you can fix</li>
+                    <li>#2126 - Variant page lists records bcftools normalised in place, not only ones it moved</li>
                 </ul>
                 <h4>Patients / Phenotype</h4>
                 <ul>
                     <li>#196 - Patient page warns when its samples don't look like the same individual (likely sample swap)</li>
+                    <li>#196 - Sample swap check runs as soon as a sample is extracted or linked, not overnight - unchecked samples collapsed</li>
                     <li>#1380 - Sample and patient previews show matched HPO / OMIM / MONDO terms</li>
                     <li>#426 - Ontology autocomplete matches words in any order ("muscular dystrophy duchenne")</li>
                     <li>Patient form - Deceased yes/no/unknown, creating a patient goes to its page</li>
                     <li>#2037 - Patient CSV import fixes, clearer message when a specimen belongs to another patient</li>
-                    <li>Phenotype matching skips words that gave false matches ("soft", "healthy", "stable")</li>
+                    <li>#2125 - Phenotype matching doesn't fuzzy-match correctly spelled words (table -&gt; "Stable"), handles British spelling</li>
+                    <li>#2131 - Phenotype matches redone when the matcher or ontology updates, keeping links and approvals</li>
                     <li>PED import validates every family and reports all the invalid ones</li>
                 </ul>
                 <h4>Search</h4>
                 <ul>
                     <li>Variants without a canonical c.HGVS preview their g./m.HGVS and gene rather than "intergenic"</li>
                     <li>#1876 - Gene level search - a single hyphen doesn't split fusion partners</li>
+                    <li>#2126 - Coordinate search says when it found the variant via its pre-normalisation (VCF) form</li>
                 </ul>
                 <h4>Genes</h4>
                 <ul>
                     <li>Gene page variants grid - "Include ClinVar variants" toggle</li>
                     <li>#2029 - Faster cdot transcript import</li>
+                    <li>#2139 - RefSeq mitochondrial transcripts give m.HGVS</li>
                 </ul>
                 <h4>User Interface</h4>
                 <ul>
@@ -436,6 +455,7 @@
                     <li>#1432 - Faster grids - write permissions checked for just the page's rows</li>
                     <li>Annotation run page explains its Retry / Subdivide / Make Local buttons</li>
                     <li>Nearby variants only count tags you can see</li>
+                    <li>#2137 - Nearby variants tab no longer hangs on some variants</li>
                     <li>Permission checks tightened across uploads, pedigrees, pathology tests, reviews and graphs</li>
                 </ul>
             </div>
