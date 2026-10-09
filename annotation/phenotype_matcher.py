@@ -7,9 +7,11 @@ from typing import Any, Optional
 
 import Levenshtein
 from cache_memoize import cache_memoize
+from nltk.corpus import words as nltk_words
 
 from library.log_utils import log_traceback
 from library.utils import is_not_none
+from library.utils.nltk_utils import ensure_nltk_data
 from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
 
 # There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
@@ -25,6 +27,17 @@ HGNC_PATTERN = re.compile(r"HGNC:(\d+)$")
 
 MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
+MIN_LENGTH_PLURAL = 5
+MIN_LENGTH_SPELLING_VARIANT = 5  # Short words are acronyms (haem -> "HEM dysplasia")
+HYPHEN_IN_WORD_PATTERN = re.compile(r"(?<=\w)-(?=\w)")  # Not a lone "-" token, which would join a match
+
+# British -> American, applied per word: anaemia, oedema, diarrhoea (not vertebrae, toes), tumour, generalised, leucopenia
+AMERICAN_SPELLINGS = [
+    (re.compile(r"[ao]e(?!s?$)"), "e"),
+    (re.compile(r"our(s?)$"), r"or\1"),
+    (re.compile(r"is(e|ed|es|ing|ation)$"), r"iz\1"),
+    (re.compile(r"^leuc"), "leuk"),
+]
 
 AMBIGUOUS_ACRONYM_MAX_LEN = 5
 AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS = frozenset({"exact", "exact_synonym", "xref"})
@@ -156,32 +169,31 @@ def get_ambiguous_acronym_denylist() -> Mapping[str, tuple[tuple[str, str], ...]
 
 
 class PhenotypeMatcher:
-    # Words which have no use matching on their own
+    # Words which have no use matching on their own. Dictionary words are never fuzzy matched, so these are only
+    # needed where the text exactly matches a term or gene symbol (charge -> CHARGE syndrome, kit -> KIT)
     COMMON_WORDS = {
         # acc = account, AGU = Adult Genetics Unit
-        'acc', 'acute', 'across', 'adult', 'agu', 'all', 'and', 'andrew', 'areas', 'associated', 'auditory',
-        'bad', 'bilateral', 'birth', 'blood', 'borderline', 'brain', 'brainstem',
-        'can', 'carries', 'cause', 'cells', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma',
-        'commas', 'common', 'complete', 'coned', 'cord', 'cousin', 'cousins',
-        'day', 'days', 'decreased in', 'diffused', 'deficiency', 'disease', 'disorder', 'distal',
-        'ear', 'exclude', 'exome',
-        'face', 'familial', 'father', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
+        'acc', 'acute', 'adult', 'agu', 'all', 'auditory',
+        'bad', 'bilateral', 'blood', 'borderline', 'brain', 'brainstem',
+        'can', 'central', 'charge', 'child', 'chronic', 'common', 'complete', 'cord', 'cousin', 'cousins',
+        'decreased in', 'disease', 'disorder', 'distal',
+        'ear',
+        'face', 'familial', 'focal', 'frequent', 'frequency', "ft 4",
         'generalized', "generalised",
-        'hard', 'has', 'health', 'healthy', 'hearing', 'high grade',
-        'image', 'inheritance', 'insulin',
+        'hard', 'has', 'healthy', 'high grade',
+        'image', 'inheritance',
         'joints',
         'kit',
-        'large', 'lateral', 'left', 'likes', 'liver',
-        'march', 'match', 'macro', 'mild', 'milena', 'moderate', 'mother', 'month', 'months', 'motor', 'movements',
-        'nad', 'name', 'normal',
+        'large', 'lateral', 'left', 'liver',
+        'march', 'mild', 'milena', 'moderate', 'movements',
+        'nad', 'name',
         'onset', 'other',
-        'panel', 'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
-        'proximal', 'progressive',
-        'range', 'raise', 'recurrent', 'right', 'req',
-        'second', 'score', 'severe', 'she', 'short', 'son', 'skeletal', 'sleep', 'soft', 'spine', 'stable', 'stage', 'study',
+        'periodic', 'pit', 'plan', 'position', 'profound', 'prolonged', 'proximal', 'progressive',
+        'recurrent', 'right', 'req',
+        'severe', 'she', 'short', 'son', 'skeletal', 'soft', 'stable',
         'syndrome',
-        'tat', 'the', 'transient', 'trio', 'trial',
-        'wants', 'was', 'week', 'weeks', 'wes', 'wgs', 'white', 'with',
+        'tat', 'the', 'transient', 'trio',
+        'was',
     }
 
     def __init__(self):
@@ -195,7 +207,14 @@ class PhenotypeMatcher:
             self._break_up_terms(pks_by_term)
             word_lookup = self._create_word_lookups(pks_by_term)
             single_words_by_length = self._get_single_words_by_length(pks_by_term, 5)
-            self.ontology[ontology_service] = (pks_by_term, single_words_by_length, word_lookup)
+            spelling_lookup = self._get_spelling_lookup(pks_by_term)
+            self.ontology[ontology_service] = (pks_by_term, single_words_by_length, word_lookup, spelling_lookup)
+
+        # A correctly spelled word isn't a typo, so is never fuzzy matched (table -> "Stable") #2125
+        ensure_nltk_data('corpora/words')
+        self.dictionary_words = {w.lower() for w in nltk_words.words()}
+        for _, _, word_lookup, _ in self.ontology.values():
+            self.dictionary_words.update(word_lookup)
 
         hgnc_aliases = {}
         hgnc_names = {}
@@ -238,22 +257,24 @@ class PhenotypeMatcher:
             if self._skip_word(lower_text):
                 return []
 
-            for _, (term_pks, single_words_by_length, word_lookup) in self.ontology.items():
-                ontology_term_pks = term_pks.get(lower_text)
-                if not ontology_term_pks:
-                    if len(words) == 1:
-                        w = words[0]
-                        if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
-                            ontology_term_pks = self.get_id_from_single_word_fuzzy_match(single_words_by_length,
-                                                                                         lower_text)
-                    else:
-                        lower_words = [w.lower() for w in words]
-                        distance = self.calculate_match_distance(lower_words)
-                        ontology_term_pks = self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words, lower_text,
-                                                                                    distance=distance)
-
-                if ontology_term_pks:
+            exact_pks = [self._get_exact_match(term_pks, spelling_lookup, lower_text)
+                         for term_pks, _, _, spelling_lookup in self.ontology.values()]
+            if any(exact_pks):
+                # Fuzzy matching other ontologies here only finds different terms (macrocephaly -> acrocephaly)
+                for ontology_term_pks in exact_pks:
                     ontology_term_ids.extend(ontology_term_pks)
+            elif len(words) == 1:
+                if len(lower_text) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH and not self._is_dictionary_word(lower_text):
+                    for _, single_words_by_length, _, _ in self.ontology.values():
+                        ontology_term_ids.extend(self.get_id_from_single_word_fuzzy_match(single_words_by_length,
+                                                                                          lower_text))
+            else:
+                lower_words = [w.lower() for w in words]
+                distance = self.calculate_match_distance(lower_words)
+                for _, _, word_lookup, _ in self.ontology.values():
+                    if ontology_term_pks := self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words,
+                                                                                    lower_text, distance=distance):
+                        ontology_term_ids.extend(ontology_term_pks)
 
             if len(words) == 1:
                 # Don't do fuzzy for genes as likely to get false positives
@@ -304,6 +325,49 @@ class PhenotypeMatcher:
         #            raise ValueError(msg)
 
         return ontology_term_ids
+
+    @staticmethod
+    def _spelling_key(text: str) -> str:
+        """ American spelling with hyphens as spaces, so either spelling of a term gives the same key """
+        words = []
+        for word in HYPHEN_IN_WORD_PATTERN.sub(" ", text).split():
+            if len(word) >= MIN_LENGTH_SPELLING_VARIANT:
+                for pattern, replacement in AMERICAN_SPELLINGS:
+                    word = pattern.sub(replacement, word)
+            words.append(word)
+        return " ".join(words)
+
+    @staticmethod
+    def _plural_variants(text: str) -> list[str]:
+        """ text, then text without a trailing plural 's' (kidneys -> kidney, but not class/virus/crisis) """
+        variants = [text]
+        last_word = text.rsplit(" ", 1)[-1]
+        if len(last_word) >= MIN_LENGTH_PLURAL and last_word.endswith("s") and last_word[-2] not in "siu":
+            variants.append(text[:-1])
+        return variants
+
+    @classmethod
+    def _get_spelling_lookup(cls, term_pks: CodePKLookups) -> CodePKLookups:
+        """ Ontology terms keyed by _spelling_key, where that differs (paraproteinaemia, rod-cone dystrophy) """
+        spelling_lookup = defaultdict(set)
+        for term, pk_set in term_pks.items():
+            spelling_key = cls._spelling_key(term)
+            if spelling_key != term:
+                spelling_lookup[spelling_key].update(pk_set)
+        return spelling_lookup
+
+    def _get_exact_match(self, term_pks: CodePKLookups, spelling_lookup: CodePKLookups, lower_text: str) -> set[CodePK]:
+        """ Exact match, allowing British/American spelling, hyphens and plurals (anaemia -> Anemia, kidneys -> Kidney) """
+        for text in self._plural_variants(lower_text):
+            if ontology_term_pks := term_pks.get(text):
+                return ontology_term_pks
+            spelling_key = self._spelling_key(text)
+            if ontology_term_pks := term_pks.get(spelling_key) or spelling_lookup.get(spelling_key):
+                return ontology_term_pks
+        return set()
+
+    def _is_dictionary_word(self, lower_word: str) -> bool:
+        return any(w in self.dictionary_words for w in self._plural_variants(lower_word))
 
     @classmethod
     def _skip_word(cls, lower_text):
@@ -552,8 +616,6 @@ class PhenotypeMatcher:
             'aHUS': HUS,
             "aCLL": (load_hpo_by_name, "chronic lymphocytic leukemia"),
             "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
-            # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
-            "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
             "ADPCKD": (load_omim_by_id, 600273),  # Autosomal dominant polycystic kidney disease
             "AVSD": (load_hpo_by_name, "Atrioventricular canal defect"),  # aka Atrioventricular septal defect
             "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
@@ -565,7 +627,6 @@ class PhenotypeMatcher:
             "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
             "FTT": (load_hpo_by_name, "Failure to thrive"),
             "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
-            "GDD": DEVELOPMENTAL_DELAY,
             "GEFS": GEFS,
             "GEFS+": GEFS,
             "GSD": GLYCOGEN_STORAGE_DISEASE,
@@ -585,7 +646,6 @@ class PhenotypeMatcher:
             'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
             "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
             "SUDEP": (load_hpo_list_by_names, ["Sudden death", "Epilepsy"]),
-            "VSD": (load_hpo_by_name, "Ventricular septal defect"),
         }
 
         CASE_INSENSITIVE_LOOKUPS = {
@@ -669,7 +729,6 @@ class PhenotypeMatcher:
             "kneist dysplasia": (load_omim_by_name, "KNIEST DYSPLASIA"),
             "learning difficulties": COGNITIVE_IMPAIRMENT,
             "learning disability": COGNITIVE_IMPAIRMENT,
-            "legius": (load_omim_by_name, "Legius Syndrome"),
             "leg pains": (load_hpo_by_name, "Limb pain"),
             "limb abnormalities": ABNORMALITY_OF_LIMBS,
             "low arylsulphatase": ARYLSULFATASE_A_DEFICIENCY,
@@ -694,7 +753,6 @@ class PhenotypeMatcher:
             "no speech": (load_hpo_by_id, 1344),
             "ohtahara syndrome": (load_omim_by_id, 308350),
             "opisthoclonus": (load_hpo_by_name, "opisthotonus"),
-            "opitz gbbb": (load_omim_by_id, 300000),
             "parkinson's disease": PARKINSONISM,
             "parkinsons": PARKINSONISM,
             "parkinson's": PARKINSONISM,
@@ -709,7 +767,6 @@ class PhenotypeMatcher:
             "pulmonary avms": PAVM,
             "pul avms": PAVM,
             "raised ck": ELEVATED_CK,
-            "raised liver enzymes": (load_hpo_by_id, 2910),  # Elevated liver enzymes
             "raised ketones": KETOSIS,
             "raised methionine": (load_hpo_by_name, "Hypermethioninemia"),
             "raised urinary orotate": (load_hpo_by_name, "Oroticaciduria"),
@@ -723,7 +780,6 @@ class PhenotypeMatcher:
             "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
             "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
             "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
-            "type 1 diabetes": DIBETES_TYPE_1,
             "t1 diabetes": DIBETES_TYPE_1,
             "two hair whorls": (load_hpo_by_id, 10813),
             "uncoordinated": (load_hpo_by_id, 2406),
@@ -769,7 +825,6 @@ class PhenotypeMatcher:
             "ehler danlos": EHLER_DANOS,
             "gaucher disease":  (load_omim_pks_containing_name, "GAUCHER DISEASE"),
             "glycogen storage disease": GLYCOGEN_STORAGE_DISEASE,
-            "glut1 deficiency": (load_omim_pks_containing_name, "GLUT1 DEFICIENCY SYNDROME"),
             "hemophagocytic lymphohistiocytosis": HLH,
             "hlh": HLH,
             "hht": (load_omim_pks_containing_name, "Hereditary hemorrhagic telangiectasia"),
