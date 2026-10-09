@@ -2,10 +2,10 @@
 Regression guard for the signal receivers that only register as a side effect of being imported.
 
 Modules under ``<app>/signals/`` register their handlers by decorating module-level functions
-with ``@receiver`` / ``@search_receiver`` / ``@worker_ready``. Nothing references the imported
+with ``@receiver`` / ``@worker_ready``. Nothing references the imported
 name afterwards, so an unused-import autofix will happily delete the import from the app's
-``ready()`` - which silently unregisters the handler. Nothing fails, nothing logs; searches just
-stop returning results and health checks stop reporting.
+``ready()`` - which silently unregisters the handler. Nothing fails, nothing logs; health checks
+just stop reporting. Search receivers are registered by name instead - snpdb/tests/test_search_registry.py.
 
 This scans for modules that register on import and asserts each one actually got imported, so a
 dropped ``ready()`` import is caught here instead of in production.
@@ -19,7 +19,7 @@ from django.apps import apps
 from django.test import SimpleTestCase
 
 # Decorators that register a handler as a side effect of the module being imported
-REGISTRATION_DECORATORS = {"receiver", "search_receiver", "worker_ready"}
+REGISTRATION_DECORATORS = {"receiver", "worker_ready"}
 
 # Not our runtime code, and migrations import lazily by design
 SKIP_DIR_NAMES = {"migrations", "tests", "__pycache__", "static", "templates"}
@@ -77,7 +77,7 @@ class SignalReceiverRegistrationTest(SimpleTestCase):
         """ Guards the scan itself - a rename that breaks it would otherwise pass vacuously """
         modules = self._registering_modules()
         self.assertGreater(len(modules), 20, f"Expected to find the signals modules, got {modules}")
-        self.assertIn("snpdb.signals.trio_search", modules)
+        self.assertIn("snpdb.signals.vcf_health_check", modules)
 
     def test_registering_modules_are_imported(self):
         """ Every module that registers on import must be imported by its app's ready() """

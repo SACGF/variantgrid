@@ -174,8 +174,9 @@ whose membership is decided outside VariantGrid says so through `Lab.external_me
 deriving the lab and organisation from the user's default lab when not given. `snpdb/genome_build_manager.py:GenomeBuildManager.get_current_genome_build`
 resolves the build for a request in a fixed order (GET parameter, build name in the URL path, the user's default, the
 first annotated build) and caches it on the request threadlocal; the URL regex only knows GRCh37 and GRCh38.
-`snpdb/apps.py:SnpdbConfig.ready` connects `user_post_save_handler` only outside `UNIT_TEST`, imports every
-`snpdb/signals/` module for its `@search_receiver` side effect, and connects the trio and VCF-import handlers.
+`snpdb/apps.py:SnpdbConfig.ready` connects `user_post_save_handler` only outside `UNIT_TEST`, imports the
+`snpdb/signals/` receiver modules, registers the app's searches by name with `search_registry.register`, and connects
+the trio and VCF-import handlers.
 
 ### Grids
 
@@ -197,10 +198,14 @@ shared-contig reason.
 
 ### Search
 
-`snpdb/search.py:SearchInput.search` sends `search_signal` and every `@search_receiver` (`snpdb/search.py:search_receiver`)
-answers with a `SearchResponse`. The decorator does the shared work: admin-only gating, `preview_enabled`, the regex
+`@search_receiver` (`snpdb/search.py:search_receiver`) turns a generator into a `snpdb/search.py:SearchReceiver`, and
+each app's `AppConfig.ready()` registers its receivers by name with `snpdb/search.py:SearchRegistry.register` (#1690;
+`snpdb/tests/test_search_registry.py` fails on a declared but unregistered one). `snpdb/search.py:SearchInput.search` runs
+every registered receiver whose `SearchReceiver.visible_to` passes (enabled, admin-only, `preview_enabled`, classify
+admits only Variant searches) and `SearchReceiver.search` returns a `SearchResponse`, doing the shared work: the regex
 `pattern`, result caps (variants uncapped because they merge into alleles), exception capture into a
-`SearchMessageOverall`, and under `settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
+`SearchMessageOverall`, timing into `duration_seconds` (the EventLog summary names the slowest over a second), and under
+`settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
 `SearchInput.get_visible_variants` restricts to a build's contigs and, on Shariant, to classified variants.
 `SearchResultMatchStrength` decides whether the UI jumps straight to a single result. The variant receivers live in
 `snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, HGVS via `snpdb/signals/variant_search.py:_search_hgvs`, ids,
