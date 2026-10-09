@@ -7,7 +7,8 @@ from annotation.fake_data import get_fake_annotation_version
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Sequence
 from snpdb.models.models_enums import ImportSource
-from snpdb.models.models_variant import VariantCoordinate
+from snpdb.models.models_variant import Variant, VariantCoordinate
+from snpdb.signals.variant_search import get_results_from_variant_coordinate
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.models import (
     FileUpload,
@@ -118,13 +119,21 @@ class TestModifiedImportedVariantLongValueLookup(TestCase):
 
     def test_exact_lookup_uses_full_value(self):
         vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="T")
-        variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant(vc)
+        variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant(Variant.objects.all(), vc)
         self.assertEqual(list(variants), [self.variant2])
 
     def test_any_alt_lookup(self):
         vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="")
-        variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(vc)
+        variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(Variant.objects.all(), vc)
         self.assertEqual(set(variants), {self.variant1, self.variant2})
+
+    def test_search_fallback_stays_inside_searched_variants(self):
+        hidden_variant2_qs = Variant.objects.exclude(pk=self.variant2.pk)
+        vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="T")
+        self.assertFalse(get_results_from_variant_coordinate(self.grch37, hidden_variant2_qs, vc).exists())
+        vc_any_alt = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="")
+        any_alt = get_results_from_variant_coordinate(self.grch37, hidden_variant2_qs, vc_any_alt, any_alt=True)
+        self.assertEqual(list(any_alt), [self.variant1])
 
 
 class TestModifiedImportedVariantNormalised(TestCase):

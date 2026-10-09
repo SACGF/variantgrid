@@ -299,7 +299,7 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
                                         any_alt: bool = False) -> QuerySet[Variant]:
     """
     :param genome_build: genome build (used for format variant_coordinate.chromosome for variant search
-    :param qs: A query set that we'll be searching inside of (except for when returning ModifiedImportVariants)
+    :param qs: A query set that we'll be searching inside of (including variants found via ModifiedImportedVariant)
     :param variant_coordinate: The variant coordinate to lookup
     :param any_alt: If true, search without using alt and return all matches
     :return: A QuerySet of variants
@@ -313,11 +313,11 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
 
     if not results.exists():
         if not any_alt:
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(qs, variant_coordinate)
         else:
             # should we really be searching ModifiedImportVariants with any alt? or should that just happen for
             # the filter of "real" variants
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(variant_coordinate)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(qs, variant_coordinate)
     return results
 
 

@@ -950,15 +950,19 @@ class ModifiedImportedVariant(models.Model):
         return miv.variant
 
     @classmethod
-    def get_variants_for_unnormalized_variant(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+    def get_variants_for_unnormalized_variant(cls, variant_qs: QuerySet[Variant],
+                                              variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+        """ old_variant_formatted has no genome build, so variant_qs scopes the result to the build (and whatever
+            else the caller may see) """
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
-        return Variant.objects.filter(pk__in=cls._filter_old_variant_formatted(old_variant).values("variant_id"))
+        return variant_qs.filter(pk__in=cls._filter_old_variant_formatted(old_variant).values("variant_id"))
 
     @classmethod
-    def get_variants_for_unnormalized_variant_any_alt(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+    def get_variants_for_unnormalized_variant_any_alt(cls, variant_qs: QuerySet[Variant],
+                                                      variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
         miv_qs = cls._filter_old_variant_formatted(old_variant, startswith=True)
-        return Variant.objects.filter(pk__in=miv_qs.values("variant_id"))
+        return variant_qs.filter(pk__in=miv_qs.values("variant_id"))
 
     @classmethod
     def get_other_loci_variants_by_multiallelic(cls, variant: Variant) -> dict[str, set['ModifiedImportedVariant']]:
