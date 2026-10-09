@@ -1,80 +1,77 @@
 // @ts-check
 // snpdb/templates/snpdb/tags/vcf_grid_filter_tags.html
-/* global ignoreFilterTable:writable, vcfGridParams:writable, tagContainer:writable */ // this file
-/* global vcfGridTableId:writable, vcfGridVariantsTypeLabels:writable */ // this file
-// Plain assignments (not let/const) as the tag may be reloaded multiple times in tabs - the last one set up
-// is the one the filter functions act on
-function vcfShowAll() {
-    ignoreFilterTable = true;
-    $("input:radio[name=genome_build_filter]:first", tagContainer).click();  // reset radio to "All"
-    vcfClearAutoCompletes();
-    ignoreFilterTable = false;
-    vcfGridParams = {};
-    filterTable();
+// The tag is on both the Samples and VCF tabs of the Data page, so each instance keeps its state in a closure,
+// reached through its own container (keyed by table_id) rather than page globals
+
+function vcfGridFilterContainer(tableId) {
+    return $(".vcf-grid-filter-tags-" + tableId);
 }
 
-function vcfClearAutoCompletes() {
-    $("select[data-autocomplete-light-function=select2]", tagContainer).each(function() {
-        clearAutocompleteChoice(this);
-    });
+// The DataTables ajax `data` hook for tableId - data-datatable-data="vcfGridDatatableFilter('samples-datatable')"
+function vcfGridDatatableFilter(tableId) {
+    return function(data) {
+        const datatableFilter = vcfGridFilterContainer(tableId).data("vcfGridDatatableFilter");
+        if (datatableFilter) {
+            datatableFilter(data);
+        }
+    };
 }
 
-// This is called by DataTables before each ajax call
-function vcfGridDatatableFilter(data) {
-    for (const [key, value] of Object.entries(vcfGridParams)) {
-        data[key] = Array.isArray(value) ? JSON.stringify(value) : value;
-    }
-}
+function initVcfGridFilter(tableId, options) {
+    const tagContainer = vcfGridFilterContainer(tableId);
+    const variantsTypeLabels = options.variantsTypeLabels;
+    let ignoreFilterTable = false;
+    let vcfGridParams = {};
 
-function filterTable() {
-    if (ignoreFilterTable) {
-        return;
-    }
-
-    const descriptionContainer = $("#vcf-grid-filter-description", tagContainer);
-    if (!$.isEmptyObject(vcfGridParams)) {
-        const descriptions = [];
-        const genomeBuildName = vcfGridParams["genome_build_name"];
-        if (genomeBuildName) {
-            descriptions.push("Genome Build = " + genomeBuildName);
+    function filterTable() {
+        if (ignoreFilterTable) {
+            return;
         }
 
-        const project = vcfGridParams["project"];
-        if (project) {
-            descriptions.push("Project = " + project);
-        }
-
-        const variantsType = vcfGridParams["variants_type"];
-        if (variantsType) {
-            const variantsTypeLabels = [];
-            for (let i=0 ; i<variantsType.length ; i++) {
-                const vt = variantsType[i];
-                variantsTypeLabels.push(vcfGridVariantsTypeLabels[vt]);
+        const descriptionContainer = $(".vcf-grid-filter-description", tagContainer);
+        if (!$.isEmptyObject(vcfGridParams)) {
+            const descriptions = [];
+            const genomeBuildName = vcfGridParams["genome_build_name"];
+            if (genomeBuildName) {
+                descriptions.push("Genome Build = " + genomeBuildName);
             }
-            let variantsTypeDescriptions = variantsTypeLabels.join(", ");
-            if (!variantsTypeDescriptions) {
-                variantsTypeDescriptions = "(None selected)";
-            }
-            descriptions.push("Variants Type = " + variantsTypeDescriptions);
-        }
 
-        if (descriptions) {
-            $("#vcf-grid-filter", tagContainer).html(descriptions.join(", "));
+            const project = vcfGridParams["project"];
+            if (project) {
+                descriptions.push("Project = " + project);
+            }
+
+            const variantsType = vcfGridParams["variants_type"];
+            if (variantsType) {
+                const variantsTypeDescriptions = variantsType.map(vt => variantsTypeLabels[vt]).join(", ");
+                descriptions.push("Variants Type = " + (variantsTypeDescriptions || "(None selected)"));
+            }
+
+            $(".vcf-grid-filter", tagContainer).html(descriptions.join(", "));
             descriptionContainer.show();
+        } else {
+            descriptionContainer.hide();
         }
-    } else {
-        descriptionContainer.hide();
+
+        $("#" + tableId).DataTable().ajax.reload();
     }
 
-    $("#" + vcfGridTableId).DataTable().ajax.reload();
-}
+    function showAll() {
+        ignoreFilterTable = true;
+        $("input:radio[name=genome_build_filter]:first", tagContainer).click();  // reset radio to "All"
+        $("select[data-autocomplete-light-function=select2]", tagContainer).each(function() {
+            clearAutocompleteChoice(this);
+        });
+        ignoreFilterTable = false;
+        vcfGridParams = {};
+        filterTable();
+    }
 
-function setupVcfGridFilterTags(tableId, variantsTypeLabels) {
-    ignoreFilterTable = false;
-    vcfGridParams = {};
-    vcfGridTableId = tableId;
-    vcfGridVariantsTypeLabels = variantsTypeLabels;
-    tagContainer = $(".vcf-grid-filter-tags-" + tableId);
+    tagContainer.data("vcfGridDatatableFilter", function(data) {
+        for (const [key, value] of Object.entries(vcfGridParams)) {
+            data[key] = Array.isArray(value) ? JSON.stringify(value) : value;
+        }
+    });
 
     // Called from inside the tag's own container, before the controls below it are parsed
     $(document).ready(function() {
@@ -93,15 +90,19 @@ function setupVcfGridFilterTags(tableId, variantsTypeLabels) {
             filterTable();
         });
 
-        $("input[type=checkbox]", "#id_variants_type").change(function() {
-            const variantsTypeList = [];
-            $("input:checked", "#id_variants_type").each(function() {
-                variantsTypeList.push($(this).val());
-            });
-            vcfGridParams["variants_type"] = variantsTypeList;
+        const variantsTypeCheckboxes = $("#id_variants_type input[type=checkbox]", tagContainer);
+        variantsTypeCheckboxes.change(function() {
+            vcfGridParams["variants_type"] = variantsTypeCheckboxes.filter(":checked").map(function() {
+                return $(this).val();
+            }).get();
             filterTable();
         });
 
-        $("#vcf-grid-filter-description", tagContainer).hide();
+        $(".vcf-grid-filter-show-all", tagContainer).click(function(event) {
+            event.preventDefault();
+            showAll();
+        });
+
+        $(".vcf-grid-filter-description", tagContainer).hide();
     });
 }

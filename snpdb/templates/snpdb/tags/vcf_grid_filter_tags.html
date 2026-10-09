@@ -8,7 +8,7 @@
         min-width: 700px;
     }
 
-    #vcf-grid-filter {
+    .vcf-grid-filter {
         margin-left: 5px;
     }
 
@@ -24,7 +24,7 @@
     </style>
     <script src="{% static 'js/snpdb/vcf_grid_filter_tags.js' %}"></script>
     <script>
-        setupVcfGridFilterTags({{ table_id|jsonify }}, {{ variants_type_labels|jsonify }});
+        initVcfGridFilter({{ table_id|jsonify }}, {variantsTypeLabels: {{ variants_type_labels|jsonify }}});
     </script>
     <div class="card grid-filter-container">
         <div class="card-header">Filter Grid</div>
@@ -41,8 +41,8 @@
             {% endlabelled %}
             {% endif %}
 
-            <div id='vcf-grid-filter-description'>
-                Filtering to <span id='vcf-grid-filter'></span>. <a href='javascript:vcfShowAll()'>Show All</a>
+            <div class='vcf-grid-filter-description'>
+                Filtering to <span class='vcf-grid-filter'></span>. <a href='#' class='vcf-grid-filter-show-all'>Show All</a>
             </div>
         </div>
     </div>
