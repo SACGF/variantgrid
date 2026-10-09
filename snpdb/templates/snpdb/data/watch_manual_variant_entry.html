@@ -18,8 +18,12 @@
           }
     }
     </style>
-    {% json_data "watch-manual-variant-entry-data" mvec_id=mvec.pk initial_json=initial_json %}
     <script src="{% static 'js/snpdb/watch_manual_variant_entry.js' %}"></script>
+    <script>
+        $(document).ready(function() {
+            handleMVECData({{ mvec.pk }}, JSON.parse({{ initial_json|jsonify }}));
+        });
+    </script>
 {% endblock %}
 {% block content %}
     <div class="container">

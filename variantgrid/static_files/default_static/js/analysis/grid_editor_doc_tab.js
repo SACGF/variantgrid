@@ -1,7 +1,7 @@
 // @ts-check
 // analysis/templates/analysis/node_editors/grid_editor_doc_tab.html
 /* global retrieveAndUpdateNodeAppearances */ // analysis_nodes.js
-$(document).ready(function() {
+function initGridEditorDocTab(nodeId) {
     // Exit Node name edit on enter
     $('#id_name').keypress(function(e) {
       if(e.keyCode == 13) {
@@ -13,7 +13,7 @@ $(document).ready(function() {
     const options = {
         target: $("#node-doc"),
         success: function () {
-            retrieveAndUpdateNodeAppearances([readJsonData("grid-editor-doc-tab-data").node_id]);
+            retrieveAndUpdateNodeAppearances([nodeId]);
         },
     };
     nodeDocForm.ajaxForm(options);
@@ -26,5 +26,4 @@ $(document).ready(function() {
             $("#id_name", nodeDocForm).val(autoNodeName);
         }
     });
-
-});
+}

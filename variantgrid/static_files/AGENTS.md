@@ -26,9 +26,14 @@ most grid and flag names still need reading the code that builds them. A class w
 
 Bootstrap 4: `data-toggle` / `data-target`, not the Bootstrap 5 `data-bs-*` forms.
 
-Page JS lives in `default_static/js/<app>/<template_name>.js`, not in an inline `<script>` (#2021): the template keeps
-a `<script src>` where the block was, and passes values with `{% json_data "<name>-data" key=value %}`
-(`uicore/templatetags/js_tags.py`), read by `readJsonData("<name>-data")` (`variantgrid/static_files/default_static/js/global.js`); URLs come from
+Page JS that doesn't depend on template values lives in `default_static/js/<app>/<template_name>.js` (#2021). The
+static file knows nothing about the page's context: it defines functions whose parameters are the page values (one
+`options` object with named keys once there are several, an `init<Name>(options)` entry point for a file called once per
+page). The template keeps a short inline `<script>` after the `<script src>` that calls it with
+`{{ value|jsonify }}` (`uicore/templatetags/js_tags.py`, a JS literal, so NaN passes through), e.g. `analysis/templates/analysis/node_data/node_data_grid.html`.
+An inclusion tag shown several times on a page, or a fragment loaded by ajax, makes the same call from its own block.
+Leave a block inline when moving it doesn't make it clearer - mostly template logic, a few lines, or callbacks that are
+nothing but page values (`classification/templates/classification/classification_dashboard.html`). URLs come from
 `Urls.<name>(...)` (django_js_reverse). New files start with `// @ts-check` and must pass `npx eslint`. A new static
 file 500s every page that references it until `collectstatic` has added it to the manifest
 (`ManifestStaticFilesStorage`), so it ships via `scripts/upgrade.sh`, never a bare checkout on a served tree.

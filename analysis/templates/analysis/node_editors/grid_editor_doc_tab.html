@@ -1,7 +1,10 @@
 {% load static %}
-{% load js_tags %}
-{% json_data "grid-editor-doc-tab-data" node_id=node.pk %}
 <script src="{% static 'js/analysis/grid_editor_doc_tab.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        initGridEditorDocTab({{ node.pk }});
+    });
+</script>
 <div id="node-doc">
     <form id="node-doc-form" method="post" action="{{ request.path }}">
         {% csrf_token %}

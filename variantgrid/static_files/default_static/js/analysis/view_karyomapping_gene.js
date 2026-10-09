@@ -4,15 +4,13 @@ function reverseArray(array) {
     return array.slice().reverse();
 }
 
-function showKaryotypeScatter() {
-    const pageData = readJsonData("view-karyomapping-gene-data");
-    const KARYOTYPE_BIN_SCATTER_DATA = pageData.karyotype_bin_scatter_data;
-    const KARYOTYPE_BIN_LABELS = pageData.karyotype_bin_labels;
+/* options: probandSample, geneSymbol, strand, upstreamKb, downstreamKb, iv - for the title */
+function showKaryotypeScatter(scatterData, binLabels, options) {
     const data = [];
 
-    for(let i=0 ; i<KARYOTYPE_BIN_LABELS.length ; i++) {
-        const k = KARYOTYPE_BIN_LABELS[i];
-        const k_data = KARYOTYPE_BIN_SCATTER_DATA[k];
+    for(let i=0 ; i<binLabels.length ; i++) {
+        const k = binLabels[i];
+        const k_data = scatterData[k];
         // console.log("k: " + k);
         // console.log(k_data);
         let x_data = k_data['x'];
@@ -33,9 +31,9 @@ function showKaryotypeScatter() {
         data.push(trace);
     }
 
-    const description = 'Karyomapping ' + escapeHtml(pageData.proband_sample);
-    const geneDescription = escapeHtml(pageData.gene_symbol) + " ('" + escapeHtml(pageData.strand) + "' strand) Up: " + pageData.upstream_kb + "KB, Down: " + pageData.downstream_kb + "KB";
-    const coordinates = escapeHtml(pageData.iv);
+    const description = 'Karyomapping ' + escapeHtml(options.probandSample);
+    const geneDescription = escapeHtml(options.geneSymbol) + " ('" + escapeHtml(options.strand) + "' strand) Up: " + options.upstreamKb + "KB, Down: " + options.downstreamKb + "KB";
+    const coordinates = escapeHtml(options.iv);
 
     const layout = {
         title: {text: [description, geneDescription, coordinates].join('\n')},
@@ -49,14 +47,10 @@ function showKaryotypeScatter() {
             showticklabels: true,
             showline: false,
             categoryorder: "array",
-            categoryarray:  reverseArray(KARYOTYPE_BIN_LABELS),
+            categoryarray:  reverseArray(binLabels),
         },
 
     };
 
     Plotly.newPlot('karyotype-graph', data, layout);
 }
-
-$(document).ready(function() {
-    showKaryotypeScatter();
-});

@@ -2,7 +2,7 @@
 // patients/templates/patients/view_patient.html
 /* global getCookie */ // global.js
 /* global FilePond, FilePondPluginFilePoster */ // lib/filepond
-(function() {
+function setupPatientFileUpload(patientId) {
     const inputElement = document.querySelector('#patient-file-upload');
     if (!inputElement) {
         return;
@@ -10,14 +10,13 @@
     if (typeof FilePondPluginFilePoster !== 'undefined') {
         FilePond.registerPlugin(FilePondPluginFilePoster);
     }
-    const data = readJsonData("view-patient-data");
     const csrftoken = getCookie('csrftoken');
     const pond = FilePond.create(inputElement, {
         allowMultiple: true,
         credits: false,
         server: {
             process: {
-                url: Urls.patient_file_upload(data.patient_id),
+                url: Urls.patient_file_upload(patientId),
                 method: 'POST',
                 headers: {'X-CSRFToken': csrftoken},
             },
@@ -40,4 +39,4 @@
     if (browseButton) {
         browseButton.addEventListener('click', () => pond.browse());
     }
-})();
+}

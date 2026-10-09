@@ -1,15 +1,10 @@
 // @ts-check
 // classification/templates/classification/classification_export.html
-const exportData = readJsonData("classification-export-data");
-let baseUriApi = exportData.base_url;
-let baseUriRedirect = exportData.base_url_redirect;
+// Set by initClassificationExport
+let baseUriApi = null;
+let baseUriRedirect = null;
 let paramString = '';
-const errorString = null;
 let lastFormat = null;
-if (baseUriApi.indexOf('localhost') !== -1) {
-    baseUriApi = Urls.classification_export_api();
-    baseUriRedirect = Urls.classification_export_redirect();
-}
 
 function scrollToAlleleOrigin() {
     document.getElementById("allele-origin-toggle").scrollIntoView({ behavior: "smooth", block: "end"});
@@ -154,14 +149,17 @@ function generateUrl() {
 }
 
 function alleleOriginToggle(filterValue) {
-    this.generateUrl();
+    generateUrl();
 }
 
-$(document).ready(() => {
-    $('#export-fields input').change(() => {
-       this.generateUrl();
-    }).keyup(() => {
-       this.generateUrl();
-    });
-    this.generateUrl();
-});
+function initClassificationExport(baseUrl, baseUrlRedirect) {
+    if (baseUrl.indexOf('localhost') !== -1) {
+        baseUriApi = Urls.classification_export_api();
+        baseUriRedirect = Urls.classification_export_redirect();
+    } else {
+        baseUriApi = baseUrl;
+        baseUriRedirect = baseUrlRedirect;
+    }
+    $('#export-fields input').change(generateUrl).keyup(generateUrl);
+    generateUrl();
+}

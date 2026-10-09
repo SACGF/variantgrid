@@ -193,7 +193,11 @@
         {% endlabelled %}
     </div>
 
-    {% json_data "classification-grouping-export-data" base_url=base_url %}
     <script src="{% static 'js/classification/classification_grouping_export.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            initClassificationGroupingExport({{ base_url|jsonify }});
+        });
+    </script>
 
 {% endblock %}

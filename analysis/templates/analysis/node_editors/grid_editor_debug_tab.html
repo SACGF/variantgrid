@@ -23,9 +23,12 @@
 </div>
 
 {% if node.valid %}
-    {% static 'js/lib/highlight/highlight.pack.js' as highlight_js_url %}
-    {% json_data "grid-editor-debug-tab-data" highlight_js_url=highlight_js_url analysis_id=node.analysis_id node_id=node.pk %}
     <script src="{% static 'js/analysis/grid_editor_debug_tab.js' %}"></script>
+    <script>
+        $(document).ready(function() {
+            initGridEditorDebugTab("{% static 'js/lib/highlight/highlight.pack.js' %}", {{ node.analysis_id }}, {{ node.pk }});
+        });
+    </script>
     {%  if node_sql or grid_sql %}
     <div class="editor-row">
         <label for="show-grid-columns"><input id='show-grid-columns' type='checkbox' /> Show grid columns in SQL</label>

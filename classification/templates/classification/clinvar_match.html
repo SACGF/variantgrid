@@ -91,8 +91,10 @@
                 {% endfor %}
                 </tbody>
             </table>
-            {% json_data "clinvar-match-data" clinvar_key=clinvar_key.pk %}
             <script src="{% static 'js/classification/clinvar_match.js' %}"></script>
+            <script>
+                loadClinVarMatches({{ clinvar_key.pk|jsonify }});
+            </script>
         {% endif %}
     </div>
 {% endblock %}

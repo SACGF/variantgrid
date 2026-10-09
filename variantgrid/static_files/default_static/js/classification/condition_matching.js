@@ -1,11 +1,9 @@
 // @ts-check
 // classification/templates/classification/condition_matching.html
 /* global severityIcon */ // global.js
-const conditionMatchingData = readJsonData("condition-matching-data");
-const gene_symbol = conditionMatchingData.gene_symbol;
-const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", gene_symbol];
-const basicHighlightStr = basicHighlight.join("|");
-const highlightRegex = new RegExp(`(${basicHighlightStr})`, 'ig');
+// Set by initConditionMatching
+let conditionTextId = null;
+let highlightRegex = null;
 
 function submitUserChoices() {
     const id = $('#mp-id').val();
@@ -451,7 +449,7 @@ function applyChanges(changes) {
             'Content-Type': 'application/json'
         },
         data: JSON.stringify({"changes": changes}),
-        url: Urls.condition_text_matching_api(conditionMatchingData.condition_text_id),
+        url: Urls.condition_text_matching_api(conditionTextId),
         type: 'POST',
         error: (call, status, text) => {
             $('#condition-list').LoadingOverlay('hide');
@@ -473,7 +471,7 @@ function updateSuggestions() {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
         },
-        url: Urls.condition_text_matching_api(conditionMatchingData.condition_text_id),
+        url: Urls.condition_text_matching_api(conditionTextId),
         type: 'GET',
         error: (call, status, text) => {
             $('#condition-list').LoadingOverlay('hide');
@@ -577,7 +575,11 @@ function applySuggestionUpdates(results, complete) {
     checkSuggestionCount();
 }
 
-$(document).ready(() => {
+/* options: conditionTextId, normalizedText (the search the MONDO dialog starts with), geneSymbol (highlighted in descriptions) */
+function initConditionMatching(options) {
+    conditionTextId = options.conditionTextId;
+    const basicHighlight = ["autosomal", "x-linked", "recessive", "dominant", options.geneSymbol];
+    highlightRegex = new RegExp(`(${basicHighlight.join("|")})`, 'ig');
     updateSuggestions();
     checkSuggestionCount();
 
@@ -601,7 +603,7 @@ $(document).ready(() => {
         $(`[name=mp-multimode][value=${joiner}]`).trigger('click');
 
         $('#mp-id').val(recordId);
-        $('#mp-search-text').val(conditionMatchingData.normalized_text.trim());
+        $('#mp-search-text').val(options.normalizedText.trim());
         $('#mp-selection-title').text(label);
         $('#mp-selected').val(selected);
         if (inheritance === 'N/A') {
@@ -624,4 +626,4 @@ $(document).ready(() => {
     $('#mp-selected').change(() => {
         updateOntoRowSelections();
     });
-});
+}

@@ -42,8 +42,16 @@
         }
 
     </style>
-    {% json_data "condition-matching-data" gene_symbol=clinvar_export.gene_symbol condition_text_id=condition_text.pk normalized_text=condition_text.normalized_text %}
     <script src="{% static 'js/classification/condition_matching.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            initConditionMatching({
+                conditionTextId: {{ condition_text.pk }},
+                normalizedText: {{ condition_text.normalized_text|jsonify }},
+                geneSymbol: {{ clinvar_export.gene_symbol|default:""|jsonify }},
+            });
+        });
+    </script>
 {% endblock %}
 {% block content %}
     <div class="modal fade" data-backdrop="static" id="mondoModal" tabindex="-1" aria-labelledby="mondoModalLabel" aria-hidden="true">

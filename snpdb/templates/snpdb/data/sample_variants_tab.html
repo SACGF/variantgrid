@@ -1,5 +1,4 @@
 {% load static %}
-{% load js_tags %}
 {% load tag_config_tags %}
 {% render_tag_styles_and_formatter %}
 <style>
@@ -16,9 +15,18 @@
     {% include "uicore/messages/messages.html" %}
 
     {% if analysis %}
-        <script type="application/json" id="sample-variants-tab-tags-data">{"variant_tags": {% render_variant_tags_dict analysis %}, "analysis_samples": {% render_analysis_samples_dict analysis %}, "variant_tag_order": {% render_variant_tag_order %}}</script>
-        {% json_data "sample-variants-tab-data" sample_id=sample.pk analysis_id=analysis.pk analysis_version=analysis.version %}
         <script src="{% static 'js/snpdb/sample_variants_tab.js' %}"></script>
+        <script>
+        // Tags are shown read only here - they are added/removed in the analysis itself
+        variantTags = {% render_variant_tags_dict analysis %};
+        analysisSamples = {% render_analysis_samples_dict analysis %};
+        variantTagOrder = {% render_variant_tag_order %};
+        variantTagsReadOnly = true;
+
+        $(document).ready(function() {
+            initSampleVariantsTab({{ sample.pk }}, {{ analysis.pk }}, {{ analysis.version }});
+        });
+        </script>
         <h3>Analysis: {{ analysis }}</h3>
         {{ output_node_form.as_p }}
 

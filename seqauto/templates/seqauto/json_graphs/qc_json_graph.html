@@ -1,6 +1,14 @@
 {% load static %}
 {% load js_tags %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
-{% json_data "qc-json-graph-data-"|add:container_name container_name=container_name qc_data=qc_data current_label=current_label label_column=label_column gold_column=gold_column %}
 <script src="{% static 'js/seqauto/qc_json_graph.js' %}"></script>
+<script>
+    setupQCJsonGraph({
+        containerName: {{ container_name|jsonify }},
+        qcData: {{ qc_data|jsonify }},
+        currentLabel: {{ current_label|jsonify }},
+        labelColumn: {{ label_column|jsonify }},
+        goldColumn: {{ gold_column|jsonify }},
+    });
+</script>
 <div class='plotly-graph-container'></div>

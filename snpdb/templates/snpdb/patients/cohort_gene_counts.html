@@ -1,11 +1,14 @@
 {% extends "uicore/page/base_container_table.html" %}
-{% load js_tags %}
 {% load static %}
 {% block title %}Gene Counts{% endblock %}
 
 {% block head %}
-{% json_data "cohort-gene-counts-data" cohort_id=cohort.pk gene_list_id=gene_list_id %}
 <script src="{% static 'js/snpdb/cohort_gene_counts.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        initCohortGeneCounts({{ cohort.pk }}, {{ gene_list_id|default:"null" }});
+    });
+</script>
 {% endblock %}
 
 {% block container_table_content %}

@@ -10,8 +10,21 @@
     {{ block.super }}
     {% render_tag_styles_and_formatter %}
     {{ gene_symbol_form.media }}
-    {% json_data "variants-data" initial_filters=initial_filters genome_build_name=genome_build.name default_contig_id=default_contig_id igv_data=igv_data num_variant_types=variant_types|length %}
     <script src="{% static 'js/variantopedia/variants.js' %}"></script>
+    <script>
+        window.ANALYSIS_SETTINGS = {
+            show_igv_links : true,
+            igv_data : {{ igv_data | jsonify }},
+            open_variant_details_in_new_window: true,
+        };
+
+        initAllVariants({
+            initialFilters: {{ initial_filters|jsonify }},
+            genomeBuildName: {{ genome_build.name|jsonify }},
+            defaultContigId: {{ default_contig_id|jsonify }},
+            numVariantTypes: {{ variant_types|length }},
+        });
+    </script>
     <style>
         {% render_node_count_styles %}
 
@@ -99,7 +112,7 @@
                     scanned, so no rows are shown.
                 </p>
                 <p id='all-variants-filter-description' class='mt-2'>
-                    Filtering to <span id='all-variants-filter'></span>. <a href='javascript:resetFilters()'>Reset</a>
+                    Filtering to <span id='all-variants-filter'></span>. <a id="all-variants-reset" href="javascript:void(0)">Reset</a>
                 </p>
             </div>
         <table id="all-variants-datatable" class="sticky-header"

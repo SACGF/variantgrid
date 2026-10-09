@@ -1,13 +1,7 @@
 // @ts-check
 // classification/templates/classification/clinvar_key_summary.html
 /* global severityIcon */ // global.js
-const clinvarKeySummaryData = readJsonData("clinvar-key-summary-data");
-function records(data) {
-    data.clinvar_key = clinvarKeySummaryData.clinvar_key;
-}
-function batches(data) {
-    data.clinvar_key = clinvarKeySummaryData.clinvar_key;
-}
+// Renderers for the ClinVar export and batch grids
 function render_allele_origin_bucket(data) {
     return VCTable.allele_origin_bucket_label(data, null, "horizontal");
 }

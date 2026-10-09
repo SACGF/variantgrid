@@ -1,21 +1,11 @@
 // @ts-check
 // variantopedia/templates/variantopedia/variants.html
-const variantsData = readJsonData("variants-data");
-// What the grid is showing - the controls only become this when Search is clicked
-let gridExtraFilters = variantsData.initial_filters;
-const genomeBuildName = variantsData.genome_build_name;
-const setAllVariantsFilterUrl = Urls.set_all_variants_filter(genomeBuildName);
-const defaultContigId = variantsData.default_contig_id;
+// What the grid is showing - the controls only become this when Search is clicked. Set by initAllVariants
+let gridExtraFilters = null;
 
 function getAlignmentFiles() {
     return [];
 }
-
-window.ANALYSIS_SETTINGS = {
-    show_igv_links : true,
-    igv_data : variantsData.igv_data,
-    open_variant_details_in_new_window: true,
-};
 
 // Called by DataTables before each ajax call (and so also by the CSV download, which is
 // built from the table's live ajax params)
@@ -53,7 +43,7 @@ function readFilters() {
     };
 }
 
-function describeFilters(filters) {
+function describeFilters(filters, numVariantTypes) {
     const parts = [];
     const contigNames = filters.contig_ids.map(function(contigId) {
         return $(".contig-filter[value='" + contigId + "']").data("contig-name");
@@ -67,8 +57,7 @@ function describeFilters(filters) {
     if (filters.gene_symbols.length) {
         parts.push("genes: " + filters.gene_symbols.join(", "));
     }
-    const allVariantTypes = variantsData.num_variant_types;
-    if (filters.variant_types.length && filters.variant_types.length < allVariantTypes) {
+    if (filters.variant_types.length && filters.variant_types.length < numVariantTypes) {
         parts.push("types: " + filters.variant_types.join(", "));
     }
     if (filters.min_count) {
@@ -77,10 +66,10 @@ function describeFilters(filters) {
     return parts.join("; ");
 }
 
-function saveFilters(filters) {
+function saveFilters(genomeBuildName, filters) {
     $.ajax({
         type: "POST",
-        url: setAllVariantsFilterUrl,
+        url: Urls.set_all_variants_filter(genomeBuildName),
         contentType: "application/json",
         data: JSON.stringify(filters),
     });
@@ -91,14 +80,14 @@ function isSelective(filters) {
     return Boolean(filters.contig_ids.length || filters.non_standard_contigs || filters.gene_symbols.length);
 }
 
-function showFilters(filters) {
-    const description = describeFilters(filters);
+function showFilters(filters, numVariantTypes) {
+    const description = describeFilters(filters, numVariantTypes);
     $("#all-variants-filter").text(description);
     $("#all-variants-filter-description").toggle(Boolean(description));
     $("#all-variants-unselective").toggle(!isSelective(filters));
 }
 
-function applyFallbacks() {
+function applyFallbacks(defaultContigId) {
     // Nothing selective would show no rows, and no variant type would show every type without
     // saying so - tick what's going to be searched, so the buttons describe the grid
     const filters = readFilters();
@@ -128,16 +117,16 @@ function showPendingSearch() {
                        .toggleClass("btn-outline-primary", !pending);
 }
 
-function runSearch() {
-    const filters = applyFallbacks();
+function runSearch(options) {
+    const filters = applyFallbacks(options.defaultContigId);
     gridExtraFilters = filters;
-    showFilters(filters);
+    showFilters(filters, options.numVariantTypes);
     showPendingSearch();
-    saveFilters(filters);
+    saveFilters(options.genomeBuildName, filters);
     filterGrid();
 }
 
-function tickGeneSymbolContigs(geneSymbol) {
+function tickGeneSymbolContigs(genomeBuildName, geneSymbol) {
     // Tick the gene's chromosomes, otherwise a gene outside the current selection shows nothing
     const url = Urls.api_gene_symbol_detail(geneSymbol) + "?genome_build=" + genomeBuildName;
     return $.getJSON(url, function(data) {
@@ -151,16 +140,16 @@ function tickGeneSymbolContigs(geneSymbol) {
     });
 }
 
-function geneSymbolsChanged() {
+function geneSymbolsChanged(genomeBuildName) {
     const geneSymbols = $("#id_gene_symbols").val() || [];
-    $.when.apply($, geneSymbols.map(tickGeneSymbolContigs)).always(showPendingSearch);
+    $.when.apply($, geneSymbols.map((geneSymbol) => tickGeneSymbolContigs(genomeBuildName, geneSymbol))).always(showPendingSearch);
 }
 
-function resetFilters() {
+function resetFilters(genomeBuildName) {
     // An empty saved filter set means "use the defaults"
     $.ajax({
         type: "POST",
-        url: setAllVariantsFilterUrl,
+        url: Urls.set_all_variants_filter(genomeBuildName),
         contentType: "application/json",
         data: JSON.stringify({}),
         success: function() { window.location.reload(); },
@@ -172,7 +161,13 @@ function setCheckedAll(selector, checked) {
     showPendingSearch();
 }
 
-$(document).ready(() => {
+/* options: initialFilters, genomeBuildName, defaultContigId, numVariantTypes */
+function initAllVariants(options) {
+    gridExtraFilters = options.initialFilters;
+    $(document).ready(() => setupAllVariantsControls(options));
+}
+
+function setupAllVariantsControls(options) {
     $(".contig-filter, #non-standard-contigs, .variant-type-filter, #min_count").change(showPendingSearch);
     $("#min_count").keydown(function(event) {
         if (event.which === 13) {  // Enter searches, rather than doing nothing
@@ -180,12 +175,13 @@ $(document).ready(() => {
             $("#search-button").click();
         }
     });
-    $("#id_gene_symbols").change(geneSymbolsChanged);
+    $("#id_gene_symbols").change(() => geneSymbolsChanged(options.genomeBuildName));
     $("#contig-all").click(() => setCheckedAll(".contig-filter", true));
     $("#contig-none").click(() => setCheckedAll(".contig-filter", false));
     $("#variant-type-all").click(() => setCheckedAll(".variant-type-filter", true));
     $("#variant-type-none").click(() => setCheckedAll(".variant-type-filter", false));
-    $("#search-button").click(runSearch);
-    showFilters(readFilters());
+    $("#search-button").click(() => runSearch(options));
+    $("#all-variants-reset").click(() => resetFilters(options.genomeBuildName));
+    showFilters(readFilters(), options.numVariantTypes);
     showPendingSearch();
-});
+}

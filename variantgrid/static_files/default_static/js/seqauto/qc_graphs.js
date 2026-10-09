@@ -1,12 +1,8 @@
 // @ts-check
 // seqauto/templates/seqauto/qc_graphs.html
-const QC_TYPES_TOTALS = readJsonData("qc-graphs-data").qc_type_totals;
-console.log("QC");
-console.log(QC_TYPES_TOTALS);
-
-function changeGraph() {
+function changeGraph(qcTypeTotals) {
     const qc_type = $("#id_qc_type").val();
-    const totalField = QC_TYPES_TOTALS[qc_type];
+    const totalField = qcTypeTotals[qc_type];
     const percent_selector = $("input#percent");
     const percent_container = percent_selector.closest("div.form-group");
     if (totalField) {
@@ -40,17 +36,17 @@ function loadGraph() {
     }
 }
 
-$(document).ready(() => {
+function initQCGraphs(qcTypeTotals) {
     const qc_type = $('#id_qc_type');
     const qc_column = $('#id_qc_column');
 
     qc_type.change(function() {
         clearAutocompleteChoice(qc_column);
     });
-    qc_column.change(changeGraph);
-    changeGraph(); // initially hide percent
+    qc_column.change(() => changeGraph(qcTypeTotals));
+    changeGraph(qcTypeTotals); // initially hide percent
 
     const graph_selector = $('#qc-column-graph');
     graph_selector.html("<div id='initial-message'>Select a column to graph</div>");
     $("button#load-graph").click(loadGraph);
-});
+}

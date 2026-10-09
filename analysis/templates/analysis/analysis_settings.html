@@ -3,8 +3,13 @@
 {% load ui_tabs_builder %}
 {% load js_tags %}
 <div id='analysis-settings-container'>
-{% json_data "analysis-settings-data" analysis_id=analysis.pk new_analysis_settings=new_analysis_settings %}
 <script src="{% static 'js/analysis/analysis_settings.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        ANALYSIS_SETTINGS = {{ new_analysis_settings|jsonify }};
+        initAnalysisSettings({{ analysis.pk }});
+    });
+</script>
 <style>
     #lock-details {
         padding-right: 10px;

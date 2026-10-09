@@ -3,9 +3,7 @@
 // Each example cell is drawn by the grid's own client renderer from the column definition and
 // fictional row the view built - the same path DataTableDefinition takes, minus DataTables
 // @see snpdb/grid_columns/composite_examples.py
-const EXAMPLE_EXTRA = readJsonData("view-annotation-descriptions-data").example_extra;
-
-function setupExampleCell(table) {
+function setupExampleCell(table, exampleExtra) {
     const col = table.data("columnJson");
     const row = table.data("rowJson");
     const th = table.find("thead th");
@@ -19,7 +17,7 @@ function setupExampleCell(table) {
 
     let html = row[col.data];
     if (col.render) {
-        html = eval(col.render)(row[col.data], "display", row, {extra: EXAMPLE_EXTRA, kwargs: col.renderKwargs || null});
+        html = eval(col.render)(row[col.data], "display", row, {extra: exampleExtra, kwargs: col.renderKwargs || null});
         if (html instanceof jQuery) {
             html = html.prop("outerHTML");
         }
@@ -76,12 +74,12 @@ function showColumnsVersion(version) {
     }).addClass("active");
 }
 
-$(document).ready(() => {
+function initAnnotationDescriptions(exampleExtra, latestColumnsVersion) {
     $("table.composite-example").each(function() {
-        setupExampleCell($(this));
+        setupExampleCell($(this), exampleExtra);
     });
     $(".columns-version-toggle .btn").on("click", function() {
         showColumnsVersion($(this).data("columnsVersion"));
     });
-    showColumnsVersion(readJsonData("view-annotation-descriptions-data").latest_columns_version);
-});
+    showColumnsVersion(latestColumnsVersion);
+}

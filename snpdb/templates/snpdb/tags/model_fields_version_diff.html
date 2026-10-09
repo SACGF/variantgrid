@@ -22,8 +22,12 @@
 }
 
 </style>
-{% json_data "model-fields-version-diff-data" model_dicts_by_version=model_dicts_by_version versions=versions %}
 <script src="{% static 'js/snpdb/model_fields_version_diff.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        showModelFieldsVersionDiff({{ model_dicts_by_version|jsonify }}, {{ versions|jsonify }});
+    });
+</script>
 
 <div>
     <div class='legend-color-box addition'></div> <div class="legend-text"> Addition.</div>

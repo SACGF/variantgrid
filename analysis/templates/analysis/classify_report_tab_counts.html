@@ -1,4 +1,8 @@
 {% load static %}
 {% load js_tags %}
-{% json_data "classify-report-tab-counts-data" classify_report_tab_url=classify_report_tab_url classify_report_summary_url=classify_report_summary_url %}
 <script src="{% static 'js/analysis/classify_report_tab_counts.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        initClassifyReportTabCounts({{ classify_report_tab_url|jsonify }}, {{ classify_report_summary_url|jsonify }});
+    });
+</script>

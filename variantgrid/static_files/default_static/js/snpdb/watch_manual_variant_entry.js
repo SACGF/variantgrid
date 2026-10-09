@@ -11,7 +11,7 @@ function displayError(message) {
     $("#variant-status").addClass("error").text(message);
 }
 
-function handleMVECData(data) {
+function handleMVECData(mvecId, data) {
     // if we can redirect - do so
     // otherwise populate screen
     if (data["is_ready"]) {
@@ -21,21 +21,19 @@ function handleMVECData(data) {
             displayError("Variant import failed.");
         } else {
             populatePage(data);
-            setTimeout(pollServer, 2000);
+            setTimeout(() => pollServer(mvecId), 2000);
         }
     }
 }
 
-function pollServer() {
+function pollServer(mvecId) {
     $.ajax({
-        url: Urls.api_manual_variant_entry_collection(readJsonData("watch-manual-variant-entry-data").mvec_id),
-        success: handleMVECData,
+        url: Urls.api_manual_variant_entry_collection(mvecId),
+        success: (data) => handleMVECData(mvecId, data),
         error: function() {
             displayError("Error contacting server - please reload page.");
         }
     });
 }
 
-$(document).ready(function() {
-    handleMVECData(JSON.parse(readJsonData("watch-manual-variant-entry-data").initial_json));
-});
+

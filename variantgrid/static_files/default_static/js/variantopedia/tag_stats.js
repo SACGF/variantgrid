@@ -1,9 +1,9 @@
 // @ts-check
 // variantopedia/templates/variantopedia/tag_stats.html
 /* global loadTagStatsCard, renderTagStatsGenes, renderTagStatsReTagged, renderTagStatsTagGenesOverTime, renderTagStatsHeadline, renderTagStatsOverTime, renderTagStatsUser, renderTagStatsByLab, renderTagStatsCoOccurrence */ // tag_stats.js
-function taggedVariantsUrl(tagIds) {
+function taggedVariantsUrl(genomeBuildName, tagIds) {
     const params = tagIds.map((t) => "tag=" + encodeURIComponent(t)).join("&");
-    return Urls.genome_build_variant_tags(readJsonData("tag-stats-data").genome_build_name) + "?" + params;
+    return Urls.genome_build_variant_tags(genomeBuildName) + "?" + params;
 }
 
 function selectedValues(selector) {
@@ -38,14 +38,14 @@ function loadTagGenesOverTimeCard() {
                      renderTagStatsTagGenesOverTime);
 }
 
-function showSelectedTagsVariants() {
+function showSelectedTagsVariants(genomeBuildName) {
     const tagIds = selectedValues("#id_co-occurrence-tags");
     if (tagIds.length) {
-        window.location = taggedVariantsUrl(tagIds);
+        window.location = taggedVariantsUrl(genomeBuildName, tagIds);
     }
 }
 
-function loadAllTagStatsCards() {
+function loadAllTagStatsCards(genomeBuildName) {
     const alleleOrigin = "?" + alleleOriginParam();
     loadTagStatsCard("tag-stats-headline", Urls.tag_stats_headline() + alleleOrigin,
                      renderTagStatsHeadline);
@@ -56,22 +56,23 @@ function loadAllTagStatsCards() {
     loadTagStatsCard("tag-stats-by-lab", Urls.tag_stats_by_lab() + alleleOrigin,
                      renderTagStatsByLab);
     loadTagStatsCard("tag-stats-co-occurrence", Urls.tag_stats_co_occurrence() + alleleOrigin,
-                     (data, $content) => renderTagStatsCoOccurrence(data, $content, taggedVariantsUrl));
+                     (data, $content) => renderTagStatsCoOccurrence(data, $content,
+                                                                    (tagIds) => taggedVariantsUrl(genomeBuildName, tagIds)));
     loadGenesCard();
     loadReTaggedCard();
     loadTagGenesOverTimeCard();
 }
 
-$(document).ready(() => {
-    loadAllTagStatsCards();
+function initTagStats(genomeBuildName) {
+    loadAllTagStatsCards(genomeBuildName);
 
     $("input[name=allele_origin]").change(() => {
         // Keep the selection in the URL so a refresh or a shared link stays on this origin
         history.replaceState(null, "", "?" + alleleOriginParam());
-        loadAllTagStatsCards();
+        loadAllTagStatsCards(genomeBuildName);
     });
     $("#genes-recalculate").click(loadGenesCard);
     $("#re-tagged-recalculate").click(loadReTaggedCard);
     $("#gene-time-recalculate").click(loadTagGenesOverTimeCard);
-    $("#co-occurrence-show-variants").click(showSelectedTagsVariants);
-});
+    $("#co-occurrence-show-variants").click(() => showSelectedTagsVariants(genomeBuildName));
+}

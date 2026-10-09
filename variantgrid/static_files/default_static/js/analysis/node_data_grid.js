@@ -1,37 +1,27 @@
 // @ts-check
 // analysis/templates/analysis/node_data/node_data_grid.html
-/* global nodeId:writable */
+/* global nodeId:writable, nodeAlignmentsDict:writable */
 /* global registerNodeGridDownloadButton, nodeGridHasData, export_grid, setupNodeGrid, gridLoadError, loadNodeGridData */ // grid.js
 /* global isHorizontalMode, resizeGrid, bottomPaneGridHidden, showGridLoadingOverlay, registerDeferredGridLoad */ // analysis.js
 /* global GRID */ // analysis/analysis_editor_and_grid.js
 /* global revealSelectedTab */ // analysis/templates/analysis/node_editors/grid_editor.html
 /* global load_node_editor, on_error_function */ // analysis/templates/analysis/node_data/base_node_data.html
-// Re-executed for every node grid loaded. The grid callbacks are handed this load's values (gridData), so
-// a callback that lands after the user has moved to another node still checks against its own node.
-nodeId = readJsonData("node-data-grid-data").node_id;
-// Tag pills are read against the node the grid is showing - a tagging for someone else, or for
-// nobody yet, is marked rather than looking like this proband's. @see VariantGridFormat.tags
-nodeProbandSampleId = readJsonData("node-data-grid-data").node_proband_sample_id;
-// A node above sample level is about a person without being about one of their VCFs
-nodeProbandPatientId = readJsonData("node-data-grid-data").node_proband_patient_id;
-
-function selectVariant() {
-    const variantId = $(this).attr("variant_id");
-    const checked = $(this).is(":checked");
-    const gridData = readJsonData("node-data-grid-data");
+function selectVariant(checkbox, gridData) {
+    const variantId = $(checkbox).attr("variant_id");
+    const checked = $(checkbox).is(":checked");
 
     const data = 'variant_id=' + variantId + '&checked=' + checked;
     $.ajax({
         type: "POST",
         data: data,
-        url: Urls.set_variant_selected(gridData.analysis_id, gridData.node_id),
+        url: Urls.set_variant_selected(gridData.analysisId, gridData.nodeId),
         success: function() {
             const aWin = getAnalysisWindow();
-            const variants = aWin.selectedVariants[nodeId] || {};
-            aWin.selectedVariants[nodeId] = variants;
+            const variants = aWin.selectedVariants[gridData.nodeId] || {};
+            aWin.selectedVariants[gridData.nodeId] = variants;
             if (checked) {
                 variants[variantId] = 1;
-                revealSelectedTab(nodeId, true); // Could need to turn on...
+                revealSelectedTab(gridData.nodeId, true); // Could need to turn on...
             } else {
                 delete variants[variantId];
             }
@@ -42,13 +32,13 @@ function selectVariant() {
 
 
 function gridComplete(gridData) {
-    const unique_code = gridData.node_id + "_" + gridData.node_version;
+    const unique_code = gridData.nodeId + "_" + gridData.nodeVersion;
     if ($("#" + unique_code, "#node-data-container").length === 0) {
         return;  // user navigated away; ignore stale callback
     }
 
     const aWin = getAnalysisWindow();
-    const variants = aWin.selectedVariants[nodeId];
+    const variants = aWin.selectedVariants[gridData.nodeId];
     if (variants) {
         $("input.variant-select").each(function() {
             const variantId = $(this).attr("variant_id");
@@ -58,23 +48,23 @@ function gridComplete(gridData) {
         });
     }
 
-    $("input.variant-select").click(selectVariant);
+    $("input.variant-select").click(function() { selectVariant(this, gridData); });
     registerComponent(unique_code, GRID);
 
     // The placeholder is the download route that matters most for big nodes - the user may never load
     // the grid at all - so keep its links in sync with any export already running for this node
-    registerNodeGridDownloadButton("#placeholder-export-csv-" + gridData.node_id, gridData.analysis_id, gridData.node_id,
+    registerNodeGridDownloadButton("#placeholder-export-csv-" + gridData.nodeId, gridData.analysisId, gridData.nodeId,
                                    unique_code, 'csv', false, "CSV");
-    registerNodeGridDownloadButton("#placeholder-export-vcf-" + gridData.node_id, gridData.analysis_id, gridData.node_id,
+    registerNodeGridDownloadButton("#placeholder-export-vcf-" + gridData.nodeId, gridData.analysisId, gridData.nodeId,
                                    unique_code, 'vcf', false, "VCF");
 
     // A deferred grid draws once with no rows (so the editor's everythingLoaded can proceed). Only a
     // genuine row fetch counts as "loaded this session" - otherwise revisiting would auto-fire the
     // query the user never asked for.
-    if (nodeGridHasData(gridData.node_id, unique_code)) {
+    if (nodeGridHasData(gridData.nodeId, unique_code)) {
         // Record this node-version as loaded so a later revisit re-shows it automatically (page-cache hit).
         aWin.loadedGridVersions = aWin.loadedGridVersions || {};
-        aWin.loadedGridVersions[gridData.node_id] = gridData.node_version;
+        aWin.loadedGridVersions[gridData.nodeId] = gridData.nodeVersion;
 
         // Clear the grid-only overlay we put up when the user clicked "Show grid" (no-op otherwise).
         hideGridLoadingOverlay();
@@ -86,11 +76,11 @@ function gridComplete(gridData) {
 }
 
 
+// Called by name from the IGV links - @see createIgvLink
 function getAlignmentFiles() {
-    const SAMPLE_ALIGNMENT_FILES = readJsonData("node-data-grid-data").alignments_dict;
     const alignmentFiles = [];
-    for (const k in SAMPLE_ALIGNMENT_FILES) {
-        const sample_alignment_files = SAMPLE_ALIGNMENT_FILES[k];
+    for (const k in nodeAlignmentsDict) {
+        const sample_alignment_files = nodeAlignmentsDict[k];
         alignmentFiles.push(...sample_alignment_files);
     }
     return alignmentFiles;
@@ -100,8 +90,8 @@ function getAlignmentFiles() {
 /* CSV/VCF run as Celery jobs and hand back a file - the buttons show their progress, see
    analysis_downloads.js. They're built once the table is, so they can read its live ajax params. */
 function addNodeGridExportButtons(unique_code, gridData) {
-    const analysisId = gridData.analysis_id;
-    const gridNodeId = gridData.node_id;
+    const analysisId = gridData.analysisId;
+    const gridNodeId = gridData.nodeId;
     const toolbar = $("#node-grid-toolbar-" + gridNodeId);
     const addButton = function(id, caption, title, exportType, useCanonicalTranscripts) {
         const link = $("<a>", {id: id, class: "btn btn-outline-secondary btn-sm", title: title,
@@ -127,23 +117,38 @@ function addNodeGridExportButtons(unique_code, gridData) {
 }
 
 
+/* Called by every node grid loaded. The grid callbacks are handed that load's values (gridData), so a callback
+   that lands after the user has moved to another node still checks against its own node.
+   gridData: analysisId, analysisVersion, nodeId, nodeVersion, extraFilters, nodeProbandSampleId,
+             nodeProbandPatientId, alignmentsDict, gridAutoLoad */
+function initNodeDataGrid(gridData) {
+    nodeId = gridData.nodeId;
+    // Tag pills are read against the node the grid is showing - a tagging for someone else, or for
+    // nobody yet, is marked rather than looking like this proband's. @see VariantGridFormat.tags
+    nodeProbandSampleId = gridData.nodeProbandSampleId;
+    // A node above sample level is about a person without being about one of their VCFs
+    nodeProbandPatientId = gridData.nodeProbandPatientId;
+    nodeAlignmentsDict = gridData.alignmentsDict;
+    $(document).ready(function() { nodeDataGridReady(gridData); });
+}
+
 function nodeDataGridReady(gridData) {
-    const analysisId = gridData.analysis_id;
-    const gridNodeId = gridData.node_id;
-    const nodeVersion = gridData.node_version;
+    const analysisId = gridData.analysisId;
+    const gridNodeId = gridData.nodeId;
+    const nodeVersion = gridData.nodeVersion;
     // Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back
     const unique_code = gridNodeId + "_" + nodeVersion;
 
-    const node_view_url = Urls.node_view(analysisId, gridData.analysis_version, gridNodeId, nodeVersion, gridData.extra_filters);
+    const node_view_url = Urls.node_view(analysisId, gridData.analysisVersion, gridNodeId, nodeVersion, gridData.extraFilters);
     load_node_editor(node_view_url, unique_code);
 
-    const config_url = Urls.node_grid_config(analysisId, gridData.analysis_version, gridNodeId, nodeVersion, gridData.extra_filters);
+    const config_url = Urls.node_grid_config(analysisId, gridData.analysisVersion, gridNodeId, nodeVersion, gridData.extraFilters);
     const handler_url = Urls.node_grid_handler(analysisId);
     // Re-show instantly if this exact node-version was already loaded this session (page cache hit).
     const aWin = getAnalysisWindow();
     aWin.loadedGridVersions = aWin.loadedGridVersions || {};
     const alreadyLoaded = aWin.loadedGridVersions[gridNodeId] === nodeVersion;
-    const wantsGrid = gridData.grid_auto_load || alreadyLoaded;
+    const wantsGrid = gridData.gridAutoLoad || alreadyLoaded;
     // Nothing to show while the Editor tab is up, so don't pay for the rows - the tab-show handler
     // in analysis.js fires the load we register below. A node over the threshold isn't deferred: its
     // placeholder shows with the tab, and the rows wait for "Show grid".
@@ -191,5 +196,3 @@ function nodeDataGridReady(gridData) {
         $("#load-variants-" + gridNodeId).click(loadDeferredGrid);
     }
 }
-
-$(document).ready(nodeDataGridReady.bind(null, readJsonData("node-data-grid-data")));

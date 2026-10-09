@@ -278,8 +278,10 @@
         </table>
 
     <h4>Classification Records</h4>
-    {% json_data "view-allele-data" allele_id=allele.pk %}
     <script src="{% static 'js/variantopedia/view_allele.js' %}"></script>
+    <script>
+        initViewAllele({{ allele.pk }});
+    </script>
     <table class="table testing-context-table">
         <thead>
             <tr>

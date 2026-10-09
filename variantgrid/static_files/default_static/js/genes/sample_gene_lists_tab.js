@@ -32,8 +32,7 @@ function populateSampleGeneListFromJSON(data) {
     }
 }
 
-function drawInitialSampleGeneLists() {
-    const sampleGeneListData = readJsonData("sample-gene-lists-tab-data").sample_gene_lists_data;
+function drawInitialSampleGeneLists(sampleGeneListData) {
     for (let i=0 ; i<sampleGeneListData.length ; i++) {
         populateSampleGeneListFromJSON(sampleGeneListData[i]);
     }
@@ -52,8 +51,8 @@ function modifySampleGeneList(that, data) {
     });
 }
 
-$(document).ready(function() {
-    drawInitialSampleGeneLists();
+function initSampleGeneListsTab(sampleGeneListData) {
+    drawInitialSampleGeneLists(sampleGeneListData);
 
     $("button.make-active").click(function() {
         modifySampleGeneList(this, {active: true});
@@ -68,5 +67,4 @@ $(document).ready(function() {
     });
 
     $("form#new-gene-list-form").ajaxForm({target: "#sample-gene-list-tab-container"});
-
-});
+}

@@ -26,11 +26,7 @@ function create_select_from_tuples(selector, list_of_tuples) {
     return sel;
 }
 
-const models_by_version = readJsonData("model-fields-version-diff-data").model_dicts_by_version;
-const modelVersionIds = Object.keys(models_by_version).map(Number);
-const versions = readJsonData("model-fields-version-diff-data").versions;
-
-function showModelDiff(aId, bId) {
+function showModelDiff(modelsByVersion, aId, bId) {
     const table = $("#version-comparison");
     $("tr.field-row", table).remove();
 
@@ -44,8 +40,8 @@ function showModelDiff(aId, bId) {
         sm.hide();
     }
 
-    const a = models_by_version[aId];
-    const b = models_by_version[bId];
+    const a = modelsByVersion[aId];
+    const b = modelsByVersion[bId];
 
     const model_fields = Object.keys(a).sort();
     for (let i=0 ; i<model_fields.length ; ++i ) {
@@ -62,12 +58,14 @@ function showModelDiff(aId, bId) {
 }
 
 
-function add_selects() {
+/* modelsByVersion: {versionId: {field: value}}, versions: [[versionId, label]] */
+function showModelFieldsVersionDiff(modelsByVersion, versions) {
+    const modelVersionIds = Object.keys(modelsByVersion).map(Number);
     const a_sel = create_select_from_tuples($("#a-version-header"), versions);
     const b_sel = create_select_from_tuples($("#b-version-header"), versions);
 
     const selectChanged = function() {
-        showModelDiff(a_sel.val(), b_sel.val());
+        showModelDiff(modelsByVersion, a_sel.val(), b_sel.val());
     };
 
     const firstId = Math.min.apply(null, modelVersionIds);
@@ -79,10 +77,4 @@ function add_selects() {
     a_sel.change(selectChanged);
     b_sel.change(selectChanged);
     selectChanged();
-
 }
-
-
-$(document).ready(function() {
-    add_selects();
-});

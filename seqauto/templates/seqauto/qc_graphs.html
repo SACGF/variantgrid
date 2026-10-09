@@ -31,8 +31,12 @@
 		
 	</style>
 
-    {% json_data "qc-graphs-data" qc_type_totals=qc_type_totals %}
     <script src="{% static 'js/seqauto/qc_graphs.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            initQCGraphs({{ qc_type_totals|jsonify }});
+        });
+    </script>
 {% endblock %}
 
 {% block content %}

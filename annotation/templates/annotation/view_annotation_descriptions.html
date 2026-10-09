@@ -245,8 +245,12 @@
             background-color: #B8860B;
         }
     </style>
-    {% json_data "view-annotation-descriptions-data" example_extra=example_extra latest_columns_version=latest_columns_version %}
     <script src="{% static 'js/annotation/view_annotation_descriptions.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            initAnnotationDescriptions({{ example_extra|jsonify }}, {{ latest_columns_version }});
+        });
+    </script>
 {% endblock head %}
 {% block content %}
     <div class="container annotation-descriptions">

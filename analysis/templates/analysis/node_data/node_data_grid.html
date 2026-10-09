@@ -9,8 +9,20 @@
 .node-grid-sorting-disabled i { margin-right: 3px; }
 {% endblock css %}
 {% block content %}
-{% json_data "node-data-grid-data" analysis_id=analysis_id analysis_version=analysis_version node_id=node_id node_version=node_version extra_filters=extra_filters node_proband_sample_id=node_proband_sample_id node_proband_patient_id=node_proband_patient_id alignments_dict=alignments_dict grid_auto_load=grid_auto_load %}
 <script src="{% static 'js/analysis/node_data_grid.js' %}"></script>
+<script>
+    initNodeDataGrid({
+        analysisId: {{ analysis_id }},
+        analysisVersion: {{ analysis_version }},
+        nodeId: {{ node_id }},
+        nodeVersion: {{ node_version }},
+        extraFilters: {{ extra_filters|jsonify }},
+        nodeProbandSampleId: {{ node_proband_sample_id|jsonify }},
+        nodeProbandPatientId: {{ node_proband_patient_id|jsonify }},
+        alignmentsDict: {{ alignments_dict|jsonify }},
+        gridAutoLoad: {{ grid_auto_load|yesno:"true,false" }},
+    });
+</script>
 <div id="{{ node_id }}_{{ node_version }}">
 	{% if not grid_auto_load %}
 	<div id="grid-placeholder-{{ node_id }}" class="node-grid-placeholder">

@@ -15,8 +15,12 @@
         }
     </style>
 
-    {% json_data "patient-term-approvals-data" patient_results=patient_results %}
     <script src="{% static 'js/patients/patient_term_approvals.js' %}"></script>
+    <script>
+        $(document).ready(function() {
+            initPatientTermApprovals({{ patient_results|jsonify }});
+        });
+    </script>
 	
 {% endblock head %}
 {% block container_table_content %}

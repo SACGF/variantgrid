@@ -4,15 +4,14 @@ function openDelete() {
    $("#delete-confirm-box").slideDown();
 }
 
-$(document).ready(function() {
-    const pageData = readJsonData("group-permissions-data");
+function initGroupPermissions(className, instanceId, deleteRedirectUrl) {
     $("button#delete-object").click(function() {
-        const delete_obj_url = Urls.group_permissions_object_delete(pageData.class_name, pageData.instance_id); 
+        const delete_obj_url = Urls.group_permissions_object_delete(className, instanceId);
         $.ajax({
             type: "POST",
             url: delete_obj_url,
             success: function(data) {
-                window.location = pageData.delete_redirect_url;
+                window.location = deleteRedirectUrl;
             },
             error: function(data) {
                 const errorMessageUl = createMessage("error", data.responseText);
@@ -30,5 +29,5 @@ $(document).ready(function() {
     const options = {
         target: '#permissions-embedded-page'
     };
-    $('form#group-permission-form').ajaxForm(options); 
-});
+    $('form#group-permission-form').ajaxForm(options);
+}

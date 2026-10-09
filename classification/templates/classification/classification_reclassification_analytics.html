@@ -424,6 +424,8 @@
     {% endif %}
 </div>
 
-{% json_data "classification-reclassification-analytics-data" chart_data=analytics.chart_data %}
 <script src="{% static 'js/classification/classification_reclassification_analytics.js' %}"></script>
+<script>
+    showReclassificationAnalytics({{ analytics.chart_data|jsonify }});
+</script>
 {% endblock content %}

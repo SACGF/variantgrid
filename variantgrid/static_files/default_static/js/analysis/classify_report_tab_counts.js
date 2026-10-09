@@ -3,9 +3,8 @@
 // The Classify & Report tab's own label carries the counts, so the page says whether there is anything
 // to do without the tab being opened. Fetched after render - working out which taggings are this case's
 // walks every analysis its samples are in, which is too much for page load
-$(document).ready(function() {
-    const pageData = readJsonData("classify-report-tab-counts-data");
-    const link = $("a.nav-link[data-href='" + pageData.classify_report_tab_url + "']");
+function initClassifyReportTabCounts(classifyReportTabUrl, classifyReportSummaryUrl) {
+    const link = $("a.nav-link[data-href='" + classifyReportTabUrl + "']");
     if (!link.length) {
         return;
     }
@@ -16,7 +15,7 @@ $(document).ready(function() {
     }
 
     function loadCounts() {
-        $.getJSON(pageData.classify_report_summary_url, function(data) {
+        $.getJSON(classifyReportSummaryUrl, function(data) {
             const counts = $("<span>", {class: "classify-report-counts small"});
             if (data.outstanding) {
                 counts.append(countBadge("fa-solid fa-tags", data.outstanding,
@@ -34,4 +33,4 @@ $(document).ready(function() {
     // Classifying inside the tab reloads it - the label has to follow, or it keeps the counts you arrived with
     $(document).on("classifyReportChanged", loadCounts);
     loadCounts();
-});
+}

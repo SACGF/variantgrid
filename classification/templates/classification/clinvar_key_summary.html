@@ -8,8 +8,15 @@
 {% load datatable_tags %}
 {% block title %}Clinical Key Summary{% endblock %}
 {% block head %}
-    {% json_data "clinvar-key-summary-data" clinvar_key=clinvar_key.pk %}
     <script src="{% static 'js/classification/clinvar_key_summary.js' %}"></script>
+    <script>
+        function records(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+        }
+        function batches(data) {
+            data.clinvar_key = {{ clinvar_key.pk | jsonify }};
+        }
+    </script>
     <style>
         .clinvar-export-table .dt-id {
             width: 25px;

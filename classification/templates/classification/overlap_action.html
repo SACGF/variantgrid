@@ -8,8 +8,12 @@
 {% load ui_help %}
 {% block title %}Overlap Discussion{% endblock %}
 {% block head %}
-    {% json_data "overlap-action-data" value_type=overlap.value_type.value %}
     <script src="{% static 'js/classification/overlap_action.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            initOverlapAction({{ overlap.value_type.value|jsonify }});
+        });
+    </script>
 {% endblock %}
 {% block content %}
     <div class="container">

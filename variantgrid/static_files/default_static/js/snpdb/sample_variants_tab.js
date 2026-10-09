@@ -3,16 +3,7 @@
 /* global setupNodeGrid */ // grid.js
 /* global AnalysisDownloadTracker */ // analysis_downloads.js
 /* global AnalysisMessagePoller */ // analysis_updates.js
-/* global variantTags:writable, analysisSamples:writable, variantTagOrder:writable */ // read via getAnalysisWindow() in grid.js
-/* global variantTagsReadOnly:writable, analysisDownloadTracker:writable */ // read via getAnalysisWindow() in grid.js
-// Tags are shown read only here - they are added/removed in the analysis itself
-variantTags = readJsonData("sample-variants-tab-tags-data").variant_tags;
-analysisSamples = readJsonData("sample-variants-tab-tags-data").analysis_samples;
-variantTagOrder = readJsonData("sample-variants-tab-tags-data").variant_tag_order;
-variantTagsReadOnly = true;
-// Every grid on this page is this sample's, so its pills are read against them
-nodeProbandSampleId = readJsonData("sample-variants-tab-data").sample_id;
-
+/* global analysisDownloadTracker:writable */ // read via getAnalysisWindow() in grid.js
 function gridLoadError() {
     console.log("gridLoadError");
 }
@@ -21,10 +12,7 @@ function on_error_function() {
     console.log("on_error_function");
 }
 
-function showNodeGrid(nodeStatus) {
-    const data = readJsonData("sample-variants-tab-data");
-    const analysisId = data.analysis_id;
-    const analysisVersion = data.analysis_version;
+function showNodeGrid(analysisId, analysisVersion, nodeStatus) {
     const nodeId = nodeStatus.id;
     const version = nodeStatus.version;
 
@@ -36,8 +24,9 @@ function showNodeGrid(nodeStatus) {
                   noOp, gridLoadError, on_error_function);
 }
 
-$(document).ready(function() {
-    const analysisId = readJsonData("sample-variants-tab-data").analysis_id;
+function initSampleVariantsTab(sampleId, analysisId, analysisVersion) {
+    // Every grid on this page is this sample's, so its pills are read against them
+    nodeProbandSampleId = sampleId;
     // The CSV/VCF exports run as Celery jobs then hand back a file - see analysis_downloads.js
     analysisDownloadTracker = new AnalysisDownloadTracker(analysisId, "#sample-variants-downloads");
 
@@ -52,8 +41,8 @@ $(document).ready(function() {
                 id: 'grid-' + nodeId,
                 class: 'grid'
             }).appendTo(gridContainer);
-            messagePoller.observe_node(nodeId, "ready", showNodeGrid);
+            messagePoller.observe_node(nodeId, "ready", (nodeStatus) => showNodeGrid(analysisId, analysisVersion, nodeStatus));
         }
     });
     messagePoller.update_loop();
-});
+}

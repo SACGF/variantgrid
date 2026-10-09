@@ -1,6 +1,5 @@
 // @ts-check
 // classification/templates/classification/classification_reclassification_analytics.html
-const reclassificationCharts = readJsonData("classification-reclassification-analytics-data").chart_data;
 const AXIS_COLOUR = "#52514e";
 const GRID_COLOUR = "#e6e5e1";
 
@@ -18,8 +17,10 @@ function chartLayout(extra) {
 
 const plotConfig = {responsive: true, displayModeBar: false};
 
-const timeToReclassification = reclassificationCharts.time_to_reclassification;
-if (timeToReclassification.series.length) {
+function plotTimeToReclassification(timeToReclassification) {
+    if (!timeToReclassification.series.length) {
+        return;
+    }
     const edges = timeToReclassification.edges;
     const centres = edges.slice(0, -1).map((edge, index) => (edge + edges[index + 1]) / 2);
     const barWidth = (edges[1] - edges[0]) * 0.94;
@@ -63,8 +64,10 @@ function sankeyColumnCentres(totals, grandTotal, usable, plotHeight) {
     });
 }
 
-const flow = reclassificationCharts.flow;
-if (flow.values.length) {
+function plotSignificanceFlow(flow) {
+    if (!flow.values.length) {
+        return;
+    }
     const columnSize = flow.node_totals.length / 2;
     const grandTotal = flow.values.reduce((running, value) => running + value, 0);
     const plotHeight = SANKEY_HEIGHT - SANKEY_MARGIN * 2;
@@ -99,8 +102,10 @@ if (flow.values.length) {
     }), plotConfig);
 }
 
-const survival = reclassificationCharts.survival;
-if (survival.intervals.length) {
+function plotSurvival(survival) {
+    if (!survival.intervals.length) {
+        return;
+    }
     const traces = survival.curves.map(curve => ({
         x: survival.intervals,
         y: curve.survival.map(remaining => remaining * 100),
@@ -121,8 +126,10 @@ if (survival.intervals.length) {
     }), plotConfig);
 }
 
-const activity = reclassificationCharts.activity;
-if (activity.years.length) {
+function plotCurationActivity(activity) {
+    if (!activity.years.length) {
+        return;
+    }
     // the two rates share a left axis, the ratio between them needs its own
     const traces = [
         {
@@ -186,8 +193,10 @@ if (activity.years.length) {
     }), plotConfig);
 }
 
-const geneBurden = reclassificationCharts.gene_burden;
-if (geneBurden.symbols.length) {
+function plotGeneBurden(geneBurden) {
+    if (!geneBurden.symbols.length) {
+        return;
+    }
     Plotly.newPlot('gene-burden', [{
         x: geneBurden.vus_counts.slice().reverse(),
         y: geneBurden.symbols.slice().reverse(),
@@ -204,8 +213,10 @@ if (geneBurden.symbols.length) {
     }), plotConfig);
 }
 
-const labs = reclassificationCharts.labs;
-if (labs.labs.length) {
+function plotLabRates(labs) {
+    if (!labs.labs.length) {
+        return;
+    }
     $('#lab-league').dataTable({
         paginate: false,
         searching: false,
@@ -233,8 +244,10 @@ if (labs.labs.length) {
     }), plotConfig);
 }
 
-const points = reclassificationCharts.points;
-if (points.labels.length) {
+function plotPointsTransitions(points) {
+    if (!points.labels.length) {
+        return;
+    }
     const traces = points.labels.map((label, index) => ({
         x: points.deltas[index],
         name: label,
@@ -316,5 +329,14 @@ function plotEvidenceMovement(selector, evidence) {
     draw();
 }
 
-plotEvidenceMovement('evidence-towards-pathogenic', reclassificationCharts.evidence_towards_pathogenic);
-plotEvidenceMovement('evidence-towards-benign', reclassificationCharts.evidence_towards_benign);
+function showReclassificationAnalytics(chartData) {
+    plotTimeToReclassification(chartData.time_to_reclassification);
+    plotSignificanceFlow(chartData.flow);
+    plotSurvival(chartData.survival);
+    plotCurationActivity(chartData.activity);
+    plotGeneBurden(chartData.gene_burden);
+    plotLabRates(chartData.labs);
+    plotPointsTransitions(chartData.points);
+    plotEvidenceMovement('evidence-towards-pathogenic', chartData.evidence_towards_pathogenic);
+    plotEvidenceMovement('evidence-towards-benign', chartData.evidence_towards_benign);
+}

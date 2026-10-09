@@ -57,8 +57,34 @@
 <script src="{% static 'js/patient_phenotype.js' %}"></script>
 <script src="{% static 'js/proband_sex_mismatch.js' %}"></script>
 <script src="{% static 'js/family_wizard_roles.js' %}"></script>
-{% json_data "family-wizard-data" patient_description_results=patient_description_results sample_sexes=sample_sexes %}
-<script src="{% static 'js/analysis/family_wizard.js' %}"></script>
+<script>
+const patient_description_results = {{ patient_description_results | jsonify }};
+const sample_sexes = {{ sample_sexes | jsonify }};
+
+function setProbandPhenoText() {
+    const pp = $("#proband-phenos");
+    pp.empty();
+    const displayedTerms = new Set();
+
+    $("select", ".sample-select").each(function(i) {
+        if ($(this).val() === 'P') {
+            const results = patient_description_results[i][1];
+            if (results) {
+                $("#proband-text").html("Using proband phenotypes:");
+                for (let m = 0; m < results.length; ++m) {
+                    const result = results[m];
+                    const ontologyService = result["ontology_service"];
+                    const resultMatch = result["match"];
+                    if (!displayedTerms.has(resultMatch) && (ontologyService === 'HPO' || ontologyService === 'OMIM')) {
+                        pp.append($("<li>").text(resultMatch));
+                        displayedTerms.add(resultMatch);
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
 {% endblock head %}
 
 {% block jsdocumentready %}

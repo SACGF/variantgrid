@@ -123,10 +123,9 @@ function plotIntervalsGraph(selector, title, step_order, step_start_end_lines) {
     Plotly.newPlot(selector, data, layout);
 }
 
-$(document).ready(function() {
-    const pageData = readJsonData("view-upload-pipeline-data");
+function initUploadPipeline(fileUploadId, stepOrder, stepStartEndLines) {
     $("button#delete-button").click(function() {
-        const delete_obj_url = Urls.group_permissions_object_delete('upload.models.models.FileUpload', pageData.file_upload_id);
+        const delete_obj_url = Urls.group_permissions_object_delete('upload.models.models.FileUpload', fileUploadId);
         $.ajax({
             type: "POST",
             url: delete_obj_url,
@@ -143,7 +142,7 @@ $(document).ready(function() {
 
     });
 
-    if (!$.isEmptyObject(pageData.step_start_end_lines)) {
-        plotIntervalsGraph('upload-steps-graph', "Job Times", pageData.step_order, pageData.step_start_end_lines);
+    if (!$.isEmptyObject(stepStartEndLines)) {
+        plotIntervalsGraph('upload-steps-graph', "Job Times", stepOrder, stepStartEndLines);
     }
-});
+}

@@ -1,12 +1,9 @@
 // @ts-check
 // snpdb/templates/snpdb/tags/vcf_grid_filter_tags.html
 /* global ignoreFilterTable:writable, vcfGridParams:writable, tagContainer:writable */ // this file
-// Plain assignments (not let/const) as may be reloaded multiple times in tabs
-ignoreFilterTable = false;
-vcfGridParams = {};
-// The filter tags (one per tab) that this load added
-tagContainer = $(".vcf-grid-filter-tags").not("[data-filter-setup]").attr("data-filter-setup", "true");
-
+/* global vcfGridTableId:writable, vcfGridVariantsTypeLabels:writable */ // this file
+// Plain assignments (not let/const) as the tag may be reloaded multiple times in tabs - the last one set up
+// is the one the filter functions act on
 function vcfShowAll() {
     ignoreFilterTable = true;
     $("input:radio[name=genome_build_filter]:first", tagContainer).click();  // reset radio to "All"
@@ -49,11 +46,10 @@ function filterTable() {
 
         const variantsType = vcfGridParams["variants_type"];
         if (variantsType) {
-            const VARIANTS_TYPE_LABELS = readJsonData("vcf-grid-filter-tags-data-" + tagContainer.attr("data-table-id")).variants_type_labels;
             const variantsTypeLabels = [];
             for (let i=0 ; i<variantsType.length ; i++) {
                 const vt = variantsType[i];
-                variantsTypeLabels.push(VARIANTS_TYPE_LABELS[vt]);
+                variantsTypeLabels.push(vcfGridVariantsTypeLabels[vt]);
             }
             let variantsTypeDescriptions = variantsTypeLabels.join(", ");
             if (!variantsTypeDescriptions) {
@@ -70,33 +66,42 @@ function filterTable() {
         descriptionContainer.hide();
     }
 
-    $("#" + tagContainer.attr("data-table-id")).DataTable().ajax.reload();
+    $("#" + vcfGridTableId).DataTable().ajax.reload();
 }
 
-$(document).ready(function() {
-    $('#id_project_' + tagContainer.attr("data-table-id"), tagContainer).change(function() {
-        vcfGridParams["project"] = $(this).val();
-        filterTable();
-    });
+function setupVcfGridFilterTags(tableId, variantsTypeLabels) {
+    ignoreFilterTable = false;
+    vcfGridParams = {};
+    vcfGridTableId = tableId;
+    vcfGridVariantsTypeLabels = variantsTypeLabels;
+    tagContainer = $(".vcf-grid-filter-tags-" + tableId);
 
-    $("input[name=genome_build_filter]", tagContainer).change(function() {
-        const genomeBuildName = $(this).val();
-        if (genomeBuildName) {
-            vcfGridParams["genome_build_name"] = genomeBuildName;
-        } else {
-            delete vcfGridParams["genome_build_name"];
-        }
-        filterTable();
-    });
-
-    $("input[type=checkbox]", "#id_variants_type").change(function() {
-        const variantsTypeList = [];
-        $("input:checked", "#id_variants_type").each(function() {
-            variantsTypeList.push($(this).val());
+    // Called from inside the tag's own container, before the controls below it are parsed
+    $(document).ready(function() {
+        $('#id_project_' + tableId, tagContainer).change(function() {
+            vcfGridParams["project"] = $(this).val();
+            filterTable();
         });
-        vcfGridParams["variants_type"] = variantsTypeList;
-        filterTable();
-    });
 
-    $("#vcf-grid-filter-description", tagContainer).hide();
-});
+        $("input[name=genome_build_filter]", tagContainer).change(function() {
+            const genomeBuildName = $(this).val();
+            if (genomeBuildName) {
+                vcfGridParams["genome_build_name"] = genomeBuildName;
+            } else {
+                delete vcfGridParams["genome_build_name"];
+            }
+            filterTable();
+        });
+
+        $("input[type=checkbox]", "#id_variants_type").change(function() {
+            const variantsTypeList = [];
+            $("input:checked", "#id_variants_type").each(function() {
+                variantsTypeList.push($(this).val());
+            });
+            vcfGridParams["variants_type"] = variantsTypeList;
+            filterTable();
+        });
+
+        $("#vcf-grid-filter-description", tagContainer).hide();
+    });
+}

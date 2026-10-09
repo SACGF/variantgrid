@@ -1,7 +1,7 @@
 // @ts-check
 // variantopedia/templates/variantopedia/view_allele.html
 /* global classificationGroupingRedraw */ // classification/classification_groupings.js
-const viewAlleleData = readJsonData("view-allele-data");
+let viewAlleleId = null;  // set by initViewAllele
 let alleleOriginFilter = null;
 let testingContextFilter = null;
 
@@ -35,13 +35,13 @@ function filterTestingContext(testingContext, label) {
 }
 
 function classificationGroupingFilterExtra(data) {
-    data.allele_id = viewAlleleData.allele_id;
+    data.allele_id = viewAlleleId;
     data.allele_origin = alleleOriginFilter;
     data.testing_context = testingContextFilter;
 }
 
 function updateDiff() {
-    let href = Urls.classification_diff() + "?allele=" + viewAlleleData.allele_id + "&latest=true";
+    let href = Urls.classification_diff() + "?allele=" + viewAlleleId + "&latest=true";
     if (alleleOriginFilter != null) {
         href += `&allele_origin=${alleleOriginFilter}`;
     }
@@ -51,6 +51,7 @@ function updateDiff() {
     $('#showDiffLink').attr('href', href);
 }
 
-$(document).ready(function() {
-    updateDiff();
-});
+function initViewAllele(alleleId) {
+    viewAlleleId = alleleId;
+    $(document).ready(updateDiff);
+}

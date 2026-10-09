@@ -27,11 +27,7 @@ function showGraph(elementId, title, data) {
     Plotly.newPlot(elementId, plotData, layout);
 }
 
-$(document).ready(function() {
-    const data = readJsonData("sequencing-stats-data");
-    const sequencingRunInfo = data.sequencing_run_info;
-    const sequencingSampleInfo = data.sequencing_sample_info;
-
+function showSequencingStats(sequencingRunInfo, sequencingSampleInfo) {
     showGraph('sequencing-run-model', 'Sequencer Model', sequencingRunInfo['sequencer_model']);
     showGraph('sequencing-run-sequencer', 'Sequencer', sequencingRunInfo['sequencer']);
     showGraph('sequencing-run-enrichment_kit', 'Sequencer EnrichmentKit', sequencingRunInfo['enrichment_kit']);
@@ -39,4 +35,4 @@ $(document).ready(function() {
     showGraph('samples-model', 'Sequencer Model', sequencingSampleInfo['sequencer_model']);
     showGraph('samples-sequencer', 'Sequencer', sequencingSampleInfo['sequencer']);
     showGraph('samples-enrichment_kit', 'EnrichmentKit', sequencingSampleInfo['enrichment_kit']);
-});
+}

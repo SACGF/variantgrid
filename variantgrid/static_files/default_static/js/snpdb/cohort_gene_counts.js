@@ -1,7 +1,6 @@
 // @ts-check
 // snpdb/templates/snpdb/patients/cohort_gene_counts.html
-$(document).ready(function() {
-    const data = readJsonData("cohort-gene-counts-data");
+function initCohortGeneCounts(cohortId, initialGeneListId) {
     const gcContainer = $("#cohort-gene-counts-graph-container");
 
     function load_graph(url) {
@@ -9,12 +8,12 @@ $(document).ready(function() {
         gcContainer.load(url);
     }
 
-    let geneListId = data.gene_list_id;
+    let geneListId = initialGeneListId;
 
     function load_gene_list() {
         const geneCountType = $("#id_gene_count_type").val();
         if (geneCountType && geneListId) {
-            load_graph(Urls.cohort_gene_counts_matrix(data.cohort_id, geneCountType, geneListId));
+            load_graph(Urls.cohort_gene_counts_matrix(cohortId, geneCountType, geneListId));
         } else {
             gcContainer.empty();
         }
@@ -28,5 +27,4 @@ $(document).ready(function() {
     });
 
     load_gene_list();
-
-});
+}

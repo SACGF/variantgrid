@@ -2,7 +2,7 @@
     {% load static %}
     {% load js_tags %}
     {# Define a JS function "hotspot_graph_click_func(text, transcript_accession, protein_position)" to get callbacks from plotly clicks  #}
-    <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}" data-uuid="{{ uuid }}"></div>
+    <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}"></div>
     <style>
         .gnomad-af-slider {
             position: relative;
@@ -65,10 +65,19 @@
             </table>
         </div>
     </div>
-    {% with uuid_str=uuid|stringformat:"s" %}
-    {% json_data "hotspot-graph-data-"|add:uuid_str molecular_consequence_colors=molecular_consequence_colors num_codons=transcript_version.num_codons domains=domains variant_data=variant_data transcript_urls=transcript_urls title=title y_title=y_title transcript_version_id=transcript_version.pk %}
-    {% endwith %}
     <script src="{% static 'js/genes/hotspot_graph.js' %}"></script>
+    <script>
+        setupHotspotGraph("{{ uuid }}", {
+            molecularConsequenceColors: {{ molecular_consequence_colors|jsonify }},
+            numCodons: {{ transcript_version.num_codons }},
+            domains: {{ domains|jsonify }},
+            variantData: {{ variant_data|jsonify }},
+            transcriptUrls: {{ transcript_urls|jsonify }},
+            title: {{ title|jsonify }},
+            yTitle: {{ y_title|jsonify }},
+            transcriptVersionId: {{ transcript_version.pk }},
+        });
+    </script>
 {% else %}
     <p>No variants</p>
     <p>({{ lookup_method }})</p>

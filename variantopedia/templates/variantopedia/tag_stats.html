@@ -9,8 +9,12 @@
 {{ genes_form.media }}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/tag_stats.js' %}"></script>
-{% json_data "tag-stats-data" genome_build_name=genome_build.name %}
 <script src="{% static 'js/variantopedia/tag_stats.js' %}"></script>
+<script>
+    $(document).ready(() => {
+        initTagStats({{ genome_build.name|jsonify }});
+    });
+</script>
 <style>
     .card-spinner {
         display: none;

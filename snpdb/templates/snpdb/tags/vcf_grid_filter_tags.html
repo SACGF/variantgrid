@@ -2,7 +2,7 @@
 {% load genome_build_tags %}
 {% load js_tags %}
 {% load ui_utils %}
-<div class="vcf-grid-filter-tags vcf-grid-filter-tags-{{ table_id }}" data-table-id="{{ table_id }}">
+<div class="vcf-grid-filter-tags-{{ table_id }}">
     <style>
     .grid-filter-container {
         min-width: 700px;
@@ -22,8 +22,10 @@
     }
 
     </style>
-    {% json_data "vcf-grid-filter-tags-data-"|add:table_id variants_type_labels=variants_type_labels %}
     <script src="{% static 'js/snpdb/vcf_grid_filter_tags.js' %}"></script>
+    <script>
+        setupVcfGridFilterTags({{ table_id|jsonify }}, {{ variants_type_labels|jsonify }});
+    </script>
     <div class="card grid-filter-container">
         <div class="card-header">Filter Grid</div>
         <div class="card-body">

@@ -1,9 +1,7 @@
 // @ts-check
 // annotation/templates/annotation/variant_annotation_runs.html
 const filter_data = {"status": "", "variant_annotation_version_id": ""};
-$(document).ready(() => {
-    const genomeBuildSummaryJSON = readJsonData("variant-annotation-runs-data").genome_build_summary;
-
+function initVariantAnnotationRuns(genomeBuildSummary) {
     function showSummaryGraph(buildVersionName, buildData) {
         const selector = "build-" + buildVersionName + "-summary-graph";
         const data = [];
@@ -57,8 +55,8 @@ $(document).ready(() => {
         Plotly.newPlot(selector, data, layout);
     }
 
-    for (const buildName in genomeBuildSummaryJSON) {
-        const buildData = genomeBuildSummaryJSON[buildName];
+    for (const buildName in genomeBuildSummary) {
+        const buildData = genomeBuildSummary[buildName];
         for (const vavId in buildData) {
             const vavData = buildData[vavId];  // { pipelineType: {summaryState: count} }
             for (const pipelineType in vavData) {
@@ -71,7 +69,7 @@ $(document).ready(() => {
     $('.table-filter').change(() => {
         $('#annotation-runs-table').DataTable().ajax.reload();
     });
-});
+}
 function idRenderer(data, type, row) {
     return $('<a>', {href:Urls.view_annotation_run(data), text:data}).prop('outerHTML');
 }

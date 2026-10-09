@@ -8,8 +8,12 @@
 {% load ui_help %}
 {% block title %}Discordance Report{% endblock %}
 {% block head %}
-    {% json_data "discordance-report-action-data" buckets=buckets %}
     <script src="{% static 'js/classification/discordance_report_action.js' %}"></script>
+    <script>
+        $(document).ready(() => {
+            initDiscordanceReportAction({{ buckets|jsonify }});
+        });
+    </script>
 {% endblock %}
 {% block content %}
     <div class="container">

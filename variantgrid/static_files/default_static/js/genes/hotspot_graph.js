@@ -1,15 +1,17 @@
 // @ts-check
 // genes/templates/genes/hotspot_graph.html
-// Loaded by ajax, possibly several graphs per page - sets up each .hotspot-graph not yet drawn
-function setupHotspotGraph(hotSpotDiv) {
+/* Loaded by ajax, possibly several graphs per page - each one calls this with its own uuid and values
+   hotspotData: molecularConsequenceColors, numCodons, domains, variantData, transcriptUrls, title, yTitle,
+                transcriptVersionId */
+function setupHotspotGraph(uuid, hotspotData) {
     const GNOMAD_PERCENT = [0.1, 1, 5, 100];
-    const hotspotData = readJsonData("hotspot-graph-data-" + hotSpotDiv.attr("data-uuid"));
-    const molecularConsequenceColors = hotspotData.molecular_consequence_colors;
-    const numCodons = hotspotData.num_codons;
+    const molecularConsequenceColors = hotspotData.molecularConsequenceColors;
+    const numCodons = hotspotData.numCodons;
     const domains = hotspotData.domains;
-    const variantData = hotspotData.variant_data;
-    const transcriptUrls = hotspotData.transcript_urls;
-    const hotSpotId = hotSpotDiv.attr("id");
+    const variantData = hotspotData.variantData;
+    const transcriptUrls = hotspotData.transcriptUrls;
+    const hotSpotId = "hotspot-graph-" + uuid;
+    const hotSpotDiv = $("#" + hotSpotId);
 
     function drawTranscriptModel(selector, gnomADMaxPercent) {
         const DEFAULT_COLORS = [
@@ -205,7 +207,7 @@ function setupHotspotGraph(hotSpotDiv) {
                 showgrid: false
             },
             yaxis: {
-                title: {text: escapeHtml(hotspotData.y_title)},
+                title: {text: escapeHtml(hotspotData.yTitle)},
                 range: [domainYBottom, yMax + 2],
                 nticks: 5,
                 showgrid: false
@@ -230,7 +232,7 @@ function setupHotspotGraph(hotSpotDiv) {
                 const text = "Hotspot click " + barClicked.data.text[i];
                 const fn = window[hotspot_graph_click_func];
                 if (typeof fn === 'function') {
-                    fn(String(hotspotData.transcript_version_id), text, barClicked.x);
+                    fn(String(hotspotData.transcriptVersionId), text, barClicked.x);
                 }
             }
         });
@@ -249,7 +251,7 @@ function setupHotspotGraph(hotSpotDiv) {
     }
 
     $(document).ready(function () {
-        const slider = $("#hotspot-graph-af-slider-" + hotSpotDiv.attr("data-uuid"));
+        const slider = $("#hotspot-graph-af-slider-" + uuid);
         function drawMyTranscriptModel() {
             let gnomADMaxPercent = 100;
             if (slider.length) {
@@ -268,11 +270,6 @@ function setupHotspotGraph(hotSpotDiv) {
 
         drawMyTranscriptModel();
 
-        $("a.hotspot-load-transcript-link", "#hotspot-transcripts-" + hotSpotDiv.attr("data-uuid")).on('click', clickTranscript);
+        $("a.hotspot-load-transcript-link", "#hotspot-transcripts-" + uuid).on('click', clickTranscript);
     });
 }
-
-$(".hotspot-graph").not("[data-hotspot-setup]").each(function() {
-    $(this).attr("data-hotspot-setup", "true");
-    setupHotspotGraph($(this));
-});

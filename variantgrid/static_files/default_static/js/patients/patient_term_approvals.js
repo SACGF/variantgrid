@@ -1,13 +1,11 @@
 // @ts-check
 // patients/templates/patients/patient_term_approvals.html
 /* global displayPhenotypeMatches */ // patient_phenotype.js
-$(document).ready(function() {
-    const data = readJsonData("patient-term-approvals-data");
-    const patient_results = data.patient_results;
-    for (const p in patient_results) {
+function initPatientTermApprovals(patientResults) {
+    for (const p in patientResults) {
         const patientSelector = $(".unapproved-patient[patient_id=" + p + "]");
         const resultSelector = $(".results", patientSelector);
-        const phenotypeMatches = patient_results[p];
+        const phenotypeMatches = patientResults[p];
         const phenotypeText = $("textarea.phenotype", patientSelector).val();
         displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches);
     }
@@ -38,4 +36,4 @@ $(document).ready(function() {
             },
         });
     });
-});
+}

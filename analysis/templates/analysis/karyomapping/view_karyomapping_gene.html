@@ -1,8 +1,19 @@
 {% load static %}
 {% load js_tags %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
-{% json_data "view-karyomapping-gene-data" karyotype_bin_scatter_data=karyotype_bin_scatter_data karyotype_bin_labels=karyotype_bin_labels proband_sample=kag.karyomapping_analysis.proband.sample|stringformat:"s" gene_symbol=kag.gene_symbol|stringformat:"s" strand=strand|stringformat:"s" upstream_kb=kag.upstream_kb downstream_kb=kag.downstream_kb iv=iv|stringformat:"s" %}
 <script src="{% static 'js/analysis/view_karyomapping_gene.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        showKaryotypeScatter({{ karyotype_bin_scatter_data|jsonify }}, {{ karyotype_bin_labels|jsonify }}, {
+            probandSample: {{ kag.karyomapping_analysis.proband.sample|stringformat:"s"|jsonify }},
+            geneSymbol: {{ kag.gene_symbol|stringformat:"s"|jsonify }},
+            strand: {{ strand|stringformat:"s"|jsonify }},
+            upstreamKb: {{ kag.upstream_kb|jsonify }},
+            downstreamKb: {{ kag.downstream_kb|jsonify }},
+            iv: {{ iv|stringformat:"s"|jsonify }},
+        });
+    });
+</script>
 <div>
     <p>
     <div id='karyotype-graph'></div>

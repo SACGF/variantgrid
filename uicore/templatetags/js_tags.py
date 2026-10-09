@@ -10,13 +10,10 @@ from html import escape
 from typing import Optional, Union
 
 from django import template
-from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import TextChoices
-from django.utils.html import json_script
 from django.utils.safestring import SafeString, mark_safe
 
 from library.utils import JsonDataType, format_diff_text, format_significant_digits
-from library.utils.json_utils import json_dumps_nan_as_null
 from snpdb.user_settings_manager import UserSettingsManager
 from uicore.json.validated_json import ValidatedJson
 
@@ -34,8 +31,7 @@ def dal_media():
 
 def jsonify_for_js(json_me, pretty=False) -> Union[SafeString, bool, int, float]:
     if isinstance(json_me, str):
-        json_me = json_me.replace('"', '\"').replace('</script>', '<\\/script>')
-        return mark_safe(f"\"{json_me}\"")
+        return mark_safe(json.dumps(json_me).replace('</script>', '<\\/script>'))
     if isinstance(json_me, bool):
         if json_me:
             return mark_safe('true')
@@ -49,20 +45,6 @@ def jsonify_for_js(json_me, pretty=False) -> Union[SafeString, bool, int, float]
         text = re.compile(r'],\s*\[', re.MULTILINE).sub('],[', text)
     text = text.replace('</script>', '<\\/script>')
     return mark_safe(text)
-
-
-class NonFiniteAsNullJSONEncoder(DjangoJSONEncoder):
-    """ JSON.parse rejects NaN/Infinity, which a JS literal (the old inline |jsonify) accepted """
-
-    def encode(self, o) -> str:
-        return json_dumps_nan_as_null(o, cls=DjangoJSONEncoder)
-
-
-@register.simple_tag
-def json_data(element_id: str, **kwargs) -> SafeString:
-    """ Page values for a static JS file, as a <script type="application/json"> it reads with readJsonData(element_id),
-        so no Django tags end up inside JS (#2021) """
-    return json_script(kwargs, element_id, encoder=NonFiniteAsNullJSONEncoder)
 
 
 @register.filter

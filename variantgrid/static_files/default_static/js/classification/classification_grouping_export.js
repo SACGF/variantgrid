@@ -1,6 +1,6 @@
 // @ts-check
 // classification/templates/classification/classification_grouping_export.html
-const groupingExportData = readJsonData("classification-grouping-export-data");
+let groupingExportBaseUrl = null;  // set by initClassificationGroupingExport
 
 function alleleOriginToggle(filterValue) {
     updateLink();
@@ -62,11 +62,12 @@ function updateLink() {
     }
     const paramString = '?' + paramParts.join('&');
 
-    const downloadLink = `${groupingExportData.base_url}${ paramString }`;
+    const downloadLink = `${groupingExportBaseUrl}${ paramString }`;
     $('#download-link').attr('href', downloadLink).text(downloadLink);
 }
 
-$(document).ready(() => {
+function initClassificationGroupingExport(baseUrl) {
+    groupingExportBaseUrl = baseUrl;
     $('a[data-toggle="tab"]').on('shown.bs.tab', (e) => {
         updateLink();
     });
@@ -77,4 +78,4 @@ $(document).ready(() => {
         updateLink();
     });
     updateLink();
-});
+}

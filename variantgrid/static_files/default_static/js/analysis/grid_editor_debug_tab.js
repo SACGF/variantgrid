@@ -1,8 +1,7 @@
 // @ts-check
 // analysis/templates/analysis/node_editors/grid_editor_debug_tab.html
 /* global hljs */ // js/lib/highlight/highlight.pack.js
-$(document).ready(function() {
-    const pageData = readJsonData("grid-editor-debug-tab-data");
+function initGridEditorDebugTab(highlightJsUrl, analysisId, nodeId) {
     // This tab is the only user of highlight.js, and it arrives by ajax - fetch the
     // library on first open rather than on every analysis page
     function highlightSql() {
@@ -13,7 +12,7 @@ $(document).ready(function() {
     if (window.hljs) {
         highlightSql();
     } else {
-        $.ajax({url: pageData.highlight_js_url, dataType: "script", cache: true}).done(highlightSql);
+        $.ajax({url: highlightJsUrl, dataType: "script", cache: true}).done(highlightSql);
     }
 
     $('input#show-grid-columns').click(function() {
@@ -34,11 +33,11 @@ $(document).ready(function() {
         if (!btn.hasClass("disabled")) {
             $.ajax({
                 type: "POST",
-                url: Urls.node_populate_clingen_alleles(pageData.analysis_id, pageData.node_id),
+                url: Urls.node_populate_clingen_alleles(analysisId, nodeId),
                 success: function(data) {
                     btn.addClass("disabled");
                 },
             });
         }
     });
-});
+}

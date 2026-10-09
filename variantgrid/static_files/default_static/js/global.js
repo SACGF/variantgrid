@@ -921,11 +921,6 @@ function deleteItemClickHandler(outerElement, innerSpan, deleteClickHandler) {
     innerSpan.animate(params, 200, 'swing', completeFunc);
 }
 
-// Values a template wrote with {% json_data element_id ... %} (or Django's json_script filter)
-function readJsonData(elementId) {
-    return JSON.parse(document.getElementById(elementId).textContent);
-}
-
 function getValue(val, defaultValue) {
     return (typeof val !== 'undefined') ?  val : defaultValue;
 }

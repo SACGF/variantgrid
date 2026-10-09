@@ -11,8 +11,12 @@
         font-size: 1.5em;
     }
 </style>
-{% json_data "sample-gene-lists-tab-data" sample_gene_lists_data=sample_gene_lists_data %}
 <script src="{% static 'js/genes/sample_gene_lists_tab.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        initSampleGeneListsTab({{ sample_gene_lists_data|jsonify }});
+    });
+</script>
 
 <p>If you have more than one sample gene list, you must manually set one as active.
     The active one is automatically used in analyses templates and gene list nodes.

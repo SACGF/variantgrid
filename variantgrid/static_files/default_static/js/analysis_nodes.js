@@ -1110,7 +1110,7 @@ function changeAnalysisSettings(oldAnalysisSettings) {
     }
     
     if (requireReload) {
-        reloadNodes();
+        reloadNodes(ANALYSIS_ID);
     }        
 }
 

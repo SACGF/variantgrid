@@ -1,6 +1,5 @@
 // @ts-check
 // classification/templates/classification/discordance_report_action.html
-const clinSigToBuckets = readJsonData("discordance-report-action-data").buckets;
 /*
 function notesVal() {
     let notes = $('#notes').val().trim();
@@ -11,7 +10,7 @@ function isConfirmed() {
 }
  */
 
-function isDiscordant() {
+function isDiscordant(clinSigToBuckets) {
     const usedBuckets = {};
     let noBuckets = false;
     $('.clin-sig-change').each((index, elem) => {
@@ -87,10 +86,10 @@ function showFormCheck() {
     });
 }
 
-$(document).ready(() => {
-   $('#resolve-form input, #resolve-form select').change(isDiscordant);
-   isDiscordant();
+function initDiscordanceReportAction(clinSigToBuckets) {
+    $('#resolve-form input, #resolve-form select').change(() => isDiscordant(clinSigToBuckets));
+    isDiscordant(clinSigToBuckets);
 
-   $("input[name='outcome']").change(showFormCheck);
-   showFormCheck();
-});
+    $("input[name='outcome']").change(showFormCheck);
+    showFormCheck();
+}

@@ -1,8 +1,12 @@
 {% load static %}
 {% load js_tags %}
 <div id="permissions-embedded-page">
-{% json_data "group-permissions-data" class_name=class_name instance_id=instance.pk delete_redirect_url=delete_redirect_url %}
 <script src="{% static 'js/snpdb/group_permissions.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        initGroupPermissions({{ class_name|jsonify }}, {{ instance.pk|jsonify }}, {{ delete_redirect_url|jsonify }});
+    });
+</script>
 
 
 <div id="permissions">

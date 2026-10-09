@@ -1,13 +1,13 @@
 // @ts-check
 // seqauto/templates/seqauto/json_graphs/qc_json_graph.html
-// Loaded by ajax into a container (named in the data) - sets up each graph whose data hasn't been used yet
-function setupQCJsonGraph(jsonDataId) {
-    const graphData = readJsonData(jsonDataId);
-    const containerSelector = $("#" + graphData.container_name);
-    const qc_data = graphData.qc_data;
-    const current_label = graphData.current_label;
-    const label_column = graphData.label_column;
-    const gold_column = graphData.gold_column;
+/* Loaded by ajax, possibly several per page - each graph calls this with its own values
+   options: containerName, qcData, currentLabel, labelColumn, goldColumn */
+function setupQCJsonGraph(options) {
+    const containerSelector = $("#" + options.containerName);
+    const qc_data = options.qcData;
+    const current_label = options.currentLabel;
+    const label_column = options.labelColumn;
+    const gold_column = options.goldColumn;
 
     function createBar(name, color) {
         return {x : [], y: [], type: 'bar', name: name, marker: { color: color} };
@@ -71,8 +71,3 @@ function setupQCJsonGraph(jsonDataId) {
         runStatsColumn.each(plotColumn); // initial plot
     });
 }
-
-$('script[id^="qc-json-graph-data-"]').not("[data-graph-setup]").each(function() {
-    $(this).attr("data-graph-setup", "true");
-    setupQCJsonGraph(this.id);
-});

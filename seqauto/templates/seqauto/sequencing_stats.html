@@ -26,8 +26,12 @@
         }
     </style>
 
-    {% json_data "sequencing-stats-data" sequencing_run_info=sequencing_run_info sequencing_sample_info=sequencing_sample_info %}
     <script src="{% static 'js/seqauto/sequencing_stats.js' %}"></script>
+    <script>
+        $(document).ready(function() {
+            showSequencingStats({{ sequencing_run_info|jsonify }}, {{ sequencing_sample_info|jsonify }});
+        });
+    </script>
 
 {% endblock %}
 

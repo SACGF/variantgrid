@@ -93,7 +93,6 @@ export default [
                 VariantGridFilterBuilder: "readonly", // variantgrid_filter_builder.js
                 VariantGridFormat: "readonly", // variantgrid_formats.js
                 getValue: "readonly", // global.js
-                readJsonData: "readonly", // global.js
                 setAutocompleteValue: "readonly", // global.js
                 setCrossLink: "readonly", // global.js
                 removeItemFromArray: "readonly", // global.js

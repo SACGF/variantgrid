@@ -8,8 +8,12 @@
 {% load classification_tags %}
 {% block title %}Classification Record Export{% endblock %}
 {% block head %}
-{% json_data "classification-export-data" base_url=base_url base_url_redirect=base_url_redirect %}
 <script src="{% static 'js/classification/classification_export.js' %}"></script>
+<script>
+    $(document).ready(() => {
+        initClassificationExport({{ base_url|jsonify }}, {{ base_url_redirect|jsonify }});
+    });
+</script>
 <style>
     #export-url {
         word-break: break-all;

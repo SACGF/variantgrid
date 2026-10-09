@@ -128,8 +128,10 @@
             </div>
 
             {% if has_write_permission %}
-            {% json_data "view-patient-data" patient_id=patient.pk %}
             <script src="{% static 'js/patients/view_patient.js' %}"></script>
+            <script>
+                setupPatientFileUpload({{ patient.pk }});
+            </script>
             {% endif %}
         </div>
         {% endif %}
