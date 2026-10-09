@@ -11,6 +11,25 @@
         function uploadStepFilter(data) {
             data.upload_pipeline = {{ upload_pipeline.pk }};
         }
+
+        $(document).ready(function() {
+            $("button#delete-button").click(function() {
+                let delete_obj_url = "{% url 'group_permissions_object_delete' 'upload.models.models.FileUpload' upload_pipeline.file_upload_id %}";
+                $.ajax({
+                    type: "POST",
+                    url: delete_obj_url,
+                    success: function(data) {
+                        window.location = "{% url 'upload' %}";
+                    },
+                    error: function(data) {
+                        console.log("Error: ");
+                        console.log(data);
+                        let errorMessageUl = createMessage("error", data.responseText);
+                        $("#delete-container").empty().append(errorMessageUl);
+                    }
+                });
+            });
+        });
     </script>
     {% if has_upload_steps and step_start_end_lines %}
         <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
@@ -139,25 +158,6 @@
             }
 
             $(document).ready(function() {
-                $("button#delete-button").click(function() {
-                    let delete_obj_url = "{% url 'group_permissions_object_delete' 'upload.models.models.FileUpload' upload_pipeline.file_upload_id %}";
-                    $.ajax({
-                        type: "POST",
-                        url: delete_obj_url,
-                        success: function(data) {
-                            window.location = "{% url 'upload' %}";
-                        },
-                        error: function(data) {
-                            console.log("Error: ");
-                            console.log(data);
-                            let errorMessageUl = createMessage("error", data.responseText);
-                            $("#delete-container").empty().append(errorMessageUl);
-                        }
-                    });
-
-                });
-
-
                 const step_order = {{ step_order | jsonify }};
                 const step_start_end_lines = {{ step_start_end_lines | jsonify }};
                 plotIntervalsGraph('upload-steps-graph', "Job Times", step_order, step_start_end_lines);
