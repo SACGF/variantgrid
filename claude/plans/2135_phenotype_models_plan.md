@@ -95,22 +95,22 @@ clean at the end and the `--keepdb` test database dropped so it is rebuilt.
 2. `annotation/migrations/0194_phenotype_models_to_patients.py`: state-only `DeleteModel` for each, children first.
    sapath's `0022_phenotype_description_moved_to_patients` (state-only `AlterField` of its two link FKs) runs between
    the two (`run_before` this one).
-3. `patients/migrations/0021_phenotype_description_owner.py`: owners onto the description. `AddField` `patient`,
-   `cohort`, `approved_by`; `RunSQL` copying owner and `approved_by` from the two link tables (two `UPDATE … FROM`);
-   `DeleteModel` the two link tables; `RunPython` deleting descriptions nothing holds - no owner and no row of any
-   other relation in the migration state, sapath's links included - and their `TextPhenotypeSentence` rows (set-based
-   SQL, 75,244 descriptions locally; `TextPhenotype` and `TextPhenotypeMatch` are untouched); `AddConstraint`
-   one-owner. Depends on annotation's 0193, so sapath's links are in the state.
-4. `patients/migrations/0022_remove_phenotype_status_and_processed.py`: `RemoveField` `PhenotypeDescription.status`,
-   `DeleteModel` `DescriptionProcessingStatus`, `RemoveField` `TextPhenotype.processed`. A row with `processed=True`
-   and no `match_version` (matched before #2131) becomes "awaiting", which is what the #2131 `--stale`
-   ManualOperation does to it anyway; that `test` reads the historical `processed` field and keeps working.
-5. `patients/migrations/0023_textphenotype_integer_pk.py`: integer primary key on `TextPhenotype`. Add a nullable
-   integer `id` and number the rows in text order; add nullable integer `text_phenotype_new` columns on
-   `TextPhenotypeSentence` and `TextPhenotypeMatch` filled by joining on `text`; remove the two text FKs; `AlterField`
-   `text` to `TextField(unique=True)` and `id` to `AutoField(primary_key=True)`, then `setval` the identity past the
-   numbered rows; `AlterField` the new columns to the `ForeignKey` and rename them to `text_phenotype`.
-6. `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py` goes up: the modules of these classes
+3. `patients/migrations/0021_phenotype_description_owner_fields.py`: `AddField` `patient`, `cohort`, `approved_by`.
+   Depends on annotation's 0194, so sapath's links are in the state.
+4. `patients/migrations/0022_phenotype_description_owners_copied.py`: data only, ORM. A `Subquery` update copies
+   owner and `approved_by` from the two link tables; then descriptions nothing holds - no owner and no row of any
+   other relation in the migration state, sapath's links included - are deleted with their sentences (75,244 locally).
+   Data steps get their own migration so their deferred FK checks run at its commit, not inside the next one's
+   `ALTER TABLE`s.
+5. `patients/migrations/0023_phenotype_description_owner_links_removed.py`: `DeleteModel` the two link tables,
+   `AddConstraint` one-owner.
+6. `patients/migrations/0024_textphenotype_rebuilt_with_integer_key.py`: `RemoveField` `PhenotypeDescription.status`,
+   `DeleteModel` `DescriptionProcessingStatus`, then `DeleteModel` / `CreateModel` `TextPhenotype`,
+   `TextPhenotypeSentence` and `TextPhenotypeMatch` with integer keys - nothing is copied, as every sentence awaited a
+   rematch anyway (processed before #2131's stamping). A `match_patient_phenotypes --rebuild` ManualOperation splits
+   every description again (`patients/phenotype_matching.py:register_unsplit_descriptions`) and matches the
+   sentences; until it runs, patients show no terms, so it runs straight after `migrate`.
+7. `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py` goes up: the modules of these classes
    change, so anything Redis pickled under the old paths fails to unpickle.
 
 ## Behaviour

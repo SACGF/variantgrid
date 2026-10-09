@@ -4,7 +4,8 @@ stamping it with the PhenotypeMatchVersion it was matched with.
 
 Entry points: create_phenotype_description (one owner's text, or an unowned live preview),
 bulk_patient_phenotype_matching (register many patients' sentences, then match the awaiting ones once each,
-optionally in parallel), requeue_sentences (mark sentences for rematching).
+optionally in parallel), requeue_sentences (mark sentences for rematching), register_unsplit_descriptions (split
+descriptions that have no sentences, for `match_patient_phenotypes --rebuild`).
 """
 import logging
 import multiprocessing as mp
@@ -228,27 +229,7 @@ def create_phenotype_description(text, owner=None, approved_by=None, phenotype_m
     owner_kwargs = {owner._meta.model_name: owner} if owner else {}
     phenotype_description = PhenotypeDescription.objects.create(original_text=text, approved_by=approved_by,
                                                                 **owner_kwargs)
-    known_sentences = []
-    unknown_sentences = []
-
-    # Strip carriage returns - some browsers send \r\n in forms, Ajax usually sends \n
-    # These need to be the same so save/ajax preview look the same
-    text = text.replace('\r', '')
-    text = _replace_comments_with_spaces(text)  # Need to keep length the same for offsets
-    for sentence, sentence_offset in phenotype_tokenizer.sentences_and_offsets(text):
-        text_phenotype, tp_created = TextPhenotype.objects.get_or_create(text=sentence)
-        tps = TextPhenotypeSentence.objects.create(phenotype_description=phenotype_description,
-                                                   text_phenotype=text_phenotype,
-                                                   sentence_offset=sentence_offset)
-        if tp_created:
-            has_alpha_numeric = any(x.isalnum() for x in sentence)
-            if not has_alpha_numeric:  # Impossible to match anything so skip
-                text_phenotype.mark_matched(match_version)
-                known_sentences.append(tps)
-            else:
-                unknown_sentences.append(tps)
-        else:
-            known_sentences.append(tps)
+    unknown_sentences = _create_sentences(phenotype_description, phenotype_tokenizer, match_version)
 
     if not defer_processing and unknown_sentences:
         if phenotype_matcher is None:
@@ -261,9 +242,44 @@ def create_phenotype_description(text, owner=None, approved_by=None, phenotype_m
             except Exception:
                 logging.error("Problem processing phenotype for '%s'", sentence.text_phenotype.text)
                 raise
-            known_sentences.append(sentence)
 
     return phenotype_description
+
+
+def _create_sentences(phenotype_description: PhenotypeDescription, phenotype_tokenizer: PhenotypeTokenizer,
+                      match_version: PhenotypeMatchVersion) -> list[TextPhenotypeSentence]:
+    """ Splits the description's text into TextPhenotypeSentences - returns those whose sentence is new and
+        needs matching """
+    unknown_sentences = []
+    # Strip carriage returns - some browsers send \r\n in forms, Ajax usually sends \n
+    # These need to be the same so save/ajax preview look the same
+    text = phenotype_description.original_text.replace('\r', '')
+    text = _replace_comments_with_spaces(text)  # Need to keep length the same for offsets
+    for sentence, sentence_offset in phenotype_tokenizer.sentences_and_offsets(text):
+        text_phenotype, tp_created = TextPhenotype.objects.get_or_create(text=sentence)
+        tps = TextPhenotypeSentence.objects.create(phenotype_description=phenotype_description,
+                                                   text_phenotype=text_phenotype,
+                                                   sentence_offset=sentence_offset)
+        if tp_created:
+            has_alpha_numeric = any(x.isalnum() for x in sentence)
+            if not has_alpha_numeric:  # Impossible to match anything so skip
+                text_phenotype.mark_matched(match_version)
+            else:
+                unknown_sentences.append(tps)
+    return unknown_sentences
+
+
+def register_unsplit_descriptions() -> int:
+    """ Splits every description that has no sentences - all of them after 0024 recreated TextPhenotype (#2135) -
+        for bulk_patient_phenotype_matching to match. Returns the number of descriptions split """
+    phenotype_tokenizer = PhenotypeTokenizer()
+    match_version = PhenotypeMatchVersion.get_or_create_current()
+    description_qs = PhenotypeDescription.objects.filter(textphenotypesentence__isnull=True)
+    num_descriptions = 0
+    for phenotype_description in description_qs.iterator():
+        _create_sentences(phenotype_description, phenotype_tokenizer, match_version)
+        num_descriptions += 1
+    return num_descriptions
 
 
 _WORKER_PHENOTYPE_TOKENIZER: Optional[PhenotypeTokenizer] = None
