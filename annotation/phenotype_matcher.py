@@ -169,32 +169,31 @@ def get_ambiguous_acronym_denylist() -> Mapping[str, tuple[tuple[str, str], ...]
 
 
 class PhenotypeMatcher:
-    # Words which have no use matching on their own
+    # Words which have no use matching on their own. Dictionary words are never fuzzy matched, so these are only
+    # needed where the text exactly matches a term or gene symbol (charge -> CHARGE syndrome, kit -> KIT)
     COMMON_WORDS = {
         # acc = account, AGU = Adult Genetics Unit
-        'acc', 'acute', 'across', 'adult', 'agu', 'all', 'and', 'andrew', 'areas', 'associated', 'auditory',
-        'bad', 'bilateral', 'birth', 'blood', 'borderline', 'brain', 'brainstem',
-        'can', 'carries', 'cause', 'cells', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma',
-        'commas', 'common', 'complete', 'coned', 'cord', 'cousin', 'cousins',
-        'day', 'days', 'decreased in', 'diffused', 'deficiency', 'disease', 'disorder', 'distal',
-        'ear', 'exclude', 'exome',
-        'face', 'familial', 'father', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
+        'acc', 'acute', 'adult', 'agu', 'all', 'auditory',
+        'bad', 'bilateral', 'blood', 'borderline', 'brain', 'brainstem',
+        'can', 'central', 'charge', 'child', 'chronic', 'common', 'complete', 'cord', 'cousin', 'cousins',
+        'decreased in', 'disease', 'disorder', 'distal',
+        'ear',
+        'face', 'familial', 'focal', 'frequent', 'frequency', "ft 4",
         'generalized', "generalised",
-        'hard', 'has', 'health', 'healthy', 'hearing', 'high grade',
-        'image', 'inheritance', 'insulin',
+        'hard', 'has', 'healthy', 'high grade',
+        'image', 'inheritance',
         'joints',
         'kit',
-        'large', 'lateral', 'left', 'likes', 'liver',
-        'march', 'match', 'macro', 'mild', 'milena', 'moderate', 'mother', 'month', 'months', 'motor', 'movements',
-        'nad', 'name', 'normal',
+        'large', 'lateral', 'left', 'liver',
+        'march', 'mild', 'milena', 'moderate', 'movements',
+        'nad', 'name',
         'onset', 'other',
-        'panel', 'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
-        'proximal', 'progressive',
-        'range', 'raise', 'recurrent', 'right', 'req',
-        'second', 'score', 'severe', 'she', 'short', 'son', 'skeletal', 'sleep', 'soft', 'spine', 'stable', 'stage', 'study',
+        'periodic', 'pit', 'plan', 'position', 'profound', 'prolonged', 'proximal', 'progressive',
+        'recurrent', 'right', 'req',
+        'severe', 'she', 'short', 'son', 'skeletal', 'soft', 'stable',
         'syndrome',
-        'tat', 'the', 'transient', 'trio', 'trial',
-        'wants', 'was', 'week', 'weeks', 'wes', 'wgs', 'white', 'with',
+        'tat', 'the', 'transient', 'trio',
+        'was',
     }
 
     def __init__(self):
@@ -774,7 +773,6 @@ class PhenotypeMatcher:
             "pulmonary avms": PAVM,
             "pul avms": PAVM,
             "raised ck": ELEVATED_CK,
-            "raised liver enzymes": (load_hpo_by_id, 2910),  # Elevated liver enzymes
             "raised ketones": KETOSIS,
             "raised methionine": (load_hpo_by_name, "Hypermethioninemia"),
             "raised urinary orotate": (load_hpo_by_name, "Oroticaciduria"),
