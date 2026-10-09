@@ -8,100 +8,10 @@
 {% load ui_help %}
 {% block title %}Discordance Report{% endblock %}
 {% block head %}
+    <script src="{% static 'js/classification/discordance_report_action.js' %}"></script>
     <script>
-        let clinSigToBuckets = {{ buckets | jsonify }};
-        /*
-        function notesVal() {
-            let notes = $('#notes').val().trim();
-            return notes.length > 0 ? notes : null;
-        }
-        function isConfirmed() {
-            return $('#discordance-confirm').is(':checked');
-        }
-         */
-
-        function isDiscordant() {
-            let usedBuckets = {};
-            let noBuckets = false;
-            $('.clin-sig-change').each((index, elem) => {
-                let bucket = clinSigToBuckets[$(elem).val()];
-                if (bucket) {
-                    usedBuckets[bucket] = true;
-                } else {
-                    noBuckets = true;
-                }
-            });
-            $('#no-bucket').collapse(noBuckets ? 'show' : 'hide');
-            let discordant = Object.keys(usedBuckets).length > 1;
-            let resultingStatusDom = $('#resulting-status');
-            resultingStatusDom.text(discordant ? "Continued Discordance" : "Pending Concordance");
-
-            let resolveButton = $('#resolve-button');
-            let resolution = $('#resolution');
-
-            if (discordant) {
-                resolution.val("discordant");
-                resolveButton.text("Finish: Mark as Continued Discordance");
-                resolveButton.removeClass("btn-primary");
-                resolveButton.addClass("btn-danger");
-                resultingStatusDom.addClass("text-danger");
-                resultingStatusDom.removeClass("text-success");
-            } else {
-                resolution.val("concordant");
-                resolveButton.text("Finish: Mark as Pending Concordance");
-                resolveButton.addClass("btn-primary");
-                resolveButton.removeClass("btn-danger");
-                resultingStatusDom.removeClass("text-danger");
-                resultingStatusDom.addClass("text-success");
-            }
-            // resolveButton.text(discordant ? "Mark as Continued Discordance" : "Mark as Pending Concordance")
-            /*
-            if (isConfirmed() && notesVal()) {
-                resolveButton.removeClass('disabled');
-            } else {
-                resolveButton.addClass('disabled');
-            }
-             */
-        }
-        /*
-        function submitCheck() {
-            let warnings = [];
-            if (notesVal() == null) {
-                warnings.push("Please provide text in the notes field.");
-            }
-            if (!isConfirmed()) {
-                warnings.push("All changes must be marked as agreed upon.");
-            }
-            if (warnings.length > 0) {
-                let warning = warnings.join("\n");
-                window.alert(`Before submitting:\n${warning}`)
-                return false;  // don't submit if checkbox isn't ticked
-            }
-        }
-         */
-        function showFormCheck() {
-            let value = $("input[name='outcome']:checked").val();
-            console.log(value);
-            let allValues = {
-                "#pending-changes": value == "agree",
-                "#postponed-changes": value == "postpone"
-            }
-            Object.entries(allValues).forEach(entry => {
-                let [key, value] = entry;
-                if (value) {
-                    $(key).slideDown();
-                } else {
-                    $(key).slideUp();
-                }
-            })
-        }
-
         $(document).ready(() => {
-           $('#resolve-form input, #resolve-form select').change(isDiscordant);
-           isDiscordant();
-
-           $("input[name='outcome']").change(showFormCheck);
-           showFormCheck();
+            initDiscordanceReportAction({{ buckets|jsonify }});
         });
     </script>
 {% endblock %}

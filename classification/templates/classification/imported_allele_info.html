@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load static %}
 {% load classification_tags %}
 {% load ui_help %}
 {% load ui_utils %}
@@ -15,34 +16,7 @@
             width: 65px;
         }
     </style>
-    <script>
-        function datatableFilter(data) {
-            $('#imported-allele-info-datatables-filter .form-check-input').each((index, element) => {
-                let $element = $(element);
-                data[$element.attr('id')] = $element.is(':checked');
-            });
-        }
-        function applyFilters() {
-            $('#imported-allele-info-datatables').DataTable().ajax.reload();
-        }
-        function render_validation(data, type, row) {
-            let dom = $('<div>');
-            let mainIncludeLine = $('<div>')
-            if (data.include) {
-                $('<i>', {class: 'fas fa-check-circle text-success'}).appendTo(dom);
-            } else {
-                $('<i>', {class: 'fas fa-times-circle text-danger'}).appendTo(dom);
-            }
-            for (let tag of data.tags) {
-                let color = tag.severity == "E" ? "text-danger" : "text-warning"
-                $('<div>', {text: tag.label, style: 'font-weight: bold', class: 'mt-1 ' + color}).appendTo(dom);
-            }
-            if (data.message) {
-                $('<div>', {html: limitLengthSpan(data.message, 100), class: 'text-secondary'}).appendTo(dom);
-            }
-            return dom.prop('outerHTML');
-        }
-    </script>
+    <script src="{% static 'js/classification/imported_allele_info.js' %}"></script>
     <div class="container-table">
         <h4>Allele Import Info</h4>
         <a class="download-link" href="{% url 'imported_allele_info_download' %}">Download All</a><br/>

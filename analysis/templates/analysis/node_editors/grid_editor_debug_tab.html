@@ -23,47 +23,12 @@
 </div>
 
 {% if node.valid %}
+    <script src="{% static 'js/lib/highlight/highlight.pack.js' %}"></script>
+    <script src="{% static 'js/analysis/grid_editor_debug_tab.js' %}"></script>
     <script>
-    $(document).ready(function() {
-        // This tab is the only user of highlight.js, and it arrives by ajax - fetch the
-        // library on first open rather than on every analysis page
-        function highlightSql() {
-            $('pre code.sql').each(function(i, block) {
-                hljs.highlightBlock(block);
-            });
-        }
-        if (window.hljs) {
-            highlightSql();
-        } else {
-            $.ajax({url: "{% static 'js/lib/highlight/highlight.pack.js' %}", dataType: "script", cache: true}).done(highlightSql);
-        }
-
-        $('input#show-grid-columns').click(function() {
-            var checked = $(this).prop('checked');
-            var min_sql = $('#min-sql');
-            var grid_sql = $('#grid-sql');
-            if (checked) {
-                min_sql.hide();
-                grid_sql.show();
-            } else {
-                grid_sql.hide();
-                min_sql.show();
-            }
+        $(document).ready(function() {
+            initGridEditorDebugTab({{ node.analysis_id }}, {{ node.pk }});
         });
-
-        $("button#node-populate-clingen-alleles").click(function() {
-            let btn = $(this);
-            if (!btn.hasClass("disabled")) {
-                $.ajax({
-                    type: "POST",
-                    url: "{% url 'node_populate_clingen_alleles' node.analysis_id node.pk %}",
-                    success: function(data) {
-                        btn.addClass("disabled");
-                    },
-                });
-            }
-        });
-    });
     </script>
     {%  if node_sql or grid_sql %}
     <div class="editor-row">

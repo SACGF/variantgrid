@@ -15,44 +15,11 @@
         }
     </style>
 
+    <script src="{% static 'js/patients/patient_term_approvals.js' %}"></script>
     <script>
-    $(document).ready(function() {
-        var patient_results = {{ patient_results | jsonify }};
-        for (var p in patient_results) {
-            var patientSelector = $(".unapproved-patient[patient_id=" + p + "]");
-            var resultSelector = $(".results", patientSelector);
-            var phenotypeMatches = patient_results[p];
-            var phenotypeText = $("textarea.phenotype", patientSelector).val();
-            displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches)
-        }
-
-        function greyOut(selector) {
-            // Grey out the div as per http://stackoverflow.com/a/14461824/4846002
-            selector.fadeTo('slow', .6);
-            selector.append('<div style="position: absolute;top:0;left:0;width: 100%;height:100%;z-index:2;opacity:0.4;filter: alpha(opacity = 50)"></div>');
-            var stopPropFn = function (e) {
-                e.stopPropagation();
-                e.preventDefault();
-            };
-            selector.bind("keydown", stopPropFn).bind("keypress", stopPropFn).bind("paste", stopPropFn);
-        }
-
-        $("button.accept-phenotype").click(function() {
-            var parentContainer = $(this).parents(".unapproved-patient")
-            greyOut(parentContainer);
-
-            var patientId = $(this).attr("patient_id");
-            var data = 'patient_id=' + patientId;
-            $.ajax({
-                type: "POST",
-                data: data,
-                url: "{% url 'approve_patient_term' %}",
-                success: function(phenotypeMatches) {
-                    parentContainer.fadeOut();
-                },
-            });
+        $(document).ready(function() {
+            initPatientTermApprovals({{ patient_results|jsonify }});
         });
-    });
     </script>
 	
 {% endblock head %}

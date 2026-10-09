@@ -31,8 +31,7 @@ def dal_media():
 
 def jsonify_for_js(json_me, pretty=False) -> Union[SafeString, bool, int, float]:
     if isinstance(json_me, str):
-        json_me = json_me.replace('"', '\"').replace('</script>', '<\\/script>')
-        return mark_safe(f"\"{json_me}\"")
+        return mark_safe(json.dumps(json_me).replace('</script>', '<\\/script>'))
     if isinstance(json_me, bool):
         if json_me:
             return mark_safe('true')

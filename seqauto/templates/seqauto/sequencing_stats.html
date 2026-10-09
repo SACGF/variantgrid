@@ -26,45 +26,10 @@
         }
     </style>
 
+    <script src="{% static 'js/seqauto/sequencing_stats.js' %}"></script>
     <script>
-        function showGraph(elementId, title, data) {
-            let labels = [];
-            let values = [];
-            for(let i=0 ; i<data.length ; ++i) {
-                labels.push(data[i][0]);
-                values.push(data[i][1]);
-            }
-
-            let plotData = [{
-              labels: labels,
-              values: values,
-              type: 'pie'
-            }];
-
-            let width = 500;
-            let height = width;
-
-            let layout = {
-                title: {text: title},
-                width: width,
-                height: height,
-            };
-
-            $("#" + elementId).empty();
-            Plotly.newPlot(elementId, plotData, layout);
-        }
-
         $(document).ready(function() {
-            let sequencingRunInfo = {{ sequencing_run_info | jsonify }};
-            let sequencingSampleInfo = {{ sequencing_sample_info | jsonify }};
-
-            showGraph('sequencing-run-model', 'Sequencer Model', sequencingRunInfo['sequencer_model']);
-            showGraph('sequencing-run-sequencer', 'Sequencer', sequencingRunInfo['sequencer']);
-            showGraph('sequencing-run-enrichment_kit', 'Sequencer EnrichmentKit', sequencingRunInfo['enrichment_kit']);
-
-            showGraph('samples-model', 'Sequencer Model', sequencingSampleInfo['sequencer_model']);
-            showGraph('samples-sequencer', 'Sequencer', sequencingSampleInfo['sequencer']);
-            showGraph('samples-enrichment_kit', 'EnrichmentKit', sequencingSampleInfo['enrichment_kit']);
+            showSequencingStats({{ sequencing_run_info|jsonify }}, {{ sequencing_sample_info|jsonify }});
         });
     </script>
 

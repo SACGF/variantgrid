@@ -1,70 +1,18 @@
 {% load static %}
 {% load js_tags %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
+<script src="{% static 'js/analysis/view_karyomapping_gene.js' %}"></script>
 <script>
-// data goes here
-var VARIANT_ID_LOOKUP = {{ variant_id_lookup | jsonify }};
-var KARYOTYPE_BIN_SCATTER_DATA = {{ karyotype_bin_scatter_data | jsonify }};
-var KARYOTYPE_BIN_LABELS = {{ karyotype_bin_labels | jsonify }};
-
-function reverseArray(array) {
-    return array.slice().reverse();
-}
-
-function showKaryotypeScatter() {
-    let data = []
-     
-    for(let i=0 ; i<KARYOTYPE_BIN_LABELS.length ; i++) {
-        let k = KARYOTYPE_BIN_LABELS[i];
-        let k_data = KARYOTYPE_BIN_SCATTER_DATA[k];
-        // console.log("k: " + k);
-        // console.log(k_data);
-        let x_data = k_data['x'];
-        if (!x_data.length) {
-            x_data = [null]; // always show even if empty
-        }
-        
-        let trace = {
-          x: x_data,
-          y: Array(x_data.length).fill(k),
-          mode: 'markers',
-          type: 'scatter',
-          name: k,
-          text: k_data['text'],
-          marker: { size: 12 },
-          visible: true,
-        };
-        data.push(trace);
-    }
-
-    const description = 'Karyomapping {{ kag.karyomapping_analysis.proband.sample }}';
-    const geneDescription = "{{ kag.gene_symbol }} ('{{ strand }}' strand) Up: {{ kag.upstream_kb }}KB, Down: {{ kag.downstream_kb }}KB";
-    const coordinates = "{{ iv }}";
-    
-    let layout = {
-        title: {text: [description, geneDescription, coordinates].join('\n')},
-        showlegend: false,
-        type: 'category',
-        xaxis : {
-            // showgrid: false,
-            showline: false,
-        },
-        yaxis : {
-            showticklabels: true,
-            showline: false,
-            categoryorder: "array",
-            categoryarray:  reverseArray(KARYOTYPE_BIN_LABELS),
-        },
-        
-    };
-    
-    Plotly.newPlot('karyotype-graph', data, layout);
-}
-
-$(document).ready(function() {
-    showKaryotypeScatter();
-});
-
+    $(document).ready(function() {
+        showKaryotypeScatter({{ karyotype_bin_scatter_data|jsonify }}, {{ karyotype_bin_labels|jsonify }}, {
+            probandSample: {{ kag.karyomapping_analysis.proband.sample|stringformat:"s"|jsonify }},
+            geneSymbol: {{ kag.gene_symbol|stringformat:"s"|jsonify }},
+            strand: {{ strand|stringformat:"s"|jsonify }},
+            upstreamKb: {{ kag.upstream_kb|jsonify }},
+            downstreamKb: {{ kag.downstream_kb|jsonify }},
+            iv: {{ iv|stringformat:"s"|jsonify }},
+        });
+    });
 </script>
 <div>
     <p>
