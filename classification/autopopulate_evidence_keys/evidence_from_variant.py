@@ -423,8 +423,10 @@ def get_evidence_fields_from_preferred_transcript(
             log_traceback()
 
     try:
-        c_hgvs = hgvs_matcher.variant_to_c_hgvs_parts(variant, transcript_version.accession)
-        if c_hgvs:
+        if transcript_version.is_cdot_fake:
+            # Mitochondrial: there's no RNA accession to write c.HGVS against, use 'NC_012920.1:m.' (#2139)
+            data[SpecialEKeys.C_HGVS] = hgvs_matcher.variant_to_g_hgvs(variant)
+        elif c_hgvs := hgvs_matcher.variant_to_c_hgvs_parts(variant, transcript_version.accession):
             data[SpecialEKeys.C_HGVS] = c_hgvs.full_hgvs
     except Exception as e:
         value_obj = {}

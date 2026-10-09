@@ -59,6 +59,7 @@ Gotchas:
   adds a migration registering `match_patient_phenotypes --stale` as a ManualOperation, or deployments keep the old
   matches (sentences are matched once and cached). Each sentence points at the PhenotypeMatchVersion (matcher +
   OntologyVersion pair) it was matched with; stale sentences show in `vg status`.
+- VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id) and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.

@@ -26,7 +26,11 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNC
 
 # Re-exported: callers have long imported these from genes.models
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
-from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
+from genes.transcript_parts import (
+    CDOT_FAKE_TRANSCRIPT_PREFIX,
+    TranscriptParts,
+    get_transcript_id_and_version,
+)
 from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
 from genes.transcripts_utils import get_lrg_and_t
 from library.cache import timed_cache
@@ -803,6 +807,12 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @cached_property
     def accession(self):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
+
+    @property
+    def is_cdot_fake(self) -> bool:
+        """ A cdot stand-in for a RefSeq gene with no RNA accession (mitochondrial, eg 'fake-rna-ND4'), not
+            something to write HGVS against """
+        return self.transcript_id.startswith(CDOT_FAKE_TRANSCRIPT_PREFIX)
 
     @property
     def annotation_consortium(self):
