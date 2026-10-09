@@ -14,7 +14,7 @@ Patterns here:
   `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike; add a behaviour as
   a new processor entry.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
-  it escapes `</script>` and marks safe; `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
+  it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
   which takes hint, help, admin_only, show_if - use it rather than a hand-built Bootstrap row. New block tags parse
   kwargs with uicore/templatetags/ui_utils.py:parse_tag.
