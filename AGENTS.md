@@ -211,6 +211,8 @@ Preface any comment on a GitHub issue or pull request with 🤖 Written by Claud
 unless I tell you to.
 
 ### Which repo an issue goes in
+`SACGF/variantgrid_private` is the repo from before the code went public: its code and history stop in 2021 and
+share nothing with `SACGF/variantgrid`, so it is used only for private issues - never branch, push or open a PR there.
 Raise issues in the public `SACGF/variantgrid` by default. An issue there must contain nothing identifying: no patient,
 lab or variant details, no hostnames, secrets or config values from a deployment. Raise it in `SACGF/variantgrid_private`
 instead when it describes a security problem (a missing permission check, an injection, anything an attacker could use
