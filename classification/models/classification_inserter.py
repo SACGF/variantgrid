@@ -158,7 +158,6 @@ class BulkClassificationInserter:
 
                 operation_data = EvidenceMixin.to_patch(operation_data)
 
-            record = None
             is_new_record = False
             if operation:
                 # operation modifiers

@@ -8,7 +8,7 @@ from classification.models import (
     ClassificationJsonParams,
     ClassificationModification,
     EvidenceKeyMap,
-    ImportedAlleleInfo, ClassificationGroupingEntry, OverlapContribution,
+    ImportedAlleleInfo, ClassificationGroupingEntry,
 )
 from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
@@ -90,6 +90,7 @@ def populate_classification_json(classification: Classification, params: Classif
     latest_modification = None
     last_published_version = None
 
+    version: ClassificationModification
     if version:
         if version.is_last_published:
             last_published_version = version

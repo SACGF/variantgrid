@@ -42,5 +42,3 @@ class ClassificationJsonAlleleRevolvedDict(TypedDict, total=False):
 class ClassificationJsonAlleleDict(TypedDict, total=False):
     resolved: ClassificationJsonAlleleRevolvedDict
     genome_builds: dict[str, ClassificationJsonAlleleGenomeBuild]
-
-
