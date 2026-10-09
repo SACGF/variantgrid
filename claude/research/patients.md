@@ -107,16 +107,24 @@ call arrived after the VCF. NEEDS_ATTENTION is what the health check
 
 ### Phenotype text
 
-Patient is a `patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`: `Patient.save` pops
-the phenotype kwargs and matches the text to HPO / OMIM / MONDO terms unless `check_patient_text_phenotype=False`.
-The matcher and the bulk path live in `patients/phenotype_matching.py`; `manage.py match_patient_phenotypes`
-reruns it for everyone. Each matched sentence (`patients/models/models_phenotype.py:TextPhenotype`) points at
-the `patients/models/models_phenotype.py:PhenotypeMatchVersion` (the `PHENOTYPE_MATCHER_VERSION` and
-OntologyVersion pair) it was matched with; `--stale` rematches those not on the current pair (`vg status` counts them)
-and `--clear` rematches every sentence. Both drop only the sentence's matches, so patient
-and cohort links and approvals are kept (#2131). Curators approve a patient's matched text on the term
-approvals page (`patients/views.py:patient_term_approvals`, `patients/views_json.py:approve_patient_term`, which records a
-PatientModification). The patients page graphs come from `patients/templatetags/patient_graph_tags.py`.
+Patient (and snpdb's Cohort) is a `patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`:
+`Patient.save` pops the phenotype kwargs and matches the text to HPO / OMIM / MONDO terms unless
+`check_patient_text_phenotype=False`. The text is a `patients/models/models_phenotype.py:PhenotypeDescription`
+that points at its patient or cohort (a one-to-one each, at most one set), so deleting the owner - `Patient.merge`
+included - deletes it; changed text replaces it, approval and all (#2135). It is split into sentences, each a
+`patients/models/models_phenotype.py:TextPhenotype` shared by every description containing it and matched once.
+The matcher lives in `patients/phenotype_matcher.py` and the splitting, matching and bulk path in
+`patients/phenotype_matching.py`; the mixin reaches it through `phenotype_description_wanted_signal`
+(`patients/signals/phenotype_description.py`), as the matcher needs ontology, which sits above snpdb.
+`manage.py match_patient_phenotypes` registers every patient's sentences and matches those awaiting. Each matched
+sentence points at the `patients/models/models_phenotype.py:PhenotypeMatchVersion` (the `PHENOTYPE_MATCHER_VERSION`
+and OntologyVersion pair) it was matched with; `--stale` requeues those not on the current pair (`vg status` counts
+them, and the awaiting ones) and `--clear` requeues every sentence. A requeued sentence keeps its matches until it is
+rematched, and descriptions and approvals are untouched (#2131). Ambiguous acronyms are one rule,
+`patients/models/models_phenotype.py:TextPhenotypeMatch.is_ambiguous_acronym`, for matching and every read path.
+Curators approve a patient's matched text on the term approvals page (`patients/views.py:patient_term_approvals`,
+`patients/views_json.py:approve_patient_term`, which records a PatientModification). The patients page graphs come
+from `patients/templatetags/patient_graph_tags.py`.
 
 ## Why it is shaped this way
 

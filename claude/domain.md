@@ -77,7 +77,8 @@ are separate facts - a depth-only caller has sample columns without a genotype. 
 an automatic cohort of all its samples; custom cohorts pick across VCFs. Membership changes go through
 `Cohort.set_samples` (one version bump, one genotype rebuild), never a bulk update. A Cohort also carries its own
 phenotype text matched to OntologyTerms the way a Patient's is (`patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`),
-so the analysis Phenotype node can read terms from either.
+so the analysis Phenotype node can read terms from either. The matched text is a
+`patients/models/models_phenotype.py:PhenotypeDescription` owned by the cohort (or patient), deleted with it.
 
 **CohortGenotypeCollection / CohortGenotype** - `snpdb/models/models_cohort.py:CohortGenotypeCollection`, `CohortGenotype`.
 Genotypes are packed one row per variant per cohort, in arrays indexed by `CohortSample.cohort_genotype_packed_field_index`;
