@@ -1,19 +1,10 @@
 // @ts-check
 // analysis/templates/analysis/node_editors/grid_editor_debug_tab.html
 /* global hljs */ // js/lib/highlight/highlight.pack.js
-function initGridEditorDebugTab(highlightJsUrl, analysisId, nodeId) {
-    // This tab is the only user of highlight.js, and it arrives by ajax - fetch the
-    // library on first open rather than on every analysis page
-    function highlightSql() {
-        $('pre code.sql').each(function(i, block) {
-            hljs.highlightBlock(block);
-        });
-    }
-    if (window.hljs) {
-        highlightSql();
-    } else {
-        $.ajax({url: highlightJsUrl, dataType: "script", cache: true}).done(highlightSql);
-    }
+function initGridEditorDebugTab(analysisId, nodeId) {
+    $('pre code.sql').each(function(i, block) {
+        hljs.highlightBlock(block);
+    });
 
     $('input#show-grid-columns').click(function() {
         const checked = $(this).prop('checked');
