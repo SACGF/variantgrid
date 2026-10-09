@@ -1,33 +1,41 @@
+"""
+Phenotype text matching: what PhenotypeMatcher finds, ambiguous acronyms, versioned rematching and the description
+owners (#2131, #2135).
+"""
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from annotation.models.models_phenotype_match import (
-    PatientTextPhenotype,
-    PhenotypeMatchVersion,
-    TextPhenotype,
-    TextPhenotypeMatch,
-    patient_phenotype_terms,
-)
-from annotation.phenotype_matcher import (
-    PHENOTYPE_MATCHER_VERSION,
-    PhenotypeMatcher,
-    _build_ambiguous_acronym_denylist,
-    get_ambiguous_acronym_denylist,
-)
-from annotation.phenotype_matching import (
-    bulk_patient_phenotype_matching,
-    create_phenotype_description,
-    requeue_sentences,
-)
 from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
 from patients.models import Patient
+from patients.models.models_phenotype import (
+    PhenotypeDescription,
+    PhenotypeMatchVersion,
+    TextPhenotype,
+    TextPhenotypeMatch,
+    TextPhenotypeSentence,
+    patient_phenotype_terms,
+)
+from patients.phenotype_matcher import (
+    PHENOTYPE_MATCHER_VERSION,
+    PhenotypeMatcher,
+    _build_ambiguous_acronym_denylist,
+    get_ambiguous_acronym_denylist,
+)
+from patients.phenotype_matching import (
+    _process_text_phenotype,
+    bulk_patient_phenotype_matching,
+    create_phenotype_description,
+    requeue_sentences,
+)
+from patients.phenotype_tokenizer import PhenotypeTokenizer
 from snpdb.models import Cohort, GenomeBuild
 
 
@@ -70,7 +78,7 @@ class TestPhenotypeMatching(TestCase):
         patient.save(phenotype_matcher=self.phenotype_matcher)
 
         patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
-        return patient.patient_text_phenotype.phenotype_description.get_results()
+        return patient.phenotype_description.get_results()
 
     def check_expected_results_for_description(self, expected_results_by_description):
         for phenotype, expected_results in expected_results_by_description.items():
@@ -161,7 +169,7 @@ class TestPhenotypeMatching(TestCase):
         phenotype = "Raised TSH\n----needs human review"
         patient = Patient(phenotype=phenotype)
         patient.save(phenotype_matcher=self.phenotype_matcher)
-        self.assertFalse(PatientTextPhenotype.objects.filter(patient=patient).exists(),
+        self.assertFalse(PhenotypeDescription.objects.filter(patient=patient).exists(),
                          "Exclude marker should prevent persisting matches")
 
     def test_matcher_only_built_when_there_is_new_text_to_match(self):
@@ -170,7 +178,7 @@ class TestPhenotypeMatching(TestCase):
         already_matched_text = "Failure to thrive"
         Patient(phenotype=already_matched_text).save(phenotype_matcher=self.phenotype_matcher)
 
-        with mock.patch("annotation.phenotype_matching.PhenotypeMatcher") as mock_matcher:
+        with mock.patch("patients.phenotype_matching.PhenotypeMatcher") as mock_matcher:
             Patient(patient_code="no phenotype").save()
             Patient(phenotype=already_matched_text).save()
             mock_matcher.assert_not_called()
@@ -186,7 +194,7 @@ class TestPhenotypeMatching(TestCase):
     def test_ambiguous_acronym_flagged_and_excluded(self):
         """A phenotype text whose lowercased form is in the denylist should:
         - NOT create TextPhenotypeMatch rows (so downstream Django queries
-          through PATIENT_TPM_PATH can't pick up the wrong concept)
+          through PATIENT_ONTOLOGY_TERM_PATH can't pick up the wrong concept)
         - emit a synthetic `ambiguous_alias` + `ambiguous_alias_candidates`
           entry on get_results() so the UI can list the conflicting concepts
         - be excluded from get_ontology_term_ids()."""
@@ -196,10 +204,8 @@ class TestPhenotypeMatching(TestCase):
                 ("OMIM:000000", "Some other thing called FTT"),
             ),
         }
-        with mock.patch(
-            "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
-            return_value=denylist,
-        ):
+        with mock.patch("patients.phenotype_matching.get_ambiguous_acronym_denylist", return_value=denylist), \
+                mock.patch("patients.models.models_phenotype.get_ambiguous_acronym_denylist", return_value=denylist):
             # Rebuild the matcher inside the patch so its ambiguous_acronyms
             # picks up the patched denylist (the class-level matcher was built
             # in setUpTestData against the real ontology test data).
@@ -208,7 +214,7 @@ class TestPhenotypeMatching(TestCase):
             patient.save(phenotype_matcher=matcher)
             patient.process_phenotype_if_changed(phenotype_matcher=matcher)
 
-            pd = patient.patient_text_phenotype.phenotype_description
+            pd = patient.phenotype_description
 
             saved = TextPhenotypeMatch.objects.filter(
                 text_phenotype__textphenotypesentence__phenotype_description=pd,
@@ -266,16 +272,51 @@ class TestPhenotypeMatching(TestCase):
             "raised tsh": (("HP:0002925", "Raised TSH"), ("OMIM:000000", "Something else")),
         }
         with mock.patch(
-            "annotation.models.models_phenotype_match.get_ambiguous_acronym_denylist",
+            "patients.models.models_phenotype.get_ambiguous_acronym_denylist",
             return_value=denylist,
         ):
             phenotype_terms = patient_phenotype_terms([patient])
-            phenotype_description = patient.patient_text_phenotype.phenotype_description
+            phenotype_description = patient.phenotype_description
             phenotype_description.get_ontology_term_ids.invalidate(phenotype_description)
             self.assertEqual(phenotype_description.get_ontology_term_ids(), [])
 
         self.assertEqual(phenotype_terms[patient.pk].terms, {},
                          "Ambiguous acronym matches must not become terms")
+
+    def test_ambiguous_acronym_rule_strips_commas_when_saving_and_reading(self):
+        """ A match saved before its text joined the denylist reads as a warning, not a term """
+        text = "LEUKEMIA, ACUTE MYELOID"
+        patient = self._create_matched_patient(text)
+        text_phenotype = TextPhenotype.objects.get(text=text)
+        saved = TextPhenotypeMatch.objects.get(text_phenotype=text_phenotype, ontology_term_id="OMIM:601626")
+        denylist = {"leukemia acute myeloid": (("OMIM:601626", "LEUKEMIA, ACUTE MYELOID"),
+                                               ("MONDO:0000001", "Something else"))}
+        self.assertTrue(saved.is_ambiguous_acronym(denylist))
+
+        with mock.patch("patients.models.models_phenotype.get_ambiguous_acronym_denylist", return_value=denylist):
+            results = patient.phenotype_description.get_results()
+        self.assertNotIn("OMIM:601626", [r.get("accession") for r in results])
+        self.assertIn(text, [r.get("ambiguous_alias") for r in results])
+
+        _process_text_phenotype(text_phenotype, PhenotypeTokenizer(), self.phenotype_matcher,
+                                PhenotypeMatchVersion.get_or_create_current(), denylist)
+        self.assertFalse(TextPhenotypeMatch.objects.filter(text_phenotype=text_phenotype,
+                                                           offset_start=saved.offset_start,
+                                                           offset_end=saved.offset_end).exists(),
+                         "Matching drops the same text the read paths do")
+
+    def test_rematching_a_sentence_replaces_its_matches(self):
+        self._create_matched_patient("Raised TSH")
+        text_phenotype = TextPhenotype.objects.get(text="Raised TSH")
+        matches = list(TextPhenotypeMatch.objects.filter(text_phenotype=text_phenotype)
+                       .values_list("ontology_term_id", "offset_start", "offset_end"))
+        self.assertTrue(matches)
+
+        _process_text_phenotype(text_phenotype, PhenotypeTokenizer(), self.phenotype_matcher,
+                                PhenotypeMatchVersion.get_or_create_current(), {})
+        rematched = list(TextPhenotypeMatch.objects.filter(text_phenotype=text_phenotype)
+                         .values_list("ontology_term_id", "offset_start", "offset_end"))
+        self.assertEqual(sorted(rematched), sorted(matches))
 
     def test_hardcoded_override_wins_over_denylist(self):
         """If a key has a hardcoded lookup (e.g. FTT), the public denylist
@@ -286,7 +327,7 @@ class TestPhenotypeMatching(TestCase):
             "some_truly_ambiguous_token": (("HP:0000001", "All"), ("MONDO:0000001", "disease")),
         }
         with mock.patch(
-            "annotation.phenotype_matcher._build_ambiguous_acronym_denylist",
+            "patients.phenotype_matcher._build_ambiguous_acronym_denylist",
             return_value=raw,
         ):
             # bust cache_memoize so our patch is used
@@ -311,20 +352,18 @@ class TestPhenotypeMatcherVersion(TestCase):
         TextPhenotype.objects.filter(text=text).update(match_version=match_version)
 
     def test_matched_sentences_are_stamped(self):
-        create_phenotype_description("Raised TSH", self.phenotype_matcher)
-        create_phenotype_description("...")  # Nothing to match, so marked processed without a matcher
+        create_phenotype_description("Raised TSH", phenotype_matcher=self.phenotype_matcher)
+        create_phenotype_description("...")  # Nothing to match, so stamped without a matcher
         for text in ["Raised TSH", "..."]:
             text_phenotype = TextPhenotype.objects.get(text=text)
-            self.assertTrue(text_phenotype.processed)
             self.assertEqual(text_phenotype.match_version.matcher_version, PHENOTYPE_MATCHER_VERSION)
             self.assertEqual(text_phenotype.match_version.ontology_version, self.ontology_version)
         self.assertEqual(PhenotypeMatchVersion.objects.count(), 1)
         self.assertFalse(TextPhenotype.stale_qs().exists())
 
     def test_stale_qs(self):
-        for text in ["current", "old matcher", "old ontology", "never stamped"]:
-            TextPhenotype.objects.create(text=text, processed=True)
-        TextPhenotype.objects.create(text="unprocessed")
+        for text in ["current", "old matcher", "old ontology", "awaiting"]:
+            TextPhenotype.objects.create(text=text)
         imports = {f: getattr(self.ontology_version, f) for f in OntologyVersion.ONTOLOGY_IMPORTS}
         imports["gencc_import"] = OntologyImport.objects.create(import_source="test", filename="older_gencc",
                                                                 processed_date=timezone.now())
@@ -333,7 +372,8 @@ class TestPhenotypeMatcherVersion(TestCase):
         self._stamp("old matcher", PHENOTYPE_MATCHER_VERSION - 1, self.ontology_version)
         self._stamp("old ontology", PHENOTYPE_MATCHER_VERSION, other_ontology_version)
         stale = set(TextPhenotype.stale_qs().values_list("text", flat=True))
-        self.assertEqual(stale, {"old matcher", "old ontology", "never stamped"})
+        self.assertEqual(stale, {"old matcher", "old ontology"})
+        self.assertEqual(list(TextPhenotype.awaiting_qs().values_list("text", flat=True)), ["awaiting"])
 
     def test_requeue_keeps_links_and_approvals(self):
         text = "Raised TSH"
@@ -348,16 +388,48 @@ class TestPhenotypeMatcherVersion(TestCase):
         expected_term_ids = patient_description.get_ontology_term_ids()
         self.assertTrue(expected_term_ids)
 
-        TextPhenotype.objects.filter(text=text).update(match_version=None)  # Matched before #2131
-        self.assertEqual(requeue_sentences(TextPhenotype.stale_qs()), 1)
-        self.assertEqual(patient_description.get_ontology_term_ids(), [])  # memo invalidated
+        self.assertEqual(requeue_sentences(TextPhenotype.objects.filter(text=text)), 1)
+        self.assertTrue(TextPhenotype.awaiting_qs().filter(text=text).exists())
+        self.assertEqual(patient_description.get_ontology_term_ids(), expected_term_ids,
+                         "Matches stay visible until the sentence is rematched")
 
         bulk_patient_phenotype_matching(patients=[patient])
 
         text_phenotype = TextPhenotype.objects.get(text=text)
         self.assertEqual(text_phenotype.match_version, PhenotypeMatchVersion.get_or_create_current())
-        patient_text_phenotype = PatientTextPhenotype.objects.get(patient=patient)
-        self.assertEqual(patient_text_phenotype.phenotype_description, patient_description)
-        self.assertEqual(patient_text_phenotype.approved_by, user)
+        patient = Patient.objects.get(pk=patient.pk)
+        self.assertEqual(patient.phenotype_description, patient_description)
+        self.assertEqual(patient.phenotype_description.approved_by, user)
         self.assertEqual(Cohort.objects.get(pk=cohort.pk).phenotype_description, cohort_description)
         self.assertEqual(patient_description.get_ontology_term_ids(), expected_term_ids)
+
+
+class TestPhenotypeDescriptionOwner(TestCase):
+    """ A description is owned through the FK on the description, so it goes with its owner (#2135) """
+
+    @classmethod
+    def setUpTestData(cls):
+        create_ontology_test_data()
+        create_test_ontology_version()
+        cls.phenotype_matcher = PhenotypeMatcher()
+
+    def test_deleting_patient_deletes_description_but_not_shared_sentence(self):
+        text = "Raised TSH"
+        patient = Patient(phenotype=text)
+        patient.save(phenotype_matcher=self.phenotype_matcher)
+        description_pk = patient.phenotype_description.pk
+
+        patient.delete()
+
+        self.assertFalse(PhenotypeDescription.objects.filter(pk=description_pk).exists())
+        self.assertFalse(TextPhenotypeSentence.objects.filter(phenotype_description_id=description_pk).exists())
+        self.assertTrue(TextPhenotypeMatch.objects.filter(text_phenotype__text=text).exists(),
+                        "The sentence and its matches are shared, so stay")
+
+    def test_description_has_one_owner(self):
+        user = User.objects.get_or_create(username="phenotype_owner")[0]
+        patient = Patient.objects.create(patient_code="phenotype owner")
+        cohort = Cohort.objects.create(name="phenotype owner", user=user,
+                                       genome_build=GenomeBuild.get_name_or_alias("GRCh37"))
+        with self.assertRaises(IntegrityError):
+            PhenotypeDescription.objects.create(original_text="Raised TSH", patient=patient, cohort=cohort)

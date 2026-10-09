@@ -10,7 +10,6 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
-from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.utils import JsonDataType
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import OntologyService, OntologyTerm
@@ -23,6 +22,7 @@ from patients.models import (
     Specimen,
     SpecimenMeasure,
 )
+from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
 from patients.models_enums import (
     MatchStatus,
     NucleicAcid,

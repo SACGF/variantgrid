@@ -3,14 +3,13 @@ from django.db.models import CharField, Count, Value
 from django.db.models.functions import Concat, Lower
 from django.dispatch import receiver
 
-from annotation.models.models_phenotype_match import (
-    PHENOTYPE_ONTOLOGY_SERVICE_LABELS,
-    patient_phenotype_terms,
-    patients_qs_for_ontology_term,
-)
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
-from patients.models import Patient
+from patients.models.models_patient import Patient
+from patients.models.models_phenotype import (
+    PHENOTYPE_ONTOLOGY_SERVICE_LABELS,
+    patient_phenotype_terms,
+)
 from snpdb.models import Sample
 from snpdb.search import HAS_3_ANY, SearchExample, SearchInputInstance, search_receiver
 
@@ -36,7 +35,7 @@ def patient_search(search_input: SearchInputInstance):
 def ontology_preview_patient_sample_extra(sender, user: User, obj: OntologyTerm, **kwargs):
     if not Patient.preview_enabled():
         return
-    patients_qs = patients_qs_for_ontology_term(user, obj)
+    patients_qs = Patient.for_ontology_term(user, obj)
     data = patients_qs.aggregate(num_patients=Count("id", distinct=True), num_samples=Count("sample", distinct=True))
     extras = []
     if num_patients := data.get("num_patients"):

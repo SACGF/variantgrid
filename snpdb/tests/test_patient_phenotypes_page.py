@@ -9,13 +9,13 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from annotation.phenotype_matcher import PhenotypeMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
 from patients.models import Patient
+from patients.phenotype_matcher import PhenotypeMatcher
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
@@ -57,7 +57,7 @@ class PatientPhenotypesPageTest(TestCase):
         hpo_terms = patient_phenotypes[self.patient.pk]["terms"]["HPO"]
         self.assertEqual([t["id"] for t in hpo_terms], ["HP:0002925"])
 
-        phenotype_queries = [q for q in ctx.captured_queries if "annotation_textphenotypematch" in q["sql"]]
+        phenotype_queries = [q for q in ctx.captured_queries if "patients_textphenotypematch" in q["sql"]]
         self.assertEqual(len(phenotype_queries), 1, "Phenotype terms come from one query for the page")
 
     def test_sample_page_data(self):
