@@ -26,6 +26,10 @@ from genes.hgvs import HGVSDisplay
 from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
+"""
+This live calculation of Overlaps will is deprecated and will be removed once
+VUS functionality has been migrated to the new Overlaps
+"""
 
 
 @dataclass(frozen=True)
