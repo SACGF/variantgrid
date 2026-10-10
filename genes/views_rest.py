@@ -15,7 +15,7 @@ import json
 from annotation.models.models_mim_hpo import HPOSynonym, MIMMorbidAlias, \
     HumanPhenotypeOntology, MIMMorbid
 from genes.gene_matching import GeneSymbolMatcher, GeneMatcher
-from genes.models import GeneInfo, GeneList, FakeGeneList, GeneListGeneSymbol, GeneSymbol, GeneAnnotationRelease, \
+from genes.models import GeneInfo, GeneList, create_fake_gene_list, GeneListGeneSymbol, GeneSymbol, GeneAnnotationRelease, \
     ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList
 from genes.panel_app import PANEL_APP_PREFIX, get_panel_app_panel_as_gene_list_json
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json
@@ -45,7 +45,7 @@ WriteGeneListPermission = is_owner_or_has_permission_factory(DjangoPermission.WR
 
 
 def get_fake_gene_list_json(gene_list_id, name, genes, category_name, icon_css_class):
-    gene_list = FakeGeneList(name=name, user=None)
+    gene_list = create_fake_gene_list(name=name, user=None)
     gene_list_genes = []
 
     # TODO: Better way to convert to symbols??
@@ -202,7 +202,7 @@ class TextToGeneListView(APIView):
         name = self.request.query_params.get('name')
         gene_list_text = self.request.query_params.get('gene_list_text')
 
-        gene_list = FakeGeneList(name=name, user=request.user)
+        gene_list = create_fake_gene_list(name=name, user=request.user)
         serializer = GeneListSerializer(gene_list, context={"request": request})
         data = serializer.data
 

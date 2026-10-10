@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import types
 from collections import namedtuple
 from dataclasses import dataclass
 from functools import total_ordering
@@ -12,7 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction
-from django.db.models import Min, Max, QuerySet
+from django.db.models import Min, Max, QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
@@ -383,9 +384,9 @@ class GeneVersion(models.Model):
         DELIMITER = ","
         qs = self.transcriptversion_set.filter(data__strand__isnull=False)
         qs = qs.annotate(**{k: KeyTextTransform(k, "data") for k in ["chrom", "start", "end", "strand"]})
-        data = qs.aggregate(chroms=StringAgg("chrom", delimiter=DELIMITER, distinct=True),
+        data = qs.aggregate(chroms=StringAgg("chrom", delimiter=DELIMITER, distinct=True, output_field=TextField()),
                             min_start=Min("start"), max_end=Max("end"),
-                            strands=StringAgg("strand", delimiter=DELIMITER, distinct=True))
+                            strands=StringAgg("strand", delimiter=DELIMITER, distinct=True, output_field=TextField()))
         for k in ["chroms", "strands"]:
             v = data[k]
             if len(v.split(DELIMITER)) != 1:
@@ -1029,14 +1030,15 @@ class GeneList(models.Model):
         return reverse('gene_lists')
 
 
-class FakeGeneList(GeneList):
-    """ Fake for serializing """
-
-    class Meta:
-        abstract = True
+def create_fake_gene_list(*args, **kwargs):
+    """ Unsaved GeneList for serializing. Was an abstract subclass, but Django 3.2+ refuses to instantiate those """
 
     def get_absolute_url(self):
         return None
+
+    gene_list = GeneList(*args, **kwargs)
+    gene_list.get_absolute_url = types.MethodType(get_absolute_url, gene_list)
+    return gene_list
 
 
 class GeneListGeneSymbol(models.Model):

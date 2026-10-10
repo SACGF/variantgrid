@@ -100,7 +100,7 @@ def get_vcf_variant_upload_stats():
             "unknown": unknown}
 
     df = pd.DataFrame(data=data)
-    df = df.replace(np.NaN, 0)
+    df = df.replace(np.nan, 0)
 
     df["cumulative_samples"] = np.cumsum(df["num_samples"])
     df["total_variants"] = np.cumsum(df["unknown"])

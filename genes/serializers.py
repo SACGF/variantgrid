@@ -48,7 +48,7 @@ class GeneListSerializer(serializers.ModelSerializer):
     def get_can_write(self, obj):
         user = self.context['request'].user
 
-        if obj.id:  # Can't check pk as may be FakeGeneList object
+        if obj.id:  # Can't check pk as may be an unsaved fake gene list
             can_write = obj.can_write(user)
         else:
             # Not yet saved, so no permissions etc

@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count
+from django.db.models import Count, TextField
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
@@ -90,7 +90,7 @@ class GeneListGenesGrid(JqGridUserRowConfig):
         for release in GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds():
             field_name = f"release_{release.pk}"
             self.annotation_field_labels[field_name] = str(release)
-            annotation_kwargs[field_name] = StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True,
+            annotation_kwargs[field_name] = StringAgg("gene_symbol__releasegenesymbol__releasegenesymbolgene__gene", delimiter=',', distinct=True, output_field=TextField(),
                                                       filter=Q(gene_symbol__releasegenesymbol__release=release))
         queryset = queryset.annotate(**annotation_kwargs)
         field_names = self.get_field_names() + list(sorted(self.annotation_field_labels))
@@ -201,7 +201,7 @@ class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         queryset = self.model.objects.all()
-        queryset = queryset.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ','))
+        queryset = queryset.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ',', output_field=TextField()))
         field_names = self.get_field_names() + ["enrichment_kits"]
         self.queryset = queryset.values(*field_names)
 

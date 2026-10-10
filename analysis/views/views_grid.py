@@ -1,5 +1,6 @@
 from io import StringIO
 from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models import TextField
 from django.http.response import Http404, StreamingHttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -50,7 +51,7 @@ def format_items_iterator(analysis, sample_ids, items):
     SAMPLE_FIELDS = ["allele_depth", "allele_frequency", "read_depth", "genotype_quality", "phred_likelihood"]
 
     variant_tags_qs = Variant.objects.filter(varianttag__analysis=analysis)
-    variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True))
+    variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True, output_field=TextField()))
     variant_tags = dict(variant_tags_qs.values_list("id", "tags"))
 
     for item in items:
