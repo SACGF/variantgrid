@@ -257,6 +257,36 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
         self.increment_version()
 
+    def set_vcf_samples(self, vcf_samples: list[Sample]):
+        """ A VCF cohort packs genotypes in VCF column order, so each sample's packed index and sort order is
+            its column. A reload in place can add or reorder columns (#1191) - existing CohortSamples are
+            updated rather than replaced, keeping the Trios/pedigrees/filters that point at them.
+            vcf_samples must include every sample already in the cohort. """
+        cohort_sample_by_sample_id = {cs.sample_id: cs for cs in self.cohortsample_set.all()}
+        if removed_sample_ids := set(cohort_sample_by_sample_id) - {s.pk for s in vcf_samples}:
+            raise ValueError(f"Cohort {self.pk}: existing sample ids {removed_sample_ids} missing from vcf_samples")
+
+        changed = False
+        new_cohort_samples = []
+        for i, sample in enumerate(vcf_samples):
+            if cohort_sample := cohort_sample_by_sample_id.get(sample.pk):
+                changed |= (cohort_sample.cohort_genotype_packed_field_index, cohort_sample.sort_order) != (i, i)
+                cohort_sample.cohort_genotype_packed_field_index = i
+                cohort_sample.sort_order = i
+            else:
+                new_cohort_samples.append(CohortSample(cohort=self, sample=sample,
+                                                       cohort_genotype_packed_field_index=i, sort_order=i))
+
+        if changed:
+            # Packed index is unique per cohort - park the old ones at distinct negatives so any reorder is free
+            parked_index = Value(-1) - F("cohort_genotype_packed_field_index")
+            self.cohortsample_set.update(cohort_genotype_packed_field_index=parked_index)
+            CohortSample.objects.bulk_update(cohort_sample_by_sample_id.values(),
+                                             ["cohort_genotype_packed_field_index", "sort_order"])
+        CohortSample.objects.bulk_create(new_cohort_samples)
+        if changed or new_cohort_samples:
+            self.increment_version()
+
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
 
