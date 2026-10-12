@@ -35,7 +35,7 @@ class CaseAutocompleteView(AutocompleteView):
     fields = ['name', 'external_pk__code']
 
     def get_user_queryset(self, user):
-        return get_cases_qs()
+        return get_cases_qs(user)
 
     def sort_queryset(self, qs):
         return qs.order_by("-pk")

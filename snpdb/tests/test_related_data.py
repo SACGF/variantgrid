@@ -2,9 +2,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from pedigree.models import PedFile, PedFileFamily, Pedigree
+from snpdb.fake_data import create_fake_cohort, create_fake_duo, create_fake_quad
 from snpdb.models import GenomeBuild, Trio
 from snpdb.templatetags.related_data_tags import related_data_for_cohort, related_data_for_samples
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_duo, create_fake_quad
 
 
 class RelatedDataForCohortTest(TestCase):

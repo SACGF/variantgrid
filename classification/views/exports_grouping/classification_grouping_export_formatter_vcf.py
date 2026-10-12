@@ -83,7 +83,7 @@ class VCFRow(ExportVCF):
 
     @export_vcf_info_cell(
         header_id="labs",
-        number=1,
+        number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
         description="Contributing Labs",
         categories={"system": VCFTargetSystem.GENERIC}
@@ -102,7 +102,7 @@ class VCFRow(ExportVCF):
         return sorted(set([cg.allele_origin_bucket.label for cg in self.entry.classification_groupings]))
 
     @export_vcf_info_cell(
-        header_id="allele_origins",
+        header_id="testing_contexts",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
         description="Testing Context - useful for Somatic classifications",

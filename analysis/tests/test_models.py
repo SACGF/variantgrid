@@ -18,7 +18,7 @@ from analysis.models import (
     ZygosityNode,
 )
 from analysis.tests.test_node_editors_render import form_submit_data
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import (

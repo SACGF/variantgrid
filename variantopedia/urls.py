@@ -1,5 +1,5 @@
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import path
+from variantgrid.perm_path import deprecated_path, path
 from variantopedia import views, views_allele, views_server_status, views_tag_stats
 from variantopedia.grids import (
     AllVariantsGrid,
@@ -47,6 +47,7 @@ urlpatterns = [
          name='view_variant_annotation_history'),
     path('variant_grid_row_detail/<int:variant_id>/<int:annotation_version_id>',
          views.variant_grid_row_detail, name='variant_grid_row_detail'),
+    path('variant_types', views.variant_types, name='variant_types'),
     path('variant_wiki', views.variant_wiki, name='variant_wiki'),
     path('variant_wiki/<genome_build_name>', views.variant_wiki, name='genome_build_variant_wiki'),
 
@@ -54,7 +55,7 @@ urlpatterns = [
          name='view_allele_from_variant'),
     path('view_allele/<int:allele_id>', views_allele.view_allele, name='view_allele'),
     path('a<int:allele_id>', views_allele.view_allele, name='view_allele_compact'),
-    path('view_allele/<int:allele_id>/classifications_download', views_allele.export_classifications_allele,
+    deprecated_path('view_allele/<int:allele_id>/classifications_download', views_allele.export_classifications_allele,
          name='allele_classifications_download'),
     path('allele/<allele_id>/create_variant/<genome_build_name>',
          views_allele.create_variant_for_allele, name='create_variant_for_allele'),

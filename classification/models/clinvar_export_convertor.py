@@ -2,24 +2,17 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache, cached_property
-from typing import Any, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
 from classification.enums import AlleleOriginBucket, EvidenceKeyValueType, ShareLevel, SpecialEKeys
-from classification.models import (
-    CLINVAR_EXPORT_CONVERSION_VERSION,
-    Classification,
-    ClassificationModification,
-    ClinVarExport,
-    ClinVarExportStatus,
-    ClinVarExportSubmission,
-    EvidenceKey,
-    EvidenceKeyMap,
-    MultiCondition,
-    classification_flag_types,
-)
+from classification.enums.clinvar_export_enums import ClinVarExportStatus
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.condition_text_matching import MultiCondition
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagType
 from genes.hgvs import HGVSComponents
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
@@ -31,6 +24,11 @@ from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, Valida
 Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 It also applies data level validation
 """
+
+if TYPE_CHECKING:
+    from classification.models.clinvar_export_models import ClinVarExport, ClinVarExportSubmission
+
+CLINVAR_EXPORT_CONVERSION_VERSION = 4
 
 # ClinVar doesn't accept ENST for example
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NC_", "NM_", "NR_"}
@@ -106,7 +104,7 @@ class ClinVarExportData:
         return False
 
     @cached_property
-    def _previous_submission(self) -> ClinVarExportSubmission:
+    def _previous_submission(self) -> 'ClinVarExportSubmission':
         return self.clinvar_export.previous_submission
 
     @property
@@ -192,7 +190,7 @@ class ClinVarExportData:
         clinvar_export.save()
 
     @staticmethod
-    def current(clinvar_export: ClinVarExport) -> 'ClinVarExportData':
+    def current(clinvar_export: 'ClinVarExport') -> 'ClinVarExportData':
         """
         Make ClinVarExoprtData based on current evidence (good if we just reloaded clinvar_export from the DB)
         """
@@ -283,7 +281,7 @@ class ClinVarExportConverter:
     @staticmethod
     @cache
     def flag_types_to_messages() -> dict[FlagType, JsonMessages]:
-        # Lazy as FlagType lookups hit the DB, which isn't available when the module is imported
+        # Built on first use, as the flag types are database rows
         return {
             classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
             # these flags are now handled by AlleleInfo
@@ -298,7 +296,7 @@ class ClinVarExportConverter:
 
     BOOKSHELF_ID_RE = re.compile(".*(NBK[0-9]+)")
 
-    def __init__(self, clinvar_export_record: ClinVarExport):
+    def __init__(self, clinvar_export_record: 'ClinVarExport'):
         """
         :param clinvar_export_record: the record to use as a basis to convert to ClinVar json (with validation)
         """
@@ -652,7 +650,7 @@ class ClinVarExportConverter:
         return ValidatedJson([data])
 
     @staticmethod
-    def clinvar_export_data(clinvar_export: ClinVarExport, update: bool) -> ClinVarExportData:
+    def clinvar_export_data(clinvar_export: 'ClinVarExport', update: bool) -> ClinVarExportData:
         if update:
             data = ClinVarExportConverter(clinvar_export).convert()
             data.apply()

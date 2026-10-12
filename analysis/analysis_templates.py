@@ -17,6 +17,7 @@ from analysis.models import (
     CohortAnalysisTemplateRun,
     SampleAnalysisTemplateRun,
 )
+from analysis.models.nodes.analysis_node import AnalysisDag
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from genes.models import ActiveSampleGeneList
@@ -64,9 +65,10 @@ def populate_analysis_from_template_run(template_run):
                         nodes_with_expected_errors.append(node)
 
         if nodes_with_expected_errors:
+            dag = AnalysisDag(template_run.analysis.pk)
             descendants_node_ids_to_hide = set()
             for node in nodes_with_expected_errors:
-                descendants_node_ids_to_hide.update([n.pk for n in node.descendants_set()])
+                descendants_node_ids_to_hide.update(dag.descendant_ids(node.pk))
 
             template_args = AnalysisTemplateRunArgument.objects.filter(variable__node_id__in=descendants_node_ids_to_hide)
             template_args.update(error="Hidden due to ancestor error")

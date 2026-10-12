@@ -290,7 +290,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
         "on_allele_page": request.GET.get("on_allele_page") == "true",
         "classifications": classifications
-    }, menubar='classification')
+    })
 
 
 class ImportedAlleleInfoDownload(ExportRow):

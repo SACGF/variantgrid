@@ -10,8 +10,8 @@ cannot *name* them, so it cannot describe the arms the API (#1707) and the sampl
 
 ## The problem
 
-A CSV row is one sample. Its `SPECIMEN_*` columns (`patients/models.py:PatientColumns`) carry the specimen plus one
-`Specimen Nucleic acid source (DNA/RNA)` value, and `patients/models.py:Specimen.get_or_create_extraction` turns that
+A CSV row is one sample. Its `SPECIMEN_*` columns (`patients/models/models_patient.py:PatientColumns`) carry the specimen plus one
+`Specimen Nucleic acid source (DNA/RNA)` value, and `patients/models/models_patient.py:Specimen.get_or_create_extraction` turns that
 into the row's `Extraction`: the sample's current extraction if it is on this specimen, else the specimen's extraction
 with that nucleic acid, else an unnamed one it can fill in, else a new one. Nothing in the file sets
 `Extraction.reference_id` or `Extraction.extraction_date`, so:
@@ -32,10 +32,10 @@ The API already expresses all of this: `patients/serializers.py:ExtractionSerial
 (`_local_reference_q`), and `test_both_arms_post_against_one_specimen` in `patients/tests/test_patient_api.py` is the
 two-arm case. The CSV gets the same three fields and the same matching rule.
 
-### Drift from the issue and the brief
+### What the code does today
 
-- **"Round-trips one Extraction per Specimen"** is no longer quite true. Since #1704/#1745 the sample discriminates:
-  `upload/test_data/patient_upload.csv` already has `ONC042_DNA` and `ONC042_RNA` rows under `SPEC-042`, and
+- **One specimen can already hold several extractions** (#1704, #1745): the sample discriminates.
+  `upload/test_data/patient_upload.csv` has `ONC042_DNA` and `ONC042_RNA` rows under `SPEC-042`, and
   `test_one_specimen_two_arms` in `upload/tests/test_import_patient_records.py` proves two extractions on one
   specimen. What the CSV cannot do is name them, date them, or hold two arms without a sample per arm. This plan is
   about naming, and the sample rule stays.
@@ -61,7 +61,7 @@ two-arm case. The CSV gets the same three fields and the same matching rule.
 
 ## Data
 
-### `patients/models.py:PatientRecord` - three columns and one FK
+### `patients/models/models_patient.py:PatientRecord` - three columns and one FK
 
 The row's raw extraction values sit beside the raw specimen values it already keeps, and the matched extraction
 beside the matched specimen, so the import page can show what each row named and what it landed on.
@@ -75,7 +75,7 @@ class PatientRecord(TimeStampedModel):
     extraction_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
     ...
     specimen_tissue_status = models.CharField(max_length=1, choices=TissueStatus.choices, null=True)
-    # Renamed from specimen_nucleic_acid_source - the value has lived on Extraction since #1704
+    # the value lives on Extraction (#1704)
     extraction_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, null=True)
     extraction_reference_id = models.TextField(null=True)
     extraction_date = models.TextField(null=True)   # as typed, like specimen_collection_date
@@ -86,7 +86,7 @@ Migration patients/migrations/0019_patientrecord_extraction.py: `RenameField` fo
 x3. No `Extraction` change - `reference_id`, `nucleic_acid_source`, `extraction_date` and `unique_together
 ("specimen", "reference_id")` are what the CSV writes to.
 
-### `patients/models.py:PatientColumns` - the column set
+### `patients/models/models_patient.py:PatientColumns` - the column set
 
 ```python
 class PatientColumns:
@@ -122,10 +122,10 @@ specimen reference plus `reference_id`, `nucleic_acid_source`, `extraction_date`
 
 The nucleic acid column is renamed from `Specimen Nucleic acid source (DNA/RNA)` to
 `Extraction Nucleic acid source (DNA/RNA)` because it sits beside `Extraction Reference id` and `Extraction date`
-and has described the extraction since #1704; the old header is gone, so a file still carrying it fails the header
+and describes the extraction (#1704); the old header is gone, so a file still carrying it fails the header
 check. The constant
 `SPECIMEN_NUCLEIC_ACID_SOURCE` becomes `EXTRACTION_NUCLEIC_ACID_SOURCE` (`grep` shows its users are
-`patients/import_records.py`, the two test modules and `patients/models.py` itself).
+`patients/import_records.py`, the two test modules and `patients/models/models_patient.py` itself).
 
 A row with a `Specimen Reference id` and blank extraction columns means what it means today. A row with an
 `Extraction Reference id` and no `Specimen Reference id` is a validation error (an extraction has nowhere to live;
@@ -158,7 +158,7 @@ extraction_date=None)`, in this order, first hit wins:
 3. **No `reference_id`**: discriminate on what the row does give. Candidates are the specimen's extractions filtered
    by `nucleic_acid_source` when given and by `extraction_date__date` when given (dates are stored as midnight
    datetimes by `patients/import_records.py:parse_date`, the way specimen dates are). One candidate: it. Several:
-   `AmbiguousExtraction` (a `ValueError` subclass in `patients/models.py`) naming them - "Specimen 2600000001 has 2
+   `AmbiguousExtraction` (a `ValueError` subclass in `patients/models/models_patient.py`) naming them - "Specimen 2600000001 has 2
    DNA extractions (2600000001C, 2600000001D): name one with Extraction Reference id or Extraction date". None, and
    the row gave an acid: an extraction with no acid yet is the row's to fill in (today's rule). None, and the row gave
    nothing: whatever is there, if exactly one (today's rule). Otherwise create.
@@ -198,7 +198,7 @@ edit -> upload is the round trip: every row names its extraction, so step 1 matc
 
 ## Code changes
 
-- `patients/models.py`: `PatientColumns` and `PatientRecord` as above; `Specimen.get_or_create_extraction` gains
+- `patients/models/models_patient.py`: `PatientColumns` and `PatientRecord` as above; `Specimen.get_or_create_extraction` gains
   `reference_id` and `extraction_date` and the order in "Matching rules"; its docstring is the one place the rule is
   written down. `AmbiguousExtraction`.
 - `patients/import_records.py`: the three columns join the required header set; `process_record`
@@ -230,7 +230,7 @@ The matching order and the column handling are ours; pandas, `RenameField` and `
   `test_export_columns_round_trip` reads the two new paths back.
 
 `upload/tests/test_import_patient_records.py` (the whole pipeline, `TestPatientUploadImport`): regenerate
-`upload/test_data/patient_upload.csv` as #1745 did - the renamed header, the two new columns, and the `ONC-042`
+`upload/test_data/patient_upload.csv` - the renamed header, the two new columns, and the `ONC-042`
 rows become block `2600000001` with arms `2600000001C` (DNA, dated) and `2600000001B` (RNA, dated), plus a third
 sample-less row for a re-extraction `2600000001D` (DNA, later date). `test_one_specimen_two_arms` asserts the
 references and dates. The old header shape gets no test of its own: the missing-header check is existing code and

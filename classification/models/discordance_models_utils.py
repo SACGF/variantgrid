@@ -18,6 +18,7 @@ from classification.models import (
     DiscordanceReportTriage,
     DiscordanceReportTriageStatus,
 )
+from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportDataType, ExportRow, export_column, pretty_label
@@ -208,7 +209,6 @@ class DiscordanceReportRowData(ExportRow):
 
     @cached_property
     def lab_significances(self) -> list[ClassificationLabSummary]:
-        from classification.models.discordance_lab_summaries import DiscordanceLabSummary
         return DiscordanceLabSummary.for_discordance_report(discordance_report=self.discordance_report, perspective=self.perspective)
 
     @cached_property

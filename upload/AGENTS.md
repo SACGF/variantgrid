@@ -32,11 +32,20 @@ Patterns here:
   get_post_vcf_header_classes / get_post_data_insertion_classes / get_finish_task_classes
   (upload/import_task_factories/abstract_vcf_import_task_factory.py:AbstractVCFImportTaskFactory), or create the
   UploadStep inside a running step and call upload/models/models.py:UploadStep.launch_task.
-- Preprocess is one shell pipe, not vt. upload/vcf/vcf_preprocess.py:_build_pipe_commands chains
+- Preprocess is one shell pipe. upload/vcf/vcf_preprocess.py:_build_pipe_commands chains
   manage.py vcf_clean_and_filter | bcftools norm --multiallelics=- --old-rec-tag | vcf_clean_alts | split, retrying
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- Symbolic alts outside settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES (`<CNV>`/`<DEL>`/`<DUP>`/`<INV>`) never become
+  Variants: management/commands/vcf_clean_alts.py:Command skips them into the upload's skipped-record stats. `<INS>` is
+  one of them - the `<INS>` branches in snpdb, annotation and genes are written ahead of any `<INS>` Variant existing.
+- `--check-ref=s` silently rewrites any REF that disagrees with the fasta, so a VCF whose header names the wrong build
+  would import "cleanly" into the wrong genes. Before the pipe, upload/vcf/vcf_ref_check.py:check_vcf_ref_matches_build
+  samples the first settings.VCF_IMPORT_REF_CHECK_SNVS SNVs against the build (and the other annotated builds, to name
+  the right one): over VCF_IMPORT_REF_MISMATCH_FAIL_FRACTION the step fails, over the WARN fraction it leaves an ERROR
+  VCFImportInfo to accept, which the status API lists under `warnings`. Only uploaded genotype VCFs
+  (PreprocessAndAnnotateVCFTask) are checked - the VCFs we write from our own coordinates are not.
 - The split stage needs GNU split, bash and the bgzip binary (htslib, apt package tabix) - a missing one only fails
   inside split's --filter at import time. upload/vcf/vcf_preprocess.py:get_split_vcf_command is the one place the
   command lives; manage.py deployment_check runs it on a tiny VCF ("VCF import split pipe") so a new box fails early.
@@ -59,6 +68,10 @@ Patterns here:
   upload/tasks/vcf/genotype_vcf_tasks.py:ImportGenotypeVCFSuccessTask sets ImportStatus.SUCCESS and sends
   upload/signals/signals.py:vcf_import_success_signal (analysis/signals/signal_handlers.py:handle_vcf_import_success
   auto-creates analyses off it; connect further consumers in an AppConfig.ready).
+- A failure the user fixes by changing the file or its metadata (wrong build, contradicting metadata) raises a
+  subclass of upload/models/models.py:UploadUserError with a short `summary`: the pipeline fails with the message and
+  no traceback or Rollbar report (UploadPipeline.user_error), and the upload grid shows the summary next to the cross.
+  Anything else is treated as our bug and keeps its traceback.
 Gotchas:
 - A killed worker child (SIGTERM/SIGKILL, `revoke(terminate=True)`) never reaches `ImportVCFStepTask.run`'s except
   blocks; the master's `task_failure`/`task_revoked` receivers in `upload/tasks/vcf/import_vcf_step_task.py` fail the
@@ -125,9 +138,17 @@ Gotchas:
   create-data-from-header tasks must stay idempotent. A retry finds the VCF the first attempt created and skips
   create_vcf_from_vcf, so the sequencing link (upload/vcf/vcf_import.py:link_uploaded_vcf_to_sequencing) is re-run
   on that path too - it is where a sample the sheet doesn't name fails, and without it the retry imports unlinked.
-- A VCF whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
-  (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask); declare genome_build/source as
-  upload metadata (upload/upload_metadata.py:validate_upload_metadata).
+  The reloaded file may add or reorder sample columns: snpdb/models/models_cohort.py:Cohort.set_vcf_samples moves each
+  existing CohortSample's packed index to its new column (a stale index reads another sample's genotypes) and does the
+  same for the cohort's sub cohorts, which read its genotype arrays; a file missing an already-loaded sample fails with
+  upload/vcf/vcf_import.py:VCFSamplesRemovedException.
+- A VCF or BED whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
+  through upload/models/models.py:UploadPipeline.terminate_early_for_user_input
+  (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask; a single-shot ImportTask raises
+  upload/tasks/import_task.py:ImportRequiresUserInputException); declare genome_build/source as upload metadata
+  (upload/upload_metadata.py:validate_upload_metadata). Setting the build on the data's page finishes it - a VCF
+  re-runs its pipeline, a BED is processed in place (upload/models/models_uploaded_files.py:UploadedBed). The
+  upload page's "Requires input" icon comes off UploadData.requires_user_input, not the pipeline status.
 - Sample ImportStatus only moves with its VCF, through snpdb/import_status.py:set_vcf_and_samples_import_status
   (success from ImportGenotypeVCFSuccessTask, error from UploadPipeline.error). A finish task list that closes the
   pipeline before the success task leaves the VCF Importing forever - the success step is SKIPPED, not run.
@@ -144,12 +165,20 @@ Gotchas:
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
   guarded on status == PROCESSING (FINISH can be scheduled twice). A FINISH task that sets SUCCESS itself therefore
-  silently swallows the timings, the success Event and the file cleanup - #928 was exactly that. Leave the status alone
+  silently swallows the timings, the success Event and the file cleanup (#928). Leave the status alone
   in get_finish_task_classes tasks.
 - library/django_utils/django_file_utils.py:get_import_processing_dir creates the directory; use
   import_processing_dir_path when you only want to name one, and remove_import_processing_dir to remove it.
   manage.py import_processing_cleanup --dry-run reports what is reclaimable under settings.IMPORT_PROCESSING_DIR.
+- upload/views/views_json.py:get_remaining_annotation_runs gates the status API's annotation_complete (and so
+  whether vg_api ever calls download) and the VCF page's "still annotating" notice. It counts only unfinished
+  AnnotationRuns of the build's active VariantAnnotationVersion: a run left CREATED on a retired version would
+  otherwise hold every later upload at "not ready yet".
 Tests:
+- Verifying the upload/annotate/download API means running the real client end to end - `vg_api annotate_vcf
+  <file> -o <dir> --export-type csv` from a scratch `uv pip install variantgrid_api` against the server - and
+  reporting its output. The client only calls download once upload_status says annotation_complete, so a
+  direct GET on the download endpoint proves nothing about what a user sees.
 - Whole pipeline in-process: create a FileUpload, then process_uploaded_file(file_upload, run_async=False) under
   CELERY_TASK_ALWAYS_EAGER (library/django_utils/unittest_utils.py:URLTestCase sets it) —
   upload/tests/test_import_patient_records.py:TestPatientUploadImport is the pattern. The VCF pipeline needs bcftools

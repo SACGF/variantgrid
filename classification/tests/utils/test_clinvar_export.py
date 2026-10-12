@@ -192,8 +192,7 @@ class TestClinVarExport(TestCase):
             genome_build=GenomeBuild.grch37(),
             variant=variant,
             allele_info=allele_info,
-            resolved_hgvs=resolved_hgvs,
-            resolved_hgvs_compat=resolved_hgvs
+            resolved_hgvs=resolved_hgvs
         )
         allele_info.grch37 = variant_info
         allele_info.latest_validation = validation

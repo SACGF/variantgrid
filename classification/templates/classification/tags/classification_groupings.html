@@ -1,90 +1,7 @@
+{% load static %}
 {% load settings_tags %}
 {% load classification_tags %}
-<script>
-    function alleleOriginToggle() {
-        classificationGroupingRedraw();
-    }
-
-    function classificationGroupingRedraw() {
-        $('#vc-datatable').DataTable().ajax.reload();
-        classificationGroupingSummaryLoad();
-    }
-    var debounceClassificationGroupingRedraw = debounce(classificationGroupingRedraw);
-
-    var classificationGroupingClinicalSignificance = null;
-
-    function classificationGroupingClinicalSignificanceSelect(clinicalSignificance) {
-        classificationGroupingClinicalSignificance = clinicalSignificance;
-        classificationGroupingRedraw();
-    }
-
-    function classificationGroupingSummaryLoad() {
-        let summary = $('#classification-grouping-summary');
-        if (!summary.length) {
-            return;
-        }
-        let data = {};
-        classificationGroupingFilter(data);
-        $.getJSON("{% url 'classification_grouping_counts' %}", data, (response) => {
-            summary.empty().toggleClass('filtered', !!classificationGroupingClinicalSignificance);
-            for (let entry of response.counts) {
-                let clinicalSignificance = entry.clinical_significance || 'none';
-                let selected = classificationGroupingClinicalSignificance === clinicalSignificance;
-                $('<a>', {
-                        class: 'summary-count' + (selected ? ' selected' : ''),
-                        href: '#',
-                        title: selected ? 'Show all classifications' : 'Only show ' + entry.label
-                    })
-                    .append($('<span>', {class: 'c-pill cs ' + entry.css_class, text: entry.label}))
-                    .append($('<span>', {class: 'count', text: entry.count.toLocaleString()}))
-                    .on('click', (event) => {
-                        event.preventDefault();
-                        classificationGroupingClinicalSignificanceSelect(selected ? null : clinicalSignificance);
-                    })
-                    .appendTo(summary);
-            }
-        });
-    }
-
-    $(document).ready(() => {
-        $('.filter').on("change", function() {
-            classificationGroupingRedraw();
-        });
-        $('#vc-datatable').on('init.dt', classificationGroupingSummaryLoad);
-    });
-
-    function classificationGroupingFilter(data) {
-        if (classificationGroupingClinicalSignificance) {
-            data.clinical_significance = classificationGroupingClinicalSignificance;
-        }
-        let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
-        if (allele_origin_filter_value) {
-            data.allele_origin = allele_origin_filter_value;
-            let germline_only = allele_origin_filter_value === "G";
-            let column = $('#vc-datatable').DataTable().column(3);
-            column.visible(!germline_only);
-        }
-
-        // allows implementation of classificationFilterExtra if surrounded code provides more filters
-        if (typeof(classificationGroupingFilterExtra) === 'function') {
-            classificationGroupingFilterExtra(data);
-        }
-    }
-    function downloadAs(mode) {
-        let data = {};
-        classificationGroupingFilter(data);
-        data["genome_build"] = "{{ genome_build }}";
-        let querystring = EncodeQueryData(data, true);
-		let url = null;
-		if (mode === 'redcap') {
-		  url = "{% url 'export_classifications_grid_redcap' %}" + "?" + querystring;
-		} else {
-		  url = "{% url 'export_classifications_grid' %}" + "?" + querystring;
-		}
-		window.location = url;
-		return false;
-    }
-</script>
+<script src="{% static 'js/classification/classification_groupings.js' %}"></script>
 <div class="row">
     <div class="col">
         {% if show_allele_origin_filter %}
@@ -97,7 +14,7 @@
         {% if show_summary_counts %}
             <div id="classification-grouping-summary" class="summary-counts"></div>
         {% endif %}
-        <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}?genome_build={{ genome_build.pk }}" class="sticky-header classification-table"></table>
+        <table id="vc-datatable" data-genome-build="{{ genome_build }}" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}?genome_build={{ genome_build.pk }}" class="sticky-header classification-table"></table>
         <div>
         Download as
             <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>

@@ -1,33 +1,30 @@
 """The GENE_LEVEL annotation pipeline - what makes gene lists and comp-het find a gene-level event."""
 from django.test import TestCase
 
-from annotation.annotation_version_querysets import (
-    get_queryset_for_annotation_version,
-    pipeline_type_variant_q,
-)
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.models.damage_enums import PathogenicityImpact
+from annotation.annotation_pipeline_routing import pipeline_type_variant_q
+from annotation.annotation_version_querysets import get_queryset_for_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
     AnnotationRangeLock,
-    AnnotationStatus,
     AnnotationRun,
+    AnnotationStatus,
     VariantAnnotation,
     VariantAnnotationPipelineType,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
-from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
-from genes.tests.gene_level_test_utils import (
-    create_gene_copy_number_event,
-    create_splice_event_variant,
+from annotation.models.damage_enums import PathogenicityImpact
+from classification.models.classification_variant_info_models import (
+    ImportedAlleleInfo,
+    ImportedAlleleInfoStatus,
 )
+from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.models import (
     HGNC,
     GeneCopyNumberEventKind,
-    GeneLevelId,
     GeneFusion,
+    GeneLevelId,
     GeneSymbol,
     HGNCImport,
     ReleaseGeneSymbol,
@@ -37,19 +34,20 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium, HGNCStatus
-from library.genomics.vcf_enums import VariantClass
-from classification.models.classification_variant_info_models import (
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
+from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
+from genes.tests.gene_level_test_utils import (
+    create_gene_copy_number_event,
+    create_splice_event_variant,
 )
+from library.genomics.vcf_enums import VariantClass
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Variant
-from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
 
 def _make_gene(genome_build, release, gene_id, gene_symbol, transcript_id, contig, start):
     """ A gene the release knows about, reachable from its symbol """
-    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol, AnnotationConsortium.ENSEMBL)
+    gene_version = create_fake_gene_version(genome_build, gene_id, gene_symbol, AnnotationConsortium.ENSEMBL)
     data = {
         "id": transcript_id,
         "gene_name": gene_symbol,
@@ -65,7 +63,7 @@ def _make_gene(genome_build, release, gene_id, gene_symbol, transcript_id, conti
             }
         },
     }
-    transcript_version = _insert_transcript_data(genome_build, data, gene_version, release)
+    transcript_version = insert_transcript_data(genome_build, data, gene_version, release)
     ReleaseTranscriptVersion.objects.get_or_create(release=release, transcript_version=transcript_version)
 
     # What GeneSymbolMatcher builds - symbol -> genes for this release
@@ -115,14 +113,16 @@ class GeneLevelAnnotationTest(TestCase):
         return annotation_run
 
     def test_pipeline_type_claims_gene_level_only(self):
-        variant_qs = Variant.objects.filter(pipeline_type_variant_q(VariantAnnotationPipelineType.GENE_LEVEL))
+        variant_qs = Variant.objects.filter(pipeline_type_variant_q(VariantAnnotationPipelineType.GENE_LEVEL,
+                                                                 self.vav.structural_variant_min_size))
         self.assertIn(self.gene_fusion.variant, list(variant_qs))
 
     def test_vep_pipelines_do_not_claim_gene_level(self):
         """ svlen=0 makes a fusion look symbolic, so both VEP types have to subtract it explicitly """
         for pipeline_type in (VariantAnnotationPipelineType.STANDARD,
                               VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            variant_qs = Variant.objects.filter(pipeline_type_variant_q(pipeline_type))
+            q = pipeline_type_variant_q(pipeline_type, self.vav.structural_variant_min_size)
+            variant_qs = Variant.objects.filter(q)
             self.assertNotIn(self.gene_fusion.variant, list(variant_qs), pipeline_type)
 
     def test_writes_overlaps_for_both_partners(self):

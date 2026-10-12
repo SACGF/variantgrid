@@ -179,7 +179,7 @@ question they are looking at and can widen it — the way `variant_tags` picks u
 | `classification/views/classification_reclassification_view.py` | evidence chart reads `evidence_changes`; link params |
 | `classification/templates/classification/classification_reclassification_analytics.html` | click-through links |
 | `classification/urls.py` | page + `DatabaseTableView` datatable route |
-| `uicore/templates/uicore/menus/menu_bar_classifications.html` | `{% menu_item %}`, `admin_only=True` |
+| `variantgrid/menus.py` | `MenuItem(..., admin_only=True)` in the classifications menu |
 | `classification/models/classification.py` (or a new `evidence_json.py`) | shared evidence value accessor |
 | `snpdb/migrations/…` or `classification/migrations/…` | GIN index on `Classification.summary` criteria labels |
 

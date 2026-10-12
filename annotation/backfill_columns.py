@@ -17,8 +17,6 @@ This is the mirror image of annotation.external_annotation at each step: it dump
 annotated, leaves AnnotationRun / range-lock state alone, UPDATEs named columns rather than INSERTing
 whole rows, and its input deliberately comes from a different annotation source than the one that
 produced the version.
-
-See claude/plans/1675_backfill_annotation_column_plan.md.
 """
 import csv
 import io
@@ -199,7 +197,9 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
         annotation_filter[f"variantannotation__{column}__isnull"] = False
     qs = qs.filter(**annotation_filter)
 
-    return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs)
+    # Matched by sequence against the source's file, like the STANDARD dump - an SV stays symbolic
+    return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs,
+                           structural_variant_min_size=variant_annotation_version.structural_variant_min_size)
 
 
 class _CSQPicker:

@@ -1072,7 +1072,7 @@ def _config_summary(node):
     skip = {
         "id", "x", "y", "version", "appearance_version", "auto_node_name",
         "output_node", "hide_node_and_descendants_upon_template_configuration_error",
-        "ready", "valid", "visible", "count", "errors", "shadow_color",
+        "ready", "valid", "visible", "count", "errors",
         "load_seconds", "cloned_from", "status", "name", "analysis", "modified",
         "created", "node_ptr",
     }

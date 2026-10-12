@@ -6,8 +6,8 @@ from analysis.models import Analysis
 from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.templatetags.related_analyses_tags import related_analyses_for_samples
+from snpdb.fake_data import create_fake_duo, create_fake_quad
 from snpdb.models import GenomeBuild
-from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad
 
 
 class RelatedAnalysesForSamplesTest(TestCase):

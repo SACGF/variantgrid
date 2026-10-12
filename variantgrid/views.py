@@ -5,9 +5,15 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-from django.http.response import HttpResponseNotFound, HttpResponseServerError, JsonResponse
+from django.http.response import (
+    HttpResponseForbidden,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+    JsonResponse,
+)
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
 from django.urls.base import resolve, reverse
@@ -15,7 +21,6 @@ from django.urls.exceptions import Resolver404
 from django.views.generic import FormView
 from django_recaptcha.fields import ReCaptchaField
 from django_recaptcha.widgets import ReCaptchaV3
-from global_login_required import login_not_required
 from registration.backends.simple.views import RegistrationView as SimpleRegistrationView
 from registration.signals import user_registered
 
@@ -92,7 +97,7 @@ def csrf_error(request, reason=''):
     message = "Your session token has changed. Please try your operation again."
     context = {"message": message}
     response = _get_custom_error_response(request, context)
-    return HttpResponseServerError(response)
+    return HttpResponseForbidden(response)
 
 
 def _get_custom_error_response(request, context=None):

@@ -51,7 +51,7 @@ Patterns here:
   the mode reads differently - and `duonode_editor.html`'s `lookup()` tries those in the same order.
 - `analysis/models/nodes/filters/phenotype_node.py:PhenotypeNode.get_phenotype_source` is the one place the node's
   patient-or-cohort choice is resolved - every term and gene lookup goes through it, and both models carry
-  `annotation/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin` so the calls are identical.
+  `patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin` so the calls are identical.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;
@@ -97,8 +97,8 @@ Patterns here:
   before the tab is opened. It is fetched after render - deciding which taggings are the case's walks every analysis its
   samples are in, which is too much for page load.
 - "Classify all" walks `analysis/classify_report.py:ClassifyQueueRow.needs_classification` rows, not unresolved ones -
-  a row whose allele has been classified is waiting on "Clear tag", and offering it again made a second record every
-  time the wizard was run.
+  a row whose allele has been classified is waiting on "Clear tag", and offering it again would make a second record every
+  time the wizard runs.
 - The queue dialog's previous classifications are filtered to the tag's allele origin bucket
   (`analysis/classify_report.py:tag_allele_origin_bucket`; "Both" means no filter), and an external lab's record is listed
   without "Apply to this sample". Where a tagged allele has nothing of the lab's own, the dialog offers the gene level
@@ -120,8 +120,7 @@ Patterns here:
   (`nulls_distinct=False`, so an analysis has at most one tagging that names nobody). Sample and patient resolve
   independently, so an extraction level node whose DNA arm has two callers still tags for the person. A tagging never
   changes who it is about: tagging for this proband adds a row rather than taking the tag off a sibling, and the X on a
-  pill deletes that one tagging by pk. Older taggings were given their patient by
-  `analysis/management/commands/one_off_backfill_variant_tag_patient.py` (#1854).
+  pill deletes that one tagging by pk.
 - The analysis grid draws one pill per tagging, marked with whose it is: a tagging that names someone - a sample, or
   just the patient - gets a solid person marker naming them, boxed as well where that isn't the proband of the node the
   grid is showing (`nodeProbandSampleId` / `nodeProbandPatientId`), and one that names nobody gets a hollow person.
@@ -156,6 +155,9 @@ Patterns here:
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
 Gotchas:
+- Walk ancestors / descendants / roots with `analysis/models/nodes/analysis_node.py:AnalysisDag` (one edge query, pks),
+  not recursive `parents()` calls. `parents()` returns base `AnalysisNode` rows, which never `==` a subclass instance -
+  compare by pk (#2060). `AnalysisEdge.save()` rejects an edge that would make a cycle.
 - Several subqueries combine as `pk = ANY(ARRAY(<a> UNION <b>))`
   (`analysis/models/nodes/analysis_node.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
   can't index an OR of IN-subqueries and walks all of snpdb_variant (#1894). Plain `pk IN (<union>)` fixes count() but
@@ -179,30 +181,31 @@ Gotchas:
   node and expects a different queryset without saving needs `@override_settings(ANALYSIS_NODE_CACHE_Q=False)`.
 - A small node answers `get_arg_q_dict` with `Q(pk__in=[...])` from `NodeVersion.variant_ids` (issue #546) - for its
   own grid and export as much as for the children composing it, and ahead of the Redis Q cache, which holds the real
-  filter the load ran. A node loaded before those pks were stored falls back to its filter chain - a count mismatch
+  filter the load ran. A node with no stored pks falls back to its filter chain - a count mismatch
   between the two paths is a real bug.
 - Anything that evaluates a node's Variant queryset runs under
   `analysis/models/nodes/analysis_node.py:node_query_planner_settings` (grid handler, export task, `update_node_task`,
   tag recounts, Venn cache). With the grid's columns selected the query joins 50+ relations, past Postgres's
   `join_collapse_limit` of 8, and the planner keeps the SQL's join order - whole variant table first, the node's
-  selective filter last. It is per operation rather than server-wide because the extra planning time regressed
+  selective filter last. It is per operation rather than server-wide because the extra planning time slows
   unrelated queries.
 - `load_seconds` is one number - `NodeVersion.load_data["timings"]` is where to look when it's big: seconds per load
   phase (`load`, `live_data_sources`, `counts`, `variant_ids`, `load_data`), also logged as a warning past
   `settings.ANALYSIS_NODE_SLOW_LOAD_SECONDS` and printed by `manage.py profile_analysis_nodes` (#1838).
 - The TagNode editor's tag pills are counted at render from `analysis_varianttag` alone
   (`analysis/models/nodes/filters/tag_node.py:TagNode.get_tag_counts`) - taggings in scope, not variants in the node's
-  input. Counting them over the node's queryset put a per-tag aggregate over `snpdb_variant` in every TagNode load.
+  input. Counting them over the node's queryset would put a per-tag aggregate over `snpdb_variant` in every TagNode load.
 - Tagging does not bump versions: `analysis/signals/signal_handlers.py:variant_tag_create` marks tag nodes dirty and
   `analysis/models/nodes/node_utils.py:update_analysis_tag_node_counts` recounts tag labels in place on the existing
   NodeVersion. It runs concurrently with loads and only computes the tag labels, so it merges into `load_data["counts"]`
   DB-side (`jsonb_set` + `||`) rather than writing the whole dict.
 - Counts are sanity-checked at load (`analysis/models/nodes/analysis_node.py:AnalysisNode._raise_or_warn_count_mismatch`):
   any label count > total, or a single-parent node with more variants than its parent. A filter that fans out over a
-  multi-valued join (transcript annotation, gene lists) must set `queryset_requires_distinct` or use a subquery.
+  multi-valued join (transcript annotation, gene lists) must filter on a `pk__in` subquery - node querysets are never
+  `distinct()`.
 - A SampleNode threshold only filters when the sample's VCF carries that column
   (`analysis/models/nodes/sources/sample_node.py:SampleNode.get_applied_thresholds`) - PL<=0 against a fusion caller's
-  VCF (AD, no PL) emptied the node while the cached stats still answered with its whole count, and the two disagreeing
+  VCF (AD, no PL) would empty the node while the cached stats still answer with its whole count, and the two disagreeing
   is what `_raise_or_warn_count_mismatch` raises on. Anything reading a threshold - query, cache check, method summary -
   goes through there.
 - The Duo/Trio/Quad editors' zygosity table is built once per page from a stub node
@@ -218,14 +221,16 @@ Gotchas:
   URL (`analysis/views/views_node.py:node_view`).
 - A worker that dies mid-LOADING perma-fails the node on the next sweep (`lease_ready_nodes`) on the assumption it OOM'd
   the box; only QUEUED nodes are re-leased, up to `analysis/tasks/node_update_tasks.py:MAX_NODE_ATTEMPTS`.
+- A hidden (`visible=False`) node with errors is never dispatched: reload and `lease_ready_nodes` set it straight to its
+  error status (`analysis/models/nodes/node_utils.py:get_hidden_error_node_statuses`), so a template's hidden branch
+  stays in error until revealed (#2076). A hidden node that must load, like the analysis tags TagNode, needs no errors.
 - Templates run by cloning the snapshot then setting AnalysisVariable-bound fields in toposort order
   (`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments`); a source node's editor gets the variable
   widget only when `analysis.template_type == TEMPLATE` (`analysis/views/nodes/node_view.py:NodeView.get_form`).
-- Renaming, moving or removing a class whose instances are pickled into Redis - enum choices inside a node's
-  `arg_q_dict` Q objects, dataclasses, model subclasses - needs a `CACHE_VERSION` bump in
-  `variantgrid/settings/components/default_settings.py`. Cache keys are pks (`analysis/models/nodes/analysis_node.py`
-  keys node Q dicts on `node_version.pk`), so old entries survive a deploy and fail on unpickle with
-  `AttributeError: Can't get attribute 'OldName'`; the bump flushes every deployment's cache at once.
+- Cache keys are pks (`analysis/models/nodes/analysis_node.py` keys node Q dicts on `node_version.pk`), so cached
+  entries survive a deploy. One whose pickled class was since renamed, moved or removed is a miss
+  (`library/django_utils/redis_cache.py:UnpickleTolerantRedisCache`); a change that leaves old entries unpickling but
+  wrong needs a `CACHE_VERSION` bump in `variantgrid/settings/components/default_settings.py`.
 - A node mixin is listed before `AnalysisNode`, so a `def` on the mixin wins the MRO ahead of the node's
   implementation. State what the mixin only reads from the node as a class-level annotation
   (`get_warnings: Callable[[], list[str]]` on `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin`),
@@ -233,8 +238,8 @@ Gotchas:
   (`analysis/models/nodes/cohort_mixin.py:CohortMixin._get_cohort`) - a subclass is ahead of the mixin either way.
 Tests:
 - `analysis/tests/utils.py:AnalysisSetupMixin` gives `cls.analysis` + `cls.grch37` with a fake annotation version
-  (`annotation/fake_annotation.py:get_fake_annotation_version`); samples/cohorts/trios/quads/pedigrees from
-  `snpdb/tests/utils/fake_cohort_data.py:create_fake_cohort` and friends;
+  (`annotation/fake_data.py:get_fake_annotation_version`); samples/cohorts/trios/quads/pedigrees from
+  `snpdb/fake_data.py:create_fake_cohort` and friends;
   `snpdb/tests/utils/vcf_testing_utils.py:slowly_create_test_variant` for a handful of real Variants.
 - `analysis/tests/test_urls.py:Test` is the URLTestCase (every analysis/node URL incl. editors and grid exports, owner vs
   non-owner) — run it after touching urls.py, a view signature or an editor template. Celery is eager under URLTestCase,

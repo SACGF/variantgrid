@@ -2,7 +2,6 @@ import logging
 from datetime import timedelta
 
 import celery
-import psycopg
 from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from celery.contrib.abortable import AbortableTask
@@ -21,7 +20,6 @@ from analysis.exceptions import (
 from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeCache,
-    NodeColors,
     NodeStatus,
     NodeTask,
     NodeVersion,
@@ -30,6 +28,7 @@ from analysis.models.nodes.analysis_node import (
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
+from library.django_utils.database_utils import query_was_cancelled
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from snpdb.models import ProcessingStatus
@@ -63,11 +62,6 @@ def _clear_lease(node_id, version):
     # here would have cancel_node_tasks cancel whatever that worker is running now
     NodeTask.objects.filter(node_version__node_id=node_id, node_version__version=version).update(
         lease_expires=None, leased_by=None, celery_task=None, db_pid=None)
-
-
-def query_was_cancelled(e: OperationalError) -> bool:
-    """ pg_cancel_backend (cancel_node_tasks) surfaces as OperationalError wrapping QueryCanceled """
-    return isinstance(e.__cause__, psycopg.errors.QueryCanceled)
 
 
 def _backoff_node(node_id, version, analysis_id) -> bool:
@@ -128,9 +122,6 @@ def update_node_task(node_id, version):
                     # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
                     with node_query_planner_settings():
                         node.load()
-                    # Check if we need to clear shadow color
-                    if node.shadow_color == NodeColors.ERROR and node.is_valid:
-                        node.update(shadow_color=None)
                 except NodeOutOfDateException:
                     logging.warning("Node %d/%d out of date - exiting", node.pk, node.version)
                     return  # version bumped - reload_analysis_nodes already re-triggered; do NOT re-trigger here
@@ -170,8 +161,7 @@ def update_node_task(node_id, version):
             if status is not None:
                 try:
                     logging.info("Node %d/%d status: %s errored: %s", node.pk, node.version, status, errors)
-                    shadow_color = NodeColors.ERROR if NodeStatus.is_error(status) else None
-                    node.update(status=status, errors=errors, shadow_color=shadow_color)
+                    node.update(status=status, errors=errors)
                 except (IntegrityError, NodeOutOfDateException) as e:
                     logging.warning("Node %d/%d out of date: {%s} - exiting", node.pk, node.version, e)
                     pass  # out of date or deleted - just ignore
@@ -252,7 +242,8 @@ def node_cache_task(node_id, version):
                 variant_collection.status = ProcessingStatus.ERROR
                 variant_collection.save()
                 return
-            log_traceback()
+            errors = get_traceback()
+            logging.error(errors)
             processing_status = ProcessingStatus.ERROR
 
         variant_collection.status = processing_status
@@ -260,9 +251,10 @@ def node_cache_task(node_id, version):
 
         # On success the node stays LOADING_CACHE, for the chained update_node_task to claim
         if processing_status == ProcessingStatus.ERROR and node.status != NodeStatus.READY:
-            with disable_auditlog():
-                node.status = NodeStatus.ERROR
-                node.save()
+            try:
+                node.update(status=NodeStatus.ERROR, errors=errors)
+            except NodeOutOfDateException:
+                pass  # A newer version is coming
     finally:
         if analysis_id is not None:
             _trigger_rescheduling(analysis_id)

@@ -10,7 +10,7 @@ from typing import Any, Optional, Union
 from django.contrib.auth.models import User
 from django.db.models import Q
 
-from classification.models.evidence_mixin import VCPatch, VCStore
+from classification.models.evidence_key import VCPatch, VCStore
 from genes.models import GeneSymbol, Transcript
 from library.log_utils import NotificationBuilder
 from library.utils import VarsDict, local_date_string

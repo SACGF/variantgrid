@@ -5,7 +5,6 @@ from django.conf import settings
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-from htmlmin.decorators import not_minified_response
 
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
@@ -28,6 +27,7 @@ from annotation.vep_annotation import (
     get_vep_variant_annotation_version_kwargs,
 )
 from genes.models import (
+    CdotDataVersion,
     GeneAnnotationImport,
     GeneListCategory,
     GeneSymbolAlias,
@@ -76,13 +76,11 @@ def _get_gene_and_transcript_stats(genome_build: GenomeBuild, annotation_consort
             num_transcripts = field_counts[field]
             import_sources[field] = {"transcripts": num_transcripts, "created": import_source.created}
         genes_and_transcripts["import_sources"] = import_sources
-        if last_tv := transcripts_qs.order_by("pk").last():
-            genes_and_transcripts["latest_cdot"] = last_tv.data.get("cdot")
+        genes_and_transcripts["latest_cdot"] = CdotDataVersion.get_version(genome_build, annotation_consortium)
 
     return genes_and_transcripts
 
 
-@not_minified_response
 def annotation_build_detail(request, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     build_contigs = get_build_contigs()
@@ -187,7 +185,6 @@ def annotation(request):
     return render(request, "annotation/annotation.html", context)
 
 
-@not_minified_response
 def annotation_detail(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None

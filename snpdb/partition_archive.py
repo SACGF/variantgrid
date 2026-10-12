@@ -4,11 +4,11 @@ Generic pre-drop archival pipeline for any RelatedModelsPartitionModel subclass.
 The helper kicks off the long-running Celery task and returns immediately;
 the task does the actual pg_dump -> verify -> drop sequence.
 
-@see claude/issue_1537_archive_plan.md
+@see https://github.com/SACGF/variantgrid/issues/1537
 """
 
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -19,6 +19,7 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.partition_archive_paths import get_partition_archive_path
 from snpdb.models.models_partition_archive import PartitionArchive
+from snpdb.tasks.partition_archive_tasks import perform_partition_archive
 
 
 class PartitionArchivePreconditionError(Exception):
@@ -56,7 +57,7 @@ def archive_partitioned_model(source: RelatedModelsPartitionModel,
             f"{source} already has a PENDING/IN_PROGRESS PartitionArchive row"
         )
 
-    iso = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    iso = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
     archive_name = f"{meta.app_label}_{meta.model_name}_{source.pk}_{iso}"
     dump_path = get_partition_archive_path(archive_name + ".dump")
 
@@ -77,7 +78,6 @@ def archive_partitioned_model(source: RelatedModelsPartitionModel,
 
 
 def _schedule_archive_task(archive_pk: int, reason: str):
-    from snpdb.tasks.partition_archive_tasks import perform_partition_archive
     perform_partition_archive.delay(archive_pk, reason)
 
 

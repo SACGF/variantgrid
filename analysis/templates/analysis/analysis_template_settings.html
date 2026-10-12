@@ -1,4 +1,4 @@
-{% extends menu_analysis_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
 {% load tz %}
@@ -6,7 +6,7 @@
 {% load ui_help %}
 {% block title %}Analysis Template: {{ analysis_template  }}{% endblock title %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <style>
 .has-error input,
 .has-error select,
@@ -169,4 +169,4 @@
 
     </p>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

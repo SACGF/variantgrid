@@ -6,13 +6,11 @@
 {% load compress %}
 {% load ui_help %}
 {% load ui_utils %}
-{% load ui_menu_bars %}
 {% load ui_tabs_builder %}
 {% load lab_tags %}
 {% load classification_tags %}
 {% load settings_tags %}
 {% block title %}Classification Dashboard{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -68,7 +66,7 @@
         {% end_page_help_embedded %}
 
         <div data-toggle="ajax" href="{% url 'classification_dashboard_graph_detail' dlab.lab_picker.selection %}">
-            <div class="loading-message" style="height:381px">Loading Graph</div>
+            <div class="loading-message" style="height:400px">Loading Graph</div>
         </div>
         <div>
             <label>See recent activity for</label>: {% for lab in dlab.labs %}{% if not forloop.first %}, {% endif %}<a href="{% url 'activity_lab' lab.pk %}">{% lab lab %}</a>{% endfor %}
@@ -129,7 +127,7 @@
         <table
            data-datatable-data='overlapsGroupingFilter'
            data-datatable-url="{% url 'overlaps_datatables' %}"
-           class="sticky-header thick-border"
+           class="sticky-header thick-border overlaps"
            id="overlaps-table"
            data-adjust-columns="false">
         </table>

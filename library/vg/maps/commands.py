@@ -3,8 +3,8 @@
 line and which apps' models it imports. Needs Django set up (get_commands and importing each command
 module); never queries.
 
-Every Command class declares `category = "ops" | "import" | "maintenance" | "one-off" | "dev"`
-(claude/plans/agent_system.md §4.6); a command without one (a private-repo command, say) is
+Every Command class declares `category = "ops" | "import" | "maintenance" | "one-off" | "dev"`;
+a command without one (a private-repo command, say) is
 categorised from its name prefix and flagged in the map. One-off commands are retired after the
 major deploy that no longer needs them.
 """

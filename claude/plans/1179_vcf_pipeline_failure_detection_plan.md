@@ -11,9 +11,9 @@ because the fix is the same code: `upload/vcf/vcf_preprocess.py:run_pipe`.
 
 Preprocess is one bash pipe (zcat, manage.py vcf_clean_and_filter, bcftools norm, bcftools view --no-header,
 manage.py vcf_clean_alts, split) built by `upload/vcf/vcf_preprocess.py:_build_pipe_commands` and run by
-`upload/vcf/vcf_preprocess.py:run_pipe`. Since `b27e3be11` (2026-03, pipefail) a stage that dies does fail the
-pipeline, so the "looks like it is still running" half of #1179 is gone. What is still missing is *which* stage failed
-and *what it said*:
+`upload/vcf/vcf_preprocess.py:run_pipe`. The pipe runs under pipefail, so a stage that dies fails the pipeline and
+the "looks like it is still running" half of #1179 does not occur. What is missing is *which* stage failed and *what
+it said*:
 
 - `run_pipe` gives bash a single `stderr=PIPE`, so the stderr of all six stages arrives as one string, and the
   `CalledProcessError` it raises carries the whole pipe as `cmd`. `upload/tasks/vcf/import_vcf_step_task.py:ImportVCFStepTask.run`
@@ -31,24 +31,23 @@ Verified on this box (bcftools 1.20) with the #1179 repro - `upload/test_data/vc
 exit 255, `PIPESTATUS` `0 255 0 0`. `bcftools norm` warns per undeclared FORMAT tag, then
 `[E::vcf_format] Invalid BCF, the FORMAT tag id=31 at chr17:43074436 not present in the header` /
 `[flush_buffer] Error: cannot write to -` and dies; `bcftools view` exits 0 with empty output (it had already read the
-header norm wrote), so the "Failed to read from standard input: unknown file type" line in the issue is from an older
-bcftools. The culprit is unambiguous from `PIPESTATUS`; today's message hides it.
+header norm wrote). The culprit is unambiguous from `PIPESTATUS`; today's message hides it.
 
 ### Drift from the issues
 
-- **The `vt` bullets in #1005 are done in bcftools form.** `vt` was removed in `6230ec00f` (#127);
+- **The `vt` bullets in #1005 are covered by bcftools.**
   `upload/vcf/vcf_preprocess.py:get_bcftools_tool_version` records the bcftools/htslib version on every sub step, and
   `variantgrid/deployment_validation/tool_version_checks.py:_check_bcftools_version` (`manage.py deployment_check`,
   "Tool versions") enforces `_REQUIRED_BCFTOOLS_VERSION` 1.20 with the install wiki link as the fix text, alongside
   `check_vcf_split_pipe` for the split stage. Nothing here adds a per-import version gate.
-- **"Error: No split VCF records"** (#1005's symptom) no longer exists: removed in `320056301` (#1079). An empty
-  post-clean VCF is now `upload/tasks/vcf/import_vcf_step_task.py:ImportVCFStepTask._handle_no_vcf_records` - a warning
+- **"Error: No split VCF records"** (#1005's symptom): an empty
+  post-clean VCF is handled by `upload/tasks/vcf/import_vcf_step_task.py:ImportVCFStepTask._handle_no_vcf_records` - a warning
   and the data stages skipped - reached from `upload/tasks/vcf/import_vcf_tasks.py:ScheduleMultiFileOutputTasksTask`.
   With the pipe failing on any non-zero stage, an empty split dir can only mean an empty VCF.
 - **"Break the pipeline into bits so we can tell what part failed"**: the sub steps already are the bits; they just
   never get their stderr. Splitting the pipe into separately run stages would mean writing the intermediate VCFs to
   disk (a 50M-record file three times over) for no gain once `PIPESTATUS` names the stage. Kept as one pipe.
-- **`settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL`** has been `True` since `8d86ef9fe` (2024-05) and is assigned only in
+- **`settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL`** is `True` and is assigned only in
   `variantgrid/settings/components/default_settings.py`. The `False` branch of `run_pipe` (one `Popen` per stage, stderr
   to files, `communicate()` in reverse) is dead, and it is the "looks like it is still running" hang: the parent never
   closes its copy of each stage's stdout read end, so a stage whose downstream has died never gets SIGPIPE and blocks
@@ -58,8 +57,8 @@ bcftools. The culprit is unambiguous from `PIPESTATUS`; today's message hides it
 
 ## Data
 
-No model changes. `UploadStep.output_text` / `error_message` / `tool_version` already exist on the sub steps; they are
-finally written.
+No model changes. `UploadStep.output_text` / `error_message` / `tool_version` already exist on the sub steps; this plan
+writes them.
 
 ```python
 @dataclass
@@ -95,8 +94,8 @@ it and formats it, and `preprocess_vcf`'s unsorted-marker retry still catches it
   built as today (stages joined with `' | '`, arguments joined with spaces, since `SPLIT_VCF_FILTER` is pre-quoted
   shell) with two additions:
   - each stage gets `2>` + `shlex.quote(stderr_filename)`, where `stderr_filename` is
-    `get_import_processing_filename(upload_pipeline.pk, f"stderr_out_{stage_name}.log")` (the name the dead branch
-    used; a sort retry overwrites them);
+    `get_import_processing_filename(upload_pipeline.pk, f"stderr_out_{stage_name}.log")` (a sort retry overwrites
+    them);
   - after the pipe, `; echo "${PIPESTATUS[*]}" > <quoted status file>` (pipestatus.txt in the same dir). `PIPESTATUS`
     is expanded before the `echo` runs, so it is still the pipe's. The status file, not `$?` or `set -o pipefail`,
     is the failure signal: bash's own exit status is the `echo`'s.
@@ -190,8 +189,8 @@ On this box (bcftools 1.20, GRCh38 reference present):
 
 ## Decisions made
 
-- **Keep one bash pipe and read `PIPESTATUS`** rather than one `Popen` per stage. The per-stage branch already
-  existed, was never used, and hangs on exactly the failure being fixed; a status file is a dozen lines and keeps
+- **Keep one bash pipe and read `PIPESTATUS`** rather than one `Popen` per stage. The per-stage branch is
+  unused and hangs on exactly the failure being fixed; a status file is a dozen lines and keeps
   `split --filter` and the sort retry as they are.
 - **The status file replaces pipefail as the failure signal.** With `PIPESTATUS` in hand every stage's code is known;
   keeping `set -o pipefail` as well would make bash's exit the pipe's and hide whether the `echo` ran. One mechanism.

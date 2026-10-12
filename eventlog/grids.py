@@ -1,10 +1,11 @@
 import logging
 from typing import Any
 
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from eventlog.models import Event
+from eventlog.models import ApiRequestLog, Event
 from library.enums.log_level import LogLevel
 from library.guardian_utils import bot_group
 from library.utils import emoji_to_unicode
@@ -60,4 +61,39 @@ class EventColumns(DatatableConfig[Event]):
         if exclude_admin:
             qs = qs.exclude(user__is_superuser=True).exclude(user__isnull=True).exclude(user__groups=bot_group())
 
+        return qs
+
+
+class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
+    search_box_enabled = True
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('api_request_log_detail', expected_height=200)
+        self.rich_columns = [
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),
+            self.user_column(),
+            RichColumn('method', orderable=True),
+            RichColumn('view_name', label='View', orderable=True),
+            RichColumn('status_code', label='Status', orderable=True),
+            RichColumn('duration_ms', label='ms', orderable=True),
+            RichColumn('path', search=['path', 'request_body'], client_renderer='TableFormat.limit.bind(null, 75)'),
+            RichColumn('id', visible=False)
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[ApiRequestLog]:
+        if not self.user.is_superuser:
+            return ApiRequestLog.objects.none()
+        if object_pk := self.get_query_param('object_pk'):
+            content_type = ContentType.objects.get_by_natural_key(self.get_query_param('app_label'),
+                                                                  self.get_query_param('model_name'))
+            return ApiRequestLog.for_object(content_type, object_pk)
+        return ApiRequestLog.objects.all()
+
+    def filter_queryset(self, qs: QuerySet[ApiRequestLog]) -> QuerySet[ApiRequestLog]:
+        if view_name := self.get_query_param('view_name'):
+            qs = qs.filter(view_name=view_name)
+        if self.get_query_json('errors_only'):
+            qs = qs.filter(status_code__gte=400)
         return qs

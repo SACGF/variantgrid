@@ -40,7 +40,7 @@ def _patient_description_results(sample: Sample) -> list:
     results = []
     try:
         description = sample.patient.phenotype
-        results = sample.patient.patient_text_phenotype.phenotype_description.get_results()
+        results = sample.patient.phenotype_description.get_results()
     except (AttributeError, ObjectDoesNotExist):
         pass
     return [description, results]

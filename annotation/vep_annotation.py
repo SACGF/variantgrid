@@ -17,7 +17,7 @@ from typing import Optional
 from django.conf import settings
 
 from annotation import vep_columns
-from annotation.fake_annotation import get_fake_vep_version
+from annotation.fake_data import get_fake_vep_version
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import (
@@ -434,6 +434,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     if distance is None:
         distance = 5000
     kwargs["distance"] = distance
+    kwargs["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     if vep_config.annotation_consortium == AnnotationConsortium.ENSEMBL:
         kwargs["gencode_subset"] = getattr(settings, "ANNOTATION_VEP_ENSEMBL_GENCODE", None)

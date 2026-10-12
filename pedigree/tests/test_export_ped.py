@@ -46,7 +46,6 @@ class _TmpPedFile(django.test.TestCase):
 class TestWriteTrioPedFileContents(_TmpPedFile):
     """Check the raw affection encoding in the written PED file.
     Standard PED: 2=affected, 1=unaffected, 0=unknown.
-    BUG-1: write_trio_ped currently uses 1=affected, 0=unaffected — opposite of the standard.
     """
 
     def _write_default(self, father_affected=False, mother_affected=False):
@@ -93,7 +92,6 @@ class TestWriteTrioPedRoundTrip(_TmpPedFile):
         return _import_file(self.fname, self.user)
 
     def test_round_trip_passes_validation(self):
-        # BUG-1 manifests here: wrong affection → no affected individual → ValidationError
         _, families = self._write_and_import()
         self.assertEqual(families[0].errors, [])
 

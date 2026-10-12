@@ -6,12 +6,10 @@
 {% load js_tags %}
 {% load ui_utils %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 {% load user_tags %}
 {% load ui_tabs_builder %}
 {% load lab_tags %}
 {% block title %}Lab: {{ lab }}{% endblock %}
-{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block content %}
     <div class="container">
         <h3>{{ lab }} {% if classification_distinguish_research and lab.research %}<span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %} {% admin_link lab %}</h3>

@@ -126,7 +126,7 @@ def hgvs_resolution_tool(request: HttpRequest):
                 output.hgvs = resolved_variant.resolved_hgvs
                 if tv := resolved_variant.transcript_version:
                     output.transcript_version = tv.as_parts
-                    current_cdot = tv.data.get('cdot', '')
+                    current_cdot = tv.modified_cdot_version or ''
                     stored_cdot = resolved_variant.hgvs_converter_data_version
                     if stored_cdot and current_cdot and stored_cdot != current_cdot:
                         output.cdot_version_changed = f"cdot data version changed: {stored_cdot} → {current_cdot}"

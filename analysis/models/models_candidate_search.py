@@ -10,6 +10,7 @@ Note on naming:
 from collections import Counter, defaultdict
 
 from celery.canvas import Signature
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import CASCADE
@@ -20,7 +21,7 @@ from model_utils.models import TimeStampedModel
 from analysis.models.models_analysis import Analysis
 from annotation.models import AnnotationVersion, ClinVar
 from classification.models import Classification
-from library.django_utils import count_values_qs, get_cached_project_git_hash
+from library.django_utils import count_values_qs
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity
 from snpdb.models import ProcessingStatus, Sample, Variant
@@ -141,7 +142,7 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
             search_version=search_version,
             user=user,
             config_snapshot=config_snapshot,
-            git_hash=get_cached_project_git_hash()
+            git_hash=settings.GIT_HASH
         )
 
         task = Signature(celery_task_name, args=(csr.pk, ))

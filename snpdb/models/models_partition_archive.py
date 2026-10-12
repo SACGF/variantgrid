@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -7,7 +8,7 @@ from django.db.models.deletion import SET_NULL
 class PartitionArchive(models.Model):
     """ Tracks a pg_dump+drop of a RelatedModelsPartitionModel's child partition tables.
 
-        @see claude/issue_1537_archive_plan.md
+        @see https://github.com/SACGF/variantgrid/issues/1537
     """
 
     class Status(models.TextChoices):
@@ -54,6 +55,5 @@ class PartitionArchive(models.Model):
 
     def resolve_source(self):
         """ Return the live source row if it still exists, else None. """
-        from django.apps import apps
         model = apps.get_model(self.source_app_label, self.source_model)
         return model.objects.filter(pk=self.source_pk).first()

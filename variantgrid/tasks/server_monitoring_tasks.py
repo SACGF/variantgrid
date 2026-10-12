@@ -10,7 +10,7 @@ from library.log_utils import report_message
 from variantgrid.deployment_validation.disk_usage import get_disk_messages
 
 
-@celery.shared_task
+@celery.shared_task(queue='db_workers')
 def warn_low_disk_space():
     low_disk_messages = get_disk_messages(info_messages=False)
     if low_disk_messages:
@@ -18,14 +18,14 @@ def warn_low_disk_space():
         report_message(message=message, level='warning')
 
 
-@celery.shared_task
+@celery.shared_task(queue='db_workers')
 def heartbeat():
     if settings.HEARTBEAT_URL:
         _ = requests.get(settings.HEARTBEAT_URL, timeout=MINUTE_SECS)
         # we're not overly concerned with the response
 
 
-@celery.shared_task
+@celery.shared_task(queue='db_workers')
 def sleep_task(seconds: int):
     time.sleep(seconds)
     logging.info("Done sleeping...")

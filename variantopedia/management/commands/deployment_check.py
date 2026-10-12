@@ -12,10 +12,14 @@ from variantgrid.deployment_validation.annotation_status_checks import (
     check_gene_annotation_versions,
     check_variant_annotation_runs_status,
 )
-from variantgrid.deployment_validation.celery_checks import check_celery_tasks
+from variantgrid.deployment_validation.celery_checks import (
+    check_beat_schedule_tasks,
+    check_celery_tasks,
+)
 from variantgrid.deployment_validation.classification_checks import check_classification_reports
 from variantgrid.deployment_validation.column_check import check_variantgrid_columns
 from variantgrid.deployment_validation.library_version_checks import check_library_versions
+from variantgrid.deployment_validation.liftover_check import check_alleles_never_lifted_over
 from variantgrid.deployment_validation.somalier_check import check_somalier
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
 from variantgrid.deployment_validation.variant_check import check_symbolic_variants
@@ -43,11 +47,13 @@ class Command(BaseCommand):
             "Tool versions": check_tool_versions(),
             "cdot data": check_cdot_data(),
             "Celery Tasks": check_celery_tasks(),
+            "Celery beat schedule": {"beat_schedule": check_beat_schedule_tasks()},
             "Classification Reports": check_classification_reports(),
             "Columns": check_variantgrid_columns(),
             "VEP Columns Registry": check_vep_columns_registry(),
             "VEP": check_vep(),
             "Symbolic variants": check_symbolic_variants(),
+            "Liftover": check_alleles_never_lifted_over(),
         }
         if settings.SOMALIER.get("enabled"):
             checks["somalier"] = check_somalier()

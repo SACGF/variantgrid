@@ -43,6 +43,10 @@ def cached_generated_file_check(request, cgf_id):
 
     if cgf.exception:
         data["exception"] = str(cgf.exception)
+    elif cgf.generation_stalled:
+        # The worker died without recording anything - fail so the page offers to try again, which relaunches it
+        data["status"] = "FAILURE"
+        data["exception"] = "Generation stopped responding"
     elif cgf.task_status == "SUCCESS":
         if cgf.file_missing:
             # Pollers that go via a generator view have had the row dropped already - this is for

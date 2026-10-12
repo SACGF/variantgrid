@@ -1,13 +1,14 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from genes.models import Gene, GeneSymbol, Transcript, TranscriptVersion
-from snpdb.models import ClinGenAllele, Duo, GenomeBuild, Quad, Trio, Variant
+from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
+from snpdb.models import ClinGenAllele, Duo, GenomeBuild, Quad, Trio, Variant, VariantCoordinate
 from snpdb.search import search_data
-from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from upload.models import ModifiedImportedVariant
 
 VARIANT_CHROM = "1"
 VARIANT_POSITION = 169519049
@@ -46,6 +47,12 @@ class TestSearch(TestCase):
         self.assertIn(obj, [sr.preview.obj for sr in matches],
                       f"{obj} not found in {search_type} search results")
 
+    def test_search_unsupported_symbolic_alt(self):
+        """ <INS> is dropped at VCF import, so search must not offer to create one (#2119) """
+        search_results = search_data(self.user, f"{VARIANT_CHROM}:{VARIANT_POSITION}-{VARIANT_POSITION + 100} <INS>", False)
+        self.assertFalse(search_results.results)
+        self.assertTrue(any("<INS> variants are not supported" in m.message for m in search_results.messages_overall))
+
     def test_search_hgvs(self):
         HGVS_NAMES = [
             "ENST00000300305.7(RUNX1):c.352-1G>A",
@@ -77,6 +84,23 @@ class TestSearch(TestCase):
             search_results = search_data(self.user, variant_str, False)
             # Returns variant if settings.PREFER_ALLELE_LINKS=False
             self._assert_found_of_type(search_results, self.variant, Variant.preview_category())
+
+    def test_search_variant_normalised_on_import(self):
+        """ The VCF form of a variant bcftools trimmed on import finds the stored variant, and says so """
+        grch37 = GenomeBuild.grch37()
+        padded = VariantCoordinate(chrom=VARIANT_CHROM, position=VARIANT_POSITION, ref="TN", alt="CN")
+        next_base = padded.calculated_reference(grch37)[1]
+        old_variant = f"{VARIANT_CHROM}:{VARIANT_POSITION}:T{next_base}/C{next_base}"
+        ModifiedImportedVariant.objects.create(variant=self.variant, old_variant_formatted=old_variant)
+
+        for search_string, expect_message in [
+            (f"{VARIANT_CHROM}:{VARIANT_POSITION} T{next_base}>C{next_base}", True),
+            (f"{VARIANT_CHROM}:{VARIANT_POSITION} T>C", False),
+        ]:
+            search_results = search_data(self.user, search_string, False)
+            result = next(sr for sr in search_results.results if sr.preview.obj == self.variant)
+            normalised = any("normalised to this variant" in m.message for m in result.messages)
+            self.assertEqual(normalised, expect_message, search_string)
 
     def test_clingen_allele(self):
         """ A ClinGen allele resolves via its genomic HGVS to the variant in this build """

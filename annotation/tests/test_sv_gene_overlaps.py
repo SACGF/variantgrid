@@ -5,9 +5,9 @@ from the VariantAnnotationVersion's gene_annotation_release transcripts.
 """
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version, _insert_transcript_data
+from annotation.fake_data import get_fake_annotation_version
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.models import ReleaseTranscriptVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -20,7 +20,7 @@ def _add_release_transcript_version(release, transcript_version: TranscriptVersi
 
 
 def _make_transcript(genome_build, gene_id, gene_symbol, transcript_id, contig, exons, release):
-    gene_version = _create_fake_gene_version(genome_build, gene_id, gene_symbol,
+    gene_version = create_fake_gene_version(genome_build, gene_id, gene_symbol,
                                              AnnotationConsortium.ENSEMBL)
     data = {
         "id": transcript_id,
@@ -37,7 +37,7 @@ def _make_transcript(genome_build, gene_id, gene_symbol, transcript_id, contig, 
             }
         },
     }
-    return _insert_transcript_data(genome_build, data, gene_version, release)
+    return insert_transcript_data(genome_build, data, gene_version, release)
 
 
 class SVGeneOverlapResolverTest(TestCase):

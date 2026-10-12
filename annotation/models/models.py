@@ -5,8 +5,7 @@ VariantAnnotationVersion); AnnotationVersion bundles one of each per build and i
 AnnotationRangeLock / AnnotationRun are one batch of variants through VEP; VariantAnnotation (the
 representative transcript row) and VariantTranscriptAnnotation (every transcript) hold the columns
 VEPColumnDef writes. Query a version's rows through annotation/annotation_version_querysets.py,
-never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py;
-annotation/AGENTS.md has the rules. Large: use `scripts/vg outline`.
+never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py.
 """
 import logging
 import os
@@ -37,6 +36,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from annotation.annotation_pipeline_routing import pipeline_type_for_variant
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.external_search_terms import (
     get_variant_pubmed_search_terms,
@@ -76,6 +76,10 @@ from annotation.models.models_enums import (
     VEPSkippedReason,
 )
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from annotation.pathogenicity_predictions import (
+    pred_pathogenic_funcs,
+    raw_score_pathogenic_funcs,
+)
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
@@ -90,8 +94,8 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
+from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_file_utils import remove_import_processing_dir
-from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
@@ -99,7 +103,6 @@ from library.log_utils import report_message
 from library.utils import all_equal, first, invert_dict
 from ontology.models import OntologyIdNormalized, OntologyTerm, OntologyVersion
 from patients.models_enums import GnomADPopulation
-from snpdb.archive import DataArchivedError
 from snpdb.models import (
     DBSNP_PATTERN,
     HGVS_UNCLEANED_PATTERN,
@@ -806,6 +809,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
     sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
     sv_max_size = models.IntegerField(null=True, blank=True)  # ANNOTATION_VEP_SV_MAX_SIZE
+    # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - a symbolic del/dup/inv shorter than this went to the STANDARD
+    # pipeline (@see annotation.annotation_pipeline_routing)
+    structural_variant_min_size = models.IntegerField()
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
@@ -895,6 +901,13 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             status = VariantAnnotationVersion.Status.ACTIVE
         qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, status=status)
         return qs.order_by("annotation_date").last()
+
+    @staticmethod
+    def latest_structural_variant_min_size(genome_build) -> int:
+        """ For routing variants not annotated yet - the setting, until a build has an active version """
+        if vav := VariantAnnotationVersion.latest(genome_build):
+            return vav.structural_variant_min_size
+        return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     @staticmethod
     def latest_for_all_builds(status: 'VariantAnnotationVersion.Status' = None) -> QuerySet:
@@ -989,10 +1002,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         """Raw-score + pred contributions to predictions_num_pathogenic at v4. Empty pre-v4."""
         if self.columns_version < 4:
             return {}
-        from annotation.pathogenicity_predictions import (
-            pred_pathogenic_funcs,
-            raw_score_pathogenic_funcs,
-        )
         return {**raw_score_pathogenic_funcs(), **pred_pathogenic_funcs()}
 
     @cached_property
@@ -1309,19 +1318,16 @@ class AnnotationRun(TimeStampedModel):
 
     @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
-        if variant.is_gene_level:
-            pipeline_type = VariantAnnotationPipelineType.GENE_LEVEL
-        elif variant.is_symbolic:
-            pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
-        else:
-            pipeline_type = VariantAnnotationPipelineType.STANDARD
-        # For newly created variants, there will only be one per build for latest annotation version
-        ar: Optional[AnnotationRun]
-        ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
+        # For newly created variants, there will only be one per build for latest annotation version.
+        # Each version routes by its own cut-off, so the pipeline is decided per run
+        qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
                                           annotation_range_lock__min_variant__lte=variant.pk,
-                                          annotation_range_lock__max_variant__gte=variant.pk,
-                                          pipeline_type=pipeline_type).first()
-        return ar
+                                          annotation_range_lock__max_variant__gte=variant.pk)
+        for ar in qs.select_related("annotation_range_lock__version").order_by("pk"):
+            sv_min_size = ar.annotation_range_lock.version.structural_variant_min_size
+            if ar.pipeline_type == pipeline_type_for_variant(variant, sv_min_size):
+                return ar
+        return None
 
     @staticmethod
     def get_active_runs(genome_build):
@@ -2068,14 +2074,17 @@ class VariantAnnotation(AbstractVariantAnnotation):
         }
     }
 
-    # List of filters to describe variants that can be annotated.
-    # Gene-level variants belong here - they get a VariantAnnotation row like anything else, just
-    # written by the GENE_LEVEL pipeline rather than VEP. Which pipeline claims them is
-    # pipeline_type_variant_q's business, and it subtracts them from both VEP types.
-    VARIANT_ANNOTATION_Q = [
-        Variant.get_no_reference_q(),
-        ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants
-    ]
+    @staticmethod
+    def get_variant_annotation_q_list() -> list[Q]:
+        """ Filters to describe variants that can be annotated - a method rather than a class constant,
+            as the reference Q looks up a Sequence pk.
+            Gene-level variants belong here - they get a VariantAnnotation row like anything else, just
+            written by the GENE_LEVEL pipeline rather than VEP. Which pipeline claims them is
+            pipeline_type_variant_q's business, and it subtracts them from both VEP types. """
+        return [
+            Variant.get_no_reference_q(),
+            ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants
+        ]
 
     @cached_property
     def is_standard_annotation(self) -> bool:
@@ -2648,10 +2657,11 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.get_gnomad_sv_overlap(self.__dict__, self.version.gnomad_sv)
 
     def get_short_label(self) -> str:
-        """ Falls back to g.HGVS, which only this (per-variant) annotation has """
+        """ Falls back to g.HGVS, which only this (per-variant) annotation has - calculated for a row
+            VEP skipped (eg an SV over its size cap), which has none of its own """
         if self.hgvs_p or self.has_hgvs_c:
             return super().get_short_label()
-        return self.hgvs_g or str(self.variant)
+        return self.hgvs_g or VariantAnnotation.get_hgvs_g(self.variant) or str(self.variant)
 
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
@@ -2682,9 +2692,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @staticmethod
     def _generate_hgvs_g(variant: Variant) -> Optional[str]:
         """ Reference variants have no annotation - so we'll have to fall back to generating it.
-            Not for gene-level, which has no coordinate to write a g.HGVS from - it is annotated, so
-            a null here means it predates the column being filled rather than "generate one" """
-        if variant.is_gene_level:
+            None for what has no g.HGVS to write - <CNV>/<INS> and gene-level """
+        if not variant.can_make_g_hgvs:
             return None
         from genes.hgvs import HGVSMatcher
         matcher = HGVSMatcher.instance(variant.any_genome_build)

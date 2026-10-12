@@ -14,7 +14,7 @@ from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
     Aligner,
-    BamFile,
+    AlignmentFile,
     EnrichmentKit,
     SampleFromSequencingSample,
     SampleSheet,
@@ -139,7 +139,7 @@ class ExtractionCarriedDownToSamplesTest(TestCase):
                                              nucleic_acid_source=NucleicAcid.DNA)
 
         aligner, _ = Aligner.objects.get_or_create(name="dragen", version="4.2")
-        self.bam_file = BamFile.objects.create(path="/data/tso500/dna.bam", name="dna.bam",
+        self.alignment_file = AlignmentFile.objects.create(path="/data/tso500/dna.bam", name="dna.bam",
                                                sequencing_run=self.sequencing_run,
                                                sequencing_sample=self.sequencing_sample,
                                                aligner=aligner)
@@ -155,7 +155,7 @@ class ExtractionCarriedDownToSamplesTest(TestCase):
         uploaded_vcf = UploadedVCF.objects.create(file_upload=file_upload, vcf=vcf)
         single_sample_vcf = SingleSampleVCF.objects.create(path=path,
                                                            sequencing_run=self.sequencing_run,
-                                                           bam_file=self.bam_file,
+                                                           alignment_file=self.alignment_file,
                                                            variant_caller=variant_caller or self.variant_caller)
         backend_vcf = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
                                                 single_sample_vcf=single_sample_vcf)

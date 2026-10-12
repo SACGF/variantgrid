@@ -612,6 +612,21 @@ a .c-hgvs-body {
 	}
 }
 
+table.overlaps {
+	tbody tr td {
+		height: 70px;
+	}
+	.dt-classification {
+		width: 280px;
+	}
+	.dt-testing_context {
+		width: 100px;
+	}
+	.dt-summary {
+		width: 400px;
+	}
+}
+
 table.overlap-summary {
 	th.overlap-lab {
 		width: 250px;

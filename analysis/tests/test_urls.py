@@ -14,7 +14,6 @@ from analysis.models import (
     AnalysisTemplateType,
     GeneListNode,
     GeneListNodeGeneList,
-    KaryomappingAnalysis,
     SampleNode,
 )
 from analysis.models.enums import SNPMatrix
@@ -22,7 +21,7 @@ from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_node_to_downloadable_file,
 )
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -131,10 +130,6 @@ class Test(URLTestCase):
                                                                 user=cls.user_owner,
                                                                 analysis=template_analysis)
 
-        cls.karyomapping_analysis = KaryomappingAnalysis.objects.create(user=cls.user_owner,
-                                                                        name="test karyomapping",
-                                                                        trio=cls.trio)
-
         grid_column_name = "variantannotation__transcript_version__gene_version__gene_symbol__symbol"
         analysis_params = {"analysis_id": cls.analysis.pk}
         analysis_node_params = {**analysis_params, "node_id": cls.node.pk}
@@ -190,7 +185,7 @@ class Test(URLTestCase):
             ('node_errors', analysis_version_and_node_version_params, 200),
             ('node_method_description', node_version_params, 200),
 
-            ('view_karyomapping_analysis', {"pk": cls.karyomapping_analysis.pk}, 200),
+            ('trio_karyomapping', {"trio_id": cls.trio.pk}, 200),
 
             ('trio_wizard', {"cohort_id": cls.cohort.pk,
                              "sample1_id": cls.trio.proband.sample_id,
@@ -211,7 +206,6 @@ class Test(URLTestCase):
             ("analyses", {}, 200),
             ("analysis_list_tag_counts", {}, 200),
             ("analysis_templates", {}, 200),
-            ("karyomapping_analyses", {}, 200),
         ]
 
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
@@ -220,15 +214,13 @@ class Test(URLTestCase):
         DATATABLE_URLS = [
             ("analyses_list_datatable", {}, 200),
             ("analysis_templates_datatable", {}, 200),
-            ("analysis_node_issues_datatable", {}, 200),
-            ("karyomapping_analyses_datatable", {}, 200),
+            ("analysis_node_issues_datatable", {}, 403),
         ]
         self._test_datatable_urls(DATATABLE_URLS, self.user_non_owner)
 
     def testDatatableListPermission(self):
         PRIVATE_DATATABLE_LIST_URLS = [
             ("analyses_list_datatable", {}, ("text", self.analysis)),
-            ("karyomapping_analyses_datatable", {}, self.karyomapping_analysis),
         ]
         self._test_datatables_grid_urls_contains_objs(PRIVATE_DATATABLE_LIST_URLS, self.user_owner, True)
 
@@ -236,7 +228,6 @@ class Test(URLTestCase):
     def testDatatableListNoPermission(self):
         PRIVATE_DATATABLE_LIST_URLS = [
             ("analyses_list_datatable", {}, ("text", self.analysis)),
-            ("karyomapping_analyses_datatable", {}, self.karyomapping_analysis),
         ]
         self._test_datatables_grid_urls_contains_objs(PRIVATE_DATATABLE_LIST_URLS, self.user_non_owner, False)
 

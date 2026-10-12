@@ -18,7 +18,6 @@ from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import QuerySet
-from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT
 from django.db.models.expressions import F, Value
 from django.db.models.query_utils import FilteredRelation, Q
@@ -29,16 +28,17 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
-from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from library.django_utils import SortByPKMixin
-from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.database_utils import get_active_backend_pids, signal_backends
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.unit_percent import convert_from_percent_to_unit
 from library.utils import invert_dict
+from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
@@ -78,16 +78,6 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         # calls save() so version bumps create new rows here too. @see issue #1551
         CohortVersion.objects.get_or_create(cohort=self, version=self.version)
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
-
-    def _get_phenotype_input_text_field(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        return "phenotype"
-
-    def _get_phenotype_description_relation_class_and_kwargs(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        # Stop circular import
-        from annotation.models.models_phenotype_match import CohortTextPhenotype
-        return CohortTextPhenotype, {"cohort": self}
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """
@@ -160,29 +150,49 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             my_samples = self.get_samples()
             parent_samples = self.parent_cohort.get_samples()
             if my_samples.exclude(pk__in=parent_samples).exists():
-                self.parent_cohort = None  # No longer a sub cohort
+                self.parent_cohort = None  # No longer a sub cohort - needs genotype data of its own
+                self.import_status = ImportStatus.CREATED
 
         self.version += 1
         self.sample_count = self.cohortsample_set.count()
         self.save()
 
-        if self.vcf is None:
-            # For custom built Cohorts - need to ensure cohort_genotype_packed_field_index entries are correct
-            if highest_packed_index := self._get_cohort_sample_field_max("cohort_genotype_packed_field_index"):
-                # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
-                out_of_range = F("cohort_genotype_packed_field_index") + Value(highest_packed_index + 1)
-                self.cohortsample_set.all().update(cohort_genotype_packed_field_index=out_of_range)
-
-                # Cohort genotype packed fields are in sample order
-                cohort_samples = []
-                for i, cs in enumerate(self.cohortsample_set.order_by("sample")):
-                    cs.cohort_genotype_packed_field_index = i
-                    cohort_samples.append(cs)
-                if cohort_samples:
-                    # Do a bulk update so it doesn't trigger a save then call this func again
-                    CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
+        # Sub cohorts read the parent's CohortGenotype arrays, so keep the parent's indexes (#2155)
+        if self.vcf is None and self.parent_cohort is None:
+            self.set_sample_order_packed_indexes()
 
         self.delete_old_counts()
+
+    def set_sample_order_packed_indexes(self):
+        """ Custom cohorts pack their own genotypes in sample order (#325) """
+        sample_ids = self.cohortsample_set.order_by("sample").values_list("sample_id", flat=True)
+        self._set_packed_field_indexes({sample_id: i for i, sample_id in enumerate(sample_ids)})
+
+    def set_parent_cohort(self, parent_cohort: 'Cohort'):
+        """ Become a sub cohort - every sample must be in parent_cohort, whose genotype data this then reads """
+        self.parent_cohort = parent_cohort
+        self.import_status = parent_cohort.import_status
+        self.save()
+        self._set_packed_field_indexes(dict(parent_cohort.cohortsample_set.values_list(
+            "sample_id", "cohort_genotype_packed_field_index")))
+
+    def _set_packed_field_indexes(self, packed_index_by_sample_id: dict[int, int]) -> bool:
+        """ Bulk update so it doesn't go through CohortSample.save() and bump the version again.
+            Returns whether anything moved """
+        cohort_samples = list(self.cohortsample_set.all())
+        if all(cs.cohort_genotype_packed_field_index == packed_index_by_sample_id[cs.sample_id]
+               for cs in cohort_samples):
+            return False
+
+        # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
+        highest_packed_index = max(cs.cohort_genotype_packed_field_index for cs in cohort_samples)
+        highest_packed_index = max(highest_packed_index, *packed_index_by_sample_id.values())
+        out_of_range = F("cohort_genotype_packed_field_index") + Value(highest_packed_index + 1)
+        self.cohortsample_set.update(cohort_genotype_packed_field_index=out_of_range)
+        for cs in cohort_samples:
+            cs.cohort_genotype_packed_field_index = packed_index_by_sample_id[cs.sample_id]
+        CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
+        return True
 
     def delete_old_counts(self):
         qs = CohortGenotypeCollection.objects.filter(cohort=self, cohort_version__lt=self.version)
@@ -195,29 +205,11 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             task = delete_old_cohort_genotypes_task.si()
             task.apply_async()
 
-    def _get_cohort_sample_field_max(self, field):
-        qs = self.cohortsample_set.all()
-        data = qs.aggregate(highest_value=Max(field))
-        return data["highest_value"]
-
-    def _get_next_sort_order(self):
-        existing_max = self._get_cohort_sample_field_max("sort_order")
-        if existing_max is not None:
-            return existing_max + 1
-        return 0
-
-    def add_sample(self, sample_id):
-        # TODO: Check for existing
-        try:
-            ss = self.cohortsample_set.get(cohort=self, sample_id=sample_id)
-        except CohortSample.DoesNotExist:
-            i = self._get_next_sort_order()
-            ss = CohortSample.objects.create(cohort=self,
-                                             sample_id=sample_id,
-                                             cohort_genotype_packed_field_index=i,
-                                             sort_order=i)
-            # Will call increment_version() to bump cohort
-        return ss
+    def add_sample(self, sample_id) -> 'CohortSample':
+        if not self.cohortsample_set.filter(sample_id=sample_id).exists():
+            sample_ids = list(self.get_cohort_samples().values_list("sample_id", flat=True))
+            self.set_samples([*sample_ids, sample_id])
+        return self.cohortsample_set.get(sample_id=sample_id)
 
     def set_samples(self, ordered_sample_ids: list[int]):
         """ Replace membership with ordered_sample_ids (in display order) under a single version bump.
@@ -267,6 +259,39 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
         self.increment_version()
 
+    def set_vcf_samples(self, vcf_samples: list[Sample]):
+        """ A VCF cohort packs genotypes in VCF column order, so each sample's packed index and sort order is
+            its column. A reload in place can add or reorder columns (#1191) - existing CohortSamples are
+            updated rather than replaced, keeping the Trios/pedigrees/filters that point at them, and sub
+            cohorts follow the new indexes as they read this cohort's genotype arrays (#2155).
+            vcf_samples must include every sample already in the cohort. """
+        packed_index_by_sample_id = {sample.pk: i for i, sample in enumerate(vcf_samples)}
+        cohort_samples = list(self.cohortsample_set.all())
+        if removed_sample_ids := {cs.sample_id for cs in cohort_samples} - set(packed_index_by_sample_id):
+            raise ValueError(f"Cohort {self.pk}: existing sample ids {removed_sample_ids} missing from vcf_samples")
+
+        # New samples are parked above every index in use, _set_packed_field_indexes then moves all to their column
+        existing_sample_ids = {cs.sample_id for cs in cohort_samples}
+        parked_index = len(vcf_samples) + max((cs.cohort_genotype_packed_field_index for cs in cohort_samples),
+                                              default=0)
+        new_cohort_samples = [CohortSample(cohort=self, sample_id=sample_id,
+                                           cohort_genotype_packed_field_index=parked_index + i, sort_order=i)
+                              for sample_id, i in packed_index_by_sample_id.items()
+                              if sample_id not in existing_sample_ids]
+        CohortSample.objects.bulk_create(new_cohort_samples)
+        reindexed = self._set_packed_field_indexes(packed_index_by_sample_id)
+
+        resorted_cohort_samples = [cs for cs in cohort_samples
+                                   if cs.sort_order != packed_index_by_sample_id[cs.sample_id]]
+        for cs in resorted_cohort_samples:
+            cs.sort_order = packed_index_by_sample_id[cs.sample_id]
+        CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
+
+        if new_cohort_samples or reindexed or resorted_cohort_samples:
+            for sub_cohort in self.sub_cohort_set.all():
+                sub_cohort._set_packed_field_indexes(packed_index_by_sample_id)
+            self.increment_version()
+
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
 
@@ -306,13 +331,11 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         """
         cohort = self.get_base_cohort()
         if cohort.vcf and cohort.vcf.data_archived:
-            from snpdb.archive import DataArchivedError
             raise DataArchivedError(cohort.vcf)
         cgc = CohortGenotypeCollection.objects.get(cohort=cohort,
                                                    cohort_version=cohort.version,
                                                    collection_type=CohortGenotypeCollectionType.UNCOMMON)
         if cgc.data_archived:
-            from snpdb.archive import DataArchivedError
             raise DataArchivedError(cgc)
         return cgc
 
@@ -322,8 +345,6 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             regex seq-scan against samples_zygosity. Returns the SUCCESS-status collection built
             for the current (cohort version, parent CGC); else None so callers fall back to the
             runtime regex. @see snpdb build_sub_cohort_any_sample_called_vc_task / issue #1551 """
-        from snpdb.archive import DataArchivedError  # Inline: snpdb.archive imports snpdb.models
-
         if not self.is_sub_cohort:
             return None
         try:
@@ -437,6 +458,7 @@ def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-arg
         sub_cohort.parent_cohort = None
         sub_cohort.import_status = ImportStatus.CREATED
         sub_cohort.save()
+        sub_cohort.set_sample_order_packed_indexes()
 
 
 class CohortSample(models.Model):
@@ -651,6 +673,16 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
             annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
         return annotation_kwargs
 
+    def get_sample_genotype(self, sample: Sample, variant: Variant) -> Optional['SampleGenotype']:
+        collections = [self]
+        if self.common_collection:
+            collections.append(self.common_collection)
+        try:
+            cg = CohortGenotype.objects.filter(collection__in=collections).get(variant=variant)
+        except CohortGenotype.DoesNotExist:
+            return None
+        return cg.get_sample_genotype(sample)
+
     def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):
         """ sample_zygosities_dict = {sample_id : zygosities_set} """
 
@@ -794,7 +826,7 @@ class SampleGenotype:
         self.allele_depth = self._get_sample_value("samples_allele_depth", sample_index)
         allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
         if sample.vcf.allele_frequency_percent:
-            allele_frequency = VCF.convert_from_percent_to_unit(allele_frequency)
+            allele_frequency = convert_from_percent_to_unit(allele_frequency, missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
         self.allele_frequency = allele_frequency
         self.read_depth = self._get_sample_value("samples_read_depth", sample_index)
         self.genotype_quality = self._get_sample_value("samples_genotype_quality", sample_index)

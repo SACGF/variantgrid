@@ -14,8 +14,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, CohortNode
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild, Variant, VariantCollection
 from snpdb.models.models_cohort import (
     CohortGenotype,
@@ -28,7 +29,6 @@ from snpdb.tasks.sub_cohort_tasks import (
     build_sub_cohort_any_sample_called_vc_task,
     delete_old_cohort_versions,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

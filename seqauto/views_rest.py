@@ -3,6 +3,7 @@ import operator
 from collections import defaultdict
 from functools import reduce
 from math import log10
+from typing import Optional
 
 import numpy as np
 from django.conf import settings
@@ -18,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
+from eventlog.models import log_api_request_objects
 from genes.models import GeneVersion
 from genes.views.views_coverage import get_coverage_stats
 from library.constants import WEEK_SECS
@@ -89,6 +91,44 @@ class SeqAutoWriteAPIView(APIView):
     permission_classes = (IsAuthenticated, SeqAutoWritePermission)
 
 
+def _sequencing_run_pk(record) -> Optional[str]:
+    if isinstance(record, SequencingRun):
+        return record.pk
+    if sequencing_run_id := getattr(record, "sequencing_run_id", None):
+        return sequencing_run_id
+    if qc := getattr(record, "qc", None):  # QCGeneCoverage is saved without its own sequencing_run
+        return qc.sequencing_run_id
+    return None
+
+
+class SequencingRunApiLogMixin:
+    """ Logs each API call against the SequencingRun of the records it reads or writes, so the
+        run page can list them (ApiRequestLog.for_object) """
+    api_log_model = SequencingRun
+
+    def log_sequencing_runs(self, records):
+        log_api_request_objects(self.request, *{_sequencing_run_pk(record) for record in records})
+
+
+class SequencingRunModelViewSet(SequencingRunApiLogMixin, SeqAutoModelViewSet):
+    def get_object(self):
+        obj = super().get_object()
+        self.log_sequencing_runs([obj])
+        return obj
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        self.log_sequencing_runs([serializer.instance])
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        self.log_sequencing_runs([serializer.instance])
+
+
+class SequencingRunWriteAPIView(SequencingRunApiLogMixin, SeqAutoWriteAPIView):
+    pass
+
+
 class EnrichmentKitSummaryView(RetrieveAPIView):
     """ Doesn't return gene list so is much faster """
     serializer_class = EnrichmentKitSummarySerializer
@@ -124,39 +164,39 @@ class VariantCallerViewSet(SeqAutoModelViewSet):
     serializer_class = VariantCallerSerializer
 
 
-class SequencingRunViewSet(SeqAutoModelViewSet):
+class SequencingRunViewSet(SequencingRunModelViewSet):
     queryset = SequencingRun.objects.filter(hidden=False)
     serializer_class = SequencingRunSerializer
     lookup_field = 'name'
     lookup_value_regex = '[^/]+'
 
 
-class SampleSheetViewSet(SeqAutoModelViewSet):
+class SampleSheetViewSet(SequencingRunModelViewSet):
     queryset = SampleSheet.objects.all()
     serializer_class = SampleSheetSerializer
 
 
-class SingleSampleVCFViewSet(SeqAutoModelViewSet):
+class SingleSampleVCFViewSet(SequencingRunModelViewSet):
     queryset = SingleSampleVCF.objects.all()
     serializer_class = SingleSampleVCFSerializer
 
 
-class JointCalledVCFViewSet(SeqAutoModelViewSet):
+class JointCalledVCFViewSet(SequencingRunModelViewSet):
     queryset = JointCalledVCF.objects.all()
     serializer_class = JointCalledVCFSerializer
 
 
-class FastQCViewSet(SeqAutoModelViewSet):
+class FastQCViewSet(SequencingRunModelViewSet):
     queryset = FastQC.objects.all()
     serializer_class = FastQCSerializer
 
 
-class IlluminaFlowcellQCViewSet(SeqAutoModelViewSet):
+class IlluminaFlowcellQCViewSet(SequencingRunModelViewSet):
     queryset = IlluminaFlowcellQC.objects.all()
     serializer_class = IlluminaFlowcellQCSerializer
 
 
-class SequencingFilesBulkCreateView(SeqAutoWriteAPIView):
+class SequencingFilesBulkCreateView(SequencingRunWriteAPIView):
     """ Bulk create sequencing file records (fastqs, BAM and VCF) for samples on a sample sheet """
 
     @extend_schema(
@@ -167,12 +207,13 @@ class SequencingFilesBulkCreateView(SeqAutoWriteAPIView):
     def post(self, request, *args, **kwargs):
         serializer = SequencingFilesBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            created = serializer.save()
+            self.log_sequencing_runs([created["sample_sheet"]])
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class SequencingSampleExtractionLinkView(SeqAutoWriteAPIView):
+class SequencingSampleExtractionLinkView(SequencingRunWriteAPIView):
     """ Name the extraction a sequencing sample was made from.
 
         The sequencing sample is the anchor: without it there is nothing to park a claim on, so an
@@ -188,6 +229,7 @@ class SequencingSampleExtractionLinkView(SeqAutoWriteAPIView):
         serializer = SequencingSampleExtractionLinkSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         sequencing_sample = serializer.save()
+        self.log_sequencing_runs([sequencing_sample.sample_sheet])
         response = {
             "sequencing_sample": str(sequencing_sample),
             "match_status": sequencing_sample.get_extraction_match_status_display(),
@@ -198,7 +240,7 @@ class SequencingSampleExtractionLinkView(SeqAutoWriteAPIView):
         return Response(response, status=status_code)
 
 
-class QCGeneListViewSet(SeqAutoModelViewSet):
+class QCGeneListViewSet(SequencingRunModelViewSet):
     queryset = QCGeneList.objects.all()
 
     def get_serializer_class(self):
@@ -207,7 +249,7 @@ class QCGeneListViewSet(SeqAutoModelViewSet):
         return QCGeneListSerializer
 
 
-class QCGeneListBulkCreateView(SeqAutoWriteAPIView):
+class QCGeneListBulkCreateView(SequencingRunWriteAPIView):
     """ Bulk create QC gene lists """
 
     @extend_schema(
@@ -218,12 +260,13 @@ class QCGeneListBulkCreateView(SeqAutoWriteAPIView):
     def post(self, request, *args, **kwargs):
         serializer = QCGeneListBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            created = serializer.save()
+            self.log_sequencing_runs(created["records"])
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class QCExecSummaryBulkCreateView(SeqAutoWriteAPIView):
+class QCExecSummaryBulkCreateView(SequencingRunWriteAPIView):
     """ Bulk create QC exec summaries """
 
     @extend_schema(
@@ -234,12 +277,13 @@ class QCExecSummaryBulkCreateView(SeqAutoWriteAPIView):
     def post(self, request, *args, **kwargs):
         serializer = QCExecSummaryBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            created = serializer.save()
+            self.log_sequencing_runs(created["records"])
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class QCGeneCoverageBulkCreateView(SeqAutoWriteAPIView):
+class QCGeneCoverageBulkCreateView(SequencingRunWriteAPIView):
     """ Bulk create QC gene coverage records """
 
     @extend_schema(
@@ -250,17 +294,18 @@ class QCGeneCoverageBulkCreateView(SeqAutoWriteAPIView):
     def post(self, request, *args, **kwargs):
         serializer = QCGeneCoverageBulkCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            created = serializer.save()
+            self.log_sequencing_runs(created["records"])
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class QCGeneCoverageViewSet(SeqAutoModelViewSet):
+class QCGeneCoverageViewSet(SequencingRunModelViewSet):
     queryset = QCGeneCoverage.objects.all()
     serializer_class = QCGeneCoverageSerializer
 
 
-class QCExecSummaryViewSet(SeqAutoModelViewSet):
+class QCExecSummaryViewSet(SequencingRunModelViewSet):
     queryset = QCExecSummary.objects.all()
     serializer_class = QCExecSummarySerializer
 
@@ -269,7 +314,7 @@ class EnrichmentKitGeneCoverageView(APIView):
     """ Coverage stats (mean, percent_20x) for a gene symbol across samples sequenced with an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        return Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit=enrichment_kit)
+        return Q(gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__enrichment_kit=enrichment_kit)
 
     @extend_schema(
         summary="Coverage stats (mean, percent_20x) for a gene symbol across samples for an enrichment kit",
@@ -322,7 +367,7 @@ class EnrichmentKitGeneGoldCoverageView(EnrichmentKitGeneCoverageView):
     """ Coverage stats for a gene symbol restricted to gold standard sequencing runs for an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
+        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
         return reduce(operator.and_, [super().get_coverage_q(enrichment_kit), gold_q])
 
 

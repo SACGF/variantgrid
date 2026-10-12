@@ -1,4 +1,4 @@
-{% extends menu_settings_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 
 {% block title %}VariantGrid Tag Config{% endblock %}
@@ -6,7 +6,7 @@
 {% block head %}
 {{ block.super }}
 <link href="{% static 'css/colorPicker.css' %}" rel="stylesheet"></link>
-<script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker-1.0.0/jquery.colorPicker-1.0.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <style>
 	.sort_placeholder {height: 15px; border: red 3px solid;}
@@ -144,7 +144,7 @@
 </script>
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <h3>Tag Config</h3>
 
 {% if has_write_permission %}

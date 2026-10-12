@@ -6,7 +6,7 @@ from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
-from genes.tests.gene_level_test_utils import create_gene_level_variant
+from genes.fake_data import create_gene_level_variant
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import Lab, VariantCoordinate
 from sync.classification_sync_status import ClassificationSyncState, classification_sync_status
@@ -93,6 +93,14 @@ class ClassificationSyncStatusTestCase(TestCase):
         self.assertEqual(status.remote_url, f"{REMOTE_HOST}/classification/classification/1234")
         self.assertIsNotNone(status.last_synced)
         self.assertFalse(status.reasons)
+
+    def test_synced_with_unsafe_remote_pk_has_no_link(self):
+        vc = self._create_classification()
+        self._create_sync_record(vc, remote_pk="//evil.example.com/x")
+
+        status = self._only_status(vc)
+        self.assertEqual(status.state, ClassificationSyncState.SYNCED)
+        self.assertIsNone(status.remote_url)
 
     def test_changes_pending(self):
         vc = self._create_classification()

@@ -4,6 +4,7 @@
     classification/tests/report/; what needs a real case is here: which samples a specimen or
     extraction case is, who may act on a built report, and what finalising writes.
 """
+from dataclasses import replace
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -27,13 +28,15 @@ from classification.models.classification_report_models import (
     Measure,
     case_report_deliveries_signal,
     case_report_finalised_signal,
+    describe_tick_when,
+    tick_for,
 )
 from classification.report.case_report_builder import build_case_report, finalise_case_report
 from classification.report.case_report_context import (
     build_report_context,
     case_combined_variant_output,
+    case_library_qc,
     context_as_dict,
-    specimen_library_qc,
 )
 from classification.report.default_templates import generic_case_template
 from library.case_report_delivery import CaseReportDelivery
@@ -246,7 +249,7 @@ class CaseReportPermissionTest(ClassifyReportTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
-        # HtmlMinifyMiddleware turns &nbsp; into the character, which reads as "Â " without a charset
+        # Without a charset the browser reads the report's non-ASCII characters as Latin-1 ("Â ")
         self.assertIn("charset=utf-8", response["Content-Type"])
 
 
@@ -463,7 +466,7 @@ class CaseReportMeasureTickTest(ClassifyReportTestCase):
         content = response.content.decode()
         self.assertIn("2.48% (MSS)", content)
         self.assertIn("no measure", content)  # the case has no TMB, tumour fraction or GIS
-        self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_msi"')
+        self.assertRegex(content, r'id="case_field_assay_success_msi"[^>]*checked')
         # The policy behind the tick is on the form, so a scientist can ask for it to change
         self.assertIn("ticked when the measure has a call", content)
         self.assertIn("policy MSI-High &gt;= 30%, MSI-Low &gt;= 10%, MSS &lt; 10% unstable sites, needs &gt;= 40 usable sites "
@@ -608,10 +611,44 @@ class CaseReportLibraryQCTickTest(ClassifyReportTestCase):
         latest = self._library_qc("RUN_2", LibraryQCCategory.CNV, passed=True,
                                   measured_date=timezone.now())
 
-        library_qc = specimen_library_qc(self.specimen)
+        library_qc = case_library_qc(None, self.specimen)
 
         self.assertEqual(latest, library_qc["cnv"])
         self.assertTrue(self._values(library_qc)["assay_success_amplifications"])
+
+    def test_the_qc_of_the_cases_own_pair_wins_over_a_newer_run_of_the_specimen(self):
+        DragenTSO500CombinedVariantOutput.objects.create(
+            sequencing_run_name="RUN_1", pair_id="5_C0000005_ABCD_2600000005", specimen=self.specimen,
+            dna_sample=self.proband)
+        own = self._library_qc("RUN_1", LibraryQCCategory.CNV, passed=False,
+                               measured_date=timezone.now() - timedelta(days=7))
+        self._library_qc("RUN_2", LibraryQCCategory.CNV, passed=True, measured_date=timezone.now())
+
+        cvo = case_combined_variant_output([self.proband], self.specimen)
+
+        self.assertEqual(own, case_library_qc(cvo, self.specimen)["cnv"])
+
+    def test_the_patient_dialog_shows_failed_categories_and_metrics_in_red(self):
+        """ A patient case has no specimen, so its QC is found through the analysis of its samples """
+        DragenTSO500CombinedVariantOutput.objects.create(
+            sequencing_run_name="RUN_1", pair_id="5_C0000005_ABCD_2600000005", dna_sample=self.proband)
+        self._library_qc("RUN_1", LibraryQCCategory.SMALL_VARIANT_TMB, passed=False, metrics={
+            "TOTAL_ON_TARGET_READS": {"value": 1000, "unit": "Count", "lsl": 9000000, "usl": None, "passed": False},
+            "MEDIAN_INSERT_SIZE": {"value": 110, "unit": "bp", "lsl": 70, "usl": None, "passed": True},
+        })
+        self.client.force_login(self.user)
+        url = reverse("case_report_build_dialog", kwargs={"case_type": "patient", "case_id": self.patient.pk})
+
+        response = self.client.post(url, {
+            "report_template": self.template.pk,
+            "classification_modification_id": [self.classification.last_published_version.pk],
+        })
+
+        content = response.content.decode()
+        self.assertIn("Small variants and TMB</a>:", content)
+        self.assertIn('<span class="text-danger">failed</span>', content)
+        self.assertRegex(content, r'<span class="text-danger">TOTAL_ON_TARGET_READS [^<]*</span>')
+        self.assertNotIn("MEDIAN_INSERT_SIZE", content)
 
     def test_the_dialog_shows_each_categorys_metrics_against_its_guideline(self):
         self._library_qc("RUN_1", LibraryQCCategory.CNV, passed=True, metrics={
@@ -630,16 +667,32 @@ class CaseReportLibraryQCTickTest(ClassifyReportTestCase):
         content = response.content.decode()
         self.assertIn("GENE_SCALED_MAD 0.059 (&lt;= 0.134), MEDIAN_BIN_COUNT_CNV_TARGET 6.4 (&gt;= 1)", content)
         self.assertIn("no QC", content)  # the case has no RNA or DNA library QC
-        self.assertRegex(content, r'checked[^>]*id="case_field_assay_success_amplifications"')
+        self.assertRegex(content, r'id="case_field_assay_success_amplifications"[^>]*checked')
         self.assertIn("ticked when the library passed QC", content)
         self.assertIn("ticked when the library failed QC or the run did not complete for the library", content)
 
-    def test_a_field_naming_an_unknown_category_a_measure_rule_or_both_kinds_is_not_saved(self):
+    def test_a_field_on_a_measure_and_its_library_unticks_when_either_fails(self):
+        """ TMB succeeded only where it was called and the small variant library passed QC """
+        field = {"key": "assay_success_tmb", "type": "bool", "default": True, "measure": "tmb",
+                 "qc": "small_variant_tmb", "tick_when": [{"called": True}, {"passed": True}]}
+        called = {"tmb": Measure(value=7.1, unit="mut/Mb", call="TMB-Low", threshold=None,
+                                 threshold_source=None, method="")}
+        passed = {"small_variant_tmb": LibraryQC(passed=True, completed=True)}
+        failed = {"small_variant_tmb": LibraryQC(passed=False, completed=True)}
+
+        self.assertTrue(tick_for(field, called, passed))
+        self.assertFalse(tick_for(field, called, failed))
+        self.assertFalse(tick_for(field, {"tmb": replace(called["tmb"], call=None)}, passed))
+        self.assertTrue(tick_for(field, called, {}))  # no QC uploaded - the measure alone decides
+        self.assertEqual("ticked when the measure has a call and the library passed QC",
+                         describe_tick_when(field["tick_when"]))
+
+    def test_a_field_naming_an_unknown_category_or_a_rule_for_a_row_it_does_not_name_is_not_saved(self):
         """ The JSON is hand written in admin, so a typo says so rather than ticking nothing """
         for case_fields in ([{"key": "flag", "type": "bool", "qc": "amplifications"}],
                             [{"key": "flag", "type": "bool", "qc": "cnv",
                               "tick_when": {"called": True}}],
-                            [{"key": "flag", "type": "bool", "qc": "cnv", "measure": "msi",
+                            [{"key": "flag", "type": "bool", "measure": "msi",
                               "tick_when": {"passed": True}}]):
             with self.subTest(case_fields=case_fields):
                 template = ClassificationReportTemplate(name="bad", case_fields=case_fields)

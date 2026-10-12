@@ -43,9 +43,7 @@ def create_cohort_genotype_and_launch_task(cohort, run_async=True):
     celery_task = None
     if containing_cohort:
         logging.info("Cohort %s can be fully contained within %s!", cohort, containing_cohort)
-        cohort.parent_cohort = containing_cohort
-        cohort.import_status = containing_cohort.import_status
-        cohort.save()
+        cohort.set_parent_cohort(containing_cohort)
         # Now a sub-cohort - pre-compute its any-sample-called VariantCollection (issue #1551)
         enqueue_sub_cohort_any_sample_called_vc(cohort)
         status = "SUCCESS"
