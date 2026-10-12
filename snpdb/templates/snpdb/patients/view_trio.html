@@ -3,6 +3,7 @@
 {% load ui_utils %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
+{% load karyomapping_tags %}
 
 {% block title %}Trio {{ trio }}{% endblock %}
 
@@ -69,6 +70,7 @@
                         </div>
                     </div>
                 </div>
+                {% trio_karyomapping_qc trio %}
             </div>
             {% if has_write_permission %}
             <div class="tab-pane" role="tabpanel" id="trio-permissions"></div>

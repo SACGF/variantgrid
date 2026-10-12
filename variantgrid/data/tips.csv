@@ -69,7 +69,7 @@ The Upload page shows VCF processing status in real time. You can monitor annota
 The Analysis grid export includes the date and node version in the filename so you can easily track which version of your analysis produced each download.,analysis,analysis,
 The variant annotation history tab shows how annotation values for a variant have changed between annotation runs over time.,variantopedia,view_variant_annotation_history,
 "You can view the Allele page (prefix 'a' + allele ID) to see a variant unified across genome builds, with liftover coordinates and all associated classifications.",variantopedia,view_allele,
-The Karyomapping view lets you visually map inherited chromosomal regions in complex family scenarios.,analysis,karyomapping_analyses,
+Trio pages graph how often the proband is in phase with each parent per chromosome - a quick check for sample swaps and uniparental disomy.,snpdb,view_trio,
 Sample pages show the full upload and annotation history trail. Useful for understanding if a sample was re-annotated or re-imported.,snpdb,view_sample,
 The Cohort Hotspot page shows which genes are most frequently variant in your cohort. Great for spotting systematic issues or shared disease genes.,snpdb,cohort_hotspot,
 You can a VCF / cohort’s samples into a Pedigree with a .ped file and use the Pedigree node in analysis to filter by inheritance across a multi-generation family.,snpdb,view_cohort,

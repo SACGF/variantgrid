@@ -213,12 +213,14 @@ by contig and zygosity-count bounds from `VariantZygosityCountCollection`.
 ### Karyomapping
 
 `analysis/models/models_karyomapping.py:KaryotypeBins` classifies each trio variant by the (proband, father, mother)
-genotype tuple into in-phase/out-of-phase paternal and maternal bins. Creating a Trio queues
+genotype tuple into in-phase/out-of-phase paternal and maternal bins; a reference call counts whether stored as HOM_REF
+(joint-called VCF) or MISSING (merged cohort). Creating a Trio queues
 `analysis/tasks/karyomapping_tasks.py:create_genome_karyomapping_for_trio` (`snpdb/signals/signal_handlers.py:trio_post_save_handler`),
 which streams the trio's genotypes once into `GenomeKaryomappingCounts` plus one `ContigKaryomappingCounts` per contig -
-the relatedness summary shown for the trio. A `analysis/models/models_karyomapping.py:KaryomappingAnalysis`
-(`analysis/views/views_karyomapping.py:create_and_view_karyomapping_analysis_for_trio`) adds `KaryomappingGene` rows
-whose bins over the gene's flanking region drive the Plotly scatter and CSV download.
+the relatedness summary and per-chromosome phase graph on the trio page (`analysis/templatetags/karyomapping_tags.py:trio_karyomapping_qc`).
+The per-gene page (`analysis/views/views_karyomapping.py:trio_karyomapping`) bins a gene plus flanks live through
+`analysis/models/models_karyomapping.py:TrioKaryomappingGeneRegion` (cached an hour, shared with the CSV download).
+`KaryomappingAnalysis` / `KaryomappingGene` are the retired saved-analysis pages, kept only until their records are archived.
 
 ## Why it is shaped this way
 
