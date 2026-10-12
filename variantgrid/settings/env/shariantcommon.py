@@ -149,8 +149,8 @@ SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing proj
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
-SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
-STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+_SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
+STATICFILES_DIRS = (_SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
@@ -176,8 +176,6 @@ CLASSIFICATION_ID_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = False
 
 VARIANT_SHOW_CANONICAL_HGVS = False
-CLASSIFICATION_MAX_REFERENCE_LENGTH = 1000000
-# Large value for MVLs that always wanted explicit nucleotides, no longer an issue, reduce when we have time to test
 
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
@@ -227,6 +225,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
     "variant_wiki": False,
+    "variant_types": False,  # Storage/annotation by size is a VCF-import concern - Shariant imports classifications
     "canonical_transcripts": False,
 
     # Settings
@@ -246,7 +245,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # Upload - list all URLS (only want them visible by admin)
     "upload": False,
-    "upload_poll": False,
+    "file_upload_datatable": False,
     "view_uploaded_file": False,
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,

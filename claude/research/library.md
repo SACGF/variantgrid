@@ -37,12 +37,12 @@ queryset filtering) both default to `self`/`cls`, and every check first follows 
 `settings.LOGGED_IN_USERS_GROUP_NAME` / `PUBLIC_GROUP_NAME`, and `library/guardian_utils.py:admin_bot` is the system
 user that owns automated writes.
 
-The batch forms are where the design shows. `GuardianPermissionsMixin.filter_for_user` used to hand the caller's
-queryset straight to `get_objects_for_user`; guardian embeds whatever it is given as a subquery in both its user-perm
-and its group-perm lookups, so a grid's annotated queryset had its joins planned three times over. Since 1b9075fb1 it
-resolves the permitted pks off the bare model in `_permitted_for_user_qs` (falling back to the public group when there
-is no authenticated user) and applies them as `pk__in`, skipping even that when the permitted queryset has no filters
-(a superuser, or a global model permission). `filter_writable_for_user` (#1794) is the same idea for the delete column
+The batch forms are where the design shows. `GuardianPermissionsMixin.filter_for_user` resolves the permitted pks
+off the bare model in `_permitted_for_user_qs` (falling back to the public group when there is no authenticated user)
+and applies them as `pk__in`, skipping even that when the permitted queryset has no filters (a superuser, or a global
+model permission). It does not hand the caller's queryset to `get_objects_for_user`: guardian embeds whatever it is
+given as a subquery in both its user-perm and its group-perm lookups, so a grid's annotated queryset would have its
+joins planned three times over. `filter_writable_for_user` (#1794) is the same idea for the delete column
 of a grid page: one query instead of two guardian lookups per row, superusers short-circuited, and
 `accept_global_perms=False` because that is how `can_write` asks. A class that overrides one must override the other.
 Given the page's `pks`, it filters `UserObjectPermission` / `GroupObjectPermission` by `object_pk__in` the pks as text
@@ -50,7 +50,7 @@ Given the page's `pks`, it filters `UserObjectPermission` / `GroupObjectPermissi
 reads every permission row the group holds - flat ~400ms a page at 200k VariantTags on vg-test2, 10-19ms scoped (#1432).
 `allow_group_permission_delete` is the third knob: the generic group-permissions delete view will hard-delete anything
 whose class returns True, so the base returns False and only the auto-initial-save mixin (user-created objects) opts in,
-after audit rows like `ClassificationModification` were found deletable through it.
+keeping audit rows like `ClassificationModification` out of its reach.
 
 ### A notification, from code to Slack
 
@@ -107,14 +107,13 @@ collection - `CohortGenotypeCollection`, `VariantCollection`, `VariantZygosityCo
 - and names, in `RECORDS_BASE_TABLE_NAMES` and `RECORDS_FK_FIELD_TO_THIS_MODEL`, the record tables whose rows point at
 it. `RelatedModelsPartitionModel.save` detects the first save and calls `create_partition`, whose SQL is
 `CREATE TABLE <base>_<label>_<pk> (LIKE <base> INCLUDING INDEXES, CHECK (fk = pk)) INHERITS (<base>)` followed by
-`ALTER COLUMN id SET DEFAULT nextval(...)`, because Postgres does not inherit an identity column's default (022d8fa6f)
-and, since sapath#433, the sequence name is asked from `pg_get_serial_sequence` rather than assumed to be
-`<table>_id_seq`. Reads and writes reach the child through `sql_partition_transformer`, a string replace of the
+`ALTER COLUMN id SET DEFAULT nextval(...)`, because Postgres does not inherit an identity column's default; the
+sequence name is asked from `pg_get_serial_sequence` rather than assumed to be `<table>_id_seq`. Reads and writes reach the child through `sql_partition_transformer`, a string replace of the
 double-quoted base table name that `library/django_utils/django_queryset_sql_transformer.py:get_queryset_with_transformer_hook`
 applies to compiled SQL (the annotation app's `SubVersionPartition` reuses the same hook), or through
 `library/django_utils/django_partition.py:temporary_db_table`, which swaps `_meta.db_table` for one query and clears
-every field's `cached_col` on the way in and out - the fix in 05c9db303 for queries that rendered a mix of both table
-names for the rest of the process. `delete_related_objects` and `truncate_related_objects` run `DROP` / `TRUNCATE`
+every field's `cached_col` on the way in and out, or later queries in the process render a mix of both table
+names. `delete_related_objects` and `truncate_related_objects` run `DROP` / `TRUNCATE`
 inside their own savepoint so a missing partition cannot poison an enclosing `atomic()`, and before a drop
 `_warn_if_no_archive` logs when no COMPLETE `snpdb/models/models_partition_archive.py:PartitionArchive` covers the
 table. That archive is the #1537 pipeline - `snpdb/partition_archive.py:archive_partitioned_model` schedules a
@@ -130,9 +129,8 @@ the manager's queryset class for one whose `get()` consults a cache first: the i
 module-level dict for the life of the process (GenomeBuild, FlagType), the request one stores them as a
 `library/request_context.py` request variable that dies with the request (Allele, Lab, Organization, GeneSymbol, ResolvedVariantInfo). Keys are
 `(model, args, frozendict(kwargs))`, so an unhashable argument silently bypasses the cache. Both constructors check
-`settings.UNIT_TEST` and leave the plain `QuerySet` in place when it is set (d02b5914f), because a cached instance
-outlives the test transaction that created it - the same reason `admin_bot` skips its `lru_cache` under `UNIT_TEST`
-(4b6a3d2a7). The consequence for query counting is that a test sees reads production never issues, which is what
+`settings.UNIT_TEST` and leave the plain `QuerySet` in place when it is set, because a cached instance
+outlives the test transaction that created it - the same reason `admin_bot` skips its `lru_cache` under `UNIT_TEST`. The consequence for query counting is that a test sees reads production never issues, which is what
 `library/django_utils/unittest_utils.py:production_query_count` subtracts: savepoints and any `SELECT ... FROM` one of
 `PRODUCTION_CACHED_TABLES`. `library/cache.py:timed_cache` is the function-level equivalent - per-process memo keyed on
 positional and keyword arguments with an optional TTL and size cap - used for `GenomeBuild.get_name_or_alias`,
@@ -148,7 +146,7 @@ slot, raises `TooManyMajorOperationsError` above `MAJOR_OPERATION_MAX_CONCURRENT
 `statement_timeout` to `MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS` for the duration, restoring the global value
 `variantgrid/wsgi.py` set (connections are reused under `CONN_MAX_AGE`). `_release_slot` tolerates the key having
 expired mid-operation - the slow operation is exactly the kind this exists for, and an unguarded `decr` in the
-`finally` turned its result into a 500. `MajorOperationViewMixin` wires it into class-based views by
+`finally` would turn its result into a 500. `MajorOperationViewMixin` wires it into class-based views by
 `major_operation_name`, answering 503 because DataTables ajax POSTs carry their parameters in the body and cannot be
 redirect-and-retried the way the analysis node grid is.
 
@@ -169,7 +167,10 @@ transitively imports it; templates, JS and `urls.py` select the app's `tests.tes
 `atomic()` that is always rolled back, tracks templates the way Django's test runner does, and reuses
 `production_query_count` for `--queries`; `library/vg/inspect/__init__.py:inspect` does the same rollback around one
 object's graph by domain kind. `library/vg/docs.py:check_docs` is what keeps this file honest: every backticked path
-and `path:Symbol` is resolved by AST against the working tree, live plans included, generated maps excluded.
+and `path:Symbol` is resolved by AST against the working tree, live plans included, generated maps excluded. `library/vg/deprecations.py:find_deprecations` runs basedpyright's `reportDeprecated` as
+`LOOKAHEAD_PYTHON`, so a call typeshed marks deprecated in a Python we haven't deployed shows before the upgrade, and
+splits the hits from our own `@deprecated` markers by name; `manage.py check` under `-W always::DeprecationWarning`
+adds the `warnings.warn` deprecations Django and packages raise at import, which no stub records.
 
 ## Why it is shaped this way
 
@@ -186,8 +187,8 @@ three renderings, and because every send is also an `Event` row: the event log i
 buffer for Slack's size limit. Reporting through the request context rather than passing requests is the price of having
 model methods that can report problems from a view or a task alike.
 
-Partitions are inheritance children rather than declarative partitions because they predate Postgres 10 and the
-design has never needed range or hash routing: each collection is its own table so that deleting a cohort or an
+Partitions are inheritance children rather than declarative partitions because the design needs no range or hash
+routing: each collection is its own table so that deleting a cohort or an
 annotation version is a `DROP TABLE`, not millions of row deletes, and the base table stays empty. That is why a
 plain ORM query on the base model returns nothing and why every read must go through the transformer or
 `temporary_db_table` (`claude/guides/operations.md#scale`).
@@ -195,32 +196,12 @@ plain ORM query on the base model returns nothing and why every read must go thr
 The caching managers exist because GenomeBuild, Lab and Allele are fetched thousands of times per request from code
 that has no natural place to pass them down; process-wide caching is reserved for tables never updated in place and
 request caching for the rest, and neither invalidates, because invalidation would only work in the process that
-did the write. Turning them off under `UNIT_TEST` was chosen over cache clearing between tests because the leak was a
-stale User surviving a rollback, which no clear-on-teardown reliably catches.
+did the write. They are off under `UNIT_TEST` rather than cleared between tests because a cached instance (a User,
+say) survives the test's rollback, which no clear-on-teardown reliably catches.
 
 `vg` lives in `library/` rather than `scripts/` so its Django-dependent halves can import models, and its
 Django-free halves are kept import-light on purpose: the agent loop calls `scripts/vg tests` and `docs check` on every
-edit, and a second of Django boot per call would make that unusable (`claude/plans/agent_system.md` §4.2).
-
-## History
-
-The guardian mixin dates from the original codebase; the 2026 changes are all about grids: instance-level checks for
-DataTables deletes (ee5016c07), the delete opt-out for audit classes (280a9aada), `filter_writable_for_user` for the
-batched delete column (#1794, #1785), and the bare-model pk resolution that stopped guardian planning the tags grid
-query three times (1b9075fb1). `library/django_utils/filter_rules.py` and `library/django_utils/grid_export.py` are
-what remained of the jqGrid client after the DataTables conversion (#1462, #1785, #1815): the filter-rule JSON that
-`FilterNode` persists was jqGrid's format, so the vocabulary was kept and the client swapped underneath it.
-`library/django_utils/major_operation.py` arrived with the per-user query limits (variantgrid_private#1502) and grew
-its expired-slot guard in #1794. The caching managers are from September 2023 (46b4668a3, 3bf85eb47) with the
-`UNIT_TEST` bypass a week later (d02b5914f); `admin_bot` lost its cache in tests in July 2023 (4b6a3d2a7).
-Partitioning gained the identity-default fix in 2024 (022d8fa6f), the archive pipeline and `DataArchiveMixin` in
-May 2026 (#1537, #1536), the `cached_col` clearing and real sequence lookup in August 2026 (05c9db303, sapath#433).
-`PreviewData` became hashable for cross-build search deduplication (#1115) and got a security pass with the rest of
-the package (variantgrid_private#3833). Health checks were split into recent and overall signals (#941, sapath#3532).
-`production_query_count` and the query-count scaling tests came with the N+1 work (#1590), and `URLTestCase` stopped
-publishing to the dev broker (edda1e7fb). The two audit tests - `library/tests/test_signal_receiver_registration.py`
-(e89c9f11f) and `library/tests/test_decorator_audit.py` (#1581) - each followed a silent production breakage.
-`library/vg/` is the agent-legibility work of September 2026 (#1816), phases 0 and 1.
+edit, and a second of Django boot per call would make that unusable.
 
 ## Traps
 

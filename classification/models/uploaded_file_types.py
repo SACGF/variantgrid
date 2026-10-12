@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
+from storages.backends.s3boto3 import S3Boto3Storage
+
 
 class FileHandle(ABC):
     """
@@ -56,9 +58,7 @@ class FileHandle(ABC):
                         abs_directory = os.path.abspath(directory)
                         abs_target = os.path.abspath(target)
 
-                        prefix = os.path.commonprefix([abs_directory, abs_target])
-
-                        return prefix == abs_directory
+                        return os.path.commonpath([abs_directory, abs_target]) == abs_directory
 
                     def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
 
@@ -115,7 +115,6 @@ class FileHandleS3(FileHandle):
 
     @staticmethod
     def create(bucket: str, file: str):
-        from storages.backends.s3boto3 import S3Boto3Storage
         media_storage = S3Boto3Storage(bucket_name=bucket)
         return FileHandleS3(media_storage=media_storage, file=file)
 

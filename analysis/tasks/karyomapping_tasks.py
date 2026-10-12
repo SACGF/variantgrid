@@ -18,19 +18,11 @@ def create_genome_karyomapping_for_trio(trio_id):
     GenomeKaryomappingCounts.objects.filter(trio=trio).delete()
     genome_karyomapping_counts = GenomeKaryomappingCounts.objects.create(trio=trio)
 
-    karyotype_bin_lookup = KaryotypeBins.get_karotype_bin_lookup()
-    variant_and_genotypes = KaryotypeBins.get_variant_and_genotypes(trio)
-
     contig_code_count = defaultdict(Counter)
-    for variant_data, genotype_tuple in variant_and_genotypes:
-        contig_id = variant_data[1]
-        (proband_gt, father_gt, mother_gt) = genotype_tuple
-
-        try:
-            karyotype_bin = karyotype_bin_lookup[proband_gt][father_gt][mother_gt]
+    for variant_data, genotype_tuple in KaryotypeBins.iter_variant_and_genotypes(trio):
+        if karyotype_bin := KaryotypeBins.get_bin(genotype_tuple):
+            contig_id = variant_data[1]
             contig_code_count[contig_id][karyotype_bin] += 1
-        except KeyError:
-            pass
 
     genome_counts = Counter()
     contig_karyomapping_counts_list = []

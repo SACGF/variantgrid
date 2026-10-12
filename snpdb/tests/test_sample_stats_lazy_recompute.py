@@ -43,8 +43,7 @@ class SampleStatsLazyRecomputeTest(TestCase):
     def test_stale_code_version_enqueues_recompute(self):
         calculate_cohort_stats(self.cohort, self.annotation_version)
         old_code_version = SampleStatsCodeVersion.objects.create(name="SampleStats",
-                                                                 version=SAMPLE_STATS_CODE_VERSION - 1,
-                                                                 code_git_hash="old")
+                                                                 version=SAMPLE_STATS_CODE_VERSION - 1)
         CohortGenotypeStats.objects.filter(sample=self.sample).update(code_version=old_code_version)
         with patch("snpdb.views.views_data.enqueue_cohort_stats_recompute") as mock_enqueue:
             _sample_stats(self.sample)

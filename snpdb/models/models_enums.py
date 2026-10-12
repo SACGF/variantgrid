@@ -152,7 +152,7 @@ class TagFilter:
         return tag_ids
 
 
-class VariantsType(models.TextChoices):
+class VariantOrigin(models.TextChoices):
     UNKNOWN = 'U', 'Unknown'
     GERMLINE = 'G', 'Germline'
     MIXED = 'M', "Mixed (Single Sample)"
@@ -167,6 +167,8 @@ class SampleFileType(models.TextChoices):
     CRAM = 'C', 'CRAM'
     BED = 'E', 'BED'
     VCF = 'V', 'VCF'
+
+    ALIGNMENT_TYPES = Constant([e[0] for e in (BAM, CRAM)])  # Reads, ie what IGV is opened with
 
 
 class SequenceRole(models.TextChoices):

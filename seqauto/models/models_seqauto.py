@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 
+from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import (
     ActiveSampleGeneList,
     CustomTextGeneList,
@@ -46,7 +47,8 @@ from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequence
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
 from snpdb.models import VCF, GenomeBuild, InheritanceManager, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_enums import ImportStatus, SampleFileType
+from snpdb.models.models_vcf import SampleFilePath
 
 
 class SeqAutoRecord(TimeStampedModel):
@@ -162,11 +164,11 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
         old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
-        old_bam_files = BamFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
+        old_alignment_files = AlignmentFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
         return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
                     old_joint_called_vcfs.exists(),
                     old_unaligned_reads.exists(),
-                    old_bam_files.exists(),
+                    old_alignment_files.exists(),
                     old_sample_links.exists()])
 
     @staticmethod
@@ -343,17 +345,12 @@ class SequencingSample(ExtractionMatchMixin, models.Model):
         params['aligned_pattern'] = aligned_pattern % params
         return params
 
-    def get_single_bam(self):
-        """ relies on there being only one """
-        try:
-            return self.bamfile_set.get()
-        except Exception:
-            logging.error("Wasn't exactly 1 bam_file for sequencing sample %s", self)
-        return None
-
     def get_single_qc(self):
-        if bam_file := self.get_single_bam():
-            return bam_file.qc_set.get()
+        """ A sample can have several alignment files (eg BAM and recalibrated BAM), QC hangs off one of them """
+        try:
+            return QC.objects.get(alignment_file__sequencing_sample=self)
+        except (QC.DoesNotExist, QC.MultipleObjectsReturned):
+            logging.error("Wasn't exactly 1 QC for sequencing sample %s", self)
         return None
 
     @staticmethod
@@ -502,12 +499,20 @@ class UnalignedReads(models.Model):
         return f"UnalignedReads from sample {self.sequencing_sample}"
 
 
-class BamFile(SeqAutoRecord):
+class AlignmentFile(SeqAutoRecord):
+    """ A BAM or CRAM - a sequencing sample can have several (eg a BAM and its recalibrated BAM) """
     sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
     # UnalignedReads is optional metadata - some sequencers produce BAMs with no FastQ stage at all
     unaligned_reads = models.ForeignKey(UnalignedReads, null=True, on_delete=CASCADE)
     name = models.TextField()
     aligner = models.ForeignKey(Aligner, on_delete=CASCADE)
+    file_type = models.CharField(max_length=1, choices=SampleFileType.choices, default=SampleFileType.BAM)
+
+    @staticmethod
+    def get_file_type_from_path(path: str) -> SampleFileType:
+        if path.lower().endswith(".cram"):
+            return SampleFileType.CRAM
+        return SampleFileType.BAM
 
     def get_params(self):
         params = self.sequencing_sample.get_params()
@@ -530,20 +535,29 @@ class BamFile(SeqAutoRecord):
             raise
         return os.path.abspath(filename)
 
+    def create_sample_file_path(self, sample: Sample):
+        """ Copied onto the Sample so it opens in IGV """
+        SampleFilePath.objects.get_or_create(sample=sample, file_path=self.path, file_type=self.file_type)
+
+    def link_to_samples(self):
+        """ For an alignment file posted after its sequencing sample's VCFs were imported """
+        for sfss in self.sequencing_sample.samplefromsequencingsample_set.select_related("sample"):
+            self.create_sample_file_path(sfss.sample)
+
     @staticmethod
-    def get_aligner_from_bam_file(bam_path):
+    def get_aligner_from_alignment_file(path):
         # TODO: Do properly
         aligner, _ = Aligner.objects.get_or_create(name='fake_aligner', version='0.666')
         return aligner
 
     def __str__(self):
-        return f"BAM: {self.sequencing_sample}"
+        return f"{self.get_file_type_display()}: {self.sequencing_sample}"
 
 
 class Flagstats(SeqAutoRecord):
     FLAGSTATS_EXTENSION = ".flagstat.txt"
 
-    bam_file = models.OneToOneField(BamFile, on_delete=CASCADE)
+    alignment_file = models.OneToOneField(AlignmentFile, on_delete=CASCADE)
     total = models.IntegerField(null=True)
     read1 = models.IntegerField(null=True)
     read2 = models.IntegerField(null=True)
@@ -559,10 +573,10 @@ class Flagstats(SeqAutoRecord):
         return 100.0 * self.properly_paired / self.total
 
     def get_params(self):
-        return self.bam_file.get_params()
+        return self.alignment_file.get_params()
 
     def __str__(self):
-        return f"Flagstats for {self.bam_file}"
+        return f"Flagstats for {self.alignment_file}"
 
 
 def get_seqauto_user():
@@ -575,20 +589,20 @@ def get_seqauto_user():
 
 
 class SingleSampleVCF(SeqAutoRecord):
-    """ Single-sample VCFs from the file system, tied to exactly one BamFile """
-    bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
+    """ Single-sample VCFs from the file system, called from one AlignmentFile """
+    alignment_file = models.ForeignKey(AlignmentFile, on_delete=CASCADE)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
     def get_params(self):
-        return self.bam_file.get_params()
+        return self.alignment_file.get_params()
 
     def get_sequencing_samples(self):
         """ The sequencing samples this VCF is allowed to link against """
-        return SequencingSample.objects.filter(pk=self.bam_file.sequencing_sample_id)
+        return SequencingSample.objects.filter(pk=self.alignment_file.sequencing_sample_id)
 
     @property
     def enrichment_kit(self) -> Optional[EnrichmentKit]:
-        return self.bam_file.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
+        return self.alignment_file.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
 
     @property
     def has_mixed_enrichment_kits(self) -> bool:
@@ -608,7 +622,7 @@ class SingleSampleVCF(SeqAutoRecord):
 
     @property
     def sample_sheet(self) -> SampleSheet:
-        return self.bam_file.sequencing_sample.sample_sheet
+        return self.alignment_file.sequencing_sample.sample_sheet
 
     @property
     def vcf(self) -> Optional[VCF]:
@@ -729,7 +743,7 @@ class QC(SeqAutoRecord):
 
         TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
     """
-    bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
+    alignment_file = models.ForeignKey(AlignmentFile, on_delete=CASCADE)
     vcf_file = models.ForeignKey(SingleSampleVCF, on_delete=CASCADE)
 
     @property
@@ -749,7 +763,7 @@ class QC(SeqAutoRecord):
 
     @property
     def sequencing_sample(self):
-        return self.bam_file.sequencing_sample
+        return self.alignment_file.sequencing_sample
 
     @staticmethod
     def get_path_from_vcf(vcf):
@@ -787,8 +801,6 @@ class QCGeneList(SeqAutoRecord):
 
     @staticmethod
     def create_gene_list(custom_gene_list_text, sequencing_sample):
-        from genes.custom_text_gene_list import create_custom_text_gene_list
-
         custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {sequencing_sample.sample_name}",
                                                    text=custom_gene_list_text)
         custom_text_gene_list.save()
@@ -884,7 +896,7 @@ class QCExecSummary(SeqAutoRecord):
 
     @staticmethod
     def get_sequencing_run_path():
-        return "qc__bam_file__sequencing_sample__sample_sheet__sequencing_run"
+        return "qc__alignment_file__sequencing_sample__sample_sheet__sequencing_run"
 
     def __str__(self):
         return f"QCExecSummary for {self.qc}"
@@ -954,7 +966,7 @@ class GoldGeneCoverageCollection(models.Model):
         If you wish to delete / replace a GeneCoverageCollection here, you must delete the
         old gold first (PROTECT) to stop Stored gold reference and current gold runs
         getting out of sync """
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
 
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=PROTECT)
@@ -1044,6 +1056,16 @@ def _number_text(value) -> str:
     return f"{value:g}" if isinstance(value, (int, float)) else "no value"
 
 
+def _number_with_unit_text(value, unit: str) -> str:
+    """ '184 bp', '98.1%'. 'Count' is what DRAGEN writes for a metric with no unit at all, so it is not shown """
+    text = _number_text(value)
+    if unit == "%":
+        return text + unit
+    if unit in ("", "Count"):
+        return text
+    return f"{text} {unit}"
+
+
 def library_qc_guideline(lsl, usl) -> str:
     """ A metric's guideline in words. A zero lower bound is no bound in practice - none of these
         metrics can go negative - so it is left off rather than read as policy """
@@ -1070,7 +1092,7 @@ class LibraryQCMetric(NamedTuple):
 
     @property
     def value_text(self) -> str:
-        return _number_text(self.value)
+        return _number_with_unit_text(self.value, self.unit)
 
     @property
     def guideline(self) -> str:
@@ -1162,19 +1184,18 @@ class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
                 for name, metric in self.metrics.items()]
 
     @property
+    def failed_metrics(self) -> list['LibraryQCMetric']:
+        """ The metrics outside their guideline - what the build form names beside a failed category """
+        return [metric for metric in self.metric_rows if metric.passed is False]
+
+    @property
     def metrics_description(self) -> str:
         """ Each metric against the guideline it was judged by - 'GENE_SCALED_MAD 0.059 (<= 0.134)' - so a
             scientist looking at a failed category can see which number failed rather than just that it did """
         parts = []
-        for name, metric in self.metrics.items():
-            described = f"{name} {_number_text(metric.get('value'))}"
-            # 'Count' is what DRAGEN writes for a metric with no unit at all, so it is not shown
-            unit = metric.get("unit") or ""
-            if unit == "%":
-                described += unit
-            elif unit not in ("", "Count"):
-                described += f" {unit}"
-            if guideline := library_qc_guideline(metric.get("lsl"), metric.get("usl")):
+        for metric in self.metric_rows:
+            described = f"{metric.name} {metric.value_text}"
+            if guideline := metric.guideline:
                 described = f"{described} ({guideline})"
             parts.append(described)
         return ", ".join(parts)
@@ -1221,6 +1242,11 @@ def band_call(value: float, bands: list) -> Optional[str]:
     return None
 
 
+def top_band_call(bands: list) -> Optional[str]:
+    """ The call of the highest band - MSI-High, GIS POSITIVE """
+    return max(bands, key=lambda band: band[0])[1] if bands else None
+
+
 def describe_bands(bands: list, unit: str) -> str:
     """ The policy in words, as the build form shows it - 'MSI-High >= 30%, MSI-Low >= 10%, MSS < 10%' """
     ordered = sorted(bands, key=lambda band: band[0], reverse=True)
@@ -1243,7 +1269,7 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
         sheet's Sample_ID - each left null until it exists and reconciled after. The specimen is claimed
         by the accession inside the sample IDs.
 
-        The lab's MSI / TMB calls are computed from the TSO500_*_CALL_BANDS settings when read rather than
+        The lab's MSI / TMB / GIS calls are computed from the TSO500_*_CALL_BANDS settings when read rather than
         stored: this row is never overwritten by a later analysis, and a CaseReport snapshots what it printed. """
     sequencing_run_name = models.TextField()        # the upload's 'sequencing_run' metadata - a SequencingRun.name
     pair_id = models.TextField()                    # [Analysis Details] Pair ID
@@ -1316,7 +1342,10 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
                 msi = f"{msi} ({self.msi_call.call})"
             parts.append(PreviewKeyValue(key="MSI", value=msi))
         if self.genomic_instability_score is not None:
-            parts.append(PreviewKeyValue(key="GIS", value=f"{self.genomic_instability_score:g}"))
+            gis = f"{self.genomic_instability_score:g}"
+            if self.gis_call and self.gis_call.call:
+                gis = f"{gis} ({self.gis_call.call})"
+            parts.append(PreviewKeyValue(key="GIS", value=gis))
         return self.preview_with(identifier=self.pair_id, title=self.sequencing_run_name,
                                  summary_extra=parts)
 
@@ -1343,9 +1372,38 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
             return None
         threshold = f"{describe_bands(bands, '%')} unstable sites, needs >= {min_usable_sites} usable sites"
         source = "settings.TSO500_MSI_CALL_BANDS / settings.TSO500_MSI_MIN_USABLE_SITES"
+        if min_high_tumor_fraction := settings.TSO500_MSI_HIGH_MIN_TUMOR_FRACTION:
+            threshold += f", {top_band_call(bands)} needs tumour fraction >= {min_high_tumor_fraction:g}"
+            source += " / settings.TSO500_MSI_HIGH_MIN_TUMOR_FRACTION"
         if self.usable_msi_sites is None or self.usable_msi_sites < min_usable_sites:
             return MeasureCall(None, threshold, source)
-        return MeasureCall(band_call(self.percent_unstable_msi_sites, bands), threshold, source)
+        call = band_call(self.percent_unstable_msi_sites, bands)
+        # A run without the HRD arm has no tumour fraction to hold the call to
+        if call == top_band_call(bands) and self._tumor_fraction_below(min_high_tumor_fraction):
+            call = None
+        return MeasureCall(call, threshold, source)
+
+    @property
+    def gis_call(self) -> Optional[MeasureCall]:
+        """ The lab's HRD category off the Genomic Instability Score. A low score is not evaluable at low
+            purity - the instability may be diluted out - while a high one stands whatever the purity """
+        bands = settings.TSO500_GIS_CALL_BANDS
+        if not bands or self.genomic_instability_score is None:
+            return None
+        threshold = describe_bands(bands, "")
+        source = "settings.TSO500_GIS_CALL_BANDS"
+        if min_tumor_fraction := settings.TSO500_GIS_MIN_TUMOR_FRACTION:
+            threshold += f", below {top_band_call(bands)} needs tumour fraction >= {min_tumor_fraction:g}"
+            source += " / settings.TSO500_GIS_MIN_TUMOR_FRACTION"
+        call = band_call(self.genomic_instability_score, bands)
+        if call != top_band_call(bands) and self._tumor_fraction_below(min_tumor_fraction):
+            call = None
+        return MeasureCall(call, threshold, source)
+
+    def _tumor_fraction_below(self, min_tumor_fraction: Optional[float]) -> bool:
+        """ Only a known tumour fraction under a set minimum holds a call back """
+        return min_tumor_fraction is not None and self.tumor_fraction is not None \
+            and self.tumor_fraction < min_tumor_fraction
 
     @property
     def tmb_call(self) -> Optional[MeasureCall]:
@@ -1357,9 +1415,11 @@ class DragenTSO500CombinedVariantOutput(PreviewModelMixin, SpecimenClaimMixin, T
                            "settings.TSO500_TMB_CALL_BANDS")
 
     def measure_call(self, context_key: str) -> Optional[MeasureCall]:
-        """ The call for a CVO_MEASURE_CONTEXT_KEYS key - MSI and TMB are the two the lab has a policy for """
+        """ The call for a CVO_MEASURE_CONTEXT_KEYS key - MSI, TMB and GIS are the ones the lab has a policy for """
         if context_key == "msi":
             return self.msi_call
+        if context_key == "gis":
+            return self.gis_call
         if context_key == "tmb":
             return self.tmb_call
         return None
@@ -1481,7 +1541,7 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
         Cached per gene/threshold as (count, num collections, max collection pk) so a call only counts collections
         added since; the cache is dropped when a collection at or below the cached max disappears or stops being
         current """
-    current_sheet_filter = "qcgenecoverage__qc__bam_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
+    current_sheet_filter = "qcgenecoverage__qc__alignment_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
     gcg_qs = GeneCoverageCollection.objects.filter(**{current_sheet_filter: False})
 
     existing_count = 0

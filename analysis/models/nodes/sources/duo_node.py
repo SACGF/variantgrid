@@ -411,18 +411,11 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     def _get_cohort(self):
         return self.duo.cohort if self.duo else None
 
-    def _has_filters_that_affect_label_counts(self) -> bool:
-        # Inheritance is a CACHE DIMENSION (precomputed via filter_key), not a defeating filter.
-        # Quality filters from AbstractCohortBasedNode still defeat the cache.
-        return AbstractCohortBasedNode._has_filters_that_affect_label_counts(self)
-
     def _get_cached_label_count(self, label):
-        # Compound het is the only duo mode that takes a parent (max_inputs=1), and its queryset is
-        # intersected with that parent (uses_parent_queryset). The cohort-wide stats cache can't
-        # represent the parent restriction, so it would over-count - do a real DB count instead.
-        if self.has_input():
-            return None
-        return super()._get_cached_label_count(label)
+        """ Nothing is precomputed for duos - the buckets are built off a cohort's Trio, so every
+            DuoNode counts live rather than reading the raw cohort row, which knows nothing about its
+            inheritance mode """
+        return None
 
     def modifies_parents(self):
         return self.duo is not None

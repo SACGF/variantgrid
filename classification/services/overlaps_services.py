@@ -18,10 +18,10 @@ from django.db.models.aggregates import Max
 from django.utils.timezone import now
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord
-from classification.enums import TestingContextBucket, OverlapStatus, OverlapState
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapSnapshot
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
-    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
+    TriageNextStep, TriageDecision, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
 from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
@@ -208,7 +208,7 @@ class OverlapServices:
                         "value": value,
                         "contribution_status": contribution_enum,
                         "effective_date": effective_date.to_dict(),
-                        "triage_state": TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
+                        "triage_state": TriageDecision(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
                     }
                 )
 
@@ -430,7 +430,7 @@ class OverlapServices:
                 OverlapServices._overlap_status_changed(overlap, cached_state, overlap_status_calculation)
 
     @staticmethod
-    def _overlap_status_changed(overlap: Overlap, old_state: OverlapState, new_state: OverlapState):
+    def _overlap_status_changed(overlap: Overlap, old_state: OverlapSnapshot, new_state: OverlapSnapshot):
         """
         Called when important factors of an Overlap change that might require a discordance notification to be prepared
         :param overlap: The overlap object (typically reflecting the new state)
@@ -449,7 +449,7 @@ class OverlapServices:
         # see if it's worth notifying anyone
         odn: OverlapDiscordanceNotification
         created: bool = False
-        if not OverlapState.is_notify_relevant(old_state, new_state):
+        if not OverlapSnapshot.is_notify_relevant(old_state, new_state):
             # change isn't worth notifying, but if we were already notifying (with a previous state), update that notification
             # so find the existing notification (if one exists) and update it, but don't create one
             odn = OverlapDiscordanceNotification.objects.filter(overlap=overlap, notification_sent_date__isnull=True).first()
@@ -757,7 +757,7 @@ class OverlapPageDetails:
         try:
             match field_name:
                 case "triage_state":
-                    return TriageState.from_dict(to_json(value))
+                    return TriageDecision.from_dict(to_json(value))
                 case "effective_date":
                     return EffectiveDate.from_dict(to_json(value))
                 case "comment":

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db.utils import OperationalError
 from django.forms import model_to_dict
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,7 +36,9 @@ from genes.models import (
     GeneSymbol,
 )
 from library.django_utils import get_field_counts
+from library.django_utils.database_utils import pg_settings, query_was_cancelled
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
+from library.genomics import format_bp
 from library.git import Git
 from library.log_utils import log_traceback
 from library.utils import StashFile
@@ -45,7 +48,7 @@ from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.forms import TagForm, UserSelectForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Sample, Tag, Variant, VariantGridColumn, get_igv_data
+from snpdb.models import GenomeBuild, Sample, Tag, Variant, VariantGridColumn, get_igv_data
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
@@ -58,6 +61,7 @@ from snpdb.variant_filters import (
     get_variant_type_label,
     resolve_gene_symbols,
 )
+from upload.models.models import ModifiedImportedVariant
 from variantopedia import forms
 from variantopedia.grids import (
     VariantTagsColumns,
@@ -70,6 +74,7 @@ from variantopedia.interesting_nearby import (
     get_nearby_qs,
     get_nearby_summaries,
 )
+from variantopedia.variant_types import get_size_limits, get_unsupported, get_variant_type_rows
 
 
 def variants(request, genome_build_name=None):
@@ -92,7 +97,6 @@ def variants(request, genome_build_name=None):
         "standard_contigs": genome_build.standard_contigs,
         "variant_types": [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()],
         "initial_filters": initial_filters,
-        "initial_filters_json": json.dumps(initial_filters),
         "default_contig_id": default_contig_ids[0] if default_contig_ids else None,
         "gene_symbol_form": gene_symbol_form,
         "gene_symbol_aliases": gene_symbol_aliases,
@@ -160,9 +164,10 @@ def variant_grid_row_detail(request, variant_id: int, annotation_version_id: int
             .select_related("classification", "classification__lab").order_by("classification__pk")
         classifications = list(cm_qs[:VARIANT_GRID_ROW_DETAIL_MAX_CLASSIFICATIONS])
 
-    # Symbolic variants span genes rather than sitting in one, so name what they hit
+    # Structural variants span genes rather than sitting in one, so name what they hit - a short symbolic
+    # variant is annotated as a small one, which doesn't record them
     overlapping_symbols = None
-    if variant.is_symbolic and variant_annotation:
+    if variant_annotation and variant_annotation.is_structural_variant_annotation:
         overlapping_symbols = variant_annotation.overlapping_symbols
 
     # What the Classifications column's ClinVar chips summarise
@@ -204,6 +209,20 @@ def _get_splice_event_variant(variant: Variant) -> Optional[SpliceEventVariant]:
     """ The third kind - the gene and the junction's label, which the alt carries rather than a row
         of its own (@see genes.gene_splice) """
     return get_splice_event_variant(variant)
+
+
+def _get_gene_level_igv_locus(genome_build: GenomeBuild, gene_fusion: Optional[GeneFusion],
+                              gene_copy_number_event: Optional[GeneCopyNumberEvent],
+                              splice_event_variant: Optional[SpliceEventVariant]) -> Optional[str]:
+    """ What the Quick Links IGV link opens for a gene-level variant, whose own locus is a gene ID
+        on a fake contig rather than a coordinate (@see snpdb.gene_level_variants) """
+    if gene_fusion:
+        return gene_fusion.igv_locus
+    if gene_copy_number_event:
+        return gene_copy_number_event.igv_locus
+    if splice_event_variant:
+        return splice_event_variant.junction_locus(genome_build)
+    return None
 
 
 def view_variant(request, variant_id, genome_build_name=None):
@@ -308,8 +327,8 @@ def search(request):
         if mode := form.cleaned_data.get('mode'):
             preview_mode = mode == "preview"
 
-    # always perform a "search" so we can get told what kind of searches are enabled
-    # note that searching on "" doesn't actually invoke any of the other search logic
+    # always perform a "search" so we can get told what kind of searches are enabled - every visible receiver
+    # returns a response, and as no pattern matches "" those are unmatched responses listing the accepted inputs
 
     search_results = search_data(user=request.user, search_string=search_string, classify=classify)
 
@@ -342,6 +361,19 @@ def search(request):
         # "external_codes": external_codes,
     }
     return render(request, "variantopedia/search.html", context)
+
+
+def variant_types(request):
+    context = {
+        "groups": get_variant_type_rows(),
+        "size_limits": get_size_limits(),
+        "unsupported": get_unsupported(),
+        "symbolic_alt_size": format_bp(settings.VARIANT_SYMBOLIC_ALT_SIZE),
+        "structural_variant_min_size": format_bp(settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
+        "vep_sv_max_size": format_bp(settings.ANNOTATION_VEP_SV_MAX_SIZE) if settings.ANNOTATION_VEP_SV_MAX_SIZE else None,
+        "annotsv_enabled": settings.ANNOTATION_ANNOTSV_ENABLED,
+    }
+    return render(request, "variantopedia/variant_types.html", context)
 
 
 def variant_wiki(request, genome_build_name=None):
@@ -408,8 +440,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         except Exception:  # May not have been annotated?
             log_traceback()
 
-    modified_normalised_variants = variant.modifiedimportedvariant_set.filter(old_variant__isnull=False)
-    modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
+    old_variants_qs = variant.modifiedimportedvariant_set.filter(ModifiedImportedVariant.q_normalised())
+    old_variants_qs = old_variants_qs.order_by("old_variant_formatted").distinct("old_variant_formatted")
+    modified_normalised_variants = [ModifiedImportedVariant.get_variant_coordinate_from_old_variant(ov).format_short()
+                                    for ov in old_variants_qs.values_list("old_variant_formatted", flat=True)]
 
     variant_allele_data = None
     # We don't really handle very rare case with having multiple VariantAlleles for a variant
@@ -432,7 +466,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
+    gene_fusion = _get_gene_fusion(variant)
+    gene_copy_number_event = _get_gene_copy_number_event(variant)
     splice_event_variant = _get_splice_event_variant(variant)
+    splice_event = splice_event_variant.splice_event if splice_event_variant else None
 
     if variant_annotation and variant_annotation.hgvs_g:
         hgvs_g = variant_annotation.hgvs_g
@@ -457,9 +494,12 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "gene_fusion": _get_gene_fusion(variant),
-        "gene_copy_number_event": _get_gene_copy_number_event(variant),
+        "gene_fusion": gene_fusion,
+        "gene_copy_number_event": gene_copy_number_event,
         "splice_event_variant": splice_event_variant,
+        "gene_level_igv_locus": _get_gene_level_igv_locus(genome_build, gene_fusion, gene_copy_number_event,
+                                                          splice_event_variant),
+        "splice_event_civic_url": splice_event.civic_url if splice_event else None,
         # Names the page and the analysis' variant details tab, which have no room for a transcript.
         # A splice event is called by its name ("AR-V7 splice variant"), not by a c.HGVS it has none of
         "variant_short_label": splice_event_variant.display if splice_event_variant else
@@ -514,8 +554,14 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
         "distance": distance,
         "distance_str": str(distance)
     }
-    context.update(get_nearby_summaries(request.user, variant, annotation_version,
-                                        distance=distance, clinical_significance=True))
+    try:
+        with pg_settings(statement_timeout=settings.VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS * 1000):
+            context.update(get_nearby_summaries(request.user, variant, annotation_version,
+                                                distance=distance, clinical_significance=True))
+    except OperationalError as e:
+        if not query_was_cancelled(e):
+            raise
+        context["timed_out"] = True
     return render(request, "variantopedia/nearby_variants_tab.html", context)
 
 

@@ -7,7 +7,7 @@ from django.db.models import F, FilteredRelation, Q, QuerySet
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
 
-from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
@@ -62,7 +62,6 @@ class VariantZygosityCountCollection(DataArchiveMixin, RelatedModelsPartitionMod
 
     def get_annotation_kwargs(self, **kwargs):
         if self.data_archived:
-            from snpdb.archive import DataArchivedError
             raise DataArchivedError(self)
         q_collection = Q(variantzygositycount__collection=self)
         return {self.alias: FilteredRelation('variantzygositycount', condition=q_collection),

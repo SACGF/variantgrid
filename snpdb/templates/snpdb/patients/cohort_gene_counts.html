@@ -3,37 +3,11 @@
 {% block title %}Gene Counts{% endblock %}
 
 {% block head %}
+<script src="{% static 'js/snpdb/cohort_gene_counts.js' %}"></script>
 <script>
-
-$(document).ready(function() {
-    const gcContainer = $("#cohort-gene-counts-graph-container");
-
-    function load_graph(url) {
-        gcContainer.html('<i class="fa fa-spinner"></i>');
-        gcContainer.load(url);
-    }
-
-    let geneListId = {{ gene_list_id|default:"null" }};
-
-    function load_gene_list() {
-        const geneCountType = $("#id_gene_count_type").val();
-        if (geneCountType && geneListId) {
-            load_graph(Urls.cohort_gene_counts_matrix({{ cohort.pk }}, geneCountType, geneListId));
-        } else {
-            gcContainer.empty();
-        }
-    }
-
-    $('#id_gene_count_type').change(load_gene_list);
-
-    $('#id_gene_list').change(function() {
-        geneListId = $(this).val();
-        load_gene_list();
+    $(document).ready(function() {
+        initCohortGeneCounts({{ cohort.pk }}, {{ gene_list_id|default:"null" }});
     });
-
-    load_gene_list();
-    
-});
 </script>
 {% endblock %}
 

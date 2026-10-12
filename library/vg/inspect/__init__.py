@@ -3,8 +3,7 @@
 
 Owns the KINDS registry (kind -> inspector module under library/vg/inspect/), the lookup rules (a pk or a
 natural key per kind), the depth / list-cap contract every inspector follows and the shared Markdown
-renderer. Entry points: `inspect(kind, key, depth)` returns nested dicts (the --json shape in
-claude/plans/agent_system.md Appendix D), `render_inspection` prints them.
+renderer. Entry points: `inspect(kind, key, depth)` returns nested dicts (the --json shape), `render_inspection` prints them.
 
 Every inspector runs inside a read-only transaction that is rolled back, so an inspector can never write.
 Lists are capped at CAP items and carry `truncated: n` for the rest; relations are followed to `depth`

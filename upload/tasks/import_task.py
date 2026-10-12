@@ -6,7 +6,7 @@ from celery.app.task import Task
 
 from library.log_utils import get_traceback
 from library.utils import format_called_process_error
-from upload.models import UploadPipeline
+from upload.models.models import UploadPipeline, UploadUserError
 
 
 class ImportRequiresUserInputException(Exception):
@@ -45,6 +45,8 @@ class ImportTask(Task):
                                     processing_seconds_cpu_time=processing_seconds_cpu_time)
         except ImportRequiresUserInputException as e:
             upload_pipeline.terminate_early_for_user_input(str(e))
+        except UploadUserError as e:
+            upload_pipeline.user_error(e)
         except subprocess.CalledProcessError as e:
             error_message = format_called_process_error(e)
         except:

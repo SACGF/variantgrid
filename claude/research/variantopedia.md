@@ -34,8 +34,7 @@ expanded row under any variant grid row (transcripts, classifications, ClinVar, 
 
 `variantopedia/views_allele.py:view_allele` (also at `/a<id>`) shows the allele across builds: the
 `classification/variant_card.py:AlleleCard`, and the valid classification `Overlap` rows for the allele split into
-single-context and cross-context (`classification/models/overlaps_model.py:Overlap`, which replaced the discordance
-reports / allele origin grouping descriptions). `view_allele_from_variant` redirects variant to allele only when
+single-context and cross-context (`classification/models/overlaps_model.py:Overlap`). `view_allele_from_variant` redirects variant to allele only when
 `PREFER_ALLELE_LINKS` is on. `create_variant_for_allele` (POST) re-runs liftover from the allele's imported (non-liftover)
 build into the requested build, retrying every conversion tool; with no imported VariantAllele it silently just
 redirects.
@@ -86,6 +85,14 @@ are a separate count. Only tags the user can see are counted, and an allele orig
 ClinVar counts by clinical significance, DB zygosity sums) plus tag counts. `variantopedia/grids.py:NearbyVariantsGrid`
 shows one region's queryset.
 
+The nearby tab (`variantopedia/views.py:nearby_variants_tab`) loads with every variant page and a slow query holds a
+sync gunicorn worker for each, so it runs under `VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS` and shows a message
+when cancelled (#2137). The codon / exon / domain lookups skip rows with no transcript
+(`variantopedia/interesting_nearby.py:_variant_transcript_annotation_qs`) - MT tRNA/rRNA have none -
+because a NULL key becomes `transcript_id IS NULL`, which scans the partition and counts every unmatched transcript.
+Per-gene rows are off by default (`VARIANT_DETAILS_NEARBY_SHOW_GENE`, #771) at seconds per gene (#765). Cancelling
+on client disconnect and short timeouts for the other variant page tabs are still open on #2137.
+
 ### Server status (superuser)
 
 `variantopedia/views_server_status.py:server_status` pings celery workers by the names in `CELERY_WORKER_NAMES` (plus
@@ -99,26 +106,16 @@ separately. Health data comes from `library/health_check.py`: apps answer `healt
 `variantopedia/tasks/server_status_tasks.py:notify_server_status` (beat at 19:00, `variantgrid/celery.py`), gated on
 `HEALTH_CHECK_ENABLED`.
 
-The two commands (`deployment_check`, `download_annotation_data`) are deploy tooling that live here by history.
+The two commands (`deployment_check`, `download_annotation_data`) are deploy tooling, unrelated to the pages.
 
 ## Why it is shaped this way
 
 The app is a presentation layer so that the heavy logic stays next to its data: search in snpdb, annotation selection in
 annotation, overlaps in classification. What is left here is page composition and grid query shaping, and the grid
 decisions are all about the size of `snpdb_variant`: no user sorting, pk-then-columns paging, estimated counts, and a
-match-nothing default on All Variants, each introduced after a page blew the statement timeout (#1279, #1651, #1663,
+match-nothing default on All Variants, each because the alternative blows the statement timeout (#1279, #1651, #1663,
 #1887). The tag grids key on allele rather than variant so a tagging follows the variant across builds, and the tag stats
 page goes further and drops builds entirely, because counting per build double-counts lifted-over tags.
-
-## History
-
-The app dates from the 2020 repo "blank slate"; its last model-ish code, a `SearchTypes` constants class, went when
-search types moved to the preview coordinator (search itself is `snpdb/search.py`). The
-All Variants page gained its at-least-one-filter rule and genomic ordering in #1663 (2026-07) and two-phase paging in
-#1887. Tag stats and tag merging arrived in #1751 (2026-08), then allele-origin-aware tags. Resolved-tag visibility
-moved from a per-user grid setting to the tag config in #1901, and tag colours became the tag config (#1892). The allele
-page switched from discordance reports to `Overlap` in the somatic squash (2026-09). Long-running query and backend
-signalling helpers moved out of the server status view into `library/django_utils/database_utils.py` (#404).
 
 ## Traps
 
@@ -133,6 +130,5 @@ panel, not a 500 - check the logs.
 
 Tag counts in `variantopedia/interesting_nearby.py:interesting_counts` are a separate query over
 `VariantTag.get_for_build` / `VariantTag.filter_for_user`, deliberately outside the aggregate that joins
-classifications - inside it every tag was repeated once per classification on the allele, and every user's tags were
-counted. The codon / exon / domain lookups there take the `VariantAnnotationVersion` so historical partitions stay out.
+classifications, which would repeat every tag once per classification on the allele and count every user's tags. The codon / exon / domain lookups there take the `VariantAnnotationVersion` so historical partitions stay out.
 `variantopedia/views_server_status.py:server_status` redirects after a POST action, so a refresh repeats nothing.

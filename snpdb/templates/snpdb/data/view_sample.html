@@ -88,9 +88,8 @@ function setPatientPhenotype() {
     });
 }
 
-function getBams() {
-    const bams = {{ bam_list | jsonify }};
-    return bams;
+function getAlignmentFiles() {
+    return {{ alignment_file_list | jsonify }};
 }
 
 window.ANALYSIS_SETTINGS = {

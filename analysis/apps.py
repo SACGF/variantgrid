@@ -14,8 +14,9 @@ class AnalysisConfig(AppConfig):
 
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
-        from analysis.signals import analysis_health_check, analysis_search  # noqa: F401
+        from analysis.signals import analysis_health_check  # noqa: F401
         from analysis import user_awards  # noqa: F401  # registers award definitions on import
+        from analysis.signals.analysis_search import search_analysis
         from analysis.signals.signal_handlers import (
             analysis_pre_delete,
             handle_active_sample_gene_list_created,
@@ -34,8 +35,11 @@ class AnalysisConfig(AppConfig):
         from genes.models import ActiveSampleGeneList
         from pedigree.models import Pedigree
         from snpdb.models import Cohort, Duo, Quad, Sample, Trio
+        from snpdb.search import search_registry
         from upload.signals.signals import vcf_import_success_signal
         # pylint: enable=import-outside-toplevel,unused-import
+
+        search_registry.register(search_analysis)
 
         post_save.connect(variant_tag_create, sender=VariantTag)
         post_delete.connect(variant_tag_delete, sender=VariantTag)

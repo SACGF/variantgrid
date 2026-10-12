@@ -85,6 +85,7 @@ class Test(URLTestCase):
             ("database_statistics_detail", {}, 403),  # Admin only
             ("search", {}, 200),
             ("variant_wiki", {}, 200),
+            ("variant_types", {}, 200),
             ("view_variant", {"variant_id": self.variant.pk}, 200),
             ("view_variant_annotation_history", {"variant_id": self.variant.pk}, 200),
             ("view_allele_from_variant", variant_kwargs, 302),

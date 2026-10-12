@@ -32,7 +32,6 @@ from annotation.models import (
     VCFAnnotationStats,
 )
 from annotation.models.models import ManualVariantEntryCollection
-from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from annotation.tasks.calculate_sample_stats import (
     SAMPLE_STATS_CODE_VERSION,
@@ -44,15 +43,18 @@ from library.django_utils import (
     get_model_fields,
     set_form_read_only,
 )
+from library.django_utils.data_archive_mixin import DataArchivedError
 from library.utils import full_class_name
 from patients.forms import PatientForm
+from patients.models.models_phenotype import patient_phenotypes_for_samples
 from patients.views_json import get_patient_upload_csv
 from snpdb import forms
 from snpdb.archive import (
     ArchivePreconditionError,
-    DataArchivedError,
     check_vcf_archive_precondition,
     mark_vcf_archive_started,
+    restore_vcf,
+    vcf_can_be_archived,
 )
 from snpdb.forms import (
     SampleChoiceForm,
@@ -281,7 +283,6 @@ def view_vcf(request, vcf_id):
                              _skipped_annotation_message(skipped_annotation_count, "vcf-skipped-annotation"),
                              extra_tags='html import-message')
 
-    from snpdb.archive import vcf_can_be_archived
     can_archive = has_write_permission and vcf_can_be_archived(vcf)
     restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
     restore_source_kind = "uploaded"
@@ -345,7 +346,6 @@ def archive_vcf_view(request, vcf_id):
 
 
 def restore_vcf_view(request, vcf_id):
-    from snpdb.archive import restore_vcf
     vcf = VCF.get_for_user(request.user, vcf_id)
     if not vcf.can_write(request.user):
         raise PermissionDenied("You do not have write permission for this VCF")
@@ -472,10 +472,10 @@ def _sample_stats(sample) -> Optional[SampleStats]:
     return SampleStats(variant_class_df, zygosity_df, annotated_df)
 
 
-def _related_samples(sample: Sample) -> list[dict]:
+def _related_samples(sample: Sample, user) -> list[dict]:
     """ The other sample of each pair, with how its patient lines up with this one's """
     # Sample.__str__ names its VCF, so pull that in too or the table is an N+1
-    pairs_qs = SomalierRelatePairs.get_for_sample(sample) \
+    pairs_qs = SomalierRelatePairs.get_for_sample(sample, user) \
         .select_related("sample_a__patient", "sample_a__vcf",
                         "sample_b__patient", "sample_b__vcf").order_by("-relatedness")
     related_samples = []
@@ -492,7 +492,7 @@ def _related_samples(sample: Sample) -> list[dict]:
     return related_samples
 
 
-def _somalier_sample_context(sample: Sample) -> dict:
+def _somalier_sample_context(sample: Sample, user) -> dict:
     """ Each stage's status, so a failed or skipped one shows on the page instead of nothing at all """
     vcf_extract = SomalierVCFExtract.objects.filter(vcf=sample.vcf).first()
     if vcf_extract is None:
@@ -505,7 +505,7 @@ def _somalier_sample_context(sample: Sample) -> dict:
         "somalier_sample_extract": sample_extract,
         "somalier_stages": vcf_extract.get_stages(),
         "somalier_relatedness": settings.SOMALIER["relatedness"],
-        "related_samples": _related_samples(sample),
+        "related_samples": _related_samples(sample, user),
     }
 
 
@@ -535,7 +535,7 @@ def view_sample(request, sample_id):
     patient_form = PatientForm(user=request.user)  # blank
     somalier_context = {}
     if settings.SOMALIER.get("enabled"):
-        somalier_context = _somalier_sample_context(sample)
+        somalier_context = _somalier_sample_context(sample, request.user)
 
     # Stats only exist (and a missing row is only worth a recompute) once the import has finished
     sample_stats = None
@@ -564,7 +564,7 @@ def view_sample(request, sample_id):
         'patient_form': patient_form,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,
-        "bam_list": sample.get_bam_files(),
+        "alignment_file_list": sample.get_alignment_files(),
         "sample_stats": sample_stats,
         "sample_genotype_stats": sample_genotype_stats,
         "skipped_annotation_count": skipped_annotation_count,

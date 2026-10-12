@@ -45,11 +45,11 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | an issue's ZenHub pipeline, what a release shipped | `claude/runbooks/zenhub_issue_triage.md` | `$ZENHUB_TOKEN`, `gh issue view` |
 | where a URL / task / signal / command lives | `claude/maps/*.md` (generated, gitignored, never hand-edited) | `scripts/vg map` |
 
-`claude/research/<app>.md` are the longer narratives - flows, why, history, traps - each with a `Verified against <sha>` header
+`claude/research/<app>.md` are the longer narratives - flows, why, traps - each with a `Verified against <sha>` header
 and citations that `scripts/vg docs check` keeps live. A research doc still without that header is from an earlier model:
 treat a claim there as a lead to verify, not a fact.
 Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks in `claude/runbooks/`;
-`claude/plans/agent_system.md` is the design behind `vg`, the maps and these notes.
+`claude/research/library.md` ("The `vg` tooling") is the design behind `vg`, the maps and these notes.
 
 ## This box
 
@@ -61,6 +61,7 @@ same name (`claude/guides/operations.md#deployments`). Identify the box before r
 | `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` and `--keepdb` tests without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those) and `vg status`, without a separate ask |
 | `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2, without the restart exception |
 | `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only only. Never run tests, `migrate`, management commands that write, service restarts, or edit files; ask before anything else |
+| `dlawrence-Precision-3680` (`dlawrenceprecision3680`, in `env_developers/`) | Developer box, disposable local database | Just work: `migrate` (forwards or back), tests, management commands, annotation/VEP, fake or test data, service restarts - no ask needed |
 | anything else | Developer box or unknown | Ask the user what the box is before the list below |
 
 Ask first on any shared box: restarting services, `manage.py migrate`, creating or deleting annotation versions or
@@ -80,6 +81,10 @@ python3 manage.py vg inspect variant 123          # one object's whole graph by 
 python3 manage.py vg settings NAME [--diff]       # resolved value and every settings file that assigned it
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
+scripts/vg health [--no-ci]                       # the ratchets: docstring coverage, dead citations, one-off
+                                                  #   commands, pylint messages, deprecated calls, last CI suite time
+scripts/vg deprecations                           # calls to deprecated APIs as the next Python sees them
+                                                  #   (basedpyright) plus warnings raised at import
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
 scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI warns
 scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names
@@ -128,10 +133,13 @@ Inside a package, import a name from the module that defines it (`from snpdb.mod
 through the package `__init__` that re-exports it - that is the usual cause of a cycle. `scripts/vg imports cycles`
 and `lint-imports` (`.importlinter`: `library` never imports an app) both gate CI.
 
-### Code comments
+### Code comments and docs
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't
 write comments about failed paths or reverted decisions, just let the existing code stand. If you are tempted to write a
 lot of comments, perhaps you could make the code clearer by extracting logic into better named variables.
+The same goes for docs (`AGENTS.md`, `claude/**/*.md`) and plans: they describe the current state - what the code does
+and why - not what it used to do, an approach tried and dropped, or a decision that changed. When the obvious approach
+is tempting and still wrong, one line giving the present reason earns its place; the story of how we learned it does not.
 Code, docstrings and templates cite a GitHub issue (`#1537`), not a plan file or anything else under `claude/` - plans
 are deleted when they land, and copies of papers or prototypes aren't in the repo. Point at an app's `AGENTS.md` only
 for something specific it holds, and name `vg` only where it calls the code.
@@ -140,23 +148,20 @@ for something specific it holds, and name `vg` only where it calls the code.
 Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and
 the compile rules are in `variantgrid/static_files/AGENTS.md`.
 
-### Migrations are frozen once pushed
-Assume a pushed migration has been run on a deployment: keep its filename and operations as they are, and express any
-change of mind (a field removed, a default changed) as a new migration on top. Renaming or editing an applied migration
-leaves `django_migrations` pointing at a name that no longer exists (`InconsistentMigrationHistory`) and has to be
-repaired by hand on every database. A migration that only exists locally (unpushed) can still be reshaped or regenerated.
-Check with `git log origin/master -- <migration file>`.
-
-### Renaming a class that Redis has pickled
-Bump `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py`; old cache entries survive a deploy and fail
-on unpickle. Details under Gotchas in `analysis/AGENTS.md`.
+### Editing a pushed migration
+By default, express a change of mind about a pushed migration (a field removed, a default changed) as a new migration on
+top: renaming or editing one that a deployment has applied leaves `django_migrations` pointing at a name that no longer
+exists (`InconsistentMigrationHistory`), repaired by hand on every database. A migration that only exists locally
+(unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
+pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
 
 ### Manual migrations (management commands on deploy)
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
 (`manual/operations/manual_operations.py`, example `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`).
 
 ### Celery
-Every task names its queue (`@app.task(queue='...')` or `CELERY_TASK_ROUTES`); the queues and what each is for are in
+A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks. Route
+one elsewhere when it needs a particular worker; the queues and what each is for are in
 `claude/guides/operations.md#services-queues-logs`.
 
 ### Scale
@@ -188,6 +193,11 @@ restates a field declaration, drop it.
 ### Verifying pages
 Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
 
+### Background shells
+Wait for a background job on its PID (`while kill -0 <pid>; do sleep 5; done`), never on `pgrep -f <pattern>`: the
+waiting shell's own command line contains the pattern, so it matches itself and never exits. Before saying nothing is
+running, check every background shell and monitor the session started, not a guessed `pgrep`.
+
 ### Git commits
 Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or
 "implement X" mean edit the code only - not commit.
@@ -211,6 +221,8 @@ Preface any comment on a GitHub issue or pull request with 🤖 Written by Claud
 unless I tell you to.
 
 ### Which repo an issue goes in
+`SACGF/variantgrid_private` is the repo from before the code went public: its code and history stop in 2021 and
+share nothing with `SACGF/variantgrid`, so it is used only for private issues - never branch, push or open a PR there.
 Raise issues in the public `SACGF/variantgrid` by default. An issue there must contain nothing identifying: no patient,
 lab or variant details, no hostnames, secrets or config values from a deployment. Raise it in `SACGF/variantgrid_private`
 instead when it describes a security problem (a missing permission check, an injection, anything an attacker could use

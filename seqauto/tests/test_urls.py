@@ -43,7 +43,7 @@ class Test(URLTestCase):
             ("experiments_datatable", {}, 200),
             ("sequencing_run_datatable", {}, 200),
             ("unaligned_reads_datatable", {}, 200),
-            ("bam_file_datatable", {}, 200),
+            ("alignment_file_datatable", {}, 200),
             ("vcf_file_datatable", {}, 200),
             ("qc_datatable", {}, 200),
             ("enrichment_kit_datatable", {}, 200),

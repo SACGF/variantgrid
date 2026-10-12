@@ -110,7 +110,8 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
 
     context = {"node": node,
                "node_data": dict(sorted(serializer.data.items()))}
-    if node.valid:
+    # A node that needs its NodeCache (eg a BED intersection) can't build its SQL until that's built
+    if node.valid and (node.node_cache or not node.use_cache):
         grid = VariantGrid(request, node, extra_filters)
         try:
             node_sql_, grid_sql = get_node_sql(grid)
@@ -195,7 +196,7 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "node_id": node_id,
         "node_version": node_version,
         "extra_filters": extra_filters,
-        "bams_dict": node.get_bams_dict(),
+        "alignments_dict": node.get_alignments_dict(),
         # The tag pills the grid draws are read against this node's proband - @see VariantGridFormat.tags
         "node_proband_sample_id": proband.sample.pk if proband.sample else None,
         "node_proband_patient_id": proband.patient.pk if proband.patient else None,

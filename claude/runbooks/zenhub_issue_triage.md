@@ -9,6 +9,10 @@ root `AGENTS.md` (GitHub comments) applies here too: read the title, body or com
 `gh` or through ZenHub, which returns titles as well - only when the user has handed you that issue or explicitly asked
 for triage over that repo. Otherwise query and report on `SACGF/variantgrid` alone.
 
+The issue is the record: discussion happens in Slack, but decisions are summarised back onto the issue. A complex design
+lives in a Google doc linked from the issue, which agents can't open - say so and ask, rather than treating the design as
+missing.
+
 ## 1. Get a token
 
 1. Go to https://app.zenhub.com/settings/tokens and create a **GraphQL Personal API Key** (starts with `zh_`).
@@ -91,6 +95,9 @@ branch (e.g. `origin/shariant_prod_2025_04`), and if so can it be closed.
 5. Read each candidate's comments (`gh issue view N -R SACGF/<repo> --json body,comments`). Close-ready means the code is in
    the branch *and* testing passed or wasn't needed. Leave for a person: an open test request, a pending decision, a
    `ManualOperation` / data fix that has to run on prod, or process-only issues (data imports, mappings, ClinVar clean-up).
+   A failed test is not always a fail of this issue: testers focus on one area and find bugs there the change didn't
+   cause. If the failure is outside what the issue's commits touch, or the tester notes it also happens on prod, it
+   belongs in a new issue (draft it for the user) and doesn't block this one.
 6. For close-ready issues: comment (prefixed `🤖 Written by Claude`) saying it went into the named prod branch and has
    been released, with the commits or the test pass as evidence, then `gh issue edit N -R SACGF/<repo> --add-label
    "can we close this?"`. Humans close issues; agents never do.
@@ -104,7 +111,10 @@ mutation($i: MoveIssueInput!) { moveIssue(input: $i) { issue { number } } }
 # variables: {"i": {"issueId": "<zenhub id>", "pipelineId": "<target pipeline id>", "position": 0}}
 ```
 
-For each issue, find its commits on `origin/master` (section 4, step 2) and send it to one of:
+For each issue, find its commits on `origin/master` (section 4, step 2) and send it to one of the pipelines below.
+System testers are not programmers: they test through the UI on the test server, so the comment on an issue moved to a
+test pipeline gives UI steps (which page, what to do, what should happen), not code references.
+
 
 - **Review/QA (Shariant)**: a user-visible change in anything Shariant has: classifications, allele/variant pages, search,
   gene pages, conditions, discordance, ClinVar export, lab/user admin, Keycloak, and all shared UI/JS/CSS/grid code.

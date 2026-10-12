@@ -15,7 +15,7 @@ import gzip
 import logging
 import re
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional
@@ -80,7 +80,7 @@ def find_latest_release_asset(genome_build_name: str, annotation_consortium_labe
 
 
 @contextmanager
-def download_cdot_json(url: str) -> Iterator[gzip.GzipFile]:
+def download_cdot_json(url: str) -> Generator[gzip.GzipFile]:
     """ Stream a cdot JSON.gz to a temp file on disk and yield an open handle on it.
 
         On disk rather than in memory because the importer reads the file twice (genes, then

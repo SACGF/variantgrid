@@ -32,6 +32,7 @@ resolved identities and a read-only view of a Variant, not models.
 import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional
 
 from genes.gene_level_resolver import (
@@ -298,11 +299,11 @@ class SpliceEventVariant:
     def canonical_str(self) -> str:
         return display_splice_label(self.gene, self.label)
 
-    @property
+    @cached_property
     def splice_event(self) -> Optional[SpliceEvent]:
-        """ The junction's own wording, where the TSO 500 panel reports it. Keyed on (gene symbol,
-            label) rather than the coordinates, which the Variant does not carry - the pair is
-            unique per build, and a label means the same event in every build """
+        """ The junction's own wording (and CIViC id), where the TSO 500 panel reports it. Keyed on
+            (gene symbol, label) rather than the coordinates, which the Variant does not carry - the
+            pair is unique per build, and a label means the same event in every build """
         return SpliceEvent.objects.filter(gene_symbol=self.gene.gene_symbol_id,
                                           label=self.label).first()
 

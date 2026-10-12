@@ -7,11 +7,12 @@ import logging
 import operator
 import re
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional, Union
 
+import django.dispatch
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
@@ -23,11 +24,15 @@ from model_utils.models import TimeStampedModel, now
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from genes.gene_matching import HGNCMatcher
 from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import Constant, first
+
+# Sent before a gene's relationships are read, so live sources (PanelApp) can refresh them. args: gene_symbol
+gene_relations_read_signal = django.dispatch.Signal()
 
 
 class OntologyImportSource:
@@ -474,8 +479,6 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         This should be used as little as possible and only to bridge between GeneSymbols and OntologyTerms
         aka if you're talking about GeneSymbols, pass around the GeneSymbol object, not the OntologyTerm
         """
-        from genes.gene_matching import HGNCMatcher
-
         if isinstance(gene_symbol, GeneSymbol):
             gene_symbol = gene_symbol.symbol
 
@@ -1130,8 +1133,7 @@ class OntologySnake:
         if otr_qs is None:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
 
-        from ontology.ontology_traversal import _make_db_step_fn, bfs_to_ontology
-        step_fn = _make_db_step_fn(otr_qs, quality_filter)
+        step_fn = make_db_step_fn(otr_qs, quality_filter)
         return bfs_to_ontology(term, to_ontology, max_depth, step_fn)
 
     @staticmethod
@@ -1142,8 +1144,7 @@ class OntologySnake:
         if (gene_ontology := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
             return []
 
-        from ontology.panel_app_ontology import update_gene_relations
-        update_gene_relations(gene_symbol)
+        gene_relations_read_signal.send(sender=OntologyTerm, gene_symbol=gene_symbol)
         otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
         q_relation = quality_filter.filter_q
         return list(otr_qs.filter(
@@ -1157,8 +1158,7 @@ class OntologySnake:
         if (gene_ontology := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
             return set()
 
-        from ontology.panel_app_ontology import update_gene_relations
-        update_gene_relations(gene_symbol)
+        gene_relations_read_signal.send(sender=OntologyTerm, gene_symbol=gene_symbol)
         terms = set()
 
         otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
@@ -1206,10 +1206,8 @@ class OntologySnake:
         if (gene_ontology := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
             return OntologySnakes([])
 
-        # TODO, do this with hooks
         if call_update_gene_relations:
-            from ontology.panel_app_ontology import update_gene_relations
-            update_gene_relations(gene_symbol)
+            gene_relations_read_signal.send(sender=OntologyTerm, gene_symbol=gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
                                         max_depth=max_depth, quality_filter=quality_filter,
                                         otr_qs=otr_qs)
@@ -1221,8 +1219,7 @@ class OntologySnake:
         if (gene_term := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
             return False
 
-        from ontology.panel_app_ontology import update_gene_relations
-        update_gene_relations(gene_symbol)
+        gene_relations_read_signal.send(sender=OntologyTerm, gene_symbol=gene_symbol)
         if isinstance(term, str):
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:
@@ -1251,8 +1248,7 @@ class OntologySnake:
         if (gene_term := OntologyTerm.get_gene_symbol_or_none(gene_symbol)) is None:
             return None
 
-        from ontology.panel_app_ontology import update_gene_relations
-        update_gene_relations(gene_symbol)
+        gene_relations_read_signal.send(sender=OntologyTerm, gene_symbol=gene_symbol)
         if isinstance(term, str):
             term = OntologyTerm.get_or_stub(term)
             if term.is_stub:
@@ -1311,6 +1307,86 @@ class OntologySnakes:
         if ontology_relation:
             relations = {otr for otr in relations if otr.relation == ontology_relation}
         return sorted(relations)
+
+
+EXCLUDED_SNAKE_RELATIONS = frozenset({
+    OntologyRelation.IS_A,
+    OntologyRelation.EXACT_SYNONYM,
+    OntologyRelation.RELATED_SYNONYM,
+    OntologyRelation.XREF,
+})
+
+
+def bfs_to_ontology(
+    start_term: OntologyTerm,
+    to_ontology: OntologyService,
+    max_depth: int,
+    step_fn: Callable[[set[str], set[str], bool], list[OntologyTermRelation]],
+):
+    """BFS from ``start_term`` toward ``to_ontology``.
+
+    ``step_fn(leaf_term_ids, seen_term_ids, exclude_hpo_endpoints)`` returns
+    the adjacent ``OntologyTermRelation`` rows to expand. Quality filtering,
+    the excluded-relation set, and HPO-endpoint exclusion are baked into
+    ``step_fn``.
+    """
+    if start_term.ontology_service == to_ontology:
+        return OntologySnakes([OntologySnake(source_term=start_term)])
+
+    seen: set[str] = {start_term.id}
+    new_snakes: list = [OntologySnake(source_term=start_term)]
+    valid_snakes: list = []
+    exclude_hpo_endpoints = (to_ontology == OntologyService.HGNC)
+
+    while new_snakes:
+        snakes = list(new_snakes)
+        new_snakes = []
+        by_leafs: dict[str, OntologySnake] = {}
+        for snake in snakes:
+            existing = by_leafs.get(snake.leaf_term.id)
+            if existing is None or len(snake.paths) < len(existing.paths):
+                by_leafs[snake.leaf_term.id] = snake
+
+        all_relations = step_fn(set(by_leafs.keys()), set(seen), exclude_hpo_endpoints)
+
+        for relation in all_relations:
+            snake = by_leafs.get(relation.source_term_id) or by_leafs.get(relation.dest_term_id)
+            if snake is None:
+                continue
+            if snake.leaf_term.id not in (relation.source_term_id, relation.dest_term_id):
+                continue
+            other_term = relation.other_end(snake.leaf_term)
+
+            ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}
+            if (OntologyService.MONDO in ontology_services
+                    and OntologyService.OMIM in ontology_services
+                    and relation.relation != OntologyRelation.EXACT):
+                continue
+
+            new_snake = snake.snake_step(relation)
+            if other_term.ontology_service == to_ontology:
+                valid_snakes.append(new_snake)
+                continue
+            if len(new_snake.paths) <= max_depth:
+                new_snakes.append(new_snake)
+            seen.add(other_term.id)
+
+    valid_snakes.sort()
+    return OntologySnakes(valid_snakes)
+
+
+def make_db_step_fn(otr_qs, quality_filter: OntologyRelationshipQualityFilter):
+    q_relation = ~Q(relation__in=EXCLUDED_SNAKE_RELATIONS) & quality_filter.filter_q
+
+    def step(leaf_term_ids, seen_term_ids, exclude_hpo_endpoints):
+        outgoing = otr_qs.filter(source_term_id__in=leaf_term_ids).exclude(dest_term_id__in=seen_term_ids).filter(q_relation)
+        incoming = otr_qs.filter(dest_term_id__in=leaf_term_ids).exclude(source_term_id__in=seen_term_ids).filter(q_relation)
+        if exclude_hpo_endpoints:
+            outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
+            incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
+        return list(outgoing) + list(incoming)
+
+    return step
 
 
 class SingleTermH:

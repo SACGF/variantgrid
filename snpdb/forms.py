@@ -49,7 +49,7 @@ from snpdb.models import (
     UserContact,
     UserSettings,
     UserSettingsOverride,
-    VariantsType,
+    VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_enums import SampleFileType
@@ -476,7 +476,7 @@ class SampleMultiForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
 
 
 class VariantsTypeMultipleChoiceForm(forms.Form):
-    variants_type = forms.MultipleChoiceField(choices=VariantsType.choices, widget=forms.CheckboxSelectMultiple())
+    variants_type = forms.MultipleChoiceField(choices=VariantOrigin.choices, widget=forms.CheckboxSelectMultiple())
 
 
 class VCFChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
@@ -865,7 +865,7 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = GenomicIntervalsCollection
         exclude = ['category']
-        read_only = ('processed_file', 'processed_records', 'import_status')
+        read_only = ('processed_file', 'processed_records', 'import_status', 'error_message')
         widgets = {'name': TextInput(),
                    'processed_file': TextInput(),
                    'user': ModelSelect2(url='user_autocomplete',

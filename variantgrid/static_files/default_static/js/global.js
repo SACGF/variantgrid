@@ -512,7 +512,7 @@ function enhanceAndMonitor() {
             $(processor.test).each((index, node) => {
                 node = $(node);
                 let isGood = true;
-                for (const badTest in badElementTests) {
+                for (const badTest of badElementTests) {
                     if (node.is(badTest)) {
                         isGood = false;
                         break;
@@ -603,6 +603,9 @@ function loadAjaxModal(linkDom, size) {
     const body = modalContent.find('.modal-body');
     modalContent.find('.modal-footer').remove();
     const content = $('<div>').appendTo(body);
+    // attach before loading: jQuery only runs inline scripts in content that is in the document,
+    // and Bootstrap doesn't attach the modal until its backdrop has faded in
+    modalContent.appendTo('body');
     const modalDialog = modalContent.modal({focus:true, show:false});
 
     loadAjaxBlock(content, url).then(() => {

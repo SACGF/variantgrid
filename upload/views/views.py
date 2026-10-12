@@ -14,20 +14,19 @@ from django.views.decorators.http import require_POST
 from annotation.views import get_build_contigs
 from library.django_utils.view_utils import render_ajax_view
 from library.guardian_utils import check_can_write
-from upload import forms, upload_stats
-from upload.import_task_factories.import_task_factory import get_import_tasks_by_extension
+from upload import upload_stats
+from upload.grids import FileUploadColumns
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
     SimpleVCFImportInfo,
     UploadedFileTypes,
     UploadPipeline,
-    UploadSettings,
     UploadStep,
     VCFSkippedContigs,
 )
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, retry_upload_pipeline
-from upload.views.views_json import _get_basic_uploaded_file_context, get_file_dicts_list
+from upload.views.views_json import _get_basic_uploaded_file_context
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS: "uploaded_vcf",
@@ -36,20 +35,9 @@ UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
 
 
 def upload(request):
-    upload_settings, _ = UploadSettings.objects.get_or_create(user=request.user)
-
-    form = forms.UploadSettingsForm(request.POST or None, instance=upload_settings, user=request.user)
-    if request.method == "POST":
-        if form.is_valid():
-            upload_settings = form.save()
-
-    file_dicts_list = get_file_dicts_list(upload_settings)
-    extensions = get_import_tasks_by_extension().keys()
-    accept_file_types = fr"/(\.|\/)({'|'.join(extensions)})$/i"
-    context = {'existing_files': file_dicts_list,
-               'form': form,
-               "upload_enabled": settings.UPLOAD_ENABLED,
-               "accept_file_types": accept_file_types}
+    context = {"upload_enabled": settings.UPLOAD_ENABLED,
+               "file_types": UploadedFileTypes.choices,
+               "all_file_types": FileUploadColumns.ALL_FILE_TYPES}
     return render(request, 'upload/upload.html', context)
 
 

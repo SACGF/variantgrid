@@ -19,6 +19,7 @@ class OverlapCategories(StrEnum):
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         pass

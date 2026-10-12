@@ -7,8 +7,8 @@ consequences and the plugin/custom scores that ride along with it, ClinVar's sum
 (ontology terms, GenCC gene-disease strength, dbNSFP gene scores, gnomAD constraint), Human Protein Atlas tissue data,
 and citations. Every one of these is versioned, and `annotation/models/models.py:AnnotationVersion` is the bundle per
 build that an analysis or a variant page pins itself to. This document is the story behind `annotation/AGENTS.md`:
-how a version comes to exist, how a variant gets its rows, why the tables are partitioned, and what has gone wrong
-before. Model fields, URLs, commands, tasks and signals are in the generated maps
+how a version comes to exist, how a variant gets its rows, why the tables are partitioned, and the traps.
+Model fields, URLs, commands, tasks and signals are in the generated maps
 ([models](../maps/models.md#annotation), [urls](../maps/urls.md#annotation), [commands](../maps/commands.md),
 [tasks](../maps/tasks.md#annotation), [settings](../maps/settings.md)); `claude/domain.md` has the vocabulary.
 
@@ -56,8 +56,8 @@ Annotation is scheduled by variant pk range. `annotation/tasks/annotation_schedu
 inserted) runs on `scheduling_single_worker` under a cache lock and, for each annotated build's latest VAV of the
 requested status, loops `annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version` until
 `annotation/annotation_versions.py:get_annotation_range_lock_and_unannotated_count` finds no more unannotated variants.
-That function walks pk blocks above the highest existing lock (never a sort-and-limit over the whole table, which was
-the original design and stopped scaling) and returns an `annotation/models/models.py:AnnotationRangeLock` of at least
+That function walks pk blocks above the highest existing lock (never a sort-and-limit over the whole table, which does
+not scale) and returns an `annotation/models/models.py:AnnotationRangeLock` of at least
 `ANNOTATION_VEP_BATCH_MIN` and at most `ANNOTATION_VEP_BATCH_MAX` variants. "Unannotated" is defined once, in
 `annotation/annotation_version_querysets.py:get_variants_qs_for_annotation`: variants in the build's contigs passing
 `annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list` (no reference-alt, no `.`/`*` alt) with no
@@ -90,7 +90,9 @@ re-picks the run in its resume lane and launches `annotation/tasks/annotate_vari
 `annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter`, clears any stale error and sends
 `annotation_run_complete_signal`. Status is never set directly: `annotation/models/models.py:AnnotationRun.get_status`
 derives it from the timestamp and error fields on every save, and `annotation/models/models.py:AnnotationRun.save_if_owner`
-is the write used after any stage during which the lease could have expired.
+is the write used after any stage during which the lease could have expired. The import lane counts VEP's
+`--skipped_variants_file` against the dump so truncated output fails the run (#1701), and SV conservation is scored with
+pyBigWig into a sidecar file (#1657).
 
 ### Import: VEP VCF to partition rows
 
@@ -103,7 +105,8 @@ transcript, links each to a Transcript / TranscriptVersion pk by accession (exac
 representative `VariantAnnotation`, writes every record as a `VariantTranscriptAnnotation`, and one `VariantGeneOverlap`
 per overlapping gene. Calculated columns (SpliceAI max, prediction counts, MaxEntScan diff, PTC/NMD distances #579,
 COSMIC id merge, local c.HGVS and g.HGVS) are added in `add_calculated_variant_annotation_columns` and
-`add_calculated_transcript_columns`. `bulk_insert` writes CSVs and `COPY`s them straight into the VAV's partition
+`add_calculated_transcript_columns`. A column added later can be filled from an annotated VCF without re-running the pipeline
+(`annotation/backfill_columns.py:import_backfill_vcf`, #1675). `bulk_insert` writes CSVs and `COPY`s them straight into the VAV's partition
 tables; under `UNIT_TEST` it falls back to `bulk_create` into the base table, which is why tests never exercise the
 partition path.
 
@@ -111,8 +114,8 @@ Reading goes the other way through one hook. Partitions are old-style inheritanc
 `annotation_variantannotation` hits the empty parent; `annotation/annotation_version_querysets.py:get_queryset_for_annotation_version`
 attaches `annotation/models/models.py:AnnotationVersion.sql_partition_transformer` to the queryset via
 `library/django_utils/django_queryset_sql_transformer.py:get_queryset_with_transformer_hook`, and the compiled SQL has
-its table names rewritten to the version's partitions. Django's `FilteredRelation` was considered and rejected because
-it cannot follow nested relations (`variantannotation__gene__geneannotation`).
+its table names rewritten to the version's partitions. Django's `FilteredRelation` cannot do this job because it cannot
+follow nested relations (`variantannotation__gene__geneannotation`).
 
 ### ClinVar
 
@@ -121,7 +124,7 @@ ClinVar arrives two ways. The bulk summary is the ClinVar VCF, imported through 
 makes a `annotation/models/models.py:ClinVarVersion` keyed on the file's sha256 (a re-upload of the same file wipes and
 refills the same version's partition), unknown variants are inserted by the normal VCF machinery, then
 `annotation/vcf_files/import_clinvar_vcf.py:BulkClinVarInserter` maps INFO fields onto `annotation/models/models.py:ClinVar`
-rows, including the oncogenic (ONC*) and somatic clinical impact (SCI*) fields added in #1791. Only staff may upload one
+rows, including the oncogenic (ONC*) and somatic clinical impact (SCI*) fields (#1791). Only staff may upload one
 (`annotation/vcf_files/import_clinvar_vcf.py:check_can_import_clinvar`). The per-submission detail is fetched lazily
 from ClinVar's XML: `annotation/clinvar_fetch_request.py:ClinVarFetchRequest.fetch` caches a
 `annotation/models/models.py:ClinVarRecordCollection` per variation id, refreshing when older than
@@ -147,7 +150,9 @@ ran with, and its partition is the unit of retention: old analyses keep reading 
 and dropping a HISTORICAL VAV drops one table rather than deleting millions of rows. `columns_version` exists so that a
 VEP upgrade that changes nothing in the schema is a new VAV without a migration, and a schema change (new plugin
 columns) is a new `VEPColumnDef` gated by `min_columns_version`; `annotation/vep_columns.py:VEP_COLUMNS` is code, not a
-table, so the mapping is versioned with the code that reads it. `annotation/models/models.py:AnnotationPipelineVersion`
+table, so the mapping is versioned with the code that reads it and can be tested and diffed. `columns_version` 2 adds
+dbNSFP rankscores, 3 gnomAD v4 and the `_xy` fields, 4 raw dbNSFP 5.3 scores with per-transcript resolution
+(`annotation/refseq_ensembl_resolver.py`), denovo-db and the VEP 116 plugins (#1652). `annotation/models/models.py:AnnotationPipelineVersion`
 (#720) is deliberately not the VAV: pinning AnnotSV on the VEP version would make rolling its data bundle cost a full
 re-annotation, so non-VEP tools get their own NEW/ACTIVE/HISTORICAL lifecycle and their runs hang off the locks the VEP
 run already created - "this lock has no run at the ACTIVE version" is the same query as "this lock has no run of this
@@ -164,28 +169,11 @@ is a conditional UPDATE on `task_id` so the losing attempt cannot clobber the ru
 `attempt_count` is bumped at execution rather than dispatch so a run that merely sat in a starved queue never burns its
 `ANNOTATION_MAX_RUN_ATTEMPTS`.
 
-External annotation (#1568, `annotation/external_annotation.py`) exists because production VEP runs were too slow on
-the web host: runs on a NEW VAV can be dumped as self-describing gzipped VCFs with a sidecar of the VAV identity and
+External annotation (#1568, `annotation/external_annotation.py`) is for deployments where VEP is too slow on the web
+host: runs on a NEW VAV can be dumped as self-describing gzipped VCFs with a sidecar of the VAV identity and
 the exact VEP command templated for another machine, and imported back into the normal import lane. The range endpoints
 are verified against local Variant pks on the way back (`annotation/external_annotation.py:verify_annotated_vcf_variant_ids`)
 because the dump's `variant_id` INFO is the only link between the external file and the database.
-
-## History
-
-The app began as a flat "annotate everything with VEP into one table" design; partitioning per VAV came with the need to
-keep old analyses reproducible. `ColumnVEPField` was a database table mapping VEP fields to columns until migration
-`annotation/migrations/0129_delete_columnvepfield.py` replaced it with the `VEPColumnDef` registry in
-`annotation/vep_columns.py`, after data-driven column gating proved impossible to test or diff. `columns_version` 2
-brought dbNSFP rankscores, 3 gnomAD v4 and the `_xy` fields, 4 raw dbNSFP 5.3 scores with per-transcript resolution
-(`annotation/refseq_ensembl_resolver.py`), denovo-db and the VEP 116 plugins (#1652). The VAV `active` boolean became
-the NEW/ACTIVE/HISTORICAL `status` in `annotation/migrations/0143_variantannotationversion_status.py` (#577) so a version
-could be built without being live. AnnotSV was split out of the SV VEP run into its own pipeline type and then given
-`AnnotationPipelineVersion` (#720, migration `annotation/migrations/0168_annotation_pipeline_version_lifecycle.py`).
-Truncated VEP output was caught by counting VEP's `--skipped_variants_file` against the dump (#1701); SV conservation
-scoring moved from a VEP `--custom` bigWig to pyBigWig (#1657); gene-level (fusion) variants got their own local
-pipeline (#1506). PyHGVS was removed in favour of biocommons throughout (#1678). Column backfill from an annotated VCF
-without re-running the pipeline (`annotation/backfill_columns.py:import_backfill_vcf`, #1675) and Open Targets L2G
-scores (#1822) are the most recent additions.
 
 ## Traps
 
@@ -204,13 +192,13 @@ off a variant you need to delete).
 Merging is only safe while every run on a lock is still CREATED and un-leased
 (`annotation/annotation_versions.py:_range_lock_is_dispatchable`); an empty-finished run is reopened when its lock grows
 because it owns no rows (`annotation/models/models.py:AnnotationRun.reopen_to_created`). A retry must reuse the run in
-place (`annotation/models/models.py:AnnotationRun.reset_for_retry`, #1654) - deleting and recreating left rangeless runs
-stuck forever - and it also removes the import scratch directory, or the leftover TSVs trip the copy-CSV overwrite guard
+place (`annotation/models/models.py:AnnotationRun.reset_for_retry`, #1654) - deleting and recreating it leaves a rangeless
+run stuck forever - and it also removes the import scratch directory, or the leftover TSVs trip the copy-CSV overwrite guard
 (#1596).
 
 `annotation/tasks/annotation_scheduler_task.py:reclaim_stalled_annotation_runs` keys on "occupies a slot but has no live
 lease", not only on an expired lease: a worker SIGKILLed before the `finally` leaves a NULL lease that is never `< now`,
-and those runs once held slots forever. Disk is a scheduling input too (`annotation/tasks/annotation_scheduler_task.py:has_free_disk_for_annotation`,
+so a check on expiry alone would leave that run holding its slot forever. Disk is a scheduling input too (`annotation/tasks/annotation_scheduler_task.py:has_free_disk_for_annotation`,
 #1670): a run's on-disk output is removed by `annotation/signals/annotation_run_cleanup.py` only after its rows commit,
 so a stalled import keeps its annotated VCF for the resume lane.
 

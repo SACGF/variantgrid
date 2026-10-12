@@ -1,12 +1,15 @@
 from collections import defaultdict
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.test import RequestFactory, TestCase, override_settings
+from django.http import HttpResponse
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from rest_framework import routers
 
+from classification.views.classification_view import ClassificationView
 from patients.views_rest import PatientViewSet
-from variantgrid.perm_path import get_visible_url_names, router_urls
+from variantgrid.perm_path import deprecated_path, get_visible_url_names, router_urls
 
 REGISTER = defaultdict(lambda: True, {"api_patient-list": False})
 
@@ -59,3 +62,22 @@ class RouterUrlsTest(TestCase):
         """ api_patient-detail is left True, so the viewset handles a non-superuser itself """
         url = self._url_patterns()["api_patient-detail"]
         self.assertEqual(self._get(url, self.user, pk=0).status_code, 404)
+
+
+class DeprecatedPathTest(SimpleTestCase):
+
+    def test_reports_and_passes_through(self):
+        url = deprecated_path("old/<int:pk>", lambda request, pk: HttpResponse(str(pk)), name="old_view")
+        request = RequestFactory().get("/old/5?x=1")
+        with mock.patch("variantgrid.perm_path.report_message") as report_message:
+            response = url.callback(request, pk=5)
+        self.assertEqual(response.content, b"5")
+        report_message.assert_called_once()
+        self.assertIn("old_view", report_message.call_args.args[0])
+        self.assertEqual(report_message.call_args.kwargs["extra_data"]["target"], "/old/5?x=1")
+
+    def test_keeps_api_view_exemptions(self):
+        """ A deprecated DRF view stays callable by external clients without a CSRF token or session """
+        url = deprecated_path("api/v2/", ClassificationView.as_view(api_version=2), name="old_api")
+        self.assertTrue(url.callback.csrf_exempt)
+        self.assertFalse(url.callback.login_required)

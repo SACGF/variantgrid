@@ -14,7 +14,7 @@ Patterns here:
   `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike; add a behaviour as
   a new processor entry.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
-  it escapes `</script>` and marks safe; `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
+  it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
   which takes hint, help, admin_only, show_if - use it rather than a hand-built Bootstrap row. New block tags parse
   kwargs with uicore/templatetags/ui_utils.py:parse_tag.
@@ -50,7 +50,7 @@ Gotchas:
   `window.CURRENT_USERNAME` are not there yet (variantgrid/static_files/default_static/js/global.js:applyPageFrame).
 - `{% load %}` names matter: labelled/modal/preview/badge/boolean live in `ui_utils`;
   jsonify/format_value/timestamp/code_json/duration/get_item live in `js_tags` (uicore/templatetags/js_tags.py:format_value).
-  The wrong library only fails when the page renders.
+  The wrong library fails `uicore/tests/test_templates_compile.py`, which compiles every project template.
 - The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `ignoreSelectors` (third
   party widgets) - a processor that never fires on injected HTML is usually inside one
   (variantgrid/static_files/default_static/js/global.js:checkNode).
@@ -62,7 +62,8 @@ Gotchas:
 - The sprite `<svg>` is `display: none`, so a symbol drawn through `clipPath`, `mask`, a gradient or anything else
   referenced by `url(#...)` is unreliable under `<use>` (Chrome drops the clip) - draw the shape directly
   (`file-icon-fusion` is two paths).
-Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
+Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint, test_js_tags.py jsonify escaping,
+  test_ui_tabs_builder.py embedded admin_only tabs. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
   (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
   ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
   library/django_utils/unittest_utils.py:URLTestCase - `_test_urls` for pages, `_test_datatable_urls` for grid
@@ -74,6 +75,9 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   snpdb/views/datatable_view.py:RichColumn) in `__init__`, implement `get_initial_queryset`, and put per-request
   narrowing in `filter_queryset` reading `self.get_query_param(...)` (URL kwargs first, then GET/POST). Worked
   example with tests: snpdb/tests/test_datatable_server_csv.py:CohortCsvColumns.
+- Always subscript the base: `class XColumns(DatatableConfig[X])`. The model behind pk links, delete permissions
+  and the default CSV name is read off that declaration (`_declared_model`); a bare `DatatableConfig` falls back to
+  building `get_initial_queryset()` for it, with a warning in the log (#1913).
 - Wire it with `path('.../datatable', DatabaseTableView.as_view(column_class=XColumns), name='x_datatable')`
   (snpdb/views/datatable_view.py:DatabaseTableView). That one endpoint answers `?dataTableDefinition=1` (columns),
   the DataTables row requests, and `?dataTableCsv=1` (server CSV).

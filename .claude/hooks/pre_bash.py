@@ -1,6 +1,6 @@
 """
 PreToolUse hook for Bash: state-changing commands on a box other people are testing on get a
-confirmation prompt with a reason, whatever the permission mode (agent_system.md §4.5). Everything
+confirmation prompt with a reason, whatever the permission mode. Everything
 else passes through untouched. A box set aside for agents opts out by setting VG_AGENT_UNGUARDED=1
 (the "env" block of that user's ~/.claude/settings.json).
 """

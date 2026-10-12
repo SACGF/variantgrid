@@ -193,23 +193,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     return render(request, "genes/view_gene_symbol.html", context)
 
 
-def view_classifications(request, gene_symbol: str, genome_build_name: str):
-
-    genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
-    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-
-    view_info = GeneSymbolViewInfo(
-        gene_symbol=gene_symbol,
-        desired_genome_build=genome_build,
-        user=request.user)
-
-    return render(request, "genes/view_gene_symbol_classifications.html", {
-        "classifications": view_info.classifications,
-        "gene_symbol": gene_symbol,
-        "genome_build": genome_build
-    })
-
-
 @dataclass(frozen=True)
 class GenomeBuildGenes:
     genome_build: GenomeBuild
@@ -441,7 +424,7 @@ def view_canonical_transcript_collection(request, pk):
     summary = None
     qs = canonical_transcript_collection.genecoveragecanonicaltranscript_set.all()
     if qs.exists():
-        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__bam_file__sequencing_sample__enrichment_kit__name")
+        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__enrichment_kit__name")
 
     is_system_default = pk == str(settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID)
     context = {"canonical_transcript_collection": canonical_transcript_collection,

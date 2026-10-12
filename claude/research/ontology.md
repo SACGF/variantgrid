@@ -36,11 +36,11 @@ per (term, other term) in priority order (exact, related, xref - one edge per pa
 traversal), and axioms and edges become `is_a` edges between MONDO terms and gene edges to HGNC nodes named by the RO
 relations in `GENE_RELATIONS`. `load_hpo` reads hp.owl through pronto for terms and
 `is_a` edges; `load_phenotype_to_genes` reads HPO's phenotype_to_genes.txt for HPO->OMIM associations and
-OMIM->gene `mim2gene` edges, deleting the relations of the older `OMIM_ALL_FREQUENCIES` file it replaced. HPO changed
-that file in 2023 from seven columns behind a `#Format:` comment (`source` column, `mim2gene` rows kept) to five columns
-with a header row (`disease_id`, OMIM rows kept); the loader tells them apart by the first line and raises if the frame
-comes out empty, because the 2023 file once imported as zero relations and left every HPO term without genes (#1862).
-`ontology/management/commands/backfill_phenotype_to_genes.py` repairs such a deployment in place: it loads the file
+OMIM->gene `mim2gene` edges, deleting any relations from the legacy `OMIM_ALL_FREQUENCIES` file. The file comes in two
+layouts, seven columns behind a `#Format:` comment (`source` column, `mim2gene` rows kept) and five columns with a header
+row (`disease_id`, OMIM rows kept); the loader tells them apart by the first line and raises if the frame comes out
+empty, because a zero-relation import leaves every HPO term without genes (#1862).
+`ontology/management/commands/backfill_phenotype_to_genes.py` repairs a deployment whose import has no relations, in place: it loads the file
 into the import the latest `OntologyVersion` already points at (`OntologyBuilder(existing_import=...)`), so no new
 version or gene annotation build follows. `load_omim`
 reads mimTitles.txt as the primary source for OMIM names and aliases and marks gene and removed entries
@@ -57,7 +57,8 @@ live rather than a file: `ontology/panel_app_ontology.py:_update_gene_relations`
 that gene's existing `panelappau` edges and rewrites them (one per condition id found in the panel's phenotypes, with
 the strongest panel confidence), under an *unversioned* builder whose context is the gene symbol, throttled by
 `PANEL_APP_CACHE_DAYS` and the response hash. The per-symbol hook `ontology/panel_app_ontology.py:update_gene_relations`
-runs on read paths only when `GENE_RELATION_PANEL_APP_LIVE_UPDATE` is set; batch work uses
+receives `ontology/models/models_ontology.py:gene_relations_read_signal`, which `OntologySnake`'s gene relationship
+reads send, and runs only when `GENE_RELATION_PANEL_APP_LIVE_UPDATE` is set; batch work uses
 `ontology/panel_app_ontology.py:bulk_update_gene_relations`, one paginated crawl of `/api/v1/genes/` that identifies
 genes by the HGNC id PanelApp reports rather than its symbol (#1667), skipped when `panel_app_bulk_data_age` says the
 crawl is fresh.
@@ -80,7 +81,7 @@ Only relations are versioned; a term's name, aliases and status are whatever the
 
 `ontology/models/models_ontology.py:OntologySnake` is an immutable path (source term, leaf term, list of relations
 walked), and `OntologySnake.snake_from` is a breadth-first search from a term toward a target ontology within
-`max_depth` steps, over `ontology/ontology_traversal.py:bfs_to_ontology`. Edges are filtered by an
+`max_depth` steps, over `ontology/models/models_ontology.py:bfs_to_ontology`. Edges are filtered by an
 `OntologyRelationshipQualityFilter`, which applies a minimum GenCC strength and a minimum PanelApp confidence only to
 edges from those two sources and passes everything else; the presets run from `ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER`
 to `ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER` (GenCC Strong, PanelApp Green), which is the default everywhere a
@@ -90,7 +91,7 @@ directions; `OntologySnake.check_if_ancestor` and `OntologySnake.all_descendants
 `OntologySnake.has_gene_relationship` also tries the MONDO/OMIM `exact` counterpart of the term, because GenCC asserts
 against MONDO while labs often pick OMIM. `ontology/ontology_traversal.py:get_ontology_traverser` gives batch callers
 the same API over a `MemoryOntologyTraverser`, which loads one version's whole edge list into adjacency dicts once;
-`gene_annotation` uses it across every HGNC term, where a query per step was the bottleneck. The HGNC bridge is
+`gene_annotation` uses it across every HGNC term, where a query per step would be the bottleneck. The HGNC bridge is
 `ontology/models/models_ontology.py:OntologyTerm.get_gene_symbol`: name match, then alias match, then
 `genes/gene_matching.py:HGNCMatcher` - and if HGNC knows the gene but no term exists it creates one on the spot under
 an ad-hoc import. Its docstring is the rule: pass GeneSymbols around and only cross to the HGNC term at the edge of a
@@ -124,9 +125,9 @@ machinery for the interactive picker, ranking terms by gene relationship, search
 
 Terms and relations are split because they age differently: a MONDO id is stable and a rename should be visible to
 every old record, while whether gene X causes disease Y is an assertion that changes with each GenCC or PanelApp
-refresh and must be reproducible for an old AnnotationVersion. Partitioning relations by import (#206, 2022) made
-"which edges did this version see" a partition pruning rather than a filter over one huge table, and made dropping a
-superseded import cheap. Storing gene symbols as HGNC terms was the price of a single relation table - every edge has
+refresh and must be reproducible for an old AnnotationVersion. Partitioning relations by import (#206) makes
+"which edges did this version see" a partition pruning rather than a filter over one huge table, and makes dropping a
+superseded import cheap. Storing gene symbols as HGNC terms is the price of a single relation table - every edge has
 two `OntologyTerm` ends - and `get_gene_symbol` exists to keep that leakage contained. `OntologyVersion` is created
 lazily from the latest imports rather than by a command because the files are loaded one at a time over several
 deploys, and the version should reflect whatever combination is complete. PanelApp is unversioned and live because it
@@ -134,19 +135,6 @@ is refreshed per gene on demand; GenCC carries PanelApp Australia's submissions 
 off still sees them, and `load_gencc` drops the PanelApp rows when live updates are on to avoid double counting.
 Condition matching lives in classification, not here, because it is about a lab's text and permissions (each
 `ConditionText` is Guardian-scoped to its lab); the ontology app only supplies terms and search.
-
-## History
-
-The app was split out of annotation in January 2021 (`ontology/migrations/0001_initial.py`). Relation partitioning
-and `OntologyVersion` came together in June 2022 (#206, `ontology/migrations/0013_one_off_ontology_term_relationship_partitions_and_copy.py`,
-`ontology/migrations/0015_ontologyimport_version_ontologyversion.py`), followed by `status` on terms so every OMIM
-entry could be stored but only conditions offered (`ontology/migrations/0020_ontologyterm_status.py`, 2022), a
-de-duplication of PanelApp edges (`ontology/migrations/0022_one_off_remove_panelappau_duplicates.py`) and gene-disease
-relations per version (#648). External ontologies were added as non-local services - DOID, Orphanet, MedGen, MeSH
-(2024) - and internal term links became a setting (#700). Strength filtering was tightened in 2024
-(variantgrid_private#3646), the in-memory traverser landed in May 2026, unsupported Monarch prefixes (MPATH) stopped
-raising (#1603), and PanelApp gene identity moved to HGNC ids (#1667). On the classification side, condition text accepted multiple terms with auto-assignment in
-2023 (#897) and the resolved-condition history began to be tracked (#881).
 
 ## Traps
 
@@ -163,4 +151,6 @@ refresh or the two drift. The `OntologyTermRelation` default manager `select_rel
 A relation's direction is conventional (MONDO->OMIM, MONDO->HGNC,
 OMIM->HGNC) but every reader uses `OntologyTermRelation.other_end` and checks both directions, so never assume
 `source_term` is the disease. `sync_condition_text_matches --obsolete` is the only thing that notices when an
-ontology import deprecates a term a lab has already matched.
+ontology import deprecates a term a lab has already matched. DOID, Orphanet and MedGen ids are recognised but not stored
+(`OntologyTerm.is_locally_stored`), and a prefix we do not support, such as MPATH from the Monarch search, resolves to
+nothing rather than raising (`OntologyService.resolve_prefix`, #1603).

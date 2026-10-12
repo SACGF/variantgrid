@@ -9,7 +9,7 @@ from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection
 from seqauto.models import (
     QC,
     Aligner,
-    BamFile,
+    AlignmentFile,
     EnrichmentKit,
     Experiment,
     QCGeneCoverage,
@@ -51,7 +51,7 @@ class SampleSheetUpdateTest(APITestCase):
         cls.sample_sheet, cls.sequencing_samples = make_sample_sheet(cls.sequencing_run, SAMPLE_NAMES)
         cls.enrichment_kit = EnrichmentKit.objects.create(name="sheet_update_kit")
         aligner = Aligner.objects.get_or_create(name="bwa", version="0.7")[0]
-        cls.bam_file = BamFile.objects.create(path="/data/SHEET_UPDATE_RUN/1_BAM/sample_a.bam", name="sample_a.bam",
+        cls.alignment_file = AlignmentFile.objects.create(path="/data/SHEET_UPDATE_RUN/1_BAM/sample_a.bam", name="sample_a.bam",
                                               sequencing_run=cls.sequencing_run,
                                               sequencing_sample=cls.sequencing_samples[0], aligner=aligner)
 
@@ -65,7 +65,7 @@ class SampleSheetUpdateTest(APITestCase):
 
         sample_a = SequencingSample.objects.get(pk=self.sequencing_samples[0].pk)
         self.assertTrue(sample_a.failed)
-        self.assertTrue(BamFile.objects.filter(pk=self.bam_file.pk).exists())
+        self.assertTrue(AlignmentFile.objects.filter(pk=self.alignment_file.pk).exists())
         self.assertEqual(self.sample_sheet.sequencingsample_set.count(), len(SAMPLE_NAMES))
 
 
@@ -119,14 +119,14 @@ class Gene20xCoverageCountTest(APITestCase):
     def _collection_for(self, sequencing_run, sample_sheet, sample_name, percent_20x=100):
         sequencing_sample = SequencingSample.objects.create(sample_sheet=sample_sheet, sample_id=sample_name,
                                                             sample_name=sample_name, sample_number=1, barcode="ACGT")
-        bam_file = BamFile.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}.bam", name=sample_name,
+        alignment_file = AlignmentFile.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}.bam", name=sample_name,
                                           sequencing_run=sequencing_run, sequencing_sample=sequencing_sample,
                                           aligner=self.aligner)
         vcf_file = SingleSampleVCF.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}.vcf",
-                                                  sequencing_run=sequencing_run, bam_file=bam_file,
+                                                  sequencing_run=sequencing_run, alignment_file=alignment_file,
                                                   variant_caller=self.variant_caller)
         qc = QC.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}_qc.txt", sequencing_run=sequencing_run,
-                               bam_file=bam_file, vcf_file=vcf_file)
+                               alignment_file=alignment_file, vcf_file=vcf_file)
         collection = GeneCoverageCollection.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}.cov.tsv",
                                                            data_state=DataState.COMPLETE,
                                                            genome_build=self.genome_build)

@@ -53,6 +53,12 @@ class GeneFusion(models.Model):
             genes.append(self.partner)
         return genes
 
+    @property
+    def igv_locus(self) -> str:
+        """ The partners by name, which IGV resolves itself and opens side by side - the breakpoints
+            are per observation, so the gene pair is all the fusion itself places on the genome """
+        return " ".join(gene.symbol_str for gene in self.gene_level_ids)
+
     def clean(self):
         super().clean()
         parsed = GeneLevelSymbolicAlt.parse(self.variant.alt.seq)

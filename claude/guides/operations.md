@@ -1,6 +1,6 @@
 # Operations guide
 
-The L4 facts from [agent_system.md](../plans/agent_system.md) §4.4: what is running where, how a deploy happens, and the
+What is running where, how a deploy happens, and the
 scale that shapes how a change must be written. Live values come from `python3 manage.py vg status`; this file holds
 what the command cannot know. Verified against vg-test2 on 2026-09-06.
 
@@ -47,17 +47,18 @@ task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` s
 
 Logs: `/var/log/variantgrid/` (`gunicorn.log`, `celery*.log`, `celeryd_beat.log`). Application events are also rows in
 `eventlog/models.py:Event` (severity, app, name, details) - `vg status` lists the last ten ERRORs; `ViewEvent` records page views
-(the `claude_agent` user's included). Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and Slack
-notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLACK.enabled`.
+(the `claude_agent` user's included). `ApiRequestLog` keeps one row per call (body, status, duration) to the endpoints in
+`INTEGRATION_API_TRACKING`, kept forever unless `API_REQUEST_LOG_DAYS` is set; admins read it at Settings → API Log.
+Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and Slack notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLACK.enabled`.
 
 ## Deploy and upgrade
 
 `scripts/upgrade.sh <target>` on a deployment: `install_requirements.sh` (uv-managed `.venv` from `requirements.txt`, not the
-dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then
-`scripts/migrator/migrator.py`, whose standard steps (`scripts/migrator/migrator.py:Migrator.STANDARD_MIGRATIONS`) are git pull +
-install requirements, `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
-and `deployed` (records the deploy in Rollbar). It also reads `manage.py manual_outstanding` (JSON) to
-surface the deploy-time steps migrations registered with `manual/operations/manual_operations.py:ManualOperation`.
+dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then it execs `manage.py upgrade`
+(`manual/upgrader.py:Upgrader`), which runs everything in one process. Its standard steps (`manual/upgrader.py:Upgrader.standard_steps`)
+are git pull (re-execing on new code), `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
+and `deployed` (records the deploy in Rollbar). It also surfaces the deploy-time steps migrations registered with
+`manual/operations/manual_operations.py:ManualOperation` (`manual/__manual_readme.md`).
 `manage` steps auto-run once their `requires` gates (`manual/gates.py`) clear and the command still exists; `other` steps are
 printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed.sh` records the deploy in Rollbar and runs
 `manage.py deployed`. `scripts/restart_services.sh` finishes it.
@@ -67,21 +68,21 @@ static file, every page that links it fails with `Missing staticfiles manifest e
 Static files below). So when an agent is asked to pull or upgrade a box, it runs the whole thing without the menu:
 
 ```bash
-source .venv/bin/activate && scripts/upgrade.sh --quick < /dev/null   # ~75s on vg-test2; exit 0 = all steps passed
+source .venv/bin/activate && scripts/upgrade.sh --quick < /dev/null   # exit 0 = all steps passed
 ```
 
 Then it restarts the services and checks the box, even when the pull brought no code (a plan or doc only): `collectstatic_clean_compressor --clear` deletes the collected files and writes them again, and a hashed name can change, while running gunicorn keeps the manifest it loaded at start. Skipping the restart leaves pages linking a file that is gone, and Rollbar fills with `UncompressableFileError: 'css/global.<hash>.css' could not be found in the COMPRESS_ROOT` until it happens. On vg-test2 that is one `sudo -n systemctl restart <unit>` per unit, for
 gunicorn and each celeryd_* unit: sudoers allows exactly those commands, not `restart_services.sh` and not several units in
 one call. After that it runs `vg status` (all services active, 0 manual tasks outstanding) and
-`vg page /variantopedia/dashboard`. If `--quick` stops at the menu (an EOFError under `< /dev/null`), manual steps are outstanding: `--auto-manage`
-runs the unblocked `manage` ones, and anything else goes back to the user.
+`vg page /variantopedia/dashboard`. If `--quick` stops at the menu ("No input available for the menu" under `< /dev/null`, exit 1), a step failed or manual steps are outstanding: `--auto-manage`
+runs the unblocked `manage` ones (carrying on past a failure, exit 1 if any failed), and anything else goes back to the user.
 
 Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
 latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read
 once per process from the checkout and reported by the API docs and `variantgrid/views_rest.py:CapabilitiesView`. Cutting a
 new major means bumping that setting in the same commit as the tag.
 
-Pushed migrations are frozen (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
+Pushed migrations stay as they are unless the user says an edit is safe (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
 migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.
@@ -93,15 +94,15 @@ Postgres statistics: after a crash or an immediate shutdown (not a clean stop or
 cumulative stats counters, and autovacuum decides when to re-analyze from those counters. Rows written before the reset
 are then invisible to it, so a table bulk-loaded shortly before keeps its old column statistics until another 10% of it
 changes, and the planner misjudges it. The sign is every `stats_reset` in `pg_stat_bgwriter` / `pg_stat_io` at one moment
-with `pg_stat_database.stats_reset` empty. Run a database-wide `ANALYZE` after such a restart (vg-test2 had this from
-2026-08-19 to 2026-09-24; a plain `ANALYZE;` took 25 minutes there, most of it on the partitioned annotation tables).
+with `pg_stat_database.stats_reset` empty. Run a database-wide `ANALYZE` after such a restart (a plain `ANALYZE;` takes
+about 25 minutes on vg-test2, most of it on the partitioned annotation tables).
 
 Static files: `manage.py collectstatic` writes `variantgrid/sitestatic/`. Storage is `ManifestStaticFilesStorage`, so
 `{% static %}` links the content-hashed names collectstatic records in its manifest, and a changed file gets a new URL - Cloudflare caches
 `/static/` for 4 hours, and a shift+reload doesn't get past it. With `DEBUG=False` a deployment that hasn't run collectstatic
 since a file was added 500s on any page linking it (`Missing staticfiles manifest entry`); `DEBUG=True` links the
 unhashed name. Under `manage.py test` (`UNIT_TEST`) the settings pick plain `StaticFilesStorage`, so tests need no
-collectstatic. (The manifest setting was lost in the Django 6 upgrade, when `STATICFILES_STORAGE` stopped being read.) django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
+collectstatic. The storage is set in `STORAGES["staticfiles"]`; Django 6 ignores `STATICFILES_STORAGE`. django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
 and caches the rendered tag in Redis for 30 days under a key hashed from the source files' mtimes. With `DEBUG=True` those
 are the finders' source files, so `collectstatic --clear` leaves every page linking a deleted bundle (symptom: unstyled
 pages, an SVG icon filling its cell); deployments read the freshly collected copies and rebuild on their own. The migrator
@@ -127,8 +128,8 @@ loci, 53 k alleles, 211 samples, 726 classifications, 46 analyses, 200 k variant
 SA Pathology holds on the order of 400,000 `VariantTag` rows (a known artefact is re-tagged in every analysis it appears in)
 and many more variants and samples.
 
-- **Whole-database operations are batched by default.** An unbatched liftover run held every Allele, VariantCoordinate and
-  AlleleLiftover in memory and took the machine down. Page the queryset by pk range (not `.iterator()`, which holds a cursor
+- **Whole-database operations are batched by default.** An unbatched liftover run holds every Allele, VariantCoordinate and
+  AlleleLiftover in memory and takes the machine down. Page the queryset by pk range (not `.iterator()`, which holds a cursor
   open for hours), size the batch from a settings constant, and fan batches out as separate celery tasks so they run in
   parallel and one failure only loses its own batch: `snpdb/liftover.py:create_liftover_pipelines` and
   `snpdb/tasks/liftover_tasks.py:liftover_allele_batch` (`settings.LIFTOVER_BATCH_SIZE`) are the pattern. Two reasons, both

@@ -240,7 +240,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         # Sample gene lists for samples we have permission to see
         samples_qs = Sample.filter_for_user(user)
         sample_gene_list_qs = GeneList.objects.filter(category__name=GeneListCategory.SAMPLE_GENE_LIST,
-                                                      customtextgenelist__qcgenelist__qc__bam_file__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+                                                      customtextgenelist__qcgenelist__qc__alignment_file__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
 
         qs = user_qs | sample_gene_list_qs
         if success_only:
