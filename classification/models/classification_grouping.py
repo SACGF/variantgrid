@@ -712,6 +712,8 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     @staticmethod
     def grouping_for(classification: Classification) -> Optional[ClassificationGrouping]:
+        if not classification.pk:
+            return None
         if entry := classification.classificationgroupingentry_set.select_related("grouping").first():
             return entry.grouping
         return None

@@ -255,7 +255,7 @@ class ClassificationTestCaseModifications(TestCase):
             if vc:
                 vc.delete()
 
-    def xtest_strip_html(self):
+    def test_strip_html(self):
         lab, user = ClassificationTestUtils.lab_and_user()
         vc = Classification.create(
             user=user,

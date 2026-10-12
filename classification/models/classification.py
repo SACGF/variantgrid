@@ -2010,7 +2010,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                           exclude_withdrawn=exclude_withdrawn).first()
 
     @property
-    def last_published_version(self) -> 'ClassificationModification':
+    def last_published_version(self) -> Optional['ClassificationModification']:
+        if not self.pk:
+            return None
         return ClassificationModification.objects.filter(classification=self, is_last_published=True) \
             .select_related('classification', 'classification__lab', 'classification__lab__organization') \
             .first()
