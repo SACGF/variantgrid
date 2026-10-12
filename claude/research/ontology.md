@@ -57,7 +57,8 @@ live rather than a file: `ontology/panel_app_ontology.py:_update_gene_relations`
 that gene's existing `panelappau` edges and rewrites them (one per condition id found in the panel's phenotypes, with
 the strongest panel confidence), under an *unversioned* builder whose context is the gene symbol, throttled by
 `PANEL_APP_CACHE_DAYS` and the response hash. The per-symbol hook `ontology/panel_app_ontology.py:update_gene_relations`
-runs on read paths only when `GENE_RELATION_PANEL_APP_LIVE_UPDATE` is set; batch work uses
+receives `ontology/models/models_ontology.py:gene_relations_read_signal`, which `OntologySnake`'s gene relationship
+reads send, and runs only when `GENE_RELATION_PANEL_APP_LIVE_UPDATE` is set; batch work uses
 `ontology/panel_app_ontology.py:bulk_update_gene_relations`, one paginated crawl of `/api/v1/genes/` that identifies
 genes by the HGNC id PanelApp reports rather than its symbol (#1667), skipped when `panel_app_bulk_data_age` says the
 crawl is fresh.
@@ -80,7 +81,7 @@ Only relations are versioned; a term's name, aliases and status are whatever the
 
 `ontology/models/models_ontology.py:OntologySnake` is an immutable path (source term, leaf term, list of relations
 walked), and `OntologySnake.snake_from` is a breadth-first search from a term toward a target ontology within
-`max_depth` steps, over `ontology/ontology_traversal.py:bfs_to_ontology`. Edges are filtered by an
+`max_depth` steps, over `ontology/models/models_ontology.py:bfs_to_ontology`. Edges are filtered by an
 `OntologyRelationshipQualityFilter`, which applies a minimum GenCC strength and a minimum PanelApp confidence only to
 edges from those two sources and passes everything else; the presets run from `ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER`
 to `ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER` (GenCC Strong, PanelApp Green), which is the default everywhere a

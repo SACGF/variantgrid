@@ -1,15 +1,12 @@
 """In-memory + DB-backed ontology graph traversal.
 
-Both implementations share the BFS body in ``bfs_to_ontology``; only the
+Both implementations share the BFS body in ``models_ontology.bfs_to_ontology``; only the
 "give me adjacent relations" step differs. The DB version queries
 ``OntologyTermRelation``; the memory version walks adjacency dicts loaded
 once.
 """
 from collections import defaultdict
-from collections.abc import Callable
 from typing import Protocol, Union
-
-from django.db.models import Q
 
 from genes.models import GeneSymbol
 from ontology.models import (
@@ -24,86 +21,12 @@ from ontology.models import (
     OntologyVersion,
     PanelAppClassification,
 )
-from ontology.models.models_ontology import OntologySnake, OntologySnakes
-
-_EXCLUDED_RELATIONS = frozenset({
-    OntologyRelation.IS_A,
-    OntologyRelation.EXACT_SYNONYM,
-    OntologyRelation.RELATED_SYNONYM,
-    OntologyRelation.XREF,
-})
-
-
-def bfs_to_ontology(
-    start_term: OntologyTerm,
-    to_ontology: OntologyService,
-    max_depth: int,
-    step_fn: Callable[[set[str], set[str], bool], list[OntologyTermRelation]],
-):
-    """BFS from ``start_term`` toward ``to_ontology``.
-
-    ``step_fn(leaf_term_ids, seen_term_ids, exclude_hpo_endpoints)`` returns
-    the adjacent ``OntologyTermRelation`` rows to expand. Quality filtering,
-    the excluded-relation set, and HPO-endpoint exclusion are baked into
-    ``step_fn``.
-    """
-    if start_term.ontology_service == to_ontology:
-        return OntologySnakes([OntologySnake(source_term=start_term)])
-
-    seen: set[str] = {start_term.id}
-    new_snakes: list = [OntologySnake(source_term=start_term)]
-    valid_snakes: list = []
-    exclude_hpo_endpoints = (to_ontology == OntologyService.HGNC)
-
-    while new_snakes:
-        snakes = list(new_snakes)
-        new_snakes = []
-        by_leafs: dict[str, OntologySnake] = {}
-        for snake in snakes:
-            existing = by_leafs.get(snake.leaf_term.id)
-            if existing is None or len(snake.paths) < len(existing.paths):
-                by_leafs[snake.leaf_term.id] = snake
-
-        all_relations = step_fn(set(by_leafs.keys()), set(seen), exclude_hpo_endpoints)
-
-        for relation in all_relations:
-            snake = by_leafs.get(relation.source_term_id) or by_leafs.get(relation.dest_term_id)
-            if snake is None:
-                continue
-            if snake.leaf_term.id not in (relation.source_term_id, relation.dest_term_id):
-                continue
-            other_term = relation.other_end(snake.leaf_term)
-
-            ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}
-            if (OntologyService.MONDO in ontology_services
-                    and OntologyService.OMIM in ontology_services
-                    and relation.relation != OntologyRelation.EXACT):
-                continue
-
-            new_snake = snake.snake_step(relation)
-            if other_term.ontology_service == to_ontology:
-                valid_snakes.append(new_snake)
-                continue
-            if len(new_snake.paths) <= max_depth:
-                new_snakes.append(new_snake)
-            seen.add(other_term.id)
-
-    valid_snakes.sort()
-    return OntologySnakes(valid_snakes)
-
-
-def _make_db_step_fn(otr_qs, quality_filter: OntologyRelationshipQualityFilter):
-    q_relation = ~Q(relation__in=_EXCLUDED_RELATIONS) & quality_filter.filter_q
-
-    def step(leaf_term_ids, seen_term_ids, exclude_hpo_endpoints):
-        outgoing = otr_qs.filter(source_term_id__in=leaf_term_ids).exclude(dest_term_id__in=seen_term_ids).filter(q_relation)
-        incoming = otr_qs.filter(dest_term_id__in=leaf_term_ids).exclude(source_term_id__in=seen_term_ids).filter(q_relation)
-        if exclude_hpo_endpoints:
-            outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
-            incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
-        return list(outgoing) + list(incoming)
-
-    return step
+from ontology.models.models_ontology import (
+    EXCLUDED_SNAKE_RELATIONS,
+    OntologySnake,
+    OntologySnakes,
+    bfs_to_ontology,
+)
 
 
 def _quality_filter_passes(otr: OntologyTermRelation,
@@ -242,7 +165,7 @@ class MemoryOntologyTraverser:
                 for otr in self._by_source.get(leaf_id, ()):
                     if otr.dest_term_id in seen_term_ids:
                         continue
-                    if otr.relation in _EXCLUDED_RELATIONS:
+                    if otr.relation in EXCLUDED_SNAKE_RELATIONS:
                         continue
                     if not _quality_filter_passes(otr, gencc_ok, panelapp_ok):
                         continue
@@ -252,7 +175,7 @@ class MemoryOntologyTraverser:
                 for otr in self._by_dest.get(leaf_id, ()):
                     if otr.source_term_id in seen_term_ids:
                         continue
-                    if otr.relation in _EXCLUDED_RELATIONS:
+                    if otr.relation in EXCLUDED_SNAKE_RELATIONS:
                         continue
                     if not _quality_filter_passes(otr, gencc_ok, panelapp_ok):
                         continue

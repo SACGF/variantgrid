@@ -93,10 +93,11 @@ from classification.models.evidence_key import (
     EvidenceKeyValueType,
     VCDataCell,
     VCDataDict,
+    VCPatch,
     WipeMode,
     resolve_default_value,
 )
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.evidence_mixin import EvidenceMixin
 from classification.models.evidence_mixin_summary_cache import (
     ClassificationSummaryCacheObj,
     ClassificationSummaryCalculator,
@@ -910,7 +911,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self.get(SpecialEKeys.G_HGVS)
 
     def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
-        return AlleleOriginBucket.bucket_for_allele_origin(self.get(SpecialEKeys.ALLELE_ORIGIN))
+        return EvidenceKeyMap.allele_origin_bucket(self.get(SpecialEKeys.ALLELE_ORIGIN))
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:

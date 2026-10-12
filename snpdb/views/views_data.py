@@ -43,6 +43,7 @@ from library.django_utils import (
     get_model_fields,
     set_form_read_only,
 )
+from library.django_utils.data_archive_mixin import DataArchivedError
 from library.utils import full_class_name
 from patients.forms import PatientForm
 from patients.models.models_phenotype import patient_phenotypes_for_samples
@@ -50,7 +51,6 @@ from patients.views_json import get_patient_upload_csv
 from snpdb import forms
 from snpdb.archive import (
     ArchivePreconditionError,
-    DataArchivedError,
     check_vcf_archive_precondition,
     mark_vcf_archive_started,
     restore_vcf,

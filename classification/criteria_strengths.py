@@ -3,8 +3,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Union
+
 from django.utils.safestring import SafeString
+
 from classification.enums import CriteriaEvaluation
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.utils import first
 
 
@@ -203,7 +206,6 @@ class CriteriaStrengths:
         if hasattr(self, item):
             return getattr(self, item)
         if isinstance(item, str):
-            from classification.models import EvidenceKeyMap
             if '_' in item:
                 parts = ["acmg:" + p for p in item.split('_')]
                 return [self.strength_map.get(part) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in parts]

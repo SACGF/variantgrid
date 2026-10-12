@@ -228,6 +228,14 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
         TrioInheritance.ANY_AFFECTED: TrioAnyAffected,
     }
+    # Modes calculate_cohort_stats precomputes counts for, as named in Trio.STATS_INHERITANCE_MODES
+    STATS_INHERITANCE_MODES = {
+        TrioInheritance.DENOVO: "denovo",
+        TrioInheritance.RECESSIVE: "autosomal_recessive",
+        TrioInheritance.DOMINANT: "autosomal_dominant",
+        TrioInheritance.XLINKED_RECESSIVE: "x_linked_recessive",
+        TrioInheritance.COMPOUND_HET: "compound_het",
+    }
 
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=TrioInheritance.choices, default=TrioInheritance.RECESSIVE)
@@ -280,12 +288,25 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         # defeat the cache.
         return AbstractCohortBasedNode._has_filters_that_affect_label_counts(self)
 
+    def _stats_inheritance_mode(self) -> Optional[str]:
+        """ The precomputed inheritance bucket this node's counts are in, None if there isn't one.
+            The buckets require both parents to have a zygosity call - require_zygosity=False also
+            matches parent no-calls, which no bucket represents """
+        if not self.require_zygosity:
+            return None
+        return self.STATS_INHERITANCE_MODES.get(TrioInheritance(self.inheritance))
+
+    def get_stats_filter_key(self) -> str:
+        return self.trio.get_stats_filter_key(self._stats_inheritance_mode())
+
     def _get_cached_label_count(self, label):
         # Compound het is the only trio mode that takes a parent (max_inputs=1), and its queryset
         # is intersected with that parent (uses_parent_queryset). The cohort-wide stats cache
         # can't represent the parent restriction, so it would over-count (tripping the single-parent
         # check in node_counts()). Fall back to a real DB count of the parent-intersected queryset.
         if self.has_input():
+            return None
+        if self._stats_inheritance_mode() is None:
             return None
         return super()._get_cached_label_count(label)
 

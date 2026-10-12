@@ -1,21 +1,18 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import cached_property
 from typing import Optional
 
 from classification.enums import SpecialEKeys
-from classification.models import (
-    ClassificationFlagTypes,
+from classification.models.classification_lab_summaries import (
     ClassificationLabSummary,
     ClassificationLabSummaryEntry,
+)
+from classification.models.discordance_models import (
     DiscordanceReport,
     DiscordanceReportClassification,
     DiscordanceReportTriage,
-    classification_flag_types,
 )
-from classification.views.discordance_report_triage_view import (
-    DiscordanceReportTriageView,
-)
+from classification.models.flag_types import ClassificationFlagTypes, classification_flag_types
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
@@ -24,11 +21,6 @@ from snpdb.models import Lab
 class DiscordanceLabSummary(ClassificationLabSummary):
     drcs: list[DiscordanceReportClassification]
     triage: Optional[DiscordanceReportTriage] = None
-
-    @cached_property
-    def embedded(self):
-        if triage := self.triage:
-            return DiscordanceReportTriageView.lazy_render(triage)
 
     def _with_triage(self, triage: Optional[DiscordanceReportTriage]) -> 'DiscordanceLabSummary':
         return DiscordanceLabSummary(
