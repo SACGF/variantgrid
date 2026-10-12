@@ -191,9 +191,10 @@ Gotchas:
   where the flag means "did the caller's library QC pass for that category" - the Amplifications / Variants / Fusions
   flags. Its `tick_when` rules are `{"passed": true|false}` and `{"completed": false}` against the category's
   `seqauto/models/models_seqauto.py:LibraryQC` row (`classification/models/classification_report_models.py:library_qc_tick`;
-  `tick_for` picks which of the two a field is judged by), the newest run per category winning
-  (`report/case_report_context.py:specimen_library_qc`, which reads the specimen's rows directly - a `LibraryQC` is
-  keyed on the run and the pair, and claims the specimen rather than either extraction). The form lists the category's
+  `tick_for` picks which of the two a field is judged by) - `report/case_report_context.py:case_library_qc` takes the
+  rows of the pair the case's analysis came off, so a patient case has them too, and without an analysis the specimen's,
+  the newest run per category winning (a `LibraryQC` is keyed on the run and the pair, and claims the specimen rather
+  than either extraction). The form lists the category's
   metrics against the guidelines DRAGEN's own file quotes, `settings.TSO500_LIBRARY_QC_GUIDELINES` overriding one
   where the lab's own number differs.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py

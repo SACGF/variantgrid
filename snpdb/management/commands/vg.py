@@ -11,6 +11,7 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg docs check [doc.md|dir ...] [--all-plans]
     vg css unused [file.scss ...] [--dynamic] [--rendered [--max-pages N] [--per-name N] [--as USER]]
     vg imports cycles
+    vg health [--no-ci] [--json]
     vg inspect <kind> <id> [--depth N] [--json]
 
 All logic lives in library/vg/; this file only parses arguments. See claude/plans/agent_system.md §4.2.
@@ -30,6 +31,7 @@ from library.vg import maps
 from library.vg.css import find_unused, render_unused_report
 from library.vg.css_rendered import crawl_rendered_classes, render_rendered_report
 from library.vg.docs import check_docs, render_report
+from library.vg.health import gather_health, render_health
 from library.vg.import_graph import build_import_graph, import_cycles, render_cycles
 from library.vg.inspect import KINDS, inspect, render_inspection
 from library.vg.outline import outline, render_coverage, render_outline
@@ -107,6 +109,10 @@ class Command(BaseCommand):
 
         imports_parser = subparsers.add_parser("imports", help="Import cycles among the imports that run at module load")
         imports_parser.add_argument("action", choices=["cycles"])
+
+        health_parser = subparsers.add_parser("health", help="Ratchet numbers: docstring coverage, dead citations, one-off commands, lint, suite time")
+        health_parser.add_argument("--no-ci", action="store_true", help="Skip the CI suite time (it asks GitHub through gh)")
+        health_parser.add_argument("--json", action="store_true")
 
         inspect_parser = subparsers.add_parser("inspect", help="An object's whole graph by domain kind: " + ", ".join(KINDS))
         inspect_parser.add_argument("kind", choices=list(KINDS))
@@ -247,6 +253,12 @@ class Command(BaseCommand):
         self.stdout.write(render_cycles(graph, cycles))
         if cycles:
             raise CommandError(f"{len(cycles)} import cycle(s)")
+
+    # --- health ---
+
+    def handle_health(self, no_ci, json: bool, **_):  # pylint: disable=redefined-outer-name
+        health = gather_health(ci=not no_ci)
+        self.stdout.write(_json_dumps(asdict(health)) if json else render_health(health))
 
     # --- inspect ---
 

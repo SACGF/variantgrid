@@ -3,10 +3,10 @@
 
 Owns the implementation behind snpdb/management/commands/vg.py: what is running on this box (`vg status`),
 generated maps of the codebase (`vg map`), test selection from changed files (`vg tests --changed`), page
-rendering through the Django test client (`vg page`), module outlines (`vg outline`) and where a setting's
-value came from (`vg settings`). Everything here is read-only against the database.
+rendering through the Django test client (`vg page`), module outlines (`vg outline`), where a setting's
+value came from (`vg settings`) and the ratchet numbers (`vg health`). Everything here is read-only against the database.
 
-Modules that need no Django (repo, import_graph, test_selection, markdown, outline, settings_chain,
+Modules that need no Django (repo, import_graph, test_selection, markdown, outline, settings_chain, health,
 maps.signals, maps.settings, maps.tasks) are kept import-light so scripts/vg can run them in well under a
 second without booting the project. See claude/plans/agent_system.md §4.2 for the command contract.
 """

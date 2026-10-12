@@ -29,6 +29,7 @@ from snpdb.models import Allele
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--flags', required=False, action='store_true'),

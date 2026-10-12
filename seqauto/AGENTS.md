@@ -7,7 +7,7 @@ JointCalledVCF), QC models, EnrichmentKit and gold coverage, and the seqauto RES
   `Sample_Type` columns, which the pipeline posts as `SequencingSampleData`
   (`seqauto/models/models_seqauto.py:sequencing_sample_for_pair`); a sheet posted without them leaves the link null
   and `patients/tasks/extraction_matching_tasks.py:link_library_qc_to_sequencing_samples` fills it later. Reports
-  read it by specimen (`classification/report/case_report_context.py:specimen_library_qc`).
+  read it by the case's pair, falling back to the specimen (`classification/report/case_report_context.py:case_library_qc`).
 - `DragenTSO500CombinedVariantOutput` is one DRAGEN analysis of one pair (#1904) - TMB, MSI, GIS, the caller's tumour
   fraction and ploidy - keyed on (run name, pair) like `LibraryQC`, sharing its specimen claim
   (`seqauto/models/models_seqauto.py:SpecimenClaimMixin`). The lab's MSI / TMB calls are properties over the
