@@ -26,6 +26,13 @@ most grid and flag names still need reading the code that builds them. A class w
 
 Bootstrap 4: `data-toggle` / `data-target`, not the Bootstrap 5 `data-bs-*` forms.
 
+Third-party libraries live under `default_static/js/lib/` as our own copies, never loaded from a CDN (#1741), and the
+version goes in the path (`variantgrid/static_files/default_static/js/lib/jquery-3.7.1/jquery-3.7.1.min.js`,
+`variantgrid/static_files/default_static/js/lib/moment-2.30.1/moment-2.30.1.min.js`) so an upgrade
+is a rename that shows in every template, and a scanner can read the version without opening the file (#1955).
+Copy the file the project publishes (npm `min/` for moment) rather than a CDN's re-minified build, so the
+`.map` matches.
+
 Page JS that doesn't depend on template values lives in `default_static/js/<app>/<template_name>.js` (#2021). The
 static file knows nothing about the page's context: it defines functions whose parameters are the page values (one
 `options` object with named keys once there are several, an `init<Name>(options)` entry point for a file called once per
