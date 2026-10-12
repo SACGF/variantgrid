@@ -57,7 +57,7 @@ def view_patient(request, patient_id):
     # One patient's samples should all be the one individual - a pair that isn't is a sample swap (#196)
     sample_relatedness = None
     if settings.SOMALIER.get("enabled"):
-        visible_samples = patient.get_samples().filter(pk__in=Sample.filter_for_user(request.user).values("pk"))
+        visible_samples = Sample.filter_for_user(request.user, queryset=patient.get_samples())
         sample_relatedness = get_same_individual_relatedness(visible_samples)
 
     context = {"patient": patient,

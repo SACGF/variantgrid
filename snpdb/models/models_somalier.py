@@ -344,9 +344,11 @@ class SomalierRelatePairs(AbstractSomalierRelatePair):
     @staticmethod
     def get_for_sample(sample: Sample, user):
         """ Only pairs whose other sample the user can view - the row names it and its VCF """
-        visible_samples = Sample.filter_for_user(user)
-        return SomalierRelatePairs.objects.filter(Q(sample_a=sample, sample_b__in=visible_samples)
-                                                  | Q(sample_b=sample, sample_a__in=visible_samples))
+        pairs = SomalierRelatePairs.objects.filter(Q(sample_a=sample) | Q(sample_b=sample))
+        paired_samples = Sample.objects.filter(Q(pk__in=pairs.values("sample_a")) | Q(pk__in=pairs.values("sample_b")))
+        visible_samples = Sample.filter_for_user(user, queryset=paired_samples)
+        return pairs.filter(Q(sample_a=sample, sample_b__in=visible_samples)
+                            | Q(sample_b=sample, sample_a__in=visible_samples))
 
     @staticmethod
     def get_between_samples(samples: Iterable[Sample]):
