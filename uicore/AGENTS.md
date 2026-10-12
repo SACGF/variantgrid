@@ -50,7 +50,7 @@ Gotchas:
   `window.CURRENT_USERNAME` are not there yet (variantgrid/static_files/default_static/js/global.js:applyPageFrame).
 - `{% load %}` names matter: labelled/modal/preview/badge/boolean live in `ui_utils`;
   jsonify/format_value/timestamp/code_json/duration/get_item live in `js_tags` (uicore/templatetags/js_tags.py:format_value).
-  The wrong library only fails when the page renders.
+  The wrong library fails `uicore/tests/test_templates_compile.py`, which compiles every project template.
 - The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `ignoreSelectors` (third
   party widgets) - a processor that never fires on injected HTML is usually inside one
   (variantgrid/static_files/default_static/js/global.js:checkNode).
