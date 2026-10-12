@@ -141,12 +141,12 @@ for something specific it holds, and name `vg` only where it calls the code.
 Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and
 the compile rules are in `variantgrid/static_files/AGENTS.md`.
 
-### Migrations are frozen once pushed
-Assume a pushed migration has been run on a deployment: keep its filename and operations as they are, and express any
-change of mind (a field removed, a default changed) as a new migration on top. Renaming or editing an applied migration
-leaves `django_migrations` pointing at a name that no longer exists (`InconsistentMigrationHistory`) and has to be
-repaired by hand on every database. A migration that only exists locally (unpushed) can still be reshaped or regenerated.
-Check with `git log origin/master -- <migration file>`.
+### Editing a pushed migration
+By default, express a change of mind about a pushed migration (a field removed, a default changed) as a new migration on
+top: renaming or editing one that a deployment has applied leaves `django_migrations` pointing at a name that no longer
+exists (`InconsistentMigrationHistory`), repaired by hand on every database. A migration that only exists locally
+(unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
+pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
 
 ### Renaming a class that Redis has pickled
 Bump `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py`; old cache entries survive a deploy and fail
@@ -157,7 +157,8 @@ A new management command that must run on existing deployments goes in a migrati
 (`manual/operations/manual_operations.py`, example `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`).
 
 ### Celery
-Every task names its queue (`@app.task(queue='...')` or `CELERY_TASK_ROUTES`); the queues and what each is for are in
+A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks. Route
+one elsewhere when it needs a particular worker; the queues and what each is for are in
 `claude/guides/operations.md#services-queues-logs`.
 
 ### Scale

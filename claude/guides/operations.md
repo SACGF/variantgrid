@@ -82,7 +82,7 @@ latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc17455
 once per process from the checkout and reported by the API docs and `variantgrid/views_rest.py:CapabilitiesView`. Cutting a
 new major means bumping that setting in the same commit as the tag.
 
-Pushed migrations are frozen (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
+Pushed migrations stay as they are unless the user says an edit is safe (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
 migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.
