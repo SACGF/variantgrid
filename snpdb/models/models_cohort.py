@@ -18,7 +18,6 @@ from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import QuerySet
-from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT
 from django.db.models.expressions import F, Value
 from django.db.models.query_utils import FilteredRelation, Q
@@ -150,29 +149,47 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             my_samples = self.get_samples()
             parent_samples = self.parent_cohort.get_samples()
             if my_samples.exclude(pk__in=parent_samples).exists():
-                self.parent_cohort = None  # No longer a sub cohort
+                self.parent_cohort = None  # No longer a sub cohort - needs genotype data of its own
+                self.import_status = ImportStatus.CREATED
 
         self.version += 1
         self.sample_count = self.cohortsample_set.count()
         self.save()
 
-        if self.vcf is None:
-            # For custom built Cohorts - need to ensure cohort_genotype_packed_field_index entries are correct
-            if highest_packed_index := self._get_cohort_sample_field_max("cohort_genotype_packed_field_index"):
-                # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
-                out_of_range = F("cohort_genotype_packed_field_index") + Value(highest_packed_index + 1)
-                self.cohortsample_set.all().update(cohort_genotype_packed_field_index=out_of_range)
-
-                # Cohort genotype packed fields are in sample order
-                cohort_samples = []
-                for i, cs in enumerate(self.cohortsample_set.order_by("sample")):
-                    cs.cohort_genotype_packed_field_index = i
-                    cohort_samples.append(cs)
-                if cohort_samples:
-                    # Do a bulk update so it doesn't trigger a save then call this func again
-                    CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
+        # Sub cohorts read the parent's CohortGenotype arrays, so keep the parent's indexes (#2155)
+        if self.vcf is None and self.parent_cohort is None:
+            self.set_sample_order_packed_indexes()
 
         self.delete_old_counts()
+
+    def set_sample_order_packed_indexes(self):
+        """ Custom cohorts pack their own genotypes in sample order (#325) """
+        sample_ids = self.cohortsample_set.order_by("sample").values_list("sample_id", flat=True)
+        self._set_packed_field_indexes({sample_id: i for i, sample_id in enumerate(sample_ids)})
+
+    def set_parent_cohort(self, parent_cohort: 'Cohort'):
+        """ Become a sub cohort - every sample must be in parent_cohort, whose genotype data this then reads """
+        self.parent_cohort = parent_cohort
+        self.import_status = parent_cohort.import_status
+        self.save()
+        self._set_packed_field_indexes(dict(parent_cohort.cohortsample_set.values_list(
+            "sample_id", "cohort_genotype_packed_field_index")))
+
+    def _set_packed_field_indexes(self, packed_index_by_sample_id: dict[int, int]):
+        """ Bulk update so it doesn't go through CohortSample.save() and bump the version again """
+        cohort_samples = list(self.cohortsample_set.all())
+        if all(cs.cohort_genotype_packed_field_index == packed_index_by_sample_id[cs.sample_id]
+               for cs in cohort_samples):
+            return
+
+        # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
+        highest_packed_index = max(cs.cohort_genotype_packed_field_index for cs in cohort_samples)
+        highest_packed_index = max(highest_packed_index, *packed_index_by_sample_id.values())
+        out_of_range = F("cohort_genotype_packed_field_index") + Value(highest_packed_index + 1)
+        self.cohortsample_set.update(cohort_genotype_packed_field_index=out_of_range)
+        for cs in cohort_samples:
+            cs.cohort_genotype_packed_field_index = packed_index_by_sample_id[cs.sample_id]
+        CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
 
     def delete_old_counts(self):
         qs = CohortGenotypeCollection.objects.filter(cohort=self, cohort_version__lt=self.version)
@@ -185,29 +202,11 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             task = delete_old_cohort_genotypes_task.si()
             task.apply_async()
 
-    def _get_cohort_sample_field_max(self, field):
-        qs = self.cohortsample_set.all()
-        data = qs.aggregate(highest_value=Max(field))
-        return data["highest_value"]
-
-    def _get_next_sort_order(self):
-        existing_max = self._get_cohort_sample_field_max("sort_order")
-        if existing_max is not None:
-            return existing_max + 1
-        return 0
-
-    def add_sample(self, sample_id):
-        # TODO: Check for existing
-        try:
-            ss = self.cohortsample_set.get(cohort=self, sample_id=sample_id)
-        except CohortSample.DoesNotExist:
-            i = self._get_next_sort_order()
-            ss = CohortSample.objects.create(cohort=self,
-                                             sample_id=sample_id,
-                                             cohort_genotype_packed_field_index=i,
-                                             sort_order=i)
-            # Will call increment_version() to bump cohort
-        return ss
+    def add_sample(self, sample_id) -> 'CohortSample':
+        if not self.cohortsample_set.filter(sample_id=sample_id).exists():
+            sample_ids = list(self.get_cohort_samples().values_list("sample_id", flat=True))
+            self.set_samples([*sample_ids, sample_id])
+        return self.cohortsample_set.get(sample_id=sample_id)
 
     def set_samples(self, ordered_sample_ids: list[int]):
         """ Replace membership with ordered_sample_ids (in display order) under a single version bump.
@@ -457,6 +456,7 @@ def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-arg
         sub_cohort.parent_cohort = None
         sub_cohort.import_status = ImportStatus.CREATED
         sub_cohort.save()
+        sub_cohort.set_sample_order_packed_indexes()
 
 
 class CohortSample(models.Model):
