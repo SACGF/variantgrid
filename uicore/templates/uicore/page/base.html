@@ -82,10 +82,10 @@
     {% dal_media %}
 
     <!-- used to set custom cookies, for functionality not worth setting in the database -->
-    <script src="{% static 'js/lib/js.cookie.min.js' %}"></script>
+    <script src="{% static 'js/lib/js.cookie-3.0.1/js.cookie-3.0.1.min.js' %}"></script>
 
     <!-- Needed by code that calls ajaxForm -->
-    <script src="{% static 'js/lib/jquery.form.min.js' %}"></script>
+    <script src="{% static 'js/lib/jquery.form-4.3.0/jquery.form-4.3.0.min.js' %}"></script>
 
     <!-- Font Awesome -->
     <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
@@ -113,14 +113,14 @@
     <!-- Other 3rd Party -->
     <!-- Chosen: used for multiselect drop downs that look good. Can probably be done by bootstrap -->
 
-    <script src="{% static 'js/lib/chosen.jquery.js' %}"></script>
+    <script src="{% static 'js/lib/chosen-1.8.7/chosen-1.8.7.jquery.js' %}"></script>
 
     <!-- Used to show time as time ago, handy to use JavaScript for dates as we get timezone sorted -->
     <script src="{% static 'js/lib/moment-2.30.1/moment-2.30.1.min.js' %}"></script>
-    <script src="{% static 'js/lib/jquery.timeago.js' %}"></script>
+    <script src="{% static 'js/lib/jquery.timeago-1.6.7/jquery.timeago-1.6.7.js' %}"></script>
 
     <!-- Used by flag dialogs to show loading -->
-    <script src="{% static 'js/lib/loadingoverlay.min.js' %}"></script>
+    <script src="{% static 'js/lib/loadingoverlay-2.1.6/loadingoverlay-2.1.6.min.js' %}"></script>
 
     <!-- Variantgrid Specific -->
     {% compress js %}
