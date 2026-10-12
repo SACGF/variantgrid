@@ -138,6 +138,9 @@ Gotchas:
   create-data-from-header tasks must stay idempotent. A retry finds the VCF the first attempt created and skips
   create_vcf_from_vcf, so the sequencing link (upload/vcf/vcf_import.py:link_uploaded_vcf_to_sequencing) is re-run
   on that path too - it is where a sample the sheet doesn't name fails, and without it the retry imports unlinked.
+  The reloaded file may add or reorder sample columns: snpdb/models/models_cohort.py:Cohort.set_vcf_samples moves each
+  existing CohortSample's packed index to its new column (a stale index reads another sample's genotypes), and a file
+  missing an already-loaded sample fails with upload/vcf/vcf_import.py:VCFSamplesRemovedException.
 - A VCF or BED whose build cannot be resolved gets ImportStatus.REQUIRES_USER_INPUT and the pipeline TERMINATED_EARLY
   through upload/models/models.py:UploadPipeline.terminate_early_for_user_input
   (upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask; a single-shot ImportTask raises
