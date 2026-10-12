@@ -981,9 +981,10 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         raise NoTranscript(f"Transcript '{transcript_accession}' missing from our DB - validity with {annotation_consortium} unknown")
 
     @staticmethod
-    def get_transcript_version(genome_build: GenomeBuild, transcript_name, best_attempt=True) -> Optional['TranscriptVersion']:
+    def get_transcript_version(genome_build: GenomeBuild, transcript_name, *, best_attempt: bool = False) -> Optional['TranscriptVersion']:
         """ @param best_attempt if we don't have the exact version specified in transcript_name, grab the closest
-            one that is larger (or the largest one if we don't have any larger than the requested) """
+            one that is larger (or the largest one if we don't have any larger than the requested). Otherwise
+            raise MissingTranscript """
         transcript_version = None
         transcript_versions_qs = TranscriptVersion.objects.filter(genome_build=genome_build)
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_name)
@@ -1025,7 +1026,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         """ Attempts to load RefSeq TranscriptVersion we have from LRG identifier """
         transcript_version: Optional[TranscriptVersion] = None
         if lrg_identifier == "LRG_199t1":
-            transcript_version = TranscriptVersion.get_transcript_version(genome_build, "NM_004006.2")
+            transcript_version = TranscriptVersion.get_transcript_version(genome_build, "NM_004006.2", best_attempt=True)
         return transcript_version
 
     @staticmethod
@@ -1445,7 +1446,8 @@ class LRGRefSeqGene(models.Model):
             if t is None:
                 raise ValueError(f"We require a t version with LRG '{lrg_identifier}'")
             if lrg_ref_seq_gene := LRGRefSeqGene.objects.filter(lrg=lrg, t=t).first():
-                transcript_version = TranscriptVersion.get_transcript_version(genome_build, lrg_ref_seq_gene.rna)
+                transcript_version = TranscriptVersion.get_transcript_version(genome_build, lrg_ref_seq_gene.rna,
+                                                                           best_attempt=True)
         return transcript_version
 
 

@@ -147,13 +147,13 @@ if UNIT_TEST:
 else:
     CACHES = {
         'default': {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "library.django_utils.redis_cache.UnpickleTolerantRedisCache",
             "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
             'TIMEOUT': TIMEOUT,
             'VERSION': CACHE_VERSION,
         },
         'debug-panel': {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "library.django_utils.redis_cache.UnpickleTolerantRedisCache",
             "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
             'TIMEOUT': TIMEOUT,
             'OPTIONS': {

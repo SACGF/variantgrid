@@ -1,7 +1,5 @@
 from typing import Optional
 
-from dateutil.tz import gettz
-from django.conf import settings
 from django.contrib.auth.models import User
 
 from library.request_context import get_current_user, get_request_variable, set_request_variable
@@ -51,7 +49,5 @@ class UserSettingsManager:
 
     @staticmethod
     def get_user_timezone():
-        if user_settings := UserSettingsManager.get_user_settings():
-            return user_settings.tz
-        else:
-            gettz(settings.TIME_ZONE)
+        """ UserSettings.tz falls back to settings.TIME_ZONE, so this is set with or without a user """
+        return UserSettingsManager.get_user_settings().tz
