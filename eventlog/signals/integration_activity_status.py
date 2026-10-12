@@ -1,8 +1,10 @@
 from functools import partial
+from urllib.parse import urlencode
 
 from django.dispatch import receiver
+from django.urls import reverse
 
-from eventlog.models import IntegrationActivity
+from eventlog.models import API_KEY_PREFIX, IntegrationActivity
 from library.integration_status import (
     IntegrationDetail,
     IntegrationStatus,
@@ -38,8 +40,14 @@ def integration_status_for_activity(activity: IntegrationActivity, **overrides) 
                                          run=partial(IntegrationActivity.acknowledge_error, activity.key),
                                          label="Dismiss error")
 
+    url = None
+    if activity.key.startswith(API_KEY_PREFIX):
+        view_name = activity.key.removeprefix(API_KEY_PREFIX)
+        url = reverse('api_request_log') + "?" + urlencode({"view_name": view_name})
+
     kwargs = {
         "name": activity.name,
+        "url": url,
         "key": activity.key,
         "details": details,
         "direction": activity.direction,

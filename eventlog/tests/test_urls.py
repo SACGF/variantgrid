@@ -23,5 +23,9 @@ class Test(URLTestCase):
         ]
         self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
 
+    def testApiRequestLogUrls(self):
+        self._test_datatable_urls([("api_request_log_datatable", {}, 200)], self.admin_user)
+        self._test_datatable_urls([("api_request_log_datatable", {}, 403)], self.user)
+
 if __name__ == "__main__":
     unittest.main()

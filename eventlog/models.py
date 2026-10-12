@@ -1,7 +1,8 @@
 """
 The event log: Event (severity, app, name, details - what `vg status` lists as recent errors),
-ViewEvent (one row per page view) and IntegrationActivity (a rolling last-seen per external system,
-updated in place through `IntegrationActivity.track`). Write events with create_event /
+ViewEvent (one row per page view), IntegrationActivity (a rolling last-seen per external system,
+updated in place through `IntegrationActivity.track`) and ApiRequestLog (one row per call to an
+INTEGRATION_API_TRACKING endpoint, written by IntegrationApiMiddleware). Write events with create_event /
 create_login_event; the logging handler and middleware in this app fill the rest.
 """
 import inspect
@@ -12,6 +13,7 @@ from typing import Optional, Union
 
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.signals import user_logged_in
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import F
 from django.db.models.deletion import SET_NULL
@@ -58,6 +60,9 @@ class Event(models.Model):
             user_msg = f"User: {self.user}, "
 
         return f"{user_msg}{self.app_name}/{self.name}: {details}"
+
+
+API_KEY_PREFIX = "api:"  # IntegrationActivity.key of an API endpoint, before its view name
 
 
 class IntegrationActivityStatus(models.TextChoices):
@@ -181,6 +186,32 @@ class IntegrationActivity(TimeStampedModel):
         if tracker.changed:
             updates["last_change"] = timestamp
         cls._upsert(key, name, direction, updates)
+
+
+class ApiRequestLog(models.Model):
+    """ One row per call to an INTEGRATION_API_TRACKING endpoint - what was sent and what came back.
+        Pruned after settings.API_REQUEST_LOG_DAYS by eventlog.tasks.prune_api_request_log """
+    created = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
+    method = models.CharField(max_length=10)
+    path = models.TextField()
+    query_string = models.TextField(blank=True)
+    view_name = models.TextField()
+    view_kwargs = models.JSONField(default=dict, encoder=DjangoJSONEncoder)  # URL converters can give a UUID
+    status_code = models.IntegerField()
+    duration_ms = models.IntegerField()
+    request_body = models.TextField(null=True)  # trimmed, secrets redacted
+    response_body = models.TextField(null=True)  # trimmed, only kept for errors
+
+    class Meta:
+        indexes = [models.Index(fields=["view_name", "created"])]
+
+    def __str__(self):
+        return f"{self.method} {self.path} ({self.status_code})"
+
+    @property
+    def is_error(self) -> bool:
+        return self.status_code >= 400
 
 
 def create_login_event(sender, user, request, **kwargs):  # pylint: disable=unused-argument

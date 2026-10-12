@@ -784,8 +784,12 @@ HEALTH_CHECK_ENABLED = True
 # if true, the Server Status page shows an "Integrations" section of registered integration statuses
 INTEGRATION_STATUS_ENABLED = True
 
-# {url path prefix: display name} - records when each external client last called those endpoints
+# {url path prefix: display name} - records when each external client last called those endpoints,
+# and logs every call (eventlog.models.ApiRequestLog, Settings -> API Log)
 INTEGRATION_API_TRACKING = {}
+API_REQUEST_LOG_DAYS = 90  # ApiRequestLog rows older than this are pruned daily
+API_REQUEST_LOG_MAX_BODY = 10_000  # characters of request / error response body kept
+API_REQUEST_LOG_MAX_READ_BYTES = 1024 * 1024  # bigger request bodies are noted by size, not read
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback

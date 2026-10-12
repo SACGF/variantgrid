@@ -94,6 +94,11 @@ app.conf.beat_schedule['reconcile-pending-extractions'] = {
     'schedule': HOUR_SECS,
 }
 
+app.conf.beat_schedule['prune-api-request-log'] = {
+    'task': 'eventlog.tasks.prune_api_request_log',
+    'schedule': crontab(hour=3, minute=45),
+}
+
 app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'task': 'analysis.tasks.analysis_grid_export_tasks.clear_old_node_export_cached_generated_files',
     'schedule': crontab(hour=3, minute=15),

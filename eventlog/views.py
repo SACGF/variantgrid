@@ -1,3 +1,6 @@
+import json
+
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponseBadRequest
 from django.http.response import HttpResponse
@@ -5,7 +8,8 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from eventlog.models import Event
+from eventlog.models import ApiRequestLog, Event
+from library.django_utils import require_superuser
 from library.enums.log_level import LogLevel
 
 
@@ -34,6 +38,29 @@ def eventlog_detail(request: HttpRequest, pk: int):
     if not (request.user.is_superuser or event.user == request.user):
         raise PermissionDenied()
     return render(request, 'eventlog_detail.html', context={'event': event})
+
+
+@require_superuser
+def api_request_log(request):
+    view_names = ApiRequestLog.objects.order_by('view_name').values_list('view_name', flat=True).distinct()
+    context = {
+        "view_names": view_names,
+        "view_name": request.GET.get("view_name"),
+        "retention_days": settings.API_REQUEST_LOG_DAYS,
+    }
+    return render(request, 'api_request_log.html', context=context)
+
+
+@require_superuser
+def api_request_log_detail(request: HttpRequest, pk: int):
+    api_request = get_object_or_404(ApiRequestLog, pk=pk)
+    request_body = api_request.request_body
+    try:
+        request_body = json.dumps(json.loads(request_body), indent=2)
+    except (TypeError, ValueError):
+        pass  # not JSON, or trimmed part way through
+    context = {'api_request': api_request, 'request_body': request_body}
+    return render(request, 'api_request_log_detail.html', context=context)
 
 
 @require_POST
