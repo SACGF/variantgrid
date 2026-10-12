@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Iterable
-from classification.enums import OverlapStatus, OverlapOverrideStatus, TriageStatus, OverlapState
+from classification.enums import OverlapStatus, OverlapOverrideStatus, TriageStatus, OverlapSnapshot
 from classification.models import ClassificationResultValue, \
     EvidenceKeyMap, OverlapContribution, ClassificationSummaryCacheObj
 from classification.enums.overlaps_enums import OverlapContributionStatus
@@ -28,12 +28,12 @@ class OverlapCalculatorBase(ABC):
         return True
 
     @classmethod
-    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
+    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapSnapshot:
         """
         Given an iterable of OverlapContributions that apply to the same allele
-        calculate what should be the current OverlapState
+        calculate what should be the current OverlapSnapshot
         :param entries: OverlapContributions of any status
-        :return: Calculated OverlapState
+        :return: Calculated OverlapSnapshot
         """
 
         override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
@@ -104,7 +104,7 @@ class OverlapCalculatorBase(ABC):
                                     elif all(con.triage_state_obj.status == TriageStatus.REVIEWED_SATISFACTORY for con in interactive_contributors):  # all confident
                                         override_status = OverlapOverrideStatus.CONFIDENT_VS_CLINVAR
 
-        return OverlapState(status=overlap_status, has_pending_values=has_pending_values, override_status=override_status, lab_groups=involved_labs)
+        return OverlapSnapshot(status=overlap_status, has_pending_values=has_pending_values, override_status=override_status, lab_groups=involved_labs)
 
     @classmethod
     @abstractmethod
@@ -163,10 +163,10 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
         return summary.pathogenicity.classification
 
     @classmethod
-    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapState:
+    def calculate_entries(cls, entries: Iterable[OverlapContribution]) -> OverlapSnapshot:
         overlap_state = super().calculate_entries(entries)
         # do the normal calculation but also do a check for ALL VUS
-        # as that gets its own property on OverlapState for quick lookup
+        # as that gets its own property on OverlapSnapshot for quick lookup
         if OverlapStatus.SINGLE_SUBMITTER <= overlap_state.status <= OverlapStatus.RESOLUTION_DIFFERENCES:
             all_vus = True
             for entry in entries:
@@ -178,7 +178,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
                             break
 
             if all_vus:
-                overlap_state = OverlapState(
+                overlap_state = OverlapSnapshot(
                     status=overlap_state.status,
                     has_pending_values=overlap_state.has_pending_values,
                     override_status=overlap_state.override_status,

@@ -152,7 +152,7 @@ class TagFilter:
         return tag_ids
 
 
-class VariantsType(models.TextChoices):
+class VariantOrigin(models.TextChoices):
     UNKNOWN = 'U', 'Unknown'
     GERMLINE = 'G', 'Germline'
     MIXED = 'M', "Mixed (Single Sample)"

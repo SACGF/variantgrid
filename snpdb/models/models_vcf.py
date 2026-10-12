@@ -33,7 +33,7 @@ from snpdb.models.models import LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
     SampleFileType,
-    VariantsType,
+    VariantOrigin,
     VCFInfoTypes,
 )
 from snpdb.models.models_genome import GenomeBuild
@@ -394,7 +394,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
 
     preview_icon_symbol = "node-icon-sample"  # SampleNode wears this too - see get_node_class_icon
 
@@ -499,7 +499,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
 
     @property
     def is_somatic(self):
-        return self.variants_type in VariantsType.SOMATIC_TYPES
+        return self.variants_type in VariantOrigin.SOMATIC_TYPES
 
     @cached_property
     def enrichment_kit(self):
@@ -812,7 +812,7 @@ class VCFSourceSettings(models.Model):
     })
 
     source_regex = models.TextField()
-    sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    sample_variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
     # The build a source's files are called against - used when nothing else resolves one, ie the header
     # has no contigs/reference to detect from and the submitter declared none (@see resolve_genome_build)

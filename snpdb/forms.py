@@ -49,7 +49,7 @@ from snpdb.models import (
     UserContact,
     UserSettings,
     UserSettingsOverride,
-    VariantsType,
+    VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_enums import SampleFileType
@@ -476,7 +476,7 @@ class SampleMultiForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
 
 
 class VariantsTypeMultipleChoiceForm(forms.Form):
-    variants_type = forms.MultipleChoiceField(choices=VariantsType.choices, widget=forms.CheckboxSelectMultiple())
+    variants_type = forms.MultipleChoiceField(choices=VariantOrigin.choices, widget=forms.CheckboxSelectMultiple())
 
 
 class VCFChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):

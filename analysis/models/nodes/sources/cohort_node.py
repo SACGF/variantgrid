@@ -19,7 +19,7 @@ from analysis.models.nodes.stats_cache import (
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import SimpleZygosity, Zygosity
-from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
+from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantOrigin
 from snpdb.views.datatable_view import NullOrder, RichColumn
 
 
@@ -353,7 +353,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         vcf = self._get_vcf()
 
         if is_new and vcf:
-            somatic_samples = vcf.sample_set.filter(variants_type__in=VariantsType.SOMATIC_TYPES)
+            somatic_samples = vcf.sample_set.filter(variants_type__in=VariantOrigin.SOMATIC_TYPES)
             if somatic_samples.exists():
                 # Somatic mode...
                 self.accordion_panel = self.SIMPLE_ZYGOSITY

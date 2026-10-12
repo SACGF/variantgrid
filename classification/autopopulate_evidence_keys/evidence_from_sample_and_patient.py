@@ -7,7 +7,7 @@ from library.genomics.vcf_enums import VCFConstant
 from patients.models_enums import Sex, TissueStatus, Zygosity
 from patients.models import Extraction
 from snpdb.models import Sample, SampleGenotype
-from snpdb.models.models_enums import VariantsType
+from snpdb.models.models_enums import VariantOrigin
 from snpdb.models.models_variant import Variant
 
 
@@ -37,9 +37,9 @@ def get_allele_origin(sample: Sample) -> Optional[str]:
     """ The specimen says what the material is and the sample says what's in the call set, so an origin
         is only asserted where both agree - a mixed tumour sample's origin is genuinely per-variant and
         is left for the curator. Returns an allele_origin evidence key option, not a display label """
-    if sample.variants_type == VariantsType.SOMATIC_ONLY:
+    if sample.variants_type == VariantOrigin.SOMATIC_ONLY:
         return "somatic"
-    if sample.variants_type == VariantsType.GERMLINE and sample.extraction:
+    if sample.variants_type == VariantOrigin.GERMLINE and sample.extraction:
         if sample.extraction.specimen.tissue_status == TissueStatus.REFERENCE:
             return "germline"
     return None

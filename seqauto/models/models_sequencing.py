@@ -13,7 +13,7 @@ from snpdb.models import (
     GenomicIntervalsCollection,
     LabProject,
     Manufacturer,
-    VariantsType,
+    VariantOrigin,
 )
 
 
@@ -90,7 +90,7 @@ class EnrichmentKit(PreviewModelMixin, models.Model):
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
     # If configured to anything other than UNKNOWN - will set Sample.variants_type - used for e.g. a somatic panel
     # see also VCFSourceSettings (which does the same thing based on VCF header)
-    sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    sample_variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
     min_coverage = models.IntegerField(null=True)  # min required, settings.SEQAUTO_MIN_COVERAGE used if not set
     obsolete = models.BooleanField(default=False)

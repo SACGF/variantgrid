@@ -106,7 +106,7 @@ class OverlapEntrySourceTextChoices(TextChoices):
 
 
 @dataclass(frozen=True)
-class TriageState(DataClassJsonMixin):
+class TriageDecision(DataClassJsonMixin):
     """
     Combination of a TriageStatus, and an optional amend_value (only if TriageStatus is REVIEWED_WILL_FIX)
     e.g. PENDING or REVIEWED WILL FIX - (P)athogenic
@@ -121,7 +121,7 @@ class TriageState(DataClassJsonMixin):
 
     @staticmethod
     def default_json():
-        return TriageState().to_dict()
+        return TriageDecision().to_dict()
 
 
 @dataclass(frozen=True)
@@ -147,10 +147,10 @@ class TriageComment(DataClassJsonMixin):
 
 
 @dataclass(frozen=True)
-class OverlapState(DataClassJsonMixin):
+class OverlapSnapshot(DataClassJsonMixin):
     """
     Considers the outcome state of the overlap, e.g. how discordant is it, what labs are in it etc
-    Allows methods to generate OverlapState (that can then be used to update an overlap with) or
+    Allows methods to generate OverlapSnapshot (that can then be used to update an overlap with) or
     record before and after states for changes so we can determine if we need to send notifications
     """
     status: OverlapStatus
@@ -172,10 +172,10 @@ class OverlapState(DataClassJsonMixin):
 
     @staticmethod
     def default_json():
-        return OverlapState(status=OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=False, override_status=OverlapOverrideStatus.NO_OVERRIDE).to_dict()
+        return OverlapSnapshot(status=OverlapStatus.NO_CONTRIBUTIONS, has_pending_values=False, override_status=OverlapOverrideStatus.NO_OVERRIDE).to_dict()
 
     @staticmethod
-    def is_notify_relevant(old_state: 'OverlapState', new_state: 'OverlapState') -> bool:
+    def is_notify_relevant(old_state: 'OverlapSnapshot', new_state: 'OverlapSnapshot') -> bool:
         """
         Returns true if we've entered or left discordance OR
         if we're discordant but now have 1 or more labs attached
