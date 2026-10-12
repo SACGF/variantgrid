@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from django.conf import settings
-from django.db.models import QuerySet, StringAgg, TextField, Value
+from django.db.models import Q, QuerySet, StringAgg, TextField, Value
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.http import HttpRequest
@@ -11,7 +11,7 @@ from django.urls.base import reverse
 from library.utils import JsonDataType
 from seqauto.models import (
     QC,
-    BamFile,
+    AlignmentFile,
     EnrichmentKit,
     EnrichmentKitType,
     Experiment,
@@ -20,6 +20,8 @@ from seqauto.models import (
     UnalignedReads,
 )
 from snpdb.models import UserGridConfig
+from snpdb.models.models_enums import SampleFileType
+from snpdb.models.models_vcf import VCF
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -110,14 +112,16 @@ class SequencingRunColumns(DatatableConfig[SequencingRun]):
         return [{"label": label, "url": url} for label, url in links]
 
     def get_initial_queryset(self) -> QuerySet[SequencingRun]:
+        visible_vcf = Q(vcffromsequencingrun__vcf__in=VCF.filter_for_user(self.user))
         return SequencingRun.objects.all().annotate(
             sample_count=Count("sequencingruncurrentsamplesheet__sample_sheet__sequencingsample", distinct=True),
             vcf_ids=StringAgg(Cast("vcffromsequencingrun__vcf__pk", TextField()), Value(','),
-                              output_field=TextField(), order_by="vcffromsequencingrun"),
+                              output_field=TextField(), order_by="vcffromsequencingrun", filter=visible_vcf),
             vcf_variant_caller=StringAgg("vcffromsequencingrun__variant_caller__name", Value(','),
-                                         output_field=TextField(), order_by="vcffromsequencingrun"),
+                                         output_field=TextField(), order_by="vcffromsequencingrun",
+                                         filter=visible_vcf),
             vcf_import_status=StringAgg("vcffromsequencingrun__vcf__import_status", Value(','),
-                                        order_by="vcffromsequencingrun"))
+                                        order_by="vcffromsequencingrun", filter=visible_vcf))
 
     def filter_queryset(self, qs: QuerySet[SequencingRun]) -> QuerySet[SequencingRun]:
         if enrichment_kit_id := self.get_query_param("enrichment_kit_id"):
@@ -149,27 +153,29 @@ class UnalignedReadsColumns(DatatableConfig[UnalignedReads]):
         return UnalignedReads.objects.all()
 
 
-class BamFileColumns(DatatableConfig[BamFile]):
+class AlignmentFileColumns(DatatableConfig[AlignmentFile]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
-                       renderer=self._render_bam_file, client_renderer='TableFormat.linkUrl'),
+                       renderer=self._render_alignment_file, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="sequencing_sample__sample_sheet__sequencing_run__name",
                        label="Sequencing Run", orderable=True),
             RichColumn(key="sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="file_type", label="Type", orderable=True,
+                       client_renderer=RichColumn.choices_client_renderer(SampleFileType.choices)),
             RichColumn(key="path", label="Path", orderable=True),
             # Hidden as it's always "Fake Aligner" currently
             RichColumn(key="aligner__name", label="Aligner", orderable=True, visible=False),
         ]
 
     @staticmethod
-    def _render_bam_file(cell: CellData) -> JsonDataType:
-        return {"text": cell.value, "url": reverse("view_bam_file", kwargs={"bam_file_id": cell.value})}
+    def _render_alignment_file(cell: CellData) -> JsonDataType:
+        return {"text": cell.value, "url": reverse("view_alignment_file", kwargs={"alignment_file_id": cell.value})}
 
-    def get_initial_queryset(self) -> QuerySet[BamFile]:
-        return BamFile.objects.all()
+    def get_initial_queryset(self) -> QuerySet[AlignmentFile]:
+        return AlignmentFile.objects.all()
 
 
 class SingleSampleVCFColumns(DatatableConfig[SingleSampleVCF]):
@@ -179,9 +185,9 @@ class SingleSampleVCFColumns(DatatableConfig[SingleSampleVCF]):
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
                        renderer=self._render_vcf_file, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+            RichColumn(key="alignment_file__sequencing_sample__sample_sheet__sequencing_run__name",
                        label="Sequencing Run", orderable=True),
-            RichColumn(key="bam_file__sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="alignment_file__sequencing_sample__sample_id", label="Sample", orderable=True),
             RichColumn(key="path", label="Path", orderable=True),
             RichColumn(key="variant_caller__name", label="Variant Caller", orderable=True),
         ]
@@ -201,9 +207,9 @@ class QCColumns(DatatableConfig[QC]):
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
                        renderer=self._render_qc, client_renderer='TableFormat.linkUrl'),
-            RichColumn(key="bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+            RichColumn(key="alignment_file__sequencing_sample__sample_sheet__sequencing_run__name",
                        label="Sequencing Run", orderable=True),
-            RichColumn(key="bam_file__sequencing_sample__sample_id", label="Sample", orderable=True),
+            RichColumn(key="alignment_file__sequencing_sample__sample_id", label="Sample", orderable=True),
             RichColumn(key="path", label="Path", orderable=True),
         ]
 

@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load model_helpers %}
 {% load help_tags %}
@@ -144,7 +144,7 @@
 
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <div id="sequencing-run-header">
         <div title='{{ sequencing_run.sequencer }}' class='sequencer'>
@@ -193,6 +193,9 @@
         {% endif %}
         {% if user.is_superuser %}
             <li class="nav-item"><a class="nav-link{% if active_tab == 'admin' %} show active{% endif %}" data-toggle="tab" role="tab" href="#admin">Admin</a></li>
+        {% endif %}
+        {% if show_api_log %}
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'api-log' %} show active{% endif %}" data-toggle="tab" role="tab" href="#api-log" data-href="{% url 'api_request_log_object_tab' 'seqauto' 'sequencingrun' sequencing_run.pk %}">API Log</a></li>
         {% endif %}
 
 	  	</ul>
@@ -295,7 +298,9 @@
 		<div class="tab-pane{% if active_tab == 'experiment' %} show active{% endif %}" role="tabpanel" id='experiment'>
             <div id='experiment-info-text'>
                 <p>ExperimentID (<a href="{% url 'view_experiment' sequencing_run.experiment.pk %}">{{ sequencing_run.experiment }}</a>) was read from RunParameters.xml (or if missing, RunInfo.xml) in the Sequencing Run directory labelled <b>Path</b> above.
+                {% if user.is_superuser %}
                 <p>Change by modifying the files manually then <button id='reload-experiment-name' class="btn btn-primary">reload experiment name</button>.
+                {% endif %}
             </div>
 		</div>
 		{% endif %}
@@ -317,11 +322,11 @@
                 {% for unaligned_reads in ss.unalignedreads_set.all %}
                     <li class='seqauto-record unaligned-reads'><a href="{% url 'view_unaligned_reads' unaligned_reads.pk %}">{{ unaligned_reads }}</a></li>
                 {% endfor %}
-                {% for bam_file in ss.bamfile_set.all %}
-                    <li class='seqauto-record bam-file'><a href="{% url 'view_bam_file' bam_file.pk %}">{{ bam_file }}</a>
+                {% for alignment_file in ss.alignmentfile_set.all %}
+                    <li class='seqauto-record alignment-file'><a href="{% url 'view_alignment_file' alignment_file.pk %}">{{ alignment_file }}</a>
 
                     <ul>
-                    {% for vcf_file in bam_file.singlesamplevcf_set.all %}
+                    {% for vcf_file in alignment_file.singlesamplevcf_set.all %}
                         {% with run_vcf=single_sample_vcfs|get_item:vcf_file.pk %}
                             {% include "seqauto/tags/run_vcf.html" %}
                         {% endwith %}
@@ -437,12 +442,15 @@
             <button id='assign-data-to-current-spreadsheet' class="btn btn-outline-danger">Assign Data to most recent SampleSheet</button>
             
             <p>
-            Otherwise, we reccomend you <a href="javascript:openDelete()">Delete </a> this SequencingRun. If data is there, it will re-generated next disk scan.
+            Otherwise, we reccomend you <a href="javascript:openDelete()">Delete </a> this SequencingRun. If the data is still there, the pipeline can re-post it.
             </div>
             {% endif %}
 
 
         </div>
+    {% endif %}
+    {% if show_api_log %}
+        <div class="tab-pane{% if active_tab == 'api-log' %} show active{% endif %}" role="tabpanel" id="api-log"></div>
     {% endif %}
         </div>
 	</div>

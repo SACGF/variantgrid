@@ -1,8 +1,11 @@
 import unittest
 
 from django.contrib.auth.models import User
+from django.urls import reverse
+from guardian.shortcuts import assign_perm
 
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from pedigree.models import Pedigree
 from snpdb.fake_data import create_fake_pedigree
 from snpdb.models.models_genome import GenomeBuild
 
@@ -18,12 +21,14 @@ class Test(URLTestCase):
 
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
+        cls.user_viewer = User.objects.get_or_create(username='pedigree_viewer')[0]
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.pedigree = create_fake_pedigree(cls.user_owner, grch37)
         cls.ped_file = cls.pedigree.ped_file_family.ped_file
+        assign_perm(Pedigree.get_read_perm(), cls.user_viewer, cls.pedigree)
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
-            # ('view_pedigree', {"pedigree_id": cls.pedigree.pk}, 200),
+            ('view_pedigree', {"pedigree_id": cls.pedigree.pk}, 200),
             ('view_ped_file', {"ped_file_id": cls.ped_file.pk}, 200),
         ]
 
@@ -64,6 +69,44 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testDatatableListNoPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLE_LIST_URLS, self.user_non_owner, False)
+
+    def _post_view_pedigree(self, user, name):
+        self.client.force_login(user)
+        url = reverse('view_pedigree', kwargs={"pedigree_id": self.pedigree.pk})
+        data = {
+            "name": name,
+            "cohort": self.pedigree.cohort.pk,
+            "ped_file_family": self.pedigree.ped_file_family.pk,
+            "form-TOTAL_FORMS": 0, "form-INITIAL_FORMS": 0, "form-MIN_NUM_FORMS": 0, "form-MAX_NUM_FORMS": 1000,
+        }
+        return self.client.post(url, data)
+
+    def testViewPedigreeSaveByOwner(self):
+        response = self._post_view_pedigree(self.user_owner, "renamed by owner")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Pedigree.objects.get(pk=self.pedigree.pk).name, "renamed by owner")
+
+    @prevent_request_warnings
+    def testViewPedigreeSaveByReadOnlyViewer(self):
+        response = self._post_view_pedigree(self.user_viewer, "renamed by viewer")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Pedigree.objects.get(pk=self.pedigree.pk).name, "fake pedigree")
+
+    def testCreatePedigreeIsPostOnly(self):
+        kwargs = {"cohort_id": self.pedigree.cohort.pk, "ped_file_family_id": self.pedigree.ped_file_family.pk}
+        url = reverse('create_pedigree_from_cohort_and_ped_file_family', kwargs=kwargs)
+        self.client.force_login(self.user_owner)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        response = self.client.post(url)
+        # The family and cohort already have a pedigree, so it is reused
+        self.assertRedirects(response, self.pedigree.get_absolute_url(), fetch_redirect_response=False)
+
+    @prevent_request_warnings
+    def testCreatePedigreeFamilyNotVisible(self):
+        kwargs = {"cohort_id": self.pedigree.cohort.pk, "ped_file_family_id": self.pedigree.ped_file_family.pk}
+        url = reverse('create_pedigree_from_cohort_and_ped_file_family', kwargs=kwargs)
+        self.client.force_login(self.user_non_owner)
+        self.assertIn(self.client.post(url).status_code, (403, 404))
 
 if __name__ == "__main__":
     unittest.main()

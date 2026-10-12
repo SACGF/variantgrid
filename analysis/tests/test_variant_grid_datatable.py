@@ -11,7 +11,9 @@ from django.test import RequestFactory
 from django.urls.base import resolve, reverse
 
 from analysis.grids import VariantGrid
+from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
 from analysis.tests.test_grid_export import GridExportTestCase
+from analysis.views.nodes.node_views import FilterNodeView
 from library.django_utils import FakeRequest
 from library.django_utils.filter_rules import FILTER_OPERATIONS
 from snpdb.models import UserGridConfig
@@ -167,3 +169,26 @@ class VariantGridFilterBuilderTest(GridExportTestCase):
         data = datatable_response(grid)
         self.assertLess(data["recordsFiltered"], node.count)
         self.assertTrue(all(row["locus__position"] < 1500 for row in data["data"]))
+
+    def test_a_rule_on_a_field_not_offered_is_ignored(self):
+        node = self._sample_node()
+        rules = {"groupOp": "AND",
+                 "rules": [{"field": "varianttag__user__username", "op": "eq", "data": "no_such_user"}]}
+        grid = self._grid(length="10", filters=json.dumps(rules))
+        self.assertIsNone(grid.filter_rules)
+        self.assertEqual(node.count, datatable_response(grid)["recordsFiltered"])
+
+    def test_filter_node_only_saves_rules_on_offered_fields(self):
+        sample_node = self._sample_node()
+        filter_node = FilterNode.objects.create(analysis=self.analysis)
+        sample_node.add_child(filter_node)
+        FilterNodeItem.objects.create(filter_node=filter_node, sort_order=0, operation="lt",
+                                      field="locus__position", data="1500")
+        rules = {"groupOp": "AND",
+                 "rules": [{"field": "varianttag__user__username", "op": "eq", "data": "no_such_user"}]}
+        request = RequestFactory().post("/", {"filters": json.dumps(rules)})
+        request.user = self.user
+        self.assertIn("locus__position", VariantGrid(request, filter_node).filter_field_names())
+        with self.assertRaises(ValueError):
+            FilterNodeView.as_view()(request, pk=filter_node.pk)
+        self.assertEqual(["locus__position"], list(filter_node.filternodeitem_set.values_list("field", flat=True)))

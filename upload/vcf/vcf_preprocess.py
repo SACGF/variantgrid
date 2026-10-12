@@ -1,6 +1,7 @@
 import glob
 import logging
 import os
+import shlex
 from dataclasses import dataclass
 from subprocess import PIPE, CalledProcessError, Popen
 from typing import Optional
@@ -29,10 +30,12 @@ from upload.models import (
     VCFSkippedContig,
     VCFSkippedContigs,
 )
+from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.unknown_variants_task import (
     AnnotateImportedVCFTask,
     SeparateUnknownVariantsTask,
 )
+from upload.vcf.vcf_ref_check import check_vcf_ref_matches_build
 
 MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
@@ -42,9 +45,9 @@ VCF_CLEAN_ALTS_SUB_STEP = "vcf_clean_alts"
 REMOVE_HEADER_SUB_STEP = "remove_header"
 SPLIT_VCF_SUB_STEP = "split_vcf"
 # Each split chunk gets the header prepended and is bgzipped so the data-insertion tasks read .vcf.gz.
-# split runs the filter via sh -c and expands $VG_HEADER_FILE / $VG_SPLIT_VCF_DIR / $FILE there, so the
+# split runs the filter via sh -c, and bash expands the quoted $VG_HEADER_FILE / $VG_SPLIT_VCF_DIR / $FILE, so the
 # paths ride in the environment rather than in the shell string (see run_pipe's split_env).
-SPLIT_VCF_FILTER = "--filter='bash -c \"set -eo pipefail; { cat $VG_HEADER_FILE; cat; } | bgzip -c > $VG_SPLIT_VCF_DIR/$FILE\"'"
+SPLIT_VCF_FILTER = """--filter=bash -c 'set -eo pipefail; { cat "$VG_HEADER_FILE"; cat; } | bgzip -c > "$VG_SPLIT_VCF_DIR/$FILE"'"""
 
 UNSORTED_VCF_MESSAGE = "VCF was not sorted - records have been sorted for import"
 
@@ -74,7 +77,7 @@ def get_bcftools_tool_version(bcftools_command):
 def create_sub_step(upload_step, sub_step_name, sub_step_commands, tool_version):
     """ tool_version is whatever runs this stage - null where the pipe has no versioned tool in it """
     start_date = timezone.now()
-    command_line = ' '.join(sub_step_commands)
+    command_line = shlex.join(sub_step_commands)
     return UploadStep.objects.create(name=sub_step_name,
                                      script=command_line,
                                      upload_pipeline=upload_step.upload_pipeline,
@@ -225,12 +228,13 @@ def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False
 
 
 def run_pipe(pipe_commands: dict, sub_steps: dict, split_env: dict, upload_pipeline):
-    piped_command = ' | '.join([' '.join(command_with_args) for command_with_args in pipe_commands.values()])
+    # Commands are argv lists - quote each argument so the shell sees exactly those arguments
+    piped_command = ' | '.join(shlex.join(command_with_args) for command_with_args in pipe_commands.values())
 
     # if POPEN_SHELL=True we're running this all as one command as native shell text
     # this is not recommended, less portable and if commands have errors
     if settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL:
-        logging.info("single_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
+        logging.info("single_commands: %s", piped_command)
         # Use pipefail so that a non-zero exit from any stage in the pipe is reported,
         # not just the last command (see #3813 - bcftools errors were silently swallowed)
         shell_command = f"set -o pipefail; {piped_command}"
@@ -311,13 +315,20 @@ def _reset_for_retry(files: PreprocessFiles, sub_steps: dict):
             os.remove(filename)
 
 
-def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False):
+def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False, check_ref=False):
+    """ check_ref: fail/flag a VCF whose REF bases mostly disagree with the build (@see vcf_ref_check) -
+        for files from outside, not the ones we write from our own coordinates """
     genome_build = upload_step.genome_build
     _ = genome_build.reference_fasta  # Fails if not available.
 
     vcf_filename = upload_step.input_filename
     if not os.path.exists(vcf_filename):
         raise FileNotFoundError(f"Can't access vcf: '{vcf_filename}'")
+
+    if check_ref:
+        if ref_mismatch_message := check_vcf_ref_matches_build(vcf_filename, genome_build):
+            SimpleVCFImportInfo.objects.create(upload_step=upload_step, severity=VCFImportInfoSeverity.ERROR,
+                                               message_string=ref_mismatch_message)
 
     upload_pipeline = upload_step.upload_pipeline
     cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)

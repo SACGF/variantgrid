@@ -10,7 +10,7 @@ from django.conf import settings
 
 from library.utils.date_utils import get_months_since, month_range, parse_yymm
 from seqauto.models import SequencingRun, SequencingSample
-from snpdb.models import VariantsType
+from snpdb.models import VariantOrigin
 
 SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{4})\d{2}[_-]")
 
@@ -19,10 +19,10 @@ VARIANTS_TYPE_COL = "enrichment_kit__sample_variants_type"
 VARIANTS_TYPE_SERIES_COL = "variants_type_series"
 # Series per EnrichmentKit.sample_variants_type, somatic types combined as Sample.is_somatic does
 VARIANTS_TYPE_SERIES = {
-    VariantsType.GERMLINE: "Germline",
-    VariantsType.MIXED: "Somatic",
-    VariantsType.SOMATIC_ONLY: "Somatic",
-    VariantsType.UNKNOWN: "Unknown",
+    VariantOrigin.GERMLINE: "Germline",
+    VariantOrigin.MIXED: "Somatic",
+    VariantOrigin.SOMATIC_ONLY: "Somatic",
+    VariantOrigin.UNKNOWN: "Unknown",
 }
 # The .allele-origin-box germline / somatic colours from global.scss
 VARIANTS_TYPE_SERIES_COLORS = {"Germline": "#88cc88", "Somatic": "#cc99cc", "Unknown": "#999999"}
@@ -41,7 +41,7 @@ def get_sequencing_run_yymm(sequencing_run_name) -> Optional[str]:
 def add_variants_type_series(df: pd.DataFrame) -> pd.DataFrame:
     """ Adds the germline / somatic series column - a sample with no kit, or a kit left as Unknown, is "Unknown" """
     variants_type = df[VARIANTS_TYPE_COL] if VARIANTS_TYPE_COL in df.columns else pd.Series(index=df.index, dtype=object)
-    df[VARIANTS_TYPE_SERIES_COL] = variants_type.map(VARIANTS_TYPE_SERIES).fillna(VARIANTS_TYPE_SERIES[VariantsType.UNKNOWN])
+    df[VARIANTS_TYPE_SERIES_COL] = variants_type.map(VARIANTS_TYPE_SERIES).fillna(VARIANTS_TYPE_SERIES[VariantOrigin.UNKNOWN])
     return df
 
 

@@ -2667,6 +2667,14 @@ VCTable.alleleGroupingIdentifier = (data, type, row) => {
     return dom;
 };
 
+// The grouping grid's expand URL (TableFormat.expandAjax looks it up on window): while the grid is filtered to a
+// sample, the expanded records lead with that sample's
+function classificationGroupingDetailUrl(groupingId) {
+    const url = Urls.classification_grouping_detail(groupingId);
+    const sampleId = $('#id_sample').val();
+    return sampleId ? `${url}?sample=${sampleId}` : url;
+}
+
 VCTable.groupIdentifier = (data, type, row) => {
     const id = data.id;
     const dirty = data.dirty;
@@ -2701,6 +2709,9 @@ VCTable.groupIdentifier = (data, type, row) => {
         dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"));
     } else if (classification_count === 0) {
         dom.append("-Invalid Record - no Classifications");
+    } else if (data.sample_record_count) {
+        // A grouping holds many samples' records - say how many of them made the sample filter match
+        dom.append($('<div>', {class:'text-muted text-small', text: `${data.sample_record_count} of ${classification_count} records from this sample`}));
     } else if (classification_count > 1) {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }

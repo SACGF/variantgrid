@@ -5,7 +5,17 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Case, F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value, When
+from django.db.models import (
+    Case,
+    F,
+    IntegerField,
+    OuterRef,
+    QuerySet,
+    StringAgg,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import TextField
 from django.db.models.query_utils import Q
@@ -15,14 +25,18 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
+from annotation.models import AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
+from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
 from patients.models_enums import GnomADPopulation, Sex
-from snpdb.grid_columns.custom_columns import get_variant_grid_columns, get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import (
+    get_variant_grid_columns,
+    get_variantgrid_extra_annotate,
+)
 from snpdb.models import (
     VCF,
     Allele,
@@ -49,12 +63,12 @@ from snpdb.models import (
     UserSettings,
     Variant,
     VariantAllele,
-    VariantsType,
+    VariantOrigin,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
-from uicore.templatetags.js_tags import jsonify_for_js
+from uicore.templatetags.js_tags import jsonify_pretty_for_html
 from variantgrid.perm_path import get_visible_url_names
 
 
@@ -152,7 +166,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(VariantsType.choices)),
+                       client_renderer=RichColumn.choices_client_renderer(VariantOrigin.choices)),
             self.user_column("vcf__user", label="Uploaded by"),
             RichColumn(key="vcf__source", label="VCF source", orderable=True),
             RichColumn(key="vcf__name", label="VCF Name", orderable=True, extra_columns=["vcf__id"],
@@ -387,7 +401,7 @@ class FamilyGroupListColumns(DatatableConfig[DC]):
     MODEL: type[DC]
     GRID_NAME: str
     # (field prefix, label, has an affected column)
-    FAMILY_MEMBERS = [("mother", "Mother", True), ("father", "Father", True), ("proband", "Proband", False)]
+    FAMILY_MEMBERS = [("father", "Father", True), ("mother", "Mother", True), ("proband", "Proband", False)]
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
@@ -757,7 +771,13 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
         # adds a second JOIN per filtered relation, which multiplies rows
         if q := self._get_q():
             qs = qs.filter(q)
-        return qs.annotate(**self._get_grid_only_annotation_kwargs())
+        # Never redefine an alias the base queryset already carries - the columns have to read the join the
+        # rows were filtered on. A node can widen its cohort genotype join to the common collection, and
+        # re-annotating that alias with the grid's own condition adds a second join whose rows come up blank
+        # for everything the node took from the common collection @see #2074
+        grid_kwargs = self._get_grid_only_annotation_kwargs()
+        already_annotated = qs.query.annotations.keys() | qs.query._filtered_relations.keys()
+        return qs.annotate(**{k: v for k, v in grid_kwargs.items() if k not in already_annotated})
 
     def _get_grid_only_annotation_kwargs(self) -> dict:
         """ Things not used in counts etc - only to display grid """
@@ -872,7 +892,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 return "Swapped Ref/Alt due to SWAP=1"
         if js is None:
             return "-"
-        return jsonify_for_js(js, pretty=True)
+        return jsonify_pretty_for_html(js)
 
     def render_error_json(self, row: dict[str, Any]) -> JsonDataType:
         if js := row["error"]:
@@ -880,7 +900,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 return js.get("message")
         if js is None:
             return "-"
-        return jsonify_for_js(js, pretty=True)
+        return jsonify_pretty_for_html(js)
 
 
 class LiftoverRunAlleleLiftoverColumns(AbstractAlleleLiftoverColumns):

@@ -34,8 +34,15 @@ from model_utils.models import TimeStampedModel
 
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
-from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
-                       HGVSNoRepresentationException, hgvs_diff_description)
+from genes.hgvs import (
+    HGVSComponents,
+    HGVSConverterType,
+    HGVSDiff,
+    HGVSDisplay,
+    HGVSMatcher,
+    HGVSNoRepresentationException,
+    hgvs_diff_description,
+)
 from genes.models import (
     GeneCopyNumberEvent,
     GeneFusion,
@@ -48,9 +55,9 @@ from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
 from library.utils import IconWithTooltip, md5sum_str, pretty_label
-from library.django_utils import get_cached_project_git_hash
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
+from snpdb.models.models import CodeVersion, CodeVersionMixin
 
 """
 Now we have
@@ -80,14 +87,13 @@ post_save seemed like it might be a little too easy to trigger.
 """
 
 
-class HGVSConverterVersion(TimeStampedModel):
+class HGVSConverterVersion(CodeVersionMixin, TimeStampedModel):
     hgvs_converter_type = models.TextField()  # HGVSConverterType
     version = models.TextField()
     used_converter_type = models.TextField(blank=True, null=True)  # HGVSConverterType
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("hgvs_converter_type", "version", "used_converter_type", "code_git_hash")
+        unique_together = ("hgvs_converter_type", "version", "used_converter_type", "code_version")
 
     @property
     def converted_using_library(self) -> bool:
@@ -97,8 +103,8 @@ class HGVSConverterVersion(TimeStampedModel):
         desc = f"{self.hgvs_converter_type} version=\"{self.version}\""
         if self.used_converter_type and not self.converted_using_library:
             desc += f" (used_converter_type={self.used_converter_type})"
-        if self.code_git_hash != "not-a-real-git-hash":
-            desc += f" git@{self.code_git_hash}"
+        if self.code_version.git_hash != "not-a-real-git-hash":
+            desc += f" git@{self.code_version.git_hash}"
         return desc
 
     @staticmethod
@@ -106,13 +112,12 @@ class HGVSConverterVersion(TimeStampedModel):
         return HGVSConverterVersion.objects.get_or_create(hgvs_converter_type=hgvs_converter_type.name,
                                                           version=version,
                                                           used_converter_type=used_converter_type.name,
-                                                          code_git_hash=get_cached_project_git_hash())[0]
+                                                          code_version=CodeVersion.current())[0]
 
 
 @dataclass(frozen=True)
 class HGVSResolution:
     resolved_hgvs: str
-    resolved_hgvs_compat: str
     hgvs_converter_version: HGVSConverterVersion
     hgvs_converter_data_version: str
     """ cdot data version or ClinGen date used during this resolution """
@@ -152,14 +157,11 @@ class ResolvedVariantInfo(TimeStampedModel):
         if components := self.resolved_hgvs_obj:
             return HGVSDisplay(components, genome_build=self.genome_build)
 
-    resolved_hgvs_compat = TextField(null=True, blank=True)
-    """ resolved_hgvs with all bases explicit in the case of dels & dups """
-
     hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to generate resolved_hgvs  """
 
     hgvs_converter_data_version = TextField(blank=True, default='')
-    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when computing resolved_hgvs """
+    """ cdot data version (TranscriptVersion.modified_cdot_version) or ClinGen date used when computing resolved_hgvs """
 
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     """ The GeneSymbol of the c.HGVS """
@@ -198,7 +200,6 @@ class ResolvedVariantInfo(TimeStampedModel):
             raise ValueError("set_variant_and_save requires a non-None variant")
 
         self.resolved_hgvs = None
-        self.resolved_hgvs_compat = None
         self.gene_symbol = None
         self.transcript_version: Optional[TranscriptVersion] = None
         self.variant = variant
@@ -216,7 +217,6 @@ class ResolvedVariantInfo(TimeStampedModel):
         try:
             hgvs_resolution = self.recalc_resolved_hgvs()
             self.resolved_hgvs = hgvs_resolution.resolved_hgvs
-            self.resolved_hgvs_compat = hgvs_resolution.resolved_hgvs_compat
             self.hgvs_converter_version = hgvs_resolution.hgvs_converter_version
             self.transcript_version = hgvs_resolution.transcript_version
             self.gene_symbol = hgvs_resolution.gene_symbol
@@ -256,12 +256,11 @@ class ResolvedVariantInfo(TimeStampedModel):
         transcript_version = TranscriptVersion.get_for_parts(genome_build, hgvs_obj.transcript_parts)
         # Prefer data version from the transcript directly used; fall back to the hgvs_obj lookup
         data_version = (result.converter_info.hgvs_converter_data_version
-                        or (transcript_version.data.get('cdot', '') if transcript_version else ''))
+                        or ((transcript_version.modified_cdot_version or '') if transcript_version else ''))
         hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
                                                           used_converter_type=result.converter_info.used_converter_type)
         return HGVSResolution(
                 resolved_hgvs=resolved_hgvs,
-                resolved_hgvs_compat=result.hgvs_variant.format(use_delins_for_inv=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
                 hgvs_converter_version=hgvs_converter_version,
                 hgvs_converter_data_version=data_version,
                 transcript_version=transcript_version,
@@ -513,7 +512,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ Tool used to resolve hgvs  """
 
     hgvs_converter_data_version = TextField(blank=True, default='')
-    """ cdot data version (TranscriptVersion.data['cdot']) or ClinGen date used when resolving imported HGVS """
+    """ cdot data version (TranscriptVersion.modified_cdot_version) or ClinGen date used when resolving imported HGVS """
 
     imported_transcript = TextField(null=True, blank=True)
     """
@@ -1064,13 +1063,6 @@ class ImportedAlleleInfo(TimeStampedModel):
                             message_parts += diffs
                         if is_c_hgvs_same_as_imported(rvi.genome_build, recalc.resolved_hgvs):
                             message_parts.append("Now matches imported value")
-
-                    elif rvi.resolved_hgvs_compat != recalc.resolved_hgvs_compat:
-                        if message_parts:
-                            message_parts.append(" ")
-                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build} compatible\n{rvi.resolved_hgvs_compat} ->\n{recalc.resolved_hgvs_compat}")
-                        if diffs := c_hgvs_diff_if_applicable(rvi.resolved_hgvs_compat, recalc.resolved_hgvs_compat):
-                            message_parts += diffs
                 except Exception as ex:
                     # Make sure that we still fail
                     if rvi.resolved_hgvs and HGVSComponents.HGVS_REGEX.match(rvi.resolved_hgvs):

@@ -198,10 +198,8 @@ join-aware grouping:
   propagates up through intermediate filter nodes), not on "are my parents SampleNodes", so an arm that filters
   (Zygosity, AF, quality, gene list, Tissue, etc.) *before* the merge is still detected and combined.
 - **disable_cache / picklability invariants preserved.** Arms are still read via `get_arg_q_dict(disable_cache=
-  True)` (the `#240 / ad35a7fb1` stale-cache protection). The combined OR-Q references only annotation aliases
-  and literal values — no embedded `QuerySet` — so `arg_q_dict` stays picklable for the q-cache `cache.set`
-  (the `#546` concern that motivated materialising PKs in the *old* path does not apply, because we are not
-  embedding a lazy queryset).
+  True)` (the #240 stale-cache protection). The combined OR-Q references only annotation aliases and literal
+  values — no embedded `QuerySet` — so `arg_q_dict` stays picklable for the q-cache `cache.set` (#546).
 
 ### Alternative representation (only if `None`-bucket proves insufficient)
 

@@ -6,7 +6,7 @@ import tempfile
 import cyvcf2
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from annotation.fake_data import get_fake_annotation_version
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
@@ -33,7 +33,11 @@ from upload.tasks.import_dragen_tso500_all_fusions_task import (
     FUSION_INFO,
     FUSION_OBSERVATIONS_INFO,
     REF_READS_FORMAT,
+    VCF_FILTER_LOW_MAPQ_RESCUE,
+    VCF_FILTER_NOT_KEPT,
+    VCF_FILTER_PASS,
     DragenTSO500AllFusionsCreateVCFTask,
+    _vcf_filter,
 )
 from upload.tso500.dragen_all_fusions_parser import can_process_file, read_all_fusions
 from upload.vcf.vcf_import import resolve_genome_build
@@ -76,6 +80,36 @@ class TestAllFusionsParser(TestCase):
     def test_does_not_claim_other_csvs(self):
         self.assertFalse(can_process_file(os.path.join(TSO500_RNA_DIR,
                                                        "ExampleSample_RNA_2600000001B_SpliceVariants.vcf")))
+
+
+@override_settings(TSO500_FUSION_RESCUE_MIN_SCORE=0.5, TSO500_FUSION_RESCUE_FILTER="FAIL;LOW_MAPQ")
+class TestAllFusionsVCFFilter(SimpleTestCase):
+    """ One gene pair's FILTER from its observations - kept, rescued, not kept, first match wins """
+    KEPT = {"KeepFusion": "True", "Score": None, "Filter": "PASS"}
+    RESCUABLE = {"KeepFusion": "False", "Score": "0.7", "Filter": "FAIL;LOW_MAPQ"}
+    NOT_KEPT = {"KeepFusion": "False", "Score": "0.7", "Filter": "FAIL;LOW_MAPQ;LOW_SCORE"}
+
+    def test_kept_is_pass(self):
+        self.assertEqual(VCF_FILTER_PASS, _vcf_filter([self.KEPT]))
+
+    def test_rescued(self):
+        self.assertEqual(VCF_FILTER_LOW_MAPQ_RESCUE, _vcf_filter([self.RESCUABLE]))
+
+    def test_filter_must_match_exactly(self):
+        self.assertEqual(VCF_FILTER_NOT_KEPT, _vcf_filter([self.NOT_KEPT]))
+
+    def test_kept_and_not_kept_observations_is_pass(self):
+        self.assertEqual(VCF_FILTER_PASS, _vcf_filter([self.NOT_KEPT, self.RESCUABLE, self.KEPT]))
+
+    def test_score_at_threshold_is_not_rescued(self):
+        self.assertEqual(VCF_FILTER_NOT_KEPT, _vcf_filter([{**self.RESCUABLE, "Score": "0.5"}]))
+
+    def test_missing_score_is_not_rescued(self):
+        self.assertEqual(VCF_FILTER_NOT_KEPT, _vcf_filter([{**self.RESCUABLE, "Score": None}]))
+
+    @override_settings(TSO500_FUSION_RESCUE_MIN_SCORE=None, TSO500_FUSION_RESCUE_FILTER=None)
+    def test_no_rescue_when_unset(self):
+        self.assertEqual(VCF_FILTER_NOT_KEPT, _vcf_filter([self.RESCUABLE]))
 
 
 class TestGeneFusionVCF(GeneFusionTestCase):
@@ -162,6 +196,14 @@ class TestGeneFusionVCF(GeneFusionTestCase):
         self.assertEqual(EXPECTED_ROWS, DragenTSO500AllFusionsCreateVCFTask.process_items(upload_step))
         fusions = {record.INFO.get(FUSION_INFO) for record in cyvcf2.VCF(vcf_filename)}
         self.assertIn("EGFR::SEPTIN14", fusions, "the approved symbol, whichever way the build came")
+
+    def test_filter_from_keep_fusion(self):
+        """ cyvcf2 reads PASS as None. ENTPD3::RPL14's three rows all have KeepFusion False """
+        for filter_id in (VCF_FILTER_LOW_MAPQ_RESCUE, VCF_FILTER_NOT_KEPT):
+            self.assertIn(f"##FILTER=<ID={filter_id},", self.reader.raw_header)
+        by_fusion = {record.INFO.get(FUSION_INFO): record for record in self.records}
+        self.assertIsNone(by_fusion["EGFR::SEPTIN14"].FILTER)
+        self.assertEqual(VCF_FILTER_NOT_KEPT, by_fusion["ENTPD3::RPL14"].FILTER)
 
     def test_sept14_resolves_to_septin14(self):
         """ The file says SEPT14; the fusion is EGFR::SEPTIN14 """

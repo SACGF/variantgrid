@@ -14,7 +14,8 @@ from django.utils import timezone
 
 from genes.archive import archive_gene_coverage_collection
 from genes.models import GeneCoverageCollection, GeneSymbol
-from snpdb.archive import ArchivePreconditionError, DataArchivedError
+from library.django_utils.data_archive_mixin import DataArchivedError
+from snpdb.archive import ArchivePreconditionError
 from snpdb.models import DataState, GenomeBuild
 
 

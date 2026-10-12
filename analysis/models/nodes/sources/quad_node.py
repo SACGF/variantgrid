@@ -1,6 +1,7 @@
 import operator
 from abc import abstractmethod
 from functools import reduce
+from types import SimpleNamespace
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -291,6 +292,12 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             warnings.extend(mosaic_parent_warnings(self.quad.cohort))
         return warnings
 
+    def _get_cached_label_count(self, label):
+        """ Nothing is precomputed for quads - the buckets are built off a cohort's Trio, so every
+            QuadNode counts live rather than reading the raw cohort row, which knows nothing about its
+            inheritance mode """
+        return None
+
     def _get_cohort(self):
         return self.quad.cohort if self.quad else None
 
@@ -366,7 +373,6 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         so the table always matches the actual filtering logic.
         For modes where affected status matters, includes both affected/unaffected variants.
         """
-        from types import SimpleNamespace
         fmt = AbstractFamilyInheritance._zygosity_options
         members = ['mother', 'father', 'proband', 'sibling']
         stub_node = SimpleNamespace(quad=SimpleNamespace())

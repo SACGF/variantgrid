@@ -1,7 +1,7 @@
 """
 `vg tests --changed`: which test modules does a set of changed files put at risk?
 
-Rules (see claude/plans/1816_agent_system_phase1_plan.md):
+Rules:
 - a changed test module selects itself
 - a changed Python module selects every test module that transitively imports it
 - a changed template, static JS/CSS or urls.py selects the owning app's tests.test_urls

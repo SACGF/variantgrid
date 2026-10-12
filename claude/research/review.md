@@ -2,7 +2,7 @@
 
 Verified against a96540a68 on 2026-09-25
 
-`review` records a multi-lab discussion about a shared object - in practice an Overlap (and, read-only now, a legacy
+`review` records a multi-lab discussion about a shared object - in practice an Overlap (and, read-only, a legacy
 DiscordanceReport) in `classification` - and hands off to the owning app for the follow-up action. It owns no
 classification logic: the form captures who met, how, which labs took part and a set of per-question "difference"
 answers, all stored as JSON on `review/models/review_models.py:Review`. Models and URLs are in
@@ -42,26 +42,20 @@ falling back to raw JSON.
 View: `Review.can_view` defers to `source_object.can_view` if it exists, else allows - Overlap has none, so overlap
 reviews are visible to every logged-in user (matching the overlap pages). Write: `ReviewableModelMixin.can_review` -
 the user (admin-checked) belongs to one of `reviewing_labs`. `edit_review` falls back to the detail view for
-non-writers, complete reviews, or `is_review_locked` sources (DiscordanceReport always returns True: reviews are
-being moved to Overlaps). Covered by `classification/tests/views/test_overlap_review_permissions.py`.
+non-writers, complete reviews, or `is_review_locked` sources (DiscordanceReport always returns True: new reviews
+happen on Overlaps). Covered by `classification/tests/views/test_overlap_review_permissions.py`.
 
 ## Why it is shaped this way
 
 - `ReviewedObject` is an indirection instead of a GenericFK or per-model M2M: each reviewable model carries one FK to
-  it, and `ReviewedObject.source_object` finds the owner by scanning its reverse `*_set` managers
-  (hardened for Django 6 in ab4de89de). Adding a new reviewable model needs no change here.
+  it, and `ReviewedObject.source_object` finds the owner by scanning its reverse `*_set` managers.
+  Adding a new reviewable model needs no change here.
 - Topics and questions are data (edited in the admin, `review/admin/review_admin.py:ReviewTopicAdmin` with a question
   inline), so wording can change per deployment. The only question type is `QuestionValueType.Disagreement`.
 - `ReviewMedium` / `ReviewParticipants` are fixed choices with a free-text "other"; stored values that are not a choice
-  are read back as `ValueOther(key="other")`. `review_method` was single-select originally, and `Review.review_method`
-  still accepts a string.
-
-## History
-
-Built May 2023 for discordance reports (0c4f089ae; "only one review per discordance report" 7c7ac005e), with the UI
-wording later changed from "Review" to "Discussion" (ebdbfb9f1) while code names stayed. The Overlaps rework (September 2026,
-25ed4f32f) made `Overlap` reviewable and locked DiscordanceReport reviews. Write permission by reviewing-lab
-membership came in e26588083 / e54821fba (variantgrid_private#3827).
+  are read back as `ValueOther(key="other")`. `Review.review_method` also accepts a stored plain string, which older
+  rows hold.
+- The UI calls a review a "Discussion"; the code names say Review.
 
 ## Traps
 

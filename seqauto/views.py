@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from eventlog.models import create_event
+from eventlog.models import ApiRequestLog, create_event
 from genes.models import CanonicalTranscriptCollection
 from library.log_utils import log_traceback
 from patients.models import Extraction, Patient
@@ -21,7 +21,7 @@ from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, S
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import (
     QC,
-    BamFile,
+    AlignmentFile,
     DragenTSO500CombinedVariantOutput,
     EnrichmentKit,
     Experiment,
@@ -31,6 +31,7 @@ from seqauto.models import (
     GoldReference,
     JointCalledVCF,
     LibraryQC,
+    LibraryQCMetric,
     QCGeneCoverage,
     QCType,
     SequencingRun,
@@ -68,8 +69,8 @@ def unaligned_reads(request):
     return render(request, 'seqauto/unaligned_reads.html')
 
 
-def bam_files(request):
-    return render(request, 'seqauto/bam_files.html')
+def alignment_files(request):
+    return render(request, 'seqauto/alignment_files.html')
 
 
 def vcf_files(request):
@@ -151,7 +152,7 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
             multi_sample_vcfs.append(rv)
 
     single_sample_vcfs = {}
-    ss_vcf_qs = SingleSampleVCF.objects.filter(bam_file__sequencing_sample__sample_sheet=sample_sheet)
+    ss_vcf_qs = SingleSampleVCF.objects.filter(alignment_file__sequencing_sample__sample_sheet=sample_sheet)
     for single_sample_vcf in ss_vcf_qs.select_related("backendvcf__uploaded_vcf__vcf"):
         single_sample_vcfs[single_sample_vcf.pk] = run_vcf(single_sample_vcf, single_sample_vcf.vcf)
 
@@ -218,11 +219,31 @@ def _get_sequencing_run_patients(sample_sheet, user) -> dict:
         else:
             unmatched.append(row)
 
-    run_patients = [
-        {"patient": patient, "extractions": list(rows_by_extraction.items())}
-        for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0]))
-    ]
+    pair_urls_by_sequencing_sample = _tso500_pair_urls_by_sequencing_sample(sample_sheet.sequencing_run)
+    run_patients = []
+    for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0])):
+        tso500_pairs = {}
+        for rows_for_extraction in rows_by_extraction.values():
+            for row in rows_for_extraction:
+                tso500_pairs.update(pair_urls_by_sequencing_sample.get(row.sequencing_sample.pk, {}))
+        run_patients.append({"patient": patient, "extractions": list(rows_by_extraction.items()),
+                             "tso500_pairs": sorted(tso500_pairs.items())})
     return {"run_patients": run_patients, "unmatched_run_samples": unmatched}
+
+
+def _tso500_pair_urls_by_sequencing_sample(sequencing_run) -> dict[int, dict[str, str]]:
+    """ {sequencing_sample_id: {pair_id: url}} - joined on the arms' sheet rows rather than the specimen, as the
+        pair's accession can be a different specimen of the patient than the one the sheet row was claimed for """
+    pair_urls = defaultdict(dict)
+    cvo_qs = DragenTSO500CombinedVariantOutput.objects.filter(sequencing_run_name=sequencing_run.name)
+    for cvo in cvo_qs.only("sequencing_run_name", "pair_id", "dna_sequencing_sample", "rna_sequencing_sample"):
+        for sequencing_sample_id in (cvo.dna_sequencing_sample_id, cvo.rna_sequencing_sample_id):
+            if sequencing_sample_id:
+                pair_urls[sequencing_sample_id][cvo.pair_id] = cvo.get_absolute_url()
+    qc_qs = LibraryQC.objects.filter(sequencing_run_name=sequencing_run.name, sequencing_sample__isnull=False)
+    for qc in qc_qs.only("sequencing_run_name", "pair_id", "sequencing_sample"):
+        pair_urls[qc.sequencing_sample_id][qc.pair_id] = qc.get_absolute_url()
+    return pair_urls
 
 
 def view_sequencing_run(request, sequencing_run_id, tab=None):
@@ -248,6 +269,7 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
         'tab': tab,
+        "show_api_log": request.user.is_superuser and ApiRequestLog.has_any_for_model(SequencingRun),
         "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects.filter(
             sequencing_run_name=sequencing_run.name).select_related("specimen").order_by("pair_id"),
         "library_qc_summaries": summarise_library_qc(
@@ -317,6 +339,34 @@ def _tso500_pair_arms(cvo: Optional[DragenTSO500CombinedVariantOutput],
     return arms
 
 
+@dataclass
+class LibraryQCRow:
+    """ One line of the pair page's Library QC table - a metric under the arm and category it belongs to.
+        The arm and category cells span their metrics' lines, so are set on the first line of each only """
+    metric: Optional[LibraryQCMetric]
+    arm: Optional[TSO500PairArm] = None
+    arm_rowspan: int = 0
+    qc: Optional[LibraryQC] = None
+    qc_rowspan: int = 0
+
+
+def _library_qc_rows(arms: list[TSO500PairArm]) -> list[LibraryQCRow]:
+    """ Every arm's categories and their metrics as one table. A category with no metrics still gets a line
+        so its call is shown """
+    rows = []
+    for arm in arms:
+        arm_rows = []
+        for qc in arm.library_qc:
+            metrics = qc.metric_rows or [None]
+            arm_rows.append(LibraryQCRow(metric=metrics[0], qc=qc, qc_rowspan=len(metrics)))
+            arm_rows.extend(LibraryQCRow(metric=metric) for metric in metrics[1:])
+        if arm_rows:
+            arm_rows[0].arm = arm
+            arm_rows[0].arm_rowspan = len(arm_rows)
+            rows.extend(arm_rows)
+    return rows
+
+
 def view_tso500_pair(request, sequencing_run_name, pair_id):
     """ One sequenced TSO 500 pair on one run: the DRAGEN analysis of it and the library QC of its arms,
         which are keyed the same way and are the two halves of what a scientist asks about a case """
@@ -337,6 +387,7 @@ def view_tso500_pair(request, sequencing_run_name, pair_id):
         # Nothing to read it through - the pair claims no specimen and names no run we have registered
         raise PermissionDenied(f"'{pair_id}' is attached to no specimen or sequencing run")
 
+    arms = _tso500_pair_arms(cvo, library_qc, request.user)
     context = {
         "sequencing_run_name": sequencing_run_name,
         "pair_id": pair_id,
@@ -347,10 +398,10 @@ def view_tso500_pair(request, sequencing_run_name, pair_id):
         "cvo": cvo,
         "cvo_file_upload": cvo.file_upload if cvo and cvo.file_upload and
                            cvo.file_upload.can_view(request.user) else None,
-        "qc_file_upload": next((qc.file_upload for qc in library_qc
-                                if qc.file_upload and qc.file_upload.can_view(request.user)), None),
-        "has_library_qc": bool(library_qc),
-        "arms": _tso500_pair_arms(cvo, library_qc, request.user),
+        # [Analysis Status] and the measured date are the pair's, carried by each of its QC rows
+        "library_qc": library_qc[0] if library_qc else None,
+        "arms": arms,
+        "library_qc_rows": _library_qc_rows(arms),
     }
     return render(request, 'seqauto/view_tso500_pair.html', context)
 
@@ -399,6 +450,8 @@ def delete_sequencing_run(request, sequencing_run_id):
 @require_POST
 def reload_experiment_name(request, sequencing_run_id):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    if not request.user.is_superuser:
+        raise PermissionDenied()
 
     old_experiment = sequencing_run.experiment
 
@@ -421,6 +474,9 @@ def reload_experiment_name(request, sequencing_run_id):
 @require_POST
 def assign_data_to_current_sample_sheet(request, sequencing_run_id):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    if not request.user.is_superuser:
+        raise PermissionDenied()
+
     assign_old_sample_sheet_data_to_current_sample_sheet(request.user, sequencing_run)
     return HttpResponse()
 
@@ -444,19 +500,19 @@ def view_unaligned_reads(request, unaligned_reads_id):
     return render(request, 'seqauto/view_unaligned_reads.html', context)
 
 
-def view_bam_file(request, bam_file_id):
-    bam_file = get_object_or_404(BamFile, pk=bam_file_id)
-    form = forms.BamFileForm(instance=bam_file)
+def view_alignment_file(request, alignment_file_id):
+    alignment_file = get_object_or_404(AlignmentFile, pk=alignment_file_id)
+    form = forms.AlignmentFileForm(instance=alignment_file)
 
     try:
-        flagstats = bam_file.flagstats
+        flagstats = alignment_file.flagstats
     except Flagstats.DoesNotExist:
         flagstats = None
 
-    context = {"bam_file": bam_file,
+    context = {"alignment_file": alignment_file,
                'form': form,
                'flagstats': flagstats}
-    return render(request, 'seqauto/view_bam_file.html', context)
+    return render(request, 'seqauto/view_alignment_file.html', context)
 
 
 def view_single_sample_vcf(request, single_sample_vcf_id):

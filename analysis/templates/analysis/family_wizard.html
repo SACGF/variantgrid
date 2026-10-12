@@ -1,4 +1,4 @@
-{% extends menu_analysis_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load js_tags %}
 {% load model_tags %}
@@ -111,7 +111,7 @@ function setProbandPhenoText() {
 
 {% endblock jsdocumentready %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <h3>
         <svg id="family-heading-icon"><use href="#{{ family_icon }}"></use></svg> Create {{ family_name }}
     </h3>
@@ -195,4 +195,4 @@ function setProbandPhenoText() {
         </div>
     </div>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

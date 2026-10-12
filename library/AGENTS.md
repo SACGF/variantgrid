@@ -8,7 +8,7 @@ report_exc_info) · `preview_request.py` (PreviewModelMixin, PreviewData, the pr
 Patterns here:
 - `library` sits below the apps: `.importlinter` (checked in CI by `lint-imports`) forbids it importing one. Code that
   needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
-  moved out for this); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
+  are examples); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
   the check, so delete it when you remove the import.
 - Give a new user-owned model permissions by inheriting
   `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsAutoInitialSaveMixin` before `models.Model`;
@@ -50,7 +50,7 @@ Patterns here:
   · `xml_utils.py` (`XmlParser`); then `library/django_utils/`: `database_utils.py` (`queryset_to_sql`, `dictfetchall`,
   `sql_delete_qs`, `pg_settings`, `get_table_row_estimates`, `IntegerFieldChoices`/`TextFieldChoices`) · `model_utils.py` (`ArrayLength`, `model_has_field`,
   `refresh_for_update`, `AuditUtils`) · `view_utils.py` (`is_ajax`, `render_ajax_view`) · `__init__.py`
-  (`require_superuser`, `get_cached_project_git_hash`) · `django_postgres.py` (`copy_from_file`).
+  (`require_superuser`) · `django_postgres.py` (`copy_from_file`).
 Gotchas:
 - `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` caches `.get()` results
   process-wide forever and `ObjectManagerCachingRequest` per request; both are plain managers under

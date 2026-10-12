@@ -58,7 +58,7 @@ class FranklinExportRow(ExportRow):
 
     GERMLINE_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
@@ -68,12 +68,11 @@ class FranklinExportRow(ExportRow):
     }
     ONCOGENIC_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
         "VUS_C": "VUS",
-        # TODO should we map LP, P to Likely Oncogenic, Oncogenic too?
         "LO": "LIKELY ONCOGENIC",
         "O": "ONCOGENIC"
     }
@@ -138,13 +137,13 @@ class FranklinExportRow(ExportRow):
         partial_url = reverse('view_allele', kwargs={"allele_id": self.data.allele.allele_id})
         allele_url = f"{get_url_from_view_path(partial_url)}"
 
-        all_classification_values = [cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) for cm in self.data.cms]
+        all_classification_values: list[str] = [cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) for cm in self.data.cms]
         all_classification_values = [v for v in all_classification_values if v is not None]  # clear out unclassified
         classification_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         all_classification_values = list(classification_key.sort_values(set(all_classification_values)))
         formatted_classification_values = [classification_key.pretty_value(v) for v in all_classification_values]
 
-        all_clinsig_values = [cm.somatic_clinical_significance_value for cm in self.data.cms]
+        all_clinsig_values: list[SomaticClinicalSignificanceValue] = [cm.somatic_clinical_significance_value for cm in self.data.cms]
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
         all_clinsig_values = [cs.pretty_str for cs in sorted(set(all_clinsig_values))]
 
@@ -213,7 +212,7 @@ class ClassificationExportFormatterFranklin(ClassificationExportFormatter):
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterFranklin':
         classification_filter = ClassificationFilter.from_request(request)
         if classification_filter.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE:
-            raise InvalidExportParameter("Fraknlin export requires Allele Origin to be set to Germline.")
+            raise InvalidExportParameter("Franklin export requires Allele Origin to be set to Germline.")
         return ClassificationExportFormatterFranklin(
             classification_filter=classification_filter
         )

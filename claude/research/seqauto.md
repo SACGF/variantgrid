@@ -5,7 +5,7 @@ Verified against a96540a68 on 2026-09-25
 seqauto is the lab's sequencing ledger: which flowcells were run (`seqauto/models/models_seqauto.py:SequencingRun`),
 what the sample sheet said was on them (`SampleSheet`, one `SequencingSample` per row), the files the pipeline made
 from each row (FastQs, BAM, per-sample and joint-called VCFs), the QC measured along the way, and enrichment-kit gold
-coverage. It does not find those files itself any more - the sequencing pipeline posts records into `/seqauto/api/`
+coverage. It does not find those files itself: the sequencing pipeline posts records into `/seqauto/api/`
 and VCF / coverage files through the upload API, and seqauto's job is to join the two by path so an imported `Sample`
 knows which sheet row, run and kit it came from. It only switches on where `SEQAUTO_ENABLED` (SA Pathology); the
 DRAGEN TSO 500 pair records (`LibraryQC`, `DragenTSO500CombinedVariantOutput`) live here because they are keyed on a
@@ -29,7 +29,7 @@ current sheet (`carry_extractions_to_new_sample_sheet`), then calls
 
 Per-sample files come in one bulk call, `seqauto/views_rest.py:SequencingFilesBulkCreateView` ->
 `SequencingFilesBulkCreateSerializer`, which resolves each record's `sample_name` on the sheet and creates
-UnalignedReads (optional since the FastQ-less pipelines, SACGF/variantgrid#357), BamFile and `SingleSampleVCF`.
+UnalignedReads (optional, for FastQ-less pipelines, SACGF/variantgrid#357), AlignmentFile and `SingleSampleVCF`.
 Joint calls post through `JointCalledVCFSerializer`; a joint call spanning runs (a trio sequenced on different
 flowcells) sends explicit `sequencing_samples`, and an empty M2M means "the whole sheet"
 (`seqauto/models/models_seqauto.py:JointCalledVCF.get_sequencing_samples`). QC hangs off a `QC` row found by
@@ -69,7 +69,7 @@ and moves FastQs / UnalignedReads / BAMs across by sample name. If it did change
 that runs `assign_old_sample_sheet_data_to_current_sample_sheet`, which relinks everything and re-runs
 `link_samples_and_vcfs_to_sequencing(replace_existing=True)`. Only the automatic path sends
 `sequencing_run_current_sample_sheet_changed_signal`. seqauto itself receives none of its signals; SA Pathology
-connects them in `variantgrid_sapath/sapath/apps.py` - the sheet-created one sets kits from the sheet's Panel
+connects them in the sapath app's `AppConfig.ready()` (the sibling `variantgrid_sapath` repo) - the sheet-created one sets kits from the sheet's Panel
 columns, the sheet-changed one relinks samples to patients.
 
 ### DRAGEN TSO 500 pairs
@@ -99,15 +99,11 @@ and the gene grid's coverage column read these. `seqauto/models/models_seqauto.p
 
 ## Why it is shaped this way
 
-seqauto began (around 2016, from the TAU project) as a filesystem scanner: a celery beat task ran shell `find` scripts over
-the sequencing directories, created a record per file keyed on its path, and wrote PBS job scripts for whatever was
-missing. That is why every file model is a `SeqAutoRecord` with `path`, `file_last_modified` and `hash`, why `QC`
-is a SeqAutoRecord with a path it does not need (its docstring says so), and why the `get_params` chains and
-`SEQAUTO_*_PATTERN` settings exist: the path of the next file was derived by string substitution down
-run -> sheet -> sample -> BAM -> VCF. The API (issue #76, 2024) kept those models so the scanner and API could run
-side by side, then #1643 deleted the scanner. What survived is the path as the join key between a record the pipeline
-posts and a file it uploads - the two arrive through different endpoints, often from different processes, and the
-path is the one string both know.
+Every file model is a `SeqAutoRecord` with `path`, `file_last_modified` and `hash` - `QC` included, though it does
+not need a path (its docstring says so) - and the `get_params` chains and `SEQAUTO_*_PATTERN` settings derive a file's
+path by string substitution down run -> sheet -> sample -> BAM -> VCF. The path is the join key between a record the
+pipeline posts and a file it uploads: the two arrive through different endpoints, often from different processes, and
+the path is the one string both know.
 
 The run name as primary key comes from Illumina run directories being globally unique; it makes the API idempotent
 without lookups, at the cost that `SequencingRunSerializer` cannot update a run. Sheets are versioned rather than
@@ -118,50 +114,29 @@ whether existing BAMs and samples can be trusted to still mean the same library.
 whichever sheet described it - hence the carry-forward on re-send - and `link_samples_and_vcfs_to_sequencing` pushes
 it down to every Sample so one link call covers all of an arm's VCFs.
 
-## History
-
-- 2016-2020: TAU-derived scanner; `SeqAutoRun`, `SeqAutoMessage`, `data_state`, job scripts. Public repo from 2020.
-- 2024 (#76): REST API and serializers; the API client command.
-- 2025: sequencer get-or-create over the API (SACGF/variantgrid_sapath#364); single-sample VCFs matched by filename
-  (SACGF/variantgrid_sapath#362); QC gene list duplicates between scan and API (#361, sapath#382); QCGeneCoverage
-  cascade (sapath#395).
-- 2026-05: `VCFFile` renamed `SingleSampleVCF`, and multi-sample trio VCFs (#1555, #343).
-- 2026-07 (#1643, 64dd39081, c1ad599da): the scanner, job scripts, `SeqAutoRun`, `SeqAutoMessage`, `data_state`,
-  the InterOp / FastQC / flagstat parsers and their commands deleted; `seqauto/sequencing_files/sample_sheet.py` is
-  what was kept of the scanner's create_resource_models module.
-- 2026-08: cross-run joint-called VCFs (SACGF/variantgrid_sapath#415); FastQ-less file posts; Specimen -> Extraction
-  -> Sample and the sequencing-sample extraction link endpoint (#1704, #1707).
-- 2026-09: `LibraryQC`, `DragenTSO500CombinedVariantOutput` and the pair page (#1904); API writes
-  gated on `SEQAUTO_API_WRITE_GROUP` (variantgrid_private#3875).
-
 ## Traps
 
 - Paths are compared as exact strings. The upload's `path` must be byte-identical to the record's, and one path can
   belong to only one `SingleSampleVCF` / `JointCalledVCF` (`validate_unique_vcf_path`).
 - `SequencingRunSerializer.create` is `get_or_create`: re-posting a run with a new kit, experiment or flags changes
   nothing. Edit it on the run page (staff) or admin.
-- `seqauto/serializers/sequencing_serializers.py:SampleSheetSerializer.update` is broken: it pops
-  `sequencing_samples` (the field is `sequencingsample_set`) and calls `instance.sequencing_samples`, so a PUT/PATCH to
-  the sample sheet endpoint raises. Were it fixed as written it would delete the rows and cascade their BAMs and VCF
-  records. The pipeline only ever POSTs a new sheet.
-- `sequencing_run_created_signal` is never sent since #1643 (the scanner sent it), so
-  `sapath_sequencing_run_created_handler` is dead. The sheet-created handler falls back to the kit from the run path,
-  so kits still get set when a sheet arrives - but a run posted with no sheet gets no kit.
-  `backend_vcf_import_success_signal` is sent with no receiver.
-- `seqauto/views.py:assign_data_to_current_sample_sheet` and `reload_experiment_name` check no permission. The first
-  relinks a run's data and samples (`replace_existing=True`); its button is on the superuser-only Admin tab, but any
-  logged-in user can POST it (compare `delete_sequencing_run`, superuser, and the run form, staff). The second's button
-  is on the Experiment tab for everyone, and it reads `RunParameters.xml` from the run's path on the web host, which
-  only works where the sequencing filesystem is mounted. The Admin tab's text still says deleted data "will
-  re-generate next disk scan" - there is no scan; the pipeline has to re-post.
-- `seqauto/models/models_seqauto.py:get_20x_gene_coverage` increments with `gene_coverage_collection__pk__gte` the
-  cached max pk, so the collection at the old max is counted again on every increment; and the transcript query is not
-  restricted to current-sheet collections the way the collection count is. Numbers drift up over time until the cache
-  is invalidated.
-- `sequencing_run.save()  # Re-validate ready` in `seqauto/sequencing_files/sample_sheet.py` is a leftover - the
-  `ready` field is long gone. Likewise most `SEQAUTO_*` path settings are scan-era and read by nothing; only the QC,
-  gene-coverage and GOI patterns are still used, to derive a default path when the API omits one
-  (`QC.get_path_from_vcf`, `QCGeneList.get_path_from_qc`). `seqauto/scripts/tau/` is the scanner's shell scripts, unused.
+- `seqauto/serializers/sequencing_serializers.py:SampleSheetSerializer.update` (PUT/PATCH) updates the sheet's
+  rows in place by `sample_id`, keeping the BAMs / VCFs / QC under them; a row whose `sample_id` is no longer in the
+  sheet is left alone. The pipeline only ever POSTs a new sheet.
+- `sequencing_run_created_signal` is sent by `SequencingRunSerializer.create` only when the POST creates the run
+  (re-posting an existing name sends nothing). `backend_vcf_import_success_signal` is sent with no receiver.
+- `seqauto/views.py:assign_data_to_current_sample_sheet` (relinks a run's data and samples, `replace_existing=True`)
+  and `reload_experiment_name` are superuser-only, like `delete_sequencing_run`. The second reads `RunParameters.xml`
+  from the run's path on the web host, which only works where the sequencing filesystem is mounted.
+- `seqauto/models/models_seqauto.py:get_20x_gene_coverage` caches (count, num collections, max pk) per gene and
+  threshold and only counts collections above the cached max pk on later calls, both queries restricted to
+  current-sheet collections; the cache is dropped when the number of current collections at or below the max changes.
+- `sequencing_run.save()  # Re-validate ready` in `seqauto/sequencing_files/sample_sheet.py` does nothing useful:
+  `SequencingRun` has no `ready` field. Most `SEQAUTO_*` path settings are read by nothing in this repo, but they
+  stay: deployment settings files outside the repo extend them (`SEQAUTO_VCF_PATTERNS_FOR_KIT.update(...)`,
+  `_SEQUENCING_STATS_SUB_DIR`), so removing one is a NameError at settings load on those hosts. Only the QC,
+  gene-coverage and GOI patterns are read, to derive a default path when the API omits one
+  (`QC.get_path_from_vcf`, `QCGeneList.get_path_from_qc`).
 - `SampleFromSequencingSample.sample` is one-to-one but `sequencing_sample` is not: an arm has a Sample per caller
   VCF and per re-import. `replace_existing` only decides whether an already-linked Sample is re-pointed at a new sheet
   row; each newly imported Sample always gets its own link.

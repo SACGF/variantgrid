@@ -2,10 +2,11 @@
 from collections import defaultdict
 from typing import Optional
 
+from genes.hgvs.hgvs_converter import HGVSException
+from genes.hgvs.hgvs_matcher import HGVSMatcher
+
 
 def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[list[str]] = None) -> tuple[str, list]:
-    from genes.hgvs import HGVSException
-
     gene_symbol = None
     if vta.gene:
         if gs := vta.gene.get_gene_symbol(vta.version.genome_build):
@@ -49,8 +50,6 @@ def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[li
 
 
 def _get_search_terms(variant_transcripts_list: list, formatter: str = None, **kwargs):
-    from genes.hgvs import HGVSMatcher
-
     gene_terms = defaultdict(set)
     for vta in variant_transcripts_list:
         hgvs_matcher = HGVSMatcher.instance(vta.version.genome_build)

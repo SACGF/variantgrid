@@ -1,5 +1,3 @@
-from unittest import skip
-
 from django.test import RequestFactory, TestCase, override_settings
 
 from classification.enums import EvidenceKeyValueType, SubmissionSource
@@ -38,7 +36,6 @@ class ClassificationTestCaseViews(TestCase):
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
-    @skip("Failing pending fix - SACGF/variantgrid_private#3740")
     def test_return_data(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({
@@ -143,6 +140,7 @@ class ClassificationTestCaseViews(TestCase):
             "withdrawn": False,
             "allele_origin_bucket": "U",
             "condition_text_match": None,
+            "triages": {},
             "has_changes": False,
             "messages": [
                 {
@@ -180,7 +178,6 @@ class ClassificationTestCaseViews(TestCase):
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
-    @skip("Failing pending fix - SACGF/variantgrid_private#3740")
     def test_test_mode(self):
 
         lab, _user = ClassificationTestUtils.lab_and_user()
@@ -219,6 +216,7 @@ class ClassificationTestCaseViews(TestCase):
             "withdrawn": False,
             "allele_origin_bucket": "U",
             "condition_text_match": None,
+            "triages": {},
             "messages": [
                 {
                     "severity": "error",
@@ -260,7 +258,6 @@ class ClassificationTestCaseViews(TestCase):
         self.assertEqual(expected, response_json)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
-    @skip("Failing pending fix - SACGF/variantgrid_private#3740")
     def test_bulk(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({"records": [{
@@ -285,7 +282,6 @@ class ClassificationTestCaseViews(TestCase):
         self.assertEqual(results[1]['lab_record_id'], "test_2")
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
-    @skip("Failing pending fix - SACGF/variantgrid_private#3740")
     def test_basic_update(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         # all test that aliases work re foo BAAA -> bar

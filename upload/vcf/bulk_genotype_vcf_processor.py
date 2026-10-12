@@ -20,12 +20,12 @@ from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_SEPARATOR,
     VCFConstant,
 )
-from library.git import Git
 from library.utils import double_quote, json_default_converter
 from library.utils.json_utils import json_dumps_nan_as_null
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
+from snpdb.models.models import CodeVersion
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (
     ModifiedImportedVariant,
@@ -100,7 +100,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                                                                     version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
                                                                     vcf_parser="cyvcf2",
                                                                     vcf_parser_version=cyvcf2.__version__,
-                                                                    code_git_hash=Git(settings.BASE_DIR).hash)
+                                                                    code_version=CodeVersion.current())
         return vcf_importer
 
     def __init__(self, upload_step, cohort_genotype_collection,

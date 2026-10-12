@@ -2,7 +2,7 @@ import zipfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from io import StringIO
 from typing import Any, Optional
 
@@ -35,7 +35,7 @@ class ClassificationExportFormatter(ABC):
         self.classification_filter = classification_filter
         self.row_count = 0
         self.file_count = 0
-        self.started = datetime.utcnow()
+        self.started = datetime.now(UTC)
 
     @property
     def delimiter_for_row(self):
@@ -323,7 +323,7 @@ class ClassificationExportFormatter(ABC):
         user = self.classification_filter.user
         if user.groups.filter(name=bot_group().name):
             return
-        end = datetime.utcnow()
+        end = datetime.now(UTC)
         row_count = self.row_count
 
         body_parts = [f":simple_smile: {user.username}"]

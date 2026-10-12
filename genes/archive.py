@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from eventlog.models import create_event
 from genes.models import GeneCoverageCollection
+from genes.tasks.gene_coverage_tasks import reload_gene_coverage_collection
 from snpdb.archive import ArchivePreconditionError
 from snpdb.models import DataState
 
@@ -42,8 +43,6 @@ def archive_gene_coverage_collection(gcc: GeneCoverageCollection, user: User, re
 
 def restore_gene_coverage_collection(gcc: GeneCoverageCollection, user: User):
     """ Re-import an archived GeneCoverageCollection from its recorded source path. """
-    from genes.tasks.gene_coverage_tasks import reload_gene_coverage_collection
-
     if not gcc.data_archived:
         raise ValueError("GeneCoverageCollection is not archived")
     if not gcc.data_restorable_from:

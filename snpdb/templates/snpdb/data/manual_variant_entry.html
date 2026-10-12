@@ -1,7 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load js_tags %}
 {% load crispy_forms_field %}
-{% load ui_menu_bars %}
 {% load ui_utils %}
 {% block title %}Manual Variant Entry{% endblock %}
 {% block head %}
@@ -14,9 +13,6 @@
         min-width: 120px;
     }
     </style>
-{% endblock %}
-{% block submenu %}
-    {% menu_bar_variants %}
 {% endblock %}
 {% block content %}
     <div class="container">

@@ -29,7 +29,7 @@ class SampleDeleteInternalDataTest(TestCase):
         cls.cgc = cls.cohort.cohort_genotype_collection
         cls.sample = cls.cohort.get_samples().first()
         cls.code_version = SampleStatsCodeVersion.objects.create(
-            name="test", version=99, code_git_hash="deleteinternaldata")
+            name="test", version=99)
 
     def _create_stats(self, sample):
         common = {

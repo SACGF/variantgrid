@@ -1,8 +1,9 @@
+from annotation.vep_columns import VEP_COLUMNS, all_variant_grid_column_ids
+from snpdb.models.models_columns import VariantGridColumn
+
+
 def check_vep_columns_registry() -> dict:
     """ Validates annotation/vep_columns.py against VariantGridColumn + internal uniqueness. """
-    from annotation.vep_columns import VEP_COLUMNS, all_variant_grid_column_ids
-    from snpdb.models import VariantGridColumn
-
     known = set(VariantGridColumn.objects.values_list("pk", flat=True))
     referenced = all_variant_grid_column_ids()
     missing = sorted(referenced - known)

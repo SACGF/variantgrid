@@ -5,6 +5,8 @@ from django.conf import settings
 from django.db.models import Q, QuerySet
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from annotation.models.models import VariantAnnotationVersion
+from classification.enums.classification_enums import ClinicalSignificance
 from classification.models import Classification
 from snpdb.models import Allele, CohortGenotypeCommonFilterVersion, CommonVariantClassified, Variant
 
@@ -38,7 +40,6 @@ def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersio
 
 
 def get_excluded_clinical_significances(cgcfv: CohortGenotypeCommonFilterVersion):
-    from classification.enums.classification_enums import ClinicalSignificance
     clinical_significances = [cs[0] for cs in ClinicalSignificance.CHOICES]
     i = clinical_significances.index(cgcfv.clinical_significance_max)
     return clinical_significances[i + 1:]
@@ -47,7 +48,6 @@ def get_excluded_clinical_significances(cgcfv: CohortGenotypeCommonFilterVersion
 def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterVersion,
                                               alleles: Optional[QuerySet[Allele]] = None) -> QuerySet[Variant]:
     """ These are 'common' variants that have classifications against them, thus can't be store in common """
-    from annotation.models import VariantAnnotationVersion
     kwargs = {
         "gnomad": cgcfv.gnomad_version,
         "genome_build": cgcfv.genome_build

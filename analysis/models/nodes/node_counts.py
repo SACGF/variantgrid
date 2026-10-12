@@ -102,7 +102,7 @@ def get_extra_filters_count(node, extra_filters) -> Optional[int]:
         # Tags narrow the node to a handful of variants, so counting them exactly here is cheap
         q = node_tag_q if node_tag_q is not None else get_extra_filters_q(node.analysis, extra_filters)
         try:
-            return node.get_queryset(inner_query_distinct=True).filter(q).count()
+            return node.get_queryset().filter(q).count()
         except NonFatalNodeError:
             pass  # An ancestor isn't ready - the count comes back when the node reloads
     return None
@@ -152,10 +152,7 @@ def get_node_counts_mine_and_available(analysis):
 
 
 def get_node_counts_and_labels_dict(node, counts_to_get):
-
-    # Need to do inner query as distinct needs to be applied
-    # before aggregate functions
-    qs = node.get_queryset(inner_query_distinct=True)
+    qs = node.get_queryset()
     return _aggregate_node_counts(qs, node.analysis, counts_to_get)
 
 
@@ -176,10 +173,10 @@ def get_tag_node_counts_dict(node, tagged_variant_ids_by_label: dict[str, list[i
     if not all_tagged_variant_ids:
         return dict.fromkeys(tagged_variant_ids_by_label, 0)
 
-    qs = node.get_queryset(inner_query_distinct=True).filter(pk__in=all_tagged_variant_ids)
-    aggregate_kwargs = {label: Count("pk", filter=Q(pk__in=variant_ids), empty_result_set_value=0)
+    qs = node.get_queryset().filter(pk__in=all_tagged_variant_ids)
+    aggregate_kwargs = {label: Count("pk", filter=Q(pk__in=variant_ids))
                         for label, variant_ids in tagged_variant_ids_by_label.items()}
-    return _aggregate(qs, aggregate_kwargs)
+    return qs.aggregate(**aggregate_kwargs)
 
 
 def _aggregate_node_counts(qs, analysis, counts_to_get) -> dict[str, int]:
@@ -189,11 +186,5 @@ def _aggregate_node_counts(qs, analysis, counts_to_get) -> dict[str, int]:
             q = None
         else:
             q = get_extra_filters_q(analysis, count_type)
-        aggregate_kwargs[count_type] = Count("pk", filter=q, empty_result_set_value=0)
-    return _aggregate(qs, aggregate_kwargs)
-
-
-def _aggregate(qs, aggregate_kwargs) -> dict[str, int]:
-    # empty_result_set_value=0 only works for Django >= 4, so we handle None manually
-    node_counts = qs.aggregate(**aggregate_kwargs)
-    return {k: v if v is not None else 0 for k, v in node_counts.items()}
+        aggregate_kwargs[count_type] = Count("pk", filter=q)
+    return qs.aggregate(**aggregate_kwargs)

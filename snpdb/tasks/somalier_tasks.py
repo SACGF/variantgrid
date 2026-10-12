@@ -1,9 +1,10 @@
 """
 Somalier stages: extract a VCF's calls at the somalier sites, predict ancestry, and relate samples
-(within a cohort, a trio, or nightly across every sample on the box).
+(within a cohort, a trio, a patient, or nightly across every sample on the box).
 
-Entry points: `somalier_vcf_id` (run by the VCF import pipeline), `somalier_cohort_relate`,
-`somalier_trio_relate` and the beat-scheduled `somalier_all_samples`. Every stage records its own
+Entry points: `somalier_vcf_id` (run by the VCF import pipeline, which relates the VCF's patients too),
+`somalier_cohort_relate`, `somalier_trio_relate`, `somalier_patient_relate` (also queued by
+snpdb/signals/somalier_patient_relate.py) and the beat-scheduled `somalier_all_samples`. Every stage records its own
 ProcessingStatus, so one failing never takes the others - or the import - down with it.
 """
 import glob
@@ -24,6 +25,7 @@ from django.utils import timezone
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.log_utils import get_traceback
 from library.utils import execute_cmd
+from patients.models import Patient
 from patients.models_enums import Zygosity
 from snpdb.models import (
     VCF,
@@ -36,6 +38,8 @@ from snpdb.models import (
     SomalierAncestryRun,
     SomalierCohortRelate,
     SomalierConfig,
+    SomalierPatientRelate,
+    SomalierPatientRelatePair,
     SomalierRelate,
     SomalierRelatePairs,
     SomalierSampleExtract,
@@ -44,10 +48,13 @@ from snpdb.models import (
     SuperPopulationCode,
     Trio,
 )
+from snpdb.models.models_somalier import AbstractSomalierRelatePair, get_sample_patient_ids
 from snpdb.variants_to_vcf import vcf_export_to_file
 
 # A PROCESSING extract older than this was left behind by a worker that died, not by a live run
 STALE_PROCESSING_AGE = timedelta(hours=1)
+
+SOMALIER_PAIRS_FILENAME = "somalier.pairs.tsv"  # in the relate's output dir
 
 
 @contextmanager
@@ -142,6 +149,11 @@ def somalier_vcf_id(vcf_id: int):
                 _somalier_relate(relate)
         except Exception:
             _record_error(relate, f"cohort relate vcf={vcf_id}")
+
+    # Patient relates are small, so a sample swap shows now rather than after the nightly relate
+    for patient_id in get_sample_patient_ids(vcf.sample_set.all()):
+        with _stage_timing(f"patient {patient_id} relate", vcf_id):
+            somalier_patient_relate(patient_id)
 
 
 def _somalier_vcf_extract(vcf_extract: SomalierVCFExtract, processing_dir):
@@ -277,16 +289,14 @@ def _all_samples_relate_needed(orphans_removed: int) -> bool:
     return bool(orphans_removed)
 
 
-def _load_somalier_pairs(all_samples: SomalierAllSamplesRelate, pairs_filename: str) -> int:
-    """ Replaces every stored pair with the ones from this run. Returns how many were kept """
-    somalier_settings = settings.SOMALIER["relatedness"]
+def _read_somalier_pairs(pairs_filename) -> pd.DataFrame:
     df = pd.read_csv(pairs_filename, sep='\t')
-    df = df.rename(columns={"concordance": "hom_concordance"})  # somalier 0.3.5 renamed it
-    shared_het_mask = df["shared_hets"] >= somalier_settings["min_shared_hets"]
-    shared_hom_mask = df["shared_hom_alts"] > somalier_settings["min_shared_hom_alts"]
-    relateness_mask = df["relatedness"] > somalier_settings["min_relatedness"]
-    df = df[shared_het_mask & shared_hom_mask & relateness_mask]
+    return df.rename(columns={"concordance": "hom_concordance"})  # somalier 0.3.5 renamed it
 
+
+def _create_somalier_pairs(pair_model: type[AbstractSomalierRelatePair], relate: SomalierRelate,
+                           df: pd.DataFrame) -> int:
+    """ Returns how many were created """
     pairs = []
     for _, row in df.iterrows():
         row_data = dict(row)
@@ -294,17 +304,66 @@ def _load_somalier_pairs(all_samples: SomalierAllSamplesRelate, pairs_filename: 
         # Sample_ids are at the start
         sample_a_id = AbstractSomalierModel.sample_name_to_id(row_data.pop("#sample_a"))
         sample_b_id = AbstractSomalierModel.sample_name_to_id(row_data.pop("sample_b"))
-        pairs.append(SomalierRelatePairs(relate=all_samples, sample_a_id=sample_a_id,
-                                         sample_b_id=sample_b_id, **row_data))
+        pairs.append(pair_model(relate=relate, sample_a_id=sample_a_id, sample_b_id=sample_b_id, **row_data))
 
     # A sample deleted since its VCF was extracted is still in the report - resolve them in one query
     sample_ids = {p.sample_a_id for p in pairs} | {p.sample_b_id for p in pairs}
     existing_ids = set(Sample.objects.filter(pk__in=sample_ids).values_list("pk", flat=True))
     pairs = [p for p in pairs if int(p.sample_a_id) in existing_ids and int(p.sample_b_id) in existing_ids]
+    pair_model.objects.bulk_create(pairs, batch_size=2000)
+    return len(pairs)
+
+
+def _load_somalier_pairs(all_samples: SomalierAllSamplesRelate, pairs_filename) -> int:
+    """ Replaces every stored pair with the ones from this run. Returns how many were kept """
+    somalier_settings = settings.SOMALIER["relatedness"]
+    df = _read_somalier_pairs(pairs_filename)
+    shared_het_mask = df["shared_hets"] >= somalier_settings["min_shared_hets"]
+    shared_hom_mask = df["shared_hom_alts"] > somalier_settings["min_shared_hom_alts"]
+    relateness_mask = df["relatedness"] > somalier_settings["min_relatedness"]
+    df = df[shared_het_mask & shared_hom_mask & relateness_mask]
 
     SomalierRelatePairs.objects.exclude(relate=all_samples).delete()  # unique on (sample_a, sample_b)
-    SomalierRelatePairs.objects.bulk_create(pairs, batch_size=2000)
-    return len(pairs)
+    return _create_somalier_pairs(SomalierRelatePairs, all_samples, df)
+
+
+def _patient_relate_is_current(patient: Patient, samples: list[Sample]) -> bool:
+    """ The last successful relate was of exactly these samples, all extracted before it ran """
+    last_relate = SomalierPatientRelate.objects.filter(patient=patient, status=ProcessingStatus.SUCCESS) \
+        .order_by("-created").first()
+    if last_relate is None:
+        return False
+    related_sample_ids = set()
+    for pair_sample_ids in last_relate.somalierpatientrelatepair_set.values_list("sample_a", "sample_b"):
+        related_sample_ids.update(pair_sample_ids)
+    if related_sample_ids != {s.pk for s in samples}:
+        return False
+    last_extracted = SomalierSampleExtract.objects.filter(sample__in=samples) \
+        .aggregate(m=Max("vcf_extract__modified"))["m"]
+    return last_relate.created >= last_extracted
+
+
+@celery.shared_task
+def somalier_patient_relate(patient_id: int):
+    """ Relates a patient's samples, which should all be one individual (#196) """
+    patient = Patient.objects.filter(pk=patient_id).first()
+    if patient is None:
+        return  # Merged away since it was queued
+    samples = list(SomalierPatientRelate.relatable_samples(patient))
+    if len(samples) < 2 or _patient_relate_is_current(patient, samples):
+        return
+
+    relate = SomalierPatientRelate.objects.create(patient=patient)
+    try:
+        related_dir = _somalier_relate(relate)
+        df = _read_somalier_pairs(related_dir / SOMALIER_PAIRS_FILENAME)
+        _create_somalier_pairs(SomalierPatientRelatePair, relate, df)
+        relate.status = ProcessingStatus.SUCCESS
+        relate.save()
+        # Their report dirs go with them (@see somalier_relate_pre_delete_handler)
+        SomalierPatientRelate.objects.filter(patient=patient, created__lt=relate.created).delete()
+    except Exception:
+        _record_error(relate, f"patient relate patient={patient_id}")
 
 
 @celery.shared_task
@@ -318,8 +377,7 @@ def somalier_all_samples(force: bool = False):
     try:
         start = time.time()
         related_dir = _somalier_relate(all_samples)
-        pairs_filename = os.path.join(related_dir, "somalier.pairs.tsv")
-        num_pairs = _load_somalier_pairs(all_samples, pairs_filename)
+        num_pairs = _load_somalier_pairs(all_samples, related_dir / SOMALIER_PAIRS_FILENAME)
         logging.info("somalier all samples relate: %d pairs took %.1fs", num_pairs, time.time() - start)
         all_samples.status = ProcessingStatus.SUCCESS
         all_samples.save()

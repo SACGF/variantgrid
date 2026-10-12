@@ -29,6 +29,7 @@ from analysis.forms.forms_nodes import (
     VennNodeForm,
     ZygosityNodeForm,
 )
+from analysis.grids import VariantGrid
 from analysis.models import MOINode, OntologyTerm, TagNode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
@@ -150,12 +151,18 @@ class FilterNodeView(NodeView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         self.object.analysis.check_can_write(request.user)
+        filters_data = request.POST.get("filters")
+        filters = json.loads(filters_data) if filters_data else None
+        if filters:
+            # The editor only offers the node grid's filter fields
+            filter_field_names = VariantGrid(request, self.object).filter_field_names()
+            if unknown_fields := {rule['field'] for rule in filters['rules']} - filter_field_names:
+                raise ValueError(f"Fields {unknown_fields} are not filterable in this grid")
+
         # Delete all old filters (probably not best way to do it)
         self.object.filternodeitem_set.all().delete()
 
-        filters_data = request.POST.get("filters")
-        if filters_data:
-            filters = json.loads(filters_data)
+        if filters:
             filternodeitem_set = set()
             opts = self.object.model._meta
             for i, rule in enumerate(filters['rules']):

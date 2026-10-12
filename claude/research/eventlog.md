@@ -47,24 +47,18 @@ that sets `last_error_acknowledged` so a failure that has been seen goes quiet u
 
 Reading: `eventlog/grids.py:EventColumns` shows own events only unless the user is a superuser, supports the page's
 `filter` (logins, errors, warnings_and_errors, events, searches) and `exclude_admin` (drops superusers, bots and user-less
-rows), and expands rows through `eventlog/views.py:eventlog_detail`, which checks superuser-or-owner.
+rows), renders emoji in details (`eventlog/grids.py:EventColumns.render_data` runs `emoji_to_unicode`), and expands rows
+through `eventlog/views.py:eventlog_detail`, which checks superuser-or-owner.
 `eventlog/signals/active_users_health_check.py:active_users_health_check` answers the nightly health check by counting
 distinct users with an `Event` or `ViewEvent` in the window, admins on their own line.
 
 ## Why it is shaped this way
 
-`Event` predates Rollbar and Slack and is now mostly an in-database audit trail; the Slack and email paths in
-`library/log_utils.py` cover alerting. `ViewEvent` exists for Shariant's usage reporting, which is why it is opt-in per
-deployment and skips the noisy paths. `IntegrationActivity` was added because outbound and inbound integrations (Alissa,
-the SA Pathology Mocha API) left nothing behind but the records they wrote, so "when did this last run" had no answer; one
-mutable row per integration keeps the table bounded however chatty the integration is.
-
-## History
-
-Security fixes (#3819, March 2026) added the owner check to `eventlog_detail`, restricted the grid to superusers rather than
-staff, and made `create_event` validate its inputs. #1519 (May 2026) added the length caps. `IntegrationActivity`,
-`IntegrationApiMiddleware` and the dismiss trigger arrived with the server status integration panel in August 2026. Emoji in
-event details render since #1098 (`eventlog/grids.py:EventColumns.render_data` runs `emoji_to_unicode`).
+`Event` is an in-database audit trail; Rollbar and the Slack and email paths in `library/log_utils.py` cover
+alerting. `ViewEvent` exists for Shariant's usage reporting, which is why it is opt-in per
+deployment and skips the noisy paths. `IntegrationActivity` exists because outbound and inbound integrations (Alissa,
+the SA Pathology Mocha API) otherwise leave nothing behind but the records they write, so "when did this last run" has no
+answer; one mutable row per integration keeps the table bounded however chatty the integration is.
 
 ## Traps
 

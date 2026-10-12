@@ -19,7 +19,7 @@ from classification.models import ClassificationGrouping, Overlap, OverlapContri
     DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
     ClassificationFlagTypes, ClassificationModification, Classification, ClassificationGroupingEntry, \
     OverlapContributionNextStep
-from classification.enums.overlaps_enums import OverlapContributionStatus, TriageState, \
+from classification.enums.overlaps_enums import OverlapContributionStatus, TriageDecision, \
     TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
@@ -29,6 +29,7 @@ from snpdb.models import Allele
 
 
 class Command(BaseCommand):
+    category = "maintenance"
 
     def add_arguments(self, parser):
         parser.add_argument('--flags', required=False, action='store_true'),
@@ -121,7 +122,7 @@ class Command(BaseCommand):
                         if grouping := ClassificationGroupingEntry.grouping_for(classification):
                             # TODO see if we can use audit log to time this as part of the original
                             triage: OverlapContribution = grouping.contribution_for(ClassificationResultValue.ONC_PATH)
-                            new_triage_state = TriageState(TriageStatus.REVIEWED_WILL_FIX, pending_value)
+                            new_triage_state = TriageDecision(TriageStatus.REVIEWED_WILL_FIX, pending_value)
                             if triage.triage_state_obj != new_triage_state:
                                 print("Updating triage with pending value")
                                 with disable_auditlog():
@@ -177,7 +178,7 @@ class Command(BaseCommand):
                         # user did not update triage, and this isn't a continued discordance so nothing to report
                         continue
 
-                    triage_state = TriageState(triage_status)
+                    triage_state = TriageDecision(triage_status)
                     has_change = False
 
                     if overlap_contribution.triage_state_obj != triage_state:

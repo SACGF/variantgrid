@@ -17,6 +17,7 @@ from django_extensions.db.models import TimeStampedModel
 from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewModelMixin, SvgSymbolPreviewIconMixin
+from library.utils.json_utils import canonical_filter_key
 from patients.models_enums import Sex
 from snpdb.models.models_cohort import Cohort, CohortSample
 from snpdb.models.models_enums import DuoRelationship
@@ -127,6 +128,8 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
     MEMBER_FIELDS = ("mother", "father", "proband")
+    # Inheritance modes calculate_cohort_stats precomputes counts for
+    STATS_INHERITANCE_MODES = ("denovo", "autosomal_recessive", "autosomal_dominant", "x_linked_recessive", "compound_het")
 
     @classmethod
     def preview_if_url_visible(cls) -> str:
@@ -134,6 +137,20 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     def get_cohort_samples(self):
         return [self.mother, self.father, self.proband]
+
+    def get_stats_filter_key(self, mode: str) -> str:
+        """ The key a mode's cohort stats bucket is stored under - the writer and the readers both
+            come through here so they can't drift apart. autosomal_dominant's predicate branches on
+            which parents are affected, so those flags belong in its key: editing them misses the
+            old bucket and recomputes, rather than reading one built for the previous flags. """
+        key = {"inheritance": mode}
+        if mode == "autosomal_dominant":
+            key["mother_affected"] = bool(self.mother_affected)
+            key["father_affected"] = bool(self.father_affected)
+        return canonical_filter_key(key)
+
+    def get_stats_filter_keys(self) -> list[str]:
+        return [self.get_stats_filter_key(mode) for mode in self.STATS_INHERITANCE_MODES]
 
     def get_absolute_url(self):
         return reverse('view_trio', kwargs={"pk": self.pk})

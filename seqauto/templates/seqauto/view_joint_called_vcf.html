@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load ui_utils %}
 {% block title %}{{ joint_called_vcf }}{% endblock %}
@@ -9,7 +9,7 @@
 {% block jsdocumentready %}
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 	<div>
 	<img class='vcenter' src="{% static 'icons/vcf_64.png' %}" /> <b>{{ joint_called_vcf }}</b>

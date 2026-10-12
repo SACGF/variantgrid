@@ -1,8 +1,8 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 
 {% block title %}Import Warnings and Errors{% endblock %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <div class="container">
         <a class="link-back" href="{% url 'view_upload_pipeline' upload_pipeline.pk %}">Back to upload pipeline.</a>

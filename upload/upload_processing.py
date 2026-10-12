@@ -66,6 +66,7 @@ def process_upload_pipeline(upload_pipeline: UploadPipeline,
                         items_to_process=0, items_processed=0, celery_task=None)
     upload_pipeline.status = ProcessingStatus.CREATED
     upload_pipeline.progress_status = "Created"
+    upload_pipeline.error_summary = None
     upload_pipeline.items_to_process = 0
     upload_pipeline.items_processed = 0
     upload_pipeline.progress_percent = 0

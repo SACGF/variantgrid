@@ -1,5 +1,5 @@
 """
-PostToolUse hook for Edit/Write: the fastest feedback loop in claude/plans/agent_system.md §4.3.
+PostToolUse hook for Edit/Write: the fastest feedback loop.
 
   *.py    -> ruff check on that file; findings go to stderr with exit 2 so the agent sees them
   *.js    -> eslint on that file when node is installed (never on the vendored js/lib/)

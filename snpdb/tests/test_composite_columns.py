@@ -15,7 +15,11 @@ from django.urls.base import reverse
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models.models_enums import Pathogenicity
 from library.django_utils.composite_columns import collapse_into_composite
-from snpdb.grid_columns.custom_columns import get_variant_grid_columns, variant_column_rich_column
+from snpdb.grid_columns.custom_columns import (
+    DBNSFP_NOTE,
+    get_variant_grid_columns,
+    variant_column_rich_column,
+)
 from snpdb.grids import variant_grid_client_extra
 from snpdb.models import (
     CompositeColumnMember,
@@ -109,6 +113,13 @@ class CompositeColumnGridTest(TestCase):
         self.assertEqual(1, names.count("variantannotation__spliceai_pred_ds_ag"))
         self.assertEqual(0, names.index("variantannotation__spliceai_pred_ds_ag"))
         self.assertTrue(columns[0].visible)
+
+    def test_dbnsfp_columns_note_non_synonymous_snvs_in_tooltip(self):
+        column_ids = ["revel_rankscore", "gene_symbol"]
+        header_titles = {rc.name: rc.header_title for rc in self._columns(column_ids)}
+        dbnsfp_column, other_column = (VariantGridColumn.objects.get(pk=pk).variant_column for pk in column_ids)
+        self.assertIn(DBNSFP_NOTE, header_titles[dbnsfp_column])
+        self.assertNotIn(DBNSFP_NOTE, header_titles[other_column])
 
     def test_every_composite_has_members_that_are_real_columns(self):
         """ Guards the migration's table - a composite with no members would draw an empty cell """

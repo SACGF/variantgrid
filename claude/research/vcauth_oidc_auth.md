@@ -85,14 +85,8 @@ which calls `snpdb/keycloak.py:Keycloak.add_user` with username = email, the lab
   user is inactive, which is how prod distinguishes between prod and test logins") relies on mozilla denying inactive
   users, and the attempt is reported with `report_message`.
 
-## History
-
-`oidc_auth` began as an app named `auth` (the "blank slate" 2020 import; a commented `OIDC_DRF_AUTH_BACKEND` in
-`shariantcommon.py` still names `auth.backend`, and `apps.py` has a TODO to rename the config). June 2026 moved to the
-Keycloak end-session logout and hardened the backend (claim sanitising, email validation, PKCE); September 2026
-(`18a86999e`) narrowed `HandleOIDC400Middleware` from swallowing any error on `/oidc/` to the provider's 400 only, and
-built the wrong-environment message with `format_html` so the email is escaped. Both have tests in
-`oidc_auth/tests/test_oidc_hardening.py`.
+Claim sanitising, email validation, PKCE, the escaped (`format_html`) wrong-environment message and
+`HandleOIDC400Middleware` handling only the provider's 400 are covered by `oidc_auth/tests/test_oidc_hardening.py`.
 
 ## Traps
 
@@ -108,3 +102,5 @@ built the wrong-environment message with `format_html` so the email is escaped. 
   straight to `LOGOUT_REDIRECT_URL`; only OIDC sessions go through Keycloak's end-session endpoint.
 - `oidc_auth/session_refresh.py:VariantGridSessionRefresh` skips `/api/` and `/<app>/api/` paths (DRF), not any path
   containing `/api/`.
+- The commented `OIDC_DRF_AUTH_BACKEND` in `shariantcommon.py` names `auth.backend`, a module that does not exist;
+  the real path is `oidc_auth.backend`.

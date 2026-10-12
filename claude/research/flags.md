@@ -9,7 +9,7 @@ The flags app hangs typed, commentable, resolvable "flags" off any model that mi
 module, no tasks, commands or tests of its own), but classification leans on it for workflow state: submitted, unshared,
 withdrawn, discordant, pending changes, significance change, condition resolution, internal review and suggestions are
 all flag types (`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the
-team's position: new development has moved away from flags, but existing uses stay. Fields and URLs are in the maps
+team's position: new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
 ([models](../maps/models.md#flags), [urls](../maps/urls.md#flags)); receivers are in [signals](../maps/signals.md).
 
 ## Flows
@@ -23,7 +23,7 @@ added since. A resolution carries a `flags/models/enums.py:FlagStatus` (open, cl
 when its resolution's status is OPEN (`FlagCollection.Q_OPEN_FLAGS`). `flags/models/models.py:FlagType.default_resolution`
 picks the type's OPEN resolution, falling back to CLOSED. Each consuming app wraps the type ids in a helper object
 (`classification/models/flag_types.py:ClassificationFlagTypes`, `snpdb/models/flag_types.py:AlleleFlagTypes`, whose
-allele types are all commented out now).
+allele types are all commented out).
 
 A model gets a `flags/models/models.py:FlagCollection` lazily: `FlagsMixin.flag_collection_safe` creates one in the
 model's `flag_type_context()` and saves the FK. The collection is the unit the UI and API address; it has no FK back to
@@ -82,24 +82,13 @@ for `classification/signals/classification_health_checks.py`.
 
 A generic collection per object, rather than per-model flag tables, means a new workflow state is a data migration
 rather than a schema change, and gave every object the same comment thread and dialog in
-`flags.js`. The cost is that flags carry little structure - hence `data` (JSON, added so flag events carry the value
-that triggered them, `bb69fffc7`) and `FlagType.attributes` (queried by `FlagsMixin.has_open_flag_with_attribute` and
+`flags.js`. The cost is that flags carry little structure - hence `data` (JSON, so flag events carry the value
+that triggered them) and `FlagType.attributes` (queried by `FlagsMixin.has_open_flag_with_attribute` and
 `FlagCollection.get_flag_of_type`). That ceiling is why the readme says new features should not be built on flags.
 
 `FlagType` uses `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` because types are looked up
 by id all over classification code and practically never change. The collection deliberately knows nothing about its
 owner so the app has no dependency on classification or snpdb; the signal is the seam in the other direction.
-
-## History
-
-The app dates from 2020 as part of the classification (then "variant classification") work;
-`flags/migrations/0003_rename_variant_classification.py` renamed the context and type ids when the model was renamed.
-Later data migrations added the "not public" ClinVar type (0005), pending changes (0008) and condition resolution
-(0009); `ensure_resolution`-style upkeep of only_one types followed. Watching / unseen activity was never finished: `FlagWatch` and `set_watcher` were removed in `486ec74f4` (2022,
-which also added the admin raise permission) but the view still calls it (Traps), sub-flags survive only as
-`FlagInfos.record_sub_flag` with the caller commented out, and allele flags (missing 37/38, `0004`) are no longer
-raised. Recent changes are housekeeping: the DRF endpoints lost format suffixes (#1375), the flag event data landed
-(2025), and the 2026 sweeps (#1795 dead code, #1773 import cycles, #1421 `library/django_utils` move) touched imports only.
 
 ## Traps
 
@@ -120,8 +109,10 @@ compare against `flag_type.raise_permission_enum`.
 every flag, private ones too (only USERS is filtered). No caller passes a user at present. Compare with
 `== FlagPermissionLevel.NO_PERM` or `.level`.
 
-**A `watch` POST 500s (confirmed, dead path).** `FlagsView` POST with `watch` calls `fc.set_watcher`, removed in 2022;
-`watch_toggle()` in `flags.js` still exists but nothing calls it. Delete both rather than revive them.
+**A `watch` POST 500s (confirmed, dead path).** `FlagsView` POST with `watch` calls `fc.set_watcher`, which
+`FlagCollection` does not define; `watch_toggle()` in `flags.js` exists but nothing calls it. Delete both rather than
+revive them. `FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele
+flag types (`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
 
 **`classification_not_public` is disabled by accident of JavaScript.** Without `CLINVAR_EXPORT` mode,
 `FlagHelper.to_json` sets that type's `permission` / `raise_permission` to `FlagPermissionLevel.SYSTEM` (the string `"A"`)

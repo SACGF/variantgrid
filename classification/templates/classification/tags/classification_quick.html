@@ -39,6 +39,12 @@
                 {% if mode == "split" %}<br/>
                 {% endif %}
                 {% if vcm.curated_date_check.name %}: <span class="text-secondary">{{ vcm.curated_date_check.name }}</span>{% timestamp vcm.curated_date_check.value time_ago=True tooltip=vcm.curated_date_check.name %}{% endif %}
+                {% if sample %}
+                    <span class="ml-2" title="Sample">{% preview_icon sample %}</span> <a class="hover-link" href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
+                {% endif %}
+                {% if username %}
+                    <span class="ml-2 text-secondary" title="User"><i class="fa-solid fa-user"></i></span> {{ username }}
+                {% endif %}
             </span>
             {% if mode == "split" %}
                 <div>

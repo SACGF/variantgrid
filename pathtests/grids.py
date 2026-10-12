@@ -35,7 +35,7 @@ class PathologyTestOrdersColumns(DatatableConfig[PathologyTestOrder]):
         ]
 
     def get_initial_queryset(self) -> QuerySet[PathologyTestOrder]:
-        return PathologyTestOrder.objects.all()
+        return PathologyTestOrder.filter_for_user(self.user)
 
 
 class CasesColumns(DatatableConfig[Case]):
@@ -65,7 +65,7 @@ class CasesColumns(DatatableConfig[Case]):
         ]
 
     def get_initial_queryset(self) -> QuerySet[Case]:
-        return Case.objects.all()
+        return Case.filter_for_user(self.user)
 
 
 class PathologyTestsColumns(DatatableConfig[PathologyTest]):
