@@ -133,6 +133,8 @@ MENUS: tuple[Menu, ...] = (
     Menu('settings', 'Settings', None, footer_template="uicore/menus/logout.html", items=(
         MenuItem('admin', href="/admin/", admin_only=True, external=True),
         MenuItem('eventlog', title="Event Log", admin_only=True),
+        MenuItem('api_request_log', title="API Log", admin_only=True,
+                 condition=lambda: bool(settings.INTEGRATION_API_TRACKING)),
         MenuItem('email_log', title="Email Log", admin_only=True, pages=('email_detail',)),
         MenuItem('keycloak_admin', title="Keycloak", admin_only=True),
         MenuItem('server_status', admin_only=True),

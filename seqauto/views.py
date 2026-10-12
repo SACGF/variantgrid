@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from eventlog.models import create_event
+from eventlog.models import ApiRequestLog, create_event
 from genes.models import CanonicalTranscriptCollection
 from library.log_utils import log_traceback
 from patients.models import Extraction, Patient
@@ -269,6 +269,7 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
         'tab': tab,
+        "show_api_log": request.user.is_superuser and ApiRequestLog.has_any_for_model(SequencingRun),
         "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects.filter(
             sequencing_run_name=sequencing_run.name).select_related("specimen").order_by("pair_id"),
         "library_qc_summaries": summarise_library_qc(
