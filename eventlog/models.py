@@ -190,7 +190,7 @@ class IntegrationActivity(TimeStampedModel):
 
 class ApiRequestLog(models.Model):
     """ One row per call to an INTEGRATION_API_TRACKING endpoint - what was sent and what came back.
-        Pruned after settings.API_REQUEST_LOG_DAYS by eventlog.tasks.prune_api_request_log """
+        Kept forever unless settings.API_REQUEST_LOG_DAYS is set, then pruned by eventlog.tasks.prune_api_request_log """
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     method = models.CharField(max_length=10)

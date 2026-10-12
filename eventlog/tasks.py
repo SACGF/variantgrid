@@ -1,5 +1,5 @@
 """
-Scheduled housekeeping for the event log: prune_api_request_log (daily, from variantgrid/celery.py).
+Scheduled housekeeping for the event log: prune_api_request_log (daily, from variantgrid/celery.py, only when API_REQUEST_LOG_DAYS is set).
 """
 from datetime import timedelta
 

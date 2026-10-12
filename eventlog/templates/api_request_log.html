@@ -7,7 +7,7 @@
 {% block content %}
     <div class="container">
         <h3>API Log</h3>
-        <p class="text-muted">Calls to the endpoints in INTEGRATION_API_TRACKING, kept for {{ retention_days }} days. Search matches the path and request body.</p>
+        <p class="text-muted">Calls to the endpoints in INTEGRATION_API_TRACKING, {% if retention_days %}kept for {{ retention_days }} days{% else %}kept indefinitely{% endif %}. Search matches the path and request body.</p>
 
         <form class="form-inline">
             <div class="form-group">

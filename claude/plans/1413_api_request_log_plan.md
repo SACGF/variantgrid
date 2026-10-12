@@ -13,7 +13,7 @@ can see what was sent and what came back.
 
 ```python
 class ApiRequestLog(models.Model):
-    """ One row per call to an INTEGRATION_API_TRACKING endpoint, pruned after API_REQUEST_LOG_DAYS """
+    """ One row per call to an INTEGRATION_API_TRACKING endpoint, kept forever unless API_REQUEST_LOG_DAYS is set """
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     method = models.CharField(max_length=10)
@@ -56,8 +56,9 @@ Measure it before adding a busy prefix such as the Shariant classification API.
 
 ## Retention
 
-`eventlog/tasks.py:prune_api_request_log` runs on `db_workers` and deletes rows older than `API_REQUEST_LOG_DAYS`
-(default 90). It is scheduled daily in `variantgrid/celery.py`.
+Rows are kept forever by default: the expected volume is a few thousand calls a year, and old calls help debugging.
+A deployment that sets `API_REQUEST_LOG_DAYS` gets `eventlog/tasks.py:prune_api_request_log`, scheduled daily on
+`db_workers` in `variantgrid/celery.py`, which deletes rows older than that many days.
 
 ## UI
 
