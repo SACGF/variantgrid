@@ -274,7 +274,7 @@ def create_event(
 
     if log:
         severity_display = dict(LogLevel.CHOICES).get(severity, "INFO")
-        level = logging.getLevelName(severity_display)
+        level = logging.getLevelNamesMapping()[severity_display]
         logging.log(level, e)
 
     return e

@@ -4,9 +4,9 @@
 Owns the implementation behind snpdb/management/commands/vg.py: what is running on this box (`vg status`),
 generated maps of the codebase (`vg map`), test selection from changed files (`vg tests --changed`), page
 rendering through the Django test client (`vg page`), module outlines (`vg outline`), where a setting's
-value came from (`vg settings`) and the ratchet numbers (`vg health`). Everything here is read-only against the database.
+value came from (`vg settings`), calls to deprecated APIs (`vg deprecations`) and the ratchet numbers (`vg health`). Everything here is read-only against the database.
 
-Modules that need no Django (repo, import_graph, test_selection, markdown, outline, settings_chain, health,
+Modules that need no Django (repo, import_graph, test_selection, markdown, outline, settings_chain, health, deprecations,
 maps.signals, maps.settings, maps.tasks) are kept import-light so scripts/vg can run them in well under a
 second without booting the project.
 """

@@ -167,7 +167,10 @@ transitively imports it; templates, JS and `urls.py` select the app's `tests.tes
 `atomic()` that is always rolled back, tracks templates the way Django's test runner does, and reuses
 `production_query_count` for `--queries`; `library/vg/inspect/__init__.py:inspect` does the same rollback around one
 object's graph by domain kind. `library/vg/docs.py:check_docs` is what keeps this file honest: every backticked path
-and `path:Symbol` is resolved by AST against the working tree, live plans included, generated maps excluded.
+and `path:Symbol` is resolved by AST against the working tree, live plans included, generated maps excluded. `library/vg/deprecations.py:find_deprecations` runs basedpyright's `reportDeprecated` as
+`LOOKAHEAD_PYTHON`, so a call typeshed marks deprecated in a Python we haven't deployed shows before the upgrade, and
+splits the hits from our own `@deprecated` markers by name; `manage.py check` under `-W always::DeprecationWarning`
+adds the `warnings.warn` deprecations Django and packages raise at import, which no stub records.
 
 ## Why it is shaped this way
 
