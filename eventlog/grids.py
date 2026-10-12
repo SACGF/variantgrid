@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
@@ -84,6 +85,10 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
     def get_initial_queryset(self) -> QuerySet[ApiRequestLog]:
         if not self.user.is_superuser:
             return ApiRequestLog.objects.none()
+        if object_pk := self.get_query_param('object_pk'):
+            content_type = ContentType.objects.get_by_natural_key(self.get_query_param('app_label'),
+                                                                  self.get_query_param('model_name'))
+            return ApiRequestLog.for_object(content_type, object_pk)
         return ApiRequestLog.objects.all()
 
     def filter_queryset(self, qs: QuerySet[ApiRequestLog]) -> QuerySet[ApiRequestLog]:

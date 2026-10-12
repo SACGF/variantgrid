@@ -1,6 +1,7 @@
 import json
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponseBadRequest
 from django.http.response import HttpResponse
@@ -49,6 +50,19 @@ def api_request_log(request):
         "retention_days": settings.API_REQUEST_LOG_DAYS,
     }
     return render(request, 'api_request_log.html', context=context)
+
+
+@require_superuser
+def api_request_log_object_tab(request: HttpRequest, app_label: str, model_name: str, object_pk: str):
+    """ The API calls about one object (ApiRequestLog.for_object), as a tab on its page """
+    content_type = get_object_or_404(ContentType, app_label=app_label, model=model_name)
+    context = {
+        "app_label": app_label,
+        "model_name": model_name,
+        "object_pk": object_pk,
+        "verbose_name": content_type.model_class()._meta.verbose_name,
+    }
+    return render(request, 'api_request_log_object_tab.html', context=context)
 
 
 @require_superuser

@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
 
@@ -210,6 +211,13 @@ class IntegrationApiMiddleware:
         if status_code >= 400 and not response.streaming:
             response_body = _trim_for_log(response.content.decode(errors="replace"))
 
+        # A view names the model its calls are about with api_log_model, and the pks it found with
+        # log_api_request_objects - a call that fails before finding one keeps only the model
+        view_class = getattr(resolver_match.func, "cls", None) or getattr(resolver_match.func, "view_class", None)
+        content_type = None
+        if api_log_model := getattr(view_class, "api_log_model", None):
+            content_type = ContentType.objects.get_for_model(api_log_model)
+
         user = getattr(request, "user", None)  # DRF copies its authenticated user back onto the Django request
         ApiRequestLog.objects.create(
             user=user if user and user.is_authenticated else None,
@@ -222,6 +230,8 @@ class IntegrationApiMiddleware:
             duration_ms=duration_ms,
             request_body=request_body,
             response_body=response_body,
+            content_type=content_type,
+            object_pks=sorted(getattr(request, "api_log_object_pks", ())),
         )
 
 

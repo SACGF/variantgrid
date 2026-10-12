@@ -30,6 +30,9 @@ API:
 - Reads are open to any logged-in user; writes need a superuser or a member of `SEQAUTO_API_WRITE_GROUP` (the
   pipeline's token user). A new write endpoint subclasses `seqauto/views_rest.py:SeqAutoModelViewSet` or
   `seqauto/views_rest.py:SeqAutoWriteAPIView`; a POST that only reads (batch lookups) stays a plain `APIView`.
+- An endpoint for records of a run subclasses `seqauto/views_rest.py:SequencingRunModelViewSet` or
+  `seqauto/views_rest.py:SequencingRunWriteAPIView` (calling `log_sequencing_runs` with what it saved), so its calls
+  appear on the run page's API Log tab.
 - The API's `bam_file` is an `AlignmentFile`: a path ending `.cram` is stored as a CRAM, and a sequencing sample can
   have several (one per VCF post, eg a BAM and its recalibrated BAM). They reach IGV as `SampleFilePath` rows, copied at
   VCF import (`upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing`) and, for a file posted after that, by

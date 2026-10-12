@@ -25,13 +25,27 @@ class ApiRequestLog(models.Model):
     duration_ms = models.IntegerField()
     request_body = models.TextField(null=True)   # trimmed, secrets redacted
     response_body = models.TextField(null=True)  # trimmed, only kept for status >= 400
+    content_type = models.ForeignKey(ContentType, null=True, on_delete=SET_NULL)  # the view's api_log_model
+    object_pks = ArrayField(models.TextField(), default=list)  # empty when the call failed before finding one
 
     class Meta:
         indexes = [models.Index(fields=["view_name", "created"])]
 ```
 
-The model has no link to domain objects. Searching `request_body` for a sequencing run name answers "what was sent
-for run X" while the table is seqauto-sized. A generic object link can come later if people use the log.
+### Linking a call to the objects it was about
+
+- A view names the model its calls are about with a class attribute, `api_log_model`. The middleware reads it from
+  `request.resolver_match.func.cls` (DRF) or `.view_class` (Django), so a call that fails before the view finds
+  anything still records `content_type`.
+- As the view resolves objects it calls `eventlog/models.py:log_api_request_objects` with their pks, which collects
+  them on the Django request. The middleware writes them into `object_pks` on the same INSERT.
+- `ApiRequestLog.for_object(content_type, pk)` returns the calls whose `object_pks` contain pk, plus the calls for that
+  model with empty `object_pks` (failed before finding one) whose request body has pk as a JSON string. The body
+  search runs only over the failures.
+- Seqauto: the run-scoped viewsets subclass `seqauto/views_rest.py:SequencingRunModelViewSet`, which logs the run of
+  each record from `get_object`, `perform_create` and `perform_update`. The bulk-create and link-extraction views
+  subclass `seqauto/views_rest.py:SequencingRunWriteAPIView` and log the runs of what they saved. Catalogue endpoints
+  (enrichment kit, sequencer, experiment, variant caller) declare no model and get no link.
 
 ## Middleware
 
@@ -69,6 +83,9 @@ A deployment that sets `API_REQUEST_LOG_DAYS` gets `eventlog/tasks.py:prune_api_
   - Expanding a row loads `api_request_log_detail`, which shows the request and response bodies.
 - Page `api_request_log` (Settings menu → "API Log", admin only). The page, the grid and the detail view are all
   `require_superuser`.
+- The sequencing run page has an "API Log" tab for superusers, shown once any call has been linked to a
+  SequencingRun. It loads `api_request_log_object_tab` (app label, model, pk), whose grid is
+  `ApiRequestLog.for_object`.
 - `eventlog/signals/integration_activity_status.py:integration_status_for_activity` sets `url` on rows whose key
   starts with `api:` to the API log filtered by that view name. The Server Status integration box then links
   straight to that endpoint's calls.
@@ -81,5 +98,8 @@ A deployment that sets `API_REQUEST_LOG_DAYS` gets `eventlog/tasks.py:prune_api_
 - a multipart body is not read
 - a response body is kept only for an error
 - nothing is written for an unconfigured prefix
+
+`seqauto/tests/test_api_request_log.py` covers a call linked to its run, a failed call found by the run name in its
+body (and not by a run whose name it only starts), and the run page tab.
 
 `eventlog/tests/test_urls.py` covers the grid, with a superuser.

@@ -26,6 +26,9 @@ class Test(URLTestCase):
     def testApiRequestLogUrls(self):
         self._test_datatable_urls([("api_request_log_datatable", {}, 200)], self.admin_user)
         self._test_datatable_urls([("api_request_log_datatable", {}, 403)], self.user)
+        object_kwargs = {"app_label": "seqauto", "model_name": "sequencingrun", "object_pk": "RUN_1"}
+        self._test_datatable_urls([("api_request_log_object_datatable", object_kwargs, 200)], self.admin_user)
+        self._test_datatable_urls([("api_request_log_object_datatable", object_kwargs, 403)], self.user)
 
 if __name__ == "__main__":
     unittest.main()

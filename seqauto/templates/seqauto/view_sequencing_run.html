@@ -194,6 +194,9 @@
         {% if user.is_superuser %}
             <li class="nav-item"><a class="nav-link{% if active_tab == 'admin' %} show active{% endif %}" data-toggle="tab" role="tab" href="#admin">Admin</a></li>
         {% endif %}
+        {% if show_api_log %}
+            <li class="nav-item"><a class="nav-link{% if active_tab == 'api-log' %} show active{% endif %}" data-toggle="tab" role="tab" href="#api-log" data-href="{% url 'api_request_log_object_tab' 'seqauto' 'sequencingrun' sequencing_run.pk %}">API Log</a></li>
+        {% endif %}
 
 	  	</ul>
         <div class="tab-content">
@@ -445,6 +448,9 @@
 
 
         </div>
+    {% endif %}
+    {% if show_api_log %}
+        <div class="tab-pane{% if active_tab == 'api-log' %} show active{% endif %}" role="tabpanel" id="api-log"></div>
     {% endif %}
         </div>
 	</div>

@@ -3,9 +3,11 @@ The event log: Event (severity, app, name, details - what `vg status` lists as r
 ViewEvent (one row per page view), IntegrationActivity (a rolling last-seen per external system,
 updated in place through `IntegrationActivity.track`) and ApiRequestLog (one row per call to an
 INTEGRATION_API_TRACKING endpoint, written by IntegrationApiMiddleware). Write events with create_event /
-create_login_event; the logging handler and middleware in this app fill the rest.
+create_login_event; the logging handler and middleware in this app fill the rest. An API view links its
+ApiRequestLog row to the objects it worked on with log_api_request_objects.
 """
 import inspect
+import json
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -13,9 +15,11 @@ from typing import Optional, Union
 
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.signals import user_logged_in
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.deletion import SET_NULL
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
@@ -202,6 +206,9 @@ class ApiRequestLog(models.Model):
     duration_ms = models.IntegerField()
     request_body = models.TextField(null=True)  # trimmed, secrets redacted
     response_body = models.TextField(null=True)  # trimmed, only kept for errors
+    # the view's api_log_model, and the pks of those it worked on - empty when it failed before finding one
+    content_type = models.ForeignKey(ContentType, null=True, on_delete=SET_NULL)
+    object_pks = ArrayField(models.TextField(), default=list)
 
     class Meta:
         indexes = [models.Index(fields=["view_name", "created"])]
@@ -212,6 +219,27 @@ class ApiRequestLog(models.Model):
     @property
     def is_error(self) -> bool:
         return self.status_code >= 400
+
+    @staticmethod
+    def for_object(content_type: ContentType, object_pk: str):
+        """ The calls about one object: those that found it, and those for its model that failed before
+            finding anything but name its pk in the request body """
+        # JSON bodies are stored re-serialised (redacted), so a string appears exactly as json.dumps writes it
+        failed_mentioning = Q(object_pks=[], request_body__contains=json.dumps(object_pk))
+        return ApiRequestLog.objects.filter(Q(object_pks__contains=[object_pk]) | failed_mentioning,
+                                            content_type=content_type)
+
+    @staticmethod
+    def has_any_for_model(model: type[models.Model]) -> bool:
+        return ApiRequestLog.objects.filter(content_type=ContentType.objects.get_for_model(model)).exists()
+
+
+def log_api_request_objects(request, *object_pks):
+    """ Links this request's ApiRequestLog row to these pks of its view's api_log_model. A DRF Request
+        wraps the Django one, which is what IntegrationApiMiddleware reads them from """
+    django_request = getattr(request, "_request", request)
+    logged_pks = django_request.__dict__.setdefault("api_log_object_pks", set())
+    logged_pks.update(str(pk) for pk in object_pks if pk is not None)
 
 
 def create_login_event(sender, user, request, **kwargs):  # pylint: disable=unused-argument
