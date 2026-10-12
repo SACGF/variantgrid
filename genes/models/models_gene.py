@@ -981,10 +981,10 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         raise NoTranscript(f"Transcript '{transcript_accession}' missing from our DB - validity with {annotation_consortium} unknown")
 
     @staticmethod
-    def get_transcript_version(genome_build: GenomeBuild, transcript_name, *, best_attempt: bool) -> Optional['TranscriptVersion']:
+    def get_transcript_version(genome_build: GenomeBuild, transcript_name, *, best_attempt: bool = False) -> Optional['TranscriptVersion']:
         """ @param best_attempt if we don't have the exact version specified in transcript_name, grab the closest
             one that is larger (or the largest one if we don't have any larger than the requested). Otherwise
-            raise MissingTranscript. No default, so each caller says whether a different version will do """
+            raise MissingTranscript """
         transcript_version = None
         transcript_versions_qs = TranscriptVersion.objects.filter(genome_build=genome_build)
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_name)
