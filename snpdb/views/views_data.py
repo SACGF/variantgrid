@@ -53,6 +53,8 @@ from snpdb.archive import (
     DataArchivedError,
     check_vcf_archive_precondition,
     mark_vcf_archive_started,
+    restore_vcf,
+    vcf_can_be_archived,
 )
 from snpdb.forms import (
     SampleChoiceForm,
@@ -281,7 +283,6 @@ def view_vcf(request, vcf_id):
                              _skipped_annotation_message(skipped_annotation_count, "vcf-skipped-annotation"),
                              extra_tags='html import-message')
 
-    from snpdb.archive import vcf_can_be_archived
     can_archive = has_write_permission and vcf_can_be_archived(vcf)
     restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
     restore_source_kind = "uploaded"
@@ -345,7 +346,6 @@ def archive_vcf_view(request, vcf_id):
 
 
 def restore_vcf_view(request, vcf_id):
-    from snpdb.archive import restore_vcf
     vcf = VCF.get_for_user(request.user, vcf_id)
     if not vcf.can_write(request.user):
         raise PermissionDenied("You do not have write permission for this VCF")

@@ -23,6 +23,7 @@ from model_utils.models import TimeStampedModel, now
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from genes.gene_matching import HGNCMatcher
 from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
@@ -474,8 +475,6 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         This should be used as little as possible and only to bridge between GeneSymbols and OntologyTerms
         aka if you're talking about GeneSymbols, pass around the GeneSymbol object, not the OntologyTerm
         """
-        from genes.gene_matching import HGNCMatcher
-
         if isinstance(gene_symbol, GeneSymbol):
             gene_symbol = gene_symbol.symbol
 

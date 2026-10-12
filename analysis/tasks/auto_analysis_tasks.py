@@ -1,6 +1,7 @@
 import celery
 
 from analysis.analysis_templates import auto_launch_analysis_templates_for_sample
+from analysis.models.models_analysis import CohortAnalysisTemplateRun, SampleAnalysisTemplateRun
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from snpdb.models import VCF, Sample
 
@@ -31,8 +32,6 @@ def auto_run_analyses_for_vcf(vcf_id: int, analysis_description: str, skip_alrea
 @celery.shared_task
 def reload_auto_analyses_for_vcf(vcf_id: int):
     """ On VCF re-import, reload nodes in any existing auto-analyses so node counts stay fresh. """
-    from analysis.models import CohortAnalysisTemplateRun, SampleAnalysisTemplateRun
-
     vcf = VCF.objects.get(pk=vcf_id)
 
     for satr in SampleAnalysisTemplateRun.objects.filter(sample__vcf=vcf):

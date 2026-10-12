@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.tasks.analysis_update_tasks import create_and_launch_analysis_tasks
 from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 
@@ -41,8 +42,6 @@ def _bump_nodes(q):
 def _schedule_analysis_updates(analysis_ids):
     if not analysis_ids:
         return
-    # pylint: disable=import-outside-toplevel
-    from analysis.tasks.analysis_update_tasks import create_and_launch_analysis_tasks
 
     def _launch():
         for analysis_id in analysis_ids:

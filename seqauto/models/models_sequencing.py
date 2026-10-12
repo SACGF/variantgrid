@@ -1,5 +1,6 @@
 from typing import Optional
 
+from django.conf import settings
 from django.db import models
 from django.db.models import CASCADE, PROTECT, Q
 from django.urls import reverse
@@ -117,7 +118,6 @@ class EnrichmentKit(PreviewModelMixin, models.Model):
 
     @classmethod
     def preview_enabled(cls) -> bool:
-        from django.conf import settings
         return settings.SEQAUTO_ENABLED
 
     def get_absolute_url(self):

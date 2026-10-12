@@ -9,6 +9,7 @@ from classification.models import (
     ClinVarExportBatchStatus,
     DiscordanceReportTriage,
 )
+from email_manager.models.email_model import EmailLog
 from eventlog.models import Event, ViewEvent
 from library.guardian_utils import bot_group
 from library.health_check import (
@@ -74,7 +75,6 @@ def active_users_health_check(sender, health_request: HealthCheckRequest, **kwar
 
 @receiver(signal=health_check_signal)
 def email_health_check(sender, health_request: HealthCheckRequest, **kwargs):
-    from email_manager.models import EmailLog
     recent_emails = EmailLog.objects.filter(created__gte=health_request.since, created__lt=health_request.now)
 
     if count := recent_emails.count():

@@ -26,6 +26,7 @@ from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
+from flags.models.models import FlagCollection
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -693,7 +694,6 @@ class UserSettings:
     @property
     def classification_issue_count(self) -> int:
         from classification.models import Classification
-        from flags.models import FlagCollection
         return FlagCollection.filter_for_open_flags(
             Classification.filter_for_user(user=self.user)
         ).order_by('-created').exclude(withdrawn=True).count()

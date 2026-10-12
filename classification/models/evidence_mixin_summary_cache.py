@@ -2,8 +2,16 @@ from dataclasses import dataclass
 from datetime import date
 from functools import cached_property
 from typing import Optional, Self
+
 from dataclasses_json import DataClassJsonMixin
-from classification.enums import AlleleOriginBucket, SpecialEKeys, TestingContextBucket, ClassificationResultValue
+
+from classification.enums import (
+    AlleleOriginBucket,
+    ClassificationResultValue,
+    SpecialEKeys,
+    TestingContextBucket,
+)
+from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 
 
@@ -49,7 +57,6 @@ class ClassificationSummaryCacheObjPathogenicity(DataClassJsonMixin):
 
     @property
     def bucket(self):
-        from classification.models import EvidenceKeyMap
         return EvidenceKeyMap.onc_path_to_bucket().get(self.classification)
 
 
@@ -145,7 +152,6 @@ class ClassificationSummaryCalculator:
     @cached_property
     def classification_sort(self) -> int:
         if classification_value := self.classification_value:
-            from classification.models import EvidenceKeyMap
             return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("sort_order").get(classification_value, 0)
         else:
             # sort unclassified to the end
@@ -162,7 +168,6 @@ class ClassificationSummaryCalculator:
         # TODO move this information into the testing context evidence key data
         if self.is_possibly_somatic:
             if testing_context_value := self.cm.get(SpecialEKeys.TESTING_CONTEXT):
-                from classification.models import EvidenceKeyMap
                 return EvidenceKeyMap.cached_key(SpecialEKeys.TESTING_CONTEXT).option_dictionary_property("testing_context_bucket").get(testing_context_value) or TestingContextBucket.OTHER
             else:
                 return TestingContextBucket.UNKNOWN.value
@@ -196,7 +201,6 @@ class ClassificationSummaryCalculator:
 
 # FIXME underlying code should change due to overlaps
 def clinical_significance_pills(summary: ClassificationSummaryCacheObj, allele_origin_bucket: str) -> list[dict]:
-    from classification.models import EvidenceKeyMap
     """ Label/CSS class for the c-pill spans - rendered server side by the clinical_significance_values
         tag, and client side by the variant details samples grid. CSS is .c-pill.cs-* """
     pathogenicity = summary.pathogenicity

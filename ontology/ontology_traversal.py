@@ -24,6 +24,7 @@ from ontology.models import (
     OntologyVersion,
     PanelAppClassification,
 )
+from ontology.models.models_ontology import OntologySnake, OntologySnakes
 
 _EXCLUDED_RELATIONS = frozenset({
     OntologyRelation.IS_A,
@@ -46,8 +47,6 @@ def bfs_to_ontology(
     the excluded-relation set, and HPO-endpoint exclusion are baked into
     ``step_fn``.
     """
-    from ontology.models import OntologySnake, OntologySnakes  # avoid circular import
-
     if start_term.ontology_service == to_ontology:
         return OntologySnakes([OntologySnake(source_term=start_term)])
 
@@ -152,7 +151,6 @@ class DbOntologyTraverser:
     def snake_from(self, term, to_ontology,
                    quality_filter=ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
                    max_depth=1):
-        from ontology.models import OntologySnake
         return OntologySnake.snake_from(term, to_ontology,
                                         quality_filter=quality_filter,
                                         max_depth=max_depth,
@@ -211,7 +209,6 @@ class MemoryOntologyTraverser:
     def snake_from(self, term, to_ontology,
                    quality_filter=ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
                    max_depth=1):
-        from ontology.models import OntologySnake, OntologySnakes
         if term.ontology_service == to_ontology:
             return OntologySnakes([OntologySnake(source_term=term)])
         step_fn = self._make_step_fn(quality_filter)
@@ -219,7 +216,6 @@ class MemoryOntologyTraverser:
 
     def terms_for_gene_symbol(self, gene_symbol, desired_ontology, max_depth=1,
                               quality_filter=ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER):
-        from ontology.models import OntologySnakes
         if isinstance(gene_symbol, GeneSymbol):
             symbol = gene_symbol.symbol
         else:

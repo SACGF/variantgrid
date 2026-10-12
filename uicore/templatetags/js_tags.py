@@ -9,6 +9,7 @@ from decimal import Decimal
 from html import escape
 from typing import Optional, Union
 
+from dal_select2.widgets import ModelSelect2
 from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import SafeString, mark_safe
@@ -25,7 +26,6 @@ def dal_media():
     """ Render DAL (Django Autocomplete Light) CSS and JS once globally.
         Loaded in base.html rather than via form.media to prevent duplicate scripts
         when multiple autocomplete forms appear on the same page. """
-    from dal_select2.widgets import ModelSelect2
     return mark_safe(str(ModelSelect2(url='').media))
 
 

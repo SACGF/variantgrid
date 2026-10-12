@@ -1,6 +1,7 @@
 import operator
 from abc import abstractmethod
 from functools import reduce
+from types import SimpleNamespace
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -348,7 +349,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         so the table always matches the actual filtering logic.
         For modes where affected status matters, includes both affected/unaffected variants.
         """
-        from types import SimpleNamespace
         fmt = AbstractFamilyInheritance._zygosity_options
         members = ['mother', 'father', 'proband']
         stub_node = SimpleNamespace(trio=SimpleNamespace())

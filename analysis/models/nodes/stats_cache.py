@@ -17,6 +17,7 @@ from annotation.models import (
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
+from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from library.utils.json_utils import canonical_filter_key
 from snpdb.models import CohortGenotypeStats
 from snpdb.models.models_enums import BuiltInFilters
@@ -198,5 +199,4 @@ def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,
 
 def _enqueue_lazy_recompute(cohort, annotation_version) -> None:
     """ Fire-and-forget. Idempotent — task no-ops if the row now exists. """
-    from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
     enqueue_cohort_stats_recompute(cohort, annotation_version)
