@@ -211,7 +211,7 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
 
         batch: ClinVarExportBatch = queryset.first()
 
-        batch_json = batch.to_json()
+        batch_json = clinvar_export_sync.batch_json(batch)
 
         response = JsonResponse(batch_json)
         response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{batch.pk}.json'

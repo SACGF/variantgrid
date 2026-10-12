@@ -16,16 +16,27 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
-from classification.enums import SpecialEKeys, ClassificationResultValue, TestingContextFull, TestingContextBucket, \
-    TriageStatus, OverlapStatus
+from classification.enums import (
+    ClassificationResultValue,
+    OverlapStatus,
+    SpecialEKeys,
+    TestingContextBucket,
+    TestingContextFull,
+    TriageStatus,
+)
 from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models import (
+    IN_REVIEW_VALUE,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
     ClassificationLabSummary,
+    ConditionReference,
     ConditionResolved,
     ConditionTextMatch,
     EvidenceMixin,
-    ImportedAlleleInfo, OverlapContribution, ClassificationGroupingEntry, ClassificationGrouping, ConditionReference,
-    Overlap, IN_REVIEW_VALUE,
+    ImportedAlleleInfo,
+    Overlap,
+    OverlapContribution,
 )
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_groups import (
@@ -35,13 +46,14 @@ from classification.models.classification_groups import (
 )
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
+from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import (
     DiscordanceReportRowData,
     DiscordanceReportTableData,
 )
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from classification.models.evidence_mixin import VCDbRefDict
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap, VCDbRefDict
+from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from eventlog.models import ViewEvent
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from genes.models import GeneSymbol
@@ -53,6 +65,7 @@ from snpdb.models import Lab, LabLike
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant
+from uicore.views.ajax_form_view import LazyRender
 
 register = Library()
 
@@ -750,6 +763,14 @@ def classification_lab_summaries(
         "include_acmg": include_acmg,
         "read_only": read_only
     }
+
+
+@register.filter
+def discordance_triage_embed(lab_summary: ClassificationLabSummary) -> Optional[LazyRender]:
+    if isinstance(lab_summary, DiscordanceLabSummary) and lab_summary.triage:
+        return DiscordanceReportTriageView.lazy_render(lab_summary.triage)
+    return None
+
 
 @register.inclusion_tag("classification/tags/criteria_strength.html")
 def criteria_strength(strength: CriteriaStrength):

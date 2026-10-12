@@ -19,9 +19,6 @@ from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
     NoFilterHandler,
     TrioInheritanceHandler,
-    get_filter_keys_to_precompute_for_cohort,
-    get_handler_for_node,
-    inheritance_filter_key,
 )
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
@@ -33,6 +30,8 @@ from annotation.tasks.calculate_sample_stats import (
     _cohort_stats_are_fresh,
     _get_sample_stats_code_version,
     calculate_cohort_stats,
+    get_filter_keys_to_precompute_for_cohort,
+    inheritance_filter_key,
 )
 from library.utils.json_utils import canonical_filter_key
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
@@ -132,7 +131,7 @@ class TestFilterKeyHandlerRoundTrip(TestCase):
         """ The buckets are built off a cohort's Trio, so a Duo/Quad node has to count live rather
             than read the raw cohort row, which knows nothing about its inheritance mode """
         for node in (DuoNode(), QuadNode()):
-            handler = get_handler_for_node(node)
+            handler = node.STATS_FILTER_KEY_HANDLER
             self.assertIs(handler.filter_key_for_node(node), UNCACHEABLE, str(type(node)))
 
     def test_no_filter_handler_returns_none_only(self):

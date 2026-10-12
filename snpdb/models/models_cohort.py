@@ -29,13 +29,14 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
-from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.database_utils import get_active_backend_pids, signal_backends
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.unit_percent import convert_from_percent_to_unit
 from library.utils import invert_dict
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import Zygosity
@@ -330,13 +331,11 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         """
         cohort = self.get_base_cohort()
         if cohort.vcf and cohort.vcf.data_archived:
-            from snpdb.archive import DataArchivedError
             raise DataArchivedError(cohort.vcf)
         cgc = CohortGenotypeCollection.objects.get(cohort=cohort,
                                                    cohort_version=cohort.version,
                                                    collection_type=CohortGenotypeCollectionType.UNCOMMON)
         if cgc.data_archived:
-            from snpdb.archive import DataArchivedError
             raise DataArchivedError(cgc)
         return cgc
 
@@ -346,8 +345,6 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
             regex seq-scan against samples_zygosity. Returns the SUCCESS-status collection built
             for the current (cohort version, parent CGC); else None so callers fall back to the
             runtime regex. @see snpdb build_sub_cohort_any_sample_called_vc_task / issue #1551 """
-        from snpdb.archive import DataArchivedError  # Inline: snpdb.archive imports snpdb.models
-
         if not self.is_sub_cohort:
             return None
         try:
@@ -676,6 +673,16 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
             annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
         return annotation_kwargs
 
+    def get_sample_genotype(self, sample: Sample, variant: Variant) -> Optional['SampleGenotype']:
+        collections = [self]
+        if self.common_collection:
+            collections.append(self.common_collection)
+        try:
+            cg = CohortGenotype.objects.filter(collection__in=collections).get(variant=variant)
+        except CohortGenotype.DoesNotExist:
+            return None
+        return cg.get_sample_genotype(sample)
+
     def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):
         """ sample_zygosities_dict = {sample_id : zygosities_set} """
 
@@ -819,7 +826,7 @@ class SampleGenotype:
         self.allele_depth = self._get_sample_value("samples_allele_depth", sample_index)
         allele_frequency = self._get_sample_value("samples_allele_frequency", sample_index)
         if sample.vcf.allele_frequency_percent:
-            allele_frequency = VCF.convert_from_percent_to_unit(allele_frequency)
+            allele_frequency = convert_from_percent_to_unit(allele_frequency, missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
         self.allele_frequency = allele_frequency
         self.read_depth = self._get_sample_value("samples_read_depth", sample_index)
         self.genotype_quality = self._get_sample_value("samples_genotype_quality", sample_index)

@@ -57,7 +57,8 @@ live rather than a file: `ontology/panel_app_ontology.py:_update_gene_relations`
 that gene's existing `panelappau` edges and rewrites them (one per condition id found in the panel's phenotypes, with
 the strongest panel confidence), under an *unversioned* builder whose context is the gene symbol, throttled by
 `PANEL_APP_CACHE_DAYS` and the response hash. The per-symbol hook `ontology/panel_app_ontology.py:update_gene_relations`
-runs on read paths only when `GENE_RELATION_PANEL_APP_LIVE_UPDATE` is set; batch work uses
+receives `ontology/models/models_ontology.py:gene_relations_read_signal`, which `OntologySnake`'s gene relationship
+reads send, and runs only when `GENE_RELATION_PANEL_APP_LIVE_UPDATE` is set; batch work uses
 `ontology/panel_app_ontology.py:bulk_update_gene_relations`, one paginated crawl of `/api/v1/genes/` that identifies
 genes by the HGNC id PanelApp reports rather than its symbol (#1667), skipped when `panel_app_bulk_data_age` says the
 crawl is fresh.

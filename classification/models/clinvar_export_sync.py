@@ -120,6 +120,24 @@ class ClinVarExportSync:
     def org_id(self) -> Optional[str]:
         return self._config.get('org_id')
 
+    def batch_json(self, batch: ClinVarExportBatch) -> JsonObjType:
+        return {
+            "actions": [{
+                "type": "AddData",
+                "targetDb": "clinvar",
+                "data": {
+                    "content": {
+                        "behalfOrgID": self.org_id,
+                        "submissionName": f"submission_{batch.id}",
+                        "assertionCriteria": batch.assertion_criteria,
+                        "clinvarSubmissionReleaseStatus": batch.release_status,
+                        "clinvarSubmission": [submission.submission_full for submission in
+                                              batch.clinvarexportsubmission_set.order_by('created')],
+                    }
+                }
+            }]
+        }
+
     def _send_data(self,
                    batch: ClinVarExportBatch,
                    request_type: ClinVarExportRequestType,
@@ -182,7 +200,7 @@ class ClinVarExportSync:
             clinvar_request = self._send_data(
                 batch=batch,
                 request_type=ClinVarExportRequestType.INITIAL_SUBMISSION,
-                json_data=batch.to_json(),
+                json_data=self.batch_json(batch),
                 url=self.submission_url)
 
         else:

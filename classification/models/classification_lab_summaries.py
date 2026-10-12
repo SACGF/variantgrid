@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.models.evidence_key import EvidenceKeyMap
 from snpdb.models import Lab
 
 
@@ -25,10 +26,6 @@ class ClassificationLabSummary:
     @property
     def allele_origin_bucket(self):
         return self.group.allele_origin_bucket
-
-    @property
-    def embedded(self):
-        return None
 
     @property
     def lab(self):
@@ -61,7 +58,6 @@ class ClassificationLabSummary:
 
     @property
     def sort_key(self):
-        from classification.models import EvidenceKeyMap
         key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         return key.classification_sorter_value(self.clinical_significance_to), key.classification_sorter_value(self.clinical_significance_from), self.pending, self.is_internal, self.lab
 

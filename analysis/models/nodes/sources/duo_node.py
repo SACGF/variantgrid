@@ -25,6 +25,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
+from analysis.models.nodes.stats_cache import DuoInheritanceHandler
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Duo, DuoRelationship, Sample
 
@@ -339,6 +340,7 @@ def _collapse_zygosity_rows(rows: dict) -> dict:
 
 
 class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
+    STATS_FILTER_KEY_HANDLER = DuoInheritanceHandler()
     INHERITANCE_CLASSES = {
         DuoInheritance.COMPOUND_HET: DuoCompHet,
         DuoInheritance.RECESSIVE: DuoRecessive,

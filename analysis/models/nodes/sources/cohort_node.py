@@ -14,8 +14,9 @@ from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
+    FilterKeyHandler,
+    NoFilterHandler,
     get_cached_label_count_for_cohort,
-    get_handler_for_node,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import SimpleZygosity, Zygosity
@@ -24,6 +25,8 @@ from snpdb.views.datatable_view import NullOrder, RichColumn
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
+    STATS_FILTER_KEY_HANDLER: FilterKeyHandler = NoFilterHandler()
+
     min_ad = models.IntegerField(default=0)
     min_dp = models.IntegerField(default=0)
     min_gq = models.IntegerField(default=0)
@@ -60,8 +63,7 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):
             return None
-        handler = get_handler_for_node(self)
-        filter_key = handler.filter_key_for_node(self)
+        filter_key = self.STATS_FILTER_KEY_HANDLER.filter_key_for_node(self)
         if filter_key is UNCACHEABLE:
             return None
         return get_cached_label_count_for_cohort(

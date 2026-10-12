@@ -23,6 +23,7 @@ from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
+from library.utils.json_utils import canonical_filter_key
 from snpdb.models import (
     VCF,
     Cohort,
@@ -252,6 +253,30 @@ def _trio_predicates(mum_zyg, dad_zyg, proband_zyg, contig, mother_affected, fat
     return modes
 
 
+PRECOMPUTED_INHERITANCE_MODES = ("denovo", "autosomal_recessive", "autosomal_dominant", "x_linked_recessive", "compound_het")
+
+
+def inheritance_filter_key(mode: str, trio) -> str:
+    """ The key a mode's bucket is stored under - the writer and the readers both come through here
+        so they can't drift apart. autosomal_dominant's predicate branches on which parents are
+        affected (@see _trio_predicates), so those flags belong in its key: editing them misses the
+        old bucket and recomputes, rather than reading one built for the previous flags. """
+    key = {"inheritance": mode}
+    if mode == "autosomal_dominant":
+        key["mother_affected"] = bool(trio.mother_affected)
+        key["father_affected"] = bool(trio.father_affected)
+    return canonical_filter_key(key)
+
+
+def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
+    """ The filter_key buckets calculate_cohort_stats populates beyond the raw aggregate (None) row.
+        Trios get the 5 inheritance keys; everything else gets just None. """
+    trio = cohort.trio_set.first()
+    if trio is None:
+        return [None]
+    return [None] + [inheritance_filter_key(mode, trio) for mode in PRECOMPUTED_INHERITANCE_MODES]
+
+
 def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion):
     """ Iterate the cohort's variant queryset once and populate the four
         CohortGenotype*Stats classes for:
@@ -285,11 +310,6 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     """ Accumulate the four CohortGenotype*Stats families for the cohort and persist
         them via _persist_cohort_stats. Must run inside the per-CGC locked
         transaction opened by calculate_cohort_stats, using the locked cgc. """
-    from analysis.models.nodes.stats_cache import (
-        get_filter_keys_to_precompute_for_cohort,
-        inheritance_filter_key,
-    )
-
     cohort_samples = list(cohort.get_cohort_samples())
     sample_index_pairs = [(cs.sample, cs.cohort_genotype_packed_field_index) for cs in cohort_samples]
     has_filters = bool(_cohort_has_filters(cohort))

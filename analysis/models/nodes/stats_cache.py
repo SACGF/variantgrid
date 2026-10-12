@@ -1,10 +1,11 @@
 """
-    Reader-side cache lookups for the CohortGenotype*Stats family + node-class
-    handlers that translate node configs to canonical filter_keys.
+    Reader-side cache lookups for the CohortGenotype*Stats family + the handlers that translate
+    node configs to canonical filter_keys. Each source node class names its handler in
+    STATS_FILTER_KEY_HANDLER.
 
-    The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats)
-    uses the same canonical_filter_key helper to populate filter-keyed rows. A
-    silent mismatch between the two would produce cache misses forever.
+    The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats) owns
+    inheritance_filter_key and the keys it precomputes, and readers build their keys through the
+    same function. A silent mismatch between the two would produce cache misses forever.
 """
 from collections.abc import Iterable
 from typing import Optional, Union
@@ -17,8 +18,11 @@ from annotation.models import (
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
-from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
-from library.utils.json_utils import canonical_filter_key
+from annotation.tasks.calculate_sample_stats import (
+    enqueue_cohort_stats_recompute,
+    get_filter_keys_to_precompute_for_cohort,
+    inheritance_filter_key,
+)
 from snpdb.models import CohortGenotypeStats
 from snpdb.models.models_enums import BuiltInFilters
 
@@ -94,10 +98,7 @@ class TrioInheritanceHandler(FilterKeyHandler):
         return inheritance_filter_key(mode, node.trio)
 
     def filter_keys_to_precompute(self, cohort) -> Iterable[Optional[str]]:
-        trio = _cohort_trio(cohort)
-        if trio is None:
-            return [None]
-        return [None] + [inheritance_filter_key(m, trio) for m in self.CACHED_MODES.values()]
+        return get_filter_keys_to_precompute_for_cohort(cohort)
 
 
 class DuoInheritanceHandler(FilterKeyHandler):
@@ -116,49 +117,6 @@ class QuadInheritanceHandler(FilterKeyHandler):
 
     def filter_key_for_node(self, node) -> FilterKey:
         return UNCACHEABLE
-
-
-def inheritance_filter_key(mode: str, trio) -> str:
-    """ The key a mode's bucket is stored under - the writer and the readers both come through here
-        so they can't drift apart. autosomal_dominant's predicate branches on which parents are
-        affected (@see _trio_predicates), so those flags belong in its key: editing them misses the
-        old bucket and recomputes, rather than reading one built for the previous flags. """
-    key = {"inheritance": mode}
-    if mode == "autosomal_dominant":
-        key["mother_affected"] = bool(trio.mother_affected)
-        key["father_affected"] = bool(trio.father_affected)
-    return canonical_filter_key(key)
-
-
-def _cohort_trio(cohort):
-    return cohort.trio_set.first()
-
-
-def get_handler_for_node(node) -> FilterKeyHandler:
-    # Local imports avoid eager imports of node modules during stats_cache import.
-    from analysis.models.nodes.sources.cohort_node import CohortNode
-    from analysis.models.nodes.sources.duo_node import DuoNode
-    from analysis.models.nodes.sources.pedigree_node import PedigreeNode
-    from analysis.models.nodes.sources.quad_node import QuadNode
-    from analysis.models.nodes.sources.sample_node import SampleNode
-    from analysis.models.nodes.sources.trio_node import TrioNode
-
-    handlers = {
-        SampleNode: SampleNodeHandler(),
-        CohortNode: NoFilterHandler(),
-        TrioNode: TrioInheritanceHandler(),
-        DuoNode: DuoInheritanceHandler(),
-        QuadNode: QuadInheritanceHandler(),
-        PedigreeNode: NoFilterHandler(),
-    }
-    return handlers.get(type(node), NoFilterHandler())
-
-
-def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
-    """ Used by the writer (calculate_cohort_stats) to know which filter_key
-        buckets to populate beyond the raw aggregate (None) row. Trios get the
-        5 inheritance keys; everything else gets just None. """
-    return list(TrioInheritanceHandler().filter_keys_to_precompute(cohort))
 
 
 def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,

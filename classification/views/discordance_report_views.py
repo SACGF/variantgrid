@@ -13,18 +13,23 @@ from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys, TestingContextBucket, ClassificationResultValue
+from classification.enums import ClassificationResultValue, SpecialEKeys, TestingContextBucket
 from classification.enums.discordance_enums import (
     ContinuedDiscordanceReason,
     DiscordanceReportResolution,
 )
 from classification.models import (
+    ClassificationFlagTypes,
     ClassificationModification,
     ClinicalContext,
+    ClinicalContextChangeData,
+    ClinicalContextRecalcTrigger,
     DiscordanceReportClassification,
-    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger, Overlap, OverlapType, \
+    EvidenceKeyMap,
+    Overlap,
+    OverlapType,
     classification_flag_types,
-    discordance_change_signal, EvidenceKeyMap,
+    discordance_change_signal,
 )
 from classification.models.classification_groups import (
     ClassificationGroups,
@@ -237,7 +242,7 @@ class DiscordanceReportTemplateData:
 
     @property
     def c_hgvses(self) -> list[HGVSDisplay]:
-        return sorted({cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications})
+        return self.report.c_hgvses(self.genome_build)
 
     @property
     def lab_clin_sigs(self) -> list[_LabClinSig]:

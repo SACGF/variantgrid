@@ -27,6 +27,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
+from analysis.models.nodes.stats_cache import QuadInheritanceHandler
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Quad, Sample
 
@@ -238,6 +239,7 @@ class QuadAnyAffected(AbstractQuadInheritance):
 
 
 class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
+    STATS_FILTER_KEY_HANDLER = QuadInheritanceHandler()
     INHERITANCE_CLASSES = {
         QuadInheritance.COMPOUND_HET:      QuadCompHet,
         QuadInheritance.RECESSIVE:         QuadRecessive,

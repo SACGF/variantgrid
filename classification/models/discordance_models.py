@@ -12,7 +12,6 @@ from django.db.models import TextChoices
 from django.db.models.deletion import CASCADE, PROTECT
 from django.urls.base import reverse
 from django.utils import timezone
-from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 
 from classification.enums.classification_enums import SpecialEKeys
@@ -29,7 +28,6 @@ from classification.models.clinical_context_models import (
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import HGVSDisplay
 from library.django_utils.model_utils import refresh_for_update
-from library.guardian_utils import admin_bot
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import invalidate_cached_property
 from review.models import Review, ReviewableModelMixin
@@ -80,12 +78,8 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
     @property
     def preview(self) -> 'PreviewData':
-
-        from classification.views.discordance_report_views import DiscordanceReportTemplateData
-        drtd = DiscordanceReportTemplateData(self.pk, user=admin_bot())
-
         c_hgvs_key_values = []
-        for c_hgvs in drtd.c_hgvses:
+        for c_hgvs in self.c_hgvses(GenomeBuildManager.get_current_genome_build()):
             c_hgvs_key_values.append(
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
@@ -411,6 +405,9 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     @property
     def all_classification_modifications(self) -> list[ClassificationModification]:
         return [drc.classification_effective for drc in self.discordance_report_classifications]
+
+    def c_hgvses(self, genome_build: GenomeBuild) -> list[HGVSDisplay]:
+        return sorted({cm.c_hgvs_best(genome_build) for cm in self.all_classification_modifications})
 
     @cached_property
     def is_medically_significant(self):

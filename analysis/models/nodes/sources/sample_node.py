@@ -31,8 +31,8 @@ from analysis.models.nodes.cohort_mixin import (
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
+    SampleNodeHandler,
     get_cached_label_count_for_cohort,
-    get_handler_for_node,
 )
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
@@ -59,6 +59,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
         Use restrict_to_qc_gene_list to keep track of that as sample_gene_list is cleared when a sample
         changes including in an AnalysisTemplates """
+    STATS_FILTER_KEY_HANDLER = SampleNodeHandler()
+
     source_level = models.CharField(max_length=1, choices=SampleSourceLevel.choices,
                                     default=SampleSourceLevel.SAMPLE)
     sample = models.ForeignKey(Sample, null=True, on_delete=SET_NULL)
@@ -508,7 +510,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if self._has_filters_that_affect_label_counts():
             return None  # Have to do counts
 
-        filter_key = get_handler_for_node(self).filter_key_for_node(self)
+        filter_key = self.STATS_FILTER_KEY_HANDLER.filter_key_for_node(self)
 
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):

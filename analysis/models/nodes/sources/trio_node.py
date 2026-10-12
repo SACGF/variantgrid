@@ -27,6 +27,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
+from analysis.models.nodes.stats_cache import TrioInheritanceHandler
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample, Trio
 
@@ -218,6 +219,7 @@ class TrioAnyAffected(AbstractTrioInheritance):
 
 
 class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
+    STATS_FILTER_KEY_HANDLER = TrioInheritanceHandler()
     INHERITANCE_CLASSES = {
         TrioInheritance.COMPOUND_HET: CompHet,
         TrioInheritance.RECESSIVE: Recessive,

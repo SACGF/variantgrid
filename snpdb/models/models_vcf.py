@@ -152,14 +152,6 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return filter_dict
 
     @staticmethod
-    def convert_from_percent_to_unit(percent):
-        from snpdb.models import CohortGenotype  # Circular import
-
-        if percent != CohortGenotype.MISSING_NUMBER_VALUE:
-            percent /= 100.0
-        return percent
-
-    @staticmethod
     def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
         """ queryset: only check these VCFs - keeps the permission lookups to them rather than every VCF """
         if has_write_permission:
@@ -565,18 +557,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return self.vcf.cohort.cohort_genotype_collection
 
     def get_genotype(self, variant: Variant) -> 'SampleGenotype':
-        from snpdb.models import CohortGenotype
-
-        cgc = self.cohort_genotype_collection
-        collections = [cgc]
-        if cgc.common_collection:
-            collections.append(cgc.common_collection)
-        try:
-            cg = CohortGenotype.objects.filter(collection__in=collections).get(variant=variant)
-            sample_genotype = cg.get_sample_genotype(self)
-        except CohortGenotype.DoesNotExist:
-            sample_genotype = None
-        return sample_genotype
+        return self.cohort_genotype_collection.get_sample_genotype(self, variant)
 
     def __str__(self):
         return f"{self.name} ({self.vcf})"

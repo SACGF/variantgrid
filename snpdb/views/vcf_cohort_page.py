@@ -13,9 +13,9 @@ from django.urls.base import reverse
 
 from annotation.models import AnnotationVersion
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from library.django_utils.data_archive_mixin import DataArchivedError
 from patients.models.models_phenotype import patient_phenotypes_for_samples
 from patients.models_enums import Sex
-from snpdb.archive import DataArchivedError
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm
 from snpdb.models import (
     VCF,

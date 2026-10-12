@@ -8,6 +8,7 @@ from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.db import transaction
+from django.dispatch import receiver
 from django.utils import timezone
 
 from annotation.regexes import DbRegexes, db_ref_regexes
@@ -32,6 +33,7 @@ from ontology.models import (
     OntologyTermStatus,
     PanelAppClassification,
 )
+from ontology.models.models_ontology import gene_relations_read_signal
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 # increment if you change the logic of parsing ontology terms from PanelApp
@@ -39,6 +41,11 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 PANEL_APP_API_PROCESSOR_VERSION = 12
 # with look ahead and behind to make sure we're not in a 7-digit number
 ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
+
+
+@receiver(gene_relations_read_signal)
+def gene_relations_read_handler(sender, gene_symbol: Union[GeneSymbol, str], **kwargs):  # pylint: disable=unused-argument
+    update_gene_relations(gene_symbol)
 
 
 def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
