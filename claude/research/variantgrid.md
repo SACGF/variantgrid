@@ -149,6 +149,7 @@ entry whose module isn't.
 `statement_timeout` is set by `variantgrid/wsgi.py:setup_postgres`, so it applies to gunicorn/runserver only - Celery and
 `manage.py` connections run unbounded, deliberately.
 
-Anything cached in Redis is keyed by `CACHE_VERSION`; bump it when renaming a pickled class (root `AGENTS.md`). Static
+Anything cached in Redis is keyed by `CACHE_VERSION`; bump it when cached values become wrong. An entry that no longer
+unpickles is a miss (`library/django_utils/redis_cache.py`). Static
 URLs need `collectstatic` after a pull or `{% static %}` raises for files missing from the manifest - part of
 `scripts/upgrade.sh` (via `manage.py upgrade`), and why tests use the plain backend.

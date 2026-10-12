@@ -148,10 +148,6 @@ leaves `django_migrations` pointing at a name that no longer exists (`Inconsiste
 repaired by hand on every database. A migration that only exists locally (unpushed) can still be reshaped or regenerated.
 Check with `git log origin/master -- <migration file>`.
 
-### Renaming a class that Redis has pickled
-Bump `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py`; old cache entries survive a deploy and fail
-on unpickle. Details under Gotchas in `analysis/AGENTS.md`.
-
 ### Manual migrations (management commands on deploy)
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
 (`manual/operations/manual_operations.py`, example `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`).
