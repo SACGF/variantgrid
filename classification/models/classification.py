@@ -5,32 +5,32 @@ evidence through Classification.patch_value, publish through ClassificationModif
 and read what a user may see through ClassificationModification.latest_for_user; allele resolution
 is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also here:
 ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
-ClassificationConsensus and CuratedDate. classification/AGENTS.md has the rules. Large: use
-`scripts/vg outline`.
+ClassificationConsensus and CuratedDate.
 """
+from __future__ import annotations
+
 import copy
 import json
 import logging
 import operator
 import re
 import uuid
-import pydantic
-from collections import Counter, namedtuple, defaultdict
+from collections import Counter, defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
     TypedDict,
     Union,
 )
 
-from typing_extensions import deprecated
-
 import django.dispatch
+import pydantic
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
@@ -48,28 +48,38 @@ from django.urls.base import reverse
 from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from typing_extensions import deprecated
 
-from annotation.models.data_enums import ClassificationDate, ClassificationDateType, EffectiveDate, EffectiveDateType
+from annotation.models.data_enums import (
+    ClassificationDate,
+    ClassificationDateType,
+    EffectiveDate,
+    EffectiveDateType,
+)
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import (
     CRITERIA_NOT_MET,
     AlleleOriginBucket,
     ClinicalSignificance,
+    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
+    TestingContextBucket,
     ValidationCode,
-    WithdrawReason, TestingContextBucket, CopyScope,
+    WithdrawReason,
 )
+from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import (
     ClassificationJsonParams,
     ClassificationPatchResponse,
     PatchMeta,
-    ValidationMerger, classification_gene_symbol_filter,
+    ValidationMerger,
+    classification_gene_symbol_filter,
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
@@ -83,11 +93,13 @@ from classification.models.evidence_key import (
     EvidenceKeyValueType,
     VCDataCell,
     VCDataDict,
+    VCPatch,
     WipeMode,
     resolve_default_value,
 )
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.evidence_mixin import EvidenceMixin
 from classification.models.evidence_mixin_summary_cache import (
+    ClassificationSummaryCacheObj,
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
@@ -100,7 +112,7 @@ from flags.models.models import (
     flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
-from genes.models import Gene, NoTranscript, GeneSymbol
+from genes.models import Gene, GeneSymbol, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -118,9 +130,13 @@ from library.utils import (
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
+from snpdb.models.models import CodeVersion, CodeVersionMixin
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
+
+if TYPE_CHECKING:
+    from classification.models import ClinicalContext, ConditionText, MultiCondition
 
 ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
@@ -216,7 +232,6 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
     :param user: The current user
     :param kwargs: Required by @receiver
     """
-    from classification.enums.discordance_enums import DiscordanceReportResolution
     from classification.models.discordance_models import DiscordanceReportClassification
 
     vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
@@ -258,7 +273,7 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
-class ConditionResolvedReferenceDict(TypedDict):
+class ConditionResolvedReferenceDict(TypedDict, total=False):
     term_id: Optional[str]
     name: str  # name of the term if term_id is provided, otherwise from a plain text condition
     count: Optional[int]  # assumed to be 1 if not provided
@@ -340,7 +355,7 @@ class ConditionResolved:
     # terms: list[OntologyTerm]
     # plain_text_terms: list[str] = None
     references: list[ConditionReference]
-    join: Optional['MultiCondition'] = None
+    join: Optional[MultiCondition] = None
     plain_text: Optional[str] = None  # fallback, not populated in all contexts
 
     def __hash__(self) -> int:
@@ -388,14 +403,14 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
+        from classification.models import MultiCondition
         if not condition_dict:
             return ConditionResolved(references=[])
 
-        join: Optional['MultiCondition'] = None
+        join: Optional[MultiCondition] = None
         plain_text = condition_dict.get("display_text")
 
         if resolved_join_text := condition_dict.get("resolved_join"):
-            from classification.models import MultiCondition
             join = MultiCondition(resolved_join_text)
 
         if references_list := condition_dict.get("references"):
@@ -440,13 +455,13 @@ class ConditionResolved:
         else:
             return None
 
-    def as_mondo_if_possible(self) -> 'ConditionResolved':
+    def as_mondo_if_possible(self) -> ConditionResolved:
         if mondo_term := self.mondo_term:
             return ConditionResolved.from_uncounted_terms(terms=[mondo_term])
         else:
             return self
 
-    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+    def is_same_or_more_specific(self, other: ConditionResolved) -> bool:
         """
         Returns the number of steps to go from this condition to the specific other condition
         Returns None if self doesn't appear to be a descendant of other
@@ -554,7 +569,7 @@ class ConditionResolved:
                 pass
         return None
 
-    def __eq__(self, other: 'ConditionResolved') -> bool:
+    def __eq__(self, other: ConditionResolved) -> bool:
         if (s_terms := self.terms) and (o_terms := other.terms):
             return s_terms == o_terms and self.join == other.join
         elif self.terms or other.terms:
@@ -562,7 +577,7 @@ class ConditionResolved:
         else:
             return self.plain_text == other.plain_text
 
-    def __lt__(self, other: 'ConditionResolved') -> bool:
+    def __lt__(self, other: ConditionResolved) -> bool:
         self_terms = self.terms or []
         other_terms = other.terms or []
         if len(self_terms) != len(other_terms):
@@ -675,7 +690,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
 
     @property
-    def summary_obj(self) -> 'ClassificationSummaryCacheObj':
+    def summary_obj(self) -> ClassificationSummaryCacheObj:
         from classification.models import ClassificationSummaryCacheObj
         return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
@@ -688,10 +703,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             models.Index(fields=["share_level"]),
             models.Index(fields=["withdrawn"]),
             models.Index(fields=["allele_origin_bucket"]),
-            models.Index(fields=["modified"]),
-            models.Index(models.F("summary__pathogenicity__sort"), name="summary__p_sort_idx"),
-            models.Index(models.F("summary__somatic__sort"), name="summary__s_sort_idx"),
-            models.Index(models.F("summary__date__date"), name="summary__d_sort_idx")
+            models.Index(fields=["modified"])
         ]
 
     @classmethod
@@ -734,7 +746,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        from classification.models import ClassificationSummaryCacheObj
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         if bucket := summary_obj.somatic.testing_context_bucket:
             return TestingContextBucket(bucket)
@@ -746,7 +757,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        from classification.models import ClassificationSummaryCacheObj
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         return summary_obj.somatic.tumor_type_category
 
@@ -776,20 +786,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
 
     @property
-    def resolved_hgvs_grch37_compat(self) -> Optional[str]:
-        try:
-            return self.allele_info.grch37.resolved_hgvs_compat
-        except AttributeError:
-            return None
-
-    @property
-    def resolved_hgvs_grch38_compat(self) -> Optional[str]:
-        try:
-            return self.allele_info.grch38.resolved_hgvs_compat
-        except AttributeError:
-            return None
-
-    @property
     def metrics_logging_key(self) -> tuple[str, Any]:
         return "classification_id", self.pk
 
@@ -802,7 +798,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return 'not-matched'
 
     @property
-    def condition_text_record(self) -> 'ConditionText':
+    def condition_text_record(self) -> ConditionText:
         try:
             if ctm := self.conditiontextmatch:
                 return ctm.condition_text
@@ -915,7 +911,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self.get(SpecialEKeys.G_HGVS)
 
     def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
-        return AlleleOriginBucket.bucket_for_allele_origin(self.get(SpecialEKeys.ALLELE_ORIGIN))
+        return EvidenceKeyMap.allele_origin_bucket(self.get(SpecialEKeys.ALLELE_ORIGIN))
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
@@ -1939,6 +1935,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 delta = pending_modification.delta
                 delta.update(diffs_only_patch)
                 pending_modification.delta = delta
+                pending_modification.code_version = CodeVersion.current()
 
             else:
                 if save and last_edited:
@@ -2024,7 +2021,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                           exclude_withdrawn=exclude_withdrawn).first()
 
     @property
-    def last_published_version(self) -> 'ClassificationModification':
+    def last_published_version(self) -> Optional['ClassificationModification']:
+        if not self.pk:
+            return None
         return ClassificationModification.objects.filter(classification=self, is_last_published=True) \
             .select_related('classification', 'classification__lab', 'classification__lab__organization') \
             .first()
@@ -2358,11 +2357,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 })
         return c_hgvs
 
-    def get_resolved_hgvs(self, genome_build: GenomeBuild, use_compat: bool = False) -> Optional[str]:
+    def get_resolved_hgvs(self, genome_build: GenomeBuild) -> Optional[str]:
         if genome_build == genome_build.grch37():
-            return self.resolved_hgvs_grch37 if not use_compat else self.resolved_hgvs_grch37_compat
+            return self.resolved_hgvs_grch37
         if genome_build == genome_build.grch38():
-            return self.resolved_hgvs_grch38 if not use_compat else self.resolved_hgvs_grch38_compat
+            return self.resolved_hgvs_grch38
         return self._generate_resolved_hgvs(genome_build)
 
     def __str__(self) -> str:
@@ -2387,7 +2386,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             raise CreateNoClassificationForbidden()
 
 
-class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models.Model):
+class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVersionMixin, models.Model):
     """ Tracks history of changes to Classification
         Created in Classification.patch_value() if any changes applied
 
@@ -2482,6 +2481,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     is_last_published = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
+    # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
+    code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
 
     @classmethod
     def order_by_evidence(cls, key_id: str) -> RawSQL:
@@ -2537,7 +2538,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         variant: Optional[Union[Variant, Iterable[Variant]]] = None,
                         allele: Allele = None,
                         published: bool = None,
-                        clinical_context: Optional['ClinicalContext'] = None,
+                        clinical_context: Optional[ClinicalContext] = None,
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
                         allele_origin_bucket: Optional[AlleleOriginBucket] = None,

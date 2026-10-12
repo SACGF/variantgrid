@@ -92,8 +92,10 @@ TICK_WHEN_CALL_IN = "call_in"
 TICK_WHEN_VALUE_BELOW = "value_below"
 TICK_WHEN_RULES = (TICK_WHEN_CALLED, TICK_WHEN_CALL_IN, TICK_WHEN_VALUE_BELOW)
 
-# What a bool case_field's `tick_when` can say about the library QC category it names instead -
-# 'the assay succeeded for amplifications' is DRAGEN's CNV library QC, not a measure
+# What a bool case_field's `tick_when` can say about the library QC category it names -
+# 'the assay succeeded for amplifications' is DRAGEN's CNV library QC, not a measure. A field naming
+# both a measure and a category applies each rule to the row it is about, and starts ticked only where
+# both sides hold - TMB succeeded when it was called and its library passed QC
 TICK_WHEN_PASSED = "passed"
 TICK_WHEN_COMPLETED = "completed"
 TICK_WHEN_QC_RULES = (TICK_WHEN_PASSED, TICK_WHEN_COMPLETED)
@@ -146,14 +148,19 @@ def library_qc_tick(tick_when, library_qc: Optional[LibraryQC]) -> Optional[bool
 
 
 def tick_for(field: dict, measures: dict, library_qc: dict) -> Optional[bool]:
-    """ Where a bool case_field's tick starts - a field names either a measure or a QC category,
-        and the one it names says which of the case's rows the rule is applied to """
+    """ Where a bool case_field's tick starts - the measure rules against the measure it names, the QC
+        rules against the QC category it names. Where it names both, either side failing unticks it,
+        and a side the case has no row for is left out rather than read as a failure """
     tick_when = field.get("tick_when")
     if not tick_when:
         return None
+    outcomes = []
+    if measure_key := field.get("measure"):
+        outcomes.append(measure_tick(tick_when, measures.get(measure_key)))
     if qc_key := field.get("qc"):
-        return library_qc_tick(tick_when, library_qc.get(qc_key))
-    return measure_tick(tick_when, measures.get(field.get("measure")))
+        outcomes.append(library_qc_tick(tick_when, library_qc.get(qc_key)))
+    known = [outcome for outcome in outcomes if outcome is not None]
+    return all(known) if known else None
 
 
 def _describe_rule(rule: dict, unit: str) -> str:
@@ -176,8 +183,18 @@ def describe_tick_when(tick_when, unit: Optional[str] = None) -> str:
     unit = unit or ""
     if unit not in ("", "%"):
         unit = f" {unit}"
-    described = [text for text in (_describe_rule(rule, unit) for rule in _tick_when_rules(tick_when)) if text]
-    return "ticked when " + " or ".join(described) if described else ""
+    rules = _tick_when_rules(tick_when)
+    sides = []
+    for kinds in (TICK_WHEN_RULES, TICK_WHEN_QC_RULES):
+        described = [text for rule in rules if set(rule) & set(kinds) and (text := _describe_rule(rule, unit))]
+        if described:
+            sides.append(described)
+    if not sides:
+        return ""
+    if len(sides) == 1:
+        return "ticked when " + " or ".join(sides[0])
+    return "ticked when " + " and ".join(
+        f"({' or '.join(side)})" if len(side) > 1 else side[0] for side in sides)
 
 
 def validate_case_fields(case_fields: list) -> Optional[str]:
@@ -195,10 +212,7 @@ def validate_case_fields(case_fields: list) -> Optional[str]:
             return f"'{key}' measures '{measure}' - one of {', '.join(sorted(measure_keys))} was expected"
         if qc is not None and qc not in qc_keys:
             return f"'{key}' names library QC '{qc}' - one of {', '.join(sorted(qc_keys))} was expected"
-        if measure is not None and qc is not None:
-            # The rules are different and the row they judge is different, so a field is one or the other
-            return f"'{key}' names both a measure and a library QC category - it can carry one"
-        rules = TICK_WHEN_QC_RULES if qc else TICK_WHEN_RULES
+        rules = (TICK_WHEN_RULES if measure else ()) + (TICK_WHEN_QC_RULES if qc else ())
         if (tick_when := field.get("tick_when")) is not None:
             for rule in _tick_when_rules(tick_when):
                 if not isinstance(rule, dict) or not rule:
@@ -224,8 +238,9 @@ class ClassificationReportTemplate(TimeStampedModel):
     # [{"key", "label", "type": "text"|"bool"|"choice", "options": [...], "default", "group",
     #   "prefill_key": the evidence key the form starts the field from,
     #   "measure": the Measure shown beside a bool field (a MEASURE_KEYS value),
-    #   "qc": the LibraryQC category shown beside a bool field instead (a LIBRARY_QC_CONTEXT_KEYS value),
-    #   "tick_when": the rule (or list of rules, any of which) that field's tick starts from - @see tick_for}]
+    #   "qc": the LibraryQC category shown beside a bool field (a LIBRARY_QC_CONTEXT_KEYS value),
+    #   "tick_when": the rule (or list of rules, any of which) that field's tick starts from. A field naming
+    #   both a measure and a qc applies each rule to its own row and needs both sides - @see tick_for}]
     case_fields = models.JSONField(default=list, blank=True)
     # Which cases this template is offered for - null is every case
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices,

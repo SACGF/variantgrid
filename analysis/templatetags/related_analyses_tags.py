@@ -10,7 +10,6 @@ from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
 
 from analysis.forms import get_analysis_template_form_for_variables_only_of_class
-from annotation.models.models_gene_counts import GeneCountType
 from analysis.models import Analysis, AnalysisTemplateVersion, MutationalSignature
 from analysis.models.models_analysis import (
     ANALYSIS_TEMPLATE_SAMPLE_GROUP_FIELDS,
@@ -18,7 +17,6 @@ from analysis.models.models_analysis import (
     ANALYSIS_TEMPLATE_VCF_SOURCE_FIELDS,
 )
 from analysis.models.nodes.sources.sample_node import SampleNode
-from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.related_analyses import (
     get_related_analysis_details_for_cohort,
     get_related_analysis_details_for_duo,
@@ -27,6 +25,7 @@ from analysis.related_analyses import (
     get_related_analysis_details_for_samples,
     get_related_analysis_details_for_trio,
 )
+from annotation.models.models_gene_counts import GeneCountType
 from library.utils import remove_duplicates_from_list
 from patients.sample_grouping import get_sample_group
 from pedigree.models import Pedigree
@@ -69,13 +68,11 @@ def update_context_with_related_analysis(context, samples, cohorts=None, trios=N
     user = context["user"]
     analysis_details = get_all_analyses_for_user(user, samples, cohorts=cohorts, trios=trios,
                                                  quads=quads, duos=duos, pedigrees=pedigrees)
-    karyomapping_analyses = KaryomappingAnalysis.filter_for_user(user).filter(trio__in=trios or [])
     analyses_list = [i[0].pk for i in analysis_details]
     analyses_with_tags = Analysis.objects.filter(pk__in=analyses_list, varianttag__isnull=False)
     variant_tag_genome_build_names = analyses_with_tags.order_by("genome_build").values_list("genome_build", flat=True).distinct()
 
     context.update({"analysis_details": analysis_details,
-                    "karyomapping_analyses": karyomapping_analyses,
                     "show_output_nodes": settings.ANALYSIS_RELATED_DOWNLOAD_OUTPUT_NODES,
                     "show_sample_info": show_sample_info,
                     "show_create_analyses": show_create_analyses,

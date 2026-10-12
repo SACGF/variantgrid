@@ -1,8 +1,18 @@
 from dataclasses import dataclass
+from datetime import date
 from functools import cached_property
 from typing import Optional, Self
+
 from dataclasses_json import DataClassJsonMixin
-from classification.enums import AlleleOriginBucket, SpecialEKeys, TestingContextBucket, ClassificationResultValue
+
+from classification.enums import (
+    AlleleOriginBucket,
+    ClassificationResultValue,
+    SpecialEKeys,
+    TestingContextBucket,
+)
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 
 
 @dataclass(frozen=True)
@@ -13,6 +23,13 @@ class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
 
     def __bool__(self):
         return bool(self.date)
+
+    @property
+    def as_date(self) -> Optional[date]:
+        try:
+            return date.fromisoformat(self.date)
+        except (TypeError, ValueError):
+            return None
 
     def __lt__(self, other):
         return self.date < other.date
@@ -40,7 +57,6 @@ class ClassificationSummaryCacheObjPathogenicity(DataClassJsonMixin):
 
     @property
     def bucket(self):
-        from classification.models import EvidenceKeyMap
         return EvidenceKeyMap.onc_path_to_bucket().get(self.classification)
 
 
@@ -67,37 +83,6 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
             if man_sub_field not in data_copy:
                 data_copy[man_sub_field] = {}
         return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
-
-
-@dataclass(frozen=True)
-class SomaticClinicalSignificanceValue:
-    tier_level: str
-    amp_level: Optional[str] = None
-
-    @property
-    def without_amp_level(self) -> Self:
-        return SomaticClinicalSignificanceValue(tier_level=self.tier_level)
-
-    @property
-    def sort_value(self) -> int:
-        if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self):
-            return sort_value
-        elif self.amp_level:
-            if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self.without_amp_level):
-                return sort_value
-        # default to 1, so things which shouldn't even be considered somatic can be 0
-        return 1
-
-    @property
-    def pretty_value(self):
-        from classification.models import EvidenceKeyMap
-        parts = [EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)]
-        if amp_level := self.amp_level:
-            parts.append(amp_level)
-        return "".join(parts)
-
-    def __lt__(self, other):
-        return self.sort_value < other.sort_value
 
 
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
@@ -167,7 +152,6 @@ class ClassificationSummaryCalculator:
     @cached_property
     def classification_sort(self) -> int:
         if classification_value := self.classification_value:
-            from classification.models import EvidenceKeyMap
             return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("sort_order").get(classification_value, 0)
         else:
             # sort unclassified to the end
@@ -184,7 +168,6 @@ class ClassificationSummaryCalculator:
         # TODO move this information into the testing context evidence key data
         if self.is_possibly_somatic:
             if testing_context_value := self.cm.get(SpecialEKeys.TESTING_CONTEXT):
-                from classification.models import EvidenceKeyMap
                 return EvidenceKeyMap.cached_key(SpecialEKeys.TESTING_CONTEXT).option_dictionary_property("testing_context_bucket").get(testing_context_value) or TestingContextBucket.OTHER
             else:
                 return TestingContextBucket.UNKNOWN.value
@@ -218,7 +201,6 @@ class ClassificationSummaryCalculator:
 
 # FIXME underlying code should change due to overlaps
 def clinical_significance_pills(summary: ClassificationSummaryCacheObj, allele_origin_bucket: str) -> list[dict]:
-    from classification.models import EvidenceKeyMap
     """ Label/CSS class for the c-pill spans - rendered server side by the clinical_significance_values
         tag, and client side by the variant details samples grid. CSS is .c-pill.cs-* """
     pathogenicity = summary.pathogenicity

@@ -10,7 +10,7 @@ from library.health_check import populate_health_check
 from library.log_utils import NotificationBuilder
 
 
-@celery.shared_task
+@celery.shared_task(queue='db_workers')
 def notify_server_status():
     if not settings.HEALTH_CHECK_ENABLED:
         return

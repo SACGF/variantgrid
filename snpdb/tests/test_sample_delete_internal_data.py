@@ -6,16 +6,16 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild, SampleLocusCount, SampleStatsCodeVersion
 from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_enums import ImportStatus
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
 class SampleDeleteInternalDataTest(TestCase):
@@ -29,7 +29,7 @@ class SampleDeleteInternalDataTest(TestCase):
         cls.cgc = cls.cohort.cohort_genotype_collection
         cls.sample = cls.cohort.get_samples().first()
         cls.code_version = SampleStatsCodeVersion.objects.create(
-            name="test", version=99, code_git_hash="deleteinternaldata")
+            name="test", version=99)
 
     def _create_stats(self, sample):
         common = {

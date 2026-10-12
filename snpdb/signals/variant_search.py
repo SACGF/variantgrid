@@ -23,7 +23,7 @@ from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
     find_gene_copy_number_events_for_string,
 )
-from genes.gene_fusions import find_gene_fusions_for_string
+from genes.gene_fusions import FUSION_STRING_SEPARATOR, find_gene_fusions_for_string
 from genes.gene_splice import SPLICE_STRING_PATTERN, find_splice_events_for_string
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
@@ -299,7 +299,7 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
                                         any_alt: bool = False) -> QuerySet[Variant]:
     """
     :param genome_build: genome build (used for format variant_coordinate.chromosome for variant search
-    :param qs: A query set that we'll be searching inside of (except for when returning ModifiedImportVariants)
+    :param qs: A query set that we'll be searching inside of (including variants found via ModifiedImportedVariant)
     :param variant_coordinate: The variant coordinate to lookup
     :param any_alt: If true, search without using alt and return all matches
     :return: A QuerySet of variants
@@ -313,11 +313,11 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
 
     if not results.exists():
         if not any_alt:
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(qs, variant_coordinate)
         else:
             # should we really be searching ModifiedImportVariants with any alt? or should that just happen for
             # the filter of "real" variants
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(variant_coordinate)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(qs, variant_coordinate)
     return results
 
 
@@ -327,6 +327,9 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
         # Coordinate is explicit/symbolic according to length
         if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.position):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
+            continue
+        if message := variant_coordinate.unsupported_symbolic_alt_message:
+            yield SearchMessageOverall(message, genome_builds=[genome_build])
             continue
 
         search_messages = []
@@ -344,8 +347,13 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
         visible_variants_qs = search_input.get_visible_variants(genome_build)
         results = get_results_from_variant_coordinate(genome_build, visible_variants_qs, variant_coordinate)
         if results.exists():
+            search_coordinate = variant_coordinate.as_contig_accession(genome_build)
             for v in results:
-                yield SearchResult(v.preview, messages=search_messages)
+                messages = search_messages
+                if v.coordinate.as_contig_accession(genome_build) != search_coordinate:  # found via ModifiedImportedVariant
+                    msg = f'"{variant_coordinate.format_short()}" was normalised to this variant during VCF import'
+                    messages = [*search_messages, SearchMessage(msg, LogLevel.WARNING, substituted=True)]
+                yield SearchResult(v.preview, messages=messages)
         else:
             yield from _yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
                                                                 variant_coordinate, search_messages)
@@ -894,9 +902,8 @@ def search_allele_id(search_input: SearchInputInstance):
     yield Allele.objects.filter(pk=search_input.match.group(1))
 
 
-# '::' is the HGVS/ISCN fusion convention; a single hyphen is what callers write, so it separates
-# only where neither side contains one of its own (RP11-458D21.5 is a gene name, not a pair)
-GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.]+)$")
+# The separators classification import accepts - never a single hyphen, which gene names contain (HLA-A)
+GENE_FUSION_PATTERN = re.compile(rf"^([A-Za-z0-9.\-]+?)\s*(?:{FUSION_STRING_SEPARATOR.pattern})\s*([A-Za-z0-9.\-]+)$")
 
 
 @search_receiver(
@@ -905,7 +912,7 @@ GENE_FUSION_PATTERN = re.compile(r"^([A-Za-z0-9.]+)\s*(?:::|--|-)\s*([A-Za-z0-9.
     sub_name="Gene Fusion",
     example=SearchExample(
         note="A gene fusion, named by its gene pair",
-        examples=["BCR::ABL1", "CD74-ROS1"]
+        examples=["BCR::ABL1", "CD74--ROS1"]
     ),
     enabled=settings.VARIANT_GENE_LEVEL_ENABLED,
 )

@@ -5,9 +5,10 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from patients.models import Patient
 from patients.models_enums import Sex
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     CohortGenotypeCollection,
     CohortGenotypeStats,
@@ -15,7 +16,6 @@ from snpdb.models import (
     SampleStatsCodeVersion,
 )
 from snpdb.models.models_cohort_stats import MIN_CHRX_VARIANTS_FOR_SEX_GUESS
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 
 
 class TestChrXSexGuess(TestCase):
@@ -51,7 +51,7 @@ class TestSampleDetectedSex(TestCase):
         cls.cohort = create_fake_cohort(cls.user, cls.genome_build)
         cls.sample = cls.cohort.cohortsample_set.get(sample__name='proband').sample
         cls.cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort)
-        cls.code_version = SampleStatsCodeVersion.objects.create(name="SampleStats", version=1, code_git_hash="test")
+        cls.code_version = SampleStatsCodeVersion.objects.create(name="SampleStats", version=1)
 
     def setUp(self):
         self.sample.patient = None

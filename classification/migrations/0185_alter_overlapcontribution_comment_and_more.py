@@ -25,6 +25,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='overlapcontribution',
             name='triage_state',
-            field=models.JSONField(default=classification.enums.overlaps_enums.TriageState.default_json),
+            field=models.JSONField(default=classification.enums.overlaps_enums.TriageDecision.default_json),
         ),
     ]

@@ -18,12 +18,14 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from analysis.models import AllVariantsNode, AnalysisNode, NodeTask
-from analysis.models.enums import NodeStatus, SetOperations
+from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
+from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
-from analysis.models.nodes.node_utils import cancel_node_tasks
+from analysis.models.nodes.node_utils import cancel_node_tasks, reload_analysis_nodes
+from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.tasks import analysis_update_tasks
 from analysis.tasks.analysis_update_tasks import (
     _node_launch_signature,
@@ -180,6 +182,50 @@ class TestSchedulerTasks(AnalysisSetupMixin, TestCase):
             NodeTask.objects.filter(node_version__node=child).exists(),
             "Child was locked despite parent being QUEUED",
         )
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestHiddenTemplateErrorNodes(AnalysisSetupMixin, TestCase):
+    """ A template run hides a node that fails configuration and its descendants - they go straight to
+        their error status rather than being dispatched, while the hidden analysis tags node still loads """
+
+    def setUp(self):
+        self.hidden_error = TrioNode.objects.create(analysis=self.analysis)  # no trio
+        self.hidden_child = GeneListNode.objects.create(analysis=self.analysis)
+        self.hidden_child.add_parent(self.hidden_error)
+        # Hidden after connecting, as the template run does
+        AnalysisNode.objects.filter(pk__in=[self.hidden_error.pk, self.hidden_child.pk]).update(visible=False)
+        self.hidden_child.refresh_from_db()
+        self.tags_node = TagNode.objects.create(analysis=self.analysis, name=TagNode.ANALYSIS_TAGS_NAME,
+                                                node_input=TagNodeInput.TAGGED_VARIANTS,
+                                                mode=TagNodeMode.THIS_ANALYSIS, visible=False)
+
+    def test_lease_sets_error_status_instead_of_dispatching(self):
+        leased = lease_ready_nodes(self.analysis.pk, "test-worker")
+        self.assertEqual([self.tags_node.pk], [node_id for node_id, _ in leased])
+        self.hidden_error.refresh_from_db()
+        self.hidden_child.refresh_from_db()
+        self.assertEqual(NodeStatus.ERROR_CONFIGURATION, self.hidden_error.status)
+        self.assertEqual(NodeStatus.ERROR_WITH_PARENT, self.hidden_child.status)
+        self.assertFalse(NodeTask.objects.filter(node_version__node__in=[self.hidden_error, self.hidden_child]).exists())
+
+    def test_reload_leaves_errored_hidden_nodes_alone(self):
+        AnalysisNode.objects.filter(pk=self.hidden_child.pk).update(status=NodeStatus.ERROR_WITH_PARENT)
+        AnalysisNode.objects.filter(pk=self.tags_node.pk).update(status=NodeStatus.READY)
+        child_version = self.hidden_child.version
+        tags_version = self.tags_node.version
+
+        with mock.patch.object(node_utils, "update_analysis"):
+            reload_analysis_nodes(self.analysis.pk)
+
+        self.hidden_error.refresh_from_db()
+        self.hidden_child.refresh_from_db()
+        self.tags_node.refresh_from_db()
+        self.assertEqual(NodeStatus.ERROR_CONFIGURATION, self.hidden_error.status)  # was DIRTY
+        self.assertEqual(NodeStatus.ERROR_WITH_PARENT, self.hidden_child.status)
+        self.assertEqual(child_version, self.hidden_child.version)
+        self.assertEqual(NodeStatus.DIRTY, self.tags_node.status)
+        self.assertEqual(tags_version + 1, self.tags_node.version)
 
 
 WAIT_FOR_NODE_TASK = "analysis.tasks.node_update_tasks.wait_for_node"

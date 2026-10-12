@@ -25,6 +25,7 @@ from variantgrid.settings.components.settings_paths import (
     PRIVATE_DATA_ROOT,
     SETTINGS_DIR,
 )
+from variantgrid.settings.components.tso500_settings import *  # noqa: F403 # pylint: disable=wildcard-import, unused-wildcard-import
 
 CSRF_FAILURE_VIEW = 'variantgrid.views.csrf_error'
 
@@ -127,7 +128,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 56  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 57  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -146,13 +147,13 @@ if UNIT_TEST:
 else:
     CACHES = {
         'default': {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "library.django_utils.redis_cache.UnpickleTolerantRedisCache",
             "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
             'TIMEOUT': TIMEOUT,
             'VERSION': CACHE_VERSION,
         },
         'debug-panel': {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "library.django_utils.redis_cache.UnpickleTolerantRedisCache",
             "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
             'TIMEOUT': TIMEOUT,
             'OPTIONS': {
@@ -247,6 +248,15 @@ CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 CLINGEN_ALLELE_REGISTRY_REATTEMPT_WITH_ACTUAL_REF = True
 CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS = 180  # Set to None to last forever. 180 = ~6 months
 
+# External service clients. Tests use implementations serving recorded data, so they neither depend on the services
+# being up nor take the latency of calling them. Each mock raises when asked for something its recordings don't cover,
+# naming the fixture to add. Settings rather than the test runner, so parallel test workers get them too
+CLINGEN_ALLELE_REGISTRY_API_CLASS = "snpdb.clingen_allele_api.ClinGenAlleleRegistryAPI"
+TRANSCRIPT_SEQUENCE_FETCHER_CLASS = "genes.transcript_sequence_retrieval.TranscriptSequenceFetcher"
+if UNIT_TEST:
+    CLINGEN_ALLELE_REGISTRY_API_CLASS = "snpdb.tests.utils.mock_clingen_api.MockClinGenAlleleRegistryAPI"
+    TRANSCRIPT_SEQUENCE_FETCHER_CLASS = "genes.tests.utils.mock_transcript_sequence_retrieval.MockTranscriptSequenceFetcher"
+
 # --- MatchMaker Exchange -------------------------------------------------
 # Patient-centric, phenotype-aware rare-disease matching federation (GA4GH mme-apis v1.1).
 # Disabled by default; enable per-deployment - needs incoming connections (ie on internet)
@@ -330,7 +340,7 @@ MME_FROM_EMAIL = None
 # --- Beacon v2 ------------------------------------------------------------
 # GA4GH Beacon v2 genomic data-sharing endpoint (#1661). Variant-centric discovery:
 # "does this database contain an allele at chrom:pos ref>alt on assembly?", tiered
-# (boolean -> count -> record) by requester permission. See claude/beacon_v2_plan.md.
+# (boolean -> count -> record) by requester permission.
 # Off everywhere by default; only vgaws.py (prod) and vgtest2.py (test) turn it on.
 BEACON_ENABLED = False
 BEACON_CONFIG = {
@@ -391,6 +401,11 @@ VCF_DOWNLOAD_ADMIN_ONLY = False
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
+# Uploaded VCFs have their first SNVs' REF bases checked against the build they're imported as (#2030). A wrong
+# build mismatches ~75% (chance). Over WARN the import carries an error to accept, over FAIL it stops.
+VCF_IMPORT_REF_CHECK_SNVS = 1000
+VCF_IMPORT_REF_MISMATCH_WARN_FRACTION = 0.05
+VCF_IMPORT_REF_MISMATCH_FAIL_FRACTION = 0.5
 # The INFO keys a CNV caller names the gene of a whole-gene call in - DRAGEN's TSO500 CNV output
 # writes SEGID. A VCF declaring one is imported as gene-level copy number events rather than
 # coordinates (@see snpdb.gene_level_variants), so this decides what claims the file at upload, the
@@ -439,7 +454,7 @@ HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrie
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # If set, patient phenotype text containing this string is treated as unreviewed:
-# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# matched ontology terms will not be persisted to the DB (PhenotypeDescription / TextPhenotypeMatch).
 # Users can still see live preview matches on the patient page along with a warning.
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
@@ -451,27 +466,6 @@ PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
 # posted, so it can never override a client. The group names only the extraction, and reference_id is
 # unique per specimen rather than globally, so a match under two specimens parks as Needs attention
 PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
-# A TSO500 CombinedVariantOutput's 'Pair ID' is either the patient's code on its own or the pair's
-# whole sample name with the code as a field inside it - SA Path's pipeline writes both forms, and
-# which one a run carries is not something to rely on. This regex's 'patient_code' group reads either
-# ('5_FMC080_FCUP_2619115319' -> 'FMC080', 'FMC080' -> 'FMC080'), the leading sequencing sample ID
-# changing on re-sequencing while the code stays. A lab naming pairs some other way sets its own;
-# None takes the whole Pair ID as the code, and a Pair ID the regex doesn't match accessions no patient
-TSO500_PAIR_ID_PATIENT_CODE_REGEX = r"^(?:\d+_)?(?P<patient_code>[^_]+)(?:_|$)"
-# Turning a pair's MSI and TMB numbers into a call is lab policy rather than vendor output - DRAGEN
-# writes the numbers and no call. None leaves the call blank, so a deployment that has not set its
-# policy reports the measure as not able to be determined, as it does today. A band list is
-# [(lower bound, call), ...], the call being the first whose lower bound the number reaches - the
-# words are the lab's too (SA Path: MSI-High / MSI-Low / MSS), and go into the Omico JSON as written
-TSO500_MSI_MIN_USABLE_SITES = None   # fewer 'Usable MSI Sites' than this and MSI cannot be called
-TSO500_MSI_CALL_BANDS = None         # over 'Percent Unstable MSI Sites', eg [(30, "MSI-High"), (10, "MSI-Low"), (0, "MSS")]
-TSO500_TMB_CALL_BANDS = None         # over 'Total TMB' in mut/Mb, eg [(10, "High"), (0, "Low")]
-# DRAGEN's MetricsOutput carries its own LSL/USL guideline per metric, and that is the policy a
-# library QC category is judged by. Where a lab's own methods paragraph quotes a different number
-# this overrides it: {(section name, metric): (lsl, usl)}, eg
-# {("RNA Library QC Metrics", "TOTAL_ON_TARGET_READS"): (9000000, None)} - keyed on the section too,
-# since MEDIAN_INSERT_SIZE appears in two of them. A row records which of the two it was judged by
-TSO500_LIBRARY_QC_GUIDELINES = None
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False
@@ -499,6 +493,7 @@ LIFTOVER_BATCH_SIZE = 10_000
 LIFTOVER_BCFTOOLS_ENABLED = True
 # 2025-02-13 - bcftools liftover currently gives a warning about symbolic variants
 LIFTOVER_BCFTOOLS_SYMBOLIC = False
+# Also lets a symbolic del/dup/inv shorter than this through, lifted over as its explicit sequence (#1358)
 LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
 # When False (default), BCFTools liftover SWAP=1 variants are rejected and the AlleleLiftover
@@ -685,7 +680,6 @@ CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN = False
 
 CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
 CLASSIFICATION_REDCAP_EXPORT = True
 CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful
@@ -722,6 +716,8 @@ SITE_NAME = "VariantGrid"
 # Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
 VARIANTGRID_MAJOR_VERSION = 4
 VARIANTGRID_VERSION = Git(BASE_DIR).version(VARIANTGRID_MAJOR_VERSION)
+# Read once at startup: the code this process is running, which after a git pull differs from what's on disk until restart
+GIT_HASH = Git(BASE_DIR).hash
 SITE_SHORT_NAME = "VG"  # Prefixes page titles, where there's no room for the full name
 SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
@@ -769,7 +765,7 @@ ROLLBAR = {
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
-    'code_version': Git(BASE_DIR).hash,
+    'code_version': GIT_HASH,
     # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
     'min_level': 'warning',
     'ignorable_404_urls': (
@@ -790,19 +786,23 @@ HEALTH_CHECK_ENABLED = True
 # if true, the Server Status page shows an "Integrations" section of registered integration statuses
 INTEGRATION_STATUS_ENABLED = True
 
-# {url path prefix: display name} - records when each external client last called those endpoints
+# {url path prefix: display name} - records when each external client last called those endpoints,
+# and logs every call (eventlog.models.ApiRequestLog, Settings -> API Log)
 INTEGRATION_API_TRACKING = {}
+API_REQUEST_LOG_DAYS = None  # None keeps ApiRequestLog rows forever; a number of days prunes older rows daily
+API_REQUEST_LOG_MAX_BODY = 10_000  # characters of request / error response body kept
+API_REQUEST_LOG_MAX_READ_BYTES = 1024 * 1024  # bigger request bodies are noted by size, not read
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 
 HEARTBEAT_URL = None  # URL to ping to prove scheduler is still alive
 
-STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "default_static")
+_DEFAULT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "default_static")
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    STATIC_FILES_DIR,
+    _DEFAULT_STATIC_FILES_DIR,
     # Use absolute paths, not relative paths.
 )
 
@@ -870,27 +870,20 @@ MIDDLEWARE = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'global_login_required.GlobalLoginRequiredMiddleware',  # Must be after other auth middleware
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',  # Must be after other auth middleware
     'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
     'auditlog.middleware.AuditlogMiddleware',
     #'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
     # if you want to always avoid 404, use
     # 'rollbar.contrib.django.middleware.RollbarNotifierMiddlewareExcluding404'
 
-    'htmlmin.middleware.HtmlMinifyMiddleware',
-    'htmlmin.middleware.MarkRequestMiddleware',
-    'threadlocals.middleware.ThreadLocalMiddleware',
+    'library.request_context.RequestContextMiddleware',
     'eventlog.middleware.IntegrationApiMiddleware',
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
 
     'axes.middleware.AxesMiddleware',  # Must be last
 )
-HTML_MINIFY = True
-EXCLUDE_FROM_MINIFYING = (
-    '^media/',  # Died in Django 4: FileResponse instance has no 'content' attribute. Use 'streaming_content' instead.
-)
-EXCLUDE_TAGS_FROM_MINIFYING = ("pre", "script", "textarea", "nomin", "code")
 
 ROOT_URLCONF = 'variantgrid.urls'
 
@@ -909,12 +902,13 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 
 # Turn ON in production!
 CACHE_GENERATED_FILES = True
+# A generation with no heartbeat (row save or progress update) for this long is assumed dead and is relaunched
+CACHED_GENERATED_FILE_STALLED_MINUTES = 30
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 
-    # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
-    # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
+    # DRF views are login_not_required, so the login middleware leaves token/basic auth to DRF at view time
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',  # Needed to classification export clients
         'rest_framework.authentication.SessionAuthentication',
@@ -929,7 +923,7 @@ REST_FRAMEWORK = {
 }
 
 # drf-spectacular OpenAPI schema / Swagger docs (served at /api/schema and /api/docs)
-# The docs pages are public (see PUBLIC_PATHS) but the API endpoints themselves still require auth
+# The docs pages are public (DRF views, SERVE_PERMISSIONS below) but the API endpoints themselves still require auth
 SPECTACULAR_SETTINGS = {
     'TITLE': 'VariantGrid API',
     'DESCRIPTION': 'REST API for VariantGrid - variant database, annotation and classification platform. '
@@ -1031,13 +1025,12 @@ INSTALLED_APPS = [
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'user_messages',
-    'django_dag',
+    'django_dag',  # only for old seqauto/annotation migrations - remove after squashing (#736)
     'django_js_reverse',
     'django_extensions',
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
-    'martor',
     "psqlextra",
     'rest_framework',
     'rest_framework.authtoken',
@@ -1173,26 +1166,8 @@ LOGGING = {
     }
 }
 
-# Instead of @login_required we use GlobalLoginRequiredMiddleware to block non-auth by
-# default then whitelist with @login_not_required or PUBLIC_PATHS setting below.
-
-# Django REST Framework:
-# DRF overrides Django's internals, so request.user is AnonymousUser during
-# the middleware check (and will fail with GlobalLoginRequiredMiddleware).
-# @see https://github.com/encode/django-rest-framework/issues/760#issuecomment-391127616
-# Thus for DRF we need to exclude it and add its own check (at view time)
-PUBLIC_PATHS = [
-    r'^/accounts/.*',  # allow public access to all django registration views,
-    r'^/oidc/.*',  # all oidc URLs
-    r'^/api/.*',  # OpenAPI schema + Swagger/ReDoc docs pages (drf-spectacular)
-    r'^/classification/api/.*',  # REST framework used by command line tools
-    r'^/patients/api/.*',
-    r'^/seqauto/api/.*',
-    r'^/upload/api/.*',
-    r'^/mme/api/.*',  # Inbound MME /match + /metrics - authenticated by per-peer X-Auth-Token (see mme/auth.py)
-    r'^/mme/(metrics|disclaimers)$',  # MME requires these be published publicly
-    r'^/beacon/.*',  # Beacon v2 answers anonymous requests (public tier); views still enforce per-tier permission
-]
+# Instead of @login_required, LoginRequiredMiddleware requires login everywhere. A view opts out with
+# @login_not_required (django.contrib.auth.decorators); DRF views are already marked, and check auth at view time.
 
 # Both need to be set to enable - and use get_secret in server settings files to keep out of source control
 RECAPTCHA_PUBLIC_KEY = ""  # get_secret('RECAPTCHA.public_key')
@@ -1270,10 +1245,18 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_match_test": False,
     "discordance_reports": False,
     "vus": False,
-    "maps": USE_MAPS,
-    "lab_members_tab": LAB_HEAD_MANAGE_MEMBERS,
 }
+
+# URL names that also follow a feature setting - read when the register is consulted
+# (variantgrid/perm_path.py:url_name_enabled), so an env file that changes the setting need not touch the register
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
+URLS_NAME_REGISTER_SETTINGS = {
+    "maps": "USE_MAPS",
+    "lab_members_tab": "LAB_HEAD_MANAGE_MEMBERS",
+}
+
+# The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default
+MENUS = "variantgrid.menus.MENUS"
 
 DEFAULT_TERMS_SLUG = 'site-terms'
 ACCEPT_TERMS_PATH = '/terms/accept/'
@@ -1297,6 +1280,8 @@ VARIANT_DETAILS_SHOW_SAMPLES = True
 VARIANT_DETAILS_SAMPLES_MAX_ROWS = 1000
 VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_DETAILS_NEARBY_SHOW_GENE = False
+# The nearby tab gives up after this rather than hold a web worker until DATABASE_STATEMENT_TIMEOUT_SECONDS
+VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS = 30
 
 # Can only use block or allow list. Use "text" value of link (see vc_links.js)
 VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST = []
@@ -1306,10 +1291,13 @@ VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 
-# Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
-# structural variants and use symbolic
+# A del/dup/inv of at least this size is stored as a symbolic <DEL>/<DUP>/<INV> with svlen rather than
+# ref/alt sequences - 50bp is the usual definition of a structural variant (#1358). Which annotation
+# pipeline it goes to is a separate cut-off, ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 VARIANT_SYMBOLIC_ALT_ENABLED = True
-VARIANT_SYMBOLIC_ALT_SIZE = 1000
+VARIANT_SYMBOLIC_ALT_SIZE = 50
+# Any other symbolic ALT is dropped at import (vcf_clean_alts). <INS> is left out on purpose: Manta's often has no
+# SVLEN and END=POS, so it would store with svlen 0 and unrelated insertions would collapse into one Variant
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
                                     VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
 
@@ -1369,6 +1357,7 @@ VCF_EXPORT_VERSION = "4.3"  # ##fileformat=VCFv<this> on every VCF we write (lib
 CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
 CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
 CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"
+CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "VariantGrid"  # "Classification Tags" column of the Franklin export
 
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages

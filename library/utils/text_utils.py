@@ -6,8 +6,6 @@ import string
 from collections.abc import Callable, Collection
 from typing import Any, Optional
 
-from rich.text import Text
-
 
 def pretty_label(label: str) -> str:
     label = label.replace('_', ' ')
@@ -127,16 +125,52 @@ def clean_string(input_string: str) -> str:
     return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())
 
 
-def emoji_to_unicode(text_with_emojis) -> str:
-    # To see available emojis in Rich - python3 -m rich.emoji
-    _replace = {
-        ":male-doctor:": ":man_health_worker:",
-        ":female-doctor:": ":woman_health_worker:",
-        ":face_with_cowboy_hat:": ":cowboy_hat_face:",
-        ":simple_smile:": ":smile:"
-    }
-    for old, new in _replace.items():
-        text_with_emojis = text_with_emojis.replace(old, new)
+# Slack emoji codes used in notifications, health checks and settings (SLACK "emoji"). Unknown codes are left as is
+_SLACK_EMOJI = {
+    "arrow_down": "\u2b07\ufe0f",
+    "bangbang": "\u203c\ufe0f",
+    "blue_book": "\U0001f4d8",
+    "cop": "\U0001f46e",
+    "cowboy_hat_face": "\U0001f920",
+    "crown": "\U0001f451",
+    "cry": "\U0001f622",
+    "currency_exchange": "\U0001f4b1",
+    "dizzy_face": "\U0001f635",
+    "dna": "\U0001f9ec",
+    "email": "\u2709\ufe0f",
+    "exploding_head": "\U0001f92f",
+    "face_with_cowboy_hat": "\U0001f920",
+    "female-doctor": "\U0001f469\u200d\u2695\ufe0f",
+    "file_folder": "\U0001f4c1",
+    "fire": "\U0001f525",
+    "flags": "\U0001f38f",
+    "floppy_disk": "\U0001f4be",
+    "ghost": "\U0001f47b",
+    "golfer": "\U0001f3cc\ufe0f",
+    "green_book": "\U0001f4d7",
+    "handshake": "\U0001f91d",
+    "hospital": "\U0001f3e5",
+    "hourglass_flowing_sand": "\u23f3",
+    "male-doctor": "\U0001f468\u200d\u2695\ufe0f",
+    "man_health_worker": "\U0001f468\u200d\u2695\ufe0f",
+    "mouse": "\U0001f42d",
+    "nerd_face": "\U0001f913",
+    "neutral_face": "\U0001f610",
+    "no_good": "\U0001f645",
+    "open_file_folder": "\U0001f4c2",
+    "orange_book": "\U0001f4d9",
+    "package": "\U0001f4e6",
+    "rage": "\U0001f621",
+    "simple_smile": "\U0001f604",
+    "skunk": "\U0001f9a8",
+    "smile": "\U0001f604",
+    "test_tube": "\U0001f9ea",
+    "triangular_ruler": "\U0001f4d0",
+    "tv": "\U0001f4fa",
+    "warning": "\u26a0\ufe0f",
+    "woman_health_worker": "\U0001f469\u200d\u2695\ufe0f",
+}
 
-    s = Text.from_markup(text_with_emojis)
-    return str(s)
+
+def emoji_to_unicode(text_with_emojis: str) -> str:
+    return re.sub(r":([a-z0-9_+-]+):", lambda m: _SLACK_EMOJI.get(m.group(1), m.group(0)), text_with_emojis)

@@ -1,0 +1,8 @@
+{% load settings_tags %}
+<hr/>
+{% settings_value "USE_OIDC" as use_oidc %}
+{% if use_oidc %}
+    <a href="#" onclick="postUrl('{% url 'oidc_logout' %}'); return false;" class="nav-link">Logout <i class="fas fa-sign-out-alt"></i></a>
+{% else %}
+    <a id="submenu-auth_logout" class="nav-link logout" href="#" onclick="postUrl('{% url 'auth_logout' %}'); return false;">Logout <i class="fas fa-sign-out-alt"></i></a>
+{% endif %}

@@ -23,8 +23,8 @@ either base. This is the sanctioned "don't bump modified" path going forward.
 
 `model_utils.TimeStampedModel.save()` force-adds `modified` to any
 `save(update_fields=[...])` call. `django_extensions` does not. So after migration,
-**every partial `save(update_fields=[...])` on a formerly-django_extensions model
-would also persist `modified = now()`**, where previously it left `modified`
+**every partial `save(update_fields=[...])` on a migrated django_extensions model
+would also persist `modified = now()`**, where today it leaves `modified`
 untouched (the attribute was set in `pre_save` but never written because it was
 absent from `update_fields`).
 
@@ -36,11 +36,10 @@ re-export a record.
 
 The faithful preservation mechanism is a **queryset `.update(...)`**: it compiles
 to raw SQL, never calls `save()`/`pre_save`, and so never touches `modified` under
-either base — exactly the workaround James identified. Every no-bump partial save
+either base. Every no-bump partial save
 on a migrating model must therefore be converted to `.update(...)` **before** the
-base class changes (Step 1). Every such site across all migrating apps has been
-audited and enumerated in Step 1 (classification in 1a–1c, everything else in 1d);
-there is no open audit remaining.
+base class changes (Step 1), which enumerates every such site across all migrating
+apps (classification in 1a–1c, everything else in 1d).
 
 ## Step 1 — Convert every no-bump save on migrating models to queryset updates
 
@@ -191,7 +190,7 @@ classification/models/evidence_key.py
 flags/models/models.py
 genes/models.py
 pathtests/models.py
-patients/models.py
+patients/models/models_patient.py
 seqauto/models/models_seqauto.py
 snpdb/models/models.py
 snpdb/models/models_clingen_allele.py
@@ -266,8 +265,8 @@ Add a `ManualOperation` / note in the squash PR so this cleanup is not forgotten
 - `python3 manage.py makemigrations --check` — no further model/state drift.
 - `python3 manage.py test --keepdb` — full suite; pay attention to classification
   import, sync, and export tests (the `modified`-on-partial-save behaviour change).
-- Targeted: exercise the classification patch path that previously used
-  `update_modified=False` (Step 1a) and confirm `modified` is unchanged after an
+- Targeted: exercise the classification patch path that uses
+  `update_modified=False` today (Step 1a) and confirm `modified` is unchanged after an
   import-run-only update.
 - `./scripts/linting/run_pylint.sh` — clean, and the new rule trips on a
   deliberately-added test import.

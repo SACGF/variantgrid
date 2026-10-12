@@ -186,6 +186,7 @@ def issues_download(request: HttpRequest, lab_id: Union[int, str] = 0):
     lab_picker = LabPickerData.from_request(request, lab_id)
 
     flag_filter = ClassificationFilter(
+        request=request,
         user=request.user,
         genome_build=GenomeBuild.grch38(),  # note that genome build for ExportFormatterFlags has no effect
         include_sources=lab_picker.selected_labs

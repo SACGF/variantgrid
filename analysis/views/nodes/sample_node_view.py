@@ -50,6 +50,7 @@ class SampleNodeView(GeneCoverageNodeView):
                         "has_sample_columns": self._any_sample("has_sample_columns"),
                         "has_genotype": self._any_sample("has_genotype"),
                         "has_depth": self._any_sample("has_depth"),
+                        "has_copy_ratio": self._any_sample("has_copy_ratio"),
                         # The editor tree draws the whole patient, then flags the picked subtree
                         "source_level": self.object.source_level,
                         "source_id": source_object.pk if source_object else None,
@@ -72,4 +73,5 @@ class SampleNodeView(GeneCoverageNodeView):
             kwargs["lock_input_sources"] = analysis.lock_input_sources
             kwargs["has_genotype"] = self._any_sample("has_genotype")
             kwargs["has_depth"] = self._any_sample("has_depth")
+            kwargs["has_copy_ratio"] = self._any_sample("has_copy_ratio")
         return kwargs

@@ -12,9 +12,9 @@ The file is the pair-level summary written beside the two arm directories: a ban
 whose first line is its header, and it ends at a blank line. Every line is right-padded with tabs to
 the widest section, and a lone 'NA' stands for a section with nothing in it.
 
-Section names move between module versions - 2.1.1's '[Exon-Level CNVs]' is documented as
-'Large Rearrangements' in 2.6, which also adds 'Gene-level Loss of Heterozygosity' - so a section
-this has no name for is read and kept rather than being an error.
+Section names move between module versions - 2.6 writes '[Copy Number Variants]' and
+'[Large Rearrangements]' where 2.1.1 wrote '[Gene Amplifications]' and '[Exon-Level CNVs]', and adds
+'[Loss of Heterozygosity]' - so a section this has no name for is read and kept rather than being an error.
 """
 import re
 from dataclasses import dataclass, field

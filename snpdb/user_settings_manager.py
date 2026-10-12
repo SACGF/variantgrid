@@ -1,9 +1,8 @@
 from typing import Optional
 
-from dateutil.tz import gettz
 from django.contrib.auth.models import User
-from threadlocals.threadlocals import get_current_user, get_request_variable, set_request_variable
 
+from library.request_context import get_current_user, get_request_variable, set_request_variable
 from snpdb.models import AvatarDetails, UserSettings
 
 
@@ -50,8 +49,5 @@ class UserSettingsManager:
 
     @staticmethod
     def get_user_timezone():
-        if user_settings := UserSettingsManager.get_user_settings():
-            return user_settings.tz
-        else:
-            from django.conf import settings
-            gettz(settings.TIME_ZONE)
+        """ UserSettings.tz falls back to settings.TIME_ZONE, so this is set with or without a user """
+        return UserSettingsManager.get_user_settings().tz

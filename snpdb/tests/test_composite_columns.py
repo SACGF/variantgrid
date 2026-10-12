@@ -12,10 +12,14 @@ from django.test import TestCase
 from django.test.client import Client
 from django.urls.base import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from annotation.models.models_enums import Pathogenicity
 from library.django_utils.composite_columns import collapse_into_composite
-from snpdb.grid_columns.custom_columns import get_variant_grid_columns, variant_column_rich_column
+from snpdb.grid_columns.custom_columns import (
+    DBNSFP_NOTE,
+    get_variant_grid_columns,
+    variant_column_rich_column,
+)
 from snpdb.grids import variant_grid_client_extra
 from snpdb.models import (
     CompositeColumnMember,
@@ -110,6 +114,13 @@ class CompositeColumnGridTest(TestCase):
         self.assertEqual(0, names.index("variantannotation__spliceai_pred_ds_ag"))
         self.assertTrue(columns[0].visible)
 
+    def test_dbnsfp_columns_note_non_synonymous_snvs_in_tooltip(self):
+        column_ids = ["revel_rankscore", "gene_symbol"]
+        header_titles = {rc.name: rc.header_title for rc in self._columns(column_ids)}
+        dbnsfp_column, other_column = (VariantGridColumn.objects.get(pk=pk).variant_column for pk in column_ids)
+        self.assertIn(DBNSFP_NOTE, header_titles[dbnsfp_column])
+        self.assertNotIn(DBNSFP_NOTE, header_titles[other_column])
+
     def test_every_composite_has_members_that_are_real_columns(self):
         """ Guards the migration's table - a composite with no members would draw an empty cell """
         catalogue = set(VariantGridColumn.objects.values_list("pk", flat=True))
@@ -202,8 +213,8 @@ class CustomColumnsArrangePageTest(TestCase):
         response = client.get(url)
         self.assertEqual(200, response.status_code)
         content = response.content.decode()
-        self.assertIn('composite-column cursor-move" column_id="spliceai"', content)
-        self.assertIn('composite-member cursor-move" column_id="spliceai_max_ds"', content)
+        self.assertIn('composite-column cursor-move" id="spliceai" column_id="spliceai"', content)
+        self.assertIn('composite-member cursor-move" id="spliceai_max_ds" column_id="spliceai_max_ds"', content)
         self.assertIn("Show columns already inside a composite", content)
 
     def test_row_id_column_is_kept_out_of_both_lists(self):
@@ -220,7 +231,7 @@ class CustomColumnsArrangePageTest(TestCase):
         client.force_login(self.user)
         url = reverse("view_custom_columns", kwargs={"custom_columns_collection_id": self.ccc.pk})
         content = client.get(url).content.decode()
-        locked = re.findall(r'class="user-column mandatory [^"]*" column_id="(\w+)"', content)
+        locked = re.findall(r'class="user-column mandatory [^"]*" id="\w+" column_id="(\w+)"', content)
         self.assertEqual(["tags", "tags_global", "Sample"], locked)
         self.assertEqual(3, content.count('class="fas fa-lock mandatory-lock"'))
 

@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 
 from analysis.models import Analysis
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 
 

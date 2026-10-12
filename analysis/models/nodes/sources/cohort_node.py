@@ -13,13 +13,11 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.stats_cache import (
-    UNCACHEABLE,
     get_cached_label_count_for_cohort,
-    get_handler_for_node,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.models_enums import SimpleZygosity, Zygosity
-from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantsType
+from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantOrigin
 from snpdb.views.datatable_view import NullOrder, RichColumn
 
 
@@ -51,6 +49,10 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             in count_for_zygosity. """
         return [True, True, True, True]
 
+    def get_stats_filter_key(self) -> Optional[str]:
+        """ The precomputed cohort stats bucket counts are read from - None is the raw aggregate row """
+        return None
+
     def _get_cached_label_count(self, label):
         cohort = self._get_cohort()
         if cohort is None:
@@ -60,14 +62,10 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):
             return None
-        handler = get_handler_for_node(self)
-        filter_key = handler.filter_key_for_node(self)
-        if filter_key is UNCACHEABLE:
-            return None
         return get_cached_label_count_for_cohort(
             cohort=cohort,
             sample=None,  # aggregate row
-            filter_key=filter_key,
+            filter_key=self.get_stats_filter_key(),
             annotation_version=self.analysis.annotation_version,
             passing_filter=bool(filter_code),
             zygosities=self._cached_label_count_zygosities(),
@@ -184,6 +182,12 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
+            if not cohort.is_sub_cohort:
+                # The genotype join is a LEFT OUTER, and default count bounds are dropped as no-ops, so
+                # without this a full cohort with no zygosity filter returns every variant in the database
+                alias = self.cohort_genotype_collection.cohortgenotype_alias
+                q_in_cohort = Q(**{f"{alias}__isnull": False})
+                self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q_in_cohort): q_in_cohort}})
             self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
             self.merge_arg_q_dicts(arg_q_dict, self.get_cohort_settings_arg_q_dict(cohort))
         return arg_q_dict
@@ -347,7 +351,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         vcf = self._get_vcf()
 
         if is_new and vcf:
-            somatic_samples = vcf.sample_set.filter(variants_type__in=VariantsType.SOMATIC_TYPES)
+            somatic_samples = vcf.sample_set.filter(variants_type__in=VariantOrigin.SOMATIC_TYPES)
             if somatic_samples.exists():
                 # Somatic mode...
                 self.accordion_panel = self.SIMPLE_ZYGOSITY

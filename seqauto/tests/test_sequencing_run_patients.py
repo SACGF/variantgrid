@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus
-from seqauto.models import SampleFromSequencingSample
+from seqauto.models import DragenTSO500CombinedVariantOutput, SampleFromSequencingSample
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from seqauto.views import _get_sequencing_run_patients
 from snpdb.models import VCF, Sample
@@ -19,7 +19,7 @@ class SequencingRunPatientsTest(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.user = User.objects.create_superuser(username="run_patients_user")
-        sequencing_run = make_sequencing_run("RUN_PATIENTS")
+        cls.sequencing_run = sequencing_run = make_sequencing_run("RUN_PATIENTS")
         cls.sample_sheet, (cls.ss_claimed, cls.ss_hand_set, cls.ss_unmatched) = make_sample_sheet(
             sequencing_run, ["CLAIMED", "HAND_SET", "UNMATCHED"])
 
@@ -56,3 +56,11 @@ class SequencingRunPatientsTest(TestCase):
         (unmatched,) = data["unmatched_run_samples"]
         self.assertIsNone(unmatched.sample)
         self.assertEqual(unmatched.match_record.extraction_match_status, MatchStatus.PENDING)
+
+    def test_tso500_pair_linked_by_its_arm_rows(self):
+        cvo = DragenTSO500CombinedVariantOutput.objects.create(sequencing_run_name=self.sequencing_run.name,
+                                                               pair_id="1_C0000001_X_2600000001", user=self.user,
+                                                               dna_sequencing_sample=self.ss_claimed,
+                                                               rna_sequencing_sample=self.ss_hand_set)
+        (run_patient,) = _get_sequencing_run_patients(self.sample_sheet, self.user)["run_patients"]
+        self.assertEqual(run_patient["tso500_pairs"], [(cvo.pair_id, cvo.get_absolute_url())])

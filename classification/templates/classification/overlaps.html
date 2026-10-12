@@ -1,23 +1,21 @@
 {% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
 {% load ui_help %}
 {% load ui_utils %}
 {% load js_tags %}
 {% load lab_tags %}
 {% block title %}Overlaps{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <style>
     .overlaps tbody tr td {
         height: 70px;
     }
-    .dt-classification {
+    .overlaps .dt-classification {
         width: 280px;
     }
-    .dt-testing_context {
+    .overlaps .dt-testing_context {
         width: 100px;
     }
-    .dt-summary {
+    .overlaps .dt-summary {
         width: 400px;
     }
 </style>

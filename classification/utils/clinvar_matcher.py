@@ -278,8 +278,7 @@ class ClinVarLegacyRow:
             if c_hgvs_preferred_str := self.c_hgvs_preferred_str:
                 search_input = SearchInput(user=admin_bot(), search_string=c_hgvs_preferred_str, genome_build_preferred=GenomeBuild.grch38())
                 try:
-                    response = search_hgvs(sender=None, search_input=search_input)
-                    # note, the method signature is correct, the annotation on search_hgvs makes it take a search_input not a search_input_instance
+                    response = search_hgvs.search(search_input)
                     for result_entry in response.results:
                         result = result_entry.preview.obj
                         allele: Optional[Allele] = None

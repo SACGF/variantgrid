@@ -24,6 +24,7 @@ from snpdb.models import (
     ImportStatus,
     Sample,
 )
+from snpdb.models.models_enums import ProcessingStatus
 from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
 from upload.models.models import FileUpload, UploadData
@@ -73,8 +74,20 @@ class UploadedBed(UploadData):
         self.genomic_intervals_collection.import_status = ImportStatus.SUCCESS
         self.genomic_intervals_collection.save()
 
+    def process_bed_file_after_user_input(self):
+        """ Finishes the import ImportBedFileTask stopped for want of a genome build, now the user has set it """
+        self.process_bed_file()
+        upload_pipeline = self.file_upload.uploadpipeline
+        if upload_pipeline.status == ProcessingStatus.TERMINATED_EARLY:
+            upload_pipeline.success(self.genomic_intervals_collection.processed_records)
+
     def get_data(self):
         return self.genomic_intervals_collection
+
+    @property
+    def requires_user_input(self) -> bool:
+        gic = self.genomic_intervals_collection
+        return gic is not None and gic.import_status == ImportStatus.REQUIRES_USER_INPUT
 
 
 class UploadedPedFile(UploadData):

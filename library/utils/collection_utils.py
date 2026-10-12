@@ -5,6 +5,7 @@ from abc import ABC
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from graphlib import TopologicalSorter
 from itertools import islice
 from typing import Any, Generic, Optional, TypeVar, Union
 
@@ -12,6 +13,17 @@ from django.utils.functional import SimpleLazyObject
 
 DictKey = TypeVar("DictKey")
 DictVal = TypeVar("DictVal")
+
+
+def toposort_groups(dependencies: dict[DictKey, Iterable[DictKey]]) -> Iterator[set[DictKey]]:
+    """ Yields sets of items whose dependencies were all in earlier sets (self-dependencies ignored).
+        Raises graphlib.CycleError on a cycle """
+    sorter = TopologicalSorter({item: {d for d in deps if d != item} for item, deps in dependencies.items()})
+    sorter.prepare()
+    while sorter.is_active():
+        ready = sorter.get_ready()
+        yield set(ready)
+        sorter.done(*ready)
 
 
 def invert_dict(source_dict: dict[DictKey, DictVal]) -> dict[DictVal, DictKey]:

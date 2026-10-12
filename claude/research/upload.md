@@ -21,8 +21,8 @@ outright when `variantgrid/settings/components/default_settings.py:UPLOAD_ENABLE
 creates the `upload/models/models.py:FileUpload` with `import_source=WEB_UPLOAD` (even for the API - the `path` a client
 sends is a hint about *its* filesystem, not ours), works out the file type from the extension through
 `upload/uploaded_file_type.py:get_uploaded_file_type`, validates any upload metadata while the client is still connected
-(`upload/upload_metadata.py:validate_upload_metadata` - a bad key or an unresolvable build is a 400 now, not a failed
-import three stages later), stores the sha256 (`FileUpload.store_sha256_hash`) and calls
+(`upload/upload_metadata.py:validate_upload_metadata` - a bad key or an unresolvable build is a 400 rather than a
+failed import three stages later), stores the sha256 (`FileUpload.store_sha256_hash`) and calls
 `upload/upload_processing.py:process_uploaded_file`. The API de-duplicates by that hash before saving anything:
 `APIFileUploadView._get_existing_file_upload` returns the newest successfully-processed upload with the same content the
 user can view, so a client re-sending a file gets the old `file_upload_id` back unless it passes `force`. The two
@@ -74,7 +74,7 @@ if nothing but FINISH-dependent steps remain, it fires the FINISH stage. The rac
 "last" is resolved by running `upload/tasks/vcf/import_vcf_step_task.py:schedule_pipeline_stage_steps` on the
 `scheduling_single_worker` queue and having it set `start_date` on each waiting step as it launches it, so a second
 invocation finds nothing to launch. FINISH steps run as a chain terminating in `pipeline_success_task` rather than a
-chord, because the chord version produced endless `celery.chord_unlock` retries (#175).
+chord, because a chord produces endless `celery.chord_unlock` retries (#175).
 
 ### Header first: the VCF model
 
@@ -192,8 +192,7 @@ processing directory when `IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS` is se
 `pipeline_success_task` is the only thing that takes a pipeline out of PROCESSING, and its `status == PROCESSING` guard
 is load-bearing: FINISH can be scheduled more than once, and the guard is what makes the second run a no-op. That makes
 it fragile in one direction - a FINISH step that sets SUCCESS itself swallows the real close, taking the timings, the
-success Event and the cleanup with it. #928 removed the step that did (`UploadPipelineFinishedTask`), so a FINISH task
-class must leave the status alone. Deleting the pipeline row cleans up too: `upload/models/models.py:upload_pipeline_post_delete_handler`
+success Event and the cleanup with it, so a FINISH task class must leave the status alone (#928). Deleting the pipeline row cleans up too: `upload/models/models.py:upload_pipeline_post_delete_handler`
 removes the processing directory and, for a generated input VCF, the directory holding it.
 
 ### Failure and retry
@@ -223,7 +222,7 @@ for each chunk, by the header task per sample - and still be scheduled correctly
 "is anything in this stage still open" rather than following a fixed list.
 
 Variants are found by hash, not by unique index, because `snpdb_variant` is the biggest hot table in every deployment
-and a unique constraint over (locus, alt, svlen) with the insert rate of a whole-genome VCF was the bottleneck;
+and a unique constraint over (locus, alt, svlen) with the insert rate of a whole-genome VCF is the bottleneck;
 `VariantPKLookup` computes the same hash the SQL side can, so lookups are index scans and inserts are COPY. The cost is
 the serialised `InsertUnknownVariantsTask`, which is why chunking keeps the unknown-variant CSVs small and the genotype
 phase (which only needs existing ids) is the parallel one.
@@ -236,27 +235,8 @@ annotated in preprocess, which is why that annotation step sits in the pipe rath
 Normalisation history is kept as `ModifiedImportedVariant` because users search for the coordinate that was in their
 file, not the left-aligned one: `ModifiedImportedVariant.get_variant_for_unnormalized_variant` and
 `get_other_loci_variants_by_multiallelic` answer "where did my variant go", and `ModifiedImportedVariants.get_for_pipeline`
-hangs the collection off the normalize sub-step so the tool version is recorded with it. Rows written before the bcftools
-move still hold vt-format `OLD_VARIANT` strings, which `_vt_split_old_variant` parses, so the model reads both.
-
-## History
-
-The pipeline began as `vt decompose | vt normalize` and moved to bcftools over 2023-25: multi-allelic splitting was
-moved ahead of normalisation to handle gVCFs (#1236), `N` reference bases are replaced from the fasta (#888), and
-`--rm-dup` was dropped once it was found to strip the old-record tag (#985); the last vt references left with the
-unsorted-VCF work (#127, 2026-08), which also added the `bcftools sort` retry. Standard contigs only and the
-clean-and-filter command arrived with the T2T build (#814, #1082). SVLEN handling was hardened for Manta (#1245) and
-DRAGEN (#1268), and symbolic alt conversion added (#1247), each bumping `VCF_IMPORTER_VERSION`.
-
-Annotation waiting was rewritten per pipeline type in 2026-07 (#1656) after the AnnotSV lane was split from the SV VEP run
-(#720): a single `max_variant` meant a stalled SV run blocked VCFs whose short variants were long done. The token API
-for upload, status and annotated download landed the same month (#1640), with sha256 de-duplication (md5 was retired
-in #1092) and the upload-metadata mechanism for declaring build and source (#1711) and, for SA Pathology, sample
-extractions (#1707). The web widget moved from jQuery File Upload to FilePond (#1566, 2026-05); `UploadedFile` was
-renamed `FileUpload` in 2026-08 because it collided with Django's own class. Gene fusions from DRAGEN TSO500
-AllFusions.csv became a VCF-shaped pipeline (#1506), which is why gene-level variants have their own preprocess.
-Guards for steps deleted mid-flight (#1593), the re-runnable retry, pipefail in the pipe (#3813) and the private-repo
-security hardening of paths (#3825) are all 2026.
+hangs the collection off the normalize sub-step so the tool version is recorded with it. Legacy rows
+hold vt-format `OLD_VARIANT` strings, which `_vt_split_old_variant` parses, so the model reads both.
 
 ## Traps
 

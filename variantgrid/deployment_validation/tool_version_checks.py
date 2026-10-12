@@ -8,6 +8,7 @@ import gzip
 import logging
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 
@@ -17,6 +18,8 @@ from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
 from upload.vcf.vcf_preprocess import get_bcftools_tool_version, get_split_vcf_command
 
+# Bump to the release that fixes https://github.com/samtools/bcftools/issues/2601 - norm doesn't left-align
+# a <DUP> with END but no SVLEN, so those are stored as called and miss HGVS search
 _REQUIRED_BCFTOOLS_VERSION = (1, 20)
 _INSTALL_BCFTOOLS = "https://github.com/SACGF/variantgrid/wiki/Install-bcftools-liftover"
 _INSTALL_HTSLIB = "Install htslib bgzip/tabix (Debian/Ubuntu: 'apt install tabix', or from https://github.com/samtools/htslib)"
@@ -65,8 +68,8 @@ def check_vcf_split_pipe() -> bool:
         with open(records_filename, "w") as f:
             f.writelines(_SPLIT_CHECK_RECORDS)
 
-        split_cmd = " ".join(get_split_vcf_command("check", split_file_rows=2))
-        shell_command = f"set -o pipefail; cat {records_filename} | {split_cmd}"
+        split_cmd = shlex.join(get_split_vcf_command("check", split_file_rows=2))
+        shell_command = f"set -o pipefail; cat {shlex.quote(records_filename)} | {split_cmd}"
         env = {**os.environ, "VG_HEADER_FILE": header_filename, "VG_SPLIT_VCF_DIR": split_vcf_dir}
         subprocess.run(shell_command, shell=True, executable="/bin/bash", env=env, check=True,
                        capture_output=True, text=True)

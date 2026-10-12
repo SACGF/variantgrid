@@ -1,7 +1,7 @@
 """
 Tests for PartitionArchive model + archive_partitioned_model helper.
 
-@see claude/issue_1537_archive_plan.md §7
+@see https://github.com/SACGF/variantgrid/issues/1537
 """
 
 import tempfile
@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import AnnotationVersion, VariantAnnotationVersion
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild

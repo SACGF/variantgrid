@@ -3,6 +3,7 @@ from django.urls import include
 from django.urls.conf import path as path_standard
 from django.views.generic import RedirectView
 
+from library.django_utils import require_superuser
 from library.preview_request import preview_view
 from snpdb.grids import (
     AlleleLiftoverFailureColumns,
@@ -79,6 +80,7 @@ urlpatterns = [
     path('duos', views_cohort.duos, name='duos'),
     path('view_duo/<int:pk>', views_cohort.view_duo, name='view_duo'),
     path('sample_files_tab/<int:sample_id>', views_data.sample_files_tab, name='sample_files_tab'),
+    path('vcf_sample_files_tab/<int:vcf_id>', views_data.vcf_sample_files_tab, name='vcf_sample_files_tab'),
     path('sample_variants_tab/<int:sample_id>', views_data.sample_variants_tab, name='sample_variants_tab'),
     path('sample_variants_gene_detail/<int:sample_id>/<gene_symbol>', views_data.sample_variants_gene_detail, name='sample_variants_gene_detail'),
     path('sample_graphs_tab/<int:sample_id>', views_data.sample_graphs_tab, name='sample_graphs_tab'),
@@ -160,12 +162,12 @@ urlpatterns = [
          DatabaseTableView.as_view(column_class=SampleSkippedAnnotationColumns),
          name='sample_skipped_annotation_datatable'),
     path('genomic_intervals/datatable/', DatabaseTableView.as_view(column_class=GenomicIntervalsListColumns), name='genomic_intervals_datatable'),
-    path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
+    path('liftover/liftover_runs/datatable', require_superuser(DatabaseTableView.as_view(column_class=LiftoverRunColumns)),
          name='liftover_runs_datatable'),
-    path('liftover/allele_liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns),
+    path('liftover/allele_liftover/datatable', require_superuser(DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns)),
          name='allele_liftover_datatable'),
     path('liftover/allele_liftover_failures/datatable',
-         DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns),
+         require_superuser(DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns)),
          name='allele_liftover_failures_datatable'),
     path('manual_variant_entry_collections/datatable',
          DatabaseTableView.as_view(column_class=ManualVariantEntryCollectionColumns),

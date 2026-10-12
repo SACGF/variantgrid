@@ -6,9 +6,16 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from analysis.models import Analysis, VariantTag
-from annotation.fake_annotation import create_fake_variants
+from annotation.fake_data import create_fake_variants
 from classification.enums import AlleleOriginBucket
-from snpdb.models import Allele, AlleleOriginFilterDefault, GenomeBuild, Tag, UserSettingsOverride, Variant
+from snpdb.models import (
+    Allele,
+    AlleleOriginFilterDefault,
+    GenomeBuild,
+    Tag,
+    UserSettingsOverride,
+    Variant,
+)
 from variantopedia.views_tag_stats import _grouped_series
 
 LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}

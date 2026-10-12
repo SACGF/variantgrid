@@ -1,9 +1,9 @@
-{% extends menu_genes_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_help %}
 
 {% block title %}Canonical Transcripts{% endblock title %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     {% page_help page_id='genes/canonical_transcripts_help' title='Canonical Transcripts' %}
 
     {% if default_ctc %}
@@ -12,4 +12,4 @@
 
     <table id="canonical-transcripts-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'canonical_transcript_collections_datatable' %}"></table>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

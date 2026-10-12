@@ -3,7 +3,6 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version
 from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource
 from classification.models import (
     Classification,
@@ -16,6 +15,7 @@ from classification.models.classification_variant_fields_validation import (
 )
 from classification.models.evidence_key import resolve_default_value
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.fake_data import create_fake_gene_version
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -76,7 +76,7 @@ class GeneConsensusGroupsTestCase(TestCase):
         ClassificationTestUtils.setUp()
         self.lab, self.user = ClassificationTestUtils.lab_and_user()
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        _create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
+        create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
 
     def _classify(self, lab_record_id: str, allele_origin: str, h_summary: str, curation_date: str) -> Classification:
         classification = Classification.create(

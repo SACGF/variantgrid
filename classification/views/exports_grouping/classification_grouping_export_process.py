@@ -2,17 +2,18 @@ import zipfile
 from datetime import datetime
 from enum import Enum, auto
 from io import StringIO
-from typing import Optional, Iterator, Any
+from typing import Any, Iterator, Optional
 
 from django.contrib.auth.models import User
-from django.http import HttpResponseBase, StreamingHttpResponse, HttpResponse
-from django.shortcuts import render
+from django.http import HttpResponse, HttpResponseBase, StreamingHttpResponse
 from more_itertools.more import peekable
 from stream_zip import ZIP_64
-from threadlocals.threadlocals import get_current_request
-from classification.views.exports_grouping.classification_grouping_export_filter import \
-    ClassificationGroupingExportFormat, ClassificationGroupingExportFileSettings
-from library.log_utils import report_exc_info, NotificationBuilder
+
+from classification.views.exports_grouping.classification_grouping_export_filter import (
+    ClassificationGroupingExportFileSettings,
+    ClassificationGroupingExportFormat,
+)
+from library.log_utils import NotificationBuilder, report_exc_info
 from library.utils import http_header_date_now
 
 
@@ -53,6 +54,9 @@ class ClassificationGroupingExportProcess:
         if custom_parts := self.classification_export_format.extra_filename_parts():
             filename_parts.extend(custom_parts)
 
+        if allele_origin_filter := self.classification_export_format.classification_grouping_filter.allele_origin:
+            filename_parts.append(allele_origin_filter.label)
+
         if lab_mode := self.classification_export_format.classification_grouping_filter.lab_mode:
             filename_parts.append(lab_mode)
 
@@ -66,7 +70,7 @@ class ClassificationGroupingExportProcess:
             else:
                 filename_parts.append(f"part_{part}")
 
-        filename = "_".join(filename_parts)
+        filename = "_".join(p.lower() for p in filename_parts)
 
         return f"{filename}.{extension_override or self.format_properties.extension}"
 
@@ -74,20 +78,12 @@ class ClassificationGroupingExportProcess:
         """
         Start generating the data and return it in an HTTP Response
         """
-        benchmarking = False
-        if benchmarking:
-            for count, row in enumerate(self._yield_single_file()):
-                if count > 100:
-                    break
-            return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
-
         if self.export_settings.rows_per_file:
             return self._non_streaming_zip()
         else:
             self.file_count = 1
             # can stream in single file
             response = StreamingHttpResponse(streaming_content=self._yield_single_file(), content_type=self.format_properties.http_content_type)
-            response.minify_response = False
             response['Last-Modified'] = self.latest_header_date
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response

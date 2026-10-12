@@ -3,13 +3,13 @@ from functools import cached_property
 from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_not_required
 from django.db.models.aggregates import Count
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
-from global_login_required import login_not_required
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion

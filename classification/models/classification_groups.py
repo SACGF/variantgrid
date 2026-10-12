@@ -4,9 +4,9 @@ from functools import cached_property
 from itertools import groupby
 from typing import Generic, Optional, TypeVar
 
-import deprecation
 from django.contrib.auth.models import User
 from more_itertools import first
+from typing_extensions import deprecated
 
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import ShareLevel, SpecialEKeys
@@ -20,7 +20,7 @@ from classification.models import (
 )
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
-from genes.hgvs import HGVSDisplay, PHGVS
+from genes.hgvs import PHGVS, HGVSDisplay
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
@@ -118,7 +118,7 @@ class ClassificationGroupEntry:
         return False
 
 
-@deprecation.deprecated("Use ClassificationGrouping whenever possible")
+@deprecated("Use ClassificationGrouping whenever possible")
 class ClassificationGroupUtils:
 
     def __init__(
@@ -178,7 +178,7 @@ class ClassificationGroupUtils:
         )
 
 
-@deprecation.deprecated("Use ClassificationGrouping whenever possible")
+@deprecated("Use ClassificationGrouping whenever possible")
 class ClassificationGroup:
 
     def __init__(self,
@@ -434,7 +434,7 @@ class ClassificationGroup:
     #     return None
 
 
-@deprecation.deprecated("Use ClassificationGrouping whenever possible")
+@deprecated("Use ClassificationGrouping whenever possible")
 class ClassificationGroups:
 
     def __init__(self,

@@ -26,5 +26,5 @@ $(document).ready(function() {
 {% datatable_user_data_filter 'samples-datatable' 'Samples' %}
 <table id="samples-datatable" class="sticky-header"
        data-datatable-url="{% url 'samples_list_datatable' %}"
-       data-datatable-data="vcfGridDatatableFilter"></table>
+       data-datatable-data="vcfGridDatatableFilter('samples-datatable')"></table>
 </div>

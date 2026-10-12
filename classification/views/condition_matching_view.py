@@ -26,7 +26,7 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
-class ConditionTextColumns(DatatableConfig):
+class ConditionTextColumns(DatatableConfig[ConditionText]):
 
     def __init__(self, request):
         super().__init__(request)

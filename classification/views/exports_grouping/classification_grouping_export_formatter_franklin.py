@@ -12,6 +12,8 @@ from django.urls import reverse
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap, ClassificationGrouping
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
+from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObjDate
+from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
     ClassificationGroupingExportFilter, ClassificationGroupingByAlleleAndOrigin
@@ -61,13 +63,13 @@ class FranklinExportRow(ExportRow):
 
     @export_column("Classification Date")
     def classification_date(self):
-        # hardcoded to 2000-01-01 so as to not change and cause duplicate records
+        # hardcoded to 2000-01-01 to not change and cause duplicate records
         # as well as be old enough that it shouldn't be suggested to copy the details into a new record
         return "2000-01-01"
 
     GERMLINE_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
@@ -77,12 +79,11 @@ class FranklinExportRow(ExportRow):
     }
     ONCOGENIC_CLASSIFICATION_MAPPER = {
         "B": "BENIGN",
-        "LB": "LIKELY PATHOGENIC",
+        "LB": "LIKELY BENIGN",
         "VUS": "VUS",
         "VUS_A": "VUS",
         "VUS_B": "VUS",
         "VUS_C": "VUS",
-        # TODO should we map LP, P to Likely Oncogenic, Oncogenic too?
         "LO": "LIKELY ONCOGENIC",
         "O": "ONCOGENIC"
     }
@@ -90,7 +91,7 @@ class FranklinExportRow(ExportRow):
         SomaticClinicalSignificanceValue("tier_1"): "TIER_1",
         SomaticClinicalSignificanceValue("tier_1", "A"): "TIER_1A",
         SomaticClinicalSignificanceValue("tier_1", "B"): "TIER_1B",
-        SomaticClinicalSignificanceValue("tier_1_or_2"): "TIER_1",  # TODO make sure there is a warning about this
+        SomaticClinicalSignificanceValue("tier_1_or_2"): "TIER_1",  # The summary will provide the more accurate value
         SomaticClinicalSignificanceValue("tier_2"): "TIER_2",
         SomaticClinicalSignificanceValue("tier_2", "C"): "TIER_2C",
         SomaticClinicalSignificanceValue("tier_2", "D"): "TIER_2D",
@@ -153,14 +154,13 @@ class FranklinExportRow(ExportRow):
         all_classification_values = list(classification_key.sort_values(set(all_classification_values)))
         formatted_classification_values = [classification_key.pretty_value(v) for v in all_classification_values]
 
-        # FIXME triaged values for somatic clin sig wont include amp level - A,B,C etc
-        all_clinsig_values = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in
+        all_clinsig_values: list[SomaticClinicalSignificanceValue | None] = [cm.latest_cached_summary_obj.somatic.somatic_clinical_significance_value for cm in
                               self.data.classification_groupings]
         all_clinsig_values = [v for v in all_clinsig_values if v is not None]  # clear out unclassified
-        all_clinsig_values = [cs.pretty_value for cs in sorted(set(all_clinsig_values))]
+        all_clinsig_values = [cs.pretty_str for cs in sorted(set(all_clinsig_values))]
 
-        latest_date = None
-        latest_date_str = None
+        latest_date: Optional[ClassificationSummaryCacheObjDate] = None
+        latest_date_str: Optional[str] = None
 
         all_labs = set()
         for cms in self.data.classification_groupings:
@@ -192,8 +192,7 @@ class FranklinExportRow(ExportRow):
 
     @export_column("Classification Tags")
     def classification_tags(self):
-        # TODO make this a setting
-        return "Shariant"
+        return settings.CLASSIFICATION_FRANKLIN_EXPORT_TAGS
 
     @export_column("Genome Build")
     def genome_build(self):
@@ -214,6 +213,8 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
                  ):
         self.franklin_formatter_details = franklin_formatter_details
         super().__init__(classification_grouping_filter)
+        if classification_grouping_filter.allele_origin != AlleleOriginBucket.GERMLINE:
+            raise InvalidExportParameter("Franklin export requires Allele Origin to be set to Germline.")
 
     @classmethod
     def format_properties(cls) -> ClassificationGroupingExportFormatProperties:
@@ -226,6 +227,9 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
     def genome_build(self) -> GenomeBuild:
         return self.franklin_formatter_details.genome_build
 
+    def extra_filename_parts(self) -> list[str]:
+        return ["franklin", self.genome_build.name]
+
     def header(self) -> list[str]:
         return [delimited_row(FranklinExportRow.csv_header(), delimiter='\t', include_new_line=False)]
 
@@ -233,7 +237,8 @@ class ClassificationGroupingExportFormatterFranklin(ClassificationGroupingExport
         return self.classification_grouping_filter.queryset(genome_build=genome_build).prefetch_related("overlapcontribution_set")
 
     def single_row_generator(self) -> Iterator[str]:
-
+        # loop through each allele and see if it has the relevant output value for
+        # germline, somatic and oncogenic, if so, actually produce the row
         def data_iterator():
             for allele_grouping in self.allele_group_iterator():
                 for allele_origin_grouping in allele_grouping.sub_by_allele_origin():

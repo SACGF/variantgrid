@@ -145,7 +145,7 @@ def get_range_lock_gaps_with_variants(variant_annotation_version: VariantAnnotat
     gaps_qs = gaps_qs.filter(min_variant_id__gt=F("prev_max_variant_id") + 1)
 
     build_variants_qs = Variant.objects.filter(Variant.get_contigs_q(variant_annotation_version.genome_build),
-                                               *VariantAnnotation.VARIANT_ANNOTATION_Q)
+                                               *VariantAnnotation.get_variant_annotation_q_list())
     gaps_with_variants = []
     for prev_max_id, next_min_id in gaps_qs.values_list("prev_max_variant_id", "min_variant_id"):
         gap_qs = build_variants_qs.filter(pk__gt=prev_max_id, pk__lt=next_min_id)

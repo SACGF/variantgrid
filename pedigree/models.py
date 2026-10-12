@@ -1,8 +1,9 @@
 """
 Pedigrees over PED files: PedFile / PedFileFamily / PedFileRecord hold the parsed file, Pedigree links
-a family to a Cohort through CohortSamplePedFileRecord (one per record, or the pedigree is invalid -
-see validate), and create_automatch_pedigree builds one by matching sample names. Trio / Duo / Quad in
-snpdb are the fixed-shape alternatives.
+a family to a Cohort through CohortSamplePedFileRecord (a record without one is simply left out of the
+analysis - nothing checks the mapping is complete; validate checks the records themselves: parent sexes
+and at least one affected member), and create_automatch_pedigree builds one by matching sample names.
+Trio / Duo / Quad in snpdb are the fixed-shape alternatives.
 """
 from collections.abc import Iterable
 
@@ -198,6 +199,10 @@ class PedigreeInheritance(models.TextChoices):
 
 
 def create_automatch_pedigree(user, ped_file_family, cohort):
+    """ Returns the existing pedigree over this family and cohort if there is one """
+    if pedigree := Pedigree.objects.filter(cohort=cohort, ped_file_family=ped_file_family).first():
+        return pedigree
+
     name = f"Auto Pedigree for {ped_file_family}/{cohort}"
     pedigree = Pedigree.objects.create(user=user,
                                        name=name,
