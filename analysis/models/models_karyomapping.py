@@ -85,9 +85,7 @@ class KaryotypeBins:
 
     @staticmethod
     def create_get_genotypes_function(trio):
-        #  CohortGenotypeCollection.samples_zygosity is packed in sample_id order
-        cohort_list = list(trio.cohort.cohortsample_set.all().order_by("sample_id"))
-        indicies = [cohort_list.index(cs) for cs in [trio.proband, trio.father, trio.mother]]
+        indicies = [cs.cohort_genotype_packed_field_index for cs in [trio.proband, trio.father, trio.mother]]
 
         def get_genotypes_func(samples_zygosity):
             return tuple(samples_zygosity[i] for i in indicies)
