@@ -297,6 +297,24 @@ class SomalierAllSamplesPairsTest(TestCase):
         self.assertEqual(new_relate, pair.relate)
         self.assertAlmostEqual(0.9, pair.relatedness)
 
+    def test_get_for_sample_only_pairs_user_can_view(self):
+        """ #1843 - the other sample of a pair is named on the page, so it must be one the user can view """
+        other_user = User.objects.get_or_create(username='somalier_pairs_other_user')[0]
+        hidden = create_fake_cohort(other_user, GenomeBuild.get_name_or_alias("GRCh37"), name="hidden") \
+            .cohortsample_set.get(sample__name="proband").sample
+        father = self.cohort.cohortsample_set.get(sample__name="father").sample
+        relate = SomalierAllSamplesRelate.objects.create(status=ProcessingStatus.PROCESSING)
+        # somalier's order puts this sample on either side of a pair
+        _load_somalier_pairs(relate, self._write_pairs([
+            _pairs_row(self._name(self.proband), self._name(self.mother), 0.5, 2000, 300),
+            _pairs_row(self._name(father), self._name(self.proband), 0.5, 2000, 300),
+            _pairs_row(self._name(self.proband), self._name(hidden), 0.5, 2000, 300),
+            _pairs_row(self._name(hidden), self._name(self.proband), 0.5, 2000, 300),
+        ]))
+        pairs = SomalierRelatePairs.get_for_sample(self.proband, self.user)
+        self.assertEqual({(self.proband.pk, self.mother.pk), (father.pk, self.proband.pk)},
+                         set(pairs.values_list("sample_a", "sample_b")))
+
     def test_same_individual_relatedness(self):
         """ #196 - a patient's samples: a missing pair between samples in the last relate is unrelated, a sample
             that relate couldn't have compared is listed rather than paired """

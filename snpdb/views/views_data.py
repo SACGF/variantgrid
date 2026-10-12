@@ -472,10 +472,10 @@ def _sample_stats(sample) -> Optional[SampleStats]:
     return SampleStats(variant_class_df, zygosity_df, annotated_df)
 
 
-def _related_samples(sample: Sample) -> list[dict]:
+def _related_samples(sample: Sample, user) -> list[dict]:
     """ The other sample of each pair, with how its patient lines up with this one's """
     # Sample.__str__ names its VCF, so pull that in too or the table is an N+1
-    pairs_qs = SomalierRelatePairs.get_for_sample(sample) \
+    pairs_qs = SomalierRelatePairs.get_for_sample(sample, user) \
         .select_related("sample_a__patient", "sample_a__vcf",
                         "sample_b__patient", "sample_b__vcf").order_by("-relatedness")
     related_samples = []
@@ -492,7 +492,7 @@ def _related_samples(sample: Sample) -> list[dict]:
     return related_samples
 
 
-def _somalier_sample_context(sample: Sample) -> dict:
+def _somalier_sample_context(sample: Sample, user) -> dict:
     """ Each stage's status, so a failed or skipped one shows on the page instead of nothing at all """
     vcf_extract = SomalierVCFExtract.objects.filter(vcf=sample.vcf).first()
     if vcf_extract is None:
@@ -505,7 +505,7 @@ def _somalier_sample_context(sample: Sample) -> dict:
         "somalier_sample_extract": sample_extract,
         "somalier_stages": vcf_extract.get_stages(),
         "somalier_relatedness": settings.SOMALIER["relatedness"],
-        "related_samples": _related_samples(sample),
+        "related_samples": _related_samples(sample, user),
     }
 
 
@@ -535,7 +535,7 @@ def view_sample(request, sample_id):
     patient_form = PatientForm(user=request.user)  # blank
     somalier_context = {}
     if settings.SOMALIER.get("enabled"):
-        somalier_context = _somalier_sample_context(sample)
+        somalier_context = _somalier_sample_context(sample, request.user)
 
     # Stats only exist (and a missing row is only worth a recompute) once the import has finished
     sample_stats = None
