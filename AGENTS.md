@@ -186,6 +186,11 @@ restates a field declaration, drop it.
 ### Verifying pages
 Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
 
+### Background shells
+Wait for a background job on its PID (`while kill -0 <pid>; do sleep 5; done`), never on `pgrep -f <pattern>`: the
+waiting shell's own command line contains the pattern, so it matches itself and never exits. Before saying nothing is
+running, check every background shell and monitor the session started, not a guessed `pgrep`.
+
 ### Git commits
 Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or
 "implement X" mean edit the code only - not commit.
