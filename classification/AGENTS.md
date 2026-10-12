@@ -38,8 +38,8 @@ Patterns here:
   services/overlap_calculator.py onto the enums/classification_enums.py:OverlapStatus ladder
   (enums/classification_enums.py:OverlapStatus.is_discordant is the threshold), and only records at a
   ShareLevel.is_discordant_level (logged_in_users, public) count.
-- ClinicalContext, DiscordanceStatus and DiscordanceReport are the previous generation: still rendered for existing rows
-  and still behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
+- ClinicalContext, DiscordanceStatus and DiscordanceReport are a legacy path: rendered for existing rows
+  and behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
   Bucketing on that legacy path comes from the
   "bucket" attribute on the clinical_significance EvidenceKey options
   (models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket), not from the ClinicalSignificance enum.
@@ -150,7 +150,7 @@ Gotchas:
 - What kind of event the case report prints a record as comes off its gene-level alt
   (`classification/report/case_report_context.py:_kind_and_alteration`) - a fusion, a copy number call or a splice
   junction. A SpliceGirl VCF imports as gene-level splice junctions (`upload/tasks/import_splicegirl_vcf_task.py`);
-  the coordinate `<DEL>`s it made before #1903 still read as small variants - the kind is the alt's, not the caller's.
+  SpliceGirl junctions stored as coordinate `<DEL>`s read as small variants - the kind is the alt's, not the caller's.
   The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
   key, autopopulated from the junction's label through `genes/gene_splice.py:display_splice_label` - the panel's own
   wording where a `genes/models/models_splice_event.py:SpliceEvent` names it, and the breakpoints written out
@@ -158,8 +158,8 @@ Gotchas:
 - A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
   runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
   before any HGVS conversion. A gene-level value keeps its spaces - `tidy_hgvs_whitespace` strips them from an HGVS
-  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; records imported before
-  that hold `EGFRamplification`, which `gene_level_strings_respace` puts right. What takes that path is the *shape* of the
+  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; a stored record holding
+  `EGFRamplification` is put right by `gene_level_strings_respace`. What takes that path is the *shape* of the
   value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
   gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
   HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
@@ -207,5 +207,5 @@ Tests:
 - tests/utils/test_urls.py is this app's URLTestCase (create_fake_variants, then admin / owner / non-owner passes with 403 checks);
   tests/views/test_query_scaling.py asserts the classification datatable query count stays flat as rows grow.
 - URLTestCase already sets CELERY_TASK_ALWAYS_EAGER and LIFTOVER_CLASSIFICATIONS=False, so import tests run inline without liftover.
-- tests/utils/data_utils.py:ConditionMock is stale by its own docstring (the ontology mock no longer builds); mock ontology lookups instead.
+- tests/utils/data_utils.py:ConditionMock is stale by its own docstring (the ontology mock doesn't build); mock ontology lookups instead.
 Deep reference: __classification_readme.md · __discordance_readme.md · claude/research/classifications.md · claude/maps/models.md#classification

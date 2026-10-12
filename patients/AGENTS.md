@@ -29,7 +29,7 @@ Gotchas:
   miss - 100s on a cold disk inside a page render. It is cached with no expiry and prebuilt on a new
   OntologyVersion (patients/tasks/ambiguous_acronym_denylist_task.py); a Redis flush means one slow rebuild.
 - patients/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups patches HPO gaps by name or ID, and goes
-  stale as HPO adds and renames terms ("distal hypermobility" pointed at its opposite). After an HPO upgrade, compare
+  stale as HPO adds and renames terms. After an HPO upgrade, compare
   each entry with the matcher's result without it; drop entries HPO now matches and repoint ones it contradicts.
 - A change to phenotype lookups or matching logic bumps patients/phenotype_matcher.py `PHENOTYPE_MATCHER_VERSION` and
   adds a migration registering `match_patient_phenotypes --stale` as a ManualOperation, or deployments keep the old

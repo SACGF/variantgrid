@@ -14,7 +14,7 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg health [--no-ci] [--json]
     vg inspect <kind> <id> [--depth N] [--json]
 
-All logic lives in library/vg/; this file only parses arguments. See claude/plans/agent_system.md §4.2.
+All logic lives in library/vg/; this file only parses arguments.
 """
 import json
 import os

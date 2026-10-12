@@ -32,7 +32,7 @@ Patterns here:
   get_post_vcf_header_classes / get_post_data_insertion_classes / get_finish_task_classes
   (upload/import_task_factories/abstract_vcf_import_task_factory.py:AbstractVCFImportTaskFactory), or create the
   UploadStep inside a running step and call upload/models/models.py:UploadStep.launch_task.
-- Preprocess is one shell pipe, not vt. upload/vcf/vcf_preprocess.py:_build_pipe_commands chains
+- Preprocess is one shell pipe. upload/vcf/vcf_preprocess.py:_build_pipe_commands chains
   manage.py vcf_clean_and_filter | bcftools norm --multiallelics=- --old-rec-tag | vcf_clean_alts | split, retrying
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
@@ -165,15 +165,15 @@ Gotchas:
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
   guarded on status == PROCESSING (FINISH can be scheduled twice). A FINISH task that sets SUCCESS itself therefore
-  silently swallows the timings, the success Event and the file cleanup - #928 was exactly that. Leave the status alone
+  silently swallows the timings, the success Event and the file cleanup (#928). Leave the status alone
   in get_finish_task_classes tasks.
 - library/django_utils/django_file_utils.py:get_import_processing_dir creates the directory; use
   import_processing_dir_path when you only want to name one, and remove_import_processing_dir to remove it.
   manage.py import_processing_cleanup --dry-run reports what is reclaimable under settings.IMPORT_PROCESSING_DIR.
 - upload/views/views_json.py:get_remaining_annotation_runs gates the status API's annotation_complete (and so
   whether vg_api ever calls download) and the VCF page's "still annotating" notice. It counts only unfinished
-  AnnotationRuns of the build's active VariantAnnotationVersion: two runs left CREATED on retired GRCh37 v21 held
-  every later upload at "not ready yet" for weeks (Sep 2026) before that filter existed.
+  AnnotationRuns of the build's active VariantAnnotationVersion: a run left CREATED on a retired version would
+  otherwise hold every later upload at "not ready yet".
 Tests:
 - Verifying the upload/annotate/download API means running the real client end to end - `vg_api annotate_vcf
   <file> -o <dir> --export-type csv` from a scratch `uv pip install variantgrid_api` against the server - and

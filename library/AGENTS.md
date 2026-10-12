@@ -8,7 +8,7 @@ report_exc_info) · `preview_request.py` (PreviewModelMixin, PreviewData, the pr
 Patterns here:
 - `library` sits below the apps: `.importlinter` (checked in CI by `lint-imports`) forbids it importing one. Code that
   needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
-  moved out for this); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
+  are examples); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
   the check, so delete it when you remove the import.
 - Give a new user-owned model permissions by inheriting
   `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsAutoInitialSaveMixin` before `models.Model`;

@@ -21,8 +21,9 @@ it wants - `annotation_settings`, `celery_settings`, `default_settings`, `seqaut
 `https_settings` - then reassigns or mutates. `variantgrid/settings/components/settings_paths.py` is the shared base for
 paths (`BASE_DIR`, `ANNOTATION_BASE_DIR`), imported by the components so they don't import each other in a cycle;
 `celery_settings` and `seqauto_settings` do import `default_settings` for `UNIT_TEST` / `BASE_DIR`. Shariant sites add a
-second layer (`variantgrid/settings/env/shariantcommon.py`, then `sharianttest.py` etc. on top), and
-`variantgrid/settings/env/claude_sapath_settings.py` is vgtest2 plus the sapath app for running its suite here.
+second layer (`variantgrid/settings/env/shariantcommon.py`, then `sharianttest.py` etc. on top). The
+sapath app's suite runs from a core checkout against that box's own settings with `"sapath"` appended to
+`INSTALLED_APPS` (see the `variantgrid_sapath` README).
 `vg settings NAME` shows the resolved value and every file that set it.
 
 Secrets never live in Python: `variantgrid/settings/components/secret_settings.py:get_secret` looks up a dotted key
@@ -76,7 +77,7 @@ so the suite needs no network (`claude/guides/testing.md#external-services-in-te
 `variantgrid/test_runner.py:VariantGridTestRunner.setup_databases` creates the main test DB with
 `parallel=1`, seeds the fake GRCh37/GRCh38 annotation versions once
 (`variantgrid/test_runner.py:VariantGridTestRunner._seed_fake_annotation_versions`),
-then clones it per worker - 240-odd test classes used to rebuild that chain in `setUpTestData`. Under `--keepdb` it drops
+then clones it per worker, so the 240-odd test classes asking for it in `setUpTestData` find it there. Under `--keepdb` it drops
 the stale per-worker clones first and refuses to run if the kept DB has migrations applied that are not on disk.
 `variantgrid/test_runner.py:FastaRecordingRunner` records the fasta regions a full run touches, to regenerate the sparse
 CI fastas under `variantgrid/data/reference/`. Base classes and fixtures: `claude/guides/testing.md`.
@@ -100,7 +101,7 @@ back the annotation-runs page and the disk health check. `VARIANTGRID_VERSION` c
 
 ## Why it is shaped this way
 
-Settings are plain star-imports rather than django-split-settings because PyDev could not resolve names through
+Settings are plain star-imports rather than django-split-settings because PyDev cannot resolve names through
 `split_settings.include` (the package docstring). One env file per host keeps the whole deployment's deviation from
 defaults in one reviewable file, and `vg settings --diff` / the settings map exist because star-import chains make "where
 did this value come from" otherwise a grep. `https_settings` is opt-in per env file because Secure cookies on a
@@ -114,15 +115,6 @@ wrapping instead of dropping keeps `{% url %}` reversible everywhere, so templat
 The beat schedule is code, not `django_celery_beat` rows, so which periodic jobs run is decided by the same settings
 that enable the feature. Several comments note `crontab` misbehaving with the timezone, which is why most sweeps use raw
 seconds.
-
-## History
-
-The settings package gained `env_developers/` (gitignored, checked before `env/`) so developer machines stop
-colliding with deployment files; `https_settings` was split out of the defaults for intranet sites. The test runner grew
-from mocks only to seeding and cloning (#1856, 191c20188) as the suite went from ~25 minutes to about two. Leaflet and
-djgeojson became optional (#1410), the capabilities endpoint moved to `/api/v1/capabilities` (sapath#443),
-`URLS_NAME_REGISTER` started gating DRF routers (#1869), `ManifestStaticFilesStorage` was restored after the Django 6
-upgrade dropped it (4592bd1b0), and the old per-publish condition matching became the automatch beat sweep (#1780).
 
 ## Traps
 

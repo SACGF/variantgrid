@@ -61,7 +61,7 @@ This has been done
 - `SampleStats` tracks: SNP/indel counts, het/hom/ref counts, chrX counts (used for `chrx_sex_guess`)
 - `SampleStatsPassingFilter` has the same for PASS-filtered variants
 - `VCFLengthStats` tracks variant length distributions
-- `SeqAutoRun` can import flagstats, FastQC, and coverage QC data from the sequencing backend
+- seqauto stores the QC the sequencing pipeline posts (`QC`, `QCExecSummary`, `QCGeneCoverage`)
 - Sex is recorded on `Patient` and `Sample` — mismatch is detectable
 
 **What needs building:**
@@ -70,7 +70,7 @@ This has been done
 - A QC status indicator on the sample page and on the analysis node when that sample is used
 - A warning banner in analysis if any source sample has failed QC
 - Ti/Tv ratio calculation (not currently computed)
-- Integration of seqauto QC data with snpdb sample model (currently separate apps with no bridge)
+- Surfacing seqauto QC on the snpdb Sample (`seqauto/models/models_seqauto.py:SampleFromSequencingSample` links them; nothing shows QC there)
 
 **Effort:** Medium. The raw data is largely there. The work is standardising thresholds, building the summary model, and surfacing warnings in the analysis UI.
 

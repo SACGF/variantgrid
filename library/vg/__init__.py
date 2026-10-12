@@ -8,5 +8,5 @@ value came from (`vg settings`) and the ratchet numbers (`vg health`). Everythin
 
 Modules that need no Django (repo, import_graph, test_selection, markdown, outline, settings_chain, health,
 maps.signals, maps.settings, maps.tasks) are kept import-light so scripts/vg can run them in well under a
-second without booting the project. See claude/plans/agent_system.md §4.2 for the command contract.
+second without booting the project.
 """

@@ -1,6 +1,6 @@
 # VariantGrid domain glossary
 
-The L0 vocabulary from [agent_system.md](plans/agent_system.md) §3: one paragraph per noun - what it is, the
+The domain vocabulary: one paragraph per noun - what it is, the
 model, the invariant that is easy to get wrong. Every other doc and every `vg` output uses these names.
 Citations are `path:Symbol`; `scripts/vg outline <path>` shows the rest of the module.
 
@@ -175,7 +175,7 @@ down the graph into a queryset - not a stored result set. Source nodes (sample, 
 the graph; filter nodes narrow it.
 
 **NodeVersion / NodeCache / NodeTask** - `analysis/models/nodes/analysis_node.py:NodeVersion`. Each node edit bumps the
-version; counts live on NodeVersion (NodeCount was folded in, #1820), caches hold materialised variant sets for slow nodes,
+version; counts live on NodeVersion, caches hold materialised variant sets for slow nodes,
 and NodeTask is the lease the celery scheduler works from.
 
 **AnalysisTemplate** - `analysis/models/models_analysis.py`: a saved analysis with `AnalysisVariable`s, run per sample or

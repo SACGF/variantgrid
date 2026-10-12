@@ -58,8 +58,8 @@ Per row: `match_sample` finds the Sample by id or name among samples the user ca
 name, and DOB / sex where given - a blank DOB or Unknown sex on the stored patient still matches, and that is recorded
 as PARTIAL rather than EXACT. Several matches fail the row, naming the patients (`#2037`). No
 match creates the patient (`create_patient`, upper-cased names, permissions to the user's groups). Deceased / date of death, family code, patient code, affected and consanguineous are then updated;
-phenotype text is appended under a dated "From Imported CSV" line rather than replaced. The specimen is found by
-`(patient, reference_id)`; a reference_id already used by a *different* patient fails the row with
+phenotype text is appended under a dated "From Imported CSV" line rather than replaced. When the row names a specimen it
+is found by `(patient, reference_id)`; a reference_id already used by a *different* patient fails the row with
 `specimen_patient_clash_message` (the lookup is unrestricted, so the other patient is only described if the user can
 view it), and its fields are updated from the row by `patients/import_records.py:set_fields_from_row` - a blank column
 is "no answer" and leaves the stored value alone. `patients/models/models_patient.py:Specimen.get_or_create_extraction` picks the extraction the row describes - the sample's
@@ -121,8 +121,8 @@ sentence points at the `patients/models/models_phenotype.py:PhenotypeMatchVersio
 and OntologyVersion pair) it was matched with; `--stale` requeues those not on the current pair (`vg status` counts
 them, and the awaiting ones) and `--clear` requeues every sentence. A requeued sentence keeps its matches until it is
 rematched, and descriptions and approvals are untouched (#2131). `--rebuild` first splits every description that has
-no sentences (`patients/phenotype_matching.py:register_unsplit_descriptions`): patients 0024 recreated the sentence
-tables empty with integer keys (#2135). Ambiguous acronyms are one rule,
+no sentences (`patients/phenotype_matching.py:register_unsplit_descriptions`), which a deployment has after patients
+0024 recreates the sentence tables empty with integer keys (#2135). Ambiguous acronyms are one rule,
 `patients/models/models_phenotype.py:TextPhenotypeMatch.is_ambiguous_acronym`, for matching and every read path.
 Curators approve a patient's matched text on the term approvals page (`patients/views.py:patient_term_approvals`,
 `patients/views_json.py:approve_patient_term`, which records a PatientModification). The patients page graphs come
@@ -144,19 +144,6 @@ from `patients/templatetags/patient_graph_tags.py`.
 - **Dates rather than ages**: age and deceased are derived from date of birth / death and collection date; the
   underscore fields (`_deceased`, `_age_at_collection_date`) exist only for when a date is not available, and
   `Patient.save` refuses both date_of_death and `_deceased` at once.
-
-## History
-
-- 2020: app bootstrapped around HPO / OMIM text matching of patient phenotypes; CSV patient records import with
-  PatientModification auditing (2021 added specimen assignment auditing).
-- 2025: CSV import handles rows with no specimen, and hides no-op modifications.
-- Aug 2026: Specimen gets a surrogate pk (it used to be keyed on `reference_id`), Extraction is split out, tissue status
-  moves onto the specimen (#1704, #1706); the Patient / Specimen / Extraction API and VCFs naming their extraction
-  (#1707, #1559); SampleNode can group at patient / specimen / extraction level (`patients/sample_grouping.py`).
-- Sep 2026: `patient_code` and "the code alone, never the name beside it" (#1860); a sample linked to an extraction gets
-  its patient (#1875); SpecimenMeasure, then narrowed to pathology only (#1904); a failing CSV row rolls back to an
-  invalid record instead of failing the upload; clearer specimen clash message (#422); somalier check on the patient
-  page (#196).
 
 ## Traps
 

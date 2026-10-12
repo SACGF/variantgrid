@@ -1,6 +1,6 @@
 # Operations guide
 
-The L4 facts from [agent_system.md](../plans/agent_system.md) §4.4: what is running where, how a deploy happens, and the
+What is running where, how a deploy happens, and the
 scale that shapes how a change must be written. Live values come from `python3 manage.py vg status`; this file holds
 what the command cannot know. Verified against vg-test2 on 2026-09-06.
 
@@ -94,15 +94,15 @@ Postgres statistics: after a crash or an immediate shutdown (not a clean stop or
 cumulative stats counters, and autovacuum decides when to re-analyze from those counters. Rows written before the reset
 are then invisible to it, so a table bulk-loaded shortly before keeps its old column statistics until another 10% of it
 changes, and the planner misjudges it. The sign is every `stats_reset` in `pg_stat_bgwriter` / `pg_stat_io` at one moment
-with `pg_stat_database.stats_reset` empty. Run a database-wide `ANALYZE` after such a restart (vg-test2 had this from
-2026-08-19 to 2026-09-24; a plain `ANALYZE;` took 25 minutes there, most of it on the partitioned annotation tables).
+with `pg_stat_database.stats_reset` empty. Run a database-wide `ANALYZE` after such a restart (a plain `ANALYZE;` takes
+about 25 minutes on vg-test2, most of it on the partitioned annotation tables).
 
 Static files: `manage.py collectstatic` writes `variantgrid/sitestatic/`. Storage is `ManifestStaticFilesStorage`, so
 `{% static %}` links the content-hashed names collectstatic records in its manifest, and a changed file gets a new URL - Cloudflare caches
 `/static/` for 4 hours, and a shift+reload doesn't get past it. With `DEBUG=False` a deployment that hasn't run collectstatic
 since a file was added 500s on any page linking it (`Missing staticfiles manifest entry`); `DEBUG=True` links the
 unhashed name. Under `manage.py test` (`UNIT_TEST`) the settings pick plain `StaticFilesStorage`, so tests need no
-collectstatic. (The manifest setting was lost in the Django 6 upgrade, when `STATICFILES_STORAGE` stopped being read.) django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
+collectstatic. The storage is set in `STORAGES["staticfiles"]`; Django 6 ignores `STATICFILES_STORAGE`. django-compressor bundles the `{% compress %}` blocks into `sitestatic/static/CACHE/`
 and caches the rendered tag in Redis for 30 days under a key hashed from the source files' mtimes. With `DEBUG=True` those
 are the finders' source files, so `collectstatic --clear` leaves every page linking a deleted bundle (symptom: unstyled
 pages, an SVG icon filling its cell); deployments read the freshly collected copies and rebuild on their own. The migrator
@@ -128,8 +128,8 @@ loci, 53 k alleles, 211 samples, 726 classifications, 46 analyses, 200 k variant
 SA Pathology holds on the order of 400,000 `VariantTag` rows (a known artefact is re-tagged in every analysis it appears in)
 and many more variants and samples.
 
-- **Whole-database operations are batched by default.** An unbatched liftover run held every Allele, VariantCoordinate and
-  AlleleLiftover in memory and took the machine down. Page the queryset by pk range (not `.iterator()`, which holds a cursor
+- **Whole-database operations are batched by default.** An unbatched liftover run holds every Allele, VariantCoordinate and
+  AlleleLiftover in memory and takes the machine down. Page the queryset by pk range (not `.iterator()`, which holds a cursor
   open for hours), size the batch from a settings constant, and fan batches out as separate celery tasks so they run in
   parallel and one failure only loses its own batch: `snpdb/liftover.py:create_liftover_pipelines` and
   `snpdb/tasks/liftover_tasks.py:liftover_allele_batch` (`settings.LIFTOVER_BATCH_SIZE`) are the pattern. Two reasons, both

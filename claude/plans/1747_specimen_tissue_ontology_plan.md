@@ -3,10 +3,7 @@
 Status: draft
 
 [#1747](https://github.com/SACGF/variantgrid/issues/1747), split out of
-[#1706](https://github.com/SACGF/variantgrid/issues/1706) once the "there's currently no way to create
-tissue" comment turned out to be bigger than that issue's scope.
-[`1706_remaining_work_plan.md`](1706_remaining_work_plan.md) is the rest of #1706 — the specimen and
-extraction grids — and the two are independent.
+[#1706](https://github.com/SACGF/variantgrid/issues/1706).
 
 ## The problem
 
@@ -17,18 +14,14 @@ a tissue `<select>` that is empty on every deployment. There is no creation path
 API field (`SpecimenSerializer`, `patients/serializers.py:184`), and the patient CSV importer has it
 commented out at `patients/import_records.py:360`.
 
-#1706 suggests seeding it from `HumanProteinAtlasTissueSample`. That does not hold up: those rows are
-populated by `human_protein_atlas_import`
-(`annotation/management/commands/human_protein_atlas_import.py:23`) off a downloaded HPA TSV, so they
-only exist on deployments that ran that annotation import, and they are HPA's expression panel — full
-of things nobody biopsies for a diagnostic workup, thin on the ones labs actually accession.
+`HumanProteinAtlasTissueSample` (which #1706 suggests as a seed) only exists on deployments that ran
+`human_protein_atlas_import` (`annotation/management/commands/human_protein_atlas_import.py:23`), and it
+is HPA's expression panel rather than what labs accession.
 
-**The answer is not a better seed list, it is the ontology app.** A local `Tissue` table with a
-hand-written list is a vocabulary we would own, version and reconcile ourselves, which is exactly what
-`ontology` exists to avoid. DOID is queued to be added there in the standard manner, so the machinery
-is being touched anyway and this rides along.
-
-`Tissue` keeps no page either way — settled in TSO 500 Phase 3, and an `OntologyTerm` brings its own.
+**Tissue comes from the ontology app.** A local `Tissue` table with a hand-written list is a vocabulary
+we would own, version and reconcile ourselves, which is exactly what `ontology` exists to avoid. DOID is
+queued to be added there in the standard manner, so the machinery is being touched anyway and this
+rides along. An `OntologyTerm` brings its own page.
 
 ## 1. Which ontology — UBERON
 
@@ -50,20 +43,8 @@ is the anatomy ontology for exactly this slot:
   (`uberon_slim`, `organ_slim`, `major_organ`) if the candidate list ever needs narrowing; `pronto`
   reads the `subset:` tags, so that is a filter at import time rather than a different source.
 
-Considered and not chosen:
-
-- **SNOMED CT specimen hierarchy** (`123038009 |Specimen|`) is the LIMS-native vocabulary and the best
-  fit for what a lab actually receives, since it carries the material and its topography together.
-  It needs a SNOMED Affiliate licence plus registration to download — free for Australia through the
-  NCTS, but not redistributable, and variantgrid.com deployments outside Australia would each need
-  their own. It cannot be a default. Worth keeping as a mapping target for a deployment that already
-  has it, which the design below allows.
-- **BRENDA Tissue Ontology (BTO)** — tissues and cell lines, freely available, but less adopted for
-  clinical specimens and with no phenopacket alignment.
-- **NCIt** — its value is the tumour axes (progression, grade, histology), which is what phenopackets
-  assigns it; for plain anatomy it is a larger and less precise UBERON.
-- **EFO** — phenopackets' recommendation for `sample_type`, i.e. the *material* axis below, not this
-  one.
+SNOMED CT's specimen hierarchy is the LIMS-native vocabulary, but its licence is per country and not
+redistributable, so it is a per-deployment mapping target (§3) rather than the default.
 
 **Preservation and processing are a different axis.** FFPE, fresh frozen, an EDTA tube — none of that
 is anatomy, and none of it belongs on a UBERON FK. Phenopackets splits it out as

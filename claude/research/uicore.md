@@ -117,7 +117,7 @@ kept with its error), `classification/models/clinvar_export_models.py` stores th
 (`review/widgets/multi_lab_selector.py`); ticking "other" with no text returns a `ValuesMissingOther`, which the
 field's `validate` turns into an error. `uicore/widgets/describe_difference_widget.py:DescribeDifferenceField` is the
 review app's "how do these differ" control. `uicore/widgets/date_widget.py:NativeDateInput` is a plain
-`<input type="date">`, which replaced the jQuery UI datepicker (2278f950d). `uicore/templatetags/tips_tags.py:tip_box`
+`<input type="date">`. `uicore/templatetags/tips_tags.py:tip_box`
 picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by visible URLs) and hands the rest to
 `tips.js`.
 
@@ -127,30 +127,18 @@ picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by 
   Django templates, not a JS framework. Attaching behaviour by selector means a fragment returned by any AJAX view
   works without its caller knowing what is in it, and a new behaviour is one processor entry rather than an init call
   at every call site. The cost is that the wiring is invisible from the template - you find it by grepping `global.js`.
-- **One template, many placements.** LazyRender exists (4dcb89f20, 2023, for discordance triage) so the same
-  template shows an object read-only inline, as a card, as an edit form in place, or in a modal, with the save response
-  re-rendering the same template; the alternative was a template per placement.
+- **One template, many placements.** LazyRender exists so the same template shows an object
+  read-only inline, as a card, as an edit form in place, or in a modal, with the save response re-rendering the same
+  template, rather than a template per placement.
 - **Deployment-visible URLs in one register.** Shariant, SA Pathology and variantgrid.com enable different apps. One
-  `URLS_NAME_REGISTER` drives both the URL guard and every menu, tab (`url_check=True`) and grid link, so a site that
+  `URLS_NAME_REGISTER` drives both the URL guard (DRF router URLs too, `variantgrid/perm_path.py:router_urls`) and every
+  menu, tab (`url_check=True`) and grid link, so a site that
   turns off patients loses the links as well as the pages.
-- **ValidatedJson** (4546736a1, 2021) keeps validation messages attached to the exact node that caused them, so the
+- **ValidatedJson** keeps validation messages attached to the exact node that caused them, so the
   ClinVar preview can say "this condition has no MONDO term" next to the condition instead of in a list at the top.
 - **Tags over includes.** `labelled`, `modal`, the tab tags and `if_user_can_edit` are block tags built on
   `uicore/templatetags/ui_utils.py:parse_tag` + `TagUtils` so they take keyword arguments and wrap arbitrary template
   content; the readme admits there are probably too many and that `english_tags`, `js_tags` and `ui_utils` overlap.
-
-## History
-
-- 2020-09-30 "blank slate": uicore arrives with the tag libraries, the tab builder and the page base.
-- 2021: ValidatedJson with the ClinVar export rewrite. 2023: LazyRender/AjaxFormView (discordance triage) and the
-  "other" / describe-difference widgets (review discussions).
-- Aug 2026 front-end cleanup: jqGrid replaced by the DataTables engine in snpdb (a16d58a47 onwards, #1462), jQuery UI
-  removed (89e53d513, #1790) with native date inputs, lodash/d3 retired, CDN files self-hosted (3ca8513ee, #1741),
-  feature tips (382ef1e21, #233).
-- Sep 2026: model icons move to `{% preview_icon %}` with an SVG sprite for pedigree/node shapes
-  (`uicore/templates/uicore/tags/svg_icon_sprite.html`, themed via `style` not presentation attributes, 16ec67411);
-  `URLS_NAME_REGISTER` gates DRF router URLs too (`variantgrid/perm_path.py:router_urls`, e3588762f); `global.scss`
-  split into partials (17178d469); install-instruction ids made unique per render (e29f286b3).
 
 ## Traps
 
@@ -164,6 +152,9 @@ picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by 
   `{% ui_register_tabs tab_set="x" %}` at the outer level first (the error from `ui_render_tabs` says so).
 - **`labelled` does not escape `label` or `help`.** Both are interpolated into an f-string (`help` only has `"`
   swapped for `'`); pass user text through `|escape` first.
+- **Model icons are `{% preview_icon %}`** (`uicore/templatetags/ui_utils.py:preview_icon`) with pedigree and node
+  shapes drawn from an SVG sprite (`uicore/templates/uicore/tags/svg_icon_sprite.html`), themed through `style`, not
+  presentation attributes.
 - **A `MenuItem` with `href` skips the URL register** - only the `url_name` path is checked (the Django admin link).
 - **A url name in two menus goes to the first visible one** in `variantgrid/menus.py:MENUS`: Liftover and Seq / Software
   Versions sit in Settings with a `condition`, so they appear there only when their own menu is off.

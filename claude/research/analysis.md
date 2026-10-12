@@ -8,8 +8,8 @@ where source nodes (sample, cohort, trio, duo, quad, pedigree, all variants) sta
 each contributing a Django Q rather than a stored result set. Around that core sit the version/lease machinery that
 recounts nodes in celery after every edit, the node grid and its exports, templates that are cloned and parameterised per
 sample or cohort (and auto-launched on VCF import), variant tags, and the trio karyomapping side-feature. This document is
-the story behind `analysis/AGENTS.md`: how an edit becomes a count, why a node is a Q and not a table, and what has gone
-wrong before. Model fields, URLs, commands, tasks, signals and settings are in the generated maps
+the story behind `analysis/AGENTS.md`: how an edit becomes a count, why a node is a Q and not a table, and where the
+traps are. Model fields, URLs, commands, tasks, signals and settings are in the generated maps
 ([models](../maps/models.md#analysis), [urls](../maps/urls.md#analysis), [commands](../maps/commands.md),
 [tasks](../maps/tasks.md#analysis), [signals](../maps/signals.md), [settings](../maps/settings.md));
 `claude/domain.md` has the vocabulary.
@@ -102,11 +102,11 @@ region (A-only, intersection, B-only); `analysis/models/nodes/filters/venn_node.
 `analysis/models/nodes/filters/venn_node.py:venn_cache_count` task for any region not yet SUCCESS, which
 `_node_launch_signature` chains ahead of the node's own update. `venn_cache_count` pulls both sides' pks into Python and
 does set arithmetic there, skipping any side an empty parent already decides - SQL EXCEPT/INTERSECT across the partition
-tables used to die with "too many range tables". It truncates partial records first and is idempotent, so a re-lease or a
+tables dies with "too many range tables". It truncates partial records first and is idempotent, so a re-lease or a
 sibling Venn over the same parents reuses an in-flight build. `analysis/models/nodes/filters/venn_node.py:VennNode._get_node_q`
 raises: the node's Q always comes from `_get_node_cache_arg_q_dict` as `variantcollectionrecord__variant_collection__in`.
 
-`analysis/models/nodes/filters/intersection_node.py:IntersectionNode` is the last user of the generic
+`analysis/models/nodes/filters/intersection_node.py:IntersectionNode` is the only user of the generic
 `analysis/models/nodes/analysis_node.py:NodeCache`: `use_cache` is true for a selected BED collection or a long pasted
 variant list, `analysis/models/nodes/analysis_node.py:AnalysisNode.get_cache_task_args_set` creates the NodeCache (or
 finds the parent's, for a pass-through node) and the chained `analysis/tasks/node_update_tasks.py:node_cache_task` calls
@@ -249,30 +249,15 @@ dict picklable for Redis (a live `TransformerQuerySet` inside a Q is not, #240).
 count, so "small" and "these pks" agree by construction; `analysis/tests/test_explicit_pk_substitution.py` pins the
 two paths to the same answer.
 
-Scheduling is single-worker and state-driven (#346) because the previous design - a celery group/chord built from a
-toposort at edit time - deadlocked: `wait_for_node` tasks occupied every worker waiting for parents that could not get a
-worker. Now nothing waits: the only cross-node dependency is "parents settled", read from the database by the one
+Scheduling is single-worker and state-driven (#346) so that no task waits on another: a celery chord built from a
+toposort at edit time deadlocks, its waiting tasks occupying every worker while the parents they wait for cannot get
+one. `analysis/tasks/node_update_tasks.py:wait_for_node` and `wait_for_cache_task` are not part of dispatch. The only
+cross-node dependency is "parents settled", read from the database by the one
 dispatcher on `scheduling_single_worker`, so leases are written by one process and need no row-lock gymnastics, and a
 finished node kicks the dispatcher rather than its children. The lease (`NodeTask.lease_expires`, restarted at claim)
 is the only way a lost worker is detected; `MAX_NODE_ATTEMPTS` bounds retries and reclaims together. Workers never
 `save()` a node (#431): `AnalysisNode.update` is a conditional UPDATE on (pk, version), so a user edit racing a load
 wins by construction and the load discovers it through `NodeOutOfDateException`.
-
-## History
-
-The app began with a jqGrid front end and a toposorted chord of celery tasks per edit; `wait_for_node` and
-`wait_for_cache_task` in `analysis/tasks/node_update_tasks.py` survive only for in-flight messages at deploy time. The
-MergeNode rewrite (#240) stopped writing parent caches and introduced the hash-keyed Q dicts. Explicit pks (#546) and
-the NodeVersion lease record (`analysis/migrations/0105_nodetask_lease_on_node_version.py`, #346) landed in mid 2026;
-`analysis/migrations/0115_nodecount_variant_ids_nodeversion_live_data_sources_and_more.py` added the stored pk list and
-count provenance (#235), and `analysis/migrations/0132_nodeversion_load_data.py` folded the per-label `NodeCount` rows
-into `NodeVersion.load_data` (#1825, #1820). Node exports moved to celery-backed `CachedGeneratedFile`s (#1257). `VariantGrid.known_count` arrived with the
-KnownCountPaginator (#1700); grids then moved from jqGrid to native DataTables (#1785, #1815).
-The ClassificationsNode was split into Classifications and ClinVar nodes (#1789). Templates gained draft versions
-(#1496). Per-tag node counts (#21), the TagNode editor's pill picker (#1820), sample-node grouping levels and per-sample
-overrides (`analysis/migrations/0130_samplenodesamplefilter.py`), waivable field errors
-(`analysis/migrations/0131_analysisnode_ignore_field_errors.py`), the DuoNode (#1829,
-`analysis/migrations/0133_add_duo_node.py`) and the mosaic-parent modes (#1830) are the most recent additions.
 
 ## Traps
 

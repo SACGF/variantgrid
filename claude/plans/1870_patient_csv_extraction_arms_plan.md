@@ -32,10 +32,10 @@ The API already expresses all of this: `patients/serializers.py:ExtractionSerial
 (`_local_reference_q`), and `test_both_arms_post_against_one_specimen` in `patients/tests/test_patient_api.py` is the
 two-arm case. The CSV gets the same three fields and the same matching rule.
 
-### Drift from the issue and the brief
+### What the code does today
 
-- **"Round-trips one Extraction per Specimen"** is no longer quite true. Since #1704/#1745 the sample discriminates:
-  `upload/test_data/patient_upload.csv` already has `ONC042_DNA` and `ONC042_RNA` rows under `SPEC-042`, and
+- **One specimen can already hold several extractions** (#1704, #1745): the sample discriminates.
+  `upload/test_data/patient_upload.csv` has `ONC042_DNA` and `ONC042_RNA` rows under `SPEC-042`, and
   `test_one_specimen_two_arms` in `upload/tests/test_import_patient_records.py` proves two extractions on one
   specimen. What the CSV cannot do is name them, date them, or hold two arms without a sample per arm. This plan is
   about naming, and the sample rule stays.
@@ -75,7 +75,7 @@ class PatientRecord(TimeStampedModel):
     extraction_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
     ...
     specimen_tissue_status = models.CharField(max_length=1, choices=TissueStatus.choices, null=True)
-    # Renamed from specimen_nucleic_acid_source - the value has lived on Extraction since #1704
+    # the value lives on Extraction (#1704)
     extraction_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, null=True)
     extraction_reference_id = models.TextField(null=True)
     extraction_date = models.TextField(null=True)   # as typed, like specimen_collection_date
@@ -122,7 +122,7 @@ specimen reference plus `reference_id`, `nucleic_acid_source`, `extraction_date`
 
 The nucleic acid column is renamed from `Specimen Nucleic acid source (DNA/RNA)` to
 `Extraction Nucleic acid source (DNA/RNA)` because it sits beside `Extraction Reference id` and `Extraction date`
-and has described the extraction since #1704; the old header is gone, so a file still carrying it fails the header
+and describes the extraction (#1704); the old header is gone, so a file still carrying it fails the header
 check. The constant
 `SPECIMEN_NUCLEIC_ACID_SOURCE` becomes `EXTRACTION_NUCLEIC_ACID_SOURCE` (`grep` shows its users are
 `patients/import_records.py`, the two test modules and `patients/models/models_patient.py` itself).
@@ -230,7 +230,7 @@ The matching order and the column handling are ours; pandas, `RenameField` and `
   `test_export_columns_round_trip` reads the two new paths back.
 
 `upload/tests/test_import_patient_records.py` (the whole pipeline, `TestPatientUploadImport`): regenerate
-`upload/test_data/patient_upload.csv` as #1745 did - the renamed header, the two new columns, and the `ONC-042`
+`upload/test_data/patient_upload.csv` - the renamed header, the two new columns, and the `ONC-042`
 rows become block `2600000001` with arms `2600000001C` (DNA, dated) and `2600000001B` (RNA, dated), plus a third
 sample-less row for a re-extraction `2600000001D` (DNA, later date). `test_one_specimen_two_arms` asserts the
 references and dates. The old header shape gets no test of its own: the missing-header check is existing code and

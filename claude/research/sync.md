@@ -19,7 +19,8 @@ generated maps ([models](../maps/models.md#sync), [tasks](../maps/tasks.md#sync)
 A destination is a name, an `enabled` flag and a free-form `config` JSON edited in the admin. Credentials are never in
 the row: `config["sync_details"]` is a key into `settings.SYNC_DETAILS`, which
 `variantgrid/settings/components/default_settings.py:get_shariant_sync_secrets` builds from the `SYNC.<key>` secrets
-(host, OAuth client, username/password). `sync/models/models.py:SyncDestination.sync_details` resolves it and
+(host, OAuth client, username/password) and refuses a single unkeyed `SYNC` secret
+(`sync/migrations/0006_one_off_manual_modify_config.py` is the deploy step that rewrites a destination's config to keys). `sync/models/models.py:SyncDestination.sync_details` resolves it and
 `library/oauth.py:ServerAuth.for_sync_details` turns it into an authenticated `requests` wrapper. The admin's
 "Validate configuration" action (`sync/admin.py:SyncDestinationAdmin.validate_configuration`) checks the key resolves.
 
@@ -98,30 +99,16 @@ check and the server status integrations table with a one-day warning age; both 
 ## Why it is shaped this way
 
 The config is JSON rather than columns because every deployment's mapping is different (which labs go up, legacy lab
-names mapped onto current ones, share levels downgraded on the way out, local usernames renamed) and the set of keys has
-grown feature flag by feature flag. `remote_lab_record_url` and `remote_gene_level` are compatibility gates for a remote
+names mapped onto current ones, share levels downgraded on the way out, local usernames renamed) and most keys are
+per-feature flags. `remote_lab_record_url` and `remote_gene_level` are compatibility gates for a remote
 that has not been upgraded yet: VariantGrid deployments upgrade on their own schedules (SA Pathology runs validated
 releases), so the sender must not assume the receiver understands a lab-record URL or a gene-level variant. The same
-concern is behind `HistoricalEKeyConverter`, whose conversion table is now down to dropping `variant_type`; its
-commented-out entries are the record of earlier evidence-key renames.
+concern is behind `HistoricalEKeyConverter`, whose conversion table drops `variant_type`.
 
 Sync records are only written once the connection has worked (see the model docstring): a bad password should produce
 one FAILED run, not a failure row per classification. Tracking per modification rather than per classification is what
 makes the delta query a single exclude and what lets the status panel tell "uploaded" from "uploaded, later changes
-pending". The runner registry exists so a destination type can be added without touching dispatch - it was built when
-Alissa was a second target.
-
-## History
-
-The app was created in 2020 (`sync/migrations/0001_initial.py`) to upload to Shariant, then gained download from
-Shariant (2021) and Alissa upload/download. Credentials moved from a single `SYNC` secret to keyed `SYNC_DETAILS` so one
-instance can talk to several remotes (`sync/migrations/0006_one_off_manual_modify_config.py` is the deploy step, and
-`get_shariant_sync_secrets` still refuses the old shape); SyncRun gained `full_sync` / `max_rows` in 2023. In 2026 the
-upload runner moved to the v2 record API with the lab-record URL gate (SACGF/variantgrid_sapath#427), the
-classification-page status panel landed (#1347), sync-created external labs started notifying, uploads got a longer
-timeout and connection retries, and gene-level variants got the `remote_gene_level` gate (#1506, #1836). Alissa and the
-MVL export it used were removed in September 2026 (variantgrid_private#3809); the old alissa package directory may survive on disk as an
-untracked `__pycache__` only.
+pending". The runner registry exists so a destination type can be added without touching dispatch.
 
 ## Traps
 
@@ -131,10 +118,8 @@ other; the sync record admin lists the `success=False` rows with the remote's er
 Un-withdrawing is never propagated (the code says so), and the status panel reports a withdrawn record as "Uploaded"
 from its earlier sync record until the next delta run has sent the withdrawal.
 
-The April 2026 hardening (53648bdbe, variantgrid_private#3831) was dropped when master was merged into its branch
-(4beb94b43) and restored under variantgrid_private#3920. Its checks were loosened on the way back: the original
-`QueryJsonFilter` key pattern rejected real evidence keys (`acmg:pvs1`, `1000_genomes_af`) and its `exclude_labs`
-pattern rejected every lab group name (they contain `/`).
+The `QueryJsonFilter` key pattern must accept real evidence keys (`acmg:pvs1`, `1000_genomes_af`) and the
+`exclude_labs` pattern real lab group names (they contain `/`); a tighter pattern breaks every configured destination.
 
 `sync/tasks/sync_tasks.py:sync_all` runs destinations one after another in a single task on the default `db_workers`
 queue (no `queue=`), and the admin actions run a sync inside the web request, so a large full sync belongs in a shell or
@@ -144,7 +129,7 @@ whole export in memory (`stream=False`, then ijson over `response.content`).
 The download's `since` comes only from the last SUCCESS run; a NO_RECORDS run stores `server_date` too but is ignored,
 so quiet periods make each delta re-fetch from further back (harmless, as inserts are upserts). Conversely
 `sync/models/models.py:SyncDestination.report` treats only SUCCESS as success, unlike the health and integration
-receivers; it and `get_reports` have no callers. `SyncRunner.report_on` returns None for both remaining runners, so the
-SyncRun admin's "Download report" action does nothing now that the Alissa report is gone.
+receivers; it and `get_reports` have no callers. `SyncRunner.report_on` returns None for both runners, so the
+SyncRun admin's "Download report" action does nothing.
 
 Deleting a SyncRun cascades to its sync records, so the next delta run re-sends those records (upserts, so safe).

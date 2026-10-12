@@ -73,18 +73,12 @@ and the view pages all apply it.
   test can drop "active" without touching versions (`pathtests/models.py:PathologyTest.delete_test`; `restore_test`
   re-activates the latest confirmed version, since a confirmed version cannot be re-confirmed).
 
-## History
-
-The app dates from 2020 (migrations stop in 2021). Clinician pages and SA Path test-form generation were removed in
-2026-08 (SACGF/variantgrid_sapath#434), the grids moved from jqGrid to datatables (#1785), and the 2026-09 dead code sweep
-(#1795) trimmed it further. `PathologyTestOrderSample`, `PathologyTestOrderPopulation`, `CaseClinician` and
-`Case.workflow_status` are schema only - nothing (sapath included) writes them. The order's library/sequencing
-timestamps are copied from Helix by sapath.
-
 ## Traps
 
 - `PathologyTestVersion.next_version` and `GeneList.clone` turn `self` into the copy (`copy = self; copy.pk = None`).
   Re-fetch if you still need the original.
 - Curator checks are an exact user match (no superuser override); `check_is_curator` raises `PermissionDenied` (403).
+- `PathologyTestOrderSample`, `PathologyTestOrderPopulation`, `CaseClinician` and `Case.workflow_status` are schema
+  only - nothing (sapath included) writes them. The order's library/sequencing timestamps are copied from Helix by sapath.
 - `pathtests/models.py:cases_for_user` is what the variantopedia dashboard's `user_has_cases` uses: cases led by the
   user or by a lead scientist they follow, the same set as the "My cases" page.
