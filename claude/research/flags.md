@@ -101,15 +101,13 @@ on a flag (including a private one: its private check only looks at USERS).
 
 **Compare `FlagPermissionLevel`s as enums, never as raw strings or truthiness.** `FlagPermissionLevel.__lt__` reads
 `other.level`, so comparing against the stored `raise_permission` / `permission` str raises AttributeError - use
-`raise_permission_enum` / `permission_enum` (`add_flag(permission_check=True)` crashed this way until #2043). And
-`NO_PERM` is `'0'`, a non-empty string, so `if not permission_level` never fires - test
-`== FlagPermissionLevel.NO_PERM` (`FlagCollection.flags(user)` returned every flag to a NO_PERM user until #2043).
-Both are covered by `flags/tests/test_flag_permissions.py`.
+`raise_permission_enum` / `permission_enum`. And `NO_PERM` is `'0'`, a non-empty string, so `if not permission_level`
+never fires - test `== FlagPermissionLevel.NO_PERM`. `flags/tests/test_flag_permissions.py` covers both
+(`add_flag(permission_check=True)` and `FlagCollection.flags(user)`).
 
-**The `source_object` probe must not use `dir()`.** It once scanned `dir(self)` for names ending `_set`; Django 5.2
-added the `Model._is_pk_set()` method, which sorted first, so `source_object` raised AttributeError whenever the
-extra-info signal had not already set it (e.g. `permission_level` from `FlagView` POST for a non-superuser). It now
-walks `_meta.related_objects` (#2043).
+**The `source_object` probe walks `_meta.related_objects`, not `dir()`.** Scanning `dir(self)` for names ending `_set`
+picks up Django's `Model._is_pk_set()` method, so `source_object` raises AttributeError whenever the extra-info signal
+has not already set it (e.g. `permission_level` from `FlagView` POST for a non-superuser).
 
 **A `watch` POST 500s (confirmed, dead path).** `FlagsView` POST with `watch` calls `fc.set_watcher`, which
 `FlagCollection` does not define; `watch_toggle()` in `flags.js` exists but nothing calls it. Delete both rather than
@@ -119,7 +117,7 @@ flag types (`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
 **`classification_not_public` is switched off in JSON only.** Without `CLINVAR_EXPORT` mode, `FlagHelper.to_json`
 sends that type's `permission` / `raise_permission` as `FlagPermissionLevel.SYSTEM.level` (4), above any browser user's
 `user_permission` (a superuser is ADMIN, 3), so `flags.js` offers nobody the raise or edit buttons; the stored type is
-unchanged. It sent the string `"A"` before #2043, which only worked because `n >= "A"` is always false in JS.
+unchanged.
 
 **FlagType edits need a restart.** `ObjectManagerCachingImmutable` caches `get()` per process (not under unit tests), so
 changing a type in admin or a shell is invisible to running gunicorn/celery workers until they restart. Add types by
