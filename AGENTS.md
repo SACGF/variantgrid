@@ -81,6 +81,8 @@ python3 manage.py vg inspect variant 123          # one object's whole graph by 
 python3 manage.py vg settings NAME [--diff]       # resolved value and every settings file that assigned it
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
+scripts/vg health [--no-ci]                       # the ratchets: docstring coverage, dead citations, one-off
+                                                  #   commands, pylint messages, last CI suite time
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
 scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI warns
 scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names

@@ -1,7 +1,7 @@
 """
 Tests for the DB-free parts of `manage.py vg` (library/vg): import resolution, test selection rules,
 the AST parsers behind the tasks / signals / settings maps, Markdown rendering, module outlines, the
-settings chain, doc citation checking and the inspect renderer.
+settings chain, doc citation checking, the inspect renderer and the health parsers.
 """
 import ast
 import tempfile
@@ -12,6 +12,7 @@ from django.test import SimpleTestCase
 
 from library.vg import css, css_rendered, docs
 from library.vg import inspect as inspect_pkg
+from library.vg.health import UNDECLARED, _command_category, lint_health
 from library.vg.import_graph import (
     ImportGraph,
     import_cycles,
@@ -183,6 +184,32 @@ class OutlineTest(SimpleTestCase):
         rendered = render_outline(f.name, entries, min_lines=3)
         self.assertNotIn(" def save", rendered)   # 2-line method hidden by min_lines
         self.assertIn("def helper", rendered)      # module level is never hidden
+
+
+class HealthTest(SimpleTestCase):
+
+    @staticmethod
+    def _temp_file(text: str, suffix: str) -> Path:
+        with tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False) as f:
+            f.write(text)
+        return Path(f.name)
+
+    def test_command_category(self):
+        declared = 'class Command(BaseCommand):\n    help = "x"\n    category = "one-off"\n'
+        undeclared = 'class Command(BaseCommand):\n    def handle(self):\n        category = "ops"\n'
+        helper = 'def build():\n    category = "ops"\n'
+        self.assertEqual(_command_category(self._temp_file(declared, ".py")), "one-off")
+        self.assertEqual(_command_category(self._temp_file(undeclared, ".py")), UNDECLARED)
+        self.assertIsNone(_command_category(self._temp_file(helper, ".py")))
+
+    def test_lint_health_counts_messages_by_type(self):
+        report = ("************* Module snpdb.models\n"
+                  "snpdb/models.py:12:4: W0612: Unused variable 'x' (unused-variable)\n"
+                  "snpdb/models.py:40:0: E1101: Instance has no member (no-member)\n"
+                  "snpdb/models.py:41:0: W1514: Using open without encoding (unspecified-encoding)\n\n"
+                  "Your code has been rated at 9.91/10 (previous run: 9.91/10, -0.00)\n")
+        lint = lint_health(self._temp_file(report, ".txt"))
+        self.assertEqual((lint.messages, lint.by_type, lint.score), (3, {"W": 2, "E": 1}, "9.91"))
 
 
 class SettingsChainTest(SimpleTestCase):

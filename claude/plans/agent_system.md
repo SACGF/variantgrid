@@ -3,7 +3,7 @@
 Written by Claude Fable 5 (claude-fable-5), 2026-08-31
 
 Issue: https://github.com/SACGF/variantgrid/issues/1816
-Status: in progress - Phase 1 landed 4e1a406fb (2026-09-02); Phase 0 landed 7c4408c62 (2026-09-06); Phase 2 core landed 2026-09-06 (§6.1); remaining Phase 2 items run in series per §6.2.
+Status: landed 2026-10-12 - Phase 1 4e1a406fb (2026-09-02), Phase 0 7c4408c62 (2026-09-06), Phase 2 core 2026-09-06, research docs and create_fake_data 2026-09-26, vg health 2026-10-12 (§6.1). `vg logs` / `sql --explain` / `browse` and the skills wait for the three-times rule (§7); Phase 3 is ongoing ratchets, not a deliverable.
 
 This is written from the driver's seat: what I, as the agent doing most of the commits on this repo,
 would need to understand a situation accurately, act on it with confidence, verify cheaply, and leave the
@@ -464,13 +464,15 @@ fail on regressions for the cheap one (dead citations) once it reaches zero.
 - **Phase 2 open items**, in the order to do them (§6.2 says how):
   1. ~~Research docs still to rewrite~~ done 2026-09-25: all 21 now carry `Verified against`. The bugs the rewrites
      turned up are collected in SACGF/variantgrid_private#3912 for triage.
-  2. `vg health`: the ratchet numbers in one place (`vg outline --coverage` already gives docstring coverage; add dead
-     citations, one-off command count, lint line count, last suite wall time).
-  3. `vg logs`, then `vg sql --explain`, then `vg browse` (Playwright is installed on vg-test2).
-  4. Skills (`vg-plan`, `vg-implement`, `vg-research`, `vg-run`) and the two subagents; `vg-research` is the research-doc
-     recipe from §6.2 written down so the remaining docs and future refreshes cost one prompt.
-  5. `create_fake_data`: one command that fills an empty dev database, each app owning its steps -
-     `claude/plans/1816_fake_data_plan.md`. Done before 2-4: people use it directly.
+  2. ~~`vg health`~~ done 2026-10-12 (`library/vg/health.py`): docstring coverage, dead citations, commands by
+     category (one-off and undeclared counted), pylint messages from the last `lint.txt` and the wall time of the
+     "Run unit tests" step in the last green CI run on master (through `gh`; `--no-ci` skips it). First reading at
+     a8ca28c1c: 29% (352/1,229), 0 dead after fixing two, 67 one-off of 180 commands, 800 pylint messages, 13m57s on CI.
+  3. `vg logs`, then `vg sql --explain`, then `vg browse` (Playwright is installed on vg-test2) - deferred.
+  4. Skills (`vg-plan`, `vg-implement`, `vg-research`, `vg-run`) and the two subagents - deferred; `vg-research`
+     would be the research-doc recipe from §6.2 written down.
+  5. ~~`create_fake_data`~~ done 2026-09-26 (d0a58c619): one command that fills an empty dev database, each app
+     owning its steps in `<app>/fake_data.py`.
 - **Human readability comes first** (2026-09-25): agent tooling and agent-facing docs stay in `claude/`, `library/vg/`,
   `scripts/vg`, `.claude/` and the `AGENTS.md` files; code and docstrings carry nothing a developer has to skim past.
   Items 3-4 wait for the three-times rule in §7.

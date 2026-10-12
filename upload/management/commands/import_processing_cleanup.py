@@ -138,6 +138,7 @@ GENE_COVERAGE_DIR_NAME = "gene_coverage"
 
 class Command(BaseCommand):
     help = "Remove import_processing scratch directories whose owner has finished with them"
+    category = "ops"
 
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true',
