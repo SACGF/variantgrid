@@ -2,10 +2,11 @@
 `vg health`: the ratchet numbers in one place, so a monthly look (or a before/after on a change) is one call.
 
 Each number should only move one way: module docstring coverage up; dead doc citations, one-off management
-commands and pylint messages down; the test suite's wall time down. Entry points are `gather_health` and
+commands, pylint messages and deprecated calls down; the test suite's wall time down. Entry points are `gather_health` and
 `render_health`. No Django: coverage, citations and command categories are read from the tree by AST; the lint
 count comes from the last `scripts/linting/run_pylint.sh` run (`lint.txt`, gitignored, so it is as old as that
-run); the suite time is the "Run unit tests" step of the last green Django Tests run on master, through `gh`.
+run); deprecations are `library/vg/deprecations.py:find_deprecations` (basedpyright plus `manage.py check`, ~25s,
+skipped with --no-deprecations); the suite time is the "Run unit tests" step of the last green Django Tests run on master, through `gh`.
 A number that can't be had (no lint.txt, no `gh` or network) is reported as unavailable rather than failing.
 """
 import ast
@@ -18,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from library.vg.deprecations import find_deprecations
 from library.vg.docs import check_docs
 from library.vg.outline import docstring_coverage
 from library.vg.repo import REPO_ROOT, first_party_packages, git_short_sha
@@ -48,6 +50,14 @@ class SuiteHealth:
 
 
 @dataclass
+class DeprecationHealth:
+    external: int
+    ours: int
+    import_in_repo: int
+    import_in_packages: int
+
+
+@dataclass
 class Health:
     sha: str
     documented_modules: int
@@ -57,6 +67,7 @@ class Health:
     dead_in_plans: int
     commands_by_category: dict[str, int]
     lint: LintHealth | None
+    deprecations: DeprecationHealth | None
     suite: SuiteHealth | None
     unavailable: dict[str, str] = field(default_factory=dict)
 
@@ -130,13 +141,28 @@ def suite_health() -> SuiteHealth:
     raise LookupError(f"run {run['id']} has no timed '{CI_TEST_STEP}' step")
 
 
-def gather_health(ci: bool = True) -> Health:
+def deprecation_health() -> tuple[DeprecationHealth, dict[str, str]]:
+    report = find_deprecations()
+    in_repo = len(report.runtime_in_repo)
+    return DeprecationHealth(external=len(report.external), ours=len(report.ours), import_in_repo=in_repo,
+                             import_in_packages=len(report.runtime) - in_repo), report.unavailable
+
+
+def gather_health(ci: bool = True, deprecations: bool = True) -> Health:
     unavailable = {}
     coverage = docstring_coverage()
     docs = check_docs()
     lint = lint_health()
     if lint is None:
         unavailable["lint"] = "no lint.txt - run scripts/linting/run_pylint.sh"
+    deprecated = None
+    if deprecations:
+        deprecated, missing = deprecation_health()
+        if "static" in missing:
+            deprecated = None
+            unavailable["deprecations"] = missing["static"]
+    else:
+        unavailable["deprecations"] = "skipped (--no-deprecations)"
     suite = None
     if ci:
         try:
@@ -149,7 +175,7 @@ def gather_health(ci: bool = True) -> Health:
                   documented_modules=sum(d for d, _ in coverage.values()),
                   counted_modules=sum(t for _, t in coverage.values()),
                   dead_citations=len(docs.dead), docs_checked=docs.docs_checked, dead_in_plans=len(docs.plan_dead),
-                  commands_by_category=command_categories(), lint=lint, suite=suite, unavailable=unavailable)
+                  commands_by_category=command_categories(), lint=lint, deprecations=deprecated, suite=suite, unavailable=unavailable)
 
 
 def _minutes(seconds: int) -> str:
@@ -171,6 +197,11 @@ def render_health(health: Health) -> str:
         lines.append(f"  pylint messages    {lint.messages} ({detail}{score}; lint.txt {lint.age_days} day(s) old)")
     else:
         lines.append(f"  pylint messages    unavailable: {health.unavailable['lint']}")
+    if deprecated := health.deprecations:
+        lines.append(f"  deprecated calls   {deprecated.external} stdlib/package + {deprecated.ours} of our own @deprecated"
+                     f"; {deprecated.import_in_repo} warned at import (+{deprecated.import_in_packages} in packages)")
+    else:
+        lines.append(f"  deprecated calls   unavailable: {health.unavailable['deprecations']}")
     if suite := health.suite:
         lines.append(f"  test suite (CI)    {_minutes(suite.seconds)} (run {suite.run_id} on {suite.head_sha}, {suite.started_at[:10]})")
     else:

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase, override_settings
-from hgvs.parser import Parser
+from hgvs.parsers import Parser
 
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import (

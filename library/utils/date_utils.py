@@ -70,7 +70,7 @@ def month_range(start_month: int, start_year: int, offset_start: int, offset_end
 
 
 def http_header_date_now():
-    return datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+    return datetime.now(UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
 
 
 def parse_http_header_date(date_str: str):

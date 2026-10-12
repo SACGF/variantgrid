@@ -8,7 +8,7 @@ the task does the actual pg_dump -> verify -> drop sequence.
 """
 
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -57,7 +57,7 @@ def archive_partitioned_model(source: RelatedModelsPartitionModel,
             f"{source} already has a PENDING/IN_PROGRESS PartitionArchive row"
         )
 
-    iso = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    iso = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
     archive_name = f"{meta.app_label}_{meta.model_name}_{source.pk}_{iso}"
     dump_path = get_partition_archive_path(archive_name + ".dump")
 

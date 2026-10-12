@@ -20,7 +20,7 @@ from hgvs.exceptions import (
 )
 from hgvs.extras.babelfish import Babelfish
 from hgvs.normalizer import Normalizer
-from hgvs.parser import Parser
+from hgvs.parsers import Parser
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 from hgvs.variantmapper import VariantMapper
