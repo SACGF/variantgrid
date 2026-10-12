@@ -69,6 +69,7 @@ from classification.models.classification_variant_info_models import (
 from classification.models.clinical_context_models import (
     DiscordanceNotification,
 )
+from classification.models.condition_text_matching import ConditionTextMatch
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.services.overlaps_services import OverlapServices
@@ -393,8 +394,6 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Fixes: Condition Text Sync")
     def condition_text_sync(self, request, queryset: QuerySet[Classification]):
-        from classification.models import ConditionTextMatch
-
         conditions_newly_set = 0
         for c in queryset:
             has_condition_already = bool(c.condition_resolution)

@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Optional
 
+import cyvcf2
 from django.conf import settings
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -21,6 +22,7 @@ from annotation.vep_warnings import (
     parse_vep_warnings,
 )
 from snpdb.models import Variant, VariantCoordinate
+from snpdb.vcf_utils import cyvcf2_header_types
 
 
 def import_vcf_annotations(
@@ -28,10 +30,6 @@ def import_vcf_annotations(
         insert_variants: bool = True,
         vep_version_check: bool = True,
         delete_temp_files: Optional[bool] = None):
-    import cyvcf2
-
-    from snpdb.vcf_utils import cyvcf2_header_types
-
     if delete_temp_files is None:
         delete_temp_files = settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
 

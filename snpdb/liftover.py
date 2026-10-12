@@ -13,7 +13,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Prefetch, QuerySet
 
+from annotation.models.models import VariantAnnotationVersion
 from genes.hgvs import HGVSMatcher
+from genes.hgvs.hgvs_matcher import get_hgvs_variant_coordinate
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import (
@@ -21,6 +23,7 @@ from snpdb.bcftools_liftover import (
     bcftools_pre_liftover_error_check,
 )
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.models.models_dbsnp import DbSNP
 from snpdb.models.models_enums import (
     AlleleConversionTool,
     AlleleOrigin,
@@ -345,10 +348,6 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
 
         Optionally pass in hgvs_matcher to save re-instantiating it all the time, and failed_tools
         (@see AlleleLiftover.get_failed_conversion_tools) to save a query per allele """
-
-    from annotation.models import VariantAnnotationVersion
-    from genes.hgvs import get_hgvs_variant_coordinate
-    from snpdb.models.models_dbsnp import DbSNP
 
     if failed_tools is None:
         failed_tools = AlleleLiftover.get_failed_conversion_tools([allele.pk], dest_genome_build).get(allele.pk, set())

@@ -13,6 +13,9 @@ from classification.models import (
     DiscordanceReportTriage,
     classification_flag_types,
 )
+from classification.views.discordance_report_triage_view import (
+    DiscordanceReportTriageView,
+)
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
@@ -25,9 +28,6 @@ class DiscordanceLabSummary(ClassificationLabSummary):
     @cached_property
     def embedded(self):
         if triage := self.triage:
-            from classification.views.discordance_report_triage_view import (
-                DiscordanceReportTriageView,
-            )
             return DiscordanceReportTriageView.lazy_render(triage)
 
     def _with_triage(self, triage: Optional[DiscordanceReportTriage]) -> 'DiscordanceLabSummary':

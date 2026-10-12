@@ -19,6 +19,7 @@ from library.django_utils import add_save_message
 from library.utils import StashFile
 from patients.models_enums import Zygosity
 from snpdb.models import Trio
+from snpdb.models.models_user_settings import UserGridConfig
 from snpdb.models.models_variant import Variant
 
 
@@ -31,7 +32,6 @@ def get_karyomapping_analysis_permission_check(request, pk):
 
 
 def karyomapping_analyses(request):
-    from snpdb.models import UserGridConfig
     show_group_data = UserGridConfig.get(request.user, 'Karomapping Analyses').show_group_data
     context = {"trio_form": UserTrioForm(), "show_group_data": show_group_data}
     return render(request, 'analysis/karyomapping/karyomapping_analyses.html', context)

@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -54,6 +55,5 @@ class PartitionArchive(models.Model):
 
     def resolve_source(self):
         """ Return the live source row if it still exists, else None. """
-        from django.apps import apps
         model = apps.get_model(self.source_app_label, self.source_model)
         return model.objects.filter(pk=self.source_pk).first()

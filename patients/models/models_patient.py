@@ -22,6 +22,7 @@ from django.dispatch.dispatcher import Signal, receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from easy_thumbnails.files import get_thumbnailer
 
 from library.django_utils import (
     ensure_mutally_exclusive_fields_not_set,
@@ -1005,7 +1006,6 @@ def patient_attachment_post_save(sender, instance, created, **kwargs):  # pylint
 
         if instance.file_type == AttachmentFileType.IMAGE:
             options = {'size': (100, 100), 'crop': True}
-            from easy_thumbnails.files import get_thumbnailer
             thumbnail_path = get_thumbnailer(instance.file).get_thumbnail(options).path
             instance.thumbnail_path = thumbnail_path
         instance.save()

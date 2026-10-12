@@ -76,6 +76,10 @@ from annotation.models.models_enums import (
     VEPSkippedReason,
 )
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from annotation.pathogenicity_predictions import (
+    pred_pathogenic_funcs,
+    raw_score_pathogenic_funcs,
+)
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
@@ -90,8 +94,8 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
-from library.django_utils.django_file_utils import remove_import_processing_dir
 from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.django_file_utils import remove_import_processing_dir
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
 from library.genomics.vcf_enums import VariantClass
@@ -999,10 +1003,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         """Raw-score + pred contributions to predictions_num_pathogenic at v4. Empty pre-v4."""
         if self.columns_version < 4:
             return {}
-        from annotation.pathogenicity_predictions import (
-            pred_pathogenic_funcs,
-            raw_score_pathogenic_funcs,
-        )
         return {**raw_score_pathogenic_funcs(), **pred_pathogenic_funcs()}
 
     @cached_property

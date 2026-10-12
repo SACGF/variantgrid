@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
+from storages.backends.s3boto3 import S3Boto3Storage
+
 
 class FileHandle(ABC):
     """
@@ -115,7 +117,6 @@ class FileHandleS3(FileHandle):
 
     @staticmethod
     def create(bucket: str, file: str):
-        from storages.backends.s3boto3 import S3Boto3Storage
         media_storage = S3Boto3Storage(bucket_name=bucket)
         return FileHandleS3(media_storage=media_storage, file=file)
 

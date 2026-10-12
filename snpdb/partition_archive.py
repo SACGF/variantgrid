@@ -19,6 +19,7 @@ from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.partition_archive_paths import get_partition_archive_path
 from snpdb.models.models_partition_archive import PartitionArchive
+from snpdb.tasks.partition_archive_tasks import perform_partition_archive
 
 
 class PartitionArchivePreconditionError(Exception):
@@ -77,7 +78,6 @@ def archive_partitioned_model(source: RelatedModelsPartitionModel,
 
 
 def _schedule_archive_task(archive_pk: int, reason: str):
-    from snpdb.tasks.partition_archive_tasks import perform_partition_archive
     perform_partition_archive.delay(archive_pk, reason)
 
 

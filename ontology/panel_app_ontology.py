@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from annotation.regexes import DbRegexes, db_ref_regexes
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import (
     PANEL_APP_SEARCH_BY_GENES_BASE_PATH,
@@ -68,7 +69,6 @@ class PanelAppResult:
         for phenotype_row in phenotypes:
             hash_str += phenotype_row + ";"
             found_term = False
-            from annotation.regexes import DbRegexes, db_ref_regexes
             for result in db_ref_regexes.search(phenotype_row):
                 if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
                     all_terms.add(result.id_fixed)

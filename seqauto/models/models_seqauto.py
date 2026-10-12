@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 
+from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import (
     ActiveSampleGeneList,
     CustomTextGeneList,
@@ -800,8 +801,6 @@ class QCGeneList(SeqAutoRecord):
 
     @staticmethod
     def create_gene_list(custom_gene_list_text, sequencing_sample):
-        from genes.custom_text_gene_list import create_custom_text_gene_list
-
         custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {sequencing_sample.sample_name}",
                                                    text=custom_gene_list_text)
         custom_text_gene_list.save()

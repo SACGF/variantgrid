@@ -8,29 +8,29 @@ ClassificationImport and the allele sources that drive matching and liftover, Co
 ClassificationConsensus and CuratedDate.
 """
 from __future__ import annotations
+
 import copy
 import json
 import logging
 import operator
 import re
 import uuid
-import pydantic
-from collections import Counter, namedtuple, defaultdict
+from collections import Counter, defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
     TypedDict,
-    Union, TYPE_CHECKING,
+    Union,
 )
 
-from typing_extensions import deprecated
-
 import django.dispatch
+import pydantic
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
@@ -48,28 +48,38 @@ from django.urls.base import reverse
 from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from typing_extensions import deprecated
 
-from annotation.models.data_enums import ClassificationDate, ClassificationDateType, EffectiveDate, EffectiveDateType
+from annotation.models.data_enums import (
+    ClassificationDate,
+    ClassificationDateType,
+    EffectiveDate,
+    EffectiveDateType,
+)
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import (
     CRITERIA_NOT_MET,
     AlleleOriginBucket,
     ClinicalSignificance,
+    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
+    TestingContextBucket,
     ValidationCode,
-    WithdrawReason, TestingContextBucket, CopyScope,
+    WithdrawReason,
 )
+from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import (
     ClassificationJsonParams,
     ClassificationPatchResponse,
     PatchMeta,
-    ValidationMerger, classification_gene_symbol_filter,
+    ValidationMerger,
+    classification_gene_symbol_filter,
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
@@ -88,6 +98,7 @@ from classification.models.evidence_key import (
 )
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.evidence_mixin_summary_cache import (
+    ClassificationSummaryCacheObj,
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
@@ -100,7 +111,7 @@ from flags.models.models import (
     flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
-from genes.models import Gene, NoTranscript, GeneSymbol
+from genes.models import Gene, GeneSymbol, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -123,7 +134,7 @@ from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
 
 if TYPE_CHECKING:
-    from classification.models import MultiCondition, ClinicalContext, ClassificationSummaryCacheObj, ConditionText
+    from classification.models import ClinicalContext, ConditionText, MultiCondition
 
 ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
@@ -219,7 +230,6 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
     :param user: The current user
     :param kwargs: Required by @receiver
     """
-    from classification.enums.discordance_enums import DiscordanceReportResolution
     from classification.models.discordance_models import DiscordanceReportClassification
 
     vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
@@ -734,7 +744,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        from classification.models import ClassificationSummaryCacheObj
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         if bucket := summary_obj.somatic.testing_context_bucket:
             return TestingContextBucket(bucket)
@@ -746,7 +755,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        from classification.models import ClassificationSummaryCacheObj
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         return summary_obj.somatic.tumor_type_category
 
