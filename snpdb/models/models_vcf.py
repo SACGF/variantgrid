@@ -160,16 +160,19 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return percent
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
+        """ queryset: only check these VCFs - keeps the permission lookups to them rather than every VCF """
         if has_write_permission:
             perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         else:
             perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
 
+        if queryset is None:
+            queryset = VCF.objects.all()
         if group_data:
-            queryset = get_objects_for_user(user, perm, klass=VCF, accept_global_perms=True)
+            queryset = get_objects_for_user(user, perm, klass=queryset, accept_global_perms=True)
         else:
-            queryset = VCF.objects.filter(user=user)
+            queryset = queryset.filter(user=user)
 
         queryset = queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
         if not include_archived:
@@ -638,24 +641,30 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return reverse('data')
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
-        """ May be given permission for whole VCF or just a sample """
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
+        """ May be given permission for whole VCF or just a sample.
+            queryset: only check these samples - keeps the permission lookups to them rather than every sample """
+        if queryset is None:
+            queryset = Sample.objects.all()
+            vcf_qs = None
+        else:
+            vcf_qs = VCF.objects.filter(pk__in=queryset.values("vcf"))
         vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission,
-                                   include_archived=include_archived)
+                                   include_archived=include_archived, queryset=vcf_qs)
         q_filters = [Q(vcf__in=vcfs)]
         if group_data:
             if has_write_permission:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.WRITE)
             else:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.READ)
-            queryset = get_objects_for_user(user, perm, klass=Sample, accept_global_perms=True)
-            sample_q = Q(pk__in=queryset.values_list("pk", flat=True))
+            permitted_samples = get_objects_for_user(user, perm, klass=queryset, accept_global_perms=True)
+            sample_q = Q(pk__in=permitted_samples.values_list("pk", flat=True))
             if not include_archived:
                 sample_q &= Q(vcf__data_archived_date__isnull=True)
             q_filters.append(sample_q)
 
         ored_q_filters = reduce(operator.or_, q_filters)
-        return Sample.objects.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
+        return queryset.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
 
     @staticmethod
     def get_for_user(user, sample_id):
