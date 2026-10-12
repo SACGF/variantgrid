@@ -31,8 +31,6 @@ from analysis.models.nodes.cohort_mixin import (
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
-    UNCACHEABLE,
-    FilterKey,
     get_cached_label_count_for_cohort,
 )
 from genes.models import SampleGeneList
@@ -502,21 +500,14 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         # the query, so it can't move the count away from the cached stats
         return bool(self.get_applied_thresholds(self.sample))
 
-    def get_stats_filter_key(self) -> FilterKey:
-        """ A group level SampleNode spans genotype collections, so there's no single cohort's stats
-            row to read - its counts are live queries """
-        if self.is_group_level:
-            return UNCACHEABLE
-        return None
-
     def _get_cached_label_count(self, label):
         """ Input counts can be static, so use cached CohortGenotype*Stats if we can. """
         if self.sample is None:
             return None
+        if self.is_group_level:
+            return None  # Spans genotype collections, so there's no single cohort's stats row to read
         if self._has_filters_that_affect_label_counts():
             return None  # Have to do counts
-
-        filter_key = self.get_stats_filter_key()
 
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):
@@ -531,7 +522,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return get_cached_label_count_for_cohort(
             cohort=self.sample.vcf.cohort,
             sample=self.sample,
-            filter_key=filter_key,
+            filter_key=None,
             annotation_version=self.analysis.annotation_version,
             passing_filter=bool(filter_code),
             zygosities=zygosities,

@@ -13,8 +13,6 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.stats_cache import (
-    UNCACHEABLE,
-    FilterKey,
     get_cached_label_count_for_cohort,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
@@ -51,9 +49,8 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             in count_for_zygosity. """
         return [True, True, True, True]
 
-    def get_stats_filter_key(self) -> FilterKey:
-        """ The precomputed cohort stats bucket counts can be read from: None is the raw aggregate
-            row, UNCACHEABLE means count live """
+    def get_stats_filter_key(self) -> Optional[str]:
+        """ The precomputed cohort stats bucket counts are read from - None is the raw aggregate row """
         return None
 
     def _get_cached_label_count(self, label):
@@ -65,13 +62,10 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):
             return None
-        filter_key = self.get_stats_filter_key()
-        if filter_key is UNCACHEABLE:
-            return None
         return get_cached_label_count_for_cohort(
             cohort=cohort,
             sample=None,  # aggregate row
-            filter_key=filter_key,
+            filter_key=self.get_stats_filter_key(),
             annotation_version=self.analysis.annotation_version,
             passing_filter=bool(filter_code),
             zygosities=self._cached_label_count_zygosities(),

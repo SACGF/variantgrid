@@ -1,12 +1,13 @@
 """
-    Reader-side cache lookups for the CohortGenotype*Stats family. Each source node translates its
-    config to a filter_key in get_stats_filter_key.
+    Reader-side cache lookups for the CohortGenotype*Stats family. A source node that can read the
+    cache passes the filter_key for its config: None for the raw aggregate row, or an inheritance
+    bucket.
 
     The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats) and the readers
     both build inheritance keys through Trio.get_stats_filter_key. A silent mismatch between the two
     would produce cache misses forever.
 """
-from typing import Optional, Union
+from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -19,15 +20,6 @@ from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompu
 from snpdb.models import CohortGenotypeStats
 from snpdb.models.models_enums import BuiltInFilters
 
-
-class _Uncacheable:
-    """ Sentinel returned by get_stats_filter_key for node configs we don't precompute. """
-
-
-UNCACHEABLE = _Uncacheable()
-FilterKey = Union[None, str, _Uncacheable]
-
-
 LABEL_TO_MODEL = {
     BuiltInFilters.TOTAL: CohortGenotypeStats,
     BuiltInFilters.IMPACT_HIGH_OR_MODERATE: CohortGenotypeVariantAnnotationStats,
@@ -36,15 +28,13 @@ LABEL_TO_MODEL = {
 }
 
 
-def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,
+def get_cached_label_count_for_cohort(cohort, sample, filter_key: Optional[str],
                                       annotation_version, passing_filter,
                                       zygosities, label) -> Optional[int]:
     """ sample=None → aggregate row; sample=Sample(...) → per-sample row.
         filter_key=None → raw count; canonical-JSON string → filter-keyed row.
         Returns None on cache miss (caller falls back to live count); on miss
         also fires a lazy recompute task. """
-    if filter_key is UNCACHEABLE:
-        return None
     model = LABEL_TO_MODEL.get(label)
     if model is None:
         return None

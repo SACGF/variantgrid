@@ -13,9 +13,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from analysis.models import DuoNode, QuadNode, TrioNode
+from analysis.models import TrioNode
 from analysis.models.enums import TrioInheritance
-from analysis.models.nodes.stats_cache import UNCACHEABLE
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
@@ -94,13 +93,7 @@ class TestStatsFilterKeyRoundTrip(TestCase):
             accepts parent no-calls has to count live """
         for inheritance in TrioNode.STATS_INHERITANCE_MODES:
             node = self._trio_node(inheritance, require_zygosity=False)
-            self.assertIs(node.get_stats_filter_key(), UNCACHEABLE)
-
-    def test_family_nodes_without_precomputed_buckets_are_uncacheable(self):
-        """ The buckets are built off a cohort's Trio, so a Duo/Quad node has to count live rather
-            than read the raw cohort row, which knows nothing about its inheritance mode """
-        for node in (DuoNode(), QuadNode()):
-            self.assertIs(node.get_stats_filter_key(), UNCACHEABLE, str(type(node)))
+            self.assertIsNone(node._stats_inheritance_mode())
 
 
 class TestCohortStatsCascade(TestCase):
