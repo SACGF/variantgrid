@@ -49,7 +49,7 @@ from snpdb.models import (
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, VariantsType, VCFInfoTypes
+from snpdb.models.models_enums import ImportSource, VariantOrigin, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (
@@ -591,7 +591,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
             modified_sample = False
             # Set sample.variants_type from EnrichmentKit (eg to Mixed somatic for somatic panels)
             if ek := sequencing_sample.enrichment_kit:
-                if ek.sample_variants_type != VariantsType.UNKNOWN:
+                if ek.sample_variants_type != VariantOrigin.UNKNOWN:
                     sample.variants_type = ek.sample_variants_type
                     modified_sample = True
 

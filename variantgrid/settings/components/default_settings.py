@@ -792,11 +792,11 @@ USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to e
 
 HEARTBEAT_URL = None  # URL to ping to prove scheduler is still alive
 
-STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "default_static")
+_DEFAULT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "default_static")
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    STATIC_FILES_DIR,
+    _DEFAULT_STATIC_FILES_DIR,
     # Use absolute paths, not relative paths.
 )
 

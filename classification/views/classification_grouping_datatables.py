@@ -16,7 +16,7 @@ from classification.enums import (
     EvidenceCategory,
     LabExternalFilter,
     ShareLevel,
-    TriageState, TriageStatus, TestingContextBucket, ClassificationResultValue,
+    TriageDecision, TriageStatus, TestingContextBucket, ClassificationResultValue,
 )
 from classification.models import (
     Classification,
@@ -213,7 +213,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 .values_list("grouping_id", "sample_record_count")
             )
 
-        overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageState] = {}
+        overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageDecision] = {}
         for overlap_cont in OverlapContribution.objects.filter(
                 classification_grouping__in=qs,
                 triage_state__status=TriageStatus.REVIEWED_WILL_FIX).only('triage_state', 'value_type', 'classification_grouping_id'):
@@ -421,7 +421,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.csv_name = "classifications"
-        self.overlap_pending: dict[int, TriageState] = {}
+        self.overlap_pending: dict[int, TriageDecision] = {}
         self._page_sample_record_counts: dict[int, int] = {}
 
         genome_build_preferred = first(self.genome_build_prefs)

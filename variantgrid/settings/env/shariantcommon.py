@@ -149,8 +149,8 @@ SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing proj
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
-SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
-STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+_SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
+STATICFILES_DIRS = (_SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)

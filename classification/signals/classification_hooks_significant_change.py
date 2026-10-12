@@ -8,7 +8,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.contrib.auth.models import User
 
-from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys, ClassificationResultValue, TriageState
+from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys, ClassificationResultValue, TriageDecision
 from classification.models import (
     Classification,
     ClassificationFlagTypes,
@@ -53,7 +53,7 @@ def summary_changed(sender, instance: ClassificationGrouping, old_summary: Class
                         "remote_addr": None,
                         "remote_port": None,
                     }):
-                        oc.triage_state_obj = TriageState(status=TriageStatus.AMENDED)
+                        oc.triage_state_obj = TriageDecision(status=TriageStatus.AMENDED)
                         oc.save()
 
                     for overlap in oc.overlaps:

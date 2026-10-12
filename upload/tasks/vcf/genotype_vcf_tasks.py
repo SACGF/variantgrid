@@ -12,7 +12,7 @@ from library.utils import full_class_name
 from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus, VariantsType
+from snpdb.models.models_enums import ImportStatus, VariantOrigin
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from snpdb.tasks.somalier_tasks import somalier_vcf_id
 from snpdb.variant_zygosity_count import (
@@ -90,7 +90,7 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
                                   script=vcf_stats_task_class_name)
 
         for sample in vcf.sample_set.all():
-            if sample.variants_type == VariantsType.SOMATIC_ONLY:
+            if sample.variants_type == VariantOrigin.SOMATIC_ONLY:
                 sort_order += 1
                 UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
                                           name="Calculate Mutational Signature",

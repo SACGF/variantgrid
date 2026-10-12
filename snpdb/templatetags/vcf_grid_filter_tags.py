@@ -1,7 +1,7 @@
 from django.template import Library
 
 from snpdb.forms import ProjectChoiceForm, VariantsTypeMultipleChoiceForm
-from snpdb.models import VariantsType
+from snpdb.models import VariantOrigin
 
 register = Library()
 
@@ -18,8 +18,8 @@ def vcf_grid_filter(context, table_id, variants_type=False):
     }
 
     if variants_type:
-        vt_initial = {"variants_type": [c[0] for c in VariantsType.choices]}
+        vt_initial = {"variants_type": [c[0] for c in VariantOrigin.choices]}
         context["variants_type_form"] = VariantsTypeMultipleChoiceForm(initial=vt_initial)
-        context["variants_type_labels"] = dict(VariantsType.choices)
+        context["variants_type_labels"] = dict(VariantOrigin.choices)
 
     return context

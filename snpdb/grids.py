@@ -63,7 +63,7 @@ from snpdb.models import (
     UserSettings,
     Variant,
     VariantAllele,
-    VariantsType,
+    VariantOrigin,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
@@ -166,7 +166,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(VariantsType.choices)),
+                       client_renderer=RichColumn.choices_client_renderer(VariantOrigin.choices)),
             self.user_column("vcf__user", label="Uploaded by"),
             RichColumn(key="vcf__source", label="VCF source", orderable=True),
             RichColumn(key="vcf__name", label="VCF Name", orderable=True, extra_columns=["vcf__id"],

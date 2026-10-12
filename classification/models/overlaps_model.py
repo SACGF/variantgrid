@@ -17,7 +17,7 @@ from annotation.models.data_enums import EffectiveDate
 from annotation.models.models import ClinVarRecord
 from classification.enums import (
     OverlapOverrideStatus,
-    OverlapState,
+    OverlapSnapshot,
     OverlapStatus,
     SpecialEKeys,
     TestingContextBucket,
@@ -30,7 +30,7 @@ from classification.enums.overlaps_enums import (
     OverlapEntrySourceTextChoices,
     OverlapType,
     TriageComment,
-    TriageState,
+    TriageDecision,
 )
 from classification.models.classification import ConditionResolved
 from classification.models.classification_grouping import ClassificationGrouping
@@ -68,7 +68,7 @@ class OverlapContribution(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
 
     effective_date = JSONField(null=False, blank=False, default=EffectiveDate.default_json)
-    triage_state = JSONField(null=False, blank=False, default=TriageState.default_json)  # pending values are captured here
+    triage_state = JSONField(null=False, blank=False, default=TriageDecision.default_json)  # pending values are captured here
     comment = JSONField(null=False, blank=False, default=TriageComment.default_json)
 
     review_agreed_value = models.TextField(null=True, blank=True)
@@ -121,11 +121,11 @@ class OverlapContribution(TimeStampedModel):
         self.effective_date = value.to_dict()
 
     @property
-    def triage_state_obj(self) -> TriageState:
-        return TriageState.from_dict(self.triage_state)
+    def triage_state_obj(self) -> TriageDecision:
+        return TriageDecision.from_dict(self.triage_state)
 
     @triage_state_obj.setter
-    def triage_state_obj(self, value: TriageState):
+    def triage_state_obj(self, value: TriageDecision):
         self.triage_state = value.to_dict()
 
     @property
@@ -283,14 +283,14 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     overlap_status_change_timestamp = models.DateTimeField(null=True, blank=True)
     valid = models.BooleanField(default=False)  # if it's cross context but only has contributions from 1 context, or if it's NO_SUBMITTERS it shouldn't be valid
 
-    cached_overlap_state = models.JSONField(default=OverlapState.default_json)
+    cached_overlap_state = models.JSONField(default=OverlapSnapshot.default_json)
 
     @property
-    def cached_overlap_state_obj(self) -> OverlapState:
-        return OverlapState.from_dict(self.cached_overlap_state)
+    def cached_overlap_state_obj(self) -> OverlapSnapshot:
+        return OverlapSnapshot.from_dict(self.cached_overlap_state)
 
     @cached_overlap_state_obj.setter
-    def cached_overlap_state_obj(self, value: OverlapState):
+    def cached_overlap_state_obj(self, value: OverlapSnapshot):
         self.cached_overlap_state = value.to_dict()
 
     @property
@@ -317,7 +317,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         It's a bit redundant but cached is used to see if we need to send out notifications
         whereas the database values and derived are used for rendering
         """
-        return OverlapState(
+        return OverlapSnapshot(
             status=self.overlap_status,
             has_pending_values=self.has_pending_values,
             override_status=self.overlap_override_status,
@@ -598,30 +598,30 @@ class OverlapContributionNextStep(TimeStampedModel):
 
 class OverlapDiscordanceNotification(TimeStampedModel):
     overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
-    old_state = models.JSONField(default=OverlapState.default_json)
-    new_state = models.JSONField(default=OverlapState.default_json)
+    old_state = models.JSONField(default=OverlapSnapshot.default_json)
+    new_state = models.JSONField(default=OverlapSnapshot.default_json)
 
     notification_sent_date = models.DateTimeField(null=True, blank=True)
 
     @property
     def old_state_obj(self):
-        return OverlapState.from_dict(self.old_state)
+        return OverlapSnapshot.from_dict(self.old_state)
 
     @old_state_obj.setter
-    def old_state_obj(self, value: OverlapState):
+    def old_state_obj(self, value: OverlapSnapshot):
         self.old_state = value.to_dict()
 
     @property
     def new_state_obj(self):
-        return OverlapState.from_dict(self.new_state)
+        return OverlapSnapshot.from_dict(self.new_state)
 
     @new_state_obj.setter
-    def new_state_obj(self, value: OverlapState):
+    def new_state_obj(self, value: OverlapSnapshot):
         self.new_state = value.to_dict()
 
     @property
     def is_still_relevant(self):
-        return OverlapState.is_notify_relevant(self.old_state_obj, self.new_state_obj)
+        return OverlapSnapshot.is_notify_relevant(self.old_state_obj, self.new_state_obj)
 
     def __lt__(self, other):
         return self.overlap_id < other.overlap_id
