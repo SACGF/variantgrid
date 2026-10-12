@@ -3,6 +3,8 @@ from django.db import connection, models
 from django.db.backends.postgresql.psycopg_any import mogrify
 from django.db.models import Model, sql
 
+from library.django_utils.django_partition import temporary_db_table
+
 # IteratorFile.read() concatenates until it has this much, so big reads go quadratic
 COPY_READ_SIZE = 8192
 
@@ -48,18 +50,15 @@ def model_to_insert_sql(model_list: list[Model], db_table: str = None, ignore_fi
         ignore_fields = []
 
     model = model_list[0]
-    old_table = model._meta.db_table
-    if db_table:
-        model._meta.db_table = db_table
-    fields = [f for f in model._meta.local_fields if f.name not in ignore_fields]
-    q = sql.InsertQuery(model)
-    q.insert_values(fields, model_list)
+    with temporary_db_table(model, db_table or model._meta.db_table):
+        fields = [f for f in model._meta.local_fields if f.name not in ignore_fields]
+        q = sql.InsertQuery(model)
+        q.insert_values(fields, model_list)
 
-    compiler = q.get_compiler('default')
-    # Normally, execute sets this, but we don't want to call execute
-    compiler.return_id = False
-    raw_statements = compiler.as_sql()
-    model._meta.db_table = old_table  # Put table name back
+        compiler = q.get_compiler('default')
+        # Normally, execute sets this, but we don't want to call execute
+        compiler.return_id = False
+        raw_statements = compiler.as_sql()
 
     # mogrify does the client side param binding - it handles the driver specific wrappers Django puts
     # around params (eg Jsonb for JSONField) as well as quoting

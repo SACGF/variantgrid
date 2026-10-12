@@ -251,10 +251,10 @@ def node_cache_task(node_id, version):
 
         # On success the node stays LOADING_CACHE, for the chained update_node_task to claim
         if processing_status == ProcessingStatus.ERROR and node.status != NodeStatus.READY:
-            with disable_auditlog():
-                node.status = NodeStatus.ERROR
-                node.errors = errors
-                node.save()
+            try:
+                node.update(status=NodeStatus.ERROR, errors=errors)
+            except NodeOutOfDateException:
+                pass  # A newer version is coming
     finally:
         if analysis_id is not None:
             _trigger_rescheduling(analysis_id)
