@@ -1,34 +1,27 @@
 """
-    Reader-side cache lookups for the CohortGenotype*Stats family + the handlers that translate
-    node configs to canonical filter_keys. Each source node class names its handler in
-    STATS_FILTER_KEY_HANDLER.
+    Reader-side cache lookups for the CohortGenotype*Stats family. Each source node translates its
+    config to a filter_key in get_stats_filter_key.
 
-    The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats) owns
-    inheritance_filter_key and the keys it precomputes, and readers build their keys through the
-    same function. A silent mismatch between the two would produce cache misses forever.
+    The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats) and the readers
+    both build inheritance keys through Trio.get_stats_filter_key. A silent mismatch between the two
+    would produce cache misses forever.
 """
-from collections.abc import Iterable
 from typing import Optional, Union
 
 from django.core.exceptions import ObjectDoesNotExist
 
-from analysis.models.enums import TrioInheritance
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
-from annotation.tasks.calculate_sample_stats import (
-    enqueue_cohort_stats_recompute,
-    get_filter_keys_to_precompute_for_cohort,
-    inheritance_filter_key,
-)
+from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from snpdb.models import CohortGenotypeStats
 from snpdb.models.models_enums import BuiltInFilters
 
 
 class _Uncacheable:
-    """ Sentinel returned by node handlers for configs we don't precompute. """
+    """ Sentinel returned by get_stats_filter_key for node configs we don't precompute. """
 
 
 UNCACHEABLE = _Uncacheable()
@@ -41,82 +34,6 @@ LABEL_TO_MODEL = {
     BuiltInFilters.OMIM: CohortGenotypeGeneAnnotationStats,
     BuiltInFilters.CLINVAR: CohortGenotypeClinVarAnnotationStats,
 }
-
-
-class FilterKeyHandler:
-    """ A node-class-specific helper that:
-          1. Given a node, returns the filter_key (or UNCACHEABLE) describing its config.
-          2. Given a cohort, returns the filter_keys the calc function should pre-populate.
-    """
-
-    def filter_key_for_node(self, node) -> FilterKey:
-        raise NotImplementedError
-
-    def filter_keys_to_precompute(self, cohort) -> Iterable[Optional[str]]:
-        return ()
-
-
-class NoFilterHandler(FilterKeyHandler):
-    """ Node only ever wants the raw aggregate row (filter_key=NULL). """
-
-    def filter_key_for_node(self, node) -> FilterKey:
-        return None
-
-    def filter_keys_to_precompute(self, cohort) -> Iterable[Optional[str]]:
-        return [None]
-
-
-class SampleNodeHandler(NoFilterHandler):
-    """ A group level SampleNode spans genotype collections, so there's no single cohort's stats
-        row to read - its counts are live queries. """
-
-    def filter_key_for_node(self, node) -> FilterKey:
-        if node.is_group_level:
-            return UNCACHEABLE
-        return None
-
-
-class TrioInheritanceHandler(FilterKeyHandler):
-    # 5 inheritance modes precomputed including compound het.
-    CACHED_MODES = {
-        TrioInheritance.DENOVO: "denovo",
-        TrioInheritance.RECESSIVE: "autosomal_recessive",
-        TrioInheritance.DOMINANT: "autosomal_dominant",
-        TrioInheritance.XLINKED_RECESSIVE: "x_linked_recessive",
-        TrioInheritance.COMPOUND_HET: "compound_het",
-    }
-
-    def filter_key_for_node(self, node) -> FilterKey:
-        # The precomputed buckets require both parents to have a zygosity call (@see _trio_predicates).
-        # require_zygosity=False also matches parent no-calls, which no bucket represents.
-        if not node.require_zygosity:
-            return UNCACHEABLE
-        # TrioNode always has an inheritance set.
-        mode = self.CACHED_MODES.get(TrioInheritance(node.inheritance))
-        if mode is None:
-            return UNCACHEABLE
-        return inheritance_filter_key(mode, node.trio)
-
-    def filter_keys_to_precompute(self, cohort) -> Iterable[Optional[str]]:
-        return get_filter_keys_to_precompute_for_cohort(cohort)
-
-
-class DuoInheritanceHandler(FilterKeyHandler):
-    """ Nothing is precomputed for duos - the buckets are built off a cohort's Trio (@see
-        _trio_predicates), so every DuoNode counts live rather than reading the raw cohort row,
-        which knows nothing about its inheritance mode. """
-
-    def filter_key_for_node(self, node) -> FilterKey:
-        return UNCACHEABLE
-
-
-class QuadInheritanceHandler(FilterKeyHandler):
-    """ Nothing is precomputed for quads - the buckets are built off a cohort's Trio (@see
-        _trio_predicates), so every QuadNode counts live rather than reading the raw cohort row,
-        which knows nothing about its inheritance mode. """
-
-    def filter_key_for_node(self, node) -> FilterKey:
-        return UNCACHEABLE
 
 
 def get_cached_label_count_for_cohort(cohort, sample, filter_key: FilterKey,

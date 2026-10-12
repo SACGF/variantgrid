@@ -18,7 +18,7 @@ from classification.models.clinvar_export_convertor import (
     ClinVarExportConverter,
 )
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
-from library.utils import first, invalidate_cached_property
+from library.utils import JsonObjType, first, invalidate_cached_property
 from snpdb.models import Allele, ClinVarKey
 from uicore.json.validated_json import JsonMessages, ValidatedJson
 
@@ -258,6 +258,24 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
 
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
+
+    def to_json(self, org_id: Optional[str]) -> JsonObjType:
+        return {
+            "actions": [{
+                "type": "AddData",
+                "targetDb": "clinvar",
+                "data": {
+                    "content": {
+                        "behalfOrgID": org_id,
+                        "submissionName": f"submission_{self.id}",
+                        "assertionCriteria": self.assertion_criteria,
+                        "clinvarSubmissionReleaseStatus": self.release_status,
+                        "clinvarSubmission": [submission.submission_full for submission in
+                                              self.clinvarexportsubmission_set.order_by('created')],
+                    }
+                }
+            }]
+        }
 
     @property
     def clinvar_batch_id(self):

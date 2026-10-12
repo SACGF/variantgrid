@@ -242,7 +242,7 @@ class DiscordanceReportTemplateData:
 
     @property
     def c_hgvses(self) -> list[HGVSDisplay]:
-        return self.report.c_hgvses(self.genome_build)
+        return self.report.all_c_hgvs(self.genome_build)
 
     @property
     def lab_clin_sigs(self) -> list[_LabClinSig]:

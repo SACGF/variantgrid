@@ -79,7 +79,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     @property
     def preview(self) -> 'PreviewData':
         c_hgvs_key_values = []
-        for c_hgvs in self.c_hgvses(GenomeBuildManager.get_current_genome_build()):
+        for c_hgvs in self.all_c_hgvs():
             c_hgvs_key_values.append(
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
@@ -405,9 +405,6 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     @property
     def all_classification_modifications(self) -> list[ClassificationModification]:
         return [drc.classification_effective for drc in self.discordance_report_classifications]
-
-    def c_hgvses(self, genome_build: GenomeBuild) -> list[HGVSDisplay]:
-        return sorted({cm.c_hgvs_best(genome_build) for cm in self.all_classification_modifications})
 
     @cached_property
     def is_medically_significant(self):

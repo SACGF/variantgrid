@@ -27,7 +27,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from analysis.models.nodes.stats_cache import QuadInheritanceHandler
+from analysis.models.nodes.stats_cache import UNCACHEABLE, FilterKey
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Quad, Sample
 
@@ -239,7 +239,6 @@ class QuadAnyAffected(AbstractQuadInheritance):
 
 
 class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
-    STATS_FILTER_KEY_HANDLER = QuadInheritanceHandler()
     INHERITANCE_CLASSES = {
         QuadInheritance.COMPOUND_HET:      QuadCompHet,
         QuadInheritance.RECESSIVE:         QuadRecessive,
@@ -293,6 +292,12 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         if self.quad and self.inheritance == QuadInheritance.MOSAIC_PARENT:
             warnings.extend(mosaic_parent_warnings(self.quad.cohort))
         return warnings
+
+    def get_stats_filter_key(self) -> FilterKey:
+        """ Nothing is precomputed for quads - the buckets are built off a cohort's Trio, so every
+            QuadNode counts live rather than reading the raw cohort row, which knows nothing about its
+            inheritance mode """
+        return UNCACHEABLE
 
     def _get_cohort(self):
         return self.quad.cohort if self.quad else None

@@ -543,7 +543,7 @@ def clinvar_export_batch_download(request: HttpRequest, clinvar_export_batch_id:
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
 
     # code duplicated from admin, but don't feel this should go into models
-    batch_json = clinvar_export_sync.batch_json(clinvar_export_batch)
+    batch_json = clinvar_export_batch.to_json(clinvar_export_sync.org_id)
     batch_json_str = json.dumps(batch_json)
     response = HttpResponse(batch_json_str, content_type='application/json')
     response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{clinvar_export_batch.pk}.json'

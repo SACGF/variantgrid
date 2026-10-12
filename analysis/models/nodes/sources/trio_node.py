@@ -27,7 +27,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from analysis.models.nodes.stats_cache import TrioInheritanceHandler
+from analysis.models.nodes.stats_cache import UNCACHEABLE, FilterKey
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample, Trio
 
@@ -219,7 +219,6 @@ class TrioAnyAffected(AbstractTrioInheritance):
 
 
 class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
-    STATS_FILTER_KEY_HANDLER = TrioInheritanceHandler()
     INHERITANCE_CLASSES = {
         TrioInheritance.COMPOUND_HET: CompHet,
         TrioInheritance.RECESSIVE: Recessive,
@@ -229,6 +228,14 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         TrioInheritance.DENOVO: Denovo,
         TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
         TrioInheritance.ANY_AFFECTED: TrioAnyAffected,
+    }
+    # Modes calculate_cohort_stats precomputes counts for, as named in Trio.STATS_INHERITANCE_MODES
+    STATS_INHERITANCE_MODES = {
+        TrioInheritance.DENOVO: "denovo",
+        TrioInheritance.RECESSIVE: "autosomal_recessive",
+        TrioInheritance.DOMINANT: "autosomal_dominant",
+        TrioInheritance.XLINKED_RECESSIVE: "x_linked_recessive",
+        TrioInheritance.COMPOUND_HET: "compound_het",
     }
 
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
@@ -281,6 +288,16 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         # defeating filter. Quality filters from AbstractCohortBasedNode still
         # defeat the cache.
         return AbstractCohortBasedNode._has_filters_that_affect_label_counts(self)
+
+    def get_stats_filter_key(self) -> FilterKey:
+        # The precomputed buckets require both parents to have a zygosity call.
+        # require_zygosity=False also matches parent no-calls, which no bucket represents.
+        if not self.require_zygosity:
+            return UNCACHEABLE
+        mode = self.STATS_INHERITANCE_MODES.get(TrioInheritance(self.inheritance))
+        if mode is None:
+            return UNCACHEABLE
+        return self.trio.get_stats_filter_key(mode)
 
     def _get_cached_label_count(self, label):
         # Compound het is the only trio mode that takes a parent (max_inputs=1), and its queryset

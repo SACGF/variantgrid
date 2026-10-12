@@ -25,7 +25,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from analysis.models.nodes.stats_cache import DuoInheritanceHandler
+from analysis.models.nodes.stats_cache import UNCACHEABLE, FilterKey
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Duo, DuoRelationship, Sample
 
@@ -340,7 +340,6 @@ def _collapse_zygosity_rows(rows: dict) -> dict:
 
 
 class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
-    STATS_FILTER_KEY_HANDLER = DuoInheritanceHandler()
     INHERITANCE_CLASSES = {
         DuoInheritance.COMPOUND_HET: DuoCompHet,
         DuoInheritance.RECESSIVE: DuoRecessive,
@@ -417,6 +416,12 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         # Inheritance is a CACHE DIMENSION (precomputed via filter_key), not a defeating filter.
         # Quality filters from AbstractCohortBasedNode still defeat the cache.
         return AbstractCohortBasedNode._has_filters_that_affect_label_counts(self)
+
+    def get_stats_filter_key(self) -> FilterKey:
+        """ Nothing is precomputed for duos - the buckets are built off a cohort's Trio, so every
+            DuoNode counts live rather than reading the raw cohort row, which knows nothing about its
+            inheritance mode """
+        return UNCACHEABLE
 
     def _get_cached_label_count(self, label):
         # Compound het is the only duo mode that takes a parent (max_inputs=1), and its queryset is

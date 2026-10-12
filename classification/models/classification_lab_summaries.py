@@ -28,6 +28,11 @@ class ClassificationLabSummary:
         return self.group.allele_origin_bucket
 
     @property
+    def triage(self):
+        """ Only a DiscordanceLabSummary has a triage to show under the lab's row """
+        return None
+
+    @property
     def lab(self):
         return self.group.lab
 

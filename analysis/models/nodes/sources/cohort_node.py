@@ -14,8 +14,7 @@ from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.stats_cache import (
     UNCACHEABLE,
-    FilterKeyHandler,
-    NoFilterHandler,
+    FilterKey,
     get_cached_label_count_for_cohort,
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
@@ -25,8 +24,6 @@ from snpdb.views.datatable_view import NullOrder, RichColumn
 
 
 class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
-    STATS_FILTER_KEY_HANDLER: FilterKeyHandler = NoFilterHandler()
-
     min_ad = models.IntegerField(default=0)
     min_dp = models.IntegerField(default=0)
     min_gq = models.IntegerField(default=0)
@@ -54,6 +51,11 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             in count_for_zygosity. """
         return [True, True, True, True]
 
+    def get_stats_filter_key(self) -> FilterKey:
+        """ The precomputed cohort stats bucket counts can be read from: None is the raw aggregate
+            row, UNCACHEABLE means count live """
+        return None
+
     def _get_cached_label_count(self, label):
         cohort = self._get_cohort()
         if cohort is None:
@@ -63,7 +65,7 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):
             return None
-        filter_key = self.STATS_FILTER_KEY_HANDLER.filter_key_for_node(self)
+        filter_key = self.get_stats_filter_key()
         if filter_key is UNCACHEABLE:
             return None
         return get_cached_label_count_for_cohort(

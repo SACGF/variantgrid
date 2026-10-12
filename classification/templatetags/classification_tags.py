@@ -46,7 +46,6 @@ from classification.models.classification_groups import (
 )
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import (
     DiscordanceReportRowData,
@@ -767,8 +766,8 @@ def classification_lab_summaries(
 
 @register.filter
 def discordance_triage_embed(lab_summary: ClassificationLabSummary) -> Optional[LazyRender]:
-    if isinstance(lab_summary, DiscordanceLabSummary) and lab_summary.triage:
-        return DiscordanceReportTriageView.lazy_render(lab_summary.triage)
+    if triage := lab_summary.triage:
+        return DiscordanceReportTriageView.lazy_render(triage)
     return None
 
 

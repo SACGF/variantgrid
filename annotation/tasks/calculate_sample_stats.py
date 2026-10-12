@@ -23,7 +23,6 @@ from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
-from library.utils.json_utils import canonical_filter_key
 from snpdb.models import (
     VCF,
     Cohort,
@@ -253,28 +252,13 @@ def _trio_predicates(mum_zyg, dad_zyg, proband_zyg, contig, mother_affected, fat
     return modes
 
 
-PRECOMPUTED_INHERITANCE_MODES = ("denovo", "autosomal_recessive", "autosomal_dominant", "x_linked_recessive", "compound_het")
-
-
-def inheritance_filter_key(mode: str, trio) -> str:
-    """ The key a mode's bucket is stored under - the writer and the readers both come through here
-        so they can't drift apart. autosomal_dominant's predicate branches on which parents are
-        affected (@see _trio_predicates), so those flags belong in its key: editing them misses the
-        old bucket and recomputes, rather than reading one built for the previous flags. """
-    key = {"inheritance": mode}
-    if mode == "autosomal_dominant":
-        key["mother_affected"] = bool(trio.mother_affected)
-        key["father_affected"] = bool(trio.father_affected)
-    return canonical_filter_key(key)
-
-
 def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
-    """ The filter_key buckets calculate_cohort_stats populates beyond the raw aggregate (None) row.
-        Trios get the 5 inheritance keys; everything else gets just None. """
-    trio = cohort.trio_set.first()
-    if trio is None:
-        return [None]
-    return [None] + [inheritance_filter_key(mode, trio) for mode in PRECOMPUTED_INHERITANCE_MODES]
+    """ The filter_key buckets calculate_cohort_stats populates: the raw aggregate (None) row, plus
+        the inheritance modes when the cohort has a Trio. """
+    keys = [None]
+    if trio := cohort.trio_set.first():
+        keys.extend(trio.get_stats_filter_keys())
+    return keys
 
 
 def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion):
@@ -315,9 +299,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     has_filters = bool(_cohort_has_filters(cohort))
 
     # Filter-keyed buckets to precompute (always includes None for raw aggregate).
-    precompute_keys = list(get_filter_keys_to_precompute_for_cohort(cohort))
-    if None not in precompute_keys:
-        precompute_keys = [None, *precompute_keys]
+    precompute_keys = get_filter_keys_to_precompute_for_cohort(cohort)
 
     # Trio context, if present (used to evaluate inheritance predicates per variant).
     trio = cohort.trio_set.first()
@@ -562,7 +544,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
                                     else UNK)
                 f_z, f_z_hm, f_z_omim, f_z_cv = PRIORITY_TO_F[proband_priority]
                 for mode in modes:
-                    key = inheritance_filter_key(mode, trio)
+                    key = trio.get_stats_filter_key(mode)
                     if key not in precompute_keys:
                         continue
                     bucket = aggregate_counters[(key, pf_pass)]
@@ -594,8 +576,8 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
 
     # Compound het post-processing — only genes with both "mum" and "dad"
     # sources contribute. Add to the compound_het filter_key bucket.
-    chet_key = inheritance_filter_key("compound_het", trio)
-    if chet_key in precompute_keys:
+    if chet_pending:
+        chet_key = trio.get_stats_filter_key("compound_het")
         for entry in chet_pending:
             (gene_id, pf_pass, type_field, dbsnp, dbsnp_class_field,
              has_transcript, clinvar, clinvar_path, impact_high_mod, has_omim,

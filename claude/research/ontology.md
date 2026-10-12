@@ -81,7 +81,7 @@ Only relations are versioned; a term's name, aliases and status are whatever the
 
 `ontology/models/models_ontology.py:OntologySnake` is an immutable path (source term, leaf term, list of relations
 walked), and `OntologySnake.snake_from` is a breadth-first search from a term toward a target ontology within
-`max_depth` steps, over `ontology/ontology_traversal.py:bfs_to_ontology`. Edges are filtered by an
+`max_depth` steps, over `ontology/models/models_ontology.py:bfs_to_ontology`. Edges are filtered by an
 `OntologyRelationshipQualityFilter`, which applies a minimum GenCC strength and a minimum PanelApp confidence only to
 edges from those two sources and passes everything else; the presets run from `ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER`
 to `ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER` (GenCC Strong, PanelApp Green), which is the default everywhere a
