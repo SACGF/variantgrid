@@ -192,8 +192,7 @@ class CohortGenotypeTestCase(TestCase):
             self.assertEqual([f"Trio '{trio.name}'"], labels)
 
     def _create_genotype_stats(self, cgc, samples):
-        code_version = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats", version=1,
-                                                                    code_git_hash="test")[0]
+        code_version = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats", version=1)[0]
         for i, sample in enumerate(samples):
             CohortGenotypeStats.objects.create(cohort_genotype_collection=cgc, sample=sample,
                                                code_version=code_version, ref_count=i, het_count=10 + i,

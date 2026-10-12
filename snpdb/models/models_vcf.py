@@ -29,7 +29,7 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
 from patients.models_enums import Sex
-from snpdb.models.models import LabProject
+from snpdb.models.models import CodeVersionMixin, LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
     SampleFileType,
@@ -738,17 +738,16 @@ class VCFAlleleSource(AlleleSource):
         return qs
 
 
-class SampleStatsCodeVersion(TimeStampedModel):
+class SampleStatsCodeVersion(CodeVersionMixin, TimeStampedModel):
     """ Track the version and code used to calculate sample stats, in case there are bugs/changes needed """
     name = models.TextField()
     version = models.IntegerField()
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("name", "version", "code_git_hash")
+        unique_together = ("name", "version", "code_version")
 
     def __str__(self):
-        return f"{self.name} v{self.version}, git: {self.code_git_hash}, {self.created}"
+        return f"{self.name} v{self.version}, git: {self.code_version.git_hash}, {self.created}"
 
 
 class VCFLengthStatsCollection(TimeStampedModel):

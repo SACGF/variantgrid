@@ -21,6 +21,7 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F, Q
@@ -33,7 +34,6 @@ from classification.models.classification import Classification, ClassificationM
 from classification.models.classification_json import ClassificationJsonParams
 from classification.models.classification_report_models import CaseReportStatus, Measure
 from classification.models.evidence_key import EvidenceKeyMap
-from library.django_utils import get_cached_project_git_hash
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
 from patients.models_enums import (
@@ -613,7 +613,7 @@ def build_versions(samples: list[Sample]) -> dict:
         if vav := VariantAnnotationVersion.latest(genome_build):
             annotation[genome_build.name] = str(vav)
     return {
-        "variantgrid": get_cached_project_git_hash(),
+        "variantgrid": settings.GIT_HASH,
         "annotation": annotation,
         "callers": _caller_versions(samples),
     }

@@ -716,6 +716,8 @@ SITE_NAME = "VariantGrid"
 # Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
 VARIANTGRID_MAJOR_VERSION = 4
 VARIANTGRID_VERSION = Git(BASE_DIR).version(VARIANTGRID_MAJOR_VERSION)
+# Read once at startup: the code this process is running, which after a git pull differs from what's on disk until restart
+GIT_HASH = Git(BASE_DIR).hash
 SITE_SHORT_NAME = "VG"  # Prefixes page titles, where there's no room for the full name
 SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
@@ -763,7 +765,7 @@ ROLLBAR = {
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
-    'code_version': Git(BASE_DIR).hash,
+    'code_version': GIT_HASH,
     # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
     'min_level': 'warning',
     'ignorable_404_urls': (

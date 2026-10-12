@@ -39,7 +39,7 @@ from more_itertools import first
 
 from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
-from library.django_utils import get_cached_project_git_hash, get_url_from_media_root_filename
+from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
@@ -268,10 +268,22 @@ class CodeVersion(models.Model):
         return f"{self.git_hash[:8]} ({self.created:%Y-%m-%d})"
 
     @staticmethod
-    def current() -> Optional['CodeVersion']:
-        if git_hash := get_cached_project_git_hash():
-            return CodeVersion.objects.get_or_create(git_hash=git_hash)[0]
-        return None
+    def current() -> 'CodeVersion':
+        """ The code this process is running (settings.GIT_HASH) """
+        return CodeVersion.objects.get_or_create(git_hash=settings.GIT_HASH)[0]
+
+
+class CodeVersionMixin(models.Model):
+    """ Records the CodeVersion that wrote this row - set on creation if not given """
+    code_version = models.ForeignKey(CodeVersion, on_delete=PROTECT)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.code_version_id:
+            self.code_version = CodeVersion.current()
+        super().save(*args, **kwargs)
 
 
 class Wiki(TimeStampedModel):
