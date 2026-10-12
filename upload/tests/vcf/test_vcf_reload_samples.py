@@ -21,10 +21,10 @@ class TestVCFReloadSamples(TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        user = User.objects.get_or_create(username='testuser')[0]
+        self.user = User.objects.get_or_create(username='testuser')[0]
         vcf_filename = self._write_vcf("original.vcf", ["A", "B"])
         file_upload = FileUpload.objects.create(path=vcf_filename, import_source=ImportSource.COMMAND_LINE,
-                                                user=user, file_type=UploadedFileTypes.VCF,
+                                                user=self.user, file_type=UploadedFileTypes.VCF,
                                                 metadata={"genome_build": "GRCh37"})
         self.upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
         self._create_vcf_model(vcf_filename)
@@ -53,6 +53,15 @@ class TestVCFReloadSamples(TestCase):
         self.vcf.refresh_from_db()
         self.assertEqual(3, self.vcf.genotype_samples)
         self.assertEqual(3, self.vcf.cohort.cohort_genotype_collection.num_samples)
+
+    def test_reload_reindexes_sub_cohorts(self):
+        sample_b = self.vcf.sample_set.get(vcf_sample_name="B")
+        sub_cohort = self.vcf.cohort.create_sub_cohort(self.user, [sample_b])
+        self.assertEqual(1, sub_cohort.cohortsample_set.get().cohort_genotype_packed_field_index)
+
+        self._create_vcf_model(self._write_vcf("reloaded.vcf", ["B", "A", "C"]))
+
+        self.assertEqual(0, sub_cohort.cohortsample_set.get().cohort_genotype_packed_field_index)
 
     def test_reload_missing_a_sample_fails(self):
         with self.assertRaises(VCFSamplesRemovedException):

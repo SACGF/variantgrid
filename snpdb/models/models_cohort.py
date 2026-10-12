@@ -175,12 +175,13 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         self._set_packed_field_indexes(dict(parent_cohort.cohortsample_set.values_list(
             "sample_id", "cohort_genotype_packed_field_index")))
 
-    def _set_packed_field_indexes(self, packed_index_by_sample_id: dict[int, int]):
-        """ Bulk update so it doesn't go through CohortSample.save() and bump the version again """
+    def _set_packed_field_indexes(self, packed_index_by_sample_id: dict[int, int]) -> bool:
+        """ Bulk update so it doesn't go through CohortSample.save() and bump the version again.
+            Returns whether anything moved """
         cohort_samples = list(self.cohortsample_set.all())
         if all(cs.cohort_genotype_packed_field_index == packed_index_by_sample_id[cs.sample_id]
                for cs in cohort_samples):
-            return
+            return False
 
         # packed fields are unique per cohort so need to move them sufficiently high to be able to rearrange
         highest_packed_index = max(cs.cohort_genotype_packed_field_index for cs in cohort_samples)
@@ -190,6 +191,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         for cs in cohort_samples:
             cs.cohort_genotype_packed_field_index = packed_index_by_sample_id[cs.sample_id]
         CohortSample.objects.bulk_update(cohort_samples, ["cohort_genotype_packed_field_index"])
+        return True
 
     def delete_old_counts(self):
         qs = CohortGenotypeCollection.objects.filter(cohort=self, cohort_version__lt=self.version)
@@ -259,31 +261,34 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     def set_vcf_samples(self, vcf_samples: list[Sample]):
         """ A VCF cohort packs genotypes in VCF column order, so each sample's packed index and sort order is
             its column. A reload in place can add or reorder columns (#1191) - existing CohortSamples are
-            updated rather than replaced, keeping the Trios/pedigrees/filters that point at them.
+            updated rather than replaced, keeping the Trios/pedigrees/filters that point at them, and sub
+            cohorts follow the new indexes as they read this cohort's genotype arrays (#2155).
             vcf_samples must include every sample already in the cohort. """
-        cohort_sample_by_sample_id = {cs.sample_id: cs for cs in self.cohortsample_set.all()}
-        if removed_sample_ids := set(cohort_sample_by_sample_id) - {s.pk for s in vcf_samples}:
+        packed_index_by_sample_id = {sample.pk: i for i, sample in enumerate(vcf_samples)}
+        cohort_samples = list(self.cohortsample_set.all())
+        if removed_sample_ids := {cs.sample_id for cs in cohort_samples} - set(packed_index_by_sample_id):
             raise ValueError(f"Cohort {self.pk}: existing sample ids {removed_sample_ids} missing from vcf_samples")
 
-        changed = False
-        new_cohort_samples = []
-        for i, sample in enumerate(vcf_samples):
-            if cohort_sample := cohort_sample_by_sample_id.get(sample.pk):
-                changed |= (cohort_sample.cohort_genotype_packed_field_index, cohort_sample.sort_order) != (i, i)
-                cohort_sample.cohort_genotype_packed_field_index = i
-                cohort_sample.sort_order = i
-            else:
-                new_cohort_samples.append(CohortSample(cohort=self, sample=sample,
-                                                       cohort_genotype_packed_field_index=i, sort_order=i))
-
-        if changed:
-            # Packed index is unique per cohort - park the old ones at distinct negatives so any reorder is free
-            parked_index = Value(-1) - F("cohort_genotype_packed_field_index")
-            self.cohortsample_set.update(cohort_genotype_packed_field_index=parked_index)
-            CohortSample.objects.bulk_update(cohort_sample_by_sample_id.values(),
-                                             ["cohort_genotype_packed_field_index", "sort_order"])
+        # New samples are parked above every index in use, _set_packed_field_indexes then moves all to their column
+        existing_sample_ids = {cs.sample_id for cs in cohort_samples}
+        parked_index = len(vcf_samples) + max((cs.cohort_genotype_packed_field_index for cs in cohort_samples),
+                                              default=0)
+        new_cohort_samples = [CohortSample(cohort=self, sample_id=sample_id,
+                                           cohort_genotype_packed_field_index=parked_index + i, sort_order=i)
+                              for sample_id, i in packed_index_by_sample_id.items()
+                              if sample_id not in existing_sample_ids]
         CohortSample.objects.bulk_create(new_cohort_samples)
-        if changed or new_cohort_samples:
+        reindexed = self._set_packed_field_indexes(packed_index_by_sample_id)
+
+        resorted_cohort_samples = [cs for cs in cohort_samples
+                                   if cs.sort_order != packed_index_by_sample_id[cs.sample_id]]
+        for cs in resorted_cohort_samples:
+            cs.sort_order = packed_index_by_sample_id[cs.sample_id]
+        CohortSample.objects.bulk_update(resorted_cohort_samples, ["sort_order"])
+
+        if new_cohort_samples or reindexed or resorted_cohort_samples:
+            for sub_cohort in self.sub_cohort_set.all():
+                sub_cohort._set_packed_field_indexes(packed_index_by_sample_id)
             self.increment_version()
 
     def get_cohort_samples(self):
