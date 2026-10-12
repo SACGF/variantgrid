@@ -2,21 +2,10 @@
 {% load datatable_tags %}
 {% load help_tags %}
 
-{% block docreadyjs %}
-	{% if node.has_gene_coverage != None %}
-		var shadowColor = "{{ node.shadow_color }}";
-		var tabsToColor = ["#gene-list-tab", "#incomplete-coverage-tab"];
-		for (var i=0 ; i<tabsToColor.length ; ++i) {
-			$(tabsToColor[i]).children().css({"background-color" : shadowColor});
-		}
-
-	{% endif %}
-
-{% endblock docreadyjs %}
 {% block node_editor_tab_links_second %}
 {% if node.status == 'R' %}
 	{% if node.has_gene_coverage != None %}
-	    	<li id='gene-list-tab' class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#node-genes-tab">Genes/Coverage</a></li>
+	    	<li id='gene-list-tab' class="nav-item"><a class="nav-link{% if node.has_gene_coverage is False %} incomplete-coverage{% endif %}" data-toggle="tab" role="tab" href="#node-genes-tab">Genes/Coverage</a></li>
 	{% else %}
 	    	<li id='gene-list-tab' class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#node-genes-tab">Genes</a></li>
 	{% endif %}
@@ -33,7 +22,7 @@
             <div id="gene-tabs">
                 <ul class="nav nav-tabs mb-4" role="tablist">
                     {% if incomplete_gene_coverage %}
-                    <li id='incomplete-coverage-tab' class="nav-item"><a class="nav-link show active" data-toggle="tab" role="tab" href="#gene-incomplete-coverage">Incomplete Coverage</a></li>
+                    <li id='incomplete-coverage-tab' class="nav-item"><a class="nav-link incomplete-coverage show active" data-toggle="tab" role="tab" href="#gene-incomplete-coverage">Incomplete Coverage</a></li>
                     {% endif %}
                     <li class="nav-item"><a class="nav-link{% if not incomplete_gene_coverage %} show active{% endif %}" data-toggle="tab" role="tab" href="#gene-list-genes">Genes</a></li>
                     <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#gene-coverage">Coverage</a></li>

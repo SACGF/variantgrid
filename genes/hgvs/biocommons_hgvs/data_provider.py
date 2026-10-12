@@ -103,7 +103,7 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
         raise NotImplementedError()
 
     def _get_transcript(self, tx_ac):
-        tv = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac)
+        tv = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac, best_attempt=True)
         return tv.data
 
     def _get_transcripts(self, tx_acs) -> dict:

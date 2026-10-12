@@ -1,0 +1,2 @@
+<p class="text-muted">API calls about this {{ verbose_name }}, and failed calls that name <b>{{ object_pk }}</b> in their request body. Every call is at <a href="{% url 'api_request_log' %}">Settings → API Log</a>.</p>
+<table id="api-request-log-object-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'api_request_log_object_datatable' app_label model_name object_pk %}"></table>

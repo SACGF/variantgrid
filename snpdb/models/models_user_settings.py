@@ -3,7 +3,7 @@ Per-user preferences and their layering: SettingsOverride rows at Global, Organi
 User level are merged by `UserSettings.get_for_user` (later wins) into the UserSettings dataclass -
 default build, columns, initial permission groups, tag config, node count settings. Also the
 small per-user state models (UserGridConfig, UserPageAck, AllVariantsFilter, UserContact) and
-UserPreview / AvatarDetails for display. Read preferences through get_for_user, never the override
+UserPreview for display. Read preferences through get_for_user, never the override
 rows directly.
 """
 import dataclasses
@@ -14,7 +14,6 @@ from datetime import datetime, timedelta
 from functools import cached_property
 from typing import Any, Optional
 
-from avatar.templatetags.avatar_tags import avatar_url
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -23,17 +22,15 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import escape
-from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
+from flags.models.models import FlagCollection
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
-from library.utils import rgb_contrasting_text, string_deterministic_hash
-from snpdb.models.models import Lab, Organization, Tag, UserAward, UserAwards
+from library.utils import rgb_contrasting_text
+from snpdb.models.models import AvatarDetails, Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
@@ -311,9 +308,6 @@ class SettingsOverride(models.Model):
         help_text="Analysis nodes with at least this many variants don't auto-load "
                   "their grid — the user clicks 'Load variants' to run the row query. "
                   "Blank inherits the next level up.")
-    show_user_awards = models.BooleanField(null=True, blank=True,
-                                           help_text="Decorate users currently holding a title (crown, medal, "
-                                                     "trophy) on grids and in user labels")
 
 
 class GlobalSettings(SettingsOverride):
@@ -432,74 +426,6 @@ class UserPreview(PreviewModelMixin):
         )
 
 
-@dataclass(frozen=True)
-class AvatarDetails:
-    user: User
-
-    @staticmethod
-    def avatar_for(user: User):
-        return AvatarDetails(user=user)
-
-    @cached_property
-    def awards(self) -> UserAwards:
-        return UserAwards(user=self.user)
-
-    @cached_property
-    def titles(self) -> list[UserAward]:
-        """ Active titles held, ALL_TIME -> MONTH -> DAY. Empty when awards are off for the deployment """
-        if not settings.USER_AWARDS_ENABLED:
-            return []
-        return self.awards.titles
-
-    @cached_property
-    def title_icon_html(self) -> SafeString:
-        """ The highest title's icon (crown beats medal beats trophy), tooltip listing every title held """
-        if not (titles := self.titles):
-            return SafeString("")
-        tooltip = escape("\n".join(t.award_text for t in titles))
-        return SafeString(f'<i class="{titles[0].icon_class} user-title" title="{tooltip}"></i>')
-
-    def shows_titles_for(self, viewer_settings: "UserSettings") -> bool:
-        """ Whether this user is decorated for a viewer - the single rule shared by grids and {% user %} """
-        return bool(self.titles) and viewer_settings.show_user_awards
-
-    def grid_label_html(self, viewer_settings: "UserSettings") -> SafeString:
-        """ Plain name, or "<crown> Name" while holding a title and the viewer wants to see it """
-        label = escape(self.preferred_label)
-        if self.shows_titles_for(viewer_settings):
-            label = f"{self.title_icon_html} {label}"
-        return SafeString(label)
-
-    @cached_property
-    def preferred_label(self) -> str:
-        user = self.user
-        preferred_label = user.username
-        if user.first_name or user.last_name:
-            preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
-        return preferred_label
-
-    @cached_property
-    def is_editable(self):
-        return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
-
-    @cached_property
-    def url(self) -> str:
-        if self.is_editable:
-            return avatar_url(self.user)
-        else:
-            # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
-            return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
-
-    @cached_property
-    def background_color(self) -> str:
-        if self.user.username == 'admin_bot':
-            return '#ffffff'
-
-        if self.url.startswith('/static/icons/users/'):
-            colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
-            return colors[string_deterministic_hash(self.user.username) % len(colors)]
-
-
 @dataclass
 class UserSettings:
     user: User
@@ -526,7 +452,6 @@ class UserSettings:
     initially_show_zygosity_table: bool
     variant_grid_two_line_rows: bool
     node_grid_auto_load_max_variants: Optional[int]
-    show_user_awards: bool
 
     @property
     def variant_tag_stale_date(self) -> Optional[datetime]:
@@ -725,7 +650,6 @@ class UserSettings:
     @property
     def classification_issue_count(self) -> int:
         from classification.models import Classification
-        from flags.models import FlagCollection
         return FlagCollection.filter_for_open_flags(
             Classification.filter_for_user(user=self.user)
         ).order_by('-created').exclude(withdrawn=True).count()

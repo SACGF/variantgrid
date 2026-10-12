@@ -10,8 +10,10 @@ breakpoints - and a name nobody registered here still mints its Variant: this ta
 whether a name is real.
 
 Seeded with the junctions the TSO 500 panel reports; a lab adds rows for the ones its own panel
-reports that we have not named.
+reports that we have not named, with the junction's CIViC variant where CIViC records one (#1909).
 """
+from typing import Optional
+
 from django.db import models
 from django.db.models.deletion import CASCADE
 
@@ -35,6 +37,8 @@ class SpliceEvent(models.Model):
     contig = models.ForeignKey('snpdb.Contig', on_delete=CASCADE)
     donor = models.IntegerField()     # Breakpoint 1: last base of the 5' exon
     acceptor = models.IntegerField()  # Breakpoint 2, as the caller writes it
+    # The junction's CIViC variant (https://civicdb.org/variants/324) - its evidence is a link away (#1909)
+    civic_variant_id = models.IntegerField(null=True, blank=True)
 
     class Meta:
         unique_together = (("genome_build", "contig", "donor", "acceptor"),
@@ -42,3 +46,9 @@ class SpliceEvent(models.Model):
 
     def __str__(self):
         return self.display
+
+    @property
+    def civic_url(self) -> Optional[str]:
+        if self.civic_variant_id:
+            return f"https://civicdb.org/variants/{self.civic_variant_id}"
+        return None

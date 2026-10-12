@@ -49,10 +49,12 @@ from snpdb.models import (
     UserContact,
     UserSettings,
     UserSettingsOverride,
-    VariantsType,
+    VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
+from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision
 from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
@@ -432,6 +434,24 @@ SampleFilesFormSet = inlineformset_factory(Sample,
                                            extra=1)
 
 
+class VCFSampleFilesPatternForm(forms.Form):
+    """ Bulk create a file for each sample in a VCF, eg /data/%(vcf_sample_name)s.bam """
+    pattern = forms.CharField(
+        initial="/data/%(vcf_sample_name)s.bam",
+        widget=TextInput(),
+        help_text="Placeholders: " + ", ".join(f"%({k})s" for k in PATTERN_KEYS) + ". A literal '%' is written %%")
+    file_type = forms.ChoiceField(choices=[(ft.value, ft.label) for ft in (SampleFileType.BAM, SampleFileType.CRAM)])
+    label = forms.CharField(required=False, help_text="Applied to the files this save creates")
+
+    def clean_pattern(self):
+        pattern = self.cleaned_data["pattern"]
+        try:
+            validate_sample_file_path_pattern(pattern)
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
+        return pattern
+
+
 class ProjectChoiceForm(forms.Form):
     project = forms.ModelChoiceField(queryset=Project.objects.all(),
                                      required=False,
@@ -456,7 +476,7 @@ class SampleMultiForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
 
 
 class VariantsTypeMultipleChoiceForm(forms.Form):
-    variants_type = forms.MultipleChoiceField(choices=VariantsType.choices, widget=forms.CheckboxSelectMultiple())
+    variants_type = forms.MultipleChoiceField(choices=VariantOrigin.choices, widget=forms.CheckboxSelectMultiple())
 
 
 class VCFChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
@@ -548,7 +568,6 @@ class SettingsOverrideForm(BaseModelForm):
             "grid_sample_label_template": TextInput(),
             "initially_show_zygosity_table": BlankNullBooleanSelect(),
             "variant_grid_two_line_rows": BlankNullBooleanSelect(),
-            "show_user_awards": BlankNullBooleanSelect(),
         }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
@@ -571,7 +590,6 @@ class SettingsOverrideForm(BaseModelForm):
             "initially_show_zygosity_table": "Initially Show Duo/Trio/Quad Zygosity Table",
             "variant_grid_two_line_rows": "Variant Grid Two Line Rows",
             "node_grid_auto_load_max_variants": "Node Grid Auto Load Max Variants",
-            "show_user_awards": "Show User Awards",
         }
 
     def __init__(self, *args, **kwargs):
@@ -596,7 +614,7 @@ class SettingsOverrideForm(BaseModelForm):
         extraction = Extraction(pk=4, specimen=specimen)
         patient = Patient(pk=2, first_name='first_name', last_name='last_name',
                           patient_code='patient_code')
-        sample = Sample(pk=1, name="sample", patient=patient, extraction=extraction)
+        sample = Sample(pk=1, vcf_sample_name="vcf_sample_name", name="sample", patient=patient, extraction=extraction)
         params = sample._get_sample_formatter_params()
         errors = []
         for i, t in enumerate(sample_label_template.split("||")):
@@ -629,7 +647,6 @@ class SettingsOverrideForm(BaseModelForm):
             "initially_show_zygosity_table": settings_config.analysis_enabled,
             "variant_grid_two_line_rows": settings_config.analysis_enabled,
             "node_grid_auto_load_max_variants": settings_config.analysis_enabled,
-            "show_user_awards": settings.USER_AWARDS_ENABLED,
         }
 
         for f, visible in field_visibility.items():
@@ -848,7 +865,7 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = GenomicIntervalsCollection
         exclude = ['category']
-        read_only = ('processed_file', 'processed_records', 'import_status')
+        read_only = ('processed_file', 'processed_records', 'import_status', 'error_message')
         widgets = {'name': TextInput(),
                    'processed_file': TextInput(),
                    'user': ModelSelect2(url='user_autocomplete',
@@ -861,7 +878,7 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
             # Toggle REQUIRES_USER_INPUT if genome build set or not
             if instance.import_status == ImportStatus.REQUIRES_USER_INPUT:
                 if instance.genome_build is not None:
-                    instance.uploadedbed.process_bed_file()
+                    instance.uploadedbed.process_bed_file_after_user_input()
             elif instance.import_status == ImportStatus.SUCCESS:
                 if instance.genome_build is None:
                     instance.import_status = ImportStatus.REQUIRES_USER_INPUT

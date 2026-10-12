@@ -6,7 +6,6 @@ from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from library.django_utils import add_save_message, set_form_read_only
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
@@ -23,6 +22,7 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
+from patients.models.models_phenotype import TextPhenotypeMatch
 from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC, SequencingSample
 from seqauto.qc.library_qc_summary import summarise_library_qc
@@ -57,7 +57,8 @@ def view_patient(request, patient_id):
     # One patient's samples should all be the one individual - a pair that isn't is a sample swap (#196)
     sample_relatedness = None
     if settings.SOMALIER.get("enabled"):
-        sample_relatedness = get_same_individual_relatedness(patient.get_samples())
+        visible_samples = Sample.filter_for_user(request.user, queryset=patient.get_samples())
+        sample_relatedness = get_same_individual_relatedness(visible_samples)
 
     context = {"patient": patient,
                "form": form,
@@ -383,13 +384,14 @@ def patient_term_matches(request):
 
 
 def patient_term_approvals(request, patient_id_offset=0, num_patients_per_page=20, show_approved=False):
-    filter_kwargs = {"patient_text_phenotype__phenotype_description__isnull": False}
+    filter_kwargs = {"phenotype_description__isnull": False}
     if not show_approved:
-        filter_kwargs["patient_text_phenotype__approved_by__isnull"] = True
+        filter_kwargs["phenotype_description__approved_by__isnull"] = True
 
     if patient_id_offset:
         filter_kwargs["pk__gt"] = patient_id_offset
-    patients_qs = Patient.filter_for_user(request.user).filter(**filter_kwargs).order_by("pk")
+    patients_qs = (Patient.filter_for_user(request.user).filter(**filter_kwargs)
+                   .select_related("phenotype_description").order_by("pk"))
     num_total = patients_qs.count()
 
     end = min(num_patients_per_page, num_total)
@@ -400,7 +402,7 @@ def patient_term_approvals(request, patient_id_offset=0, num_patients_per_page=2
     patient_results = {}
     max_patient_id = 0
     for p in patients:
-        patient_results[p.pk] = p.patient_text_phenotype.phenotype_description.get_results()
+        patient_results[p.pk] = p.phenotype_description.get_results()
         max_patient_id = p.pk
 
     context = {"patients": patients,

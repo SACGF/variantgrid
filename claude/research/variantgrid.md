@@ -21,8 +21,9 @@ it wants - `annotation_settings`, `celery_settings`, `default_settings`, `seqaut
 `https_settings` - then reassigns or mutates. `variantgrid/settings/components/settings_paths.py` is the shared base for
 paths (`BASE_DIR`, `ANNOTATION_BASE_DIR`), imported by the components so they don't import each other in a cycle;
 `celery_settings` and `seqauto_settings` do import `default_settings` for `UNIT_TEST` / `BASE_DIR`. Shariant sites add a
-second layer (`variantgrid/settings/env/shariantcommon.py`, then `sharianttest.py` etc. on top), and
-`variantgrid/settings/env/claude_sapath_settings.py` is vgtest2 plus the sapath app for running its suite here.
+second layer (`variantgrid/settings/env/shariantcommon.py`, then `sharianttest.py` etc. on top). The
+sapath app's suite runs from a core checkout against that box's own settings with `"sapath"` appended to
+`INSTALLED_APPS` (see the `variantgrid_sapath` README).
 `vg settings NAME` shows the resolved value and every file that set it.
 
 Secrets never live in Python: `variantgrid/settings/components/secret_settings.py:get_secret` looks up a dotted key
@@ -41,7 +42,8 @@ Postgres connections and a temp `IMPORT_PROCESSING_DIR` (#928, #1856).
 `variantgrid/urls.py` mounts the project views, the admin, DRF-spectacular's `/api/schema|docs|redoc`,
 `/api/v1/capabilities`, then loops `APPS_WITH_URLS`, including `<app>/` only when the app is installed and
 `URLS_APP_REGISTER[app]` is truthy - Shariant switches off analysis, pathtests, pedigree and seqauto this way. Inside an
-app, `variantgrid/perm_path.py:path` replaces Django's `path` so a named URL whose `URLS_NAME_REGISTER` entry is False is
+app, `variantgrid/perm_path.py:path` replaces Django's `path` so a named URL whose `URLS_NAME_REGISTER` entry is False
+(or whose `URLS_NAME_REGISTER_SETTINGS` feature setting is off - `variantgrid/perm_path.py:url_name_enabled`) is
 still registered but wrapped in `require_superuser`; `variantgrid/perm_path.py:router_urls` does the same for DRF router
 URLs (#1869). Templates read the same register through `variantgrid/perm_path.py:get_visible_url_names` (as
 `url_name_visible`) to hide menu items and tabs, and `variantgrid/tips.py` uses it to show only tips about reachable pages.
@@ -75,7 +77,7 @@ so the suite needs no network (`claude/guides/testing.md#external-services-in-te
 `variantgrid/test_runner.py:VariantGridTestRunner.setup_databases` creates the main test DB with
 `parallel=1`, seeds the fake GRCh37/GRCh38 annotation versions once
 (`variantgrid/test_runner.py:VariantGridTestRunner._seed_fake_annotation_versions`),
-then clones it per worker - 240-odd test classes used to rebuild that chain in `setUpTestData`. Under `--keepdb` it drops
+then clones it per worker, so the 240-odd test classes asking for it in `setUpTestData` find it there. Under `--keepdb` it drops
 the stale per-worker clones first and refuses to run if the kept DB has migrations applied that are not on disk.
 `variantgrid/test_runner.py:FastaRecordingRunner` records the fasta regions a full run touches, to regenerate the sparse
 CI fastas under `variantgrid/data/reference/`. Base classes and fixtures: `claude/guides/testing.md`.
@@ -91,7 +93,7 @@ Source assets are under `variantgrid/static_files/<site>_static/`; each env file
 
 `variantopedia/management/commands/deployment_check.py:Command` runs the checks in `variantgrid/deployment_validation/`
 (annotation data and versions, VEP and its column registry, tool and library versions, cdot, Celery routes/imports,
-somalier) and logs each failure with its fix; `scripts/upgrade.sh` runs it with `--die-if-invalid` through `scripts/migrator/migrator.py`. The same modules
+somalier) and logs each failure with its fix; `scripts/upgrade.sh` runs it with `--die-if-invalid` through `manual/upgrader.py`. The same modules
 back the annotation-runs page and the disk health check. `VARIANTGRID_VERSION` comes from
 `library/git.py:Git.version` (`git describe` against `vg<major>.*` tags) at settings load, and
 `variantgrid/views.py:version` compares the running hash with `manual` Deployment rows.
@@ -99,7 +101,7 @@ back the annotation-runs page and the disk health check. `VARIANTGRID_VERSION` c
 
 ## Why it is shaped this way
 
-Settings are plain star-imports rather than django-split-settings because PyDev could not resolve names through
+Settings are plain star-imports rather than django-split-settings because PyDev cannot resolve names through
 `split_settings.include` (the package docstring). One env file per host keeps the whole deployment's deviation from
 defaults in one reviewable file, and `vg settings --diff` / the settings map exist because star-import chains make "where
 did this value come from" otherwise a grep. `https_settings` is opt-in per env file because Secure cookies on a
@@ -114,42 +116,32 @@ The beat schedule is code, not `django_celery_beat` rows, so which periodic jobs
 that enable the feature. Several comments note `crontab` misbehaving with the timezone, which is why most sweeps use raw
 seconds.
 
-## History
-
-The settings package gained `env_developers/` (gitignored, checked before `env/`) so developer machines stop
-colliding with deployment files; `https_settings` was split out of the defaults for intranet sites. The test runner grew
-from mocks only to seeding and cloning (#1856, 191c20188) as the suite went from ~25 minutes to about two. Leaflet and
-djgeojson became optional (#1410), the capabilities endpoint moved to `/api/v1/capabilities` (sapath#443),
-`URLS_NAME_REGISTER` started gating DRF routers (#1869), `ManifestStaticFilesStorage` was restored after the Django 6
-upgrade dropped it (4592bd1b0), and the old per-publish condition matching became the automatch beat sweep (#1780).
-
 ## Traps
 
 Derived settings are computed once in `default_settings` from the defaults, so overriding the input in an env file does
-not move them: `URLS_NAME_REGISTER["lab_members_tab"]` is fixed from `LAB_HEAD_MANAGE_MEMBERS`, `"maps"` from `USE_MAPS`,
-the somalier report dir from `MEDIA_ROOT`. Shariant sets `LAB_HEAD_MANAGE_MEMBERS = False` without touching the register
-(the view's own `can_manage_members` check covers it); the sapath env sets both. Override the derived value too, and
-note that `@override_settings` on the input does not reach it (`snpdb/tests/test_lab_members.py`).
+not move them (the somalier report dir from `MEDIA_ROOT`, for one): override the derived value too. The two URL names
+that follow a feature setting are the exception: `URLS_NAME_REGISTER_SETTINGS` maps `lab_members_tab` to
+`LAB_HEAD_MANAGE_MEMBERS` and `maps` to `USE_MAPS`, and `variantgrid/perm_path.py:url_name_enabled` reads the setting
+when the register is consulted, so an env file (Shariant sets `LAB_HEAD_MANAGE_MEMBERS = False`) and
+`@override_settings` both reach it - after `get_visible_url_names.cache_clear()` in a test.
 
 A hostname with no env file only logs an error and loads nothing, so Django then fails on a missing setting far from
 the cause. A plain script that imports settings must set `DJANGO_SETTINGS_MODULE` to a concrete module.
 
-`variantgrid/settings/components/secret_settings.py:_get_env_variable` returns `None` instead of a tuple when an env var
-is set but empty, so `get_secret` raises `TypeError: cannot unpack non-iterable NoneType` - `SETTINGS_CONFIG=` or any
-exported-but-blank secret breaks every process at settings load (confirmed; unfixed). Its fallback warning prints
-`found` (always `True`) where it means the default value.
+An exported-but-empty environment variable (`SETTINGS_CONFIG=`, a blank secret) counts as unset in
+`variantgrid/settings/components/secret_settings.py:_get_env_variable` and falls through to the config file.
 
-Tasks defined outside an autodiscovered `<app>/tasks` module and not in `CELERY_IMPORTS` are registered in workers only
-because Celery's Django fixup runs system checks, whose URL check imports every urls module:
-`variantgrid/tasks/server_monitoring_tasks.py:heartbeat` / `warn_low_disk_space` (reached via
-`variantopedia/views_server_status.py`) and `classification/views/classification_email_view.py:send_summary_emails`.
-`CELERY_SKIP_CHECKS=1`, or unregistering that app's URLs, makes beat send tasks the worker doesn't know. `deployment_check`
-validates routes and imports but not beat task names.
+A worker registers a task only by importing its module itself: `CELERY_IMPORTS` or an autodiscovered `<app>.tasks`. A
+task whose module is reached only through a urls/views import chain is registered because Celery's Django fixup runs the
+system checks, whose URL check imports every urls module - `CELERY_SKIP_CHECKS=1` would leave beat sending tasks the
+worker doesn't know. Every beat-scheduled module is therefore listed in `CELERY_IMPORTS`, and
+`variantgrid/deployment_validation/celery_checks.py:check_beat_schedule_tasks` (in `deployment_check`) fails a beat
+entry whose module isn't.
 
 `statement_timeout` is set by `variantgrid/wsgi.py:setup_postgres`, so it applies to gunicorn/runserver only - Celery and
-`manage.py` connections run unbounded, deliberately. `variantgrid/views.py:csrf_error` answers CSRF failures with a 500,
-not 403, so they show up as server errors in logs and monitoring.
+`manage.py` connections run unbounded, deliberately.
 
-Anything cached in Redis is keyed by `CACHE_VERSION`; bump it when renaming a pickled class (root `AGENTS.md`). Static
+Anything cached in Redis is keyed by `CACHE_VERSION`; bump it when cached values become wrong. An entry that no longer
+unpickles is a miss (`library/django_utils/redis_cache.py`). Static
 URLs need `collectstatic` after a pull or `{% static %}` raises for files missing from the manifest - part of
-`scripts/upgrade.sh` (via the migrator), and why tests use the plain backend.
+`scripts/upgrade.sh` (via `manage.py upgrade`), and why tests use the plain backend.

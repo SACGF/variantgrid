@@ -8,9 +8,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
+from library.django_utils.data_archive_mixin import DataArchivedError
 from snpdb.archive import (
     ArchivePreconditionError,
-    DataArchivedError,
     archive_vcf,
     mark_vcf_archive_started,
 )

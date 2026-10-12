@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% block title %}Patient Record Imports{% endblock title %}
 
@@ -13,7 +13,7 @@
 }
 {% endblock css %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 <div>
     <div id='patient-header'>
         <h3>Import Patient Record Details</h3>
@@ -42,4 +42,4 @@
         </table>
     </div>
 </div>
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

@@ -94,23 +94,22 @@ app.conf.beat_schedule['reconcile-pending-extractions'] = {
     'schedule': HOUR_SECS,
 }
 
+if settings.API_REQUEST_LOG_DAYS:
+    app.conf.beat_schedule['prune-api-request-log'] = {
+        'task': 'eventlog.tasks.prune_api_request_log',
+        'schedule': crontab(hour=3, minute=45),
+    }
+
 app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'task': 'analysis.tasks.analysis_grid_export_tasks.clear_old_node_export_cached_generated_files',
     'schedule': crontab(hour=3, minute=15),
 }
 
-# User awards (#1819). The "today" trophy should move during the day; crowns, medals and badges
-# nightly. Raw seconds rather than crontab - see the timezone note above.
+# User awards (#1819). Raw seconds rather than crontab - see the timezone note above.
 if settings.USER_AWARDS_ENABLED:
-    app.conf.beat_schedule['user-awards-daily'] = {
-        'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
-        'schedule': HOUR_SECS,
-        'kwargs': {'periods': ['D']},
-    }
     app.conf.beat_schedule['user-awards-nightly'] = {
         'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
         'schedule': HOUR_SECS * 24,
-        'kwargs': {'periods': ['A', 'M'], 'badges': True},
     }
 
 # send update emails once a day (if there has been activity)

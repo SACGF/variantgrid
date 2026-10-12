@@ -6,10 +6,8 @@
 {% load compress %}
 {% load datatable_tags %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 
 {% block title %}Classification Record{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 {% if record and attachments_enabled %}
 <link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">

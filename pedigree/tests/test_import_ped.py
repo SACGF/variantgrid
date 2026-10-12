@@ -7,9 +7,11 @@ import django.test
 from django.contrib.auth.models import User
 
 from patients.models_enums import Sex
-from pedigree.models import PedFile
-from pedigree.ped.import_ped import import_ped
+from pedigree.models import PedFile, PedFileFamily, Pedigree
+from pedigree.ped.import_ped import automatch_pedigree_samples, import_ped
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import ImportStatus
+from snpdb.models.models_genome import GenomeBuild
 
 
 def _import(ped_text, user, name="test.ped"):
@@ -73,7 +75,7 @@ class TestImportPedValidation(django.test.TestCase):
             "FAM001 proband 0 0 1 1\n"
             "FAM001 father  0 0 1 1\n"
         )
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             _import(ped_text, self.user)
 
     def test_no_affected_sets_error_status(self):
@@ -95,7 +97,7 @@ class TestImportPedValidation(django.test.TestCase):
             "FAM001 father  0      0      2 1\n"  # sex=2 (Female)
             "FAM001 mother  0      0      2 1\n"
         )
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             _import(ped_text, self.user)
 
     def test_phenotips_minus9_affection_imports_as_none(self):
@@ -111,5 +113,32 @@ class TestImportPedValidation(django.test.TestCase):
     def test_missing_parent_reference_raises(self):
         # Parent ID present in a record but not defined as its own row
         ped_text = "FAM001 proband ghost_dad 0 1 2\n"
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             _import(ped_text, self.user)
+
+    def test_invalid_family_keeps_no_families(self):
+        ped_text = (
+            "FAM001 proband_a 0 0 1 2\n"
+            "FAM002 proband_b 0 0 2 1\n"  # nobody affected
+            "FAM003 proband_c 0 0 1 2\n"
+        )
+        with self.assertRaises(ValueError) as cm:
+            _import(ped_text, self.user)
+        self.assertIn("FAM002", str(cm.exception))
+        self.assertNotIn("FAM003", str(cm.exception))
+        ped_file = PedFile.objects.get(name="test.ped", user=self.user)
+        self.assertEqual(ped_file.import_status, ImportStatus.ERROR)
+        self.assertFalse(PedFileFamily.objects.filter(ped_file=ped_file).exists())
+
+
+class TestAutomatch(django.test.TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user('automatch_test')
+        self.cohort = create_fake_cohort(self.user, GenomeBuild.get_name_or_alias("GRCh37"))
+
+    def test_reupload_makes_one_pedigree(self):
+        for _ in range(2):
+            _, families = _import(VALID_TRIO, self.user)
+            automatch_pedigree_samples(self.user, families, min_matching_samples=3)
+        self.assertEqual(Pedigree.objects.filter(cohort=self.cohort).count(), 1)

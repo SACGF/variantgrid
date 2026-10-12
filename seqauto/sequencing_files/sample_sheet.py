@@ -48,7 +48,7 @@ def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
 
 
 def _reassign_sequencing_data_to_current_samples(old_samples_by_name, current_samples_by_name):
-    """ Reassign the existing Fastq / UnalignedReads / BamFile records onto the current sheet's
+    """ Reassign the existing Fastq / UnalignedReads / AlignmentFile records onto the current sheet's
         SequencingSample with the same sample name (match by name).
         Used when a newer SampleSheet replaces an old one. """
     for sequencing_sample_name, old_sequencing_sample in old_samples_by_name.items():
@@ -66,10 +66,10 @@ def _reassign_sequencing_data_to_current_samples(old_samples_by_name, current_sa
             unaligned_reads.sequencing_sample = current_ss
             unaligned_reads.save()
 
-        for bam_file in old_sequencing_sample.bamfile_set.all():
+        for alignment_file in old_sequencing_sample.alignmentfile_set.all():
             logging.info("Updating BAM file with current sequencing sample")
-            bam_file.sequencing_sample = current_ss
-            bam_file.save()
+            alignment_file.sequencing_sample = current_ss
+            alignment_file.save()
 
 
 def _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, new_sample_sheet) -> bool:
@@ -154,7 +154,7 @@ def current_sample_sheet_changed(sequencing_run_current_sample_sheet, new_sample
 
             _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, new_sample_sheet)
 
-        # Update downstream models - reassign Fastq / UnalignedReads / BamFile to the current sequencing samples
+        # Update downstream models - reassign Fastq / UnalignedReads / AlignmentFile to the current sequencing samples
         _reassign_sequencing_data_to_current_samples(old_sample_sheet.get_sequencing_samples_by_name(),
                                                      new_sample_sheet.get_sequencing_samples_by_name())
 
@@ -170,7 +170,7 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
 
         Operates purely on model data (the API sends records for the files; there is no filesystem
         to scan): relink old IlluminaFlowcellQC / JointCalledVCF and reassign the existing
-        Fastq / UnalignedReads / BamFile records by sample name. """
+        Fastq / UnalignedReads / AlignmentFile records by sample name. """
     current_sample_sheet = sequencing_run.get_current_sample_sheet()
     old_sample_sheets = sequencing_run.get_old_sample_sheets()
 
@@ -217,7 +217,7 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
         if relink_samples or joint_called_vcf.needs_to_be_linked():
             link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
 
-    # Reassign the existing Fastq / UnalignedReads / BamFile records from the old sample sheets'
+    # Reassign the existing Fastq / UnalignedReads / AlignmentFile records from the old sample sheets'
     # sequencing samples onto the current sheet's matching sequencing samples (match by sample name).
     current_samples_by_name = current_sample_sheet.get_sequencing_samples_by_name()
     for old_sample_sheet in old_sample_sheets:

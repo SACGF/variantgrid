@@ -30,19 +30,8 @@ if command -v uv > /dev/null; then
     echo "Installing requirements with uv"
     uv pip install "${REQUIREMENTS[@]}"
 else
-    # pip can't check hashes next to the git-pinned hgvs (it refuses the whole file), so it installs the same pins
-    # with the hashes stripped - unverified, as before hashes were added
-    echo "uv not found - installing requirements with pip, without hash checking"
-    PIP_REQUIREMENTS=()
-    STRIPPED_FILES=()
-    trap 'rm -f "${STRIPPED_FILES[@]}"' EXIT
-    for ((i = 1; i < ${#REQUIREMENTS[@]}; i += 2)); do
-        STRIPPED=$(mktemp)
-        STRIPPED_FILES+=("${STRIPPED}")
-        sed -E '/^[[:space:]]+--hash=/d; s/[[:space:]]+\\$//' "${REQUIREMENTS[$i]}" > "${STRIPPED}"
-        PIP_REQUIREMENTS+=(-r "${STRIPPED}")
-    done
-    python3 -m pip install --quiet "${PIP_REQUIREMENTS[@]}"
+    echo "uv not found - installing requirements with pip"
+    python3 -m pip install --quiet "${REQUIREMENTS[@]}"
 fi
 
 STATUS=$?

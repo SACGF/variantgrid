@@ -8,7 +8,12 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-from django.http.response import HttpResponseNotFound, HttpResponseServerError, JsonResponse
+from django.http.response import (
+    HttpResponseForbidden,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+    JsonResponse,
+)
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
 from django.urls.base import resolve, reverse
@@ -92,7 +97,7 @@ def csrf_error(request, reason=''):
     message = "Your session token has changed. Please try your operation again."
     context = {"message": message}
     response = _get_custom_error_response(request, context)
-    return HttpResponseServerError(response)
+    return HttpResponseForbidden(response)
 
 
 def _get_custom_error_response(request, context=None):

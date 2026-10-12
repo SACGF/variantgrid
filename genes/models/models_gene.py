@@ -26,7 +26,11 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNC
 
 # Re-exported: callers have long imported these from genes.models
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
-from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
+from genes.transcript_parts import (
+    CDOT_FAKE_TRANSCRIPT_PREFIX,
+    TranscriptParts,
+    get_transcript_id_and_version,
+)
 from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
 from genes.transcripts_utils import get_lrg_and_t
 from library.cache import timed_cache
@@ -374,6 +378,37 @@ class GeneAnnotationImport(TimeStampedModel):
         return self.url
 
 
+class CdotDataVersion(TimeStampedModel):
+    """ The cdot data release of the last whole cdot file imported for a build and consortium
+
+        An import only rewrites a TranscriptVersion whose data changed, so TranscriptVersion.modified_cdot_version
+        is the release that transcript last changed in - this is what's installed """
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
+    cdot_version = models.TextField()
+
+    class Meta:
+        unique_together = ("genome_build", "annotation_consortium")
+
+    def __str__(self):
+        return f"{self.genome_build}/{self.get_annotation_consortium_display()}: cdot {self.cdot_version}"
+
+    @staticmethod
+    def get_version(genome_build: GenomeBuild, annotation_consortium) -> Optional[str]:
+        qs = CdotDataVersion.objects.filter(genome_build=genome_build, annotation_consortium=annotation_consortium)
+        return qs.values_list("cdot_version", flat=True).first()
+
+    @staticmethod
+    def get_installed_versions(genome_builds: Iterable[GenomeBuild], annotation_consortia: Iterable) -> set[Optional[str]]:
+        """ The cdot version of each build/consortium combination - None for one that's never been imported """
+        genome_builds = list(genome_builds)
+        annotation_consortia = list(annotation_consortia)
+        qs = CdotDataVersion.objects.filter(genome_build__in=genome_builds, annotation_consortium__in=annotation_consortia)
+        version_by_key = {(gb_id, ac): version
+                          for gb_id, ac, version in qs.values_list("genome_build_id", "annotation_consortium", "cdot_version")}
+        return {version_by_key.get((gb.pk, ac)) for gb in genome_builds for ac in annotation_consortia}
+
+
 class Gene(PreviewModelMixin, models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
@@ -647,6 +682,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
+    # cdot release this row's data came from - an import only rewrites rows whose data changed
+    modified_cdot_version = models.TextField(null=True, blank=True)
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -770,6 +807,12 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @cached_property
     def accession(self):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
+
+    @property
+    def is_cdot_fake(self) -> bool:
+        """ A cdot stand-in for a RefSeq gene with no RNA accession (mitochondrial, eg 'fake-rna-ND4'), not
+            something to write HGVS against """
+        return self.transcript_id.startswith(CDOT_FAKE_TRANSCRIPT_PREFIX)
 
     @property
     def annotation_consortium(self):
@@ -938,9 +981,10 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         raise NoTranscript(f"Transcript '{transcript_accession}' missing from our DB - validity with {annotation_consortium} unknown")
 
     @staticmethod
-    def get_transcript_version(genome_build: GenomeBuild, transcript_name, best_attempt=True) -> Optional['TranscriptVersion']:
+    def get_transcript_version(genome_build: GenomeBuild, transcript_name, *, best_attempt: bool = False) -> Optional['TranscriptVersion']:
         """ @param best_attempt if we don't have the exact version specified in transcript_name, grab the closest
-            one that is larger (or the largest one if we don't have any larger than the requested) """
+            one that is larger (or the largest one if we don't have any larger than the requested). Otherwise
+            raise MissingTranscript """
         transcript_version = None
         transcript_versions_qs = TranscriptVersion.objects.filter(genome_build=genome_build)
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_name)
@@ -982,7 +1026,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         """ Attempts to load RefSeq TranscriptVersion we have from LRG identifier """
         transcript_version: Optional[TranscriptVersion] = None
         if lrg_identifier == "LRG_199t1":
-            transcript_version = TranscriptVersion.get_transcript_version(genome_build, "NM_004006.2")
+            transcript_version = TranscriptVersion.get_transcript_version(genome_build, "NM_004006.2", best_attempt=True)
         return transcript_version
 
     @staticmethod
@@ -1402,7 +1446,8 @@ class LRGRefSeqGene(models.Model):
             if t is None:
                 raise ValueError(f"We require a t version with LRG '{lrg_identifier}'")
             if lrg_ref_seq_gene := LRGRefSeqGene.objects.filter(lrg=lrg, t=t).first():
-                transcript_version = TranscriptVersion.get_transcript_version(genome_build, lrg_ref_seq_gene.rna)
+                transcript_version = TranscriptVersion.get_transcript_version(genome_build, lrg_ref_seq_gene.rna,
+                                                                           best_attempt=True)
         return transcript_version
 
 

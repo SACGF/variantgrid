@@ -27,6 +27,15 @@ def get_genomic_size_description(genomic_size):
     return genomic_size_description
 
 
+def format_bp(length: int) -> str:
+    """ 50 -> '50 bp', 1500 -> '1.5 kb', 55_123 -> '55.12 kb', 10_000_000 -> '10 Mb'
+        Matches _formatBases in variantgrid_formats.js (the SV badge) """
+    for unit, scale in (("Mb", 1_000_000), ("kb", 1_000)):
+        if length >= scale:
+            return f"{round(length / scale, 2):g} {unit}"
+    return f"{length:,} bp"
+
+
 @dataclass
 class Range:
     start: int

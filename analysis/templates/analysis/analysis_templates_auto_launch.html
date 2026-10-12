@@ -1,11 +1,11 @@
-{% extends menu_analysis_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load ui_help %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
 {% load crispy_forms_tags %}
 {% block title %}VariantGrid: Analysis templates{% endblock title %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 <script>
 $(document).ready(function() {
     console.log("doc ready");
@@ -76,5 +76,5 @@ $(document).ready(function() {
         There is no currently configured auto launching
     {% endif %}
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}
 

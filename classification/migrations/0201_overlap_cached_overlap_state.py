@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlap',
             name='cached_overlap_state',
-            field=models.JSONField(default=classification.enums.overlaps_enums.OverlapState.default_json),
+            field=models.JSONField(default=classification.enums.overlaps_enums.OverlapSnapshot.default_json),
         ),
     ]

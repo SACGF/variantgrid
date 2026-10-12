@@ -6,6 +6,12 @@ Plans live in `claude/plans/<issue>_<slug>_plan.md`. Directly under the title, r
 judgement it reflects. Update the line if a different model revises the plan. Add a `Status:` line
 (`draft | approved | in progress | landed <sha> | superseded by <plan>`) and keep it current.
 
+A plan states the chosen design: what the code and data will be, and why. Leave out rejected alternatives,
+"considered and dropped" sections and revision history (what changed since the last draft, review notes, struck-through
+text) - when the design changes, rewrite the text in place so it reads as the current decision. Once part of a plan
+lands, describe that part as what exists now. Where the obvious approach is tempting and still wrong, one line giving
+the present reason is enough.
+
 Put the data front and centre. Code can be changed later; data stays in the database for years and limits what can be
 built on it, so the database models are what the reviewer most wants to see. When a plan adds or changes a Django model,
 show the model as a code block with just its fields, relations, constraints and `Meta` - near the top of the plan, before

@@ -74,6 +74,18 @@ class TestTSO500PairPage(URLTestCase):
         self._test_urls([("view_tso500_pair", {"sequencing_run_name": SEQUENCING_RUN_NAME,
                                                "pair_id": PAIR_ID}, 200)], self.user)
 
+    def test_library_qc_table_spans_the_arm_and_category_over_their_metrics(self):
+        """ One table: the arm and category cells on the first metric's line only, spanning the rest """
+        self._make_library_qc(specimen=self.specimen)
+        self.client.force_login(self.user)
+        rows = self.client.get(self._url()).context["library_qc_rows"]
+        self.assertEqual(("DNA", 2), (rows[0].arm.nucleic_acid, rows[0].arm_rowspan))
+        self.assertEqual(2, rows[0].qc_rowspan)
+        self.assertEqual((None, None), (rows[1].arm, rows[1].qc))
+        # The unit folded into the value, and DRAGEN's 'Count' for no unit left off
+        self.assertEqual({"MEDIAN_INSERT_SIZE": "184 bp", "GENE_SCALED_MAD": "0.2"},
+                         {row.metric.name: row.metric.value_text for row in rows})
+
     def test_a_parked_pair_says_why_it_is_attached_to_nothing(self):
         """ No specimen, but a registered run - readable, and the page shows the match error """
         self._make_cvo(specimen_match_error="'2600000001' is not accessioned")

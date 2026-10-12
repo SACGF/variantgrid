@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from django.test import TestCase
@@ -7,6 +8,7 @@ from classification.models import (
     AlleleOriginGrouping,
     Classification,
     ClassificationGrouping,
+    ClassificationGroupingEntry,
     ClassificationModification,
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
@@ -73,3 +75,46 @@ class ClassificationGroupingCountsTestCase(TestCase):
             filtered = ClassificationGrouping.objects.filter(
                 ClassificationGrouping.clinical_significance_q(clinical_significance))
             self.assertEqual(filtered.count(), expected, clinical_significance)
+
+
+class ClassificationGroupingSortColumnsTestCase(TestCase):
+
+    def setUp(self):
+        ClassificationTestUtils.setUp()
+        self.lab, self.user = ClassificationTestUtils.lab_and_user()
+
+    def _grouping(self, summary: dict) -> ClassificationGrouping:
+        classification = Classification.objects.create(lab=self.lab, user=self.user, lab_record_id="test_1",
+                                                       summary=summary)
+        ClassificationModification.objects.create(classification=classification, user=self.user,
+                                                  source=SubmissionSource.API, is_last_published=True)
+        grouping = ClassificationGrouping.objects.create(
+            allele_origin_grouping=AlleleOriginGrouping.objects.create(allele=Allele.objects.create(),
+                                                                       allele_origin_bucket=AlleleOriginBucket.SOMATIC),
+            lab=self.lab,
+            share_level=ShareLevel.ALL_USERS
+        )
+        ClassificationGroupingEntry.objects.create(classification=classification, grouping=grouping)
+        grouping.update()
+        return grouping
+
+    def test_update_copies_sort_columns_and_clears_them_when_empty(self):
+        grouping = self._grouping({"pathogenicity": {"classification": "P", "sort": 5},
+                                   "somatic": {"clinical_significance": "tier_1", "sort": 3},
+                                   "date": {"date": "2024-03-07", "type": "curation_date"}})
+        self.assertEqual((grouping.latest_pathogenicity_sort, grouping.latest_somatic_sort, grouping.latest_curated_date),
+                         (5, 3, date(2024, 3, 7)))
+
+        grouping.classificationgroupingentry_set.all().delete()
+        del grouping.classification_modifications
+        grouping.update()
+        grouping.refresh_from_db()
+        self.assertEqual((grouping.latest_pathogenicity_sort, grouping.latest_somatic_sort, grouping.latest_curated_date),
+                         (None, None, None))
+
+    def test_malformed_curated_date_is_null(self):
+        for date_value in ["", "not a date", None]:
+            ClassificationGrouping.objects.all().delete()
+            Classification.objects.all().delete()
+            grouping = self._grouping({"date": {"date": date_value}})
+            self.assertIsNone(grouping.latest_curated_date, date_value)

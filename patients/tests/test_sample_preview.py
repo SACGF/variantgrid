@@ -2,18 +2,19 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from annotation.phenotype_matcher import PhenotypeMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
 from patients.models import Patient
+from patients.phenotype_matcher import PhenotypeMatcher
 from patients.signals.patient_search import (
     patient_preview_phenotype_extra,
     sample_preview_patient_extra,
 )
 from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
+from snpdb.search import search_data
 
 
 class TestSamplePreviewPatientExtra(TestCase):
@@ -47,3 +48,11 @@ class TestSamplePreviewPatientExtra(TestCase):
     def test_patient_preview_phenotype(self):
         extras = patient_preview_phenotype_extra(sender=Patient, user=self.user, obj=self.patient)
         self.assertEqual({kv.key: kv.value for kv in extras}, {"HPO": "Increased thyroid-stimulating hormone level"})
+
+    def test_patient_search_only_finds_viewable_patients(self):
+        def found(user) -> bool:
+            results = search_data(user, "PT-1", False).results
+            return any(r.preview.internal_url == self.patient.get_absolute_url() for r in results)
+
+        self.assertTrue(found(self.user))
+        self.assertFalse(found(self.other_user))

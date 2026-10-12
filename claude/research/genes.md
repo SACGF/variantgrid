@@ -8,7 +8,7 @@ RefSeq/Ensembl gene and transcript ids, the per-build, per-version transcript ge
 versions it reported. On top of that sit the things users make from symbols - gene lists (typed, PanelApp, per-sample),
 canonical transcript collections for coverage, gene fusions - and the reference downloads (HGNC, MANE, LRG, gnomAD
 constraint, Pfam). This document is the story behind `genes/AGENTS.md`: how the data gets in, why symbol matching is
-per release, how HGVS resolution falls through biocommons to ClinGen, and what has bitten before. Fields, URLs,
+per release, how HGVS resolution falls through biocommons to ClinGen, and the traps. Fields, URLs,
 commands, tasks and signals are in the generated maps ([models](../maps/models.md#genes),
 [urls](../maps/urls.md#genes), [commands](../maps/commands.md), [tasks](../maps/tasks.md#genes),
 [signals](../maps/signals.md), [settings](../maps/settings.md)); `claude/domain.md` has the vocabulary.
@@ -23,14 +23,20 @@ two kinds of file per data release, described in `genes/cdot_data_release.py`: a
 holding the latest copy of every transcript, and a *per-GFF* file per gene set VEP can be built against.
 `genes/management/commands/import_cdot_latest.py:import_latest_combo_file` downloads the combo file to disk
 (`genes/cdot_data_release.py:download_cdot_json` - a temp file, because the importer reads it twice and the larger
-builds OOMed in memory) and `genes/management/commands/import_gene_annotation.py:Command.import_cdot_data_file`
-streams genes then transcripts out of it with ijson. `genes/management/commands/import_cdot_latest.py:cdot_data_needs_update` compares the `cdot`
-key stamped into the most recently inserted TranscriptVersion's `data` with the latest GitHub release tag, so a
-re-run is a no-op unless cdot moved.
+builds do not fit in memory) and `genes/management/commands/import_gene_annotation.py:Command.import_cdot_data_file`
+streams genes then transcripts out of it with ijson, then records the file's release in
+`genes/models/models_gene.py:CdotDataVersion` (one row per build and consortium).
+`genes/management/commands/import_cdot_latest.py:cdot_data_needs_update` compares those rows with the latest GitHub
+release tag, so a re-run is a no-op unless cdot moved.
 
 `genes/management/commands/import_gene_annotation.py:Command._import_cdot_data` is an upsert keyed on accession: it
 loads every known symbol, gene id, transcript id and `GeneVersion.id_by_accession` /
-`TranscriptVersion.id_by_accession` map up front, then bulk-creates what is new and bulk-updates the rest. RefSeq genes have no version and are stored as version 0; a cdot
+`TranscriptVersion.id_by_accession` map up front, then bulk-creates what is new. Existing TranscriptVersions are
+compared, a streamed batch at a time, against what's stored and only those that differ are updated
+(`genes/management/commands/import_gene_annotation.py:Command._update_changed_transcript_versions`, #2029) - most
+transcripts don't change between cdot releases, and rewriting all ~2.2M JSON rows takes about an hour.
+`TranscriptVersion.modified_cdot_version` is only written with a changed row, so it holds the release a transcript
+last changed in, not what's installed. RefSeq genes have no version and are stored as version 0; a cdot
 gene accession starting with `_` (a fake from UTA data) is renamed with `Gene.FAKE_GENE_ID_PREFIX`. Each distinct GFF
 URL in the file becomes a `genes/models/models_gene.py:GeneAnnotationImport`
 (`genes/management/commands/import_gene_annotation.py:GeneAnnotationImportManager`), and a version row keeps the
@@ -83,8 +89,8 @@ RefSeq ids over time (and TAZ became TAFAZZIN between builds), so `genes/gene_ma
 a direct hit on the release's own GeneVersion symbols, then `genes/gene_matching.py:ReleaseGeneMatcher.aliases_dict`,
 which takes a single `GeneSymbolAlias` hop in either direction (the symbol is the alias, or the alias is of the symbol)
 plus the symbols other builds' GeneVersions gave the same gene, recording the hop as `match_info` so the gene list grid
-can show why. The hop count is the whole point: chaining hops let an alias string shared by two unrelated genes bridge
-them, which is how an MT-TS2 gene list matched PDCD2 via "RP8" (#1669), and HGNC lists every previous symbol of a gene
+can show why. The hop count is the whole point: chaining hops would let an alias string shared by two unrelated genes
+bridge them (an MT-TS2 gene list matching PDCD2 via "RP8", #1669), and HGNC lists every previous symbol of a gene
 so renames never need more than one. Readers never touch the
 matcher: `genes/models/models_gene_annotation_release.py:GeneAnnotationRelease.genes_for_symbols` and
 `genes/models/models_gene_list.py:GeneList.get_genes` read the cached rows, and the release always comes from the
@@ -111,8 +117,8 @@ For a c./n. string, `genes/hgvs/hgvs_matcher.py:HGVSMatcher.get_variant_coordina
 converter) candidates and takes the first that succeeds. The candidate versions span the lowest to highest we have
 seen in any build or sequence-info row; versions we lack become a `genes/hgvs/hgvs_matcher.py:FakeTranscriptVersion`
 that only ClinGen can answer, and a local candidate is added only when `TranscriptVersion.hgvs_ok`. Ordering is
-`HGVSMatcher._sort_transcript_converter_types`: version distance comes from cdot's `rank_transcript_versions` (ported
-out of this file, so change it there) with local-before-ClinGen layered on top. ClinGen calls are guarded by
+`HGVSMatcher._sort_transcript_converter_types`: version distance comes from cdot's `rank_transcript_versions` (it lives
+in cdot, so change it there) with local-before-ClinGen layered on top. ClinGen calls are guarded by
 `HGVSMatcher._clingen_allele_registry_ok` - an "unknown reference" answer is cached in Redis for a week per transcript
 so the next candidate is tried without another request, and any other server error turns ClinGen off for the life of
 the matcher. The result carries the transcript actually used, a `HGVSConverterInfo` (converter, method string, cdot
@@ -205,33 +211,19 @@ copy number call is the same shape (`genes/gene_copy_number.py`, #1836).
 
 Gene and Transcript are versionless, build-independent ids and GeneVersion / TranscriptVersion carry the build so
 that a symbol, a coordinate or an HGVS can be asked about in any build without going through liftover; the price is
-that the symbol lives on GeneVersion and `Gene.get_symbols` legitimately returns several. cdot replaced the in-house
-GTF parsing (#566, 2022) and `TranscriptVersion.data` is the cdot record verbatim rather than columns, so the HGVS
+that the symbol lives on GeneVersion and `Gene.get_symbols` legitimately returns several. Transcripts come from cdot
+(#566) and `TranscriptVersion.data` is the cdot record verbatim rather than columns, so the HGVS
 library reads the shape it was developed against and a cdot schema change is a data reimport, not a migration. The
 per-release matching cache exists because an analysis pinned to an old AnnotationVersion must keep resolving its
 gene list to the genes VEP actually reported then; populating `ReleaseGeneSymbol` eagerly whenever symbols appear
 keeps the read path to two indexed lookups.
 
-HGVS moved from PyHGVS to biocommons (#839) because biocommons validates against real transcript sequence and handles
+HGVS goes through biocommons (#839) because it validates against real transcript sequence and handles
 normalisation, and the local-then-ClinGen candidate list exists because neither source is complete: we lack old
 transcript versions ClinGen has, and ClinGen lacks Ensembl and anything recent. `allow_alternative_transcript_version`
 is a flag rather than always-on because annotation import must link the exact version VEP wrote (#1222) while search
 and classification import want the nearest. Keeping `HGVSConverterInfo` on every result is what lets
 `ImportedAlleleInfo` record the cdot version a classification was resolved with (#1321) and re-resolve when it moves.
-
-## History
-
-GeneAnnotationRelease and per-release symbol matching arrived in 2021 (#459, #494) when new gene annotation releases
-started diverging from what old analyses expected. cdot replaced GTF imports in 2022 (#566), the data migrated in
-place by `genes/migrations/0068_one_off_upgrade_cdot_data.py`. `GeneSymbol.symbol` moved from `citext` to a TextField
-with the `case_insensitive` collation (`genes/migrations/0076_genesymbol_symbol_genesymbolalias_alias.py`), the
-source of the `startswith` trap below. The HGVS layer went through hgvs_shim (#1477) and back in-tree (#1812), PyHGVS
-was removed (#1678, 2026), HGVSDisplay/HGVSComponents were split out of the old CHGVS with a corpus test (#1702),
-symbolic CNV HGVS stopped reading the reference (#1571) and the m. kind check was added (#1632). PanelApp gained soft
-deletion (#405), spoofed headers (#1457) and HGNC-based gene identity (#1667,
-`genes/migrations/0084_panel_app_local_cache_gene_symbol_hgnc.py`). GeneInfo was retired (#693), Pfam went lazy via
-InterPro (#1554), gene fusions became Variants (#1506), and the release import was automated from the VAV's VEP pins
-in mid-2026 (`genes/cdot_data_release.py`, `annotation/gene_annotation_release_matching.py`).
 
 ## Traps
 

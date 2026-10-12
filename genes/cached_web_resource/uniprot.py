@@ -8,6 +8,7 @@ from Bio import SwissProt
 
 from annotation.models import CachedWebResource
 from genes.models import UniProt
+from genes.models.models_gene import HGNC
 
 FUNCTION_KEY = "FUNCTION: "
 TISSUE_SPEC_KEY = "TISSUE SPECIFICITY: "
@@ -89,8 +90,6 @@ def link_hgnc_and_uniprot():
 
         As HGNC is inserted - it does its own uniprot - so only need to handle case of uniprot being
         inserted last """
-
-    from genes.models import HGNC
 
     # We only store uni prot IDs that have info we care about, so not all will link
     uniprot_pks = set(UniProt.objects.all().values_list("pk", flat=True))

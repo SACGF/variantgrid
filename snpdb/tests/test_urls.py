@@ -12,7 +12,6 @@ from snpdb.models import Duo, TagConfigCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import (
-    AwardPeriod,
     DuoRelationship,
     ImportStatus,
     UserAwardKind,
@@ -66,8 +65,6 @@ class Test(URLTestCase):
         cls.test_tag = TagConfigCollection.objects.create(user=cls.user_owner, name="TagA", version_id=1)
         cls.custom_columns_collection = CustomColumnsCollection.objects.create(name="Test Column Collections", user=cls.user_owner, version_id=1)
         # Award cabinet on the user pages (#1819)
-        UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.TITLE, definition_key="top_tagger",
-                                 period=AwardPeriod.ALL_TIME, award_text="Top tagger (all time)", count=3)
         UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.BADGE, definition_key="tagger",
                                  award_text="Tagger", count=150, award_level=UserAwardLevel.BRONZE)
         UserAward.objects.create(user=cls.user_owner, award_text="Thanks for the help")
@@ -75,6 +72,7 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_vcf', {"vcf_id": cls.vcf.pk}, 200),
             ('get_patient_upload_csv_for_vcf', {"pk": cls.vcf.pk}, 200),
+            ('vcf_sample_files_tab', {"vcf_id": cls.vcf.pk}, 200),
 
             # Sample related
             ('view_sample', {"sample_id": cls.sample.pk}, 200),

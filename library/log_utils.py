@@ -21,6 +21,7 @@ import markdown
 import requests
 import rollbar
 from django.conf import settings
+from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.auth.models import User
 from django.db.models import Model
 from django.forms import ModelForm
@@ -104,7 +105,6 @@ def log_admin_change(obj: Model, message: Union[str, dict], user: Optional[User]
 
     The default implementation creates an admin LogEntry object.
     """
-    from django.contrib.admin.models import CHANGE, LogEntry
     if not user:
         user = get_current_logged_in_user()
 

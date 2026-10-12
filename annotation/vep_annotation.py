@@ -434,6 +434,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     if distance is None:
         distance = 5000
     kwargs["distance"] = distance
+    kwargs["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     if vep_config.annotation_consortium == AnnotationConsortium.ENSEMBL:
         kwargs["gencode_subset"] = getattr(settings, "ANNOTATION_VEP_ENSEMBL_GENCODE", None)

@@ -1,7 +1,8 @@
 {% load ui_help %}
 {% load js_tags %}
 {% if dlab.shared_classifications.count %}
-    <div id="accumulation-graph"></div>
+    <!-- Plotly sets height:100% on its inner .plot-container, so the div needs the graph's size -->
+    <div id="accumulation-graph" style="height: 400px"></div>
     <script>
         function plotCumulativeClassifications(selector, cum_data, title, width, height) {
             let layout = defaultLayout(title, width, height);
@@ -13,7 +14,7 @@
         }
 
         let graph_width = 1000;
-        let graph_height = 400;
+        let graph_height = $("#accumulation-graph").height();
         let accumulation_data = {{ dlab.accumulation_graph_data | jsonify }};
         plotCumulativeClassifications("accumulation-graph", accumulation_data, "", graph_width, graph_height)
     </script>

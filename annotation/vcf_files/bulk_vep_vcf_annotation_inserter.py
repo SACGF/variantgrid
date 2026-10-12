@@ -43,6 +43,7 @@ from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneVersion, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
+from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_VERSION, get_cdot_fake_transcript_id
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import (
     get_import_processing_filename,
@@ -52,6 +53,7 @@ from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
 from library.utils import split_dict_multi_values
 from snpdb.models import VariantCoordinate
+from snpdb.models.models_enums import AssemblyMoleculeType
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 DELIMITER = '\t'
@@ -251,7 +253,10 @@ class BulkVEPVCFAnnotationInserter:
                  annotation_run: AnnotationRun,
                  infos: Optional[dict] = None,
                  insert_variants: bool = True,
-                 validate_columns: bool = True):
+                 validate_columns: bool = True,
+                 vep_skipped_only: bool = False):
+        """ vep_skipped_only: writing just the vep_skipped_reason rows of variants VEP never annotated, with
+            no annotated VCF behind them - skips the conservation sidecar and the dbNSFP resolver """
         self.annotation_run = annotation_run
         self.genome_build = self.annotation_run.variant_annotation_version.genome_build
         self.vep_config = VEPConfig(self.genome_build)
@@ -274,7 +279,10 @@ class BulkVEPVCFAnnotationInserter:
         )
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_list)
-        self._load_sv_conservation()
+        self.sv_conservation: dict[int, dict[str, float]] = {}
+        self.sv_conservation_columns: set[str] = set()
+        if not vep_skipped_only:
+            self._load_sv_conservation()
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
                                         # We only want exact transcript version for annotation
                                         allow_alternative_transcript_version=False)
@@ -289,13 +297,20 @@ class BulkVEPVCFAnnotationInserter:
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
         self.transcript_geometry_cache = TranscriptGeometryCache()
+        # RefSeq MT transcripts are VEP gene-name Features ('ND4.1') with no real accession (#2139)
+        self.refseq_mitochondrial_chroms: set[str] = set()
+        if self.annotation_run.variant_annotation_version.annotation_consortium == AnnotationConsortium.REFSEQ:
+            self.refseq_mitochondrial_chroms = {
+                chrom for chrom, contig in self.genome_build.chrom_contig_mappings.items()
+                if contig.molecule_type == AssemblyMoleculeType.MITOCHONDRION
+            }
 
         # Resolver for picking per-transcript dbNSFP values (RefSeq <-> Ensembl translation).
         # Only relevant for columns_version >= 4 (which introduced per-transcript dbNSFP
         # score fields). Persist the resolver name on the VAV so we have provenance for
         # which strategy populated the scores.
         self.transcript_resolver = None
-        if self.vep_config.columns_version >= 4:
+        if self.vep_config.columns_version >= 4 and not vep_skipped_only:
             self.transcript_resolver = DBNSFPGeneResolver()
             vav = self.annotation_run.variant_annotation_version
             if vav.transcript_resolver != self.transcript_resolver.name:
@@ -446,8 +461,6 @@ class BulkVEPVCFAnnotationInserter:
 
             An SV run with the stage enabled must have one: importing without it writes nulls that read as
             real "no conservation here" values, and only a re-annotation can correct them. """
-        self.sv_conservation: dict[int, dict[str, float]] = {}
-        self.sv_conservation_columns: set[str] = set()
         vcf_annotated_filename = self.annotation_run.vcf_annotated_filename
         if not vcf_annotated_filename:
             return
@@ -640,13 +653,19 @@ class BulkVEPVCFAnnotationInserter:
             transcript_accession = vep_transcript_data[VEPColumns.FEATURE]
         return transcript_accession
 
-    def _get_transcript_id_and_transcript_version_id(self, transcript_accession: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    def _get_transcript_id_and_transcript_version_id(self, transcript_accession: Optional[str],
+                                                     refseq_mitochondrial: bool = False) -> tuple[Optional[str], Optional[str]]:
         """ Returns Transcript.pk and TranscriptVersion.pk for linking records """
         transcript_id: Optional[str] = None
         transcript_version_id: Optional[str] = None
         if transcript_accession:
             t_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
             transcript_versions = self.transcript_versions_by_id.get(t_id)
+            if not transcript_versions and refseq_mitochondrial:
+                # VEP's 'ND4' is cdot's 'fake-rna-ND4' (coding genes only - tRNA/rRNA have neither)
+                t_id = get_cdot_fake_transcript_id(t_id)
+                version = CDOT_FAKE_TRANSCRIPT_VERSION
+                transcript_versions = self.transcript_versions_by_id.get(t_id)
             if transcript_versions:
                 transcript_id = t_id  # Know it's valid to link
                 transcript_version_id = transcript_versions.get(version)
@@ -795,6 +814,15 @@ class BulkVEPVCFAnnotationInserter:
 
             transcript_data['hgvs_c'] = hgvs_c
 
+    def _get_mitochondrial_hgvs(self, variant_coordinate: VariantCoordinate) -> Optional[str]:
+        """ VEP's RefSeq MT c.HGVS ('ND4.1:c.100A>G') names no real accession so can't be resolved -
+            store the standard 'NC_012920.1:m.' form instead (#2139) """
+        try:
+            return self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
+        except Exception as e:
+            logging.warning("Error calculating m.HGVS for '%s': %s", variant_coordinate.format_short(), e)
+            return None
+
     def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
         if transcript_data.get('hgvs_g'):
@@ -830,6 +858,11 @@ class BulkVEPVCFAnnotationInserter:
                 and variant_coordinate.can_be_made_explicit:
             variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
 
+        refseq_mitochondrial = v.CHROM in self.refseq_mitochondrial_chroms
+        mitochondrial_hgvs = None
+        if refseq_mitochondrial:
+            mitochondrial_hgvs = self._get_mitochondrial_hgvs(variant_coordinate)
+
         try:
             variant_id = v.INFO["variant_id"]
             variant_data = None
@@ -850,7 +883,8 @@ class BulkVEPVCFAnnotationInserter:
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
-                transcript_id, transcript_version_id = self._get_transcript_id_and_transcript_version_id(transcript_accession)
+                transcript_id, transcript_version_id = self._get_transcript_id_and_transcript_version_id(
+                    transcript_accession, refseq_mitochondrial=refseq_mitochondrial)
                 transcript_data["transcript_id"] = transcript_id
                 transcript_data["transcript_version_id"] = transcript_version_id
                 if symbol := transcript_data.get("symbol"):
@@ -858,6 +892,9 @@ class BulkVEPVCFAnnotationInserter:
                 if gene_id:
                     overlapping_gene_ids.add(gene_id)
                 self.add_calculated_transcript_columns(variant_coordinate, transcript_accession, transcript_data)
+                if refseq_mitochondrial and transcript_data.get("hgvs_c") \
+                        and transcript_data["hgvs_c"] != VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE:
+                    transcript_data["hgvs_c"] = mitochondrial_hgvs
                 self.variant_transcript_annotation_list.append(transcript_data)
 
                 representative_transcript = vep_transcript_data.get(VEPColumns.PICK, False)

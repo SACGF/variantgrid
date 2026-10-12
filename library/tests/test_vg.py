@@ -1,7 +1,7 @@
 """
 Tests for the DB-free parts of `manage.py vg` (library/vg): import resolution, test selection rules,
 the AST parsers behind the tasks / signals / settings maps, Markdown rendering, module outlines, the
-settings chain, doc citation checking and the inspect renderer.
+settings chain, doc citation checking, the inspect renderer, the health parsers and the deprecation report parsers.
 """
 import ast
 import tempfile
@@ -12,6 +12,12 @@ from django.test import SimpleTestCase
 
 from library.vg import css, css_rendered, docs
 from library.vg import inspect as inspect_pkg
+from library.vg.deprecations import (
+    deprecated_names_in_source,
+    runtime_deprecations,
+    static_deprecations,
+)
+from library.vg.health import UNDECLARED, _command_category, lint_health
 from library.vg.import_graph import (
     ImportGraph,
     import_cycles,
@@ -183,6 +189,70 @@ class OutlineTest(SimpleTestCase):
         rendered = render_outline(f.name, entries, min_lines=3)
         self.assertNotIn(" def save", rendered)   # 2-line method hidden by min_lines
         self.assertIn("def helper", rendered)      # module level is never hidden
+
+
+class HealthTest(SimpleTestCase):
+
+    @staticmethod
+    def _temp_file(text: str, suffix: str) -> Path:
+        with tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False) as f:
+            f.write(text)
+        return Path(f.name)
+
+    def test_command_category(self):
+        declared = 'class Command(BaseCommand):\n    help = "x"\n    category = "one-off"\n'
+        undeclared = 'class Command(BaseCommand):\n    def handle(self):\n        category = "ops"\n'
+        helper = 'def build():\n    category = "ops"\n'
+        self.assertEqual(_command_category(self._temp_file(declared, ".py")), "one-off")
+        self.assertEqual(_command_category(self._temp_file(undeclared, ".py")), UNDECLARED)
+        self.assertIsNone(_command_category(self._temp_file(helper, ".py")))
+
+    def test_lint_health_counts_messages_by_type(self):
+        report = ("************* Module snpdb.models\n"
+                  "snpdb/models.py:12:4: W0612: Unused variable 'x' (unused-variable)\n"
+                  "snpdb/models.py:40:0: E1101: Instance has no member (no-member)\n"
+                  "snpdb/models.py:41:0: W1514: Using open without encoding (unspecified-encoding)\n\n"
+                  "Your code has been rated at 9.91/10 (previous run: 9.91/10, -0.00)\n")
+        lint = lint_health(self._temp_file(report, ".txt"))
+        self.assertEqual((lint.messages, lint.by_type, lint.score), (3, {"W": 2, "E": 1}, "9.91"))
+
+
+class DeprecationsTest(SimpleTestCase):
+
+    def test_deprecated_names_are_qualified_by_class(self):
+        source = ('@deprecated("x")\ndef old(): pass\n'
+                  '@typing_extensions.deprecated("x")\nclass Old:\n    pass\n'
+                  'class Keeper:\n    @deprecated("x")\n    def stale(self): pass\n    def fresh(self): pass\n'
+                  '@cache\ndef current(): pass\n')
+        self.assertEqual(deprecated_names_in_source(source), {"old", "Old", "Keeper.stale"})
+
+    def test_static_hit_is_ours_only_when_we_declared_the_symbol(self):
+        def diagnostic(message, line=0):
+            return {"rule": "reportDeprecated", "file": str(REPO_ROOT / "snpdb" / "x.py"), "message": message,
+                    "range": {"start": {"line": line}}}
+
+        pyright_json = {"generalDiagnostics": [
+            diagnostic('The method "utcnow" in class "datetime" is deprecated\n  Use .now(UTC)', line=4),
+            diagnostic('The method "stale" in class "Keeper" is deprecated\n  Use fresh'),
+            diagnostic('The function "md5sum_str" is deprecated\n  Use sha256sum_str instead'),
+            {"rule": "reportAttributeAccessIssue", "file": str(REPO_ROOT / "snpdb" / "x.py"), "message": "x",
+             "range": {"start": {"line": 0}}},
+        ]}
+        hits = static_deprecations(pyright_json, ours={"md5sum_str", "Keeper.stale"})
+        self.assertEqual([(h.symbol, h.ours) for h in hits],
+                         [("datetime.utcnow", False), ("Keeper.stale", True), ("md5sum_str", True)])
+        self.assertEqual((hits[0].path, hits[0].line, hits[0].reason), ("snpdb/x.py", 5, "Use .now(UTC)"))
+
+    def test_runtime_warnings_split_repo_from_packages_and_skip_other_categories(self):
+        package = REPO_ROOT / ".venv" / "lib" / "python3.12" / "site-packages" / "pkg" / "admin.py"
+        stderr = (f"{REPO_ROOT}/genes/hgvs/__init__.py:8: DeprecationWarning: hgvs.parser is deprecated\n"
+                  "  import hgvs.parser\n"
+                  f"{REPO_ROOT}/genes/hgvs/__init__.py:8: DeprecationWarning: hgvs.parser is deprecated\n"
+                  f"{package}:20: RemovedInDjango70Warning: list_select_related=True is deprecated\n"
+                  f"{REPO_ROOT}/snpdb/x.py:3: UserWarning: not a deprecation\n")
+        found = [(w.path, w.category, w.ours) for w in runtime_deprecations(stderr)]
+        self.assertEqual(found, [("genes/hgvs/__init__.py", "DeprecationWarning", True),
+                                 ("pkg/admin.py", "RemovedInDjango70Warning", False)])
 
 
 class SettingsChainTest(SimpleTestCase):

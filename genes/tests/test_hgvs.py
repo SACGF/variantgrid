@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase, override_settings
-from hgvs.parser import Parser
+from hgvs.parsers import Parser
 
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import (
@@ -26,7 +26,7 @@ from genes.hgvs import (
 )
 from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
-from snpdb.models import GenomeBuild, VariantCoordinate
+from snpdb.models import Contig, GenomeBuild, VariantCoordinate
 from snpdb.signals.variant_search import _get_non_coding_c_hgvs_as_n_details
 
 
@@ -377,6 +377,51 @@ class TestSymbolicHGVS(TestCase):
         biggest = self._symbolic_coordinate('3', 134514471, '<DUP>', 463493)
         self.assertGreater(biggest.max_sequence_length,
                            settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT)
+
+    @override_settings(VARIANT_SYMBOLIC_ALT_SIZE=1000)  # The inv cases below sit either side of 1000 bases
+    def test_long_g_hgvs_to_symbolic_coordinate(self):
+        """ #2103 - a long g. del/dup/inv resolves through Babelfish's symbolic VCF coordinate. Cases shift
+            right, shift left and trim palindromic inv ends, and an inv of exactly VARIANT_SYMBOLIC_ALT_SIZE
+            (after trimming) stays explicit. A whole chromosome arm isn't normalized at all """
+        converter = HGVSMatcher(self.genome_build, clingen_resolution=False).hgvs_converter
+        EXPECTED = {
+            "NC_000003.11:g.128200126_128201326del": ('3', 128200125, 'G', '<DEL>', -1201),
+            "NC_000003.11:g.128200126_128201326dup": ('3', 128200125, 'G', '<DUP>', 1201),
+            "NC_000003.11:g.128200308_128201508del": ('3', 128200304, 'A', '<DEL>', -1201),
+            "NC_000003.11:g.128200308_128201508dup": ('3', 128200304, 'A', '<DUP>', 1201),
+            "NC_000003.11:g.128200007_128201207inv": ('3', 128200009, 'G', '<INV>', 1196),
+            "NC_000003.11:g.128200007_128201007inv": ('3', 128200007, 'A', '<INV>', 1000),
+            "NC_000002.11:g.1000000_224225011dup": ('2', 999999, 'G', '<DUP>', 223225012),
+        }
+        for hgvs_string, (chrom, position, ref, alt, svlen) in EXPECTED.items():
+            vc, _, _ = converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string)
+            self.assertEqual(VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen), vc,
+                             hgvs_string)
+
+        vc, _, _ = converter.hgvs_to_variant_coordinate_reference_match_and_normalized("NC_000003.11:g.128200007_128201008inv")
+        self.assertIsNone(vc.svlen)
+        self.assertEqual(settings.VARIANT_SYMBOLIC_ALT_SIZE, len(vc.ref))
+
+    def test_unnormalized_g_hgvs_other_build_contig(self):
+        """ Search skips a build quietly on ContigNotInBuildError, which a del/dup/inv too big to normalize
+            must still raise even though it never reads the reference """
+        converter = HGVSMatcher(self.genome_build, clingen_resolution=False).hgvs_converter
+        with self.assertRaises(Contig.ContigNotInBuildError):
+            converter.hgvs_to_variant_coordinate_reference_match_and_normalized("NC_000002.12:g.1000000_224225011dup")
+
+    def test_symbolic_g_hgvs_3_prime_shifted_and_searchable(self):
+        """ A left-aligned symbolic DEL/DUP in a repeat gets its HGVS 3'-shifted g., which searches back to it """
+        matcher = HGVSMatcher(self.genome_build, clingen_resolution=False)
+        EXPECTED = {
+            ('3', 128200304, '<DEL>', -1201): "NC_000003.11:g.128200308_128201508del",
+            ('3', 128200304, '<DUP>', 1201): "NC_000003.11:g.128200308_128201508dup",
+        }
+        for (chrom, position, alt, svlen), expected in EXPECTED.items():
+            vc = VariantCoordinate(chrom=chrom, position=position, ref='A', alt=alt, svlen=svlen)
+            g_hgvs = matcher.variant_coordinate_to_g_hgvs(vc)
+            self.assertEqual(expected, g_hgvs)
+            vc_searched, _, _ = matcher.hgvs_converter.hgvs_to_variant_coordinate_reference_match_and_normalized(expected)
+            self.assertEqual(vc, vc_searched)
 
     def test_c_hgvs_symbolic_del_both_strands(self):
         """ A 1kb DEL inside the transcript, projected onto a minus and a plus strand transcript """

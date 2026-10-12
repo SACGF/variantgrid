@@ -1,0 +1,72 @@
+{% extends "uicore/page/base_container_table.html" %}
+{% load static %}
+{% load js_tags %}
+{% load ui_utils %}
+{% block title %}Karyomapping {{ trio }}{% endblock title %}
+{% block head %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
+<script src="{% static 'js/analysis/karyomapping.js' %}"></script>
+{% if gene_region %}
+<script>
+    $(document).ready(function() {
+        showKaryotypeScatter({{ karyotype_bin_scatter_data|jsonify }}, {{ karyotype_bin_labels|jsonify }}, {
+            probandSample: {{ trio.proband.sample|stringformat:"s"|jsonify }},
+            geneSymbol: {{ gene_region.gene_symbol|stringformat:"s"|jsonify }},
+            strand: {{ gene_version.strand|stringformat:"s"|jsonify }},
+            upstreamKb: {{ gene_region.upstream_kb|jsonify }},
+            downstreamKb: {{ gene_region.downstream_kb|jsonify }},
+            iv: {{ gene_region.genomic_interval|stringformat:"s"|jsonify }},
+            geneStart: {{ gene_version.start|jsonify }},
+            geneEnd: {{ gene_version.end|jsonify }},
+            variantIdLookup: {{ variant_id_lookup|jsonify }},
+        });
+    });
+</script>
+{% endif %}
+{% endblock head %}
+
+{% block container_table_content %}
+<h3>{% preview_icon trio %} Karyomapping: <a href="{% url 'view_trio' trio.pk %}">{{ trio }}</a></h3>
+<p class="text-muted">
+    Proband variants near a gene, binned by which parent passed them on and whether in phase with the proband.
+    Genome-wide and per-chromosome counts are on the <a href="{% url 'view_trio' trio.pk %}">trio page</a>.
+</p>
+
+<form method="get" id="gene-form" class="form-inline mb-3">
+    <label class="mr-2" for="{{ form.gene_symbol.id_for_label }}">Gene</label>
+    <div class="mr-3" style="min-width: 200px">{{ form.gene_symbol }}</div>
+    <label class="mr-2" for="{{ form.upstream_kb.id_for_label }}">{{ form.upstream_kb.label }}</label>
+    <div class="mr-3">{{ form.upstream_kb }}</div>
+    <label class="mr-2" for="{{ form.downstream_kb.id_for_label }}">{{ form.downstream_kb.label }}</label>
+    <div class="mr-3">{{ form.downstream_kb }}</div>
+    <button class="btn btn-primary">Karyomap Gene</button>
+    {{ form.media }}
+</form>
+{% if form.errors %}
+    <div class="alert alert-danger">
+    {% for field, errors in form.errors.items %}{% for error in errors %}<div>{{ error }}</div>{% endfor %}{% endfor %}
+    </div>
+{% endif %}
+
+{% if gene_region %}
+<div class="card">
+    <div class="card-header">
+        {{ gene_region.gene_symbol }} - {{ gene_region.genomic_interval }}
+        <a class="float-right" href="{% url 'trio_karyomapping_gene_csv' trio.pk %}?{{ request.GET.urlencode }}">
+            <i class="fas fa-file-csv"></i> Download CSV
+        </a>
+    </div>
+    <div class="card-body">
+        <div id='karyotype-graph'></div>
+        <table class="table table-sm w-auto">
+            <thead><tr><th>Bin</th><th>Count</th></tr></thead>
+            <tbody>
+            {% for kb, count in karyotype_bin_counts.items %}
+                <tr><td>{{ kb }}</td><td>{{ count }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock container_table_content %}

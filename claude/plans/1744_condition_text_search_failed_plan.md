@@ -187,8 +187,7 @@ On this box, Monarch reachable:
   an outage is N × up-to-2-minutes for nothing.
 - **Both a beat task and a `--failed` command flag**, sharing one method: the task closes "nothing
   re-attempts it"; the flag is four lines and gives an operator the immediate retry.
-- **No datatable column or dashboard count.** The admin filter lists the rows; a column on
-  `condition_matchings.html` can follow if curators ask for it.
+- **The admin filter is the list of failed rows.**
 
 ## Definition of done
 

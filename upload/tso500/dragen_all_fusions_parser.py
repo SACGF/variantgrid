@@ -25,6 +25,9 @@ GENE_B = "Gene B"
 GENE_A_BREAKPOINT = "Gene A Breakpoint"
 GENE_B_BREAKPOINT = "Gene B Breakpoint"
 DIRECTIONALITY_KNOWN = "Fusion Directionality Known"
+SCORE = "Score"
+FILTER = "Filter"
+KEEP_FUSION = "KeepFusion"
 ALT_SPLIT = "Alt Split"
 ALT_PAIR = "Alt Pair"
 ALT_SPLIT_DEDUP = "Alt Split Dedup"
@@ -144,6 +147,19 @@ def reference_reads(observation: dict) -> Optional[int]:
     """ Reads across either junction that do not support the fusion, deduplicated where reported """
     return _read_count(observation, (REF_A_DEDUP, REF_B_DEDUP),
                        (REF_A_SPLIT, REF_A_PAIR, REF_B_SPLIT, REF_B_PAIR))
+
+
+def is_kept(observation: dict) -> bool:
+    """ DRAGEN's own decision - the rows it puts in the CombinedVariantOutput's [Fusions] """
+    return str(observation.get(KEEP_FUSION) or "").lower() == "true"
+
+
+def fusion_score(observation: dict) -> Optional[float]:
+    """ The caller's score - 'N/A' (read as None) or anything else unparseable is None """
+    try:
+        return float(observation.get(SCORE))
+    except (TypeError, ValueError):
+        return None
 
 
 def format_fusion_observation(observation: dict) -> str:

@@ -182,7 +182,7 @@ class ClinVarExportSync:
             clinvar_request = self._send_data(
                 batch=batch,
                 request_type=ClinVarExportRequestType.INITIAL_SUBMISSION,
-                json_data=batch.to_json(),
+                json_data=batch.to_json(self.org_id),
                 url=self.submission_url)
 
         else:

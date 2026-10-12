@@ -512,7 +512,7 @@ function enhanceAndMonitor() {
             $(processor.test).each((index, node) => {
                 node = $(node);
                 let isGood = true;
-                for (const badTest in badElementTests) {
+                for (const badTest of badElementTests) {
                     if (node.is(badTest)) {
                         isGood = false;
                         break;
@@ -603,6 +603,9 @@ function loadAjaxModal(linkDom, size) {
     const body = modalContent.find('.modal-body');
     modalContent.find('.modal-footer').remove();
     const content = $('<div>').appendTo(body);
+    // attach before loading: jQuery only runs inline scripts in content that is in the document,
+    // and Bootstrap doesn't attach the modal until its backdrop has faded in
+    modalContent.appendTo('body');
     const modalDialog = modalContent.modal({focus:true, show:false});
 
     loadAjaxBlock(content, url).then(() => {
@@ -747,6 +750,32 @@ function getCookie(name) {
         return match[2];
     }
     return null;
+}
+
+/* The menus and the rest of the per-user page frame (uicore/page_frame.py), requested while the page is still loading
+   and filled in once it is ready - the page body itself is the same for every user. */
+function loadPageFrame(frameUrl, urlName) {
+    const frameRequest = $.getJSON(frameUrl, {url_name: urlName});
+    $(() => frameRequest.done(applyPageFrame));
+}
+
+function applyPageFrame(frame) {
+    window.CURRENT_USERNAME = frame.username;
+    $('#menu-bar-main').html(frame.menu_main_html);
+    $('#menu-bar-sub').html(frame.menu_sub_html);
+    // the page's .current-record-menu-item went to the fallback spot before the side bar existed
+    const currentRecordSpot = $('#current-record-spot');
+    if (currentRecordSpot.length) {
+        currentRecordSpot.append($('.current-record-menu-item').detach());
+    }
+    $('#navbar-user').html(frame.user_html);
+    $('#site-messages').html(frame.site_messages_html);
+    if (frame.messages_html) {
+        $('#django-messages').replaceWith(frame.messages_html);
+    }
+    if (frame.rollbar_person.id && typeof Rollbar !== 'undefined') {
+        Rollbar.configure({payload: {person: frame.rollbar_person}});
+    }
 }
 
 /* Navigate to url via a POST (rather than a GET link), including the CSRF token.
@@ -1332,9 +1361,10 @@ function createModal(id, title, body) {
 
 // Suggestions
 
-function suggestionDialog(userName) {
+function suggestionDialog() {
     let modalDialog = window.MODAL_SUGGESTION;
     if (!modalDialog) {
+        const userName = $('<span>', {text: window.CURRENT_USERNAME || ''}).html();
         const siteName = window.SITE_NAME || 'Variant Grid';
         // FIXME need to escape username, siteName, location etc
         const modalContent = createModalShell('suggestionModal', 'Suggestion / Bug Report');

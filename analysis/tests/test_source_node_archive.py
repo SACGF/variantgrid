@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from analysis.models.nodes.cohort_mixin import CohortMixin
-from snpdb.archive import DataArchivedError
+from library.django_utils.data_archive_mixin import DataArchivedError
 from snpdb.fake_data import (
     create_fake_cohort,
     create_fake_quad,

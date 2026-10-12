@@ -1,9 +1,9 @@
 """
 The evidence schema. EvidenceKey rows define each key's type, options (with bucket and other
 metadata), share level, category and immutability; EvidenceKeyMap is the cached lookup
-(EvidenceKeyMap.cached_key / instance) every validator and renderer reads; VCDataCell and VCDataDict
-wrap a patch or a record's evidence JSON so values, notes and explanations are read the same way
-everywhere. Name keys through SpecialEKeys, never string literals.
+(EvidenceKeyMap.cached_key / instance) every validator and renderer reads; VCBlobDict / VCPatch type a
+record's evidence JSON and a patch to it, and VCDataCell and VCDataDict wrap them so values, notes and
+explanations are read the same way everywhere. Name keys through SpecialEKeys, never string literals.
 """
 import math
 import re
@@ -13,7 +13,7 @@ from copy import deepcopy
 from datetime import date
 from enum import Enum
 from functools import cached_property
-from typing import Any, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union, cast
 
 import pydantic
 from django.conf import settings
@@ -24,28 +24,56 @@ from django_extensions.db.models import TimeStampedModel
 
 from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource
 from classification.enums.classification_enums import (
+    AlleleOriginBucket,
     CopyAlleleOrigin,
     CopyScope,
     EvidenceCategory,
     EvidenceKeyValueType,
     ShareLevel,
 )
-from classification.models.evidence_mixin import (
-    EvidenceMixin,
-    VCBlobDict,
-    VCDbRefDict,
-    VCPatch,
-    VCPatchValue,
-)
 from library.cache import timed_cache
-from library.utils import empty_to_none, first, strip_json, pretty_label
+from library.utils import empty_to_none, first, pretty_label, strip_json
 from snpdb.models import VariantGridColumn
+
+if TYPE_CHECKING:
+    from classification.models.evidence_mixin import EvidenceMixin
 
 CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
 """
 The amount a float can change, and for VG to not consider it a change (this is to stop churning changes through
 caused by floating point rounding issues)
 """
+
+
+class VCDbRefDict(TypedDict, total=False):
+    id: str
+    db: str
+    idx: Union[str, int]
+    url: str
+    summary: str
+    internal_id: int
+
+
+class VCValidation(TypedDict, total=True):
+    severity: str
+    code: str
+    message: str
+    options: Optional[Any]
+
+
+class VCBlobDict(TypedDict, total=False):
+    value: Any
+    note: str
+    explain: str
+    immutable: str
+    db_refs: list[VCDbRefDict]
+    validation: list[VCValidation]
+
+
+VCStoreValue = VCBlobDict
+VCPatchValue = Union[None, VCStoreValue]
+VCStore = dict[str, VCStoreValue]
+VCPatch = dict[str, VCPatchValue]
 
 
 class EvidenceKeyOption(TypedDict):
@@ -459,7 +487,7 @@ class EvidenceKey(TimeStampedModel):
 
         return key[:1].upper() + key[1:].replace('_', ' ')
 
-    def pretty_value_from(self, evidence: EvidenceMixin, empty_value=None):
+    def pretty_value_from(self, evidence: 'EvidenceMixin', empty_value=None):
         raw_value = evidence.get(self.key)
         if raw_value is None:
             return empty_value
@@ -707,6 +735,24 @@ class EvidenceKeyMap:
     @timed_cache(ttl=60)
     def somatic_clinical_significance_to_bucket() -> dict[str, int]:
         return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+
+    @staticmethod
+    def allele_origin_bucket(allele_origin: Optional[str]) -> AlleleOriginBucket:
+        # logic is duplicated in JavaScript in vc_form.js updateTitle()
+        if not allele_origin:
+            return AlleleOriginBucket(settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET)
+
+        # TODO, it would be good to put the bucket directly into allele origin
+        if bucket := EvidenceKeyMap.cached_key(SpecialEKeys.ALLELE_ORIGIN).matched_options(allele_origin)[0].get("bucket"):
+            return AlleleOriginBucket(bucket)
+
+        allele_origin = allele_origin.lower()
+        if "somatic" in allele_origin:
+            return AlleleOriginBucket.SOMATIC
+        elif "germline" in allele_origin:
+            return AlleleOriginBucket.GERMLINE
+        else:
+            return AlleleOriginBucket.UNKNOWN
 
 
 class WipeMode(Enum):

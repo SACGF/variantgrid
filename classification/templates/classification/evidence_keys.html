@@ -1,4 +1,5 @@
 {% extends "uicore/page/base_external.html" %}
+{% load static %}
 {% load classification_tags %}
 {% block head %}
     <style>
@@ -91,29 +92,7 @@
         }
 
     </style>
-    <script>
-        $(document).ready(() => {
-            $('#key-table').dataTable({
-                fixedHeader: true,
-                dom: 'frBtip',
-                paginate: false,
-                order: [[0, 'asc']],
-                buttons: [
-                    // Uncomment the below line to put filters back in
-                    // 'searchPanes'
-                ],
-                language: {
-                    searchPanes: {
-                        collapse: 'Filter'
-                    }
-                },
-                columnDefs: [
-                    {searchPanes: {show: true}, targets: ['category', 'status', 'max-share-level']},
-                    {searchPanes: {show: false}, targets: '_all'},
-                ]
-            });
-        });
-    </script>
+    <script src="{% static 'js/classification/evidence_keys.js' %}"></script>
 {% endblock head %}
 
 {% block content %}

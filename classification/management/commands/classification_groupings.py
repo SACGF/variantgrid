@@ -21,7 +21,7 @@ class Command(BaseCommand):
     category = "maintenance"
 
     def add_arguments(self, parser):
-        parser.add_argument('--summary', required=False, action="store_true", help="Refreshes the summary data assigned to each classification")
+        parser.add_argument('--summary', required=False, action="store_true", help="Refreshes the summary data assigned to each classification, and the groupings that cache it")
         parser.add_argument('--refresh', required=False, action="store_true", help="Refreshes all existing groups, but not which classifications belong to them")
         parser.add_argument('--all', required=False, action="store_true", help="Refreshes which classification belongs to which group, and the groups, may take a long time")
         parser.add_argument('--dirty', required=False, action="store_true", help="Updates all records left in a dirty state")
@@ -50,6 +50,9 @@ class Command(BaseCommand):
                     classification.summary = ClassificationSummaryCalculator(cm).cache_dict()
                     classifications.append(classification)
                 Classification.objects.bulk_update(classifications, fields=["summary"])
+                # groupings cache the latest classification's summary (and sort on it), so they need refreshing too
+                ClassificationGrouping.objects.filter(
+                    classificationgroupingentry__classification__in=classifications).update(dirty=True)
                 print(f"Updated {len(classifications)} classification summaries")
 
         if all:
@@ -62,7 +65,7 @@ class Command(BaseCommand):
             print("About to update all classification groups")
             ClassificationGrouping.objects.all().update(dirty=True)
 
-        if all or dirty or refresh:
+        if all or summary or dirty or refresh:
             qs = ClassificationGrouping.objects.all()
             if not refresh:
                 qs = qs.filter(dirty=True)

@@ -1,4 +1,4 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
@@ -88,9 +88,8 @@ function setPatientPhenotype() {
     });
 }
 
-function getBams() {
-    const bams = {{ bam_list | jsonify }};
-    return bams;
+function getAlignmentFiles() {
+    return {{ alignment_file_list | jsonify }};
 }
 
 window.ANALYSIS_SETTINGS = {
@@ -174,7 +173,7 @@ $(document).ready(function() {
 <script type="text/javascript" src="{% static 'js/analysis_downloads.js' %}"></script>
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
 <div id="sample">
     {% load vcf_history_trail_tags %}
