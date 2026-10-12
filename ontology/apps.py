@@ -11,6 +11,10 @@ class OntologyConfig(AppConfig):
         # imported to activate receivers
 
         from annotation.models import CachedWebResource
+
+        # panel_app_ontology and ontology.signals register receivers on import - noqa: F401 keeps the
+        # unused-import autofix from silently unregistering them
+        from ontology import panel_app_ontology  # noqa: F401
         from ontology.models.ontology_search import (
             hpo_name_search,
             mondo_name_search,
@@ -18,9 +22,6 @@ class OntologyConfig(AppConfig):
             ontology_search_hgnc,
             ontology_search_id,
         )
-
-        # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
-        # silently unregistering them
         from ontology.signals import ontology_health_check, ontology_preview  # noqa: F401
         from ontology.signals.signals import gencc_post_save_handler
         from snpdb.search import search_registry

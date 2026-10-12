@@ -94,7 +94,7 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
-from library.django_utils.data_archive_mixin import DataArchiveMixin
+from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_file_utils import remove_import_processing_dir
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
@@ -103,7 +103,6 @@ from library.log_utils import report_message
 from library.utils import all_equal, first, invert_dict
 from ontology.models import OntologyIdNormalized, OntologyTerm, OntologyVersion
 from patients.models_enums import GnomADPopulation
-from snpdb.archive import DataArchivedError
 from snpdb.models import (
     DBSNP_PATTERN,
     HGVS_UNCLEANED_PATTERN,

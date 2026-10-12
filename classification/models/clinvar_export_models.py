@@ -11,13 +11,16 @@ from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 
 from classification.enums import AlleleOriginBucket
+from classification.enums.clinvar_export_enums import ClinVarExportStatus
 from classification.models.classification import ClassificationModification, ConditionResolved
+from classification.models.clinvar_export_convertor import (
+    CLINVAR_EXPORT_CONVERSION_VERSION,
+    ClinVarExportConverter,
+)
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import JsonObjType, first, invalidate_cached_property
 from snpdb.models import Allele, ClinVarKey
 from uicore.json.validated_json import JsonMessages, ValidatedJson
-
-CLINVAR_EXPORT_CONVERSION_VERSION = 4
 
 
 class ClinVarAllele(TimeStampedModel):
@@ -41,19 +44,6 @@ class ClinVarAllele(TimeStampedModel):
 
     def __str__(self):
         return f"{self.allele} {self.clinvar_key}"
-
-
-class ClinVarExportStatus(models.TextChoices):
-    """
-    The status of an Export as compared to the last batch.
-    Note doesn't involve itself in the status as data progresses
-    """
-
-    NEW_SUBMISSION = "N", "New Submission"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
-    CHANGES_PENDING = "C", "Changes Pending"
-    UP_TO_DATE = "D", "Up to Date"
-    IN_ERROR = "E", "Error"
-    EXCLUDE = "X", "Exclude"
 
 
 class ClinVarExport(TimeStampedModel, PreviewModelMixin):
@@ -208,12 +198,9 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
         return self.clinvarexportsubmission_set.exclude(submission_batch__status=ClinVarExportBatchStatus.REJECTED).order_by('-created').first()
 
     def update(self):
-        # messy, due to dependencies
-        from classification.models.clinvar_export_convertor import ClinVarExportConverter
         ClinVarExportConverter(self).convert().apply()
 
     def differences_since_last_submission(self):
-        from classification.models.clinvar_export_convertor import ClinVarExportConverter
         return ClinVarExportConverter(self).convert().changes
 
     @classmethod
@@ -272,15 +259,14 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
 
-    def to_json(self) -> JsonObjType:
-        from classification.models.clinvar_export_sync import clinvar_export_sync
+    def to_json(self, org_id: Optional[str]) -> JsonObjType:
         return {
             "actions": [{
                 "type": "AddData",
                 "targetDb": "clinvar",
                 "data": {
                     "content": {
-                        "behalfOrgID": clinvar_export_sync.org_id,
+                        "behalfOrgID": org_id,
                         "submissionName": f"submission_{self.id}",
                         "assertionCriteria": self.assertion_criteria,
                         "clinvarSubmissionReleaseStatus": self.release_status,
@@ -439,7 +425,6 @@ class ClinVarExportBatches:
         self.skipped_records: int = 0
 
     def add_record(self, record: ClinVarExport, force_update: bool = False):
-        from classification.models.clinvar_export_convertor import ClinVarExportConverter
         data = ClinVarExportConverter.clinvar_export_data(record, update=force_update)
         if data.clinvar_export.status not in {ClinVarExportStatus.CHANGES_PENDING, ClinVarExportStatus.NEW_SUBMISSION}:
             self.skipped_records += 1

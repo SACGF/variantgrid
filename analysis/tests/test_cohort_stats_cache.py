@@ -3,7 +3,7 @@
 
     Covers the invariants the plan calls out as load-bearing:
       - canonical_filter_key encoding is deterministic and round-trip stable
-      - reader handler ↔ writer precompute keys produce byte-identical strings
+      - reader node ↔ writer precompute keys produce byte-identical strings
       - CGC CASCADE deletes stats rows when the CGC dies
       - SampleNode (per-sample) and CohortNode (aggregate) cache hits use
         the right row keys
@@ -13,16 +13,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from analysis.models import DuoNode, QuadNode
+from analysis.models import TrioNode
 from analysis.models.enums import TrioInheritance
-from analysis.models.nodes.stats_cache import (
-    UNCACHEABLE,
-    NoFilterHandler,
-    TrioInheritanceHandler,
-    get_filter_keys_to_precompute_for_cohort,
-    get_handler_for_node,
-    inheritance_filter_key,
-)
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
@@ -33,6 +25,7 @@ from annotation.tasks.calculate_sample_stats import (
     _cohort_stats_are_fresh,
     _get_sample_stats_code_version,
     calculate_cohort_stats,
+    get_filter_keys_to_precompute_for_cohort,
 )
 from library.utils.json_utils import canonical_filter_key
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
@@ -41,6 +34,7 @@ from snpdb.models import (
     GenomeBuild,
     ImportStatus,
     SampleStatsCodeVersion,
+    Trio,
 )
 
 
@@ -66,116 +60,40 @@ class TestCanonicalFilterKey(TestCase):
         self.assertNotIn(" ", encoded)
 
 
-class TestFilterKeyHandlerRoundTrip(TestCase):
-    """ The reader's filter_key_for_node MUST produce strings that match the
-        writer's filter_keys_to_precompute. A silent mismatch produces cache
-        misses forever. """
+class TestStatsFilterKeyRoundTrip(TestCase):
+    """ The reader's get_stats_filter_key MUST produce strings that match the writer's precompute
+        keys. A silent mismatch produces cache misses forever. """
 
-    def test_trio_handler_round_trip(self):
-        handler = TrioInheritanceHandler()
-        # Build a fake "node" for each cached mode and check the key matches
-        # one of the precompute keys (ignoring None).
-        cohort = _FakeTrioCohort()
-        precomputed = set(handler.filter_keys_to_precompute(cohort))
-        for inheritance, _ in TrioInheritanceHandler.CACHED_MODES.items():
-            class _FakeNode:
-                pass
-            n = _FakeNode()
-            n.inheritance = inheritance
-            n.require_zygosity = True
-            n.trio = cohort.trio
-            self.assertIn(handler.filter_key_for_node(n), precomputed)
+    @staticmethod
+    def _trio_node(inheritance, mother_affected=False, father_affected=True, require_zygosity=True):
+        trio = Trio(mother_affected=mother_affected, father_affected=father_affected)
+        return TrioNode(inheritance=inheritance, require_zygosity=require_zygosity, trio=trio)
+
+    def test_trio_node_round_trip(self):
+        for inheritance in TrioNode.STATS_INHERITANCE_MODES:
+            node = self._trio_node(inheritance)
+            self.assertIn(node.get_stats_filter_key(), node.trio.get_stats_filter_keys())
 
     def test_dominant_key_varies_with_affected_flags(self):
         """ The dominant predicate branches on who is affected, so a flag edit has to miss the
             bucket built for the previous flags rather than read it """
-        handler = TrioInheritanceHandler()
-
         def dominant_key(mother_affected, father_affected):
-            class _FakeNode:
-                pass
-            n = _FakeNode()
-            n.inheritance = TrioInheritance.DOMINANT
-            n.require_zygosity = True
-            n.trio = _FakeTrio(mother_affected=mother_affected, father_affected=father_affected)
-            return handler.filter_key_for_node(n)
+            return self._trio_node(TrioInheritance.DOMINANT, mother_affected, father_affected).get_stats_filter_key()
 
         self.assertNotEqual(dominant_key(True, False), dominant_key(False, True))
-        # And the writer builds the same key off the trio it computed the bucket from
-        cohort = _FakeTrioCohort(_FakeTrio(mother_affected=True, father_affected=False))
-        self.assertIn(dominant_key(True, False), set(handler.filter_keys_to_precompute(cohort)))
 
     def test_modes_without_affected_flags_keep_one_key(self):
         """ Only dominant depends on affected status - a flag edit leaves the other buckets valid """
-        handler = TrioInheritanceHandler()
-        unaffected_parents = set(handler.filter_keys_to_precompute(
-            _FakeTrioCohort(_FakeTrio(mother_affected=False, father_affected=False))))
-        affected_mother = set(handler.filter_keys_to_precompute(
-            _FakeTrioCohort(_FakeTrio(mother_affected=True, father_affected=False))))
-        # 5 modes + None, differing only in the dominant key
-        self.assertEqual(len(unaffected_parents & affected_mother), len(TrioInheritanceHandler.CACHED_MODES))
+        unaffected_parents = set(Trio(mother_affected=False, father_affected=False).get_stats_filter_keys())
+        affected_mother = set(Trio(mother_affected=True, father_affected=False).get_stats_filter_keys())
+        self.assertEqual(len(unaffected_parents & affected_mother), len(Trio.STATS_INHERITANCE_MODES) - 1)
 
-    def test_trio_handler_uncacheable_without_require_zygosity(self):
+    def test_trio_node_uncacheable_without_require_zygosity(self):
         """ The buckets are computed requiring a parent zygosity call, so a node that also
             accepts parent no-calls has to count live """
-        handler = TrioInheritanceHandler()
-        for inheritance, _ in TrioInheritanceHandler.CACHED_MODES.items():
-            class _FakeNode:
-                pass
-            n = _FakeNode()
-            n.inheritance = inheritance
-            n.require_zygosity = False
-            n.trio = _FakeTrio()
-            self.assertIs(handler.filter_key_for_node(n), UNCACHEABLE)
-
-    def test_family_nodes_without_precomputed_buckets_are_uncacheable(self):
-        """ The buckets are built off a cohort's Trio, so a Duo/Quad node has to count live rather
-            than read the raw cohort row, which knows nothing about its inheritance mode """
-        for node in (DuoNode(), QuadNode()):
-            handler = get_handler_for_node(node)
-            self.assertIs(handler.filter_key_for_node(node), UNCACHEABLE, str(type(node)))
-
-    def test_no_filter_handler_returns_none_only(self):
-        handler = NoFilterHandler()
-        self.assertEqual(list(handler.filter_keys_to_precompute(_FakeNonTrioCohort())), [None])
-        self.assertIsNone(handler.filter_key_for_node(object()))
-
-
-class _FakeTrio:
-    def __init__(self, mother_affected=False, father_affected=True):
-        self.mother_affected = mother_affected
-        self.father_affected = father_affected
-
-
-class _FakeTrioCohort:
-    def __init__(self, trio=None):
-        self.trio = trio or _FakeTrio()
-
-    @property
-    def trio_set(self):
-        trio = self.trio
-
-        class _TrioSet:
-            @staticmethod
-            def exists():
-                return True
-
-            @staticmethod
-            def first():
-                return trio
-        return _TrioSet
-
-
-class _FakeNonTrioCohort:
-    class _TrioSet:
-        @staticmethod
-        def exists():
-            return False
-
-        @staticmethod
-        def first():
-            return None
-    trio_set = _TrioSet
+        for inheritance in TrioNode.STATS_INHERITANCE_MODES:
+            node = self._trio_node(inheritance, require_zygosity=False)
+            self.assertIsNone(node._stats_inheritance_mode())
 
 
 class TestCohortStatsCascade(TestCase):
@@ -231,8 +149,8 @@ class TestPrecomputeKeysForCohort(TestCase):
         trio = create_fake_trio(self.user, self.grch37)
         keys = get_filter_keys_to_precompute_for_cohort(trio.cohort)
         self.assertIn(None, keys)
-        for mode in TrioInheritanceHandler.CACHED_MODES.values():
-            self.assertIn(inheritance_filter_key(mode, trio), keys)
+        for mode in Trio.STATS_INHERITANCE_MODES:
+            self.assertIn(trio.get_stats_filter_key(mode), keys)
         self.assertEqual(len(keys), 6)
 
     def test_non_trio_cohort_only_precomputes_none(self):

@@ -26,7 +26,7 @@ from annotation.models import (
 )
 from genes.models import Gene
 from genes.models_enums import AnnotationConsortium
-from snpdb.archive import DataArchivedError
+from library.django_utils.data_archive_mixin import DataArchivedError
 from snpdb.models import GenomeBuild
 
 

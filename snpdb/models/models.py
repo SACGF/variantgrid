@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import uuid
-from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property, total_ordering
@@ -18,6 +17,7 @@ from html import escape
 from re import RegexFlag
 from typing import Optional, TypedDict
 
+from avatar.templatetags.avatar_tags import avatar_url
 from celery import signature
 from celery.result import AsyncResult
 from django.conf import settings
@@ -40,16 +40,16 @@ from more_itertools import first
 from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
+from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
-from library.utils import JsonObjType, import_class
+from library.utils import JsonObjType, import_class, string_deterministic_hash
 from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
-
 
 # A tag used for both origins is stored as UNKNOWN so AlleleOriginFilterDefault.buckets works verbatim.
 # On a tag that means "applies to both", which is what people see
@@ -413,7 +413,6 @@ class LabUser:
 
     @cached_property
     def preferred_label(self) -> str:
-        from snpdb.models import AvatarDetails
         return AvatarDetails.avatar_for(self.user).preferred_label
 
     def __lt__(self, other):
@@ -1050,6 +1049,48 @@ class UserAwards:
 
     def __getitem__(self, item):
         return self.awards[item]
+
+
+@dataclass(frozen=True)
+class AvatarDetails:
+    user: User
+
+    @staticmethod
+    def avatar_for(user: User):
+        return AvatarDetails(user=user)
+
+    @cached_property
+    def awards(self) -> UserAwards:
+        return UserAwards(user=self.user)
+
+    @cached_property
+    def preferred_label(self) -> str:
+        user = self.user
+        preferred_label = user.username
+        if user.first_name or user.last_name:
+            preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
+        return preferred_label
+
+    @cached_property
+    def is_editable(self):
+        return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
+
+    @cached_property
+    def url(self) -> str:
+        if self.is_editable:
+            return avatar_url(self.user)
+        else:
+            # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
+            return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
+
+    @cached_property
+    def background_color(self) -> str:
+        if self.user.username == 'admin_bot':
+            return '#ffffff'
+
+        if self.url.startswith('/static/icons/users/'):
+            colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
+            return colors[string_deterministic_hash(self.user.username) % len(colors)]
 
 
 @dataclass(frozen=True)

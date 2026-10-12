@@ -238,7 +238,7 @@ the CSV/REDCap exporters and the ClinVar mapping are all generated from the same
 migration (`ls classification/migrations | grep ekey`). `classification/models/evidence_key.py:EvidenceKeyOverrides`
 layers lab and organisation config (hide a key, change options, enable a namespace such as `somatic:` or `acmg:`) on top,
 merged by `classification/models/evidence_key.py:EvidenceKeyOverrides.merge` and cached per lab through
-`classification/models/evidence_key.py:EvidenceKeyMap.with_overrides`. Each value is a `classification/models/evidence_mixin.py:VCBlobDict`
+`classification/models/evidence_key.py:EvidenceKeyMap.with_overrides`. Each value is a `classification/models/evidence_key.py:VCBlobDict`
 of value / note / explain / db_refs / validation / immutable, so a note and its provenance travel with the value.
 
 **Every edit is a modification.** A classification is a clinical opinion that gets reported on and re-examined years
@@ -253,7 +253,7 @@ the app insists on `patch_value`.
 only knows B/LB/VUS/LP/P, but deployments add VUS-A/B/C, oncogenic tiers, risk alleles and "other" as options on the
 `clinical_significance` key, and which of those count as the same bucket is a policy each deployment sets in the option's
 `bucket` attribute. Reading the bucket from `EvidenceKeyMap` means a new option is a data change, not code, and the
-`bucket` on `allele_origin` options is what `classification/enums/classification_enums.py:AlleleOriginBucket.bucket_for_allele_origin`
+`bucket` on `allele_origin` options is what `classification/models/evidence_key.py:EvidenceKeyMap.allele_origin_bucket`
 uses to split germline from somatic contexts.
 
 **Allele resolution is shared and asynchronous.** Thousands of records cite the same HGVS; resolving once per distinct

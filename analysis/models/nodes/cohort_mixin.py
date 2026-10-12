@@ -16,11 +16,11 @@ from analysis.models.nodes.analysis_node import (
     queryset_to_pk_in_q,
     querysets_to_pk_any_array_q,
 )
+from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_writer import percent_decode_info_value
 from patients.models import Patient
 from patients.models_enums import SampleSourceLevel, Zygosity
 from patients.sample_grouping import get_patient_for_source
-from snpdb.archive import DataArchivedError
 from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter, VCFInfo
 from snpdb.views.datatable_view import CellData, NullOrder, RichColumn
 from upload.models.models import UploadedVCF

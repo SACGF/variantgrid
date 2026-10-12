@@ -3,7 +3,7 @@ Per-user preferences and their layering: SettingsOverride rows at Global, Organi
 User level are merged by `UserSettings.get_for_user` (later wins) into the UserSettings dataclass -
 default build, columns, initial permission groups, tag config, node count settings. Also the
 small per-user state models (UserGridConfig, UserPageAck, AllVariantsFilter, UserContact) and
-UserPreview / AvatarDetails for display. Read preferences through get_for_user, never the override
+UserPreview for display. Read preferences through get_for_user, never the override
 rows directly.
 """
 import dataclasses
@@ -14,7 +14,6 @@ from datetime import datetime, timedelta
 from functools import cached_property
 from typing import Any, Optional
 
-from avatar.templatetags.avatar_tags import avatar_url
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -28,11 +27,10 @@ from model_utils.managers import InheritanceManager
 
 from flags.models.models import FlagCollection
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
-from library.utils import rgb_contrasting_text, string_deterministic_hash
-from snpdb.models.models import Lab, Organization, Tag, UserAwards
+from library.utils import rgb_contrasting_text
+from snpdb.models.models import AvatarDetails, Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
@@ -426,48 +424,6 @@ class UserPreview(PreviewModelMixin):
             internal_url=reverse('view_user', kwargs={"pk": self.user.pk}),
             summary_extra=extras
         )
-
-
-@dataclass(frozen=True)
-class AvatarDetails:
-    user: User
-
-    @staticmethod
-    def avatar_for(user: User):
-        return AvatarDetails(user=user)
-
-    @cached_property
-    def awards(self) -> UserAwards:
-        return UserAwards(user=self.user)
-
-    @cached_property
-    def preferred_label(self) -> str:
-        user = self.user
-        preferred_label = user.username
-        if user.first_name or user.last_name:
-            preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
-        return preferred_label
-
-    @cached_property
-    def is_editable(self):
-        return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
-
-    @cached_property
-    def url(self) -> str:
-        if self.is_editable:
-            return avatar_url(self.user)
-        else:
-            # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
-            return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
-
-    @cached_property
-    def background_color(self) -> str:
-        if self.user.username == 'admin_bot':
-            return '#ffffff'
-
-        if self.url.startswith('/static/icons/users/'):
-            colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
-            return colors[string_deterministic_hash(self.user.username) % len(colors)]
 
 
 @dataclass

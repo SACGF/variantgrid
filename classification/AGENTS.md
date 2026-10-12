@@ -10,7 +10,7 @@ Start with:
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
 Patterns here:
 - Evidence is JSON keyed by EvidenceKey.key; each value is a blob of value/note/explain/db_refs/validation
-  (models/evidence_mixin.py:VCBlobDict). Read it with models/evidence_mixin.py:EvidenceMixin.get and name keys via
+  (models/evidence_key.py:VCBlobDict). Read it with models/evidence_mixin.py:EvidenceMixin.get and name keys via
   enums/classification_enums.py:SpecialEKeys rather than string literals.
 - Change evidence only through models/classification.py:Classification.patch_value (or Classification.create_with_response /
   models/classification_inserter.py:BulkClassificationInserter.insert): it validates, honours per-field immutability by

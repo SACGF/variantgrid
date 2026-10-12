@@ -32,7 +32,6 @@ from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
-    get_handler_for_node,
 )
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
@@ -505,10 +504,10 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         """ Input counts can be static, so use cached CohortGenotype*Stats if we can. """
         if self.sample is None:
             return None
+        if self.is_group_level:
+            return None  # Spans genotype collections, so there's no single cohort's stats row to read
         if self._has_filters_that_affect_label_counts():
             return None  # Have to do counts
-
-        filter_key = get_handler_for_node(self).filter_key_for_node(self)
 
         filter_code = self.get_filter_code()
         if filter_code not in (0, 1):
@@ -523,7 +522,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return get_cached_label_count_for_cohort(
             cohort=self.sample.vcf.cohort,
             sample=self.sample,
-            filter_key=filter_key,
+            filter_key=None,
             annotation_version=self.analysis.annotation_version,
             passing_filter=bool(filter_code),
             zygosities=zygosities,
