@@ -22,7 +22,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.cache import cache
 from django.core.exceptions import FieldError
 from django.db import connection, models, transaction
-from django.db.models import BooleanField, F, Func, IntegerField, QuerySet, Value
+from django.db.models import BooleanField, F, Func, IntegerField, QuerySet, Subquery, Value
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.expressions import RawSQL
@@ -30,7 +30,6 @@ from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from django_dag.models import edge_factory, node_factory
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
@@ -45,23 +44,25 @@ from analysis.exceptions import (
 from analysis.models.enums import (
     AnalysisTemplateType,
     GroupOperation,
-    NodeColors,
     NodeErrorSource,
     NodeStatus,
 )
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.node_counts import get_node_counts_and_labels_dict, get_node_extra_filters_q
+from analysis.models.nodes.node_counts import (
+    get_node_counts_and_labels_dict,
+    get_node_extra_filters_q,
+)
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification
 from library.constants import DAY_SECS, MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.django_utils.database_utils import queryset_to_sql
 from library.django_utils.django_postgres import get_backend_pid
 from library.django_utils.major_operation import planner_join_collapse_limit
+from library.django_utils.model_utils import get_model_content_type_dict
 from library.log_utils import log_traceback
 from library.utils import add_exception_note, format_percent
-from library.django_utils.database_utils import queryset_to_sql
-from library.django_utils.model_utils import get_model_content_type_dict
 from patients.models import Patient
 from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
@@ -79,6 +80,7 @@ from snpdb.models import (
     VCFFilter,
     Wiki,
 )
+from snpdb.models.models_enums import SampleFileType
 from snpdb.variant_collection import write_sql_to_variant_collection
 from snpdb.views.datatable_view import RichColumn
 
@@ -204,11 +206,13 @@ class NodeAuditLogMixin:
         }
 
 
-class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=TimeStampedModel)):
+class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
     model = Variant
     objects = NodeInheritanceManager()
     history = AuditlogHistoryField()
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
+    children = models.ManyToManyField('self', blank=True, symmetrical=False, through='AnalysisEdge',
+                                      related_name='_parents')
     name = models.TextField(blank=True)
     x = models.IntegerField(default=_default_position)
     y = models.IntegerField(default=_default_position)
@@ -224,7 +228,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     visible = models.BooleanField(default=True)
     count = models.IntegerField(null=True, default=None)
     errors = models.TextField(null=True)
-    shadow_color = models.TextField(null=True)
     load_seconds = models.FloatField(null=True)
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
@@ -387,7 +390,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
     def get_samples(self) -> list[Sample]:
         """ Every node + ancestor sample, including those from variant-only VCFs. Sample level data
-            that doesn't come from the genotype - gene lists, coverage, BAMs, patients - and
+            that doesn't come from the genotype - gene lists, coverage, alignment files, patients - and
             restricting sample fields to ancestors @see AncestorSampleMixin """
         _, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return sorted(visibility)  # Every sample the node knows about is a key, genotype or not
@@ -395,12 +398,13 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     def get_sample_ids(self) -> list[int]:
         return [s.pk for s in self.get_samples()]
 
-    def get_bams_dict(self):
-        bams_dict = defaultdict(set)
-        sfp_qs = SampleFilePath.objects.filter(sample__in=self.get_samples())
+    def get_alignments_dict(self):
+        alignments_dict = defaultdict(set)
+        sfp_qs = SampleFilePath.objects.filter(sample__in=self.get_samples(),
+                                               file_type__in=SampleFileType.ALIGNMENT_TYPES)
         for sample_id, file_path in sfp_qs.values_list("sample_id", "file_path"):
-            bams_dict[sample_id].add(file_path)
-        return {k: list(v) for k, v in bams_dict.items()}
+            alignments_dict[sample_id].add(file_path)
+        return {k: list(v) for k, v in alignments_dict.items()}
 
     def get_connection_data(self, parent):
         """ Return dict of source_id/target_id for sending as JSON """
@@ -603,21 +607,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         a_kwargs.update(self._get_annotation_kwargs_for_node(**kwargs))
         return a_kwargs
 
-    @property
-    def queryset_requires_distinct(self):
-        if self._queryset_requires_distinct():
-            return True
-
-        if self.has_input() and self.uses_parent_queryset:
-            for parent in self.get_non_empty_parents():
-                if parent.queryset_requires_distinct:
-                    return True
-        return False
-
-    def _queryset_requires_distinct(self):
-        """ Override if you need this - don't do by default as it's slow """
-        return False
-
     @staticmethod
     def q_all():
         return Q(pk__isnull=False)
@@ -800,7 +789,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return node_contigs
 
     def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None, arg_q_dict=None,
-                     inner_query_distinct=False, disable_cache=False):
+                     disable_cache=False):
         if extra_annotation_kwargs is None:
             extra_annotation_kwargs = {}
 
@@ -820,15 +809,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
             q_list.append(extra_filters_q)
         if q_list:
             q = reduce(operator.and_, q_list)
-            filtered_qs = qs.filter(q)
-
-            if self.queryset_requires_distinct:
-                if inner_query_distinct:
-                    qs = qs.filter(pk__in=filtered_qs.values_list("pk", flat=True))
-                else:
-                    qs = filtered_qs.distinct()
-            else:
-                qs = filtered_qs
+            qs = qs.filter(q)
 
         # Clear ordering, @see
         # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
@@ -1011,6 +992,13 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     @staticmethod
     def flatten_errors(errors):
         return [f"{NodeErrorSource(nes).label}: {error}" for nes, error in errors]
+
+    def get_error_summaries(self) -> list[str]:
+        """ get_errors(flat=True) for the tooltip on the node card's error cross - a load's traceback
+            isn't for users, so it's only named as an internal error """
+        return [NodeErrorSource.INTERNAL_ERROR.label if source == NodeErrorSource.INTERNAL_ERROR
+                else f"{NodeErrorSource(source).label}: {error}"
+                for source, error in self.get_errors()]
 
     @staticmethod
     def get_status_from_errors(errors):
@@ -1250,9 +1238,10 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return variant_ids
 
     def _get_load_data(self) -> dict:
-        """ Override to snapshot anything else the node worked out at load - merged into
-            NodeVersion.load_data alongside "counts" @see node_counts """
-        return {}
+        """ Extend (via super) to snapshot anything else the node worked out at load - merged into
+            NodeVersion.load_data alongside "counts" @see node_counts.
+            "warnings" are drawn on the node card, so they're visible without opening the editor (#347) """
+        return {"warnings": self.get_warnings()}
 
     def _load(self):
         """ Override to do anything interesting.
@@ -1279,20 +1268,28 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if not parent.visible:
             raise NonFatalNodeError("Not connecting children to invisible nodes!")
 
-        existing_connect = parent.children.through.objects.filter(parent=parent, child=self)
+        existing_connect = AnalysisEdge.objects.filter(parent=parent, child=self)
         if not existing_connect.exists():
-            super().add_parent(parent)
+            AnalysisEdge.objects.create(parent=parent, child=self)
             self.parents_changed = True
         else:
             logging.error("Node(pk=%d).add_parent(pk=%d) already exists!", self.pk, parent.pk)
 
+    def add_child(self, child):
+        """ Only creates the edge - unlike add_parent, leaves the child's parents_changed alone """
+        AnalysisEdge.objects.create(parent=self, child=child)
+
     def remove_parent(self, parent):
         """ disconnects parent by deleting edge """
         # Ok to have multiple, just delete first
-        edge = parent.children.through.objects.filter(parent=parent, child=self).first()
+        edge = AnalysisEdge.objects.filter(parent=parent, child=self).first()
         if edge:  # could be some kind of race condition?
             edge.delete()
         self.parents_changed = True
+
+    def parents(self):
+        """ Base AnalysisNode rows, so parents of every node type are found """
+        return AnalysisNode.objects.filter(children=self)
 
     def handle_ancestor_input_samples_changed(self):
         pass
@@ -1328,12 +1325,6 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
 
         # TODO: This causes lots of DB queries... should we change this?
         self.valid = self.is_valid
-        if not self.valid:
-            self.shadow_color = NodeColors.ERROR
-            self.appearance_dirty = True
-        elif self.shadow_color == NodeColors.ERROR:  # Need to allow nodes to set to warning
-            self.shadow_color = NodeColors.VALID
-            self.appearance_dirty = True
 
         if self.appearance_dirty:
             self.appearance_version += 1
@@ -1447,7 +1438,19 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         return l
 
 
-class AnalysisEdge(NodeAuditLogMixin, edge_factory(AnalysisNode, concrete=False)):
+class AnalysisEdge(NodeAuditLogMixin, models.Model):
+    parent = models.ForeignKey(AnalysisNode, related_name="analysisnode_child", on_delete=CASCADE)
+    child = models.ForeignKey(AnalysisNode, related_name="analysisnode_parent", on_delete=CASCADE)
+
+    def __str__(self):
+        return f"{self.parent_id} -> {self.child_id}"
+
+    def save(self, *args, **kwargs):
+        dag = AnalysisDag.for_node(self.parent_id)
+        if self.parent_id == self.child_id or self.child_id in dag.ancestor_ids(self.parent_id):
+            raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - it would create a cycle")
+        super().save(*args, **kwargs)
+
     def _get_node(self):
         return self.child
 
@@ -1468,6 +1471,44 @@ class AnalysisEdge(NodeAuditLogMixin, edge_factory(AnalysisNode, concrete=False)
             }
         })
         return additional_data
+
+
+class AnalysisDag:
+    """ An analysis's edges loaded in one query, so walks are by pk rather than a parents() query per node """
+
+    def __init__(self, analysis_id):
+        """ analysis_id can be a Subquery - see for_node """
+        self.parent_ids = defaultdict(set)
+        self.child_ids = defaultdict(set)
+        edges = AnalysisEdge.objects.filter(child__analysis_id=analysis_id).values_list("parent_id", "child_id")
+        for parent_id, child_id in edges:
+            self.parent_ids[child_id].add(parent_id)
+            self.child_ids[parent_id].add(child_id)
+
+    @classmethod
+    def for_node(cls, node_id) -> 'AnalysisDag':
+        return cls(Subquery(AnalysisNode.objects.filter(pk=node_id).values("analysis_id")[:1]))
+
+    @staticmethod
+    def _walk(node_id, links: dict[int, set[int]]) -> set[int]:
+        found = set()
+        stack = [node_id]
+        while stack:
+            for linked_id in links.get(stack.pop(), ()):
+                if linked_id not in found:
+                    found.add(linked_id)
+                    stack.append(linked_id)
+        return found
+
+    def ancestor_ids(self, node_id) -> set[int]:
+        return self._walk(node_id, self.parent_ids)
+
+    def descendant_ids(self, node_id) -> set[int]:
+        return self._walk(node_id, self.child_ids)
+
+    def root_ids(self, node_id) -> set[int]:
+        """ Ancestors without parents - empty if node_id has none itself """
+        return {pk for pk in self.ancestor_ids(node_id) if not self.parent_ids.get(pk)}
 
 
 class NodeTask(TimeStampedModel):

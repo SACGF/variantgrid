@@ -58,7 +58,8 @@ class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificat
 
     def get_initial_queryset(self) -> QuerySet[UploadedClassificationsUnmapped]:
         if lab_id := self.get_query_param("lab_id"):
-            return UploadedClassificationsUnmapped.objects.filter(lab=int(lab_id))
+            return UploadedClassificationsUnmapped.objects.filter(
+                lab=int(lab_id), lab__in=Lab.valid_labs_qs(self.user, admin_check=True))
         else:
             raise ValueError("Must pass in lab_id")
 
@@ -91,6 +92,8 @@ def upload_classification_unmapped_download_validation(request: HttpRequest, upl
     user = request.user
     record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
         lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+    if not record:
+        raise PermissionDenied("You do not have access to this file")
 
     filename = record.filename
     if '.' in filename:

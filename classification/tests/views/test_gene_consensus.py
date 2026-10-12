@@ -3,10 +3,10 @@ from typing import Optional
 from django.test import TestCase
 from django.urls import reverse
 
-from annotation.tests.test_data_fake_genes import _create_fake_gene_version
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.fake_data import create_fake_gene_version
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -21,7 +21,7 @@ class GeneConsensusPanelTestCase(TestCase):
         self.lab, self.user = ClassificationTestUtils.lab_and_user()
         self.client.force_login(self.user)
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        _create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
+        create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
         self.record = self._classify("being_curated", curation_date="2024-01-01")
         self.url = reverse("classification_gene_consensus", kwargs={"classification_id": self.record.pk})
 

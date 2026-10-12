@@ -1,4 +1,4 @@
-{% extends menu_variants_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load settings_tags %}
 {% load crispy_forms_tags %}
 {% load genome_build_tags %}
@@ -103,7 +103,7 @@
 </style>
 {% endblock head %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     {% genome_build_url_arg genome_build 'genome_build_variant_tags' %}
 
     <h3>Variant Tags</h3>
@@ -171,4 +171,4 @@
         <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadVariantTagsCSV()">CSV</a>
     </div>
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

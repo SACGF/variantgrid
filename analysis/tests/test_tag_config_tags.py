@@ -12,7 +12,7 @@ from analysis.templatetags.tag_config_tags import (
     render_variant_quick_tags,
     render_variant_tag_order,
 )
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from snpdb.models import GenomeBuild, Tag, TagConfig, TagConfigCollection
 from snpdb.models.models_user_settings import UserSettingsOverride
 

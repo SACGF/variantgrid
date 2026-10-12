@@ -32,8 +32,8 @@ class ColdCaseAwardTest(TestCase):
 
     def test_year_gap_counts(self):
         self._classification_with_gap(timedelta(days=365))
-        self.assertEqual(_cold_cases(None), {None: {self.user.pk: 1}})
+        self.assertEqual(_cold_cases(), {self.user.pk: 1})
 
     def test_month_gap_ignored(self):
         self._classification_with_gap(timedelta(days=30))
-        self.assertEqual(_cold_cases(None), {None: {}})
+        self.assertEqual(_cold_cases(), {})

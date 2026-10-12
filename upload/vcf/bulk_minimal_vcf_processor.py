@@ -1,8 +1,7 @@
 import cyvcf2
-from django.conf import settings
 
-from library.git import Git
 from snpdb.models import VariantCoordinate
+from snpdb.models.models import CodeVersion
 from upload.models import VCFImporter
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
 
@@ -22,7 +21,7 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
                                                             version=1,
                                                             vcf_parser="cyvcf2",
                                                             vcf_parser_version=cyvcf2.__version__,
-                                                            code_git_hash=Git(settings.BASE_DIR).hash)
+                                                            code_version=CodeVersion.current())
         return vcf_importer
 
     def process_entry(self, variant: cyvcf2.Variant) -> tuple[VariantCoordinate, str]:

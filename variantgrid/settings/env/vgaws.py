@@ -46,8 +46,8 @@ CONTACT_US_ENABLED = True
 
 # variantgrid.com static overrides (e.g. vc_settings.js enables the 'public' / "3rd Party
 # Databases" share level - the gate for sharing outward to ClinVar / MatchMaker Exchange).
-VGAWS_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "vgaws_static")
-STATICFILES_DIRS = (VGAWS_STATIC_FILES_DIR,) + STATICFILES_DIRS
+_VGAWS_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "vgaws_static")
+STATICFILES_DIRS = (_VGAWS_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 # MatchMaker Exchange - our own contact, sent as the `contact` block on every outbound patient.
 MME_CONTACT = {

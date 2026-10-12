@@ -24,7 +24,8 @@ class Test(URLTestCase):
         DATATABLE_GRID_LIST_URLS = [
             ("manual_migrations_datatable", {}, 200),
         ]
-        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.admin_user)
+        self._test_datatable_urls([("manual_migrations_datatable", {}, 403)], self.user)
 
 if __name__ == "__main__":
     unittest.main()

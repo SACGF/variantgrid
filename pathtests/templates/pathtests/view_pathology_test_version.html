@@ -1,4 +1,4 @@
-{% extends menu_pathtests_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load enrichment_kit_coverage_tags %}
 
@@ -31,14 +31,13 @@ $("button#confirm-test").click(function() {
 
 {% endblock jsdocumentready %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <h3>{{ pathology_test_version }}</h3>
 
     {% load help_tags %}
     {% page_help user 'pathtests/view_pathology_test_version_help' 'View Pathology Test Version Help' %}
 
-    {% include "messages/messages.html" %}
 
     <form id='pathology-test-version-form' name="pathology-test-version" method="post">
         {% csrf_token %}
@@ -225,4 +224,4 @@ $("button#confirm-test").click(function() {
     </div>
 {% endif %}
 
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

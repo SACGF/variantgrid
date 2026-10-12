@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
 from json import JSONDecodeError
+from collections.abc import Iterable
 from typing import Optional, Any, Self
 
 from auditlog.context import set_extra_data
@@ -12,27 +13,29 @@ from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import QuerySet, Q, Subquery, OuterRef
+from django.db.models import QuerySet, Q, Subquery, OuterRef, Prefetch
 from django.db.models.aggregates import Max
 from django.utils.timezone import now
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord
-from classification.enums import TestingContextBucket, OverlapStatus, OverlapState
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapSnapshot
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
-    TriageNextStep, TriageState, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
+    TriageNextStep, TriageDecision, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
 from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 import json
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
+from library.utils.collection_utils import batch_iterator
 from review.models import Review
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, LabLike, UserSettings
 from snpdb.utils import LabNotificationBuilder
 
 _discordance_notifications_suppressed: ContextVar[bool] = ContextVar("discordance_notifications_suppressed", default=False)
+_deferred_overlap_recalc_ids: ContextVar[Optional[set[int]]] = ContextVar("deferred_overlap_recalc_ids", default=None)
 
 
 class OverlapServices:
@@ -52,6 +55,27 @@ class OverlapServices:
             yield
         finally:
             _discordance_notifications_suppressed.reset(token)
+
+    @staticmethod
+    @contextmanager
+    def overlap_recalcs_deferred():
+        """
+        For updating many classification groupings at once: the overlaps they touch are recalculated once each, in
+        batches, on leaving the block, rather than after every grouping (an allele's cross context overlap is shared
+        by all its groupings).
+        """
+        if _deferred_overlap_recalc_ids.get() is not None:
+            # an outer block does the recalculation
+            yield
+            return
+
+        overlap_ids: set[int] = set()
+        token = _deferred_overlap_recalc_ids.set(overlap_ids)
+        try:
+            yield
+        finally:
+            _deferred_overlap_recalc_ids.reset(token)
+        OverlapServices.recalc_overlaps_batch(overlap_ids)
 
     @staticmethod
     def update_classification_grouping_overlap_contribution(
@@ -128,10 +152,12 @@ class OverlapServices:
 
             if recalc_overlaps:
                 # now update status of any created overlaps or existing linked overlaps
-                for overlap in overlap_contribution.overlaps:
-                    # FIXME, should mark the overlap as dirty instead so overlap can be batch
-                    OverlapServices.update_next_steps(overlap)
-                    OverlapServices.recalc_overlap(overlap)
+                if (deferred_overlap_ids := _deferred_overlap_recalc_ids.get()) is not None:
+                    deferred_overlap_ids.update(overlap_contribution.overlapcontributionnextstep_set.values_list("overlap_id", flat=True))
+                else:
+                    for overlap in overlap_contribution.overlaps:
+                        OverlapServices.update_next_steps(overlap)
+                        OverlapServices.recalc_overlap(overlap)
 
     @staticmethod
     def update_clinvar_overlap_contribution(
@@ -182,7 +208,7 @@ class OverlapServices:
                         "value": value,
                         "contribution_status": contribution_enum,
                         "effective_date": effective_date.to_dict(),
-                        "triage_state": TriageState(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
+                        "triage_state": TriageDecision(status=TriageStatus.NON_INTERACTIVE_THIRD_PARTY).to_dict()
                     }
                 )
 
@@ -251,6 +277,16 @@ class OverlapServices:
         Skews determine if from a lab's PoV an Overlap is waiting on them, waiting on another lab etc.
         So grab all the OverlapContributions, check their TriageStatus, link those to the Skews
         Then update the Skew's next steps
+        """
+        OverlapContributionNextStep.objects.bulk_update(
+            objs=OverlapServices._calculate_next_steps(overlap),
+            fields=['next_step']
+        )
+
+    @staticmethod
+    def _calculate_next_steps(overlap: Overlap) -> list[OverlapContributionNextStep]:
+        """
+        Sets next_step on the overlap's interactive skews (without saving them) and returns them
         """
 
         status_buckets: defaultdict[TriageStatus, list[OverlapContributionNextStep]] = defaultdict(list)
@@ -325,20 +361,40 @@ class OverlapServices:
             if entry.next_step == TriageNextStep.PENDING_CALCULATION:
                 raise ValueError("Failed to assign each skew a status")
 
-        OverlapContributionNextStep.objects.bulk_update(
-            objs=all_interactive_next_steps,
-            fields=['next_step']
-        )
+        return all_interactive_next_steps
 
     @staticmethod
-    def recalc_overlap(overlap: Overlap):
+    def recalc_overlaps_batch(overlap_ids: Iterable[int], batch_size: int = 1000):
+        """
+        update_next_steps and recalc_overlap for many overlaps, loading each batch's contributions up front
+        """
+        next_step_qs = OverlapContributionNextStep.objects.select_related("contribution__classification_grouping__lab__organization")
+        for batch_ids in batch_iterator(overlap_ids, batch_size):
+            overlap_qs = Overlap.objects.filter(pk__in=batch_ids).prefetch_related(
+                Prefetch("overlapcontributionnextstep_set", queryset=next_step_qs))
+            next_steps = []
+            with transaction.atomic():
+                for overlap in overlap_qs:
+                    next_steps += OverlapServices._calculate_next_steps(overlap)
+                    contributions = sorted(
+                        skew.contribution for skew in overlap.overlapcontributionnextstep_set.all()
+                        if skew.contribution.contribution_status == OverlapContributionStatus.CONTRIBUTING
+                    )
+                    OverlapServices.recalc_overlap(overlap, contributions=contributions)
+                OverlapContributionNextStep.objects.bulk_update(next_steps, fields=['next_step'], batch_size=batch_size)
+
+    @staticmethod
+    def recalc_overlap(overlap: Overlap, contributions: Optional[list[OverlapContribution]] = None):
         """
         Recalculates the overlap status based on contributions and triage status (no need to call save after)
         :param overlap: The overlap to recalculate
+        :param contributions: The overlap's sorted contributing OverlapContributions, if already loaded
         """
+        if contributions is None:
+            contributions = overlap.contributions_list
         calculator = overlap_calculator_for_value_type(overlap.value_type)
 
-        overlap_status_calculation = calculator.calculate_entries(overlap.contributions_list)
+        overlap_status_calculation = calculator.calculate_entries(contributions)
         cached_state = overlap.cached_overlap_state_obj
 
         overlap_status_changed = False
@@ -363,7 +419,7 @@ class OverlapServices:
         elif overlap.overlap_type == OverlapType.CROSS_CONTEXT:
             # cross contexts need at least 2 different contexts to be considered valid
             # Rather than a whole valid bool, could this be better done as just the status of REQUIRES_MULTIPLE_CONTEXTS?
-            valid = len(overlap.testing_contexts_objs) > 1
+            valid = len({contribution.testing_context_bucket for contribution in contributions}) > 1
             if overlap.valid != valid:
                 overlap.valid = valid
                 overlap_valid_changed = True
@@ -374,7 +430,7 @@ class OverlapServices:
                 OverlapServices._overlap_status_changed(overlap, cached_state, overlap_status_calculation)
 
     @staticmethod
-    def _overlap_status_changed(overlap: Overlap, old_state: OverlapState, new_state: OverlapState):
+    def _overlap_status_changed(overlap: Overlap, old_state: OverlapSnapshot, new_state: OverlapSnapshot):
         """
         Called when important factors of an Overlap change that might require a discordance notification to be prepared
         :param overlap: The overlap object (typically reflecting the new state)
@@ -393,7 +449,7 @@ class OverlapServices:
         # see if it's worth notifying anyone
         odn: OverlapDiscordanceNotification
         created: bool = False
-        if not OverlapState.is_notify_relevant(old_state, new_state):
+        if not OverlapSnapshot.is_notify_relevant(old_state, new_state):
             # change isn't worth notifying, but if we were already notifying (with a previous state), update that notification
             # so find the existing notification (if one exists) and update it, but don't create one
             odn = OverlapDiscordanceNotification.objects.filter(overlap=overlap, notification_sent_date__isnull=True).first()
@@ -701,7 +757,7 @@ class OverlapPageDetails:
         try:
             match field_name:
                 case "triage_state":
-                    return TriageState.from_dict(to_json(value))
+                    return TriageDecision.from_dict(to_json(value))
                 case "effective_date":
                     return EffectiveDate.from_dict(to_json(value))
                 case "comment":

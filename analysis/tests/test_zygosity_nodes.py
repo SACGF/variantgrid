@@ -3,14 +3,14 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import AllVariantsNode, Analysis, AnalysisNode, CohortNode
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import (
     GenomeBuild,
     VariantZygosityCount,
     VariantZygosityCountCollection,
 )
 from snpdb.models.models_cohort import CohortGenotype, CohortGenotypeCollection
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
@@ -46,6 +46,7 @@ class TestZygosityNodes(TestCase):
         cls.het_hom_v = cls._make_variant(2000, "EOR")
         cls.all_ref_v = cls._make_variant(3000, "RRR")
         cls.all_het_v = cls._make_variant(4000, "EEE")
+        cls.not_in_cohort_v = slowly_create_test_variant("3", 5000, "A", "T", cls.grch37)
 
     @classmethod
     def _make_variant(cls, position: int, samples_zygosity: str):
@@ -84,6 +85,13 @@ class TestZygosityNodes(TestCase):
                                                 accordion_panel=CohortNode.COUNT)
         self._assert_zygosity_filters(cohort_node, {self.all_types_v, self.het_hom_v},
                                       **self.ONE_OF_EACH_ZYGOSITY)
+
+    def test_cohort_node_default_bounds_only_cohort_variants(self):
+        """ Default count bounds add no filter, so the node has to restrict to the cohort itself """
+        cohort_node = CohortNode.objects.create(analysis=self.analysis, cohort=self.trio.cohort,
+                                                accordion_panel=CohortNode.COUNT)
+        self._assert_zygosity_filters(cohort_node, {self.all_types_v, self.het_hom_v,
+                                                    self.all_ref_v, self.all_het_v})
 
     def test_sub_cohort_node_zyg_filters(self):
         sub_cohort_node = CohortNode.objects.create(analysis=self.analysis, cohort=self.sub_cohort,

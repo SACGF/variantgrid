@@ -1,4 +1,4 @@
-{% extends "seqauto/menu_sequencing_data_base.html" %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load tz %}
 {% load model_helpers %}
@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <p>
     Back to <a href="{% url 'enrichment_kits_list' %}">enrichment kits list</a>
     </p>

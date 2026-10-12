@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import auto
 from functools import cached_property, reduce
-from typing import Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union, get_args
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -26,6 +26,7 @@ from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Val
 from django.db.models.functions import Concat
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
+from django.utils.html import escape
 from kombu.utils import json
 
 from library.django_utils.datatable_mixins import JSONResponseView
@@ -34,7 +35,7 @@ from library.django_utils.grid_export import csv_streaming_response, grid_export
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
-from snpdb.models import AvatarDetails, UserGridConfig, UserSettings
+from snpdb.models import AvatarDetails, UserGridConfig
 
 logger = logging.getLogger(__name__)
 
@@ -437,10 +438,6 @@ class DatatableConfig(Generic[DC]):
         self._page_writable_pks: Optional[set] = None
         self._user_labels: dict[int, str] = {}
 
-    @cached_property
-    def viewer_settings(self) -> UserSettings:
-        return UserSettings.get_for_user(self.user)
-
     def user_column(self, fk: str = "user", **kwargs) -> RichColumn:
         """ The column for a User FK: sorts and exports on the username, renders through render_user,
             and the search box matches the username or the "First Last" the cell shows (#1200) """
@@ -457,14 +454,13 @@ class DatatableConfig(Generic[DC]):
 
     def render_user(self, cell: CellData) -> JsonDataType:
         """ For a "<fk>__username" column with extra_columns=["<fk>__id"] (see user_column): renders the
-            name through AvatarDetails so a title holder gets their crown (#1819). Sort/CSV stay on
-            the username """
+            "First Last" name from AvatarDetails. Sort/CSV stay on the username """
         user_id = cell.get(cell.key.removesuffix("__username") + "__id")
         if user_id is None:
             return ""
         if (label := self._user_labels.get(user_id)) is None:
             user = User.objects.filter(pk=user_id).first()
-            label = str(AvatarDetails.avatar_for(user).grid_label_html(self.viewer_settings)) if user else ""
+            label = escape(AvatarDetails.avatar_for(user).preferred_label) if user else ""
             self._user_labels[user_id] = label
         return label
 
@@ -521,7 +517,9 @@ class DatatableConfig(Generic[DC]):
         """ The column filter rules this request carries (@see library.django_utils.filter_rules) """
         if not self.filter_builder:
             return None
-        return parse_filters(self.get_query_param(DATATABLE_FILTERS_PARAM))
+        if filters := parse_filters(self.get_query_param(DATATABLE_FILTERS_PARAM)):
+            filters = self.restrict_to_filter_fields(filters)
+        return filters
 
     @property
     def filter_rules_supplied(self) -> bool:
@@ -536,6 +534,22 @@ class DatatableConfig(Generic[DC]):
             if column_filter := rc.column_filter:
                 fields.append(column_filter.as_json(rc.name, rc.label))
         return fields
+
+    def filter_field_names(self) -> set[str]:
+        return {rc.name for rc in self.enabled_columns if rc.column_filter}
+
+    def restrict_to_filter_fields(self, filters: dict) -> Optional[dict]:
+        """ filters without the rules on a field filter_fields doesn't offer """
+        field_names = self.filter_field_names()
+        rules = []
+        for rule in filters["rules"]:
+            if rule.get("field") in field_names:
+                rules.append(rule)
+            else:
+                logger.warning("%s: ignoring filter rule on field not offered: %s", nice_class_name(self), rule)
+        if not rules:
+            return None
+        return {**filters, "rules": rules}
 
     def apply_filter_rules(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         if rules := self.filter_rules:
@@ -627,12 +641,7 @@ class DatatableConfig(Generic[DC]):
     def get_csv_name(self) -> str:
         if csv_name := self.csv_name:
             return csv_name
-        try:
-            return nice_class_name(self._model)
-        except Exception:
-            # The definition names the download before any request filtering, and a config whose
-            # queryset needs those params raises here - a generic filename is fine
-            return "export"
+        return nice_class_name(self._model)
 
     def initial_order(self) -> Optional[list]:
         """ The client's initial sort - None leaves the table unsorted """
@@ -732,8 +741,25 @@ class DatatableConfig(Generic[DC]):
         self._page_rows = rows
         self._page_writable_pks = None
 
+    @classmethod
+    def _declared_model(cls) -> Optional[type[DC]]:
+        """ The model a subclass named in DatatableConfig[Model], read off __orig_bases__ (set when a class
+            subscripts a Generic) - also found through an intermediate [DC] base or a parameterised abstract one """
+        for klass in cls.__mro__:
+            for base in getattr(klass, "__orig_bases__", ()):
+                for arg in get_args(base):
+                    if isinstance(arg, type) and issubclass(arg, models.Model):
+                        return arg
+        return None
+
     @cached_property
     def _model(self) -> type[DC]:
+        if model := self._declared_model():
+            return model
+        # Building the initial queryset can be expensive (permission lookups, request params) and the
+        # definition request has no reason to pay for it - name the model instead (#1913)
+        logger.warning("%s should subclass DatatableConfig[Model] - resolving the model via get_initial_queryset()",
+                       full_class_name(type(self)))
         return self.get_initial_queryset().model
 
     def view_primary_key(self, row: CellData) -> JsonDataType:

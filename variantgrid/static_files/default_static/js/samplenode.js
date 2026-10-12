@@ -1,7 +1,7 @@
 // Patient pedigree shape used by the patient form's example node and the upload page.
 // The analysis canvas draws its own badge from NodeIcon - see node_icon_sprite.html
-SIDE_LENGTH = 60;
-DEFAULT_SHADOW_COLOR = "#aaa";
+const SIDE_LENGTH = 60;
+const DEFAULT_SHADOW_COLOR = "#aaa";
 
 
 function maleSVG(svg, sideLength) {

@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, ExternalModelManager, Patient, Specimen
+from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, TissueStatus
 
 RECONCILE_TASK = "patients.views_rest.reconcile_pending_extractions.delay"
@@ -88,6 +88,14 @@ class PatientAPITest(APITestCase):
                              {"specimen": "2600000001", "reference_id": "2600000001C"}, format="json")
         mock_delay.assert_called_once()
 
+    def test_specimen_create_fires_reconcile(self):
+        """ LibraryQC / CombinedVariantOutput claims park on the specimen, not the extraction """
+        self._create_patient()
+        with patch(RECONCILE_TASK) as mock_delay:
+            self.client.post(reverse("api_specimen-list"),
+                             {"patient": "2600000001P", "reference_id": "2600000001"}, format="json")
+        mock_delay.assert_called_once()
+
     def test_specimen_naming_an_unknown_patient_is_400(self):
         response = self._create_specimen(patient="NOBODY")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -139,6 +147,19 @@ class PatientAPITest(APITestCase):
         self._create_patient()
         response = self._create_specimen(user=self.other_user)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_another_users_external_pk_is_400(self):
+        """ The upsert only searches rows the user can see, so the ExternalPK can already belong to
+            one they cannot - that is a 400, not the one-to-one IntegrityError """
+        external_pk = {"code": "H12345", "external_type": "HelixID", "external_manager": "HELIX"}
+        self._create_patient(external_pk=external_pk)
+
+        response = self._create_patient(user=self.other_user, patient_code="OTHER-CODE", external_pk=external_pk)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("external_pk", response.data)
+        self.assertNotIn("H12345", str(response.data))  # an existence oracle on external codes
+        self.assertEqual(ExternalPK.objects.filter(code="H12345").count(), 1)
+        self.assertFalse(Patient.objects.filter(patient_code="OTHER-CODE").exists())
 
     def test_unknown_external_manager_is_400_naming_the_known_ones(self):
         response = self._create_patient(external_pk={"code": "H12345", "external_type": "HelixID",

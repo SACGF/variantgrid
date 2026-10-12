@@ -1,7 +1,7 @@
 """
-Archive/restore for VCF (and exception types reused across apps).
+Archive/restore for VCF.
 
-@see claude/issue_1536_data_archive_plan.md
+@see https://github.com/SACGF/variantgrid/issues/1536
 """
 
 import logging
@@ -17,26 +17,6 @@ from eventlog.models import create_event
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf
-
-
-class DataArchivedError(Exception):
-    """ Raised when code tries to read underlying data that has been archived.
-
-        Callers either propagate to a UI surface (banner / badge) or catch in
-        a source-node helper that maps to NodeStatus.ERROR_CONFIGURATION.
-    """
-
-    def __init__(self, obj):
-        self.obj = obj
-        date = getattr(obj, "data_archived_date", None)
-        by = getattr(obj, "data_archived_by", None)
-        reason = getattr(obj, "data_archive_reason", None) or ""
-        date_str = date.strftime("%Y-%m-%d") if date else "unknown date"
-        by_str = str(by) if by else "unknown user"
-        msg = f"Source data archived on {date_str} by {by_str}"
-        if reason:
-            msg += f": {reason}"
-        super().__init__(msg)
 
 
 class ArchivePreconditionError(Exception):

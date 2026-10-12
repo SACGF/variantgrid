@@ -69,6 +69,7 @@ from classification.models.classification_variant_info_models import (
 from classification.models.clinical_context_models import (
     DiscordanceNotification,
 )
+from classification.models.condition_text_matching import ConditionTextMatch
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.services.overlaps_services import OverlapServices
@@ -91,6 +92,7 @@ from library.django_utils.admin_utils import (
 from library.guardian_utils import admin_bot
 from library.utils import ExportDataType, ExportRow, export_column, first
 from ontology.models import AncestorCalculator, OntologyTerm
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
 
@@ -347,6 +349,7 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Data: Populate w Annotations")
     def populate_base_variant_data(self, request, queryset: QuerySet[Classification]):
+        clingen_api = ClinGenAlleleRegistryAPI.instance(max_attempts=1)
         for vc in queryset:
             refseq_transcript_id = vc.get(SpecialEKeys.REFSEQ_TRANSCRIPT_ID)
             ensembl_transcript_id = vc.get(SpecialEKeys.ENSEMBL_TRANSCRIPT_ID)
@@ -357,7 +360,8 @@ class ClassificationAdmin(ModelAdminBasics):
                 annotation_version = AnnotationVersion.latest(genome_build)
                 data = get_evidence_fields_for_variant(genome_build, vc.variant, refseq_transcript_id,
                                                        ensembl_transcript_id,
-                                                       evidence_keys_list=[], annotation_version=annotation_version)
+                                                       evidence_keys_list=[], annotation_version=annotation_version,
+                                                       clingen_api=clingen_api)
                 patch = {}
                 publish = False
                 for key in [SpecialEKeys.GENOME_BUILD,
@@ -390,8 +394,6 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Fixes: Condition Text Sync")
     def condition_text_sync(self, request, queryset: QuerySet[Classification]):
-        from classification.models import ConditionTextMatch
-
         conditions_newly_set = 0
         for c in queryset:
             has_condition_already = bool(c.condition_resolution)
@@ -1162,7 +1164,7 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'allele_info',
         'genome_build',
         'variant',
-        'c_hgvs_both',
+        'resolved_hgvs',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
@@ -1171,17 +1173,7 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
 
     search_fields = (
         'resolved_hgvs',
-        'resolved_hgvs_compat'
     )
-
-    @admin_list_column(short_description="c.HGVS", order_field="resolved_hgvs")
-    def c_hgvs_both(self, obj: ResolvedVariantInfo):
-        c_hgvs = obj.resolved_hgvs
-        c_hgvs_compatible = obj.resolved_hgvs_compat
-        if c_hgvs == c_hgvs_compatible:
-            return c_hgvs
-        else:
-            return SafeString(f"<em>canonical</em><br/>{c_hgvs}<br/><em>c_hgvs_compatible</em><br/>{c_hgvs_compatible}")
 
     def has_add_permission(self, request):
         return False

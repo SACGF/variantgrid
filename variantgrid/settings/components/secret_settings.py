@@ -5,18 +5,17 @@ from typing import Any, Optional
 
 
 def _get_env_variable(key: str) -> tuple[Any, bool]:
-    try:
-        e_value = os.environ[key]
-        if e_value:
-            if e_value == 'false':
-                e_value = False
-            elif e_value == 'true':
-                e_value = True
-            elif e_value.startswith('"') and e_value.endswith('"'):
-                e_value = e_value[1:-1]
-            return e_value, True
-    except KeyError:
+    """ An exported-but-empty variable counts as unset, so it falls through to the config file """
+    e_value = os.environ.get(key)
+    if not e_value:
         return None, False
+    if e_value == 'false':
+        e_value = False
+    elif e_value == 'true':
+        e_value = True
+    elif e_value.startswith('"') and e_value.endswith('"'):
+        e_value = e_value[1:-1]
+    return e_value, True
 
 
 def _settings_file() -> str:
@@ -124,11 +123,12 @@ def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     value, found = _get_nested(parts, _default_settings)
     if found:
         if key != 'DB.port':
-            root_json = value
+            # Defaults include credentials (DB.password, CELERY.broker_url) so never log the value itself
+            root_json = "<value>"
             for p in reversed(parts):
                 root_json = {p: root_json}
             root_json_str = json.dumps(root_json)
-            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using default value '{found}', please migrate e.g. {root_json_str}")
+            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using the built-in default, please migrate e.g. {root_json_str}")
         return value
 
     if not mandatory:

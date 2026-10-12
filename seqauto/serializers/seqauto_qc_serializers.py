@@ -11,7 +11,7 @@ from seqauto.models import (
     SingleSampleVCF,
 )
 from seqauto.serializers.sequencing_serializers import (
-    BamFilePathSerializer,
+    AlignmentFilePathSerializer,
     FastqSerializer,
     SampleSheetLookupSerializer,
     SequencingSampleLookupSerializer,
@@ -40,7 +40,7 @@ class QCSerializer(serializers.ModelSerializer):
     # Instead of dealing with all the bam/vcf etc - we'll just deal with sequencing_sample and
     # assume we're using the latest ones associated with that
     sequencing_sample = SequencingSampleLookupSerializer()
-    bam_file = BamFilePathSerializer()
+    bam_file = AlignmentFilePathSerializer(source="alignment_file")
     vcf_file = SingleSampleVCFPathSerializer()
 
     class Meta:
@@ -52,16 +52,16 @@ class QCSerializer(serializers.ModelSerializer):
         # We are passed "sequencing_sample" - which we can use to get what we really want
         sequencing_sample = SequencingSampleLookupSerializer.get_object(data.pop("sequencing_sample"))
         sequencing_run = sequencing_sample.sequencing_run
-        # Occasionally we could have multiple bam and VCF files in there that match path
-        # we want to make sure we get the bam out that is linked to the VCF file we pull out
-        bam_file_data = data.pop("bam_file")
+        # Occasionally we could have multiple alignment and VCF files in there that match path
+        # we want to make sure we get the alignment file out that is linked to the VCF file we pull out
+        alignment_file_data = data.pop("alignment_file")
         vcf_file_data = data.pop("vcf_file")
         vcf_file_kwargs = {
             "path": vcf_file_data["path"],
-            # Make sure bam file also matches
-            "bam_file__path": bam_file_data["path"],
-            "bam_file__sequencing_run": sequencing_run,
-            "bam_file__sequencing_sample": sequencing_sample
+            # Make sure alignment file also matches
+            "alignment_file__path": alignment_file_data["path"],
+            "alignment_file__sequencing_run": sequencing_run,
+            "alignment_file__sequencing_sample": sequencing_sample
 
         }
         vcf_file = SingleSampleVCF.objects.filter(**vcf_file_kwargs).first()
@@ -78,7 +78,7 @@ class QCSerializer(serializers.ModelSerializer):
 
         qc, _ = QC.objects.get_or_create(
             sequencing_run=sequencing_run,
-            bam_file=vcf_file.bam_file,
+            alignment_file=vcf_file.alignment_file,
             vcf_file=vcf_file,
             defaults=defaults
         )

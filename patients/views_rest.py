@@ -22,6 +22,11 @@ class SpecimenViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Specimen.filter_for_user(self.request.user)
 
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        # A LibraryQC / CombinedVariantOutput claim may be parked waiting for exactly this specimen
+        reconcile_pending_extractions.delay()
+
 
 class ExtractionViewSet(viewsets.ModelViewSet):
     serializer_class = ExtractionSerializer

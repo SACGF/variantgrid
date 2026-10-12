@@ -66,10 +66,10 @@ def classification_ontology_slots(classification, include_patient_phenotype: boo
     # 2. Linked patient phenotype (auto-matched; HPO only, genuinely observed)
     sample = classification.sample if include_patient_phenotype else None  # nullable FK
     patient = getattr(sample, "patient", None) if sample else None
-    ptp = getattr(patient, "patient_text_phenotype", None) if patient else None
-    if ptp and ptp.phenotype_description:
+    phenotype_description = getattr(patient, "phenotype_description", None) if patient else None
+    if phenotype_description:
         for term in OntologyTerm.objects.filter(
-                pk__in=ptp.phenotype_description.get_ontology_term_ids(),
+                pk__in=phenotype_description.get_ontology_term_ids(),
                 ontology_service=OntologyService.HPO):
             add_feature(term)
 

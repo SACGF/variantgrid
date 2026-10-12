@@ -129,7 +129,7 @@ function variantGridRowDetail(annotationVersionId, rowData) {
     // to open - a splice junction's own IGV link comes off its breakpoints instead
     // (@see VariantGridFormat.spliceCalls, snpdb/gene_level_variants.py)
     if (chrom != null && position != null && chrom !== GENE_LEVEL_CONTIG_NAME) {
-        const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getBams');  // null unless the analysis shows IGV links
+        const igvUrl = createIgvUrl(`${chrom}:${position}`, 'getAlignmentFiles');  // null unless the analysis shows IGV links
         if (igvUrl) {
             actions.append($('<a>', {href: igvUrl, text: 'IGV'}));
         }
@@ -554,12 +554,14 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
     });
 }
 
-// Fire the row query for a node whose table was built but held back (@see setupNodeGrid autoLoad)
+/* Fire the row query for a node whose table was built but held back (@see setupNodeGrid autoLoad).
+   Returns false when there's no table to load - node errors, or the pane was replaced */
 function loadNodeGridData(nodeId, unique_code) {
     const dataTable = getNodeDataTable(nodeId, unique_code);
     if (dataTable) {
         dataTable.ajax.reload();
     }
+    return Boolean(dataTable);
 }
 
 // True once the grid has actually fetched rows - a built-but-deferred table has made no request

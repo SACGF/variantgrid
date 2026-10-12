@@ -131,13 +131,20 @@
 		}
 	}
 
+	/* One summary per picked column, each loaded into its own container so they stack in column order */
 	function load_column_summary() {
-		const column = $("select#id_column", "form#column-summary-form").val();
+		const columns = $("select#id_columns", "form#column-summary-form").val() || [];
 		const base_url = "{% url 'node_column_summary' node.analysis_id node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
-		const url = base_url.replace('COLUMN', column);
 		const nodeDataSummary = $("#node-data-summary");
 
-		nodeDataSummary.load(url);
+		nodeDataSummary.empty();
+		if (columns.length === 0) {
+			nodeDataSummary.text("Please select one or more columns above and select view.");
+		}
+		for (const column of columns) {
+			const columnSummary = $("<div>", {class: "column-summary mb-4"}).appendTo(nodeDataSummary);
+			columnSummary.load(base_url.replace('COLUMN', column));
+		}
 		showNodeDataPane();
 	}
 
@@ -304,8 +311,8 @@
 						<form id='column-summary-form'>
 							{% csrf_token %}
 							<div class="editor-row">
-								<label class="editor-label" for="{{ column_summary_form.column.id_for_label }}">Column</label>
-								{{ column_summary_form.column }}
+								<label class="editor-label" for="{{ column_summary_form.columns.id_for_label }}">Columns</label>
+								{{ column_summary_form.columns }}
 								<button id='column-summary-button' class="btn btn-sm btn-outline-primary" type='button'>View</button>
 							</div>
 						</form>

@@ -1,4 +1,4 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load model_tags %}
 {% load ui_utils %}
 {% load related_analyses_tags %}
@@ -40,7 +40,7 @@
 </style>
 {% endblock head %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 
     <h3 id="quad-heading">
         {% preview_icon quad %} Quad: {{ quad }}

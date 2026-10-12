@@ -7,7 +7,7 @@ match is saved.
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from annotation.fake_annotation import get_fake_annotation_settings_dict, get_fake_vep_version
+from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotationVersion
 from genes.models import GeneAnnotationImport, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium

@@ -69,7 +69,7 @@ conversion is attempted, are:
 
 | Written | Resolves via | Since |
 |---|---|---|
-| `BCR::ABL1`, `CD74-ROS1` | `genes/gene_fusions.py:resolve_fusion_string` - both sides have to be genes we know | #1506 |
+| `BCR::ABL1`, `CD74--ROS1` (`~`, `/` too; never a single hyphen, which gene names contain) | `genes/gene_fusions.py:resolve_fusion_string` - both sides have to be genes we know | #1506, #1876 |
 | `EGFR amplification`, `PTEN loss` (`amp`, `gain`, `deletion`, `del` also accepted) | `genes/gene_copy_number.py:resolve_gene_copy_number_string` | #1836 |
 | `AR V7`, `AR-V7 splice variant`, `EGFRvIVa`, `MET exon 14 skipping`, `AR X_66905968_66914514` | `genes/gene_splice.py:resolve_splice_string` - every form canonicalised to one label (`genes/gene_splice.py:canonical_splice_label`), the gene has to be one we know, and the breakpoint form is read under the imported build | #1875, #1835 |
 
@@ -80,7 +80,7 @@ validation tag. Which values take this path at all is the shape of the string
 (`genes/gene_level_strings.py:looks_gene_level`), so one naming a gene we don't know never reaches the HGVS converter.
 A gene-level value keeps its spaces (`classification/models/classification_variant_info_models.py:tidy_hgvs_whitespace`
 strips them from an HGVS only), so `EGFR amplification` is stored and displayed as written; the splice and copy number
-forms still accept no space between gene and label, since records imported before that had theirs removed.
+forms also accept no space between gene and label, the form some stored records hold.
 
 That task runs `classification/classification_import.py:process_classification_import`: known coordinates are matched in
 bulk through `VariantPKLookup`; unknown ones are written to a synthetic VCF and pushed through the ordinary upload
@@ -120,6 +120,7 @@ public - and only the last two are `is_discordant_level`, i.e. count as "shared"
 and export. The web form republishes at the record's current level (`classification/views/views.py:create_classification_object`)
 and the inserter refuses to go lower, republishing at the current level with a `shared_higher` warning, but the model has
 no constraint: the ratchet is convention. `user` is never a publish target - the inserter maps it to "do not publish".
+`ShareLevel._missing_` reads the legacy `institution` value as `organisation` (#1472).
 Per-key visibility is separate: `classification/models/evidence_key.py:EvidenceKey.max_share_level` and
 `classification/models/classification.py:Classification.get_visible_evidence` blank out keys such as patient identifiers
 for anyone whose `lowest_share_level` is below the key's ceiling, even on a public record.
@@ -131,8 +132,7 @@ for anyone whose `lowest_share_level` is below the key's ceiling, even on a publ
 `classification/models/classification.py:classification_withdraw_signal`, which removes the record from its grouping
 and recalculates its clinical context. The inserter's `delete: true` withdraws a shared record and hard-deletes an unshared
 one (unless `settings.CLASSIFICATION_ALLOW_DELETE` is off, as it is on Shariant); `delete: "withdraw"` always withdraws;
-`delete: false` un-withdraws. Since #1481 a re-imported withdrawn record stays withdrawn and returns a `withdrawn` warning
-instead of silently resurrecting.
+`delete: false` un-withdraws. A re-imported withdrawn record stays withdrawn and returns a `withdrawn` warning (#1481).
 
 ### Grouping
 
@@ -150,8 +150,7 @@ SCV) are fed by `classification_grouping_search_term_signal` so the grid's searc
 
 ### Discordance
 
-Discordance is calculated on the `classification/models/overlaps_model.py:Overlap`, keyed on testing context rather than
-on the older ClinicalContext. Publishing, withdrawing, deleting, resolving a condition or matching to an allele all reach
+Discordance is calculated on the `classification/models/overlaps_model.py:Overlap`, keyed on testing context. Publishing, withdrawing, deleting, resolving a condition or matching to an allele all reach
 the receivers in `classification/signals/classification_hooks_grouping.py`, which dirty the record's
 `classification/models/classification_grouping.py:ClassificationGrouping`. While an import is running
 (`ClassificationImportRun.ongoing_imports()`) the grouping is left dirty and swept up afterwards by
@@ -187,11 +186,10 @@ an optional amend value), and `classification/models/overlaps_model.py:TriageNex
 `classification/signals/classification_hooks_significant_change.py:clinical_significance_change_check` closes the loop
 when a lab republishes the value it agreed to amend to.
 
-The earlier generation is still in the tree but no longer driven:
 `classification/models/clinical_context_models.py:ClinicalContext` (allele + allele-origin bucket + name),
 `classification/models/clinical_context_models.py:DiscordanceStatus.calculate` and
-`classification/models/discordance_models.py:DiscordanceReport`. Nothing live assigns a `ClinicalContext` or writes a new
-`DiscordanceReport`; the existing rows are still rendered, and `DiscordanceStatus.calculate` is still the display-time
+`classification/models/discordance_models.py:DiscordanceReport` are legacy models nothing live drives: nothing assigns a
+`ClinicalContext` or writes a new `DiscordanceReport`; the existing rows are still rendered, and `DiscordanceStatus.calculate` is still the display-time
 calculator for those legacy screens and for the VUS overlaps page
 (`classification/models/allele_overlaps.py:ClinicalGroupingOverlap.status`), where a clinical significance is bucketed via
 `classification/models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket`.
@@ -228,6 +226,11 @@ then drives one batch through submit → poll → fetch response file against th
 next submission is an update rather than a novel record. `classification/models/clinvar_export_exclude_utils.py:published`
 applies a key's `ClinVarKeyExcludePattern`s at publish time by opening the not-public flag.
 
+### Reclassification events
+
+The reclassification analytics page reads a `ReclassificationEvent` timeline built by
+`classification/models/classification_reclassification_models.py:ReclassificationEventBuilder` (#1523).
+
 ## Why it is shaped this way
 
 **Evidence is JSON with an EvidenceKey schema.** Labs disagree on which fields exist, what they are called and which
@@ -238,7 +241,7 @@ the CSV/REDCap exporters and the ClinVar mapping are all generated from the same
 migration (`ls classification/migrations | grep ekey`). `classification/models/evidence_key.py:EvidenceKeyOverrides`
 layers lab and organisation config (hide a key, change options, enable a namespace such as `somatic:` or `acmg:`) on top,
 merged by `classification/models/evidence_key.py:EvidenceKeyOverrides.merge` and cached per lab through
-`classification/models/evidence_key.py:EvidenceKeyMap.with_overrides`. Each value is a `classification/models/evidence_mixin.py:VCBlobDict`
+`classification/models/evidence_key.py:EvidenceKeyMap.with_overrides`. Each value is a `classification/models/evidence_key.py:VCBlobDict`
 of value / note / explain / db_refs / validation / immutable, so a note and its provenance travel with the value.
 
 **Every edit is a modification.** A classification is a clinical opinion that gets reported on and re-examined years
@@ -253,40 +256,23 @@ the app insists on `patch_value`.
 only knows B/LB/VUS/LP/P, but deployments add VUS-A/B/C, oncogenic tiers, risk alleles and "other" as options on the
 `clinical_significance` key, and which of those count as the same bucket is a policy each deployment sets in the option's
 `bucket` attribute. Reading the bucket from `EvidenceKeyMap` means a new option is a data change, not code, and the
-`bucket` on `allele_origin` options is what `classification/enums/classification_enums.py:AlleleOriginBucket.bucket_for_allele_origin`
+`bucket` on `allele_origin` options is what `classification/models/evidence_key.py:EvidenceKeyMap.allele_origin_bucket`
 uses to split germline from somatic contexts.
 
 **Allele resolution is shared and asynchronous.** Thousands of records cite the same HGVS; resolving once per distinct
-input (`ImportedAlleleInfo`) rather than per classification made re-matching after a transcript or cdot upgrade tractable
+input (`ImportedAlleleInfo`) rather than per classification makes re-matching after a transcript or cdot upgrade tractable
 (`classification_re_matching`, `fix_variant_matching` in `claude/maps/commands.md`). Matching goes through
 the VCF pipeline because that is the only path allowed to create Variants, and liftover is a separate task chain because
 it can take hours on a big import - so a classification has a nullable `variant` and `allele` for as long as that takes.
 
 **Imports defer the expensive work.** One file can touch thousands of records, and recalculating discordance, groupings
-and common-variant filters per row was both slow and noisy (an allele can flip discordant and back within one import).
+and common-variant filters per row would be both slow and noisy (an allele can flip discordant and back within one import).
 `classification/models/classification_import_run.py:ClassificationImportRun.ongoing_imports` gates all three; the
-`classification_imports_complete_signal` sweep does the work once, and `ClinicalContext.pending_cause` remembers what to
-say in the notification. #1725 dates the guard to 2021-12 ("delay discordances until import completes").
+`classification_imports_complete_signal` sweep does the work once.
 
-**Discordance is per ClinicalContext, not per allele.** Two labs can legitimately classify the same allele differently
-for different conditions (or germline vs somatic), so the unit of comparison is allele + allele-origin bucket + a name a
-user can split records into, with `default` as the name nearly every record has.
-
-## History
-
-The models date from the 2020 rewrite (`7a00283d9`, "renamed lots of things, re-did flags"), with condition matching
-reworked into a hierarchy that December. ClinVar export arrived in 2021-08 against ClinVar's test API; the import-run
-guard in 2021-12; `UploadedClassificationsUnmapped` and the OmniImporter task in 2022-03; `ImportedAlleleInfo` in 2022-11,
-replacing per-classification matching flags with `ImportedAlleleInfoValidation` rows in 2023-01. 2023 added the review
-app and discordance triage (2023-08), medically-significant prioritisation and bulk discordance emails (#3486, #3384),
-and condition resolution history (#881). Somatic support split the significance axis in 2024-02 ("classification" vs
-"somatic clinical significance"), and `allele_origin` became mandatory in 2024-11 (variantgrid_private#2926).
-`ClassificationGrouping` landed in 2025-02 for the listing grids. 2026 renamed the `institution` share level to
-`organisation` (#1472, with `ShareLevel._missing_` accepting the old value), allowed g.HGVS-only imports (#1063), recorded
-the HGVS converter version (#1321), made gene fusions first-class variants (#1506), added the external-lab filter (#394),
-the CSV inserter (#1481), the `ReclassificationEvent` timeline behind the reclassification analytics page
-(`classification/models/classification_reclassification_models.py:ReclassificationEventBuilder`, #1523), and the
-denormalised `summary` JSON with its `summary__p_sort_idx` index that the grids sort on.
+**Discordance is per Overlap, not per allele.** Two labs can legitimately classify the same allele differently for
+germline vs somatic testing or for different tumour types, so the unit of comparison is allele + testing-context bucket +
+tumour type category + value type (the unique constraint on `Overlap`).
 
 ## Traps
 

@@ -15,6 +15,7 @@ from classification.models import (
     UploadedClassificationsUnmappedStatus,
 )
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.classification_inserter import BulkClassificationInserter
 from library.log_utils import NotificationBuilder, report_message
 from library.utils import batch_iterator, pretty_label
 from variantgrid.celery import app
@@ -89,7 +90,6 @@ class ClassificationImportMapInsertTask(Task):
         """
         upload_file = UploadedClassificationsUnmapped.objects.get(pk=upload_classifications_unmapped_id)
 
-        from classification.models.classification_inserter import BulkClassificationInserter
         try:
             user = upload_file.user
             ClassificationImportMapInsertTask.update_status(upload_file, UploadedClassificationsUnmappedStatus.Mapping)

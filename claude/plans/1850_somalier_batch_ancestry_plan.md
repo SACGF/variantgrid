@@ -3,8 +3,7 @@
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-09
 Status: draft
 
-[#1850](https://github.com/SACGF/variantgrid/issues/1850). Grew out of the #1147 measurements, which are
-the numbers below. #1842 (skip ancestry/relate below a minimum number of genotyped sites) is already in
+[#1850](https://github.com/SACGF/variantgrid/issues/1850). The numbers below are the #1147 measurements. #1842 (skip ancestry/relate below a minimum number of genotyped sites) is already in
 the code as `settings.SOMALIER["min_genotyped_sites"]` and this plan keeps that behaviour per VCF.
 
 ## The problem
@@ -121,13 +120,6 @@ for a deploy where the operator would rather not hold a terminal for an hour.
 Expected on 10k VCFs / 30k samples with four `db_workers` processes: extracts ~1.5 h (DB-bound, 2s each),
 ancestry 30 batches × ~35s ≈ 20 min, all-samples relate ~45 min (somalier: ~1 min for 4,500, O(n²)).
 Under 3 hours from ~100.
-
-## Not in scope
-
-- `vcf_export_to_file` cost (2s per VCF). It is the cohort-genotype join at the sites; once extracts
-  are parallel it is no longer the wall-clock bottleneck. Measure on the real box before touching it.
-- The nightly `somalier_all_samples`: already one call, and somalier drops pairs with relatedness
-  ≤ 0.05 by default so `_load_somalier_pairs` stays small.
 
 ## Tests (`snpdb/tests/test_somalier.py`)
 

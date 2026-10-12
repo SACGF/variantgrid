@@ -5,8 +5,9 @@ from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
     CohortGenotype,
     CohortGenotypeCollection,
@@ -20,7 +21,6 @@ from snpdb.tasks.cohort_genotype_tasks import (
     common_variant_classified_task,
     create_cohort_genotype_collection,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort, create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

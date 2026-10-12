@@ -9,9 +9,9 @@ from typing import Optional
 
 from django.db import transaction
 
+from genes.fake_data import create_gene_level_variant
 from genes.gene_fusions import GeneFusionResolver, ResolvedFusion, create_gene_fusions_for_variants
 from genes.models import GeneFusion, GeneLevelId
-from genes.tests.gene_level_test_utils import create_gene_level_variant
 from snpdb.models import Variant
 
 

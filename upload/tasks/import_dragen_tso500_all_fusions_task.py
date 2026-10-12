@@ -19,18 +19,20 @@ Two steps:
 
 Each caller row becomes an observation carried in INFO, so what the caller wrote survives import.
 Several rows can name one gene pair (one caller reports ENTPD3::RPL14 three times with three 5'
-breakpoints), and those become one Variant with several observations.
+breakpoints), and those become one Variant with several observations. The record's FILTER is decided
+from all of them (_vcf_filter): kept by DRAGEN, rescued by the lab's rule, or not kept.
 
 A fusion caller asserts the fusion is present, not a diploid genotype, so the VCF has no GT and the
 sample has no zygosity to filter on. What it does have is read support, written as the sample's
 ALT_READS and REF_READS; the ^FusionProcessor VCFSourceSettings row binds those as alt and ref depth
 so the sample node's minimum-reads threshold and allele frequency work on fusions.
 """
+import json
 import logging
 from collections import defaultdict
 from typing import Optional
 
-import simplejson
+from django.conf import settings
 
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
 from library.genomics.vcf_writer import (
@@ -40,6 +42,7 @@ from library.genomics.vcf_writer import (
     percent_decode_info_value,
     percent_encode_info_value,
 )
+from library.utils.json_utils import json_dumps_nan_as_null
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
 from upload.models import (
@@ -50,9 +53,12 @@ from upload.models import (
 )
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_all_fusions_parser import (
+    FILTER,
     FUSION_INFO,
     FUSION_OBSERVATIONS_INFO,
     format_fusion_observations,
+    fusion_score,
+    is_kept,
     read_all_fusions,
     reference_reads,
     supporting_reads,
@@ -67,6 +73,17 @@ ALL_FUSIONS_FILENAME_SUFFIX = "_AllFusions.csv"
 ALT_READS_FORMAT = "ALT_READS"
 REF_READS_FORMAT = "REF_READS"
 VCF_MISSING_VALUE = "."
+
+# FILTER for a gene pair, from its observations. Kept by DRAGEN is PASS; the template's Fusions node
+# takes PASS and LowMapQRescue, and the review set takes everything
+VCF_FILTER_PASS = "PASS"
+VCF_FILTER_LOW_MAPQ_RESCUE = "LowMapQRescue"
+VCF_FILTER_NOT_KEPT = "NotKept"
+FILTER_HEADER_LINES = [
+    f'##FILTER=<ID={VCF_FILTER_LOW_MAPQ_RESCUE},'
+    f'Description="Not kept by DRAGEN; Score and Filter match the lab\'s rescue rule">',
+    f'##FILTER=<ID={VCF_FILTER_NOT_KEPT},Description="KeepFusion is false">',
+]
 
 
 def arm_sample_name(filename: str) -> str:
@@ -116,12 +133,33 @@ def _sample_call(observations: list[dict]) -> str:
     return ":".join(VCF_MISSING_VALUE if v is None else str(v) for v in (alt, ref))
 
 
+def _is_rescued(observation: dict) -> bool:
+    """ settings.TSO500_FUSION_RESCUE_MIN_SCORE / _FILTER - lab policy, unset rescues nothing """
+    min_score = settings.TSO500_FUSION_RESCUE_MIN_SCORE
+    rescue_filter = settings.TSO500_FUSION_RESCUE_FILTER
+    if min_score is None or rescue_filter is None:
+        return False
+    score = fusion_score(observation)
+    return score is not None and score > min_score and observation.get(FILTER) == rescue_filter
+
+
+def _vcf_filter(observations: list[dict]) -> str:
+    """ Any one observation kept makes the pair kept. DRAGEN's own Filter string stays per
+        observation in FUSION_OBS """
+    if any(is_kept(o) for o in observations):
+        return VCF_FILTER_PASS
+    if any(_is_rescued(o) for o in observations):
+        return VCF_FILTER_LOW_MAPQ_RESCUE
+    return VCF_FILTER_NOT_KEPT
+
+
 def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, source: str):
     """ Written already-clean and sorted, which is what lets preprocess skip straight to the split.
         END = POS gives svlen 0 through vcf_get_ref_alt_svlen_and_modification, which needs one of
         SVLEN/END for any symbolic alt (and reads SVLEN=0 as absent). """
 
     meta_lines = [f"##source={source}"] if source else []
+    meta_lines.extend(FILTER_HEADER_LINES)
     header_lines = build_header_lines(
         meta_lines=meta_lines,
         info=[
@@ -145,15 +183,17 @@ def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, s
         writer = VCFWriter(f, header_lines, encode_info=percent_encode_info_value)
         for resolved_fusion in sorted(observations, key=lambda r: (r.anchor.pk, r.alt)):
             variant_coordinate = resolved_fusion.variant_coordinate
+            fusion_observations = observations[resolved_fusion]
             info = {
                 "END": variant_coordinate.position,
                 FUSION_INFO: resolved_fusion.canonical_str,
-                FUSION_OBSERVATIONS_INFO: simplejson.dumps(observations[resolved_fusion], ignore_nan=True),
+                FUSION_OBSERVATIONS_INFO: json_dumps_nan_as_null(fusion_observations),
             }
             writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
                                 variant_coordinate.ref, variant_coordinate.alt,
+                                vcf_filter=_vcf_filter(fusion_observations),
                                 info=info, fmt=f"{ALT_READS_FORMAT}:{REF_READS_FORMAT}",
-                                sample_calls=[_sample_call(observations[resolved_fusion])])
+                                sample_calls=[_sample_call(fusion_observations)])
 
 
 class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
@@ -195,7 +235,7 @@ def _record_merged_rows(upload_step, variant_qs):
     for variant_id, info in variant_qs.values_list("pk", info_alias):
         # INFO values are stored as VCF writes them - htslib doesn't decode, so we do
         encoded = (info or {}).get(FUSION_OBSERVATIONS_INFO) or "[]"
-        observations = simplejson.loads(percent_decode_info_value(encoded))
+        observations = json.loads(percent_decode_info_value(encoded))
         if len(observations) > 1:
             merged.append((variant_id, len(observations), format_fusion_observations(observations)))
 

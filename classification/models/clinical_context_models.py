@@ -16,12 +16,13 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.evidence_key import EvidenceKeyMap
 from flags.models import Flag, FlagStatus
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils import get_url_from_view_path
+from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property
-from library.django_utils.database_utils import TextFieldChoices, IntegerFieldChoices
 from snpdb.models import Lab
 from snpdb.models.models_variant import Allele
 
@@ -147,7 +148,6 @@ class DiscordanceStatus:
 
     @staticmethod
     def cs_buckets():
-        from classification.models import EvidenceKeyMap
         return EvidenceKeyMap.clinical_significance_to_bucket()
 
     @staticmethod

@@ -27,15 +27,22 @@ from analysis.models import (
     VariantTag,
 )
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from genes.fake_data import create_fake_transcript_version
 from genes.models import GeneList, GeneListGeneSymbol
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from pedigree.models import PedigreeInheritance
-from snpdb.models import AbstractNodeCountSettings, BuiltInFilters, GenomeBuild, ImportStatus, Tag, Variant
-from snpdb.tests.utils.fake_cohort_data import create_fake_pedigree, create_fake_trio
+from snpdb.fake_data import create_fake_pedigree, create_fake_trio
+from snpdb.models import (
+    AbstractNodeCountSettings,
+    BuiltInFilters,
+    GenomeBuild,
+    ImportStatus,
+    Tag,
+    Variant,
+)
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

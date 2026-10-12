@@ -1,6 +1,7 @@
 # uicore — agent notes
 Owns: template tags (labelled/modal/tabs/menus/help), js_tags JSON-for-JS filters, ValidatedJson, AJAX form embedding
-  (LazyRender), "other" choice widgets, crispy FormHelper builders, page chrome (uicore/page/base.html). No models, no urls.
+  (LazyRender), "other" choice widgets, crispy FormHelper builders, page frame (uicore/page/base.html and the
+  per-user parts in uicore/page_frame.py). No models; one url, `page_frame` (uicore/urls.py).
 Start with: templatetags/ui_utils.py (labelled, modal, preview, if_user_can_edit, embed), templatetags/js_tags.py
   (jsonify, format_value, timestamp, code_json), templatetags/ui_tabs_builder.py (ui_register_tab, ui_render_tabs),
   views/ajax_form_view.py (LazyRender, AjaxFormView), json/validated_json.py (ValidatedJson, JsonMessages),
@@ -13,15 +14,22 @@ Patterns here:
   `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike; add a behaviour as
   a new processor entry.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
-  it escapes `</script>` and marks safe; `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
+  it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
   which takes hint, help, admin_only, show_if - use it rather than a hand-built Bootstrap row. New block tags parse
   kwargs with uicore/templatetags/ui_utils.py:parse_tag.
 - Tabs: `{% ui_register_tab tab_set="x" label="..." url="view_name" param=obj.pk %}` then `{% ui_render_tabs tab_set="x" %}`
   (uicore/templatetags/ui_tabs_builder.py:ui_register_tab) loads the view by AJAX on first click; `url_check=True`
   hides the tab when the URL is unregistered on this deployment; `{% ui_register_tab_embedded %}` inlines content.
+- Menus are data: variantgrid/menus.py:MENUS (the registry `settings.MENUS` names; uicore/menus.py is the
+  mechanism). A new page gets its top-bar highlight and side bar by adding its url
+  name there (a new item, an item's `pages` if it is that item's detail page, else the menu's `pages`) - templates
+  never pick a menu; a url name in no menu renders with no side bar.
+- Nothing in a page body depends on the user: menus, username, inbox, site and Django messages arrive as JSON from
+  uicore/views/page_frame_view.py:page_frame after the page loads (uicore/page_frame.py:PageFrame, filled by
+  `loadPageFrame` in global.js). Something new that varies per user goes there or into an AJAX fragment.
 - Deployment-visible URLs come from variantgrid/perm_path.py:get_visible_url_names - menus
-  (uicore/templatetags/ui_menus.py:menu_item) and snpdb/grids.py:url_if_visible check it; guard any link to a view
+  (uicore/menus.py:MenuItem) and snpdb/grids.py:url_if_visible check it; guard any link to a view
   a site unregisters (patients on Shariant) the same way. Only names passed through `variantgrid/perm_path.py:path`
   are enforced - a DRF router's patterns must go through `variantgrid/perm_path.py:router_urls` or the register
   does not apply to them.
@@ -38,9 +46,11 @@ Patterns here:
   read `all_messages`/`has_errors` (uicore/json/validated_json.py:ValidatedJson). `to_json()`/`pure_json()` drop
   the messages, `serialize()`/`deserialize()` keep them - store the serialized form, send the pure form.
 Gotchas:
+- Page JS on document ready runs before the page frame arrives - the menus, `#current-record-spot` and
+  `window.CURRENT_USERNAME` are not there yet (variantgrid/static_files/default_static/js/global.js:applyPageFrame).
 - `{% load %}` names matter: labelled/modal/preview/badge/boolean live in `ui_utils`;
   jsonify/format_value/timestamp/code_json/duration/get_item live in `js_tags` (uicore/templatetags/js_tags.py:format_value).
-  The wrong library only fails when the page renders.
+  The wrong library fails `uicore/tests/test_templates_compile.py`, which compiles every project template.
 - The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `ignoreSelectors` (third
   party widgets) - a processor that never fires on injected HTML is usually inside one
   (variantgrid/static_files/default_static/js/global.js:checkNode).
@@ -49,7 +59,11 @@ Gotchas:
 - `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the
   pedigree symbols in uicore/templates/uicore/tags/svg_icon_sprite.html theme themselves through `style="fill: var(...)"`
   instead, which is what lets a page fill in the affected members with `--pedigree-*-fill`.
-Tests: no uicore/tests. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
+- The sprite `<svg>` is `display: none`, so a symbol drawn through `clipPath`, `mask`, a gradient or anything else
+  referenced by `url(#...)` is unreliable under `<use>` (Chrome drops the clip) - draw the shape directly
+  (`file-icon-fusion` is two paths).
+Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint, test_js_tags.py jsonify escaping,
+  test_ui_tabs_builder.py embedded admin_only tabs. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
   (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
   ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
   library/django_utils/unittest_utils.py:URLTestCase - `_test_urls` for pages, `_test_datatable_urls` for grid
@@ -61,9 +75,17 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   snpdb/views/datatable_view.py:RichColumn) in `__init__`, implement `get_initial_queryset`, and put per-request
   narrowing in `filter_queryset` reading `self.get_query_param(...)` (URL kwargs first, then GET/POST). Worked
   example with tests: snpdb/tests/test_datatable_server_csv.py:CohortCsvColumns.
+- Always subscript the base: `class XColumns(DatatableConfig[X])`. The model behind pk links, delete permissions
+  and the default CSV name is read off that declaration (`_declared_model`); a bare `DatatableConfig` falls back to
+  building `get_initial_queryset()` for it, with a warning in the log (#1913).
 - Wire it with `path('.../datatable', DatabaseTableView.as_view(column_class=XColumns), name='x_datatable')`
   (snpdb/views/datatable_view.py:DatabaseTableView). That one endpoint answers `?dataTableDefinition=1` (columns),
   the DataTables row requests, and `?dataTableCsv=1` (server CSV).
+- The endpoint checks nothing beyond login, so the config (or its url) repeats the page's restriction: a
+  superuser-only page's grid is wrapped in `require_superuser(DatabaseTableView.as_view(...))` (a url name disabled in
+  `URLS_NAME_REGISTER` covers that name only, not the grid's), and an object id from the request goes through
+  `get_for_user` / `check_can_view`. Filter rules on a field `filter_fields()` doesn't offer are dropped
+  (snpdb/views/datatable_view.py:DatatableConfig.restrict_to_filter_fields).
 - Mount it with markup only: `<table data-datatable-url="{% url 'x_datatable' %}" data-datatable-data="jsFunc"></table>`;
   the global.js processor builds a variantgrid/static_files/default_static/js/datatable_definition.js:DataTableDefinition
   from it. `data-datatable-data` names a JS function whose return object is merged into every request.

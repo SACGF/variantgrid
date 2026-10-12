@@ -1,7 +1,7 @@
 /*
  * Base FX loaders - ambient brightness patterns over an anonymous GATC field.
  * Three modes: matrix (falling drops), ripple (expanding rings), wave.
- * Adapted from claude/loading_animations/base-fx-loader.html. Each mode is
+ * Adapted from the loading animation prototypes (#1622). Each mode is
  * registered as its own selectable loader via a shared factory.
  */
 (function () {

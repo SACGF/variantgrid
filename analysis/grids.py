@@ -2,7 +2,7 @@
 The analysis grids: VariantGrid (the node variant grid - AbstractVariantGrid with the node's
 queryset, count and sample columns) and ExportVariantGrid for unpaged CSV/VCF export, plus the
 DatatableConfig tables for analyses, templates, node issues, node column summaries, gene lists
-and ontology genes inside a node, karyomapping, the audit log and candidate search runs. Grid
+and ontology genes inside a node, the audit log and candidate search runs. Grid
 plumbing is snpdb/views/datatable_view.py; columns come from the user's CustomColumnsCollection.
 """
 import operator
@@ -36,7 +36,6 @@ from analysis.models import (
     NodeStatus,
     VariantTag,
 )
-from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
@@ -737,35 +736,6 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
         data = {field: self.get_query_param(field) for field in AnalysisNodeIssuesFilterForm.base_fields}
         qs = AnalysisNodeIssuesFilterForm(data).get_queryset()
         return qs.annotate(node_class=get_node_class_name_expression())
-
-
-class KaryomappingAnalysesColumns(DatatableConfig[KaryomappingAnalysis]):
-    def __init__(self, request):
-        super().__init__(request)
-        self.rich_columns = [
-            RichColumn(key='id', visible=False),
-            RichColumn(key='name', label='Name', orderable=True,
-                       renderer=self.view_primary_key,
-                       client_renderer='TableFormat.linkUrl'),
-            RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
-                       default_sort=SortOrder.DESC),
-            RichColumn(key='trio__cohort__genome_build__name', label='Genome Build', orderable=True),
-            self.user_column(label='Created by'),
-            RichColumn(key='trio__name', label='Trio', orderable=True),
-            RichColumn(key='trio__proband__sample__name', label='Proband', orderable=True),
-            RichColumn(key='id', name='delete', label='', orderable=False,
-                       renderer=self.render_delete,
-                       client_renderer='TableFormat.deleteRow'),
-        ]
-
-    def get_initial_queryset(self) -> QuerySet[KaryomappingAnalysis]:
-        return KaryomappingAnalysis.filter_for_user(self.user)
-
-    def filter_queryset(self, qs: QuerySet[KaryomappingAnalysis]) -> QuerySet[KaryomappingAnalysis]:
-        user_grid_config = UserGridConfig.get(self.user, 'Karomapping Analyses')
-        if not user_grid_config.show_group_data:
-            qs = qs.filter(user=self.user)
-        return qs
 
 
 class NodeTissueExpressionGenesColumns(DatatableConfig[HumanProteinAtlasAnnotation]):

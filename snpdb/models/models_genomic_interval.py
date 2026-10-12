@@ -31,6 +31,7 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
     processed_records = models.IntegerField(null=True, blank=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
+    error_message = models.TextField(null=True, blank=True)
 
     @cached_property
     def num_intervals(self):
@@ -38,8 +39,19 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
             return self.processed_records
         return self.genomicinterval_set.count()
 
+    def check_processed_file_exists(self) -> bool:
+        """ A BED file's processed file can go missing from disk (eg a database cloned without its data
+            directory) - mark the collection as an error so users see why rather than nodes failing later """
+        if self.processed_file and not os.path.exists(self.processed_file):
+            if self.import_status != ImportStatus.ERROR:
+                self.import_status = ImportStatus.ERROR
+                self.error_message = f"Processed BED file '{self.processed_file}' does not exist"
+                self.save()
+            return False
+        return True
+
     def genomic_interval_iterator(self):
-        """ returns iterator of GenomicInterval (collection) or HTSeq.GenomicInterval (bed file)
+        """ returns iterator of GenomicInterval (collection) or BedInterval (bed file)
             both classes share chrom/start/end fields """
         if self.processed_file is not None:
             with open(self.processed_file, encoding="utf-8") as f:

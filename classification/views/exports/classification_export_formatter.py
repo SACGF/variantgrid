@@ -2,16 +2,14 @@ import zipfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from io import StringIO
 from typing import Any, Optional
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
-from django.shortcuts import render
 from more_itertools import peekable
 from stream_zip import ZIP_64
-from threadlocals.threadlocals import get_current_request
 
 from classification.views.exports.classification_export_filter import (
     AlleleData,
@@ -37,7 +35,7 @@ class ClassificationExportFormatter(ABC):
         self.classification_filter = classification_filter
         self.row_count = 0
         self.file_count = 0
-        self.started = datetime.utcnow()
+        self.started = datetime.now(UTC)
 
     @property
     def delimiter_for_row(self):
@@ -91,7 +89,7 @@ class ClassificationExportFormatter(ABC):
             for count, row in enumerate(self._yield_single_file()):
                 if count > 100:
                     break
-            return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
+            return HttpResponse("<html><body>Benchmark complete - for use with Debug Toolbar</body></html>")
 
         if self.classification_filter.rows_per_file:
             # Had subtle issues with stream_zip, maybe try again after a version increase
@@ -103,7 +101,6 @@ class ClassificationExportFormatter(ABC):
             self.file_count = 1
             # can stream in single file
             response = StreamingHttpResponse(streaming_content=self._yield_single_file(), content_type=self.content_type())
-            response.minify_response = False
             response['Last-Modified'] = self.classification_filter.last_modified_header
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response
@@ -326,7 +323,7 @@ class ClassificationExportFormatter(ABC):
         user = self.classification_filter.user
         if user.groups.filter(name=bot_group().name):
             return
-        end = datetime.utcnow()
+        end = datetime.now(UTC)
         row_count = self.row_count
 
         body_parts = [f":simple_smile: {user.username}"]
@@ -339,7 +336,7 @@ class ClassificationExportFormatter(ABC):
         nb = NotificationBuilder(message="Classification Download")\
             .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
-        for key, value in self.classification_filter.request_params.items():
+        for key, value in (self.classification_filter.request_params or {}).items():
             nb.add_field(key, value)
         nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
         nb.send()

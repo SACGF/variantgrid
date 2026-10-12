@@ -4,7 +4,7 @@ from typing import Any, Optional
 from django.http import HttpRequest
 
 from classification.models import EvidenceKey, EvidenceKeyMap
-from classification.models.evidence_mixin import VCBlobDict
+from classification.models.evidence_key import VCBlobDict
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
 )

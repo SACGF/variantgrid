@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import operator
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self
+from typing import TYPE_CHECKING, Optional, Self, Iterable
 
 import django
-from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -47,6 +48,10 @@ from classification.models.evidence_mixin_summary_cache import ClassificationSum
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
 from snpdb.models import Allele, Lab
+from django.contrib.auth.models import User
+
+if TYPE_CHECKING:
+    from classification.models.overlaps_model import OverlapContribution
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
 classification_grouping_summary_signal = django.dispatch.Signal()  # args: "instance", expects ClassificationGrouping, old_summary, new_summary
@@ -103,7 +108,7 @@ class AlleleOriginGrouping(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
 
     @staticmethod
-    def allele_origin_dict(allele: Allele) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
+    def allele_origin_dict(allele: Allele) -> dict[AlleleOriginBucket, AlleleOriginGrouping]:
         by_bucket = {}
         for ao in AlleleOriginGrouping.objects.filter(allele=allele).prefetch_related("classificationgrouping_set"):
             by_bucket[ao.allele_origin_bucket] = ao
@@ -204,16 +209,42 @@ class ClassificationGrouping(TimeStampedModel):
     zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
+    # copied out of latest_cached_summary so the grouping grid can sort on an index of this table
+    latest_pathogenicity_sort = models.IntegerField(null=True, blank=True)
+    latest_somatic_sort = models.IntegerField(null=True, blank=True)
+    latest_curated_date = models.DateField(null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
     class Meta:
         unique_together = ('allele_origin_grouping', 'lab', 'share_level')
+        # The grid's ORDER BY exactly: NULLS LAST in both directions then the pk DESC tiebreaker
+        # (DatatableConfig._get_sort_tiebreaker). One index per direction, as a backward scan would put the NULLs first.
+        indexes = [
+            models.Index(F("latest_pathogenicity_sort").desc(nulls_last=True), F("latest_somatic_sort").desc(nulls_last=True),
+                         F("id").desc(), name="cg_path_sort_desc_idx"),
+            models.Index(F("latest_pathogenicity_sort").asc(nulls_last=True), F("latest_somatic_sort").asc(nulls_last=True),
+                         F("id").desc(), name="cg_path_sort_asc_idx"),
+            models.Index(F("latest_somatic_sort").desc(nulls_last=True), F("latest_pathogenicity_sort").desc(nulls_last=True),
+                         F("id").desc(), name="cg_somatic_sort_desc_idx"),
+            models.Index(F("latest_somatic_sort").asc(nulls_last=True), F("latest_pathogenicity_sort").asc(nulls_last=True),
+                         F("id").desc(), name="cg_somatic_sort_asc_idx"),
+            models.Index(F("latest_curated_date").desc(nulls_last=True), F("id").desc(), name="cg_curated_date_desc_idx"),
+            models.Index(F("latest_curated_date").asc(nulls_last=True), F("id").desc(), name="cg_curated_date_asc_idx"),
+        ]
 
     @property
     def latest_cached_summary_obj(self):
         return ClassificationSummaryCacheObj.from_dict_safe(self.latest_cached_summary)
 
-    def contribution_for(self, value_type: ClassificationResultValue) -> 'OverlapContribution':
+    def _set_latest_cached_summary(self, summary: dict):
+        """ Sets the summary along with the sort columns copied out of it, so the two can't drift """
+        self.latest_cached_summary = summary
+        summary_obj = self.latest_cached_summary_obj
+        self.latest_pathogenicity_sort = summary_obj.pathogenicity.sort
+        self.latest_somatic_sort = summary_obj.somatic.sort
+        self.latest_curated_date = summary_obj.date.as_date
+
+    def contribution_for(self, value_type: ClassificationResultValue) -> OverlapContribution:
         from classification.models import OverlapContribution
         return OverlapContribution.objects.filter(classification_grouping=self, value_type=value_type).first()
 
@@ -270,7 +301,7 @@ class ClassificationGrouping(TimeStampedModel):
             raise PermissionDenied("You do not have permission to view this classification grouping.")
 
     @staticmethod
-    def filter_for_user(user: User, qs: QuerySet['ClassificationGrouping']) -> QuerySet['ClassificationGrouping']:
+    def filter_for_user(user: User, qs: QuerySet[ClassificationGrouping]) -> QuerySet[ClassificationGrouping]:
         # TODO, consider making the groups GuardianPermission rather than this manual security check
         if not user.is_superuser:
             permission_q: list[Q] = []
@@ -297,7 +328,7 @@ class ClassificationGrouping(TimeStampedModel):
         return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})
 
     @staticmethod
-    def _desired_grouping_for_classification(classification: Classification) -> tuple[Optional['ClassificationGrouping'], bool]:
+    def _desired_grouping_for_classification(classification: Classification) -> tuple[Optional[ClassificationGrouping], bool]:
         # withdrawn classifications are removed from groupings
         if classification.withdrawn:
             return None, False
@@ -322,10 +353,11 @@ class ClassificationGrouping(TimeStampedModel):
         return None, False
 
     @staticmethod
-    def assign_grouping_for_classification(classification: Classification, force_dirty_up=True) -> bool:
+    def assign_grouping_for_classification(classification: Classification, force_dirty_up=True, update_new_grouping=True) -> bool:
         """
         :param classification: The classification that needs to go into a grouping
         :param force_dirty_up: If grouping for the classification needs to be marked as dirty even if the classification is not changing groupings
+        :param update_new_grouping: If a grouping created for the classification is updated right away, rather than left dirty
         :return: A boolean indicating if the classification changed groupings
         """
         desired_grouping, is_new_grouping = ClassificationGrouping._desired_grouping_for_classification(classification)
@@ -335,8 +367,9 @@ class ClassificationGrouping(TimeStampedModel):
                 defaults={"grouping": desired_grouping}
             )
             if is_new_grouping and is_new_entry:
-                # if we've got the first record in the grouping, process it right now, so we can see it during the import process
-                desired_grouping.update()
+                if update_new_grouping:
+                    # if we've got the first record in the grouping, process it right now, so we can see it during the import process
+                    desired_grouping.update()
                 return True
             elif is_new_entry:
                 entry.dirty_up()
@@ -368,7 +401,7 @@ class ClassificationGrouping(TimeStampedModel):
         # show in date order
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
         all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
-        all_modifications = all_modifications.select_related("classification")
+        all_modifications = all_modifications.select_related("classification", "classification__sample__patient", "classification__user")
         return sorted(all_modifications, key=lambda mod: mod.curated_date_check)
 
     @cached_property
@@ -380,7 +413,7 @@ class ClassificationGrouping(TimeStampedModel):
         return list(self.overlapcontribution_set.all())
 
     @cached_property
-    def onc_path_contribution(self) -> Optional['OverlapContribution']:
+    def onc_path_contribution(self) -> Optional[OverlapContribution]:
         """
         Written to optimize for prefetch_related
         """
@@ -390,7 +423,7 @@ class ClassificationGrouping(TimeStampedModel):
         return None
 
     @cached_property
-    def somatic_clin_sig_contribution(self) -> Optional['OverlapContribution']:
+    def somatic_clin_sig_contribution(self) -> Optional[OverlapContribution]:
         """
         Written to optimize for prefetch_related
         """
@@ -415,7 +448,7 @@ class ClassificationGrouping(TimeStampedModel):
             new_summary = best_classification.classification.summary_obj
 
             self.latest_classification_modification = best_classification
-            self.latest_cached_summary = best_classification.classification.summary
+            self._set_latest_cached_summary(best_classification.classification.summary)
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values
@@ -463,7 +496,7 @@ class ClassificationGrouping(TimeStampedModel):
 
             evidence_map = EvidenceKeyMap.instance()
 
-            # the below shouldn't happen but has in development environemnts
+            # the below shouldn't happen but has in development environments
             if None in all_zygosities:
                 all_zygosities.remove(None)
 
@@ -499,6 +532,7 @@ class ClassificationGrouping(TimeStampedModel):
             self.somatic_difference = somatic_difference
 
             all_term_stubs: list[ClassificationGroupingSearchTermStub] = []
+            term_stubs: Optional[Iterable[ClassificationGroupingSearchTermStub]]
             for _, term_stubs in classification_grouping_search_term_signal.send(sender=ClassificationGrouping, grouping=self):
                 if term_stubs:
                     all_term_stubs += [ts.to_search_term(grouping=self) for ts in term_stubs]
@@ -518,7 +552,7 @@ class ClassificationGrouping(TimeStampedModel):
             self.conditions = None
             self.zygosity_values = None
             self.latest_classification_modification = None
-            self.latest_cached_summary = {}
+            self._set_latest_cached_summary({})
             # leaving the share level and allele info alone
             # latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
@@ -538,11 +572,11 @@ class ClassificationGrouping(TimeStampedModel):
     """ Filter value for the "No Data" summary count, as the significance itself is absent """
 
     @staticmethod
-    def clinical_significance_counts(qs: QuerySet['ClassificationGrouping']) -> list['ClassificationGroupingCount']:
+    def clinical_significance_counts(qs: QuerySet[ClassificationGrouping]) -> list[ClassificationGroupingCount]:
         """
-        Counts groupings by the clinical significance of their latest classification, VUS sub-levels merged into VUS.
+        Counts groupings by the clinical significance of their latest classification, VUS sublevels merged into VUS.
         Ordered most significant first, with values the evidence key doesn't rank (and No Data) last.
-        :param qs: Groupings to summarise - already filtered for the user
+        :param qs: Groupings to summarize - already filtered for the user
         """
         clin_sig_column = ClassificationGrouping.CLINICAL_SIGNIFICANCE_COLUMN
         counts: dict[Optional[str], int] = defaultdict(int)
@@ -638,7 +672,7 @@ class ClassificationGroupingSearchTermStub:
     term: str
     extra: Optional[frozendict] = None
 
-    def to_search_term(self, grouping: ClassificationGrouping) -> 'ClassificationGroupingSearchTerm':
+    def to_search_term(self, grouping: ClassificationGrouping) -> ClassificationGroupingSearchTerm:
         return ClassificationGroupingSearchTerm(
             grouping=grouping,
             term=self.term,
@@ -678,6 +712,8 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     @staticmethod
     def grouping_for(classification: Classification) -> Optional[ClassificationGrouping]:
+        if not classification.pk:
+            return None
         if entry := classification.classificationgroupingentry_set.select_related("grouping").first():
             return entry.grouping
         return None

@@ -10,6 +10,7 @@ from django.utils.timezone import localtime
 from analysis.models import VariantTag
 from annotation import vep_columns
 from annotation.models import AnnotationVersion
+from annotation.models.models_enums import VEPPlugin
 from classification.models import ClassificationModification
 from library.django_utils import resolve_field_path
 from library.utils import JsonDataType, add_exception_note
@@ -35,6 +36,11 @@ VARIANT_GRID_EXTRA_ANNOTATION_ALIASES = set(CLASSIFICATIONS_COLUMN_ROW_ANNOTATIO
 # VariantGrid column name -> the separator its stored value joins multiple values with. The cell
 # splits on it so a multi-value column reads as a list; the raw value is what the exports carry
 COLUMN_SEPARATORS = vep_columns.separators_by_variant_grid_column()
+
+# Same note the annotation descriptions page shows (annotation/tags/annotation_column_row.html)
+DBNSFP_COLUMNS = frozenset(vgc for c in vep_columns.filter_for(vep_plugin=VEPPlugin.DBNSFP)
+                           for vgc in c.variant_grid_columns)
+DBNSFP_NOTE = "Note: Values from dbNSFP are for non-synonymous SNVs only (no indels or intergenic)"
 
 # Filter type offered for a model field's class (first match wins)
 _FIELD_FILTER_TYPES = [
@@ -121,11 +127,14 @@ def _catalogue_column_kwargs(column) -> dict:
     """ RichColumn kwargs a VariantGridColumn carries whether it's shown or riding along hidden - a
         hidden member still gets a CSV header, and the catalogue label beats the model verbose_name
         (locus__ref__seq and alt__seq are both 'seq') """
+    header_title = column.description
+    if column.pk in DBNSFP_COLUMNS:
+        header_title += f"\n{DBNSFP_NOTE}"
     kwargs = {
         "model_field": column.model_field,
         "queryset_field": column.queryset_field or column.variant_column in VARIANT_GRID_EXTRA_ANNOTATION_ALIASES,
         "label": column.label,
-        "header_title": column.description.replace("'", "&#146;"),
+        "header_title": header_title.replace("'", "&#146;"),
     }
     if column.width is not None:
         kwargs["width"] = column.width

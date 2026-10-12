@@ -1,10 +1,14 @@
+import random
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Sequence
 from snpdb.models.models_enums import ImportSource
+from snpdb.models.models_variant import Variant, VariantCoordinate
+from snpdb.signals.variant_search import get_results_from_variant_coordinate
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.models import (
     FileUpload,
@@ -84,3 +88,78 @@ class TestModifiedImportedVariantsMessage(TestCase):
         msg = self.mivs.message
         self.assertIn("1 multi-allelic split", msg, "Two alts from same row should count as 1 event")
         self.assertNotIn("2 multi-allelic split", msg)
+
+
+class TestModifiedImportedVariantLongValueLookup(TestCase):
+    """ Long indels make old values bigger than a btree entry can hold - lookups go via an indexed prefix,
+        so values sharing that prefix must still be told apart by the full value """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for base in "GATC":
+            Sequence.objects.get_or_create(seq=base, seq_sha256_hash=sha256sum_str(base))
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+
+        user = User.objects.create_user(username="miv_long_test_user", password="x")
+        mivs = ModifiedImportedVariants.objects.create(upload_step=_make_upload_step(user))
+        cls.variant1 = slowly_create_test_variant("1", 100, "A", "T", cls.grch37)
+        cls.variant2 = slowly_create_test_variant("1", 200, "C", "G", cls.grch37)
+
+        # Random so it doesn't compress under the index entry size limit
+        cls.long_ref = "".join(random.Random(2092).choices("GATC", k=40000))
+        old_multiallelic = f"1|100|{cls.long_ref}|C,T|"
+        for i, (variant, alt) in enumerate([(cls.variant1, "C"), (cls.variant2, "T")], start=1):
+            ModifiedImportedVariant.objects.create(
+                import_info=mivs, variant=variant, operation=ModifiedImportedVariantOperation.NORMALIZATION,
+                old_multiallelic=f"{old_multiallelic}{i}",
+                old_variant_formatted=f"1:100:{cls.long_ref}/{alt}",
+            )
+
+    def test_exact_lookup_uses_full_value(self):
+        vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="T")
+        variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant(Variant.objects.all(), vc)
+        self.assertEqual(list(variants), [self.variant2])
+
+    def test_any_alt_lookup(self):
+        vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="")
+        variants = ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(Variant.objects.all(), vc)
+        self.assertEqual(set(variants), {self.variant1, self.variant2})
+
+    def test_search_fallback_stays_inside_searched_variants(self):
+        hidden_variant2_qs = Variant.objects.exclude(pk=self.variant2.pk)
+        vc = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="T")
+        self.assertFalse(get_results_from_variant_coordinate(self.grch37, hidden_variant2_qs, vc).exists())
+        vc_any_alt = VariantCoordinate(chrom="1", position=100, ref=self.long_ref, alt="")
+        any_alt = get_results_from_variant_coordinate(self.grch37, hidden_variant2_qs, vc_any_alt, any_alt=True)
+        self.assertEqual(list(any_alt), [self.variant1])
+
+
+class TestModifiedImportedVariantNormalised(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for base in "GATC":
+            Sequence.objects.get_or_create(seq=base, seq_sha256_hash=sha256sum_str(base))
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(grch37)
+
+        user = User.objects.create_user(username="miv_normalised_test_user", password="x")
+        mivs = ModifiedImportedVariants.objects.create(upload_step=_make_upload_step(user))
+        variant = slowly_create_test_variant("1", 100, "A", "T", grch37)
+        # Imports before #2126 left old_variant null when bcftools trimmed an indel in place
+        cls.trimmed = ModifiedImportedVariant.objects.create(
+            import_info=mivs, variant=variant, operation=ModifiedImportedVariantOperation.NORMALIZATION,
+            old_variant_formatted="1:100:AC/TC")
+        cls.split_only = ModifiedImportedVariant.objects.create(
+            import_info=mivs, variant=variant, operation=ModifiedImportedVariantOperation.NORMALIZATION,
+            old_multiallelic="1|100|A|G,T|2", old_variant_formatted="1:100:A/T")
+
+    def test_q_normalised_compares_with_variant(self):
+        qs = ModifiedImportedVariant.objects.filter(ModifiedImportedVariant.q_normalised())
+        self.assertEqual(list(qs), [self.trimmed])
+
+    def test_variant_coordinate_from_old_variant_alt_contig(self):
+        vc = ModifiedImportedVariant.get_variant_coordinate_from_old_variant("HLA-A*01:01:01:01:100:AC/A")
+        self.assertEqual(vc.as_tuple, ("HLA-A*01:01:01:01", 100, "AC", "A", None))

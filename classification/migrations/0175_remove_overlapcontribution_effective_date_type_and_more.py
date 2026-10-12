@@ -6,7 +6,7 @@ import library.django_utils.database_utils
 from django.db import migrations
 
 from annotation.models.data_enums import EffectiveDate
-from classification.models import TriageComment, TriageState
+from classification.models import TriageComment, TriageDecision
 
 
 class Migration(migrations.Migration):
@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlapcontribution',
             name='triage_state',
-            field=library.django_utils.database_utils.JSONDataclassField(dataclass_type=TriageState, default=TriageState.default_json, illegal_value_result=None),
+            field=library.django_utils.database_utils.JSONDataclassField(dataclass_type=TriageDecision, default=TriageDecision.default_json, illegal_value_result=None),
         ),
         migrations.AlterField(
             model_name='overlapcontribution',

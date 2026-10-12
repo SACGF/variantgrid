@@ -1,4 +1,4 @@
-{% extends menu_help_base %}
+{% extends "uicore/page/base_container_table.html" %}
 
 {% block jshead %}
     // There are 2 versions of this function, here and internal page.
@@ -14,7 +14,7 @@
 }
 {% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
 	<div id="static-content">
 
 	<iframe src="/static/help/{{ page_name }}" %}" frameBorder="0">

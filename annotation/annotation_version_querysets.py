@@ -15,38 +15,24 @@ from functools import reduce
 from typing import Optional, TypeVar
 
 from django.db.models import Model, QuerySet
+from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 
+from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.models.models import AnnotationVersion, VariantAnnotation
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from library.django_utils.data_archive_mixin import DataArchivedError
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
-from snpdb.archive import DataArchivedError
 from snpdb.models import GenomeBuild, Variant
 
 
-def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType) -> Q:
-    """ Single source of truth for "which variants are subject to a given annotation pipeline type".
-
-        A variant is structural iff it's symbolic - long variants are stored symbolically (svlen set)
-        by Variant.as_internal_canonical_form on import, so Variant.get_symbolic_q() (svlen not null) is
-        the canonical signal, matching AnnotationRun.get_for_variant's variant.is_symbolic. New pipeline
-        types register their predicate here - a type's predicate may overlap another's. """
-
-    q_sv = Variant.get_symbolic_q()  # symbolic (eg <DEL>/<DUP>/<INS>) -> structural variant pipeline
-    # Gene-level variants carry svlen=0 (so unique_together works - Postgres treats nulls as distinct),
-    # which makes them look symbolic. VEP can't parse their alt and they have no coordinate anyway, so
-    # subtract them from both VEP pipelines. @see snpdb.gene_level_variants
-    q_gene_level = Variant.get_gene_level_q()
-    if pipeline_type == VariantAnnotationPipelineType.STANDARD:
-        return ~q_sv & ~q_gene_level
-    elif pipeline_type in (VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
-                           VariantAnnotationPipelineType.ANNOTSV):
-        # AnnotSV annotates the same variants VEP's SV pipeline does - a different tool, not a different
-        # class of variant. The overlap the docstring above allows for.
-        return q_sv & ~q_gene_level
-    elif pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
-        return q_gene_level
-    raise ValueError(f"Unrecognised {pipeline_type=}")
+def filter_vep_sv_max_size(qs: QuerySet[Variant], sv_max_size: int, too_long: bool) -> QuerySet[Variant]:
+    """ Split variants on VEP's SV size cap (ANNOTATION_VEP_SV_MAX_SIZE). The dump leaves the too-long ones
+        out (VEP would only skip them), and they get vep_skipped_reason=TOO_LONG rows instead (#2104) """
+    qs = qs.annotate(abs_svlen=Abs("svlen"))
+    if too_long:
+        return qs.filter(abs_svlen__gt=sv_max_size)
+    return qs.filter(Q(svlen__isnull=True) | Q(abs_svlen__lte=sv_max_size))
 
 
 def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild) -> QuerySet[Variant]:
@@ -101,14 +87,15 @@ def get_variants_qs_for_annotation(
     _check_annotation_version_archive(annotation_version)
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
-    q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \
-        [Variant.get_contigs_q(annotation_version.genome_build)]
+    q_filters = [*VariantAnnotation.get_variant_annotation_q_list(),
+                 Variant.get_contigs_q(annotation_version.genome_build)]
 
     if not annotated:
         q_filters.append(Q(variantannotation__isnull=True))
 
     if pipeline_type:
-        q_filters.append(pipeline_type_variant_q(pipeline_type))
+        sv_min_size = annotation_version.variant_annotation_version.structural_variant_min_size
+        q_filters.append(pipeline_type_variant_q(pipeline_type, sv_min_size))
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))

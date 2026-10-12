@@ -9,13 +9,13 @@ from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.handlers.wsgi import WSGIRequest
-from threadlocals.threadlocals import (
+
+from library.request_context import (
     get_current_request,
     get_current_user,
     get_request_variable,
     set_request_variable,
 )
-
 from snpdb.models import GenomeBuild, UserSettings
 
 # hardcoded to look for 37 or 38, needs support for other genome builds

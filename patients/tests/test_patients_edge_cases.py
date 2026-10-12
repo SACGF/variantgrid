@@ -11,6 +11,7 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.core.exceptions import MultipleObjectsReturned
 from django.test import TestCase
+from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.forms import PatientForm
@@ -34,7 +35,7 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import Sex
+from patients.models_enums import Sex, TissueStatus
 from snpdb.models import ImportSource
 from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
@@ -287,6 +288,61 @@ class TestProcessRecordSpecimenAge(TestCase):
         specimen = Specimen.objects.get(reference_id="EXISTSPECAGE001")
         self.assertEqual(specimen._age_at_collection_date, 35,
                          "Age not updated on reimport")
+
+
+class TestProcessRecordSpecimenReimport(TestCase):
+    """ A blank column on a re-import means 'no answer', so it leaves the stored value alone """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("spec_reimport_user", password="x")
+        cls.patient = Patient.objects.create(first_name="IMPORTTESTFIRST", last_name="IMPORTTESTLAST")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def setUp(self):
+        self.pr = _make_patient_records(self.user)
+
+    def test_blank_columns_keep_stored_values_and_filled_ones_replace(self):
+        row = {PatientColumns.SPECIMEN_REFERENCE_ID: "REIMPORT001",
+               PatientColumns.SPECIMEN_DESCRIPTION: "Skin punch",
+               PatientColumns.SPECIMEN_TISSUE_STATUS: "Affected"}
+        process_record(self.pr, record_id=1, row=_make_row(**row))
+        specimen = Specimen.objects.get(reference_id="REIMPORT001")
+        self.assertEqual(specimen.description, "Skin punch")
+        self.assertEqual(specimen.tissue_status, TissueStatus.AFFECTED)
+        self.assertIsNone(specimen.collection_date)
+
+        process_record(self.pr, record_id=2, row=_make_row(**{
+            PatientColumns.SPECIMEN_REFERENCE_ID: "REIMPORT001",
+            PatientColumns.SPECIMEN_COLLECTION_DATE: "2024-03-05",
+            PatientColumns.SPECIMEN_COLLECTED_BY: "Dr Who",
+        }))
+        specimen.refresh_from_db()
+        self.assertEqual(timezone.localdate(specimen.collection_date), date(2024, 3, 5))
+        self.assertEqual(specimen.collected_by, "Dr Who")
+        self.assertEqual(specimen.description, "Skin punch")
+        self.assertEqual(specimen.tissue_status, TissueStatus.AFFECTED)
+
+
+class TestProcessRecordMultiplePatientMatches(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("multi_match_user", password="x")
+        for dob in ("1980-03-05", "2020-01-01"):
+            patient = Patient.objects.create(first_name="IMPORTTESTFIRST", last_name="IMPORTTESTLAST",
+                                             date_of_birth=dob)
+            assign_permission_to_user_and_groups(cls.user, patient)
+
+    def test_row_is_invalid_naming_the_patients(self):
+        pr = _make_patient_records(self.user)
+        with self.assertRaises(InvalidPatientRecord) as cm:
+            process_record(pr, record_id=1, row=_make_row())
+        message = str(cm.exception)
+        self.assertIn("Matched multiple patients", message)
+        for patient in Patient.objects.filter(last_name="IMPORTTESTLAST"):
+            self.assertIn(f"Patient:{patient.pk}", message)
 
 
 # ---------------------------------------------------------------------------

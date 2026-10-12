@@ -38,12 +38,14 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          cache-dependency-glob: requirements.txt
+          cache-dependency-glob: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install Python dependencies
         run: |
           uv venv --python 3.12
-          uv pip install -r requirements.txt
+          uv pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Generate agent maps
         run: .venv/bin/python manage.py vg map
@@ -53,7 +55,7 @@ jobs:
         run: .venv/bin/python scripts/vg docs check
 
       - name: Check import contracts
-        run: .venv/bin/lint-imports --config .importlinter
+        run: uvx --from import-linter lint-imports --config .importlinter
 
       - name: Check for import cycles
         run: .venv/bin/python scripts/vg imports cycles

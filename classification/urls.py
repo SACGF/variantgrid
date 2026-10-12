@@ -25,18 +25,12 @@ from classification.views.classification_overlaps_vus_view import (
     view_overlaps_vus,
     view_overlaps_vus_detail,
 )
+from classification.views.classification_reclassification_view import (
+    view_reclassification_analytics,
+)
 from classification.views.classification_view import (
     ClassificationView,
     LabGeneClassificationCountsView,
-)
-from classification.views.classification_reclassification_view import view_reclassification_analytics
-from classification.views.views_case_report import (
-    case_report_download,
-    case_report_finalise,
-    case_report_lis_details,
-    case_report_new_version,
-    case_report_rebuild,
-    view_case_report,
 )
 from classification.views.classification_view_metrics import (
     view_classification_metrics,
@@ -66,16 +60,36 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import (
     redcap_data_dictionary,
 )
-from classification.views.exports_grouping.classification_grouping_export_view import \
-    view_classification_grouping_export, serve_export
+from classification.views.exports_grouping.classification_grouping_export_view import (
+    serve_export,
+    view_classification_grouping_export,
+)
 from classification.views.imported_allele_info_view import (
     ImportedAlleleInfoColumns,
-    download_allele_info, view_imported_allele_info, view_imported_allele_info_detail
+    download_allele_info,
+    view_imported_allele_info,
+    view_imported_allele_info_detail,
 )
 from classification.views.overlaps_datatables import OverlapColumns
-from classification.views.overlaps_view import view_overlaps, view_overlap_history, overlap_report_review, \
-    action_overlap_review, discordance_calculator, TriageView, view_overlap, download_overlaps
+from classification.views.overlaps_view import (
+    TriageView,
+    action_overlap_review,
+    discordance_calculator,
+    download_overlaps,
+    overlap_report_review,
+    view_overlap,
+    view_overlap_history,
+    view_overlaps,
+)
 from classification.views.views import AutopopulateView, classification_import_tool
+from classification.views.views_case_report import (
+    case_report_download,
+    case_report_finalise,
+    case_report_lis_details,
+    case_report_new_version,
+    case_report_rebuild,
+    view_case_report,
+)
 from classification.views.views_gene_consensus import gene_consensus_panel
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import (
@@ -87,8 +101,9 @@ from classification.views.views_uploaded_classifications_unmapped import (
     view_uploaded_classification_unmapped_detail,
     view_uploaded_classification_unmapped_validation_detail,
 )
+from library.django_utils import require_superuser
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import path
+from variantgrid.perm_path import deprecated_path, path
 
 router = routers.DefaultRouter()
 
@@ -99,7 +114,6 @@ urlpatterns = [
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
     path('classifications', views.classifications, name='classifications'),
 
-    path('groupings', views.classification_groupings, name='classification_groupings'),
     path('groupings/export_config', view_classification_grouping_export, name='classification_grouping_export_config'),
     path('groupings/export', serve_export, name='classification_grouping_export'),
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
@@ -187,7 +201,6 @@ urlpatterns = [
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
 
-    path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
     # Classification Candidate Searching
@@ -213,8 +226,6 @@ urlpatterns = [
 
     path('dashboard_download', issues_download, name='classification_dashboard_download'),
     path('dashboard_download/<str:lab_id>', issues_download, name='classification_dashboard_download'),
-    # legacy URL
-    path('dashboard/all', classification_dashboard_view.classification_dashboard, name="classification_dashboard_all"),
 
 
     path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
@@ -223,9 +234,9 @@ urlpatterns = [
     path('discordance_reports', discordance_reports_view, name='discordance_reports'),
 
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
-    path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
+    deprecated_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
-    path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
+    deprecated_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
 
     path('discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report'),
     path('discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export'),
@@ -268,7 +279,7 @@ urlpatterns = [
 
     path('public_info', views.view_public_info, name='classification_public_info'),
 
-    path('api/imported_allele_info/datatables/', DatabaseTableView.as_view(column_class=ImportedAlleleInfoColumns), name='imported_allele_info_datatables'),
+    path('api/imported_allele_info/datatables/', require_superuser(DatabaseTableView.as_view(column_class=ImportedAlleleInfoColumns)), name='imported_allele_info_datatables'),
 
     path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
 
@@ -282,7 +293,9 @@ urlpatterns = [
     path('api/classifications/v2/record/', ClassificationView.as_view(api_version=2), name='classification_api_2'),
     path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
 
-    path('api/classifications/v3/record/', ClassificationView.as_view(api_version=3), name='classification_api_3'),
+    # v3 currently behaves exactly as v2. Reserved for splitting a record into "meta" and "evidence" (uploads would put
+    # evidence under "evidence" with an operation param rather than "data"/"upsert"/"insert") - kept, not deprecated, #1475
+    path('api/classifications/v3/record/',ClassificationView.as_view(api_version=3), name='classification_api_3'),
     path('api/classifications/v3/record/<record_id>', ClassificationView.as_view(api_version=3),
          name='classification_with_record_api_3'),
 

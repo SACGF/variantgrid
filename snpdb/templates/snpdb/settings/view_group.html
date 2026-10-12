@@ -1,9 +1,9 @@
-{% extends menu_settings_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_utils %}
 {% load user_tags %}
 {% block title %}Group: {{ group }}{% endblock %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     <div class="container">
         <div class="card">
             <div class="card-header">Group {{ group }}</div>

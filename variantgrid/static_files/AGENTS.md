@@ -25,3 +25,23 @@ most grid and flag names still need reading the code that builds them. A class w
 (`SequencerModel.css_class`) goes in `DATA_DERIVED` there, or the scan calls it unused.
 
 Bootstrap 4: `data-toggle` / `data-target`, not the Bootstrap 5 `data-bs-*` forms.
+
+Third-party libraries live under `default_static/js/lib/` as our own copies, never loaded from a CDN (#1741), and the
+version goes in the path (`variantgrid/static_files/default_static/js/lib/jquery-3.7.1/jquery-3.7.1.min.js`,
+`variantgrid/static_files/default_static/js/lib/moment-2.30.1/moment-2.30.1.min.js`) so an upgrade
+is a rename that shows in every template, and a scanner can read the version without opening the file (#1955).
+Copy the file the project publishes (npm `min/` for moment) rather than a CDN's re-minified build, so the
+`.map` matches. `double-helix.jquery.js` is the one unversioned file: a loading-animation snippet with no upstream
+release.
+
+Page JS that doesn't depend on template values lives in `default_static/js/<app>/<template_name>.js` (#2021). The
+static file knows nothing about the page's context: it defines functions whose parameters are the page values (one
+`options` object with named keys once there are several, an `init<Name>(options)` entry point for a file called once per
+page). The template keeps a short inline `<script>` after the `<script src>` that calls it with
+`{{ value|jsonify }}` (`uicore/templatetags/js_tags.py`, a JS literal, so NaN passes through), e.g. `analysis/templates/analysis/node_data/node_data_grid.html`.
+An inclusion tag shown several times on a page, or a fragment loaded by ajax, makes the same call from its own block.
+Leave a block inline when moving it doesn't make it clearer - mostly template logic, a few lines, or callbacks that are
+nothing but page values (`classification/templates/classification/classification_dashboard.html`). URLs come from
+`Urls.<name>(...)` (django_js_reverse). New files start with `// @ts-check` and must pass `npx eslint`. A new static
+file 500s every page that references it until `collectstatic` has added it to the manifest
+(`ManifestStaticFilesStorage`), so it ships via `scripts/upgrade.sh`, never a bare checkout on a served tree.

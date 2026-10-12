@@ -1,0 +1,847 @@
+"""
+PhenotypeMatcher: lookups from words to HPO / OMIM / MONDO / HGNC terms, built from the latest ontology (exact, then
+one typo inside one long word), plus hand-written special cases. PHENOTYPE_MATCHER_VERSION versions the result.
+Also the ambiguous-acronym denylist (get_ambiguous_acronym_denylist): short strings that name several unrelated terms.
+"""
+import functools
+import logging
+import re
+from collections import defaultdict
+from collections.abc import Mapping
+from typing import Any, Optional
+
+import Levenshtein
+from cache_memoize import cache_memoize
+from nltk.corpus import words as nltk_words
+
+from library.log_utils import log_traceback
+from library.utils import is_not_none
+from library.utils.nltk_utils import ensure_nltk_data
+from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
+
+# Bump when a change to the lookups or matching logic would change the matches of an already matched sentence.
+# TextPhenotype records the version a sentence was matched with; `match_patient_phenotypes --stale` redoes older ones.
+# Every bump also registers that command as a ManualOperation in a new migration so deployments rematch (#2131).
+# 1: special-case lookups repointed after the HPO review (2026-10)
+# 2: fuzzy matching is one typo in one word (#2130)
+PHENOTYPE_MATCHER_VERSION = 2
+
+# There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
+CodePK = Any
+CodePKLookups = dict[CodePK, set[str]]
+OntologyResults = tuple[str, list[CodePK]]
+
+HPO_PATTERN = re.compile(r"HP:(\d{7})$")
+HPO_TYPO_PATTERN = re.compile(r"HPO:(\d{7})$")
+OMIM_PATTERN = re.compile(r"OMIM:(\d+)$")
+MONDO_PATTERN = re.compile(r"MONDO:(\d+)$")
+HGNC_PATTERN = re.compile(r"HGNC:(\d+)$")
+
+MIN_MATCH_LENGTH = 3
+MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
+MIN_LENGTH_PLURAL = 5
+MIN_LENGTH_SPELLING_VARIANT = 5  # Short words are acronyms (haem -> "HEM dysplasia")
+HYPHEN_IN_WORD_PATTERN = re.compile(r"(?<=\w)-(?=\w)")  # Not a lone "-" token, which would join a match
+
+# British -> American, applied per word: anaemia, oedema, diarrhoea (not vertebrae, toes), tumour, generalised, leucopenia
+AMERICAN_SPELLINGS = [
+    (re.compile(r"[ao]e(?!s?$)"), "e"),
+    (re.compile(r"our(s?)$"), r"or\1"),
+    (re.compile(r"is(e|ed|es|ing|ation)$"), r"iz\1"),
+    (re.compile(r"^leuc"), "leuk"),
+]
+
+AMBIGUOUS_ACRONYM_MAX_LEN = 5
+AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS = frozenset({"exact", "exact_synonym", "xref"})
+
+
+def load_by_id(accession, ontology_service: OntologyService) -> OntologyResults:
+    pk = OntologyService.index_to_id(ontology_service, accession)
+    return ontology_service, [pk]
+
+
+def load_hgnc_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.HGNC)
+
+
+def load_hpo_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.HPO)
+
+
+def load_mondo_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.MONDO)
+
+
+def load_omim_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.OMIM)
+
+
+class SkipAllPhenotypeMatchException(Exception):
+    pass
+
+
+@cache_memoize(timeout=None)
+def _build_ambiguous_acronym_denylist(ontology_version_pk: int) -> dict[str, tuple[tuple[str, str], ...]]:
+    """Lowercased short ontology lookup keys that match multiple distinct concept
+    clusters - building these matches would silently mean the wrong thing.
+    Each key maps to a tuple of (term_id, name) pairs covering every concept
+    cluster the key matched, so callers can show users what was ambiguous.
+    Cached on the latest OntologyVersion so reimports invalidate automatically."""
+    _ = ontology_version_pk  # cache key only
+
+    parent: dict[str, str] = {}
+
+    def find(x):
+        root = x
+        while parent.get(root, root) != root:
+            root = parent[root]
+        while parent.get(x, x) != root:
+            nxt = parent.get(x, x)
+            parent[x] = root
+            x = nxt
+        return root
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    rel_qs = OntologyTermRelation.objects.filter(
+        relation__in=AMBIGUOUS_ACRONYM_CONCEPT_RELATIONS
+    ).values_list("source_term_id", "dest_term_id")
+    for s, d in rel_qs.iterator():
+        if s.startswith("HGNC:") or d.startswith("HGNC:"):
+            continue  # Genes are their own concept - never merge into disease clusters
+        if s not in parent:
+            parent[s] = s
+        if d not in parent:
+            parent[d] = d
+        union(s, d)
+
+    def concept_root(term_id: str) -> str:
+        if term_id.startswith("HGNC:"):
+            return term_id
+        return find(term_id) if term_id in parent else term_id
+
+    keys: dict[str, dict[str, str]] = defaultdict(dict)  # text -> {term_id: name}
+    services = (OntologyService.HPO, OntologyService.MONDO, OntologyService.OMIM,
+                OntologyService.HGNC)
+    for service in services:
+        qs = OntologyTerm.objects.filter(ontology_service=service)
+        for pk, name, aliases in qs.values_list("pk", "name", "aliases"):
+            for term in filter(is_not_none, (aliases or []) + [name]):
+                k = term.lower().replace(",", "")
+                if 2 <= len(k) <= AMBIGUOUS_ACRONYM_MAX_LEN:
+                    stripped = k.replace(" ", "").replace("-", "")
+                    if stripped.isalnum() and any(c.isalpha() for c in stripped):
+                        keys[k][pk] = name or pk
+
+    denylist: dict[str, tuple[tuple[str, str], ...]] = {}
+    for text, pk_to_name in keys.items():
+        if len(pk_to_name) < 2:
+            continue
+        if len({concept_root(p) for p in pk_to_name}) >= 2:
+            denylist[text] = tuple(sorted(pk_to_name.items()))
+    return denylist
+
+
+_EXPLICIT_OVERRIDE_KEYS: Optional[frozenset] = None
+
+
+def _get_explicit_override_keys() -> frozenset:
+    """Lowercased keys with hardcoded or case-insensitive overrides defined in
+    PhenotypeMatcher._get_special_case_lookups. These win over the denylist
+    because the developer has already chosen the right disambiguation."""
+    global _EXPLICIT_OVERRIDE_KEYS
+    if _EXPLICIT_OVERRIDE_KEYS is None:
+        # The loader closures need ontology dicts, but we never CALL them - we
+        # just want the keys - so empty dicts are fine.
+        hardcoded, case_insens, _ = PhenotypeMatcher._get_special_case_lookups({}, {}, {})
+        _EXPLICIT_OVERRIDE_KEYS = frozenset(
+            {k.lower() for k in hardcoded.keys()} | set(case_insens.keys())
+        )
+    return _EXPLICIT_OVERRIDE_KEYS
+
+
+def get_ambiguous_acronym_denylist() -> Mapping[str, tuple[tuple[str, str], ...]]:
+    """Returns the lowercased ambiguous-acronym mapping for the current
+    OntologyVersion, minus keys that have explicit hardcoded overrides
+    (those have a known correct meaning). Values are tuples of (term_id, name)
+    pairs so callers can display the conflicting candidates. Cached in Redis
+    with no expiry, keyed on OntologyVersion - the build reads every ontology term
+    and relation, so patients.tasks.ambiguous_acronym_denylist_task prebuilds it when a
+    new OntologyVersion is created rather than leaving it for a page render."""
+    ov = OntologyVersion.latest(validate=False)
+    raw = _build_ambiguous_acronym_denylist(ov.pk if ov else 0)
+    overrides = _get_explicit_override_keys()
+    if isinstance(raw, Mapping):
+        return {k: v for k, v in raw.items() if k not in overrides}
+    # Fallback for legacy frozenset return values (used in some test mocks)
+    return {k: () for k in raw if k not in overrides}
+
+
+class PhenotypeMatcher:
+    # Words which have no use matching on their own. Dictionary words are never fuzzy matched, so these are only
+    # needed where the text exactly matches a term or gene symbol (charge -> CHARGE syndrome, kit -> KIT)
+    COMMON_WORDS = {
+        # acc = account, AGU = Adult Genetics Unit
+        'acc', 'acute', 'adult', 'agu', 'all', 'auditory',
+        'bad', 'bilateral', 'blood', 'borderline', 'brain', 'brainstem',
+        'can', 'central', 'charge', 'child', 'chronic', 'common', 'complete', 'cord', 'cousin', 'cousins',
+        'disease', 'disorder', 'distal',
+        'ear',
+        'face', 'familial', 'focal', 'frequent', 'frequency', "ft 4",
+        'generalized', "generalised",
+        'hard', 'has', 'healthy', 'high grade',
+        'image', 'inheritance',
+        'joints',
+        'kit',
+        'large', 'lateral', 'left', 'liver',
+        'march', 'mild', 'milena', 'moderate', 'movements',
+        'nad', 'name',
+        'onset', 'other',
+        'periodic', 'pit', 'plan', 'position', 'profound', 'prolonged', 'proximal', 'progressive',
+        'recurrent', 'right', 'req',
+        'severe', 'she', 'short', 'son', 'skeletal', 'soft', 'stable',
+        'syndrome',
+        'tat', 'the', 'transient', 'trio',
+        'was',
+    }
+
+    def __init__(self):
+        ONTOLOGY_PK = {
+            OntologyService.HPO: self._get_ontology_pks_by_term(OntologyService.HPO),
+            OntologyService.MONDO: self._get_ontology_pks_by_term(OntologyService.MONDO),
+            OntologyService.OMIM: self._get_omim_pks_by_term(),  # Special case
+        }
+        self.ontology = {}
+        for ontology_service, pks_by_term in ONTOLOGY_PK.items():
+            self._break_up_terms(pks_by_term)
+            word_lookup = self._create_word_lookups(pks_by_term)
+            single_words_by_length = self._get_single_words_by_length(pks_by_term, 5)
+            spelling_lookup = self._get_spelling_lookup(pks_by_term)
+            self.ontology[ontology_service] = (pks_by_term, single_words_by_length, word_lookup, spelling_lookup)
+
+        # A correctly spelled word isn't a typo, so is never fuzzy matched (table -> "Stable") #2125
+        ensure_nltk_data('corpora/words')
+        self.dictionary_words = {w.lower() for w in nltk_words.words()}
+        for _, _, word_lookup, _ in self.ontology.values():
+            self.dictionary_words.update(word_lookup)
+
+        hgnc_aliases = {}
+        hgnc_names = {}
+        hgnc_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
+        for pk, name, aliases in hgnc_qs.values_list("pk", "name", "aliases"):
+            for alias in aliases:
+                hgnc_aliases[alias.lower()] = pk
+            hgnc_names[name.lower()] = pk
+        self.hgnc_records = hgnc_aliases  # Aliases first so they get overwritten
+        self.hgnc_records.update(hgnc_names)  # Overwrite with assigned names
+
+        hpo_pks = self.ontology[OntologyService.HPO][0]
+        omim_pks = self.ontology[OntologyService.OMIM][0]
+        special_case_lookups = self._get_special_case_lookups(hpo_pks, omim_pks, self.hgnc_records)
+        self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
+
+    def get_matches(self, words_and_spans_subset) -> list[str]:
+        words = tuple(ws[0] for ws in words_and_spans_subset)
+        return self._get_matches_for_words(words)
+
+    @functools.lru_cache(maxsize=10000)
+    def _get_matches_for_words(self, words: tuple[str, ...]) -> list[str]:
+        # Memoised: same joined text recurs across sentences (boilerplate phrasing)
+        # and inside the recursive parse_words walk that re-tests overlapping subsets.
+        text = ' '.join(words)
+        lower_text = text.lower()
+
+        ontology_term_ids: list[str] = []
+        special_case_match = self._get_special_case_match(text)
+        if any(special_case_match):
+            ontology_term_ids = special_case_match
+        else:
+            # Ambiguous acronyms (short strings matching multiple distinct concept
+            # clusters) are matched here but dropped before persistence by
+            # without_ambiguous_acronyms(), and surfaced as warning-only
+            # results by TextPhenotypeSentence.get_results().
+            if len(lower_text) < MIN_MATCH_LENGTH:
+                return []
+
+            if self._skip_word(lower_text):
+                return []
+
+            exact_pks = [self._get_exact_match(term_pks, spelling_lookup, lower_text)
+                         for term_pks, _, _, spelling_lookup in self.ontology.values()]
+            if any(exact_pks):
+                # Fuzzy matching other ontologies here only finds different terms (macrocephaly -> acrocephaly)
+                for ontology_term_pks in exact_pks:
+                    ontology_term_ids.extend(ontology_term_pks)
+            elif len(words) == 1:
+                for _, single_words_by_length, _, _ in self.ontology.values():
+                    ontology_term_ids.extend(self._get_single_word_fuzzy_match(single_words_by_length, lower_text))
+            else:
+                lower_words = lower_text.split()
+                for _, _, word_lookup, _ in self.ontology.values():
+                    ontology_term_ids.extend(self._get_multi_word_fuzzy_match(word_lookup, lower_words, lower_text))
+
+            if len(words) == 1:
+                # Don't do fuzzy for genes as likely to get false positives
+                if hgnc := self.hgnc_records.get(lower_text):
+                    ontology_term_ids.append(hgnc)
+
+        return ontology_term_ids
+
+    def _get_special_case_match(self, text) -> list[str]:
+        ontology_term_ids = []
+
+        hl = self.hardcoded_lookups.get(text)
+        if not hl:
+            # Lookup accessions in form of: HP:0000362, OMIM:607196
+
+            PATTERNS = [
+                (HGNC_PATTERN, load_hgnc_by_id),
+                (HPO_PATTERN, load_hpo_by_id),
+                (HPO_TYPO_PATTERN, load_hpo_by_id),
+                (MONDO_PATTERN, load_mondo_by_id),
+                (OMIM_PATTERN, load_omim_by_id),
+            ]
+
+            for pattern, load_func in PATTERNS:
+                if m := pattern.match(text):
+                    accession = int(m.group(1))
+                    hl = (load_func, accession)
+                    break
+
+        if not hl:  # Try lowercase lookups
+            lowercase_text = text.lower()
+
+            hl = self.case_insensitive_lookups.get(lowercase_text)
+            if not hl:
+                hl = self.disease_families.get(lowercase_text)
+
+        if hl:
+            func, arg = hl
+            try:
+                _, records = func(arg)
+                ontology_term_ids.extend(records)
+
+                # logging.info("Got exact: %s => %s", text, records)
+            except Exception as e:
+                msg = f"Error: {e}, func: {func}, arg={arg}"
+                logging.error(msg)
+                log_traceback()
+        #            raise ValueError(msg)
+
+        return ontology_term_ids
+
+    @staticmethod
+    def _spelling_key(text: str) -> str:
+        """ American spelling with hyphens as spaces, so either spelling of a term gives the same key """
+        words = []
+        for word in HYPHEN_IN_WORD_PATTERN.sub(" ", text).split():
+            if len(word) >= MIN_LENGTH_SPELLING_VARIANT:
+                for pattern, replacement in AMERICAN_SPELLINGS:
+                    word = pattern.sub(replacement, word)
+            words.append(word)
+        return " ".join(words)
+
+    @staticmethod
+    def _plural_variants(text: str) -> list[str]:
+        """ text, then text without a trailing plural 's' (kidneys -> kidney, but not class/virus/crisis) """
+        variants = [text]
+        last_word = text.rsplit(" ", 1)[-1]
+        if len(last_word) >= MIN_LENGTH_PLURAL and last_word.endswith("s") and last_word[-2] not in "siu":
+            variants.append(text[:-1])
+        return variants
+
+    @classmethod
+    def _get_spelling_lookup(cls, term_pks: CodePKLookups) -> CodePKLookups:
+        """ Ontology terms keyed by _spelling_key, where that differs (paraproteinaemia, rod-cone dystrophy) """
+        spelling_lookup = defaultdict(set)
+        for term, pk_set in term_pks.items():
+            spelling_key = cls._spelling_key(term)
+            if spelling_key != term:
+                spelling_lookup[spelling_key].update(pk_set)
+        return spelling_lookup
+
+    def _get_exact_match(self, term_pks: CodePKLookups, spelling_lookup: CodePKLookups, lower_text: str) -> set[CodePK]:
+        """ Exact match, allowing British/American spelling, hyphens and plurals (anaemia -> Anemia, kidneys -> Kidney) """
+        for text in self._plural_variants(lower_text):
+            if ontology_term_pks := term_pks.get(text):
+                return ontology_term_pks
+            spelling_key = self._spelling_key(text)
+            if ontology_term_pks := term_pks.get(spelling_key) or spelling_lookup.get(spelling_key):
+                return ontology_term_pks
+        return set()
+
+    def _is_dictionary_word(self, lower_word: str) -> bool:
+        return any(w in self.dictionary_words for w in self._plural_variants(lower_word))
+
+    @classmethod
+    def _skip_word(cls, lower_text):
+        """ Return true to skip a word, throws SkipAllPhenotypeMatchException to skip all.
+            Only need to skip >MIN_LENGTH words as will do that later (after exact) """
+
+        # Off: SkipAllPhenotypeMatchException drops every match in the sentence, and _words_together tests substrings
+        # of the whole sentence ("tat" is in "mutation"). Skip an exact multi-word phrase by adding it to COMMON_WORDS
+        SKIP_MULTI_WORDS = False
+        if SKIP_MULTI_WORDS:
+            # For multi-words where you want to skip components
+            SKIP_ALL = {"library prep", "to cgf", "set up", "ad pattern", "recurrent eps", "rest of"}
+            if lower_text in SKIP_ALL:
+                raise SkipAllPhenotypeMatchException()
+
+            if cls._words_together(lower_text, {"TAT"}, {"non-urgent", "months", "month", "days", "week", "weeks"}):
+                raise SkipAllPhenotypeMatchException()
+
+            if cls._words_together(lower_text, {"trio"}, {"exome", "MedEx", "WES", "TS1", "father", "mother"}):
+                raise SkipAllPhenotypeMatchException()
+
+        return lower_text in cls.COMMON_WORDS
+
+    def _is_typo_of(self, word: str, term_word: str) -> bool:
+        """ One edit inside a long misspelled word. Short words are abbreviations (QT/PT, URTI/UTI) and the one
+            negation prefix reachable in one edit flips the meaning (afebrile/febrile, areflexia/reflexia) #2130 """
+        if len(word) < MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH or len(term_word) < MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
+            return False
+        if self._is_dictionary_word(word):
+            return False
+        if word == "a" + term_word or term_word == "a" + word:
+            return False
+        return Levenshtein.distance(word, term_word) == 1
+
+    def _get_single_word_fuzzy_match(self, single_words_by_length: dict[int, CodePKLookups], word: str) -> set[CodePK]:
+        word_length = len(word)
+        for length in range(word_length - 1, word_length + 2):
+            for term, pk_set in single_words_by_length.get(length, {}).items():
+                if self._is_typo_of(word, term):
+                    return pk_set
+        return set()
+
+    def _get_multi_word_fuzzy_match(self, word_lookup: dict[str, CodePKLookups], words: list[str],
+                                    text: str) -> set[CodePK]:
+        """ A term with the same words as the text bar one, which is a typo (infectons -> infections) """
+        potentials: CodePKLookups = {}
+        min_length = len(text) - 1
+        max_length = len(text) + 1
+        for w in words:
+            for term, pk_set in word_lookup.get(w, {}).items():
+                if min_length <= len(term) <= max_length:
+                    potentials[term] = pk_set
+
+        for term, pk_set in potentials.items():
+            term_words = term.split()
+            if len(term_words) != len(words):
+                continue
+            differing = [(w, tw) for w, tw in zip(words, term_words) if w != tw]
+            if len(differing) == 1 and self._is_typo_of(*differing[0]):
+                return pk_set
+        return set()
+
+    @staticmethod
+    def _words_together(text, first_words, second_words):
+        first_words = {x.lower() for x in first_words}
+        second_words = {x.lower() for x in second_words}
+
+        for f in first_words:
+            if f in text:
+                for s in second_words:
+                    if s in text:
+                        return True
+        return False
+
+    @staticmethod
+    def _create_word_lookups(records: CodePKLookups) -> dict[str, dict]:
+        word_lookup = defaultdict(dict)
+
+        for text, obj in records.items():
+            for word in text.split():
+                word_lookup[word][text] = obj
+
+        return word_lookup
+
+    @staticmethod
+    def _get_single_words_by_length(records, min_length):
+        """ if key is pure alpha (ie FOO not FOO,BAR or FOO1 or FOO BAR) put lookup into dict by lengths """
+        words_by_length = defaultdict(dict)
+        for k, v in records.items():
+            if k.isalpha():
+                length = len(k)
+                if length >= min_length:
+                    words_by_length[length][k] = v
+        return words_by_length
+
+    @staticmethod
+    def _break_up_terms(hpo_pks):
+        """ or could be alias """
+
+        new_entries = defaultdict(set)
+        for name, ontology_pk_set in hpo_pks.items():
+            words = name.split()
+            # Make dysplasia/disease synonyms
+            if len(words) >= 2:
+                if words[-1] == 'dysplasia':
+                    words[-1] = 'disease'
+                    text = ' '.join(words)
+                    if text not in hpo_pks:
+                        new_entries[text].update(ontology_pk_set)
+
+                if words[-1] in ['dysplasia', "disease", "syndrome"]:
+                    before_disease_text = ' '.join(words[:-1])
+                    if before_disease_text not in hpo_pks:
+                        new_entries[before_disease_text].update(ontology_pk_set)
+
+                # Vitamin B12 deficiency => B12 deficiency, B-12 deficiency
+                if len(words) == 3 and words[0] == 'vitamin' and words[2] == 'deficiency':
+                    if words[1].startswith('b'):  # Only B12 etc not "C" or "D" (need vitamin for those)
+                        no_vitamin = words[1:]
+                        no_vitamin_text = ' '.join(no_vitamin)
+                        new_entries[no_vitamin_text].update(ontology_pk_set)
+
+                        b_vitamin = words[1]
+                        dash_text = f'b-{b_vitamin[1:]} deficiency'
+                        new_entries[dash_text].update(ontology_pk_set)
+
+        for name, ontology_pk_set in new_entries.items():
+            hpo_pks[name].update(ontology_pk_set)
+
+    @staticmethod
+    def _get_ontology_pks_by_term(ontology_service: OntologyService) -> dict[str, set[str]]:
+        ot_pks = defaultdict(set)
+        ontology_term_qs = OntologyTerm.objects.filter(ontology_service=ontology_service)
+        for pk, name, aliases in ontology_term_qs.values_list('pk', 'name', "aliases"):
+            for term in filter(is_not_none, aliases + [name]):
+                k = term.lower().replace(",", "")
+                ot_pks[k].add(pk)
+        return ot_pks
+
+    @staticmethod
+    def _get_omim_pks_by_term():
+        """ Create entries for UNIQUE ';' separated terms
+            ie "BECKWITH-WIEDEMANN SYNDROME; BWS" => "BECKWITH-WIEDEMANN" and "BECKWITH-WIEDEMANN SYNDROME" and "BWS" """
+
+        omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
+        omim_pks_by_term = defaultdict(set)
+
+        def break_up_dashes(omim_description, pk):
+            if '-' in omim_description:
+                cleaned_omim_description = omim_description.replace('-', ' ')
+                omim_pks_by_term[cleaned_omim_description].add(pk)
+
+        def break_up_syndromes_and_disease(omim_description, pk):
+            words = omim_description.split()
+            if len(words) >= 2:
+                for t in ['syndrome', 'disease']:
+                    try:
+                        i = words.index(t)
+                        if i >= 2:
+                            term_before_syndrome = ' '.join(words[:i])
+                            omim_pks_by_term[term_before_syndrome].add(pk)
+                            break_up_dashes(term_before_syndrome, pk)
+                    except ValueError:
+                        pass
+
+        for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
+            for term in filter(is_not_none, aliases + [name]):
+                # Remove commas, as phenotype to match will have that done also
+                term = term.strip().lower().replace(",", "")
+                omim_pks_by_term[term].add(pk)
+                for split_term in term.split(";"):
+                    split_term = split_term.strip()
+                    omim_pks_by_term[split_term].add(pk)
+                    break_up_syndromes_and_disease(split_term, pk)
+                    break_up_dashes(split_term, pk)
+        return omim_pks_by_term
+
+    @staticmethod
+    def _get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> tuple[dict, dict, dict]:
+        def load_omim_by_name(description: str) -> OntologyResults:
+            return OntologyService.OMIM, omim_pks[description.lower()]
+
+        def load_hpo_by_name(hpo_name) -> OntologyResults:
+            return OntologyService.HPO, hpo_pks[hpo_name.lower()]
+
+        def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
+            hpo_list: list[CodePK] = []
+            for hpo_name in hpo_name_list:
+                _, hpo = load_hpo_by_name(hpo_name)
+                hpo_list.extend(hpo)
+            return OntologyService.HPO, hpo_list
+
+        def load_gene_by_name(gene_symbol: str) -> OntologyResults:
+            gene_symbol_id = gene_symbol_records[gene_symbol.lower()]
+            return OntologyService.HGNC, [gene_symbol_id]
+
+        def load_genes_by_name(gene_symbols_list: list[str]) -> OntologyResults:
+            genes_list = []
+            for gene_symbol in gene_symbols_list:
+                _, genes = load_gene_by_name(gene_symbol)
+                genes_list.extend(genes)
+
+            return OntologyService.HGNC, genes_list
+
+        omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
+
+        def load_omim_pks_containing_name(name: str) -> OntologyResults:
+            return OntologyService.OMIM, omim_qs.filter(name__icontains=name).values_list("pk", flat=True)
+
+        def load_omim_pks_containing_alias_name(name) -> OntologyResults:
+            return OntologyService.OMIM, omim_qs.filter(aliases__icontains=name).values_list("pk", flat=True)
+
+        ABSENT_FOREARM = (load_hpo_by_name, 'absent forearm')
+        ABNORMAL_BRAIN = (load_hpo_by_name, "Abnormality of brain morphology")
+        ABNORMALITY_OF_LIMBS = (load_hpo_by_name, 'Abnormality of limbs')
+        ARYLSULFATASE_A_DEFICIENCY = (load_omim_by_name, "ARYLSULFATASE A DEFICIENCY")
+        AUTISTIC = (load_hpo_by_id, 729)
+        BULLS_EYE_MACULOPATHY = (load_hpo_by_name, "bull's eye maculopathy")
+        FATTY_ACID_DISORDER = (load_hpo_by_id, 4359)
+        HUS = (load_hpo_by_name, "Hemolytic-uremic syndrome")
+        MITO_DEFICIENCY = (load_omim_by_name, "MITOCHONDRIAL COMPLEX I DEFICIENCY")
+        DEVELOPMENTAL_DELAY = (load_hpo_by_id, 1263)
+        ELEVATED_CK = (load_hpo_by_id, 30234)  # Highly elevated CK
+        KETOSIS = (load_hpo_by_name, "Ketosis")
+        PIERRE_ROBIN = (load_hpo_by_name, "Pierre-Robin sequence")
+        PAVM = (load_hpo_by_name, "Pulmonary arteriovenous malformation")
+        CMS = (load_hpo_by_name, "Fatigable weakness")
+        HYDROPS_FETALIS = (load_hpo_by_name, "Hydrops fetalis")
+        AFEBRILE = (load_hpo_by_id, 7359)  # Focal seizures, afebrile (HP:0040168) is obsolete, links to "Focal-onset seizure"
+        FEBRILE_SEIZURES = (load_hpo_by_id, 11171)
+        GEFS = FEBRILE_SEIZURES  # GEFS+ is a multi-type OMIM disease (febrile seizures links to all)
+        PIG_GENES = (load_genes_by_name, ['PIG' + i for i in 'ABCFGHKLMNOPQSTUVWXYZ'])
+        GLYCOGEN_STORAGE_DISEASE = (load_omim_pks_containing_name, "glycogen storage disease")
+        HIGH_TSH = (load_hpo_by_id, 2925)  # Increased thyroid-stimulating hormone level
+        PARKINSONISM = (load_hpo_by_name, 'Parkinsonism')
+        DIBETES_TYPE_1 = (load_hpo_by_name, 'Type I diabetes mellitus')
+        DYSMORPHIC_FACE = (load_hpo_by_name, "Abnormal facial shape")
+        COGNITIVE_IMPAIRMENT = (load_hpo_by_name, "Cognitive impairment")  # There is also 'Specific learning disability' but this is different I think
+        FACIAL_DYSMORPHISM = (load_hpo_by_id, 1999)
+        HEARING_IMPAIRMENT = (load_hpo_by_name, "Hearing impairment")
+
+        HARDCODED_LOOKUPS = {
+            'aHUS': HUS,
+            "aCLL": (load_hpo_by_name, "chronic lymphocytic leukemia"),
+            "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
+            "ADPCKD": (load_omim_by_id, 600273),  # Autosomal dominant polycystic kidney disease
+            "AVSD": (load_hpo_by_name, "Atrioventricular canal defect"),  # aka Atrioventricular septal defect
+            "BCC": (load_hpo_by_name, "Basal cell carcinoma"),
+            "BrCa": (load_omim_by_id, 114480),  # BREAST CANCER
+            "CHD": (load_hpo_by_name, "Abnormal heart morphology"),
+            "CMS": CMS,
+            "DD":  DEVELOPMENTAL_DELAY,
+            "FAOD": FATTY_ACID_DISORDER,  # Fatty Acid Oxidation Disorders
+            "FSGS": (load_hpo_by_name, "focal segmental glomerulosclerosis"),
+            "FTT": (load_hpo_by_name, "Failure to thrive"),
+            "GAII": (load_omim_by_name, "GLUTARIC ACIDURIA II"),
+            "GEFS": GEFS,
+            "GEFS+": GEFS,
+            "GSD": GLYCOGEN_STORAGE_DISEASE,
+            "GTOP": (load_hpo_by_name, "Spontaneous abortion"),  # Genetic Termination of Pregnancy
+            "HCM": (load_hpo_by_name, "Hypertrophic cardiomyopathy"),
+            "HL": (load_hpo_by_name, "Hodgkin lymphoma"),
+            'HUS': HUS,
+            "IBD": (load_omim_by_id, 266600),  # IBD1
+            "ID": (load_hpo_by_name, 'intellectual disability'),
+            "LGA": (load_hpo_by_name, "Large for gestational age"),
+            "LQTS": (load_hpo_by_id, 1657),  # Prolonged QT interval
+            "MM": (load_hpo_by_name, 'Multiple myeloma'),
+            "NCS": (load_hpo_by_id, 12668),  # "Neurocardiogenic syncope" aka Vasovagal syncope
+            "PCKD": (load_hpo_by_name, "Polycystic kidney dysplasia"),
+            "PV": (load_omim_by_id, 263300),  # POLYCYTHEMIA VERA; PV
+            "SCID": (load_hpo_by_name, "Severe combined immunodeficiency"),
+            'SMA': (load_hpo_by_name, "spinal muscular atrophy"),
+            "SNA12": (load_gene_by_name, "SNAI2"),  # Common misspelling
+            "SUDEP": (load_hpo_by_id, 33258),  # Sudden unexpected death in epilepsy
+        }
+
+        CASE_INSENSITIVE_LOOKUPS = {
+            "aarskog": (load_omim_by_name, "AARSKOG-SCOTT SYNDROME"),
+            "abdo pain": (load_hpo_by_name, "Abdominal pain"),
+            "abnormal mri brain": ABNORMAL_BRAIN,
+            "aching limbs": (load_hpo_by_name, "Limb pain"),
+            "adenosine phosphoribosyl transferase deficiencies": (load_omim_by_id, 614723),
+            "agenesis cc": (load_hpo_by_id, 1274),  # Agenesis of corpus callosum
+            "afebrile seizures": AFEBRILE,
+            "autistic features": AUTISTIC,
+            "autistic": AUTISTIC,
+            "behaviour problems": (load_hpo_by_name, "Behavioral abnormality"),
+            "bladder ca": (load_hpo_by_name, "Bladder neoplasm"),
+            "bowel cancer": (load_omim_by_id, 114500),
+            "bowel polyps": (load_hpo_by_id, 200063),  # Colorectal polyposis
+            "brain abnormalities": ABNORMAL_BRAIN,
+            "brain abnormality": ABNORMAL_BRAIN,
+            "brain malformation": ABNORMAL_BRAIN,
+            "breast ca": (load_hpo_by_name, "breast cancer"),
+            "breat ca": (load_hpo_by_name, "breast cancer"),
+            "bulls ' eye maculopathy": BULLS_EYE_MACULOPATHY,  # TODO: Hacked due to us joining ' badly
+            "caf au lait": (load_hpo_by_name, "Cafe-au-lait spot"),
+            "carnitine transporter deficiency": (load_omim_by_id, 212140),
+            "callosal dysgenesis": (load_hpo_by_name, 'Callosal agenesis'),
+            "coagulation disorder": (load_hpo_by_name, "Abnormality of coagulation"),
+            "congenital heart disease": (load_hpo_by_id, 1627),
+            "congenital myasthenic": CMS,
+            "congenital myasthenic syndrome": CMS,
+            "congenital myaesthenic": CMS,
+            "congenital myaesthenic syndrome": CMS,
+            "cortical vision impairment": (load_hpo_by_id, 100704),  # Cerebral visual impairment
+            "craniofacial dysmorphism": FACIAL_DYSMORPHISM,
+            "crowded dentition": (load_hpo_by_id, 678),
+            "development delay": DEVELOPMENTAL_DELAY,
+            "dev issues": DEVELOPMENTAL_DELAY,
+            "distal hypermobility": (load_hpo_by_id, 20152),  # Distal joint hypermobility
+            "duane syndrome": (load_hpo_by_id, 9921),
+            "dystrophin": (load_gene_by_name, 'DMD'),
+            "dysmorphic feature": DYSMORPHIC_FACE,
+            "dysmorphic features": DYSMORPHIC_FACE,
+            "easily bruised skin": (load_hpo_by_id, 978),  # Bruising susceptability
+            "ehler danlos syndrome (type iii)": (load_omim_by_id, 130020),
+            "ehlers-danos syndrome classic type": (load_omim_by_id, 130000),
+            "elevated ammonia": (load_hpo_by_name, "Hyperammonemia"),
+            "elevated ck": ELEVATED_CK,
+            "elevated ketones": KETOSIS,
+            "elevated lactate": (load_hpo_by_id, 2151),  # Increased serum lactate
+            "elevated pth": (load_hpo_by_id, 3165),  # Elevated circulating parathyroid hormone
+            "epileptic": (load_hpo_by_id, 1250),  # Seizures
+            "facial dysmorphology": FACIAL_DYSMORPHISM,
+            "fatty acid oxidation defect": FATTY_ACID_DISORDER,
+            "fatty acid oxidation disorder": FATTY_ACID_DISORDER,
+            "febrile sz": FEBRILE_SEIZURES,
+            "fetal hydrops": HYDROPS_FETALIS,
+            "global dd": DEVELOPMENTAL_DELAY,
+            "global delay": DEVELOPMENTAL_DELAY,
+            "global dev delay": DEVELOPMENTAL_DELAY,
+            #"hailey-hailey syndrome" : (load_omim_by_name, "HAILEY-HAILEY DISEASE"),
+            "hand flapping": (load_hpo_by_name, "Recurrent hand flapping"),
+            "hearing aids": HEARING_IMPAIRMENT,
+            "hearing impaired": HEARING_IMPAIRMENT,
+            "hereditary neuralgic amyotrophy": (load_omim_by_id, 162100),
+            "high ketones": KETOSIS,
+            "high acth": (load_hpo_by_name, "Increased circulating ACTH level"),
+            "hot flushes": (load_hpo_by_name, "Hot flashes"),
+            "hyperinsulinism": (load_hpo_by_id, 842),
+            "hypoca": (load_hpo_by_name, "Hypocalcemia"),
+            "hypoferritinaemia": (load_hpo_by_name, "Decreased serum ferritin"),  # hyper is there, hypo is not...
+            "hypok": (load_hpo_by_name, "Hypokalemia"),
+            "hypomg": (load_hpo_by_name, "Hypomagnesemia"),
+            "hypop": (load_hpo_by_name, "Hypophosphatemia"),
+            # I considered making a general conversion of "hypoplastic X" -> "Hypoplasia of X" but there are lots
+            # of aliases that already do that, and a few entries for hypoplastic X but NOT hypoplasia of X so do case by case
+            "hypoplastic right ventricle": (load_hpo_by_name, "Hypoplasia of right ventricle"),
+            "inattention": (load_hpo_by_name, "Short attention span"),
+            "increased renin": (load_hpo_by_id, 848),  # Increased circulating renin level
+            "intellectual delay": (load_hpo_by_id, 1249),  # Intellectual disability (no delay anymore)
+            "impaired consciousness": (load_hpo_by_name, "Reduced consciousness/confusion"),
+            "iron deficiency": (load_hpo_by_id, 40303),  # Decreased circulating iron concentration
+            "kneist dysplasia": (load_omim_by_name, "KNIEST DYSPLASIA"),
+            "learning difficulties": COGNITIVE_IMPAIRMENT,
+            "learning disability": COGNITIVE_IMPAIRMENT,
+            "leg pains": (load_hpo_by_name, "Lower limb pain"),
+            "limb abnormalities": ABNORMALITY_OF_LIMBS,
+            "low arylsulphatase": ARYLSULFATASE_A_DEFICIENCY,
+            "low arylsulphatase A": ARYLSULFATASE_A_DEFICIENCY,
+            "low bgl": (load_hpo_by_name, "Hypoglycemia"),
+            "low bp": (load_hpo_by_id, 2615),  # Hypotension
+            "low carnitine": (load_hpo_by_name, "Decreased plasma carnitine"),
+            "lymphopaena": (load_hpo_by_name, "Lymphopenia"),
+            "migranes": (load_hpo_by_name, "migraine"),
+            "men type 1": (load_omim_by_id, 131100),
+            "methylenetetrahyrofolate deficiency": (load_omim_by_id, 236250),  # HOMOCYSTINURIA DUE TO DEFICIENCY OF N(5,10)-METHYLENETETRAHYDROFOLATE REDUCTASE ACTIVITY
+            "missing forearm": ABSENT_FOREARM,
+            "missing forearms": ABSENT_FOREARM,
+            "mitochondrial resp. chain disorder": MITO_DEFICIENCY,
+            "mitochondrial respiratory chain disorder": MITO_DEFICIENCY,
+            "moya moya": (load_hpo_by_id, 11834),
+            "musculoskeletal abnormalities": (load_hpo_by_id, 33127),
+            "myeloid": (load_hpo_by_name, "myeloid leukemia"),
+            "na craving": (load_hpo_by_name, "Salt craving"),
+            "neuroregression": (load_hpo_by_id, 2376),  # Developmental regression
+            "noggin": (load_gene_by_name, 'NOG'),
+            "no speech": (load_hpo_by_id, 1344),
+            "ohtahara syndrome": (load_omim_by_id, 308350),
+            "opisthoclonus": (load_hpo_by_name, "opisthotonus"),
+            "parkinson's disease": PARKINSONISM,
+            "parkinsons": PARKINSONISM,
+            "parkinson's": PARKINSONISM,
+            "parkinson": PARKINSONISM,
+            "pierre robin": PIERRE_ROBIN,
+            "pierre-robin": PIERRE_ROBIN,
+            'pig genes': PIG_GENES,
+            "polysyndactyly": (load_hpo_list_by_names, ["Polydactyly", "Syndactyly"]),  # HPO only has foot/hallux-specific terms
+            "prolonged qt": (load_hpo_by_name, "Prolonged QT interval"),
+            "prostate ca": (load_hpo_by_name, "Prostate cancer"),
+            "pulmonary avms": PAVM,
+            "pul avms": PAVM,
+            "raised ck": ELEVATED_CK,
+            "raised ketones": KETOSIS,
+            "raised methionine": (load_hpo_by_name, "Hypermethioninemia"),
+            "raised urinary orotate": (load_hpo_by_name, "Oroticaciduria"),
+            "raised tyrosine": (load_hpo_by_name, "Hypertyrosinemia"),
+            "raised tsh": HIGH_TSH,
+            "rem sleep": (load_hpo_by_id, 2494),  # Abnormal REM sleep
+            # "Russel Sivler Syndrome"
+            "increased tsh": HIGH_TSH,
+            "increased sweat": (load_hpo_by_name, "Hyperhidrosis"),
+            "recurrent urtis": (load_hpo_by_name, "Recurrent upper respiratory tract infections"),
+            "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
+            "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
+            "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
+            "t1 diabetes": DIBETES_TYPE_1,
+            "two hair whorls": (load_hpo_by_id, 10813),
+            "uncoordinated": (load_hpo_by_name, "Incoordination"),
+            "urea cycle": (load_genes_by_name, ["ARG1", "ASL", "ASS1", "CPS1", "NAGS", "OTC"]),
+            "urogenital sinus": (load_hpo_by_id, 100779),  # Urogenital sinus anomaly
+            "waardenburg type ii": (load_omim_pks_containing_name, "waardenburg syndrome, type 2"),
+            "widespread eyes": (load_hpo_by_id, 316),
+        }
+
+        # People put down e.g. Waardenburg but there are many different OMIM diseases - we'll put ALL of them
+        # Switching to MONDO will help disease families, as it's hierarchial (unlike OMIM)
+        ALPORT_SYNDROME = (load_omim_pks_containing_name, "Alport Syndrome")
+        CILIARY_DYSKINESIA = (load_omim_pks_containing_name, "Ciliary dyskinesia")
+        BARTTER_SYNDROME = (load_omim_pks_containing_name, "Bartter Syndrome")
+        BRUGADA_SYNDROME = (load_omim_pks_containing_name, "Brugada Syndrome")
+        CHARCOT_MARIE_TOOTH = (load_omim_pks_containing_name, "Charcot-marie-tooth")
+        CHONDRODYSPLASIA_PUNCTATA = (load_omim_pks_containing_name, "CHONDRODYSPLASIA PUNCTATA")
+        EHLER_DANOS = (load_omim_pks_containing_name, "EHLERS-DANLOS SYNDROME")
+        HLH = (load_omim_pks_containing_name, "HEMOPHAGOCYTIC LYMPHOHISTIOCYTOSIS")
+        LEBER_AMAUROSIS = (load_omim_pks_containing_name, "leber congenital amaurosis")
+        ROBINOW = (load_omim_pks_containing_name, "Robinow Syndrome")
+        SANFILIPPO = (load_omim_pks_containing_alias_name, "Sanfilippo Syndrome")
+        STICKLER = (load_omim_pks_containing_name, "Stickler Syndrome")
+        TUBEROUS_SCLEROSIS = (load_omim_pks_containing_name, "tuberous sclerosis")
+
+        DISEASE_FAMILIES = {
+            "aicardi goutires syndrome": (load_omim_pks_containing_name, "AICARDI-GOUTIERES"),
+            "alport syndrome": ALPORT_SYNDROME,
+            "alport": ALPORT_SYNDROME,
+            "autoinflammatory syndrome": (load_omim_pks_containing_name, "autoinflammatory syndrome"),
+            "bartter syndrome": BARTTER_SYNDROME,
+            "bartter": BARTTER_SYNDROME,
+            "brugada": BRUGADA_SYNDROME,
+            "brugada syndrome": BRUGADA_SYNDROME,
+            "charcot-marie-tooth": CHARCOT_MARIE_TOOTH,
+            "charcot marie tooth": CHARCOT_MARIE_TOOTH,
+            "chondrodysplasia": CHONDRODYSPLASIA_PUNCTATA,
+            "chondroplasia punctata": CHONDRODYSPLASIA_PUNCTATA,  # Typo
+            "cilial dyskinesis": CILIARY_DYSKINESIA,
+            "cilial dyskinesia": CILIARY_DYSKINESIA,
+            "ehrlers danlos": EHLER_DANOS,
+            "ehlers-danos": EHLER_DANOS,
+            "ehler danlos": EHLER_DANOS,
+            "gaucher disease":  (load_omim_pks_containing_name, "GAUCHER DISEASE"),
+            "glycogen storage disease": GLYCOGEN_STORAGE_DISEASE,
+            "hemophagocytic lymphohistiocytosis": HLH,
+            "hlh": HLH,
+            "hht": (load_omim_pks_containing_name, "Hereditary hemorrhagic telangiectasia"),
+            "leber amaurosis": LEBER_AMAUROSIS,
+            "lebers amaurosis": LEBER_AMAUROSIS,
+            "leber's amaurosis": LEBER_AMAUROSIS,  # TODO: This doesn't match as seems ' ' inserted??
+            "osteogenesis imperfecta": (load_omim_pks_containing_name, "osteogenesis imperfecta"),
+            "robinow syndrome": ROBINOW,
+            "robinow": ROBINOW,
+            "sanfilippo": SANFILIPPO,
+            "stickler syndrome": STICKLER,
+            "stickler": STICKLER,
+            "tuberous sclerosis": TUBEROUS_SCLEROSIS,
+            "usher syndrome": (load_omim_pks_containing_name, "usher syndrome"),
+            "waardenburg": (load_omim_pks_containing_name, "waardenburg"),
+        }
+        return HARDCODED_LOOKUPS, CASE_INSENSITIVE_LOOKUPS, DISEASE_FAMILIES

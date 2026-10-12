@@ -7,7 +7,6 @@ from typing import Optional
 
 import cyvcf2
 import numpy as np
-import simplejson
 from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Max
@@ -21,11 +20,12 @@ from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_SEPARATOR,
     VCFConstant,
 )
-from library.git import Git
 from library.utils import double_quote, json_default_converter
+from library.utils.json_utils import json_dumps_nan_as_null
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
+from snpdb.models.models import CodeVersion
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (
     ModifiedImportedVariant,
@@ -100,7 +100,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                                                                     version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
                                                                     vcf_parser="cyvcf2",
                                                                     vcf_parser_version=cyvcf2.__version__,
-                                                                    code_git_hash=Git(settings.BASE_DIR).hash)
+                                                                    code_version=CodeVersion.current())
         return vcf_importer
 
     def __init__(self, upload_step, cohort_genotype_collection,
@@ -486,8 +486,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             genotype_quality_str,
             phred_likelihood_str,
             samples_filters_str,
-            simplejson.dumps(format_json, ignore_nan=True, default=json_default_converter),
-            simplejson.dumps(info_json, ignore_nan=True, default=json_default_converter),
+            json_dumps_nan_as_null(format_json, default=json_default_converter),
+            json_dumps_nan_as_null(info_json, default=json_default_converter),
         ]
 
         self.locus_variant_hashes.append(variant_hash)

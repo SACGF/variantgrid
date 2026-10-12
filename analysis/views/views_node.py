@@ -14,7 +14,6 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-from htmlmin.decorators import not_minified_response
 
 from analysis import forms
 from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
@@ -95,7 +94,6 @@ def get_node_sql(grid):
     return node_sql, grid_sql
 
 
-@not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
 def node_debug(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
@@ -112,7 +110,8 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
 
     context = {"node": node,
                "node_data": dict(sorted(serializer.data.items()))}
-    if node.valid:
+    # A node that needs its NodeCache (eg a BED intersection) can't build its SQL until that's built
+    if node.valid and (node.node_cache or not node.use_cache):
         grid = VariantGrid(request, node, extra_filters)
         try:
             node_sql_, grid_sql = get_node_sql(grid)
@@ -123,7 +122,6 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
     return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
-@not_minified_response
 # @cache_page(WEEK_SECS)
 # @vary_on_cookie
 def node_audit_log(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
@@ -198,7 +196,7 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "node_id": node_id,
         "node_version": node_version,
         "extra_filters": extra_filters,
-        "bams_dict": node.get_bams_dict(),
+        "alignments_dict": node.get_alignments_dict(),
         # The tag pills the grid draws are read against this node's proband - @see VariantGridFormat.tags
         "node_proband_sample_id": proband.sample.pk if proband.sample else None,
         "node_proband_patient_id": proband.patient.pk if proband.patient else None,
@@ -236,6 +234,8 @@ def node_column_summary(request, analysis_id, analysis_version, node_id, node_ve
         poll_url = reverse(column_summary_boxplot, kwargs={"analysis_id": analysis_id, "node_id": node_id,
                                                            "label": label, "variant_column": variant_column})
         context["poll_url"] = poll_url
+        # The Summary tab stacks one summary per column
+        context["graph_id"] = f"node-generated-graph-{node.id}-{grid_column_name}"
         template = 'analysis/node_data/node_data_graph.html'
         return render(request, template, context)
 
@@ -310,6 +310,7 @@ def node_data_graph(request, analysis_id, analysis_version, node_id, node_versio
     poll_url = reverse(node_graph, kwargs={"analysis_id": analysis_id, "node_id": node.id,
                                            "graph_type_id": graph_type_id, "cmap": cmap})
     context["poll_url"] = poll_url
+    context["graph_id"] = f"node-generated-graph-{node.id}"
     template = 'analysis/node_data/node_data_graph.html'
     return render(request, template, context)
 
