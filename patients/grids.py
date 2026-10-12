@@ -22,7 +22,7 @@ from patients.models import (
     Specimen,
     SpecimenMeasure,
 )
-from patients.models.models_phenotype import PATIENT_ONTOLOGY_TERM_PATH
+from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
 from patients.models_enums import (
     MatchStatus,
     NucleicAcid,

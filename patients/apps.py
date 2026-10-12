@@ -16,7 +16,11 @@ class PatientsConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
-        from patients.signals import ambiguous_acronym_denylist, extraction_match_health_check  # noqa: F401
+        from patients.signals import (  # noqa: F401
+            ambiguous_acronym_denylist,
+            extraction_match_health_check,
+            phenotype_description,
+        )
         from patients.signals.external_pk_search import search_external_pk
         from patients.signals.patient_search import patient_search
         from patients.signals.specimen_search import extraction_search, specimen_search

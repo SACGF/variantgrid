@@ -1,5 +1,6 @@
 """
-Patients and the material taken from them: Patient (phenotype text matched to ontology terms),
+Patients and the material taken from them: Patient (phenotype text matched to ontology terms, which
+patients/models/models_phenotype.py holds),
 Specimen (one tissue at one timepoint), Extraction (nucleic acid off a specimen) and
 SpecimenMeasure, all Guardian-permissioned and optionally externally managed (ExternalPK /
 ExternallyManagedModel). ExtractionMatchMixin is how a Sample claims its extraction before the
@@ -14,7 +15,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import Case, F, Q, TextField, Value, When
+from django.db.models import Case, F, Q, QuerySet, TextField, Value, When
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Concat
 from django.dispatch.dispatcher import Signal, receiver
@@ -45,6 +46,9 @@ from patients.models_enums import (
 )
 
 TEST_PATIENT_KWARGS = {"first_name": "PATIENT", "last_name": "TESTPATIENT"}
+
+# Patient to the ontology terms matched in its phenotype text
+PATIENT_ONTOLOGY_TERM_PATH = "phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch__ontology_term"
 
 
 class FakeData(TimeStampedModel):
@@ -255,7 +259,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             raise ValueError(f"Can't merge {other}({other.pk}) into {self}({self.pk}): {', '.join(conflicts)}")
 
         for rel in Patient._meta.related_objects:
-            # One to one (PatientTextPhenotype) goes with other, and is redone on save if phenotype is copied
+            # One to one (PhenotypeDescription) goes with other, and is redone on save if phenotype is copied
             if rel.one_to_many:
                 rel.related_model._base_manager.filter(**{rel.field.name: other}).update(**{rel.field.name: self})
 
@@ -309,15 +313,18 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         """ You may actually want to use Specimen.age_at_collection_date rather than this """
         return calculate_age(self.date_of_birth, self.date_of_death)
 
-    def _get_phenotype_input_text_field(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        return "phenotype"
+    @staticmethod
+    def with_phenotype_text() -> QuerySet['Patient']:
+        """ Patients whose phenotype text is matched - set, and free of settings.PATIENT_PHENOTYPE_EXCLUDE_STRING """
+        patients = Patient.objects.filter(phenotype__isnull=False).exclude(phenotype='')
+        if exclude_string := getattr(settings, "PATIENT_PHENOTYPE_EXCLUDE_STRING", None):
+            patients = patients.exclude(phenotype__contains=exclude_string)
+        return patients
 
-    def _get_phenotype_description_relation_class_and_kwargs(self):
-        # Implemented for HasPhenotypeDescriptionMixin
-        # Stop circular import
-        from patients.models.models_phenotype import PatientTextPhenotype
-        return PatientTextPhenotype, {"patient": self}
+    @staticmethod
+    def for_ontology_term(user, ontology_term) -> QuerySet['Patient']:
+        """ Patients the user can view whose phenotype text matched ontology_term """
+        return Patient.filter_for_user(user).filter(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term}).order_by("id")
 
     def get_json_dict(self):
         args = {'sex': self.sex,
