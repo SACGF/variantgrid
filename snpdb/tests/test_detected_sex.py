@@ -51,7 +51,7 @@ class TestSampleDetectedSex(TestCase):
         cls.cohort = create_fake_cohort(cls.user, cls.genome_build)
         cls.sample = cls.cohort.cohortsample_set.get(sample__name='proband').sample
         cls.cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort)
-        cls.code_version = SampleStatsCodeVersion.objects.create(name="SampleStats", version=1, code_git_hash="test")
+        cls.code_version = SampleStatsCodeVersion.objects.create(name="SampleStats", version=1)
 
     def setUp(self):
         self.sample.patient = None

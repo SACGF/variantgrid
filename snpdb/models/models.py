@@ -258,6 +258,34 @@ class SoftwareVersion(models.Model):
         abstract = True
 
 
+class CodeVersion(models.Model):
+    """ A git hash of this codebase, recorded the first time something was written by it. pk increases with
+        each new hash seen, so "written between these deployments" is a pk range (#1977) """
+    git_hash = models.TextField(unique=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.git_hash[:8]} ({self.created:%Y-%m-%d})"
+
+    @staticmethod
+    def current() -> 'CodeVersion':
+        """ The code this process is running (settings.GIT_HASH) """
+        return CodeVersion.objects.get_or_create(git_hash=settings.GIT_HASH)[0]
+
+
+class CodeVersionMixin(models.Model):
+    """ Records the CodeVersion that wrote this row - set on creation if not given """
+    code_version = models.ForeignKey(CodeVersion, on_delete=PROTECT)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.code_version_id:
+            self.code_version = CodeVersion.current()
+        super().save(*args, **kwargs)
+
+
 class Wiki(TimeStampedModel):
     # Inherit and add a 1-to-1 field for whatever object you want
     objects = InheritanceManager()

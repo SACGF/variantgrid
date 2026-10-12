@@ -5,7 +5,6 @@ from typing import Optional
 
 import celery
 import numpy as np
-from django.conf import settings
 from django.db import transaction
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -21,7 +20,6 @@ from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
-from library.git import Git
 from library.log_utils import get_traceback
 from snpdb.models import (
     VCF,
@@ -36,6 +34,7 @@ from snpdb.models import (
     VCFLengthStatsCollection,
     Zygosity,
 )
+from snpdb.models.models import CodeVersion
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
@@ -70,7 +69,7 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
     code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
                                                                 name="SampleStats",
                                                                 version=SAMPLE_STATS_CODE_VERSION,
-                                                                code_git_hash=Git(settings.BASE_DIR).hash)
+                                                                code_version=CodeVersion.current())
     return code_version
 
 

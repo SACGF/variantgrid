@@ -45,6 +45,7 @@ from seqauto.models import (
 )
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
+from snpdb.models.models import CodeVersionMixin
 from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
@@ -520,19 +521,18 @@ class UploadStepMultiFileOutput(models.Model):
     items_to_process = models.IntegerField(null=True)
 
 
-class VCFImporter(models.Model):
+class VCFImporter(CodeVersionMixin, models.Model):
     """ Keep track of how the processing is done, in case we need to audit/fix import bugs later """
     name = models.TextField()
     version = models.IntegerField()
     vcf_parser = models.TextField()
     vcf_parser_version = models.TextField()
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("name", "version", "vcf_parser", "vcf_parser_version", "code_git_hash")
+        unique_together = ("name", "version", "vcf_parser", "vcf_parser_version", "code_version")
 
     def __str__(self):
-        return f"{self.name} (v.{self.version}). Git: {self.code_git_hash}. Uses {self.vcf_parser} (v.{self.vcf_parser_version})"
+        return f"{self.name} (v.{self.version}). Git: {self.code_version.git_hash}. Uses {self.vcf_parser} (v.{self.vcf_parser_version})"
 
 
 # UploadedVCF and the satellites in models_uploaded_files are heading towards being FileUpload

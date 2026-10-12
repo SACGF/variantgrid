@@ -130,6 +130,7 @@ from library.utils import (
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
+from snpdb.models.models import CodeVersion, CodeVersionMixin
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
@@ -1934,6 +1935,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 delta = pending_modification.delta
                 delta.update(diffs_only_patch)
                 pending_modification.delta = delta
+                pending_modification.code_version = CodeVersion.current()
 
             else:
                 if save and last_edited:
@@ -2384,7 +2386,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             raise CreateNoClassificationForbidden()
 
 
-class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models.Model):
+class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVersionMixin, models.Model):
     """ Tracks history of changes to Classification
         Created in Classification.patch_value() if any changes applied
 
@@ -2479,6 +2481,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     is_last_published = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
+    # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
+    code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
 
     @classmethod
     def order_by_evidence(cls, key_id: str) -> RawSQL:

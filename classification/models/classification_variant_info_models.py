@@ -34,8 +34,15 @@ from model_utils.models import TimeStampedModel
 
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
-from genes.hgvs import (HGVSComponents, HGVSDiff, HGVSConverterType, HGVSDisplay, HGVSMatcher,
-                       HGVSNoRepresentationException, hgvs_diff_description)
+from genes.hgvs import (
+    HGVSComponents,
+    HGVSConverterType,
+    HGVSDiff,
+    HGVSDisplay,
+    HGVSMatcher,
+    HGVSNoRepresentationException,
+    hgvs_diff_description,
+)
 from genes.models import (
     GeneCopyNumberEvent,
     GeneFusion,
@@ -48,9 +55,9 @@ from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
 from library.utils import IconWithTooltip, md5sum_str, pretty_label
-from library.django_utils import get_cached_project_git_hash
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
+from snpdb.models.models import CodeVersion, CodeVersionMixin
 
 """
 Now we have
@@ -80,14 +87,13 @@ post_save seemed like it might be a little too easy to trigger.
 """
 
 
-class HGVSConverterVersion(TimeStampedModel):
+class HGVSConverterVersion(CodeVersionMixin, TimeStampedModel):
     hgvs_converter_type = models.TextField()  # HGVSConverterType
     version = models.TextField()
     used_converter_type = models.TextField(blank=True, null=True)  # HGVSConverterType
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("hgvs_converter_type", "version", "used_converter_type", "code_git_hash")
+        unique_together = ("hgvs_converter_type", "version", "used_converter_type", "code_version")
 
     @property
     def converted_using_library(self) -> bool:
@@ -97,8 +103,8 @@ class HGVSConverterVersion(TimeStampedModel):
         desc = f"{self.hgvs_converter_type} version=\"{self.version}\""
         if self.used_converter_type and not self.converted_using_library:
             desc += f" (used_converter_type={self.used_converter_type})"
-        if self.code_git_hash != "not-a-real-git-hash":
-            desc += f" git@{self.code_git_hash}"
+        if self.code_version.git_hash != "not-a-real-git-hash":
+            desc += f" git@{self.code_version.git_hash}"
         return desc
 
     @staticmethod
@@ -106,7 +112,7 @@ class HGVSConverterVersion(TimeStampedModel):
         return HGVSConverterVersion.objects.get_or_create(hgvs_converter_type=hgvs_converter_type.name,
                                                           version=version,
                                                           used_converter_type=used_converter_type.name,
-                                                          code_git_hash=get_cached_project_git_hash())[0]
+                                                          code_version=CodeVersion.current())[0]
 
 
 @dataclass(frozen=True)

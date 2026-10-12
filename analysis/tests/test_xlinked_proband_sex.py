@@ -40,7 +40,7 @@ class TestXLinkedRecessiveProbandSex(TestCase):
         cls.trio.mother_affected = False  # XLR requires an unaffected mother
         cls.trio.save()
         cls.cgc = CohortGenotypeCollection.objects.get(cohort=cls.trio.cohort)
-        cls.code_version = SampleStatsCodeVersion.objects.create(name="SampleStats", version=1, code_git_hash="test")
+        cls.code_version = SampleStatsCodeVersion.objects.create(name="SampleStats", version=1)
 
     def setUp(self):
         self.proband_sample = self.trio.proband.sample

@@ -109,7 +109,7 @@ class TestCohortStatsCascade(TestCase):
         cls.cohort = create_fake_cohort(cls.user, cls.grch37)
         cls.cgc = cls.cohort.cohort_genotype_collection
         cls.code_version = SampleStatsCodeVersion.objects.create(
-            name="test", version=99, code_git_hash="cascadetest")
+            name="test", version=99)
 
     def test_cgc_delete_cascades_to_stats(self):
         sample = self.cohort.get_samples().first()
@@ -209,7 +209,7 @@ class TestCohortStatsRecomputeLock(TestCase):
     def test_cohort_stats_are_fresh_false_on_code_version_mismatch(self):
         # Rows present but at a different code_version → a bump must force recompute.
         other_code_version = SampleStatsCodeVersion.objects.create(
-            name="test_other", version=98, code_git_hash="stale")
+            name="test_other", version=98)
         self._create_fresh_stats(self.cgc, other_code_version)
         self.assertFalse(
             _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
