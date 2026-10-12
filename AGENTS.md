@@ -148,10 +148,6 @@ exists (`InconsistentMigrationHistory`), repaired by hand on every database. A m
 (unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
 pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
 
-### Renaming a class that Redis has pickled
-Bump `CACHE_VERSION` in `variantgrid/settings/components/default_settings.py`; old cache entries survive a deploy and fail
-on unpickle. Details under Gotchas in `analysis/AGENTS.md`.
-
 ### Manual migrations (management commands on deploy)
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
 (`manual/operations/manual_operations.py`, example `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`).
