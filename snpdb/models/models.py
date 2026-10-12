@@ -39,7 +39,7 @@ from more_itertools import first
 
 from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
-from library.django_utils import get_url_from_media_root_filename
+from library.django_utils import get_cached_project_git_hash, get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
@@ -256,6 +256,22 @@ class SoftwareVersion(models.Model):
 
     class Meta:
         abstract = True
+
+
+class CodeVersion(models.Model):
+    """ A git hash of this codebase, recorded the first time something was written by it. pk increases with
+        each new hash seen, so "written between these deployments" is a pk range (#1977) """
+    git_hash = models.TextField(unique=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.git_hash[:8]} ({self.created:%Y-%m-%d})"
+
+    @staticmethod
+    def current() -> Optional['CodeVersion']:
+        if git_hash := get_cached_project_git_hash():
+            return CodeVersion.objects.get_or_create(git_hash=git_hash)[0]
+        return None
 
 
 class Wiki(TimeStampedModel):

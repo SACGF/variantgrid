@@ -9,7 +9,9 @@ from classification.models.classification import (
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
 from classification.tests.models.test_utils import ClassificationTestUtils
+from library.django_utils import get_cached_project_git_hash
 from library.guardian_utils import admin_bot
+from snpdb.models.models import CodeVersion
 
 
 class ClassificationTestCaseModifications(TestCase):
@@ -86,6 +88,22 @@ class ClassificationTestCaseModifications(TestCase):
         finally:
             if vc:
                 vc.delete()
+
+    @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
+    def test_code_version(self):
+        """ A new modification records the code that wrote it, and an edit appended to it moves it to the current code """
+        lab, user = ClassificationTestUtils.lab_and_user()
+        vc = Classification.create(user=user, lab=lab, lab_record_id=None, data={'foo': {'value': 'bar'}},
+                                   save=True, source=SubmissionSource.API, make_fields_immutable=False)
+        modification = vc.last_edited_version
+        self.assertEqual(modification.code_version.git_hash, get_cached_project_git_hash())
+
+        modification.code_version = CodeVersion.objects.create(git_hash="older-deployment")
+        modification.save()
+        vc.patch_value(patch={'foo': {'value': 'baz'}}, user=user, source=SubmissionSource.API, save=True)
+        modification.refresh_from_db()
+        self.assertEqual(vc.last_edited_version, modification)  # appended, not a new modification
+        self.assertEqual(modification.code_version.git_hash, get_cached_project_git_hash())
 
     def test_nullify(self):
         """
