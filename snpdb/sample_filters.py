@@ -3,9 +3,9 @@ from functools import reduce
 
 from django.db.models.query_utils import Q
 
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH
 from genes.models import GeneSymbol, SampleGeneList
 from ontology.models import OntologyTerm
+from patients.models.models_phenotype import PATIENT_ONTOLOGY_TERM_PATH
 
 
 def get_sample_ontology_q(ontology_terms_str) -> Q | None:

@@ -9,7 +9,8 @@ from django.conf import settings
 from django.db import connections, transaction
 from django.db.models import QuerySet
 
-from annotation.models.models_phenotype_match import (
+from patients.models import Patient
+from patients.models.models_phenotype import (
     PhenotypeDescription,
     PhenotypeMatchVersion,
     TextPhenotype,
@@ -17,9 +18,8 @@ from annotation.models.models_phenotype_match import (
     TextPhenotypeSentence,
     filter_ambiguous_acronym_matches,
 )
-from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
-from annotation.phenotype_tokenizer import PhenotypeTokenizer
-from patients.models import Patient
+from patients.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
+from patients.phenotype_tokenizer import PhenotypeTokenizer
 
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
 

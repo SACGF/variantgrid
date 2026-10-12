@@ -32,7 +32,6 @@ from annotation.models import (
     VCFAnnotationStats,
 )
 from annotation.models.models import ManualVariantEntryCollection
-from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from annotation.tasks.calculate_sample_stats import (
     SAMPLE_STATS_CODE_VERSION,
@@ -46,6 +45,7 @@ from library.django_utils import (
 )
 from library.utils import full_class_name
 from patients.forms import PatientForm
+from patients.models.models_phenotype import patient_phenotypes_for_samples
 from patients.views_json import get_patient_upload_csv
 from snpdb import forms
 from snpdb.archive import (

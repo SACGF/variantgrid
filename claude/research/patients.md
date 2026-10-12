@@ -3,8 +3,8 @@
 Verified against a96540a68 on 2026-09-25
 
 The patients app holds the people a Sample was sequenced from and the material in between:
-`patients/models.py:Patient` → `patients/models.py:Specimen` (one tissue at one timepoint) →
-`patients/models.py:Extraction` (the DNA or RNA arm off it) → `snpdb.Sample`. Around that sit the ways those rows
+`patients/models/models_patient.py:Patient` → `patients/models/models_patient.py:Specimen` (one tissue at one timepoint) →
+`patients/models/models_patient.py:Extraction` (the DNA or RNA arm off it) → `snpdb.Sample`. Around that sit the ways those rows
 arrive (a CSV upload, a REST API for lab clients, references named by VCFs and seqauto records that are parked until
 they resolve), phenotype text matched to ontology terms, and a per-patient audit trail. Fields, URLs, the task and the
 command are in the generated maps ([models](../maps/models.md#patients), [urls](../maps/urls.md#patients),
@@ -16,16 +16,16 @@ command are in the generated maps ([models](../maps/models.md#patients), [urls](
 ### Identity: who a record is, and who may see it
 
 Patient, Specimen and Extraction are `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsMixin`
-models, but only Patient carries permission rows: Specimen, Extraction and `patients/models.py:SpecimenMeasure`
+models, but only Patient carries permission rows: Specimen, Extraction and `patients/models/models_patient.py:SpecimenMeasure`
 point `get_permission_class` / `get_permission_object` at their patient, so granting a patient grants everything off it.
-All three are `patients/models.py:ExternallyManagedModel`s: an optional one-to-one `patients/models.py:ExternalPK`
+All three are `patients/models/models_patient.py:ExternallyManagedModel`s: an optional one-to-one `patients/models/models_patient.py:ExternalPK`
 (unique on code, external_type, external_manager) plus a local reference named by `LOCAL_REFERENCE_FIELD`
 (`patient_code` on Patient, `reference_id` on the other two). `ExternallyManagedModel.can_write` is false when the
-`patients/models.py:ExternalModelManager` says `can_modify=False`, and `Patient.filter_writable_for_user` applies the
+`patients/models/models_patient.py:ExternalModelManager` says `can_modify=False`, and `Patient.filter_writable_for_user` applies the
 same rule in SQL for grids. `ExternallyManagedModel.short_identifier` is the one identity rule for previews, search and
 node chips.
 
-A patient is shown by `patients/models.py:Patient.display_identity`: the de-identified code alone when there is one
+A patient is shown by `patients/models/models_patient.py:Patient.display_identity`: the de-identified code alone when there is one
 (showing a name beside it would re-identify the patient), else the name, else `Patient:<pk>`.
 `Patient.display_identity_expression` is the same rule as a SQL `Case` so grids can sort, filter and export on it; the
 two must change together.
@@ -35,7 +35,7 @@ two must change together.
 A Sample reaches a patient either directly (`Sample.patient`, which the CSV import and the sample form set) or through
 `Sample.extraction.specimen.patient`. `snpdb/models/models_vcf.py:Sample.save` fills an empty patient from the
 extraction, but never replaces a different one - that disagreement is left for the sample form to report. So every
-"samples of this patient" query is a union: `patients/models.py:Patient.get_samples` on the model side and
+"samples of this patient" query is a union: `patients/models/models_patient.py:Patient.get_samples` on the model side and
 `patients/sample_grouping.py:SOURCE_LEVELS` for the analysis grouping node. `patients/sample_grouping.py` is the single
 implementation of which Samples a Sample / Extraction / Specimen / Patient reaches
 (`get_sample_group`, `get_patient_sample_tree`), shared by the SampleNode above sample level, its canvas chips and the
@@ -46,15 +46,15 @@ cohort genotype stats rows, not the variant table (`get_sample_variant_counts`).
 ### CSV patient records import
 
 An uploaded CSV becomes `upload/tasks/import_patient_records_task.py:ImportPatientRecords` (web_workers), which makes a
-`patients/models.py:PatientImport` and a `patients/models.py:PatientRecords` (one-to-one) and calls
-`patients/import_records.py:import_patient_records`. The file must carry every `patients/models.py:PatientColumns`
+`patients/models/models_patient.py:PatientImport` and a `patients/models/models_patient.py:PatientRecords` (one-to-one) and calls
+`patients/import_records.py:import_patient_records`. The file must carry every `patients/models/models_patient.py:PatientColumns`
 header. Each row runs `patients/import_records.py:process_record` in its own `transaction.atomic()`: a row that fails
-rolls back to a single invalid `patients/models.py:PatientRecord` (`create_failed_patient_record`) and the rest still
+rolls back to a single invalid `patients/models/models_patient.py:PatientRecord` (`create_failed_patient_record`) and the rest still
 import; an unparseable value is a validation message on an otherwise imported row. There is no review-then-submit
 step - rows are applied as they are read.
 
 Per row: `match_sample` finds the Sample by id or name among samples the user can write;
-`patients/models.py:Patient.match` looks the patient up among those the user can see on last name (required), first
+`patients/models/models_patient.py:Patient.match` looks the patient up among those the user can see on last name (required), first
 name, and DOB / sex where given - a blank DOB or Unknown sex on the stored patient still matches, and that is recorded
 as PARTIAL rather than EXACT. Several matches fail the row, naming the patients (`#2037`). No
 match creates the patient (`create_patient`, upper-cased names, permissions to the user's groups). Deceased / date of death, family code, patient code, affected and consanguineous are then updated;
@@ -62,11 +62,11 @@ phenotype text is appended under a dated "From Imported CSV" line rather than re
 `(patient, reference_id)`; a reference_id already used by a *different* patient fails the row with
 `specimen_patient_clash_message` (the lookup is unrestricted, so the other patient is only described if the user can
 view it), and its fields are updated from the row by `patients/import_records.py:set_fields_from_row` - a blank column
-is "no answer" and leaves the stored value alone. `patients/models.py:Specimen.get_or_create_extraction` picks the extraction the row describes - the sample's
+is "no answer" and leaves the stored value alone. `patients/models/models_patient.py:Specimen.get_or_create_extraction` picks the extraction the row describes - the sample's
 own extraction if it already has one, else one with the same nucleic acid, else an unnamed one - so a TSO 500 specimen's
 DNA and RNA arms stay separate on re-import. `assign_patient_to_sample` / `assign_extraction_to_sample` write a
-`patients/models.py:PatientModification` for every change, hung off the PatientImport. Phenotype matching for touched
-patients runs once in bulk at the end (`annotation/phenotype_matching.py:bulk_patient_phenotype_matching`).
+`patients/models/models_patient.py:PatientModification` for every change, hung off the PatientImport. Phenotype matching for touched
+patients runs once in bulk at the end (`patients/phenotype_matching.py:bulk_patient_phenotype_matching`).
 
 ### REST API and external references
 
@@ -87,7 +87,7 @@ extraction legitimately arrives after the VCF that names it. The API treats anyt
 
 ### Parked extraction claims and reconciliation
 
-`patients/models.py:ExtractionMatchMixin` (on `snpdb.Sample` and `seqauto.SequencingSample`) is a claim about which
+`patients/models/models_patient.py:ExtractionMatchMixin` (on `snpdb.Sample` and `seqauto.SequencingSample`) is a claim about which
 Extraction a row belongs to that may not be resolvable yet: the reference as JSON, a `MatchStatus`, an error and the
 date the claim was parked. `ExtractionMatchMixin.apply_extraction_match` never touches a row that already has its
 extraction, and restarts the clock only when the reference changes. Claims are made by the VCF import
@@ -107,11 +107,11 @@ call arrived after the VCF. NEEDS_ATTENTION is what the health check
 
 ### Phenotype text
 
-Patient is a `annotation/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`: `Patient.save` pops
+Patient is a `patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`: `Patient.save` pops
 the phenotype kwargs and matches the text to HPO / OMIM / MONDO terms unless `check_patient_text_phenotype=False`.
-The matcher and the bulk path live in `annotation/phenotype_matching.py`; `manage.py match_patient_phenotypes`
-reruns it for everyone. Each matched sentence (`annotation/models/models_phenotype_match.py:TextPhenotype`) points at
-the `annotation/models/models_phenotype_match.py:PhenotypeMatchVersion` (the `PHENOTYPE_MATCHER_VERSION` and
+The matcher and the bulk path live in `patients/phenotype_matching.py`; `manage.py match_patient_phenotypes`
+reruns it for everyone. Each matched sentence (`patients/models/models_phenotype.py:TextPhenotype`) points at
+the `patients/models/models_phenotype.py:PhenotypeMatchVersion` (the `PHENOTYPE_MATCHER_VERSION` and
 OntologyVersion pair) it was matched with; `--stale` rematches those not on the current pair (`vg status` counts them)
 and `--clear` rematches every sentence. Both drop only the sentence's matches, so patient
 and cohort links and approvals are kept (#2131). Curators approve a patient's matched text on the term

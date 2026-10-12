@@ -2,13 +2,13 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from annotation.phenotype_matcher import PhenotypeMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
 )
 from patients.models import Patient
+from patients.phenotype_matcher import PhenotypeMatcher
 from patients.signals.patient_search import (
     patient_preview_phenotype_extra,
     sample_preview_patient_extra,

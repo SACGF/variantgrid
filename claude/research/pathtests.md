@@ -48,18 +48,18 @@ which genes each kit in `PATHOLOGY_TEST_SORTED_ENRICHMENT_KITS` misses.
 ### Cases and orders
 
 `pathtests/models.py:Case` and `pathtests/models.py:PathologyTestOrder` are
-`patients/models.py:ExternallyManagedModel`s: each carries a one-to-one `external_pk`, and
+`patients/models/models_patient.py:ExternallyManagedModel`s: each carries a one-to-one `external_pk`, and
 `ExternallyManagedModel.can_write` is false when that key's external manager says so - `pathtests/forms.py:CaseForm`
 disables every field in that case. There is no create or edit view in this app: SA Pathology's Helix import makes a Case
 per Helix accession and a PathologyTestOrder per SAP order number, and links samples to patients through those cases.
 The pages here are read-only views, the three datatables in `pathtests/grids.py`, lookup-by-LIMS-id redirects
 (`view_external_case`, `view_external_pathology_test_order`) and "my cases" by lead scientist, which includes the
-scientists a user follows (`patients/models.py:get_lead_scientist_users_for_user`, toggled by
+scientists a user follows (`patients/models/models_patient.py:get_lead_scientist_users_for_user`, toggled by
 `pathtests/views.py:follow_scientist`). `pathtests/models.py:get_external_order_system_last_checked` reaches into
 `sapath` for the "last checked" time, and returns None when that app is absent.
 
 A case is visible to whoever can view its patient: `Case` delegates its Guardian permissions to
-`patients/models.py:Patient`, and `PathologyTestOrder.filter_for_user` / `can_view` go through the order's case (an order
+`patients/models/models_patient.py:Patient`, and `PathologyTestOrder.filter_for_user` / `can_view` go through the order's case (an order
 without a case: its user or a superuser). The grids, the case autocomplete, "my cases" (`pathtests/models.py:get_cases_qs`)
 and the view pages all apply it.
 

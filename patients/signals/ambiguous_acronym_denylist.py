@@ -3,8 +3,8 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from annotation.tasks.ambiguous_acronym_denylist_task import build_ambiguous_acronym_denylist_task
 from ontology.models import OntologyVersion
+from patients.tasks.ambiguous_acronym_denylist_task import build_ambiguous_acronym_denylist_task
 
 
 @receiver(post_save, sender=OntologyVersion)

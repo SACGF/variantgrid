@@ -27,7 +27,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass, VCFConstant
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
-from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import LabProject
 from snpdb.models.models_enums import (

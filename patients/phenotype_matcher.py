@@ -164,7 +164,7 @@ def get_ambiguous_acronym_denylist() -> Mapping[str, tuple[tuple[str, str], ...]
     (those have a known correct meaning). Values are tuples of (term_id, name)
     pairs so callers can display the conflicting candidates. Cached in Redis
     with no expiry, keyed on OntologyVersion - the build reads every ontology term
-    and relation, so annotation.tasks.ambiguous_acronym_denylist_task prebuilds it when a
+    and relation, so patients.tasks.ambiguous_acronym_denylist_task prebuilds it when a
     new OntologyVersion is created rather than leaving it for a page render."""
     ov = OntologyVersion.latest(validate=False)
     raw = _build_ambiguous_acronym_denylist(ov.pk if ov else 0)

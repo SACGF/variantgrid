@@ -191,7 +191,7 @@ classification/models/evidence_key.py
 flags/models/models.py
 genes/models.py
 pathtests/models.py
-patients/models.py
+patients/models/models_patient.py
 seqauto/models/models_seqauto.py
 snpdb/models/models.py
 snpdb/models/models_clingen_allele.py

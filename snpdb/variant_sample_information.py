@@ -11,13 +11,13 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from annotation.models.models import VariantAnnotation
-from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from classification.models import ClassificationModification
 from classification.models.evidence_mixin_summary_cache import clinical_significance_pills
 from library.log_utils import log_traceback
 from library.unit_percent import format_af
 from ontology.models import OntologyService
 from patients.models import Patient
+from patients.models.models_phenotype import PATIENT_ONTOLOGY_TERM_PATH
 from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
 from snpdb.models import (
     CohortGenotype,

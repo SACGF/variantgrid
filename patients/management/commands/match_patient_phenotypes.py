@@ -3,8 +3,8 @@ from collections import Counter
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 
-from annotation.models.models_phenotype_match import TextPhenotype, TextPhenotypeMatch
-from annotation.phenotype_matching import bulk_patient_phenotype_matching, requeue_sentences
+from patients.models.models_phenotype import TextPhenotype, TextPhenotypeMatch
+from patients.phenotype_matching import bulk_patient_phenotype_matching, requeue_sentences
 
 
 def _get_ontology_text_match_counts() -> dict:

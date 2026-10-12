@@ -6,7 +6,6 @@ from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from library.django_utils import add_save_message, set_form_read_only
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.log_utils import log_traceback
@@ -23,6 +22,7 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
+from patients.models.models_phenotype import TextPhenotypeMatch
 from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC, SequencingSample
 from seqauto.qc.library_qc_summary import summarise_library_qc
