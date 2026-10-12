@@ -512,7 +512,7 @@ function enhanceAndMonitor() {
             $(processor.test).each((index, node) => {
                 node = $(node);
                 let isGood = true;
-                for (const badTest in badElementTests) {
+                for (const badTest of badElementTests) {
                     if (node.is(badTest)) {
                         isGood = false;
                         break;
