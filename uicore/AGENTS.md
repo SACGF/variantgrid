@@ -62,7 +62,8 @@ Gotchas:
 - The sprite `<svg>` is `display: none`, so a symbol drawn through `clipPath`, `mask`, a gradient or anything else
   referenced by `url(#...)` is unreliable under `<use>` (Chrome drops the clip) - draw the shape directly
   (`file-icon-fusion` is two paths).
-Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
+Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoint, test_js_tags.py jsonify escaping,
+  test_ui_tabs_builder.py embedded admin_only tabs. Tag logic is tested by rendering a `Template("{% load x %}...")` with a Context
   (variantgrid/tests/test_tips.py) or `render_to_string` of the template (analysis/tests/test_node_display.py);
   ValidatedJson in classification/tests/utils/test_json_utils.py. Pages are covered by URL tests:
   library/django_utils/unittest_utils.py:URLTestCase - `_test_urls` for pages, `_test_datatable_urls` for grid
