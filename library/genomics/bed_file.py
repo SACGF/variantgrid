@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from shlex import shlex
 
 from library import genomics
@@ -13,6 +14,23 @@ BLOCK_ATTRIBUTES = ['block_count', 'block_sizes', 'block_starts']
 OPTIONAL_ATTRIBUTES = THICK_ATTRIBUTES + RGB_ATTRIBUTE + BLOCK_ATTRIBUTES
 ALL_OPTIONAL = OPTIONAL_FIELDS + OPTIONAL_ATTRIBUTES
 
+@dataclass
+class BedInterval:
+    """ 0-based half-open, like BED. Shares chrom/start/end with snpdb GenomicInterval """
+    chrom: str
+    start: int
+    end: int
+    strand: str = '.'
+
+
+@dataclass
+class BedFeature:
+    name: str
+    iv: BedInterval
+    score: float = 0.0
+    attr: dict = field(default_factory=dict)
+
+
 TYPE_CONVERSIONS = {'chrom_start': int,
                     'chrom_end': int,
                     'score': float,
@@ -26,8 +44,8 @@ TYPE_CONVERSIONS = {'chrom_start': int,
 class BedFileReader:
     """
     Reads bed file
-    Returns - iterator of HTSeq Genomic Features
-    Attribute fields (column 7-12: 'thick_start', 'thick_end', 'block_count', 'block_sizes', 'block_starts')
+    Returns - iterator of BedFeature
+    Attribute fields (column 7-12: 'thick_start', 'thick_end', 'item_rgb', 'block_count', 'block_sizes', 'block_starts')
         are saved as dict in feature attribute 'attr'. e.g. feature.attr['thick_start']
     """
 
@@ -103,8 +121,8 @@ class BedFileReader:
                 raise ValueError(f"bedDetails line should have 14 columns, was {num_columns}: '{line}'")
 
             # Last 2 fields are details - strip them
-            columns = columns[:-2]
             details_columns = columns[-2:]
+            columns = columns[:-2]
 
         data = dict(list(zip(REQUIRED_FIELDS, columns[:len(REQUIRED_FIELDS)])))
         # Only put in optional fields when provided
@@ -121,21 +139,15 @@ class BedFileReader:
         chrom = data["chrom"]
         if self.want_chr is not None:  # format chrom
             chrom = genomics.format_chrom(chrom, self.want_chr)
-        import HTSeq
-        iv = HTSeq.GenomicInterval(chrom, start, end)
-        name = data.get("name", "")
+        iv = BedInterval(chrom, start, end, strand=data.get("strand", '.'))
         score = data.get("score", 0.0)  # Using "." here causes intron to not be displayed correctly
-        iv.strand = data.get("strand", '.')
+        # So attr and .score are always the same (may be 0.0 if not found)
+        feature = BedFeature(data.get("name", ""), iv, score=score, attr={"score": score})
 
-        feature = HTSeq.GenomicFeature(name, "from_bed", iv)
-        feature.score = score
-        feature.attr = {"score": score}  # So attr and .score are always the same (may be 0.0 if not found)
-
-        # Copy set optional fields to GenomicFeature.attr
-        for field in OPTIONAL_ATTRIBUTES:
-            value = data.get(field)
-            if value:
-                feature.attr[field] = value
+        # Copy set optional fields to BedFeature.attr
+        for attribute in OPTIONAL_ATTRIBUTES:
+            if value := data.get(attribute):
+                feature.attr[attribute] = value
 
         if details_columns:
             feature.attr["ID"] = details_columns[0]

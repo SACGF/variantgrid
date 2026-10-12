@@ -1,8 +1,8 @@
-{% extends menu_patients_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load ui_help %}
 {% block title %}Unmatched Extractions{% endblock title %}
 
-{% block submenu_page_content %}
+{% block container_table_content %}
     {% page_help 'patients/unmatched_extractions_help' 'Unmatched Extractions' %}
     <div class="mb-3">
         These rows name an extraction that hasn't resolved yet. Independent feeds arrive in any order,
@@ -17,4 +17,4 @@
         <h4 class="mt-4">Sequencing samples</h4>
         <table id="unmatched-sequencing-sample-datatable" data-datatable-url="{% url 'unmatched_extraction_sequencing_sample_datatables' %}" class="sticky-header"></table>
     {% endif %}
-{% endblock submenu_page_content %}
+{% endblock container_table_content %}

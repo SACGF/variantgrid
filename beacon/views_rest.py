@@ -1,7 +1,7 @@
 """ Inbound Beacon v2 REST endpoints (§6): framework (identity/config/map) + the
     g_variants model endpoint. Plain DRF APIViews (no routers), following snpdb/views_rest.
 
-Anonymous requests are allowed (permission AllowAny + the /beacon/ PUBLIC_PATHS entry);
+Anonymous requests are allowed (no permission classes; DRF views skip the login middleware);
 per-tier data scope is still enforced by filter_for_user (anonymous -> public group).
 """
 import logging

@@ -7,8 +7,8 @@ from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError, Response
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from genes.models import TranscriptVersionSequenceInfo
 from genes.transcript_errors import NoTranscript
 from genes.transcript_sequence_retrieval import TranscriptSequenceFetcher

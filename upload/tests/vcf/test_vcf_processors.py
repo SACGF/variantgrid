@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFSymbolicAllele
 from library.utils import sha256sum_str
 from snpdb.models import ImportSource, Sequence

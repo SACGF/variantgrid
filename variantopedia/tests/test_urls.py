@@ -4,12 +4,12 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from analysis.models import VariantTag
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     create_fake_variant_annotation,
     create_fake_variants,
     get_fake_annotation_version,
 )
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import (
     Allele,
@@ -85,6 +85,7 @@ class Test(URLTestCase):
             ("database_statistics_detail", {}, 403),  # Admin only
             ("search", {}, 200),
             ("variant_wiki", {}, 200),
+            ("variant_types", {}, 200),
             ("view_variant", {"variant_id": self.variant.pk}, 200),
             ("view_variant_annotation_history", {"variant_id": self.variant.pk}, 200),
             ("view_allele_from_variant", variant_kwargs, 302),

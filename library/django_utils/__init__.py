@@ -2,7 +2,7 @@
 Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
 and choice display formatting (get_choices_formatter), Q helpers for name
 searches, timezone and form read-only utilities, `thread_safe_unique_together_get_or_create`,
-`get_cached_project_git_hash`, related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
+related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
 SortByPKMixin that let model instances sort like their querysets. Permission checks live in
 guardian_permissions_mixin.py, partitioning in django_partition.py, test bases in unittest_utils.py.
 """
@@ -10,15 +10,13 @@ import datetime
 import operator
 import os
 from functools import reduce
-from functools import wraps, partial
+from functools import wraps
 from typing import Any
 
 import nameparser
-from cache_memoize import cache_memoize
 from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
 from django.db.models import F, JSONField
 from django.db.models.aggregates import Count, Max
@@ -27,20 +25,14 @@ from django.db.models.fields.reverse_related import OneToOneRel
 from django.db.models.options import Options
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
-from django.urls.base import reverse_lazy
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django.views import View
 from redis import Redis
-from threadlocals.threadlocals import get_current_request
 
-from library.git import Git
+from library.request_context import get_current_request
 from library.utils import invert_dict
-
-
-@cache_memoize(30)
-def get_cached_project_git_hash() -> str:
-    return Git(settings.BASE_DIR).hash
 
 
 def get_url_from_view_path(view_path):
@@ -182,7 +174,17 @@ def get_field_counts(qs, field):
     return field_counts
 
 
-staff_only = partial(staff_member_required, login_url=reverse_lazy('staff_only'))
+def staff_only(view_func):
+    """ A logged-in user who isn't active staff gets the staff_only page. Anonymous users never reach this -
+        LoginRequiredMiddleware sends them to LOGIN_URL """
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if request.user.is_active and request.user.is_staff:
+            return view_func(request, *args, **kwargs)
+        return redirect('staff_only')
+
+    return wrapper
 
 
 def ensure_timezone_aware(datetime_date):

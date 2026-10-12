@@ -12,10 +12,10 @@ from django.db.models.expressions import F
 from django.urls.base import reverse
 
 from annotation.models import AnnotationVersion
-from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from library.django_utils.data_archive_mixin import DataArchivedError
+from patients.models.models_phenotype import patient_phenotypes_for_samples
 from patients.models_enums import Sex
-from snpdb.archive import DataArchivedError
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm
 from snpdb.models import (
     VCF,
@@ -163,7 +163,6 @@ def vcf_cohort_page_context(user, cohort: Cohort, has_write_permission: bool, vc
         cohort_samples = [cs.sample for cs in cohort.get_cohort_samples()]
 
     context = {
-        "base_template": "snpdb/menu/menu_data_base.html" if vcf else "snpdb/menu/menu_patients_base.html",
         "vcf": vcf,
         "cohort": cohort,
         "cohort_genotype_collection": cohort_genotype_collection,

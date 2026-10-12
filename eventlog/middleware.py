@@ -1,11 +1,16 @@
+import json
+import time
 from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
 
 from eventlog.models import (
+    API_KEY_PREFIX,
+    ApiRequestLog,
     IntegrationActivity,
     IntegrationActivityStatus,
     ViewEvent,
@@ -17,6 +22,9 @@ IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}  # this should be mostl
 IGNORE_TEXT = {"detail", "metrics"}
 IGNORE_VIEW_NAME_SUFFIX = {"_detail", "_autocomplete"}
 IGNORE_PARAMETERS = {"csrfmiddlewaretoken"}
+
+REDACTED = "[redacted]"
+REDACTED_KEY_PARTS = ("password", "token", "secret", "api_key")
 
 
 class PageViewsMiddleware:
@@ -149,8 +157,9 @@ class PageViewsMiddleware:
 
 class IntegrationApiMiddleware:
     """
-    Records when each external client last called us - the API equivalent of a "last run" log,
-    for endpoints that would otherwise leave nothing behind but the records they wrote.
+    Records each call an external client makes to us: the rolling "last run" on Server Status
+    (IntegrationActivity) and one ApiRequestLog row with what was sent and what came back, for
+    endpoints that would otherwise leave nothing behind but the records they wrote.
 
     Driven by settings.INTEGRATION_API_TRACKING - {url path prefix: display name} - so a
     deployment only pays for the endpoints it names.
@@ -160,25 +169,26 @@ class IntegrationApiMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        response = self.get_response(request)
-
         tracking = settings.INTEGRATION_API_TRACKING
-        if not tracking:
-            return response
+        display_name = next((name for prefix, name in tracking.items() if request.path_info.startswith(prefix)), None)
+        if display_name is None:
+            return self.get_response(request)
 
-        for prefix, display_name in tracking.items():
-            if request.path_info.startswith(prefix):
-                self._record(request, response, display_name)
-                break
-
+        # read before the view, which consumes the stream
+        request_body = _request_body_for_log(request)
+        start = time.perf_counter()
+        response = self.get_response(request)
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        self._record(request, response, display_name, request_body, duration_ms)
         return response
 
     @staticmethod
-    def _record(request, response, display_name: str):
+    def _record(request, response, display_name: str, request_body: Optional[str], duration_ms: int):
         try:
-            view_name = resolve(request.path_info).view_name
+            resolver_match = request.resolver_match or resolve(request.path_info)
         except Resolver404:
             return
+        view_name = resolver_match.view_name
 
         status_code = response.status_code
         if status_code >= 400:
@@ -189,10 +199,77 @@ class IntegrationApiMiddleware:
             message = None
 
         IntegrationActivity.record(
-            key=f"api:{view_name}",
+            key=f"{API_KEY_PREFIX}{view_name}",
             name=f"{display_name} ({view_name})",
             direction=IntegrationDirection.INBOUND,
             status=status,
             changed=status == IntegrationActivityStatus.SUCCESS and request.method != "GET",
             message=message
         )
+
+        response_body = None
+        if status_code >= 400 and not response.streaming:
+            response_body = _trim_for_log(response.content.decode(errors="replace"))
+
+        # A view names the model its calls are about with api_log_model, and the pks it found with
+        # log_api_request_objects - a call that fails before finding one keeps only the model
+        view_class = getattr(resolver_match.func, "cls", None) or getattr(resolver_match.func, "view_class", None)
+        content_type = None
+        if api_log_model := getattr(view_class, "api_log_model", None):
+            content_type = ContentType.objects.get_for_model(api_log_model)
+
+        user = getattr(request, "user", None)  # DRF copies its authenticated user back onto the Django request
+        ApiRequestLog.objects.create(
+            user=user if user and user.is_authenticated else None,
+            method=request.method,
+            path=request.path_info,
+            query_string=request.META.get("QUERY_STRING", ""),
+            view_name=view_name,
+            view_kwargs=resolver_match.kwargs,
+            status_code=status_code,
+            duration_ms=duration_ms,
+            request_body=request_body,
+            response_body=response_body,
+            content_type=content_type,
+            object_pks=sorted(getattr(request, "api_log_object_pks", ())),
+        )
+
+
+def _trim_for_log(text: str) -> str:
+    max_length = settings.API_REQUEST_LOG_MAX_BODY
+    if len(text) > max_length:
+        text = text[:max_length] + f"\n[trimmed from {len(text)} characters]"
+    return text
+
+
+def _redact(data):
+    if isinstance(data, dict):
+        return {key: REDACTED if any(part in str(key).lower() for part in REDACTED_KEY_PARTS) else _redact(value)
+                for key, value in data.items()}
+    if isinstance(data, list):
+        return [_redact(value) for value in data]
+    return data
+
+
+def _request_body_for_log(request) -> Optional[str]:
+    """ Uploads and big bodies are noted by size rather than read, so they stay out of memory and
+        under DATA_UPLOAD_MAX_MEMORY_SIZE, which request.body enforces and DRF's stream parsing doesn't """
+    try:
+        content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        content_length = 0
+    if not content_length:
+        return None
+
+    content_type = request.content_type or "unknown content type"
+    max_read = min(filter(None, [settings.API_REQUEST_LOG_MAX_READ_BYTES, settings.DATA_UPLOAD_MAX_MEMORY_SIZE]))
+    if content_type.startswith("multipart/") or content_length > max_read:
+        return f"[{content_type}, {content_length} bytes]"
+
+    body = request.body.decode(errors="replace")
+    if content_type == "application/json":
+        try:
+            body = json.dumps(_redact(json.loads(body)))
+        except ValueError:
+            pass
+    return _trim_for_log(body)

@@ -1,13 +1,15 @@
 import abc
 import os
 from collections import Counter
+from functools import cached_property
 from typing import Optional
 
 import cyvcf2
 from django.conf import settings
 from django.db.models import Max
 
-from annotation.annotation_version_querysets import pipeline_type_variant_q
+from annotation.annotation_pipeline_routing import pipeline_type_variant_q
+from annotation.models.models import VariantAnnotationVersion
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
 from snpdb.models import Variant, VariantCoordinate
@@ -66,6 +68,10 @@ class AbstractBulkVCFProcessor(abc.ABC):
     def genome_build(self):
         return self.upload_pipeline.genome_build
 
+    @cached_property
+    def structural_variant_min_size(self) -> int:
+        return VariantAnnotationVersion.latest_structural_variant_min_size(self.genome_build)
+
     def get_ref_alt_svlen(self, variant: cyvcf2.Variant) -> tuple[str, str, Optional[int]]:
         """ Ensures SVLEN fits symbolic alt, some callers eg Manta (non-Dragen) write positive SVLEN for dels
             We don't do this in vcf_clean_and_filter as we don't pull apart the INFO there
@@ -84,7 +90,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
         if non_ref_variant_ids:
             base_qs = Variant.objects.filter(pk__in=non_ref_variant_ids)
             for pipeline_type in blocking_pipeline_types():
-                data = base_qs.filter(pipeline_type_variant_q(pipeline_type)).aggregate(m=Max("pk"))
+                q = pipeline_type_variant_q(pipeline_type, self.structural_variant_min_size)
+                data = base_qs.filter(q).aggregate(m=Max("pk"))
                 max_returned_variant_id = data["m"]
                 if max_returned_variant_id is not None:
                     current = self.max_variant_id_by_pipeline_type.get(pipeline_type.value)
@@ -106,8 +113,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
     def add_modified_imported_variant(self, variant: cyvcf2.Variant, variant_hash, miv_hash_list=None, miv_list=None):
         # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only
         if bcftools_old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
-            _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(variant,
-                                                                                      old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(variant,
+                                                                                    old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             # svlen = variant.INFO.get("SVLEN")
 
             if miv_hash_list is None:
@@ -120,13 +127,13 @@ class AbstractBulkVCFProcessor(abc.ABC):
             else:
                 old_multiallelic = None
 
-            old_position = int(bcftools_old_variant.split("|")[1])
-            if old_position != variant.POS:
-                old_variant = bcftools_old_variant
-            else:
-                old_variant = None  # Wasn't normalized
+            contig = self.genome_build.chrom_contig_mappings[variant.CHROM]
+            record = VariantCoordinate(chrom=contig.name, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
+            record_formatted = ModifiedImportedVariant.get_old_variant_from_variant_coordinate(record)
 
             for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, self.genome_build):
+                # Normalized (moved or trimmed), not only split from a multi-allelic
+                old_variant = bcftools_old_variant if ov != record_formatted else None
                 # These 2 need to be in sync
                 miv_hash_list.append(variant_hash)
                 miv_list.append((ModifiedImportedVariantOperation.NORMALIZATION, old_multiallelic, old_variant,

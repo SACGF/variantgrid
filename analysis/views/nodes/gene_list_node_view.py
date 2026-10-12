@@ -1,8 +1,5 @@
 from collections import defaultdict
 
-from django.conf import settings
-from django.utils.timesince import timesince
-
 from analysis.forms.forms_nodes import GeneListNodeForm
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.views.nodes.gene_coverage_node_view import GeneCoverageNodeView
@@ -44,30 +41,9 @@ class GeneListNodeView(GeneCoverageNodeView):
         context = super().get_context_data(**kwargs)
 
         context.update(self._get_sample_gene_lists_context())
-        context.update(self._get_pathology_test_context())
-        context.update(self._get_panel_app_context())
+        context["pathology_test_category"] = GeneListCategory.get_pathology_test_gene_category()
         return context
 
     def _get_sample_gene_lists_context(self):
         has_sample_gene_lists = SampleGeneList.objects.filter(sample__in=self.object.get_sample_ids()).exists()
         return {'has_sample_gene_lists': has_sample_gene_lists}
-
-    def _get_pathology_test_context(self):
-        pathology_test_category = GeneListCategory.get_pathology_test_gene_category()
-        return {'pathology_test_category': pathology_test_category,
-                'pathology_test_stale_warning_days': settings.PATHOLOGY_TEST_STALE_WARNING_DAYS}
-
-    def _get_panel_app_context(self):
-        # TODO: Give a warning if panel app is out of date...
-        warnings = []
-        for gln_pap in self.object.genelistnodepanelapppanel_set.all():
-            if lc := gln_pap.panel_app_panel_local_cache:
-                panel_app_panel = lc.panel_app_panel
-                cache_version = lc.version
-                if cache_version != panel_app_panel.current_version:
-                    msg = f"Using {panel_app_panel} v.{cache_version} while latest is {panel_app_panel.current_version}"
-                    warnings.append(msg)
-                elif not panel_app_panel.cache_valid:
-                    msg = f"{panel_app_panel} may be out of date (last checked {timesince(panel_app_panel.modified)} ago)"
-                    warnings.append(msg)
-        return {"panel_app_warnings": warnings}

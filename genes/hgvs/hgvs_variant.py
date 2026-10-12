@@ -1,7 +1,5 @@
 from typing import Optional
 
-from bioutils.sequences import reverse_complement
-from hgvs.edit import NARefAlt
 from hgvs.sequencevariant import SequenceVariant
 
 
@@ -76,13 +74,8 @@ class HGVSVariant:
     def get_cdna_coords(self) -> str:
         return str(self._sequence_variant.posedit.pos.start)
 
-    def format(self, use_delins_for_inv: bool = False, max_ref_length=None):
+    def format(self, max_ref_length=None):
         sv: SequenceVariant = self._sequence_variant
-        if use_delins_for_inv:
-            if sv.posedit.edit.type == "inv":
-                ref = sv.posedit.edit.ref
-                sv.posedit.edit = NARefAlt(ref=ref, alt=reverse_complement(ref))
-
         conf = {}
         if max_ref_length:
             conf["max_ref_length"] = max_ref_length

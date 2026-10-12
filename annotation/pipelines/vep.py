@@ -2,11 +2,10 @@ import logging
 import os
 
 from django.conf import settings
-from django.db.models.functions.math import Abs
-from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotated_filename
+from annotation.annotation_version_querysets import filter_vep_sv_max_size
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines.base import AnnotationPipelineRunner
 from annotation.sv_conservation import (
@@ -15,7 +14,10 @@ from annotation.sv_conservation import (
     score_sv_vcf,
     write_conservation_sidecar,
 )
-from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
+from annotation.vcf_files.import_vcf_annotations import (
+    import_vcf_annotations,
+    insert_vep_too_long_skipped,
+)
 from annotation.vep_annotation import (
     get_vep_command,
     get_vep_skipped_variants_filename,
@@ -44,10 +46,12 @@ class VEPRunner(AnnotationPipelineRunner):
         qs = super().get_variants_qs(annotation_run)
         if self.is_structural_variant and settings.ANNOTATION_VEP_SV_MAX_SIZE:
             # VEP will skip variants above a certain size and fill up the logs with 'too long to annotate'
-            # So just skip these. I don't think it makes much difference in memory usage
-            q_not_too_long = Q(svlen__isnull=True) | Q(abs_svlen__lte=settings.ANNOTATION_VEP_SV_MAX_SIZE)
-            qs = qs.annotate(abs_svlen=Abs("svlen")).filter(q_not_too_long)
+            # So just skip these - handle_vep_skipped / handle_empty_dump write their TOO_LONG rows
+            qs = filter_vep_sv_max_size(qs, settings.ANNOTATION_VEP_SV_MAX_SIZE, too_long=False)
         return qs
+
+    def handle_empty_dump(self, annotation_run):
+        insert_vep_too_long_skipped(annotation_run)
 
     def get_output_paths(self, annotation_run, dump_filename) -> list[str]:
         annotated_filename = get_annotated_filename(annotation_run, dump_filename)
@@ -141,6 +145,7 @@ class VEPRunner(AnnotationPipelineRunner):
             # Now we have standard/CNV type pipelines, it's possible some can be empty
             annotation_run.annotated_count = 0
             annotation_run.annotation_end = timezone.now()
+            self.handle_empty_dump(annotation_run)
 
         annotation_run.save()
 

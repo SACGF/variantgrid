@@ -59,6 +59,7 @@ const VCForm = (function() {
     let jShareButtons = null;
 
     let eKeys = null;
+    let eKeysBase = null;
     let vcLinks = null;
 
     const VCForm = function() {};
@@ -689,12 +690,6 @@ const VCForm = (function() {
 
                 $(`#label-${error.key}`).prepend(inlineError);
 
-                switch (error.severity) {
-                    case 'error': icon = '<i class="fas fa-exclamation-circle text-danger"></i>'; break;
-                    case 'warning': icon = '<i class="fas fa-exclamation-triangle text-warning"></i>'; break;
-                    case 'info': icon = '<i class="fas fa-info-circle text-primary"></i>'; break;
-                }
-
                 const listItem = $('<a>', {class: 'list-group-item list-group-item-action',  target: '_blank', click: () => {
                     jFilterBox.val('#' + eKey.key);
                     jFilterBox.keyup();
@@ -1083,7 +1078,7 @@ const VCForm = (function() {
         },
 
         cHGVS() {
-            vc_value = this.value(SpecialEKeys.C_HGVS);
+            const vc_value = this.value(SpecialEKeys.C_HGVS);
             if (vc_value) {
                 return vc_value;
             }
@@ -1621,7 +1616,7 @@ const VCForm = (function() {
                     ])
                 );
             } else {
-                descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
+                const descriptionSpan = eKey.description ? EKeys.fixDescription(eKey.description) : $('<i>', {text:'No help is provided for this field'});
                 if (this.isEditMode()) {
                     if (eKey.hide === true) {
                         descriptionSpan.append($('<br/><br/><i>This field is not shown by default for your lab.</i>'));
@@ -2440,11 +2435,13 @@ VCTable.format_hgvs = (parts) => {
         outterDom.prepend($('<dom>', {class: 'font-weight-bold', text: allele}));
     }
 
-    if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.always_show_genome_build)) {
+    if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.resolved_without_hgvs || parts.always_show_genome_build)) {
         const genomeBuildWrapper = $('<div>');
         let addNewLine = false;
         if (parts.normalized === false) {
             $('<span>', {html: 'not resolved<br/>showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+        } else if (parts.resolved_without_hgvs) {
+            $('<span>', {html: 'resolved, no c.HGVS<br/>showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else if (parts.desired === false) {
             $('<span>', {html: 'not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else {
@@ -2670,6 +2667,14 @@ VCTable.alleleGroupingIdentifier = (data, type, row) => {
     return dom;
 };
 
+// The grouping grid's expand URL (TableFormat.expandAjax looks it up on window): while the grid is filtered to a
+// sample, the expanded records lead with that sample's
+function classificationGroupingDetailUrl(groupingId) {
+    const url = Urls.classification_grouping_detail(groupingId);
+    const sampleId = $('#id_sample').val();
+    return sampleId ? `${url}?sample=${sampleId}` : url;
+}
+
 VCTable.groupIdentifier = (data, type, row) => {
     const id = data.id;
     const dirty = data.dirty;
@@ -2704,6 +2709,9 @@ VCTable.groupIdentifier = (data, type, row) => {
         dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"));
     } else if (classification_count === 0) {
         dom.append("-Invalid Record - no Classifications");
+    } else if (data.sample_record_count) {
+        // A grouping holds many samples' records - say how many of them made the sample filter match
+        dom.append($('<div>', {class:'text-muted text-small', text: `${data.sample_record_count} of ${classification_count} records from this sample`}));
     } else if (classification_count > 1) {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }

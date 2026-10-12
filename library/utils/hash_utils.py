@@ -2,7 +2,7 @@ import hashlib
 import json
 from hashlib import md5
 
-import deprecation
+from typing_extensions import deprecated
 
 
 def string_deterministic_hash(s: str) -> int:
@@ -21,7 +21,7 @@ def _hash_str(method: callable, s: str) -> str:
     return method(s_bytes).hexdigest()
 
 
-@deprecation.deprecated(details="Use sha256sum_str instead")
+@deprecated("Use sha256sum_str instead")
 def md5sum_str(s: str) -> str:
     return _hash_str(hashlib.md5, s)
 
@@ -44,7 +44,7 @@ def stable_dict_hash(d: dict) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
-@deprecation.deprecated(details="Use file_sha256sum instead")
+@deprecated("Use file_sha256sum instead")
 def file_md5sum(filename: str):
     m = md5()
     with open(filename, "rb") as f:

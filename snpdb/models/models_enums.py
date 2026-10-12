@@ -35,28 +35,8 @@ class UserAwardLevel(models.TextChoices):
 
 
 class UserAwardKind(models.TextChoices):
-    TITLE = "T", "Title"  # Held until someone takes it - crown/medal/trophy
     BADGE = "B", "Badge"  # Permanent once earned, tiered bronze/silver/gold
     KUDOS = "K", "Kudos"  # Hand-given by an admin
-
-
-class AwardPeriod(models.TextChoices):
-    ALL_TIME = "A", "all time"
-    MONTH = "M", "this month"
-    DAY = "D", "today"
-
-    @property
-    def icon(self) -> str:
-        return {
-            AwardPeriod.ALL_TIME: "fa-crown",
-            AwardPeriod.MONTH: "fa-medal",
-            AwardPeriod.DAY: "fa-trophy",
-        }[self]
-
-    @property
-    def rank(self) -> int:
-        """ ALL_TIME outranks MONTH outranks DAY """
-        return {AwardPeriod.ALL_TIME: 3, AwardPeriod.MONTH: 2, AwardPeriod.DAY: 1}[self]
 
 
 class ImportSource(models.TextChoices):
@@ -172,7 +152,7 @@ class TagFilter:
         return tag_ids
 
 
-class VariantsType(models.TextChoices):
+class VariantOrigin(models.TextChoices):
     UNKNOWN = 'U', 'Unknown'
     GERMLINE = 'G', 'Germline'
     MIXED = 'M', "Mixed (Single Sample)"
@@ -187,6 +167,8 @@ class SampleFileType(models.TextChoices):
     CRAM = 'C', 'CRAM'
     BED = 'E', 'BED'
     VCF = 'V', 'VCF'
+
+    ALIGNMENT_TYPES = Constant([e[0] for e in (BAM, CRAM)])  # Reads, ie what IGV is opened with
 
 
 class SequenceRole(models.TextChoices):

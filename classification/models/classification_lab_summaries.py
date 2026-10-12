@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.models.evidence_key import EvidenceKeyMap
 from snpdb.models import Lab
 
 
@@ -27,7 +28,8 @@ class ClassificationLabSummary:
         return self.group.allele_origin_bucket
 
     @property
-    def embedded(self):
+    def triage(self):
+        """ Only a DiscordanceLabSummary has a triage to show under the lab's row """
         return None
 
     @property
@@ -61,7 +63,6 @@ class ClassificationLabSummary:
 
     @property
     def sort_key(self):
-        from classification.models import EvidenceKeyMap
         key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         return key.classification_sorter_value(self.clinical_significance_to), key.classification_sorter_value(self.clinical_significance_from), self.pending, self.is_internal, self.lab
 

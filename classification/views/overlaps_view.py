@@ -13,7 +13,7 @@ from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, Overl
     OverlapOverrideStatus
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionNextStep
-from classification.enums.overlaps_enums import TriageState, TriageStatus
+from classification.enums.overlaps_enums import TriageDecision, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
 from classification.views.overlaps_datatables import OverlapColumns
@@ -192,7 +192,7 @@ class TriageView(AjaxFormView[OverlapContribution]):
             if triage_status != TriageStatus.REVIEWED_WILL_FIX or new_value == 'undecided':
                 new_value = None
 
-            triage.triage_state_obj = TriageState(
+            triage.triage_state_obj = TriageDecision(
                 triage_status,
                 new_value
             )
@@ -221,7 +221,7 @@ def view_overlap(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
     context = {
         "overlap_details": overlap_details
     }
-    return render_ajax_view(request, "classification/overlap_detail.html", context, menubar="classification")
+    return render_ajax_view(request, "classification/overlap_detail.html", context)
 
 
 def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
@@ -231,7 +231,7 @@ def view_overlap_history(request: HttpRequest, overlap_id: int) -> HttpResponseB
     context = {
         "overlap_grouping": overlap_grouping
     }
-    return render_ajax_view(request, "classification/overlap_history.html", context, menubar="classification")
+    return render_ajax_view(request, "classification/overlap_history.html", context)
 
 
 def overlap_report_review(request: HttpRequest, overlap_id: int) -> HttpResponseBase:
@@ -265,7 +265,7 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
     overlap: Overlap = review.reviewing.source_object
 
     if request.method == 'POST':
-        # check to see if user is involved in this overlap?
+        review.check_can_write(request.user)
         action = request.POST.get('action')
 
         review.user = request.user
@@ -292,9 +292,9 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                         old_effective_value = contribution.effective_value
                         if updated_value == contribution.value:
                             # actually doing a review to change a pending value back to the value that was originally there
-                            contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_SATISFACTORY)
+                            contribution.triage_state_obj = TriageDecision(TriageStatus.REVIEWED_SATISFACTORY)
                         else:
-                            contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_WILL_FIX, updated_value)
+                            contribution.triage_state_obj = TriageDecision(TriageStatus.REVIEWED_WILL_FIX, updated_value)
                         changes_dict.append({
                             "lab": contribution.lab.group_name,
                             "from": old_effective_value,

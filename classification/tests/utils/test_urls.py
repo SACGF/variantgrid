@@ -1,12 +1,14 @@
 import unittest
 
 from django.contrib.auth.models import User
+from django.urls.base import reverse
 
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
     create_classification_for_sample_and_variant_objects,
 )
 from classification.models import EvidenceKey
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import (
     Allele,
@@ -105,11 +107,11 @@ class Test(URLTestCase):
             # ("clinical_context", {"pk": self.allele.pk}, 200), # Needs clinical context on allele
         ]
         self._test_urls(ADMIN_URL_NAMES_AND_KWARGS, self.user_admin)
+        self._test_datatable_urls([("imported_allele_info_datatables", {}, 200)], self.user_admin)
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("classifications", {}, 200),
-            ("classification_groupings", {}, 200),
             ("classification_grouping_counts", {}, 200),
             ("export_classifications_grid", {}, 200),
             ("export_classifications_grid_redcap", {}, 200),
@@ -149,9 +151,17 @@ class Test(URLTestCase):
             ("clinvar_export_batch_datatables", {}, 200),
             ("clinvar_exports_datatables", {}, 200),
             ("condition_text_datatable", {"lab_id": self.lab.pk}, 200),
-            ("imported_allele_info_datatables", {}, 200),
         ]
         self._test_datatable_urls(GRID_LIST_URLS, self.user_owner)
+
+    def testUploadUnmappedDatatableOnlyUsersLabs(self):
+        upload = UploadedClassificationsUnmapped.objects.create(url="file:///tmp/fake.csv", filename="fake.csv",
+                                                                lab=self.lab, user=self.user_owner)
+        url = reverse("classification_upload_unmapped_datatable")
+        for user, expected_ids in [(self.user_owner, [upload.pk]), (self.user_non_owner, [])]:
+            self.client.force_login(user)
+            data = self.client.get(url, {"lab_id": self.lab.pk}).json()
+            self.assertEqual(expected_ids, [row["id"] for row in data["data"]])
 
     def testDataTablesGridListPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)

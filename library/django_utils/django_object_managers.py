@@ -5,7 +5,8 @@ from typing import Any, Optional
 from django.conf import settings
 from django.db.models import Manager, QuerySet
 from frozendict import frozendict
-from threadlocals.threadlocals import get_request_variable, set_request_variable
+
+from library.request_context import get_request_variable, set_request_variable
 
 
 @dataclass(frozen=True)

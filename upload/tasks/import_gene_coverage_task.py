@@ -9,6 +9,7 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.models import AnnotationConsortium, GeneCoverageCollection, TranscriptVersion
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
+from seqauto.models.models_seqauto import QCGeneCoverage
 from snpdb.models import DataState, GenomeBuild, Sample
 from upload.models import UploadedGeneCoverage
 from upload.tasks.import_task import ImportTask
@@ -62,7 +63,6 @@ class ImportGeneCoverageTask(ImportTask):
             # Only API or seqauto sets path - but seqauto won't call this method it just directly calls
             # GeneCoverageCollection.load_from_file
             if file_upload.path:
-                from seqauto.models import QCGeneCoverage
                 if qc_gene_coverage := QCGeneCoverage.objects.filter(path=file_upload.path).first():
                     logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
                     genome_build = qc_gene_coverage.qc.genome_build

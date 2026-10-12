@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.dispatch import receiver
 
-from annotation.models import VariantAnnotationVersion
+from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
 from library.preview_request import PreviewKeyValue, preview_extra_signal
@@ -119,19 +119,32 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     return extras + hgvs_extras
 
 
+def _variant_location_summary(va: VariantAnnotation) -> Optional[str]:
+    """ RefSeq annotation of MT genes has no transcript, so being in a gene doesn't mean a c.HGVS """
+    consequence = va.consequence or ""
+    if va.distance:
+        for direction in ["upstream", "downstream"]:
+            if direction in consequence:
+                return f"{va.distance}bp {direction} of {va.symbol}"
+    if "intergenic" in consequence:
+        return "intergenic"
+    if va.symbol:
+        return f"in {va.symbol}"
+    return None
+
+
 def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> list[PreviewKeyValue]:
+    """ c.HGVS where there's a canonical transcript, otherwise the g.HGVS and where it lies """
     hgvs_extras = []
     if c_hgvs := variant.get_canonical_c_hgvs(genome_build):
         hgvs_extras.append(PreviewKeyValue(None, c_hgvs, dedicated_row=True))
-    elif vav := VariantAnnotationVersion.latest(genome_build):
-        if va := variant.variantannotation_set.filter(version=vav).first():
-            variant_summary = "intergenic"
-            if va.distance:
-                for direction in ["upstream", "downstream"]:
-                    if direction in va.consequence:
-                        variant_summary = f"{va.distance}bp {direction} of {va.symbol}"
-                        break
-            hgvs_extras.append(PreviewKeyValue(None, variant_summary, dedicated_row=True))
+    else:
+        if hgvs_g := VariantAnnotation.get_hgvs_g(variant):
+            hgvs_extras.append(PreviewKeyValue(None, hgvs_g, dedicated_row=True))
+        if vav := VariantAnnotationVersion.latest(genome_build):
+            if va := variant.variantannotation_set.filter(version=vav).first():
+                if location_summary := _variant_location_summary(va):
+                    hgvs_extras.append(PreviewKeyValue(None, location_summary, dedicated_row=True))
 
     return hgvs_extras
 

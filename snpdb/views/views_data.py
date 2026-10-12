@@ -9,6 +9,7 @@ import pandas as pd
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.db import transaction
 from django.forms.models import inlineformset_factory
 from django.http import HttpRequest
 from django.http.response import (
@@ -31,24 +32,29 @@ from annotation.models import (
     VCFAnnotationStats,
 )
 from annotation.models.models import ManualVariantEntryCollection
-from annotation.models.models_phenotype_match import patient_phenotypes_for_samples
 from annotation.serializers import ManualVariantEntryCollectionSerializer
-from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from annotation.tasks.calculate_sample_stats import (
+    SAMPLE_STATS_CODE_VERSION,
+    enqueue_cohort_stats_recompute,
+)
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import (
     add_save_message,
     get_model_fields,
     set_form_read_only,
 )
+from library.django_utils.data_archive_mixin import DataArchivedError
 from library.utils import full_class_name
 from patients.forms import PatientForm
+from patients.models.models_phenotype import patient_phenotypes_for_samples
 from patients.views_json import get_patient_upload_csv
 from snpdb import forms
 from snpdb.archive import (
     ArchivePreconditionError,
-    DataArchivedError,
     check_vcf_archive_precondition,
     mark_vcf_archive_started,
+    restore_vcf,
+    vcf_can_be_archived,
 )
 from snpdb.forms import (
     SampleChoiceForm,
@@ -76,6 +82,12 @@ from snpdb.models import (
 )
 from snpdb.models.models_enums import (
     ImportStatus,
+)
+from snpdb.models.models_somalier import DUPLICATE_SAMPLE_RELATEDNESS
+from snpdb.sample_file_path import (
+    create_sample_file_paths,
+    get_vcf_samples_with_files,
+    resolve_sample_file_paths,
 )
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
@@ -178,7 +190,7 @@ def view_vcf(request, vcf_id):
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
 
     sample_stats_het_hom_count, sample_names, sample_zygosities = _get_vcf_sample_stats(vcf, passing_filter=False)
-    sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, passing_filter=True)
+    sample_stats_pass_het_hom_count, _, _ = _get_vcf_sample_stats(vcf, passing_filter=True)
     sample_genotype_stats = _get_vcf_sample_genotype_stats(vcf)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
@@ -271,7 +283,6 @@ def view_vcf(request, vcf_id):
                              _skipped_annotation_message(skipped_annotation_count, "vcf-skipped-annotation"),
                              extra_tags='html import-message')
 
-    from snpdb.archive import vcf_can_be_archived
     can_archive = has_write_permission and vcf_can_be_archived(vcf)
     restore_source_exists = bool(vcf.data_restorable_from) and os.path.exists(vcf.data_restorable_from)
     restore_source_kind = "uploaded"
@@ -335,7 +346,6 @@ def archive_vcf_view(request, vcf_id):
 
 
 def restore_vcf_view(request, vcf_id):
-    from snpdb.archive import restore_vcf
     vcf = VCF.get_for_user(request.user, vcf_id)
     if not vcf.can_write(request.user):
         raise PermissionDenied("You do not have write permission for this VCF")
@@ -391,7 +401,7 @@ def _sample_stats(sample) -> Optional[SampleStats]:
     variant_class_data = {}
     zygosity_data = {}
     annotated_data = {}
-    missing_stats = False
+    stale_stats = False
     for stats_klass, (variant_class_name, zygosity_name, shared_fields) in STATS.items():
         base_kwargs = {
             "cohort_genotype_collection": cgc,
@@ -403,10 +413,14 @@ def _sample_stats(sample) -> Optional[SampleStats]:
 
         objs = {}
         try:
-            objs[False] = stats_klass.objects.get(passing_filter=False, **base_kwargs)
+            objs[False] = stats_klass.objects.select_related("code_version").get(passing_filter=False,
+                                                                                 **base_kwargs)
+            # Rows from older stats code are still shown, and recomputed for the next view
+            if objs[False].code_version.version < SAMPLE_STATS_CODE_VERSION:
+                stale_stats = True
         except ObjectDoesNotExist:
             # Stats absent for the latest annotation version (eg it was bumped since import)
-            missing_stats = True
+            stale_stats = True
 
         try:
             objs[True] = stats_klass.objects.get(passing_filter=True, **base_kwargs)
@@ -452,20 +466,16 @@ def _sample_stats(sample) -> Optional[SampleStats]:
         zygosity_df = zygosity_df.sum().to_frame("all").T
     annotated_df = pd.DataFrame.from_dict(annotated_data).reindex(list(ANNOTATED.values()))
 
-    if missing_stats:
+    if stale_stats:
         enqueue_cohort_stats_recompute(cohort, annotation_version)
 
     return SampleStats(variant_class_df, zygosity_df, annotated_df)
 
 
-# A pair this close is the same DNA, so two different patients means a sample swap or a mislabel (#196)
-DUPLICATE_SAMPLE_RELATEDNESS = 0.9
-
-
-def _related_samples(sample: Sample) -> list[dict]:
+def _related_samples(sample: Sample, user) -> list[dict]:
     """ The other sample of each pair, with how its patient lines up with this one's """
     # Sample.__str__ names its VCF, so pull that in too or the table is an N+1
-    pairs_qs = SomalierRelatePairs.get_for_sample(sample) \
+    pairs_qs = SomalierRelatePairs.get_for_sample(sample, user) \
         .select_related("sample_a__patient", "sample_a__vcf",
                         "sample_b__patient", "sample_b__vcf").order_by("-relatedness")
     related_samples = []
@@ -482,7 +492,7 @@ def _related_samples(sample: Sample) -> list[dict]:
     return related_samples
 
 
-def _somalier_sample_context(sample: Sample) -> dict:
+def _somalier_sample_context(sample: Sample, user) -> dict:
     """ Each stage's status, so a failed or skipped one shows on the page instead of nothing at all """
     vcf_extract = SomalierVCFExtract.objects.filter(vcf=sample.vcf).first()
     if vcf_extract is None:
@@ -495,7 +505,7 @@ def _somalier_sample_context(sample: Sample) -> dict:
         "somalier_sample_extract": sample_extract,
         "somalier_stages": vcf_extract.get_stages(),
         "somalier_relatedness": settings.SOMALIER["relatedness"],
-        "related_samples": _related_samples(sample),
+        "related_samples": _related_samples(sample, user),
     }
 
 
@@ -525,7 +535,7 @@ def view_sample(request, sample_id):
     patient_form = PatientForm(user=request.user)  # blank
     somalier_context = {}
     if settings.SOMALIER.get("enabled"):
-        somalier_context = _somalier_sample_context(sample)
+        somalier_context = _somalier_sample_context(sample, request.user)
 
     # Stats only exist (and a missing row is only worth a recompute) once the import has finished
     sample_stats = None
@@ -554,7 +564,7 @@ def view_sample(request, sample_id):
         'patient_form': patient_form,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,
-        "bam_list": sample.get_bam_files(),
+        "alignment_file_list": sample.get_alignment_files(),
         "sample_stats": sample_stats,
         "sample_genotype_stats": sample_genotype_stats,
         "skipped_annotation_count": skipped_annotation_count,
@@ -567,6 +577,7 @@ def view_sample(request, sample_id):
 def sample_files_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     if request.method == "POST":
+        sample.check_can_write(request.user)
         sample_files_formset = forms.SampleFilesFormSet(request.POST, instance=sample)
         valid = sample_files_formset.is_valid()
         if valid:
@@ -582,6 +593,48 @@ def sample_files_tab(request, sample_id):
         'has_write_permission': sample.can_write(request.user),
     }
     return render(request, 'snpdb/data/sample_files_tab.html', context)
+
+
+def vcf_sample_files_tab(request, vcf_id):
+    """ Bulk add a BAM/CRAM to every sample in a VCF from a pattern (#647) - preview first, then save """
+    vcf = VCF.get_for_user(request.user, vcf_id)
+    has_write_permission = vcf.can_write(request.user)
+    resolutions = None
+    if request.method == "POST":
+        vcf.check_can_write(request.user)
+        form = forms.VCFSampleFilesPatternForm(request.POST)
+        if form.is_valid():
+            pattern = form.cleaned_data["pattern"]
+            file_type = form.cleaned_data["file_type"]
+            resolutions = resolve_sample_file_paths(vcf, pattern, file_type)
+            if request.POST.get("action") == "save":
+                with transaction.atomic():
+                    created = create_sample_file_paths(resolutions, file_type, form.cleaned_data["label"])
+                already_present = sum(r.already_exists for r in resolutions)
+                skipped = [r.sample.name for r in resolutions if r.error]
+                message = f"Added {len(created)}, {already_present} already present, {len(skipped)} skipped"
+                if skipped:
+                    message += f" ({', '.join(skipped)})"
+                messages.add_message(request, messages.INFO, message)
+                resolutions = resolve_sample_file_paths(vcf, pattern, file_type)  # show new rows as present
+        else:
+            add_save_message(request, False, "Sample Files")
+    else:
+        form = forms.VCFSampleFilesPatternForm()
+
+    if resolutions is None:
+        samples_and_resolutions = [(sample, None) for sample in get_vcf_samples_with_files(vcf)]
+    else:
+        samples_and_resolutions = [(r.sample, r) for r in resolutions]
+
+    context = {
+        "vcf": vcf,
+        "form": form,
+        "samples_and_resolutions": samples_and_resolutions,
+        "has_resolutions": resolutions is not None,
+        "has_write_permission": has_write_permission,
+    }
+    return render(request, 'snpdb/data/vcf_sample_files_tab.html', context)
 
 
 def sample_variants_tab(request, sample_id):
@@ -639,6 +692,7 @@ def view_genomic_intervals(request, genomic_intervals_collection_id):
 
     form = forms.GenomicIntervalsCollectionForm(request.POST or None, instance=gic)
     if request.method == "POST":
+        gic.check_can_write(request.user)
         valid = form.is_valid()
         if valid:
             gic = form.save()

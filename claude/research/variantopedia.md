@@ -1,124 +1,134 @@
-# VariantGrid Variantopedia App — Reference Document
+# variantopedia — research notes
 
-## Purpose and Overview
+Verified against a96540a68 on 2026-09-25
 
-The `variantopedia` app is the variant encyclopedia and metadata search module. It provides the primary interface for searching, viewing, and managing variant data, plus server health monitoring.
+variantopedia owns no models (`claude/maps/models.md#variantopedia` is empty). It is the read side of the variant
+database: the variant and allele pages, search, the All Variants and tag work-list pages, the tag stats page, the
+nearby-variants summaries, and the superuser server status pages. Everything it shows lives in snpdb, annotation,
+classification, analysis (VariantTag) and seqauto; this app composes it. URLs, the one task, the one signal receiver and
+the two commands are in the generated maps ([urls](../maps/urls.md#variantopedia), [tasks](../maps/tasks.md#variantopedia),
+[commands](../maps/commands.md), [signals](../maps/signals.md)); `claude/domain.md` has the vocabulary.
 
-**Key Design:** No new models defined; orchestrates data from snpdb, annotation, classification, genes, and analysis apps into comprehensive variant views.
+## Flows
 
----
+### Variant page
 
-## Key Views and URL Patterns
+`variantopedia/views.py:view_variant` picks a build (URL, else the user's default build if the variant is in it, else
+`Variant.any_genome_build` - contigs such as MT sit in several builds), sets it on
+`snpdb/genome_build_manager.py:GenomeBuildManager`, and hands off to
+`variantopedia/views.py:variant_details_annotation_version` with the build's latest AnnotationVersion. That view is also
+reachable directly with an explicit annotation version id, with the bare `variant_details.html` template - analysis
+grids load it that way from `grid.js`. It builds
+`annotation/transcripts_annotation_selections.py:VariantTranscriptSelections` for the transcript picker, the canonical
+transcripts per enrichment kit (`variantopedia/views.py:get_genes_canonical_transcripts`), the VariantAllele/ClinGen data
+(left out when `needs_clingen_call()` so the page fetches it asynchronously), tag presence across the allele's builds,
+and the short label the page title uses. Gene-level variants (fusion, copy number, splice event) are resolved by
+`_get_gene_fusion` / `_get_gene_copy_number_event` / `_get_splice_event_variant` in `variantopedia/views.py` and shown
+in place of a coordinate. Tabs load separately: nearby variants, sample information
+(`variantopedia/views.py:variant_sample_information` is a shell; the grid and counts are drawn client side from the
+`variant_sample_genotypes` API), and the tag counts grid (`variantopedia/grids.py:VariantTagCountsColumns`) whose rows
+expand to `variantopedia/grids.py:VariantTagDetailColumns`. `variantopedia/views.py:variant_grid_row_detail` is the
+expanded row under any variant grid row (transcripts, classifications, ClinVar, build variants) - `grid.js` calls it.
 
-### Core Variant Views
-- `variants(request, genome_build_name=None)` — `/variants` — Entry point for variant browsing
-- `view_variant(request, variant_id, genome_build_name=None)` — `/view_variant/<variant_id>` — Main variant detail page; handles genome build selection; includes IGV data
-- `variant_details_annotation_version(request, variant_id, annotation_version_id, template, extra_context)` — `/view/<variant_id>/<annotation_version_id>` — Core variant details with specific annotation version; generates transcript selections, canonical transcripts, annotation descriptions
-- `view_variant_annotation_history(request, variant_id)` — `/view_variant_annotation_history/<variant_id>` — Historical annotation versions
+### Allele page
 
-### Search and Discovery
-- `search(request)` — `/search` — Multi-type search; supports SearchForm and SearchAndClassifyForm; auto-redirects to single preferred result
+`variantopedia/views_allele.py:view_allele` (also at `/a<id>`) shows the allele across builds: the
+`classification/variant_card.py:AlleleCard`, and the valid classification `Overlap` rows for the allele split into
+single-context and cross-context (`classification/models/overlaps_model.py:Overlap`). `view_allele_from_variant` redirects variant to allele only when
+`PREFER_ALLELE_LINKS` is on. `create_variant_for_allele` (POST) re-runs liftover from the allele's imported (non-liftover)
+build into the requested build, retrying every conversion tool; with no imported VariantAllele it silently just
+redirects.
 
-### Allele Views
-- `view_allele(request, allele_id)` — `/view_allele/<allele_id>` or `/a<allele_id>` — Allele-level data across all genome builds; AlleleOriginGrouping descriptions with overlap status; classification filtering per user; ClinGen Allele Registry link
-- `view_allele_from_variant(request, variant_id)` — Redirects variant to linked allele (respects PREFER_ALLELE_LINKS setting)
-- `export_classifications_allele(request, allele_id)` — CSV export of classifications for an allele
-- `create_variant_for_allele(request, allele_id, genome_build_name)` — POST; creates liftover pipelines across genome builds
+### Search
 
-### Variant Tagging
-- `variant_tags(request, genome_build_name=None)` — `/variant_tags/` — Lists all variant tags with counts
-- `variant_tag_detail(request, variant_id, tag)` — Details for a specific tag on a variant
-- `variant_tags_export(request, genome_build_name)` — CSV export of tags grid
-- `tagged_variant_export(request, genome_build_name)` — CSV export of tagged variants grid
+`variantopedia/views.py:search` is a thin shell over `snpdb/search.py:search_data` - the search machinery lives in snpdb.
+Every call is logged with `create_event` (even an empty search, which is made so the page can list the enabled search
+types), and a single preferred result redirects straight to it unless `mode=preview`. `?classify` swaps in
+`variantopedia/forms.py:SearchAndClassifyForm`, which search passes on so results offer "create classification".
 
-### Server Administration (superuser only)
-- `server_status(request)` — `/server_status` — Comprehensive health monitoring: Celery workers, long-running SQL queries, reference FASTA accessibility, disk usage, variant annotation status; actions: Test Slack, Health Check, Test Rollbar, Kill PID
-- `server_status_activity(request, days_ago)` — `/server_status_activity/detail/<int:days_ago>` — Historical activity with dashboard notices
-- `server_status_settings(request)` — HGVS matcher status, import run overview
-- `health_check_details(request)` — `/health_check_details` — Detailed health check results from all registered signals
-- `database_statistics(request)` — `/database_statistics/detail` — Variant upload statistics; cumulative samples/variants/genotypes
+### All Variants page
 
-### Analysis Views
-- `nearby_variants_tab(request, variant_id, annotation_version_id)` — Nearby variants (tab format)
-- `nearby_variants(request, variant_id, annotation_version_id)` — Full nearby variants page
-- `variant_sample_information(request, variant_id, genome_build_name)` — Sample-level info; multiallelic handling
-- `gene_coverage(request, gene_symbol_id)` — Gene-level 20x coverage statistics
-- `variant_wiki(request, genome_build_name=None)` — Variant wiki with markdown editing
-- `dashboard(request)` — User-facing dashboard; latest sequencing VCFs, sample enrichment, case existence check
+`variantopedia/grids.py:AllVariantsGrid` over the build's latest annotation version. The chromosome / gene / variant type
+/ min sample count controls are applied on a Search click (`variantopedia/templates/variantopedia/variants.html`); a
+direct grid hit (CSV export, bookmark) falls back to the user's last saved filters
+(`snpdb/variant_filters.py:get_all_variants_filters`). With no selective filter
+(`snpdb/variant_filters.py:is_selective`) the grid matches nothing rather than scanning the table. Nothing is sortable:
+every page is in `(contig, position, pk)` order, which streams off the `snpdb_locus` unique index (#1663).
+`AllVariantsGrid.paging` takes the page's pks first and only then joins the annotation columns for those rows (#1887);
+a gene filter is bounded by the gene's locus span (`snpdb/variant_filters.py:get_gene_bounds_q`) so it seeks.
+`AllVariantsGrid.known_count` reports the planner's row estimate (`~1.2M`) instead of a COUNT(*) once it passes
+`APPROXIMATE_COUNT_MIN`.
 
----
+### Tags: work list, stats
 
-## Business Logic
+`variantopedia/views.py:variant_tags` pairs two grids that share one filter state: `VariantTagsColumns` (one row per
+tagging) and `TaggedVariantGrid` (one row per variant, with a tag-events count), both in `variantopedia/grids.py`. Both
+start from `analysis/models/models_variant_tag.py:VariantTag.get_for_build`, so a tagging shows in a build once its allele
+has a variant there, or immediately in the build it was made in (before liftover assigns the allele). The build's
+coordinate is picked with a `FilteredRelation` on the allele's VariantAllele, coalesced to the tag's own variant
+(`VariantTagsColumns._build_variant_field`), and annotation is joined through the build's partition
+(`_annotation_version_queryset`). Resolved taggings (a classify-queue tag whose classification exists) are hidden unless
+the tag config says show them or the page flips `show_resolved` for one view
+(`variantopedia/grids.py:show_resolved_variant_tags`, #1901). Without `show_group_data` a user sees only their own
+taggings; an explicit user filter overrides that but stays permission checked. The CSV export
+(`variantopedia/views.py:variant_tags_export`) streams straight off the grid's queryset rather than paging it.
 
-### Nearby Variant Discovery
-Multiple search strategies based on variant location:
-- **Codon**: Variants in same codon
-- **Exon**: Variants in same exon
-- **Domain**: Variants in overlapping protein domains
-- **Gene**: Variants in overlapping gene(s)
-- **Range**: Variants within configurable distance (e.g., 50bp)
-Each returns filtered queryset plus summary text; supports clinical significance filtering.
+`variantopedia/views_tag_stats.py` (#1751) is a skeleton page whose cards each fetch a JSON endpoint cached in Redis per
+user and parameters for a day (`_cached_json`). It counts on allele, so there is no build switch; tags with no allele yet
+are a separate count. Only tags the user can see are counted, and an allele origin radio narrows every card.
 
-### Allele Origin Grouping Analysis (AlleleOriginGroupingDescription)
-Categorizes classifications by AlleleOriginBucket (germline, somatic, etc.) and analyzes overlap status:
-- AGREEMENT, CONFIDENCE, DISCORDANCE, MEDICALLY_SIGNIFICANT_DISCORDANCE
-- SINGLE_SUBMITTER, NO_SHARED_RECORDS, NOT_COMPARABLE
+### Nearby variants
 
-### Server Health Monitoring
-- Celery worker inspection via Celery control API
-- Long-running query detection from PostgreSQL pg_stat_activity (`RunningQuery` dataclass)
-- Reference genome accessibility verification
-- Disk space monitoring with thresholds
+`variantopedia/interesting_nearby.py:get_nearby_qs` gives querysets for the same codon, exon, InterPro domain, a
+`VARIANT_DETAILS_NEARBY_RANGE` window and (if `VARIANT_DETAILS_NEARBY_SHOW_GENE`) each overlapping gene;
+`get_nearby_summaries` / `interesting_counts` aggregate each into a text summary (variant count, classification and
+ClinVar counts by clinical significance, DB zygosity sums) plus tag counts. `variantopedia/grids.py:NearbyVariantsGrid`
+shows one region's queryset.
 
----
+The nearby tab (`variantopedia/views.py:nearby_variants_tab`) loads with every variant page and a slow query holds a
+sync gunicorn worker for each, so it runs under `VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS` and shows a message
+when cancelled (#2137). The codon / exon / domain lookups skip rows with no transcript
+(`variantopedia/interesting_nearby.py:_variant_transcript_annotation_qs`) - MT tRNA/rRNA have none -
+because a NULL key becomes `transcript_id IS NULL`, which scans the partition and counts every unmatched transcript.
+Per-gene rows are off by default (`VARIANT_DETAILS_NEARBY_SHOW_GENE`, #771) at seconds per gene (#765). Cancelling
+on client disconnect and short timeouts for the other variant page tabs are still open on #2137.
 
-## Grids
+### Server status (superuser)
 
-- **AllVariantsGrid** — All variants in a genome build; customizable columns; every page served in genomic
-  order, nothing user-sortable (`variantopedia/grids.py:AllVariantsGrid`). The chromosome / gene symbol /
-  variant type / min sample count controls are applied on a **Search** click - one filter save and one grid
-  request per search (`variantopedia/templates/variantopedia/variants.html`). A page is served in two phases:
-  the pks off the filtered, ordered queryset, then the columns for those pks
-  (`variantopedia/grids.py:AllVariantsGrid.paging`), and a gene filter is bounded by the locus range the
-  gene's variants span (`snpdb/variant_filters.py:get_gene_bounds_q`) so it seeks rather than scans.
-- **NearbyVariantsGrid** — Variants near a target; filter by region type (codon, exon, domain, range, genes)
-- **VariantTagsGrid** — Tag-centric (one row per tag-variant pair); filter by analysis/gene/tag
-- **TaggedVariantGrid** — Variant-centric (variants that have tags); filter by specific tag
-- **VariantTagCountsColumns** — Tag counts per variant; expandable detail rows
-- **VariantWikiColumns** — Variant wiki entries; filter by genome build
+`variantopedia/views_server_status.py:server_status` pings celery workers by the names in `CELERY_WORKER_NAMES` (plus
+analysis / heavy workers when enabled), lists long-running SQL (`library/django_utils/database_utils.py:long_running_sql`),
+checks reference FASTA access, whether the highest variant is annotated, disk and integration status, and handles POST
+actions (Test Slack, Health Check, Test Rollbar, run-integration, kill-pid via `signal_backends`). The tabs
+(`server_status_activity`, `server_status_settings`, `health_check_details`, `database_statistics`) are loaded
+separately. Health data comes from `library/health_check.py`: apps answer `health_check_signal` (recent activity) and
+`health_check_overall_stats_signal` (totals); this app contributes
+`variantopedia/signals/integration_health_check.py:integration_health_check`. The nightly Slack digest is
+`variantopedia/tasks/server_status_tasks.py:notify_server_status` (beat at 19:00, `variantgrid/celery.py`), gated on
+`HEALTH_CHECK_ENABLED`.
 
----
+The two commands (`deployment_check`, `download_annotation_data`) are deploy tooling, unrelated to the pages.
 
-## Forms
-- **SearchForm** — search (CharField), mode (optional "preview")
-- **SearchAndClassifyForm** — extends SearchForm; adds classify (BooleanField, hidden)
+## Why it is shaped this way
 
----
+The app is a presentation layer so that the heavy logic stays next to its data: search in snpdb, annotation selection in
+annotation, overlaps in classification. What is left here is page composition and grid query shaping, and the grid
+decisions are all about the size of `snpdb_variant`: no user sorting, pk-then-columns paging, estimated counts, and a
+match-nothing default on All Variants, each because the alternative blows the statement timeout (#1279, #1651, #1663,
+#1887). The tag grids key on allele rather than variant so a tagging follows the variant across builds, and the tag stats
+page goes further and drops builds entirely, because counting per build double-counts lifted-over tags.
 
-## Template Tags
+## Traps
 
-**nearby_variants_tags.py:**
-- `@nearby_variants(context, variant, annotation_version, clinical_significance=True)` — inclusion_tag; displays nearby variants within variant details context
+Viewing a page writes: `view_allele` calls `snpdb/clingen_allele.py:link_allele_to_existing_variants` (may create
+VariantAlleles) and both pages call `annotation/models/models.py:ClinVarRecordCollection.set_allele_for_variants`, which
+backfills `allele` on ClinVar record collections so the ClinVar AJAX finds them. A read-only replica would break these
+pages.
 
----
+`variant_details_annotation_version` swallows any exception from transcript selection with `log_traceback` (an
+unannotated variant is expected to fail there), so a real bug in that path shows up as a page missing its transcript
+panel, not a 500 - check the logs.
 
-## Key Data Structures
-
-**ShareLevelRecordCounts** (dataclass): Classification share level statistics with lab_count.
-
----
-
-## Integration Points
-
-| App | Integration |
-|-----|-------------|
-| snpdb | Variant, Allele, Sample, VCF, GenomeBuild models; variant search; IGV data; Tag/UserSettings |
-| annotation | VariantAnnotation, AnnotationVersion, transcript annotations, canonical transcripts |
-| classification | Classification, AlleleOriginGrouping, DiscordanceReport, ClassificationGrouping, ClinicalSignificance |
-| genes | GeneSymbol, CanonicalTranscript, transcript selection logic |
-| analysis | VariantTag model for user-created variant tags |
-| seqauto | VCFFromSequencingRun, sample enrichment kits, 20x gene coverage stats |
-| eventlog | Event logging for search actions |
-| pathtests | Cases for user functionality |
-| patients | Clinician model for role-based access |
-| library | Health check signals, health_check_signal aggregation |
+Tag counts in `variantopedia/interesting_nearby.py:interesting_counts` are a separate query over
+`VariantTag.get_for_build` / `VariantTag.filter_for_user`, deliberately outside the aggregate that joins
+classifications, which would repeat every tag once per classification on the allele and count every user's tags. The codon / exon / domain lookups there take the `VariantAnnotationVersion` so historical partitions stay out.
+`variantopedia/views_server_status.py:server_status` redirects after a POST action, so a refresh repeats nothing.

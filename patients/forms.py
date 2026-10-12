@@ -18,17 +18,21 @@ from uicore.widgets.date_widget import NativeDateInput
 
 
 class PatientForm(forms.ModelForm):
+    # Patient._deceased under a name templates can reach (they can't look up a leading underscore)
+    MODEL_ATTRIBUTES = {"deceased": "_deceased"}
+
     population = forms.MultipleChoiceField(
         required=False,
         widget=forms.CheckboxSelectMultiple,
         choices=PopulationGroup.choices,
     )
+    deceased = forms.NullBooleanField(required=False, help_text="For when the date of death is unknown")
 
     class Meta:
         model = Patient
         # patient_code first - the de-identified code we want people to enter and that's shown everywhere
         fields = ['patient_code', 'family_code', 'first_name', 'last_name',
-                  'date_of_birth', 'date_of_death', 'sex',
+                  'date_of_birth', 'date_of_death', 'deceased', 'sex',
                   'consanguineous', 'affected', 'phenotype']
         widgets = {'first_name': TextInput(attrs={'placeholder': 'First Name'}),
                    'last_name': TextInput(attrs={'placeholder': 'Last Name'}),
@@ -47,10 +51,17 @@ class PatientForm(forms.ModelForm):
             self.old_patient_data = instance.__dict__.copy()
             pop_set = instance.patientpopulation_set.all()
             initial["population"] = list(set(pop_set.values_list("population", flat=True)))
+            initial["deceased"] = True if instance.date_of_death else instance._deceased
         else:
             self.old_patient_data = {}
 
         super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("date_of_death") and cleaned_data.get("deceased") is False:
+            self.add_error("deceased", "A patient with a date of death is deceased")
+        return cleaned_data
 
     def create_patient_modification(self, description):
         PatientModification.objects.create(patient=self.instance,
@@ -60,6 +71,8 @@ class PatientForm(forms.ModelForm):
 
     def save(self, commit=True):
         patient = super().save(commit=False)
+        # Patient keeps only one of the two - Patient.deceased already reads date_of_death
+        patient._deceased = None if patient.date_of_death else self.cleaned_data["deceased"]
         if commit:
             created = patient.pk is None
             patient.save(phenotype_approval_user=self.user)
@@ -71,9 +84,10 @@ class PatientForm(forms.ModelForm):
 
             changed = []
             for f in self.changed_data:
-                if f in self.old_patient_data:  # Only care about fields on the patient model
-                    old_val = self.old_patient_data[f]
-                    new_val = getattr(patient, f)
+                attribute = self.MODEL_ATTRIBUTES.get(f, f)
+                if attribute in self.old_patient_data:  # Only care about fields on the patient model
+                    old_val = self.old_patient_data[attribute]
+                    new_val = getattr(patient, attribute)
                     changed.append(f"{f}: '{old_val}' to '{new_val}'")
 
             if changed:

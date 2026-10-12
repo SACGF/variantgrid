@@ -17,7 +17,6 @@
     $("#mirror-exclude").change(function() { mirrorCheckbox(this, $("#id_exclude")); });
 
 {% if pathology_tests_enabled and pathology_test_category %}
-    const PATHOLOGY_TEST_STALE_WARNING_DAYS = {{ pathology_test_stale_warning_days }};
     const ptvSelect = $("#id_pathology_test_version");
 
     function showPathologyTestInfo() {
@@ -42,11 +41,6 @@
             if (data.pathology_test && data.pathology_test.curator) {
                 container.append($("<div>").append($("<b>", {text: "Curator: "}))
                     .append(document.createTextNode(data.pathology_test.curator.username)));
-            }
-            if (ageDays > PATHOLOGY_TEST_STALE_WARNING_DAYS) {
-                container.append($("<div>", {class: "warning",
-                    text: "This test was last modified " + ageDays + " days ago and may be out of date - " +
-                          "check the current gene list via the test link above."}));
             }
         });
     }
@@ -149,13 +143,6 @@
             </div>
         </div>
     </div>
-    {% if node.accordion_panel == 4 and panel_app_warnings %}
-        {% for w in panel_app_warnings %}
-            <div class='warning'>{{ w }}</div>
-        {% endfor %}
-        <div class="editor-help">Save this node to check/update PanelApp panels</div>
-    {% endif %}
-
     {# Analysis template "add output node" checkbox #}
     {% if form.output_node %}
         <div class="editor-row">

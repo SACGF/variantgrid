@@ -2,7 +2,7 @@
 ManualOperation: a migration operation that registers a deploy-time task (a management command to
 run, or a step for a human) as a ManualMigrationTask instead of doing work itself. Build one with
 ManualOperation.operation_manage / operation_other or task_id_manage, and pass `test=` (receives
-`apps`) so the task only registers when the deployment has data that needs it. The migrator and
+`apps`) so the task only registers when the deployment has data that needs it. The upgrader and
 `manage.py manual_outstanding` surface what is registered; manual/__manual_readme.md has the procedure.
 """
 from collections.abc import Callable
@@ -20,7 +20,7 @@ class ManualOperation(Operation):
                  requires: Optional[list[str]] = None):
         """ test - optional callable, only create manual operation if test returns True
             requires - gate names (see manual.gates) that must be satisfied before this task
-                       may be auto-run by the migrator """
+                       may be auto-run by the upgrader """
         self.task_id = task_id
         self.note = note
         self.test = test

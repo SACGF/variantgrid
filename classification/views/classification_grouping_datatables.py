@@ -4,7 +4,7 @@ from functools import cached_property, reduce
 from typing import Optional, Tuple
 
 from django.conf import settings
-from django.db.models import F, Q, QuerySet
+from django.db.models import Count, F, Q, QuerySet
 from django.http import HttpRequest
 from more_itertools import first
 from rest_framework.request import Request
@@ -16,7 +16,7 @@ from classification.enums import (
     EvidenceCategory,
     LabExternalFilter,
     ShareLevel,
-    TriageState, TriageStatus, TestingContextBucket, ClassificationResultValue,
+    TriageDecision, TriageStatus, TestingContextBucket, ClassificationResultValue,
 )
 from classification.models import (
     Classification,
@@ -89,7 +89,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "testing_context_bucket": testing_context,
             "testing_context_bucket_label": testing_context_bucket_label,
             "matches": matches,
-            "search": search
+            "search": search,
+            "sample_record_count": self._page_sample_record_counts.get(row.get("id"))
         }
 
     # def render_latest_curation_date(self, row: CellData) -> JsonDataType:
@@ -150,18 +151,24 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     return c_hgvs.to_json()
 
             imported_hgvs = row["latest_allele_info__imported_c_hgvs"] or row["latest_allele_info__imported_g_hgvs"]
-            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS
-            for index, genome_build in enumerate(self.genome_build_prefs):
+            imported_genome_build = None
+            if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
+                imported_genome_build = GenomeBuild.get_name_or_alias(raw_genome_build)
+
+            # A variant HGVS can't write (a gene-level event, a symbolic CNV) matches without getting a c.HGVS.
+            # The imported value is shown, so it is labelled with the build it was imported against
+            for genome_build in self.genome_build_prefs:
                 if row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "variant_id")):
-                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=genome_build,
-                                               is_normalised=True, is_desired_build=index == 0)
+                    display_genome_build = imported_genome_build or genome_build
+                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=display_genome_build,
+                                               is_normalised=True,
+                                               is_desired_build=display_genome_build == first(self.genome_build_prefs),
+                                               is_resolved_without_hgvs=True)
                     return c_hgvs.to_json()
 
             # could be dirty and not have a latest_allele_info
-            if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
-                c_hgvs = HGVSDisplay.parse(imported_hgvs,
-                                           genome_build=GenomeBuild.get_name_or_alias(raw_genome_build),
-                                           is_normalised=False)
+            if imported_genome_build:
+                c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=imported_genome_build, is_normalised=False)
                 return c_hgvs.to_json()
             else:
                 return {}
@@ -197,7 +204,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             for cm in sorted(page_cms, key=lambda mod: mod.curated_date_check):
                 self._page_grouping_modifications[cm.page_grouping_id].append(cm)
 
-        overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageState] = {}
+        self._page_sample_record_counts = {}
+        if sample_id := self.sample_filter_id:
+            self._page_sample_record_counts = dict(
+                ClassificationGroupingEntry.objects.filter(grouping_id__in=[row["id"] for row in rows],
+                                                           classification__sample_id=sample_id)
+                .values("grouping_id").annotate(sample_record_count=Count("pk"))
+                .values_list("grouping_id", "sample_record_count")
+            )
+
+        overlap_pending: dict[Tuple[ClassificationResultValue, int], TriageDecision] = {}
         for overlap_cont in OverlapContribution.objects.filter(
                 classification_grouping__in=qs,
                 triage_state__status=TriageStatus.REVIEWED_WILL_FIX).only('triage_state', 'value_type', 'classification_grouping_id'):
@@ -301,7 +317,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if user_id := self.get_query_param('user'):
                 filters.append(self.classification_filter_to_grouping(Q(user__pk=user_id)))
 
+        if sample_id := self.sample_filter_id:
+            filters.append(self.classification_filter_to_grouping(Q(sample__pk=sample_id)))
+
         return qs.filter(*filters)
+
+    @cached_property
+    def sample_filter_id(self) -> Optional[str]:
+        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
+            return self.get_query_param('sample')
+        return None
 
     @cached_property
     def discordance_report(self) -> Optional[DiscordanceReport]:
@@ -396,12 +421,13 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.csv_name = "classifications"
-        self.overlap_pending: dict[int, TriageState] = {}
+        self.overlap_pending: dict[int, TriageDecision] = {}
+        self._page_sample_record_counts: dict[int, int] = {}
 
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classification_grouping_detail',
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classificationGroupingDetailUrl',
                                                                        expected_height=108)
         self.rich_columns = [
             RichColumn(
@@ -463,10 +489,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ),
             RichColumn(
                 name="Classification",
-                sort_keys=[
-                    "latest_classification_modification__classification__summary__pathogenicity__sort",
-                    "latest_classification_modification__classification__summary__somatic__sort"
-                ],
+                sort_keys=["latest_pathogenicity_sort", "latest_somatic_sort"],
                 client_renderer='VCTable.classification',
                 renderer=self.render_pathogenic,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
@@ -482,10 +505,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 name='somatic_clinical_significances',
                 label='Somatic Clinical<br/>Significance',
                 client_renderer="VCTable.somatic_clinical_significance",
-                sort_keys=[
-                    'latest_classification_modification__classification__summary__somatic__sort',
-                    'latest_classification_modification__classification__summary__pathogenicity__sort',
-                ],
+                sort_keys=["latest_somatic_sort", "latest_pathogenicity_sort"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
@@ -515,7 +535,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
                 label='<span class="text-secondary">Latest</span><br/>Curated',
-                sort_keys=["latest_classification_modification__classification__summary__date__date"],
+                sort_keys=["latest_curated_date"],
                 client_renderer="VCTable.latest_curation_and_link",
                 renderer=self._render_date,
                 extra_columns=[

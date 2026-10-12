@@ -1,7 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
 {% load ui_help %}
-{% load ui_menu_bars %}
 {% load ui_tabs_builder %}
 {% load js_tags %}
 {% load crispy_forms_tags %}
@@ -11,7 +10,6 @@
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% block title %}View Patient {{ patient }}{% endblock title %}
-{% block submenu %}{% menu_bar_patients %}{% endblock submenu %}
 {% block head %}
     <link href="{% static 'js/lib/filepond/4.32.12/filepond.min.css' %}" rel="stylesheet">
     <link href="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.css' %}" rel="stylesheet">
@@ -23,10 +21,6 @@
         display: inline-block;
         min-width: 230px;
         margin-right: 12px;
-    }
-
-    #patient-phenotype-form-section {
-        margin-bottom: 10px;
     }
 
     {% if not has_write_permission %}
@@ -44,6 +38,12 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
+        {% if somalier_enabled and sample_relatedness.mismatch %}
+            <div class="alert alert-danger" id="sample-relatedness-warning">
+                Somalier finds samples of this patient that are not the same individual - a possible sample swap
+                or mislabel. See <a href="#sample-relatedness">Sample Relatedness</a> below.
+            </div>
+        {% endif %}
         {% ui_register_tab_embedded label="Patient" tab_set="patients" %}
             <form id="patient-form" method="post">
                 {% csrf_token %}
@@ -58,17 +58,15 @@
                     {% else %}
                         {{ form.age | as_crispy_field }}
                     {% endif %}
+                    {{ form.deceased | as_crispy_field }}
+                    {{ form.consanguineous | as_crispy_field }}
+                    {{ form.affected | as_crispy_field }}
                 <div>
                     {% page_help 'patients/patient_population_help' 'Patient Population' header_tag="h4" %}
                     {{ form.population | as_crispy_field }}
                 </div>
-                {{  form.consanguineous | as_crispy_field }}
 
                 <div>
-                    <h4>Phenotype</h4>
-                    <div id='patient-phenotype-form-section'>
-                        {{ form.affected | as_crispy_field }}
-                    </div>
                     <div id="phenotype-container">
                     {% phenotype_entry form.phenotype patient.phenotype_description edit=has_write_permission %}
                     </div>
@@ -130,48 +128,73 @@
             </div>
 
             {% if has_write_permission %}
+            <script src="{% static 'js/patients/view_patient.js' %}"></script>
             <script>
-                (function() {
-                    const inputElement = document.querySelector('#patient-file-upload');
-                    if (!inputElement) {
-                        return;
-                    }
-                    if (typeof FilePondPluginFilePoster !== 'undefined') {
-                        FilePond.registerPlugin(FilePondPluginFilePoster);
-                    }
-                    const csrftoken = getCookie('csrftoken');
-                    const pond = FilePond.create(inputElement, {
-                        allowMultiple: true,
-                        credits: false,
-                        server: {
-                            process: {
-                                url: "{% url 'patient_file_upload' patient_id=patient.pk %}",
-                                method: 'POST',
-                                headers: {'X-CSRFToken': csrftoken},
-                            },
-                            revert: (uniqueFileId, load, error) => {
-                                fetch("/patients/patient_file_delete/" + uniqueFileId, {
-                                    method: 'DELETE',
-                                    headers: {'X-CSRFToken': csrftoken},
-                                }).then((resp) => {
-                                    if (resp.ok) {
-                                        load();
-                                    } else {
-                                        error('Could not revert');
-                                    }
-                                }).catch(() => error('Could not revert'));
-                            },
-                        },
-                    });
-
-                    const browseButton = document.querySelector('#patient-file-browse');
-                    if (browseButton) {
-                        browseButton.addEventListener('click', () => pond.browse());
-                    }
-                })();
+                setupPatientFileUpload({{ patient.pk }});
             </script>
             {% endif %}
         </div>
+        {% endif %}
+
+        {% if somalier_enabled and sample_relatedness %}
+            <a name="sample-relatedness"></a>
+            <h4>Sample Relatedness</h4>
+            <p>
+                Each pair of this patient's samples should be the same individual: <a href="https://github.com/brentp/somalier">Somalier</a>
+                relatedness &ge; {{ duplicate_sample_relatedness }}. This patient's samples are related whenever one is imported
+                or linked to them, falling back on the nightly all-samples relate. A sample needs enough HET/HOM sites to be compared.
+            </p>
+            {% if sample_relatedness.sample_pairs %}
+            <table class="table" id="sample-relatedness-table">
+                <tr>
+                    <th>Sample</th>
+                    <th>Sample</th>
+                    <th>relatedness</th>
+                    <th>shared_hets</th>
+                    <th>shared_hom_alts</th>
+                    <th>N</th>
+                    <th>Check</th>
+                </tr>
+                {% for sp in sample_relatedness.sample_pairs %}
+                    <tr>
+                        <td><a href="{% url 'view_sample' sp.sample_a.pk %}">{{ sp.sample_a }}</a></td>
+                        <td><a href="{% url 'view_sample' sp.sample_b.pk %}">{{ sp.sample_b }}</a></td>
+                        <td>{{ sp.pair.relatedness | floatformat:2 }}</td>
+                        <td>{{ sp.pair.shared_hets }}</td>
+                        <td>{{ sp.pair.shared_hom_alts }}</td>
+                        <td>{{ sp.pair.n }}</td>
+                        <td>
+                            {% if sp.same_individual %}
+                                <span class="badge badge-success">Same individual</span>
+                            {% elif sp.pair %}
+                                <span class="badge badge-danger" title="Not the same DNA">Different individual</span>
+                            {% else %}
+                                <span class="badge badge-danger" title="Too little in common for the all-samples relate to keep the pair">Unrelated</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+            {% if sample_relatedness.not_checked %}
+            <p>
+                <a href="#sample-relatedness-not-checked-table" class="toggle-link" data-toggle="collapse">
+                    {{ sample_relatedness.not_checked|length }} sample{{ sample_relatedness.not_checked|length|pluralize }} not checked
+                </a>
+            </p>
+            <table class="table collapse" id="sample-relatedness-not-checked-table">
+                <tr>
+                    <th>Not checked</th>
+                    <th>Reason</th>
+                </tr>
+                {% for sample, reason in sample_relatedness.not_checked %}
+                    <tr>
+                        <td><a href="{% url 'view_sample' sample.pk %}">{{ sample }}</a></td>
+                        <td>{{ reason }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
         {% endif %}
 
         {% related_data_for_patient patient %}

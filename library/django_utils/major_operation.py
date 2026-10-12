@@ -21,9 +21,9 @@ from typing import Optional
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import connection
 from django.http import JsonResponse
 
+from library.django_utils.database_utils import pg_settings
 from library.utils.hash_utils import sha256sum_str
 
 
@@ -56,49 +56,12 @@ def _release_slot(count_key: str):
         logging.info("Major operation slot key had already expired - nothing to release")
 
 
-@contextmanager
-def _statement_timeout(seconds: int):
-    """ Temporarily lower the Postgres statement_timeout on the current connection.
-        Reset on exit as connections are reused (CONN_MAX_AGE). """
-    if connection.vendor != 'postgresql':
-        yield
-        return
-
-    with connection.cursor() as cursor:
-        cursor.execute("SET statement_timeout TO %s;", [seconds * 1000])
-    try:
-        yield
-    finally:
-        # Restore the global backstop value applied to all connections (see variantgrid/wsgi.py)
-        default_ms = settings.DATABASE_STATEMENT_TIMEOUT_SECONDS * 1000
-        with connection.cursor() as cursor:
-            cursor.execute("SET statement_timeout TO %s;", [default_ms])
-
-
-@contextmanager
 def planner_join_collapse_limit(limit: Optional[int]):
     """ Let the Postgres planner reorder joins across up to ``limit`` relations on the current connection.
         Past join_collapse_limit / from_collapse_limit (server default 8) the planner keeps the joins in
         the order the SQL wrote them, so a query that joins a wide table set has its most selective
-        filter applied last. Restores the previous values on exit - connections are reused and this may
-        run inside another caller's raised limit. None leaves the server settings alone. """
-    if limit is None or connection.vendor != 'postgresql':
-        yield
-        return
-
-    with connection.cursor() as cursor:
-        cursor.execute("SHOW join_collapse_limit;")
-        previous_join_limit = int(cursor.fetchone()[0])
-        cursor.execute("SHOW from_collapse_limit;")
-        previous_from_limit = int(cursor.fetchone()[0])
-        cursor.execute("SET join_collapse_limit TO %s;", [limit])
-        cursor.execute("SET from_collapse_limit TO %s;", [limit])
-    try:
-        yield
-    finally:
-        with connection.cursor() as cursor:
-            cursor.execute("SET join_collapse_limit TO %s;", [previous_join_limit])
-            cursor.execute("SET from_collapse_limit TO %s;", [previous_from_limit])
+        filter applied last. None leaves the server settings alone. """
+    return pg_settings(join_collapse_limit=limit, from_collapse_limit=limit)
 
 
 @contextmanager
@@ -131,7 +94,7 @@ def major_operation(user, operation_name: str = "major_operation"):
         raise TooManyMajorOperationsError(user, operation_name, limit)
 
     try:
-        with _statement_timeout(settings.MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS):
+        with pg_settings(statement_timeout=settings.MAJOR_OPERATION_STATEMENT_TIMEOUT_SECONDS * 1000):
             yield
     finally:
         _release_slot(count_key)

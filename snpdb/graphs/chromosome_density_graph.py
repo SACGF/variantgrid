@@ -40,9 +40,9 @@ class AbstractChromosomeDensityGraph(CacheableGraph, metaclass=abc.ABCMeta):
         group_by = (f'GROUP BY (snpdb_locus.position / {BIN_SIZE}), "snpdb_contig"."name"')
         sql = '\n'.join([select_part, from_part, where_part, group_by])
 
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        results = cursor.fetchall()
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            results = cursor.fetchall()
 
         chrom_bins = defaultdict(list)
 

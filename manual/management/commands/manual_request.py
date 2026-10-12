@@ -5,9 +5,7 @@ from manual.models import ManualMigrationRequired, ManualMigrationTask
 
 
 class Command(BaseCommand):
-    """
-    To be called via the migrator.py program
-    """
+    """ Register a manual task by hand (migrations use ManualOperation) """
     category = "ops"
 
     def add_arguments(self, parser: CommandParser):

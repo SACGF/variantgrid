@@ -7,12 +7,13 @@ import cyvcf2
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
 from annotation.models.models import AnnotationVersion, VCFAnnotationStats
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
+from eventlog.models import create_event
 from library.log_utils import log_traceback
 from library.utils import full_class_name
 from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus, ProcessingStatus, VariantsType
+from snpdb.models.models_enums import ImportStatus, VariantOrigin
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from snpdb.tasks.somalier_tasks import somalier_vcf_id
 from snpdb.variant_zygosity_count import (
@@ -69,9 +70,8 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
             vcf.import_status = ImportStatus.REQUIRES_USER_INPUT
             vcf.save()
 
-            # Make other tasks get skipped...
-            upload_pipeline.status = ProcessingStatus.TERMINATED_EARLY
-            upload_pipeline.save()
+            msg = "Couldn't determine genome build - set it on the VCF page"
+            upload_pipeline.terminate_early_for_user_input(msg)
             return
 
         # If past this point - we have VCF w/genome build
@@ -91,7 +91,7 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
                                   script=vcf_stats_task_class_name)
 
         for sample in vcf.sample_set.all():
-            if sample.variants_type == VariantsType.SOMATIC_ONLY:
+            if sample.variants_type == VariantOrigin.SOMATIC_ONLY:
                 sort_order += 1
                 UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
                                           name="Calculate Mutational Signature",
@@ -187,8 +187,6 @@ class SomalierVCFTask(ImportVCFStepTask):
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
-        from eventlog.models import create_event
-
         uploaded_vcf = upload_step.get_uploaded_vcf()
         vcf = uploaded_vcf.vcf
         logging.info("ImportVCFSuccessTask for VCF = %s", vcf)

@@ -2,7 +2,7 @@
 The icon for each UploadedFileTypes value, as shown on the upload page and the upload pipeline page.
 
 Entry point is file_type_icon_html, behind the {% file_type_icon %} tag (upload/templatetags/upload_tags.py) and the
-upload poll JSON, so the server-rendered table and the rows the page's JS adds agree. Where the site already has an
+upload page's grid (upload/grids.py:FileUploadColumns). Where the site already has an
 icon for the concept the file wears the same one - the analysis node badges (BED / IntersectionNode, pedigree /
 PedigreeNode, tags / TagNode, classifications / ClassificationsNode) and the preview icons on search results (patient
 records / Cohort, ClinVar / the server status card, analysis / Analysis) - and the VCF sub-types are the VCF with a

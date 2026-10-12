@@ -27,6 +27,7 @@ from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 ALLELE_ORDER_SITES_PER_ORDER = 10
 ALLELE_ORDER_DEPTH = 80
 ALLELE_ORDER_SAMPLE = "allele_order_check"
+ALLELE_ORDER_UNKNOWN_SAMPLE = "allele_order_unknown"
 SOMALIER_ALLELE_ORDER_ISSUE = "https://github.com/brentp/somalier/issues/163"
 RELATE_SITES_OPTION = "--sites"
 # What a pre-0.3.5 relate says when we hand it the sites VCF the fixed one needs
@@ -46,20 +47,10 @@ def verify_somalier_config() -> Optional[str]:
     return somalier
 
 
-def _relate_takes_sites(cfg: SomalierConfig) -> bool:
-    """ Whether the installed somalier is one of the fixed ones - asking relate beats parsing a version """
-    somalier_bin = cfg.get_annotation("command")
-    try:
-        relate_help = check_output([somalier_bin, "relate", "--help"], stderr=subprocess.STDOUT).decode()
-    except Exception:
-        log_traceback()
-        return False
-    return RELATE_SITES_OPTION in relate_help
-
-
 def _write_allele_order_vcf(genome_build: GenomeBuild, sites_filename: str, vcf_filename: str) -> int:
-    """ One sample, hom-ref at every site, half of them at sites whose ALT sorts first - written the
-        way snpdb.variants_to_vcf writes a somalier export. Returns the number of records. """
+    """ One sample hom-alt at every site and one with no call, half of the sites ones whose ALT sorts
+        first - written the way snpdb.variants_to_vcf writes a somalier export. Returns the number of
+        records. """
     sites = []
     per_order = Counter()
     with gzip.open(sites_filename, "rt") as f:
@@ -76,7 +67,8 @@ def _write_allele_order_vcf(genome_build: GenomeBuild, sites_filename: str, vcf_
             if all(per_order[o] == ALLELE_ORDER_SITES_PER_ORDER for o in (False, True)):
                 break
 
-    header_lines = get_vcf_header_from_contigs(genome_build, samples=[ALLELE_ORDER_SAMPLE],
+    header_lines = get_vcf_header_from_contigs(genome_build,
+                                               samples=[ALLELE_ORDER_SAMPLE, ALLELE_ORDER_UNKNOWN_SAMPLE],
                                                use_accession=False,
                                                formats=[SOMALIER_GT_FORMAT, SOMALIER_AD_FORMAT],
                                                top_lines=[SOMALIER_ALLELE_ORDER_NOTE])
@@ -85,20 +77,20 @@ def _write_allele_order_vcf(genome_build: GenomeBuild, sites_filename: str, vcf_
             f = io.TextIOWrapper(bgzip_f, encoding="utf-8", write_through=True)
             writer = VCFWriter(f, header_lines)
             for chrom, position, ref, alt in sites:
-                # every call is hom-ref, so all the depth sits on whichever allele we put first
+                # every call is hom-alt, so all the depth sits on whichever allele we put second
                 flipped = somalier_alleles_flipped(ref, alt)
-                allele_depths = f"0,{ALLELE_ORDER_DEPTH}" if flipped else f"{ALLELE_ORDER_DEPTH},0"
+                allele_depths = f"{ALLELE_ORDER_DEPTH},0" if flipped else f"0,{ALLELE_ORDER_DEPTH}"
                 writer.write_record(chrom, position, ref, alt, fmt="GT:AD",
-                                    sample_calls=[f"0/0:{allele_depths}"])
+                                    sample_calls=[f"1/1:{allele_depths}", "./.:."])
             f.flush()
             f.detach()
 
     return len(sites)
 
 
-def _somalier_genotype_counts(cfg: SomalierConfig, genome_build: GenomeBuild, work_dir: str,
-                              vcf_filename: str) -> dict:
-    """ extract + relate the one sample, and hand back its row of somalier.samples.tsv """
+def _somalier_ibs0(cfg: SomalierConfig, genome_build: GenomeBuild, work_dir: str, vcf_filename: str) -> int:
+    """ extract + relate the pair with --unknown, as the all-samples relate runs, and hand back how many
+        sites somalier saw them as opposite homozygotes """
     somalier_bin = cfg.get_annotation("command")
     extract_dir = os.path.join(work_dir, "extract")
     relate_dir = os.path.join(work_dir, "relate")
@@ -112,23 +104,28 @@ def _somalier_genotype_counts(cfg: SomalierConfig, genome_build: GenomeBuild, wo
     if return_code != 0:
         raise ValueError(f"somalier extract failed: {stderr}")
 
-    somalier_file = os.path.join(extract_dir, f"{ALLELE_ORDER_SAMPLE}.somalier")
-    relate_cmd = [somalier_bin, "relate", *cfg.get_relate_sites_args(genome_build), somalier_file]
-    return_code, _stdout, stderr = execute_cmd(relate_cmd, cwd=relate_dir)
+    somalier_files = [os.path.join(extract_dir, f"{sample}.somalier")
+                      for sample in (ALLELE_ORDER_SAMPLE, ALLELE_ORDER_UNKNOWN_SAMPLE)]
+    relate_cmd = [somalier_bin, "relate", *cfg.get_relate_sites_args(genome_build), "--unknown", *somalier_files]
+    # An unrelated pair is otherwise left out of the report
+    env = os.environ | {"SOMALIER_REPORT_ALL_PAIRS": "1"}
+    return_code, _stdout, stderr = execute_cmd(relate_cmd, cwd=relate_dir, env=env)
     if return_code != 0:
         raise ValueError(f"somalier relate failed: {stderr}")
 
-    with open(os.path.join(relate_dir, "somalier.samples.tsv")) as f:
-        return next(iter(csv.DictReader(f, delimiter="\t")))
+    with open(os.path.join(relate_dir, "somalier.pairs.tsv")) as f:
+        return int(next(iter(csv.DictReader(f, delimiter="\t")))["ibs0"])
 
 
 def verify_somalier_allele_order() -> dict:
-    """ A somalier before v0.3.5 reads a record against its own alphabetically sorted site alleles
-        rather than the record's REF/ALT, so snpdb.variants_to_vcf writes the AD pair in the site's
-        order to compensate. Against a v0.3.5+ handed the sites VCF at relate the compensation becomes
-        the bug and every relatedness inverts, and nothing else would say so - a deployment upgrades
-        somalier on its own schedule. So genotype a handful of hom-ref calls of each allele order
-        through the installed binary, the way the setting says to, and check they come back hom-ref.
+    """ somalier (up to at least v0.3.5) keeps each site's genotypes against its alphabetically sorted
+        alleles rather than the record's REF/ALT, so snpdb.variants_to_vcf writes the AD pair in the
+        site's order to compensate. v0.3.5's relate --sites only corrects the hom-ref/hom-alt counts in
+        somalier.samples.tsv; pairs are still computed in the sorted order, where --unknown makes a
+        missing call hom for whichever allele sorts first. Consistent relabelling cancels out pairwise,
+        so it's only that no-call that shows the setting is wrong - and relatedness inflates, with
+        nothing else saying so. So relate a hom-alt sample against a no-call one through the installed
+        binary, the way the setting says to, and check every site comes back as opposite homozygotes.
         @see snpdb/variants_to_vcf.py:somalier_alleles_flipped """
     cfg = SomalierConfig()
     for genome_build in GenomeBuild.builds_with_annotation():
@@ -146,21 +143,13 @@ def verify_somalier_allele_order() -> dict:
             return_code, _stdout, stderr = execute_cmd(["tabix", vcf_filename])
             if return_code != 0:
                 raise ValueError(f"tabix failed: {stderr}")
-            counts = _somalier_genotype_counts(cfg, genome_build, work_dir, vcf_filename)
+            ibs0 = _somalier_ibs0(cfg, genome_build, work_dir, vcf_filename)
     except Exception as e:
         log_traceback()
         return allele_order_unchecked(str(e))
 
     compensating = settings.SOMALIER["compensate_allele_order"]
-    result = allele_order_result(str(genome_build), num_sites, int(counts["n_hom_ref"]),
-                                 int(counts["n_hom_alt"]), compensating)
-    if result["valid"] and compensating and _relate_takes_sites(cfg):
-        # Both settings genotype correctly on a fixed somalier, so nothing above fails - but the
-        # workaround is only carried for the binaries that need it
-        result["warning"] = ("This somalier's relate takes --sites, so it doesn't need the exported AD "
-                             "pair swapped around: set SOMALIER[\"compensate_allele_order\"] = False and "
-                             "re-run 'somalier_existing_vcfs --clear' to rebuild the extracts")
-    return result
+    return allele_order_result(str(genome_build), num_sites, ibs0, compensating)
 
 
 def allele_order_unchecked(error: str) -> dict:
@@ -176,20 +165,19 @@ def allele_order_unchecked(error: str) -> dict:
     return {"valid": True, "warning": f"Somalier allele order unchecked: {error}"}
 
 
-def allele_order_result(genome_build_name: str, num_sites: int, hom_ref: int, hom_alt: int,
-                        compensating: bool) -> dict:
-    """ Every call written was hom-ref, so anything else means the setting and the installed somalier
-        disagree about who orders the alleles. Exactly half coming back inverted is that and nothing
-        else, and says which way to set it. """
-    if hom_ref == num_sites and hom_alt == 0:
+def allele_order_result(genome_build_name: str, num_sites: int, ibs0: int, compensating: bool) -> dict:
+    """ Every site is hom-alt against a no-call that --unknown makes hom-ref, so anything short of all
+        of them opposite means the setting and the installed somalier disagree about who orders the
+        alleles. Exactly the half whose ALT sorts first dropping out is that and nothing else, and
+        says which way to set it. """
+    if ibs0 == num_sites:
         return {"valid": True, "fix": ""}
 
-    fix = (f"{num_sites} hom-ref calls came back as {hom_ref} hom-ref / {hom_alt} hom-alt on "
+    fix = (f"{num_sites} hom-alt calls against no-calls came back as {ibs0} opposite homozygotes on "
            f"{genome_build_name} - this somalier and SOMALIER[\"compensate_allele_order\"] "
            f"({compensating}) disagree, see {SOMALIER_ALLELE_ORDER_ISSUE}")
-    if hom_ref == ALLELE_ORDER_SITES_PER_ORDER and hom_alt == ALLELE_ORDER_SITES_PER_ORDER:
-        needs = " (needs somalier v0.3.5+, whose relate takes --sites)" if compensating else ""
-        fix += (f". Set SOMALIER[\"compensate_allele_order\"] = {not compensating}{needs} in this "
+    if ibs0 == ALLELE_ORDER_SITES_PER_ORDER:
+        fix += (f". Set SOMALIER[\"compensate_allele_order\"] = {not compensating} in this "
                 "deployment's settings and re-run 'somalier_existing_vcfs --clear' to rebuild the extracts")
     else:
         fix += (". Neither setting explains this, so somalier is genotyping some third way - check that "

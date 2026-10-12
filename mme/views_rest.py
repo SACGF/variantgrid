@@ -28,7 +28,7 @@ from mme.versioning import (
 class MMEAPIView(APIView):
     """ Shared config for the inbound MME endpoints. Authenticated by the per-peer
         X-Auth-Token we issued that node (mme/auth.py), NOT by a VariantGrid user session
-        (their paths are exempted from GlobalLoginRequiredMiddleware via PUBLIC_PATHS). """
+        (DRF views are login_not_required, so the login middleware leaves them to this). """
     authentication_classes = []          # token-header auth, not session/DRF user
     permission_classes = []
     content_negotiation_class = MMEContentNegotiation

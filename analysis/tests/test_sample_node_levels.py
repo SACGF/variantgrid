@@ -50,7 +50,7 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
 from analysis.views.views import CreateClassificationForVariantTagView
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
@@ -240,7 +240,6 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         """ The per-sample subqueries are UNIONed rather than joined, so v_both - called by both
             VCFs - comes back once (#1894) """
         node = self._extraction_node()
-        self.assertFalse(node.queryset_requires_distinct)
         pks = list(node.get_queryset().values_list("pk", flat=True))
         self.assertEqual(sorted(pks), sorted([self.v_snv.pk, self.v_cnv.pk, self.v_both.pk]))
 

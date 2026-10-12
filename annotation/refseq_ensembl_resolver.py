@@ -19,6 +19,8 @@ per-transcript dbNSFP scores for a given annotation run.
 
 from typing import Optional, Protocol
 
+from annotation.models.models import DBNSFPGeneAnnotation, DBNSFPGeneAnnotationVersion
+
 
 class RefSeqEnsemblTranscriptResolver(Protocol):
     """ Translate between RefSeq and Ensembl transcript identifiers (unversioned).
@@ -52,8 +54,6 @@ class DBNSFPGeneResolver:
     name = "dbnsfp_gene"
 
     def __init__(self):
-        # Imported lazily to avoid Django app-loading order issues at module import time.
-        from annotation.models.models import DBNSFPGeneAnnotation, DBNSFPGeneAnnotationVersion
         self._refseq_to_ensembl: dict[tuple[str, str], str] = {}
         self._ensembl_to_refseq: dict[tuple[str, str], str] = {}
         version = DBNSFPGeneAnnotationVersion.latest()

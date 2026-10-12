@@ -6,6 +6,9 @@ SEQAUTO_ENABLED = False
 SEQAUTO_DIR = os.path.join(BASE_DIR, "seqauto")
 SEQAUTO_USER = 'seqauto'
 SEQAUTO_GROUP = None
+# Writes to the seqauto REST API (/seqauto/api/) need a superuser or a member of this group - add the
+# user whose DRF token the sequencing pipeline posts with. Reads are open to any logged-in user
+SEQAUTO_API_WRITE_GROUP = "seqauto_api_write"
 
 SEQAUTO_SKIP_FLOWCELLS_FILE = None
 SEQAUTO_SKIP_FLOWCELLS_PATTERNS = []

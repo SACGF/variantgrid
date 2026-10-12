@@ -560,7 +560,7 @@ const Diff = (function() {
                                 diffBreakdown.push(`${hasBlank} <span style="color:#888;font-size:smaller">x</span> <span style="color:#888">blank</span>`);
                             }
                         }
-                        valueCounts = Object.values(uniqueValues);
+                        const valueCounts = Object.values(uniqueValues);
                         valueCounts.sort((vc1,vc2) => {
                             if (vc1.count !== vc2.count) {
                                 return vc1.count - vc2.count;

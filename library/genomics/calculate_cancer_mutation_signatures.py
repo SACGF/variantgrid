@@ -95,11 +95,10 @@ Comments = Correlates with age of cancer diagnosis.
 
 import multiprocessing as mp
 import random
-from argparse import RawTextHelpFormatter
+from argparse import ArgumentParser, RawTextHelpFormatter
 from collections import defaultdict, namedtuple
 from functools import partial
 
-import configargparse
 import cyvcf2
 import numpy as np
 from scipy.optimize import minimize
@@ -110,7 +109,7 @@ VERSION = "1.0.1"
 
 
 def handle_args():
-    parser = configargparse.ArgParser(description="""Calculate cancer mutation signatures
+    parser = ArgumentParser(description="""Calculate cancer mutation signatures
 
 Usage:
 calculate_signatures.py \
@@ -119,11 +118,11 @@ calculate_signatures.py \
   --reference genome_reference.fa \
   --sigdata signature_data
 
-""", formatter_class=RawTextHelpFormatter)
+Arguments can also be read from a file, one per line: calculate_signatures.py @args.txt
+""", formatter_class=RawTextHelpFormatter, fromfile_prefix_chars="@")
     parser.add_argument("--invcf", "-i", required=True, help="Input VCF file")
     parser.add_argument("--outprefix", "-o", required=True, help="Output prefix")
 
-    parser.add_argument("--config", "-c", required=False, is_config_file=True, help="Configuration file")
     parser.add_argument("--reference", "-R", required=True, help="Genome reference fasta file")
     parser.add_argument("--sigdata", "-s", required=True, help="Cancer mutation signature data file")
     parser.add_argument("--siginfo", "-g", required=False,

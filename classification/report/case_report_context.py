@@ -21,6 +21,7 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F, Q
@@ -33,7 +34,6 @@ from classification.models.classification import Classification, ClassificationM
 from classification.models.classification_json import ClassificationJsonParams
 from classification.models.classification_report_models import CaseReportStatus, Measure
 from classification.models.evidence_key import EvidenceKeyMap
-from library.django_utils import get_cached_project_git_hash
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
 from patients.models_enums import (
@@ -235,6 +235,14 @@ def _as_int(value) -> Optional[int]:
         return None
 
 
+def _estimated_copy_number(kind: str, copy_number: Optional[int], fold_change: Optional[float]) -> Optional[int]:
+    """ The caller's count, else for a gain twice its ratio - the ratio is against a diploid normal, so a
+        fold change of 2.5 is 5 copies. Rounded half up, as the document's VAF is """
+    if copy_number is not None or kind != ReportVariantKind.COPY_NUMBER or fold_change is None:
+        return copy_number
+    return int((Decimal(str(fold_change)) * 2).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 @dataclass
 class ReportVariant:
     """ One classification as the report prints it """
@@ -248,7 +256,7 @@ class ReportVariant:
     amp_tier: str
     tier_rank: int
     vaf: Optional[float]  # allele_frequency, as a fraction
-    copy_number: Optional[int]
+    copy_number: Optional[int]  # copy_number key, else estimated from a gain's fold_change
     fold_change: Optional[float]  # fold_change key, as the caller wrote it
     reported: bool
     sample: Optional[Sample]
@@ -264,6 +272,7 @@ class ReportVariant:
         tier_label, warnings = amp_tier(record)
         if reported is None:
             reported = record.get(SpecialEKeys.VARIANT_REPORTED) != NOT_REPORTED
+        fold_change = _as_float(record.get(SpecialEKeys.FOLD_CHANGE))
         return ReportVariant(
             modification=record,
             kind=kind,
@@ -275,8 +284,8 @@ class ReportVariant:
             amp_tier=tier_label,
             tier_rank=AMP_TIER_RANK.get(tier_label, UNTIERED_RANK),
             vaf=_as_float(record.get(SpecialEKeys.ALLELE_FREQUENCY)),
-            copy_number=_as_int(record.get(SpecialEKeys.COPY_NUMBER)),
-            fold_change=_as_float(record.get(SpecialEKeys.FOLD_CHANGE)),
+            copy_number=_estimated_copy_number(kind, _as_int(record.get(SpecialEKeys.COPY_NUMBER)), fold_change),
+            fold_change=fold_change,
             reported=reported,
             sample=record.classification.sample,
             evidence=evidence if evidence is not None else evidence_row_data(record, user),
@@ -512,7 +521,7 @@ def case_combined_variant_output(samples: list[Sample],
                                  specimen: Optional[Specimen]) -> Optional[DragenTSO500CombinedVariantOutput]:
     """ The one analysis a case's TMB, MSI and GIS come off - the one whose arm is one of the case's samples,
         directly or through the sequencing sample it came off. Where none is linked yet, the newest
-        analysis claiming the specimen, as specimen_library_qc picks """
+        analysis claiming the specimen """
     by_output = [F("output_datetime").desc(nulls_last=True), "-pk"]
     if samples:
         arm_q = Q()
@@ -551,14 +560,19 @@ def case_measures(cvo: Optional[DragenTSO500CombinedVariantOutput],
     return measures
 
 
-def specimen_library_qc(specimen: Optional[Specimen]) -> dict[str, LibraryQC]:
-    """ What the caller's QC said about the specimen's libraries, by context key - the newest run
-        per category wins, since a repeat sequencing supersedes the QC of the one it replaced """
-    if specimen is None:
+def case_library_qc(cvo: Optional[DragenTSO500CombinedVariantOutput],
+                    specimen: Optional[Specimen]) -> dict[str, LibraryQC]:
+    """ What the caller's QC said about the case's libraries, by context key - the QC of the pair the
+        case's analysis came off, so a patient case has it too. Without an analysis, the specimen's: the
+        newest run per category wins, since a repeat sequencing supersedes the QC of the one it replaced """
+    if cvo:
+        qs = LibraryQC.objects.filter(sequencing_run_name=cvo.sequencing_run_name, pair_id=cvo.pair_id)
+    elif specimen:
+        qs = LibraryQC.objects.filter(specimen=specimen)
+    else:
         return {}
     library_qc = {}
-    qs = LibraryQC.objects.filter(specimen=specimen) \
-        .order_by(F("measured_date").asc(nulls_first=True), "pk")
+    qs = qs.order_by(F("measured_date").asc(nulls_first=True), "pk")
     for qc in qs:
         if key := LIBRARY_QC_CONTEXT_KEYS.get(qc.category):
             library_qc[key] = qc
@@ -599,7 +613,7 @@ def build_versions(samples: list[Sample]) -> dict:
         if vav := VariantAnnotationVersion.latest(genome_build):
             annotation[genome_build.name] = str(vav)
     return {
-        "variantgrid": get_cached_project_git_hash(),
+        "variantgrid": settings.GIT_HASH,
         "annotation": annotation,
         "callers": _caller_versions(samples),
     }

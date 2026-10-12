@@ -2,15 +2,12 @@ import logging
 import operator
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import reduce
-from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
-from django.db import connection
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 
@@ -23,6 +20,7 @@ from annotation.models import (
 from classification.models.classification_import_run import ClassificationImportRun
 from genes.hgvs import HGVSMatcher
 from library.django_utils import highest_pk, require_superuser
+from library.django_utils.database_utils import long_running_sql, signal_backends
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
 from library.integration_status import get_integration_statuses, run_integration_trigger
 from library.log_utils import AdminNotificationBuilder, report_message, slack_bot_username
@@ -114,6 +112,29 @@ def _celery_worker_status() -> dict:
     return celery_workers
 
 
+def _highest_variant_annotation_status() -> dict:
+    """ Is the highest standard variant annotated in the latest version - an incredibly quick check that
+        annotation keeps up with variant insertion. Not annotated is a warning while an AnnotationRun covers
+        it, danger when nothing does. """
+    try:
+        q = reduce(operator.and_, VariantAnnotation.get_variant_annotation_q_list())
+        highest_variant = Variant.objects.filter(q).order_by("pk").last()
+        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
+        vav = VariantAnnotationVersion.latest(genome_build)
+        if highest_variant.variantannotation_set.filter(version=vav).exists():
+            return {"status": "info", "message": "OK"}
+
+        ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
+                                             annotation_range_lock__min_variant__lte=highest_variant.pk,
+                                             annotation_range_lock__max_variant__gte=highest_variant.pk)
+        ar_qs = ar_qs.exclude(status=AnnotationStatus.ERROR)
+        if annotation_runs := [str(ar) for ar in ar_qs]:
+            return {"status": "warning", "message": f"AnnotationRuns: {', '.join(annotation_runs)}"}
+        return {"status": "danger", "message": "Not annotated, no AnnotationRun!"}
+    except Exception as e:
+        return {"status": "danger", "message": str(e)}
+
+
 @require_superuser
 def server_status(request):
     if request.method == "POST":
@@ -146,16 +167,11 @@ def server_status(request):
                                      message=f"No integration is registered against '{action_id}'.")
         elif action == 'kill-pid':
             pid = int(request.POST.get('pid'))
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT pg_terminate_backend(%s)", [pid])
-                terminated = cursor.fetchone()[0]
-                messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
+            terminated = bool(signal_backends([pid], terminate=True))
+            messages.add_message(request, level=messages.INFO, message=f"Query {pid} Terminated = {terminated}")
         else:
             logging.warning("Unrecognised action %s", action)
-
-        # return redirect(reverse('server_status'))
-
-        # TODO should redirect to read-only version of the page
+        return redirect("server_status")
 
     celery_workers = _celery_worker_status()
 
@@ -166,33 +182,7 @@ def server_status(request):
     except (KeyError, FileNotFoundError):
         can_access_reference = False
 
-    # Variant Annotation - incredibly quick check
-    highest_variant_annotated = {}
-    try:
-        q = reduce(operator.and_, VariantAnnotation.VARIANT_ANNOTATION_Q)
-        highest_variant = Variant.objects.filter(q).order_by("pk").last()
-        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
-        vav = VariantAnnotationVersion.latest(genome_build)
-        annotated = highest_variant.variantannotation_set.filter(version=vav).exists()
-        if annotated:
-            highest_variant_annotated["status"] = "info"
-            highest_variant_annotated["message"] = "OK"
-        else:
-            try:
-                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
-                                                     annotation_range_lock__min_variant__lte=highest_variant.pk,
-                                                     annotation_range_lock__max_variant__gte=highest_variant.pk)
-                ar_qs = ar_qs.exclude(status=AnnotationStatus.ERROR)
-                annotation_run_message = f"AnnotationRuns: {', '.join([str(ar) for ar in ar_qs])}"
-
-                highest_variant_annotated["status"] = "warning"
-                highest_variant_annotated["message"] = annotation_run_message
-            except AnnotationRun.DoesNotExist:
-                highest_variant_annotated["status"] = "danger"
-                highest_variant_annotated["message"] = "Not annotated, no AnnotationRun!"
-    except Exception as e:
-        highest_variant_annotated["status"] = "danger"
-        highest_variant_annotated["message"] = str(e)
+    highest_variant_annotated = _highest_variant_annotation_status()
 
     disk_messages = get_disk_messages(info_messages=True)
     disk_free = {"status": "info", "messages": []}
@@ -260,45 +250,6 @@ def health_check_details(request):
         'overall_lines': overall_lines,
     }
     return render(request, "variantopedia/health_check_details.html", context)
-
-
-@dataclass
-class RunningQuery:
-    pid: int
-    duration: Any  # is actually a Duration
-    query: str
-    state: str
-
-
-def long_running_sql(min_age_in_seconds: int = 30):
-    with connection.cursor() as cursor:
-        db_name = connection.settings_dict['NAME']
-        # We exclude "idle" state - as they are from connection pool and not actually running
-        cursor.execute(
-            """
-            SELECT
-              pid,
-              now() - pg_stat_activity.query_start AS duration,
-              query,
-              state
-            FROM pg_stat_activity
-            WHERE (now() - pg_stat_activity.query_start) > interval %s
-            AND datname = %s
-            AND state <> 'idle'                
-            ORDER BY now() - pg_stat_activity.query_start desc;
-            """,
-            [f"{min_age_in_seconds} seconds", db_name]
-        )
-
-        def to_obj(row) -> RunningQuery:
-            return RunningQuery(
-                pid=row[0],
-                duration=row[1],
-                query=row[2],
-                state=row[3]
-            )
-
-        return [to_obj(result) for result in cursor.fetchall()]
 
 
 @require_superuser

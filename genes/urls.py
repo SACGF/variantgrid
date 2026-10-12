@@ -24,7 +24,6 @@ urlpatterns = [
     path('genes/<genome_build_name>', views.genes, name='genome_build_genes'),
     path('view_gene/<gene_id>', views.view_gene, name='view_gene'),
     path('view_gene_symbol/<gene_symbol>', views.view_gene_symbol, name='view_gene_symbol'),
-    path('view_gene_symbol/<gene_symbol>/<genome_build_name>/classification', views.view_classifications, name='view_gene_symbol_classifications'),
     path('view_gene_symbol/<gene_symbol>/<genome_build_name>/classifications_download', views.export_classifications_gene_symbol, name='view_gene_symbol_classifications_download'),
     path('view_gene_symbol/<gene_symbol>/<genome_build_name>', views.view_gene_symbol, name='view_gene_symbol_genome_build'),
     path('view_transcript/<transcript_id>', views.view_transcript, name='view_transcript'),

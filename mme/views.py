@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpRequest
 from django.shortcuts import get_object_or_404, redirect, render
@@ -191,8 +192,9 @@ def view_mme_inbound_match(request: HttpRequest, inbound_match_id: int):
     })
 
 
+@login_not_required
 def mme_public_metrics(request: HttpRequest):
-    """ MME requires metrics be published publicly - no auth, via PUBLIC_PATHS. Shares the
+    """ MME requires metrics be published publicly - no auth. Shares the
         get_metrics() cache with the API view. """
     return render(request, "mme/mme_metrics.html", {
         "metrics": get_metrics(),
@@ -201,6 +203,7 @@ def mme_public_metrics(request: HttpRequest):
     })
 
 
+@login_not_required
 def mme_public_disclaimers(request: HttpRequest):
     """ Each connected database's disclaimers and terms. Public, like the metrics page. """
     return render(request, "mme/mme_disclaimers.html", {"nodes": connected_nodes()})

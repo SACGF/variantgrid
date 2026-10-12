@@ -50,9 +50,6 @@
     {% if node.has_classification_filters %}
         <div class="editor-warning">
             This node retrieves variants that have been classified in this database - this changes over time!
-            {% if out_of_date_message %}
-                <div>{{ out_of_date_message }}</div>
-            {% endif %}
         </div>
     {% endif %}
     <div class="editor-actions">

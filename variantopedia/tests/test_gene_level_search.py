@@ -2,7 +2,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from genes.models import HGNC, GeneCopyNumberEventKind, GeneSymbol, HGNCImport
 from genes.models_enums import HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
@@ -40,7 +40,7 @@ class TestGeneLevelSearch(TestCase):
 
     def test_gene_fusion(self):
         gene_fusion = create_gene_fusion("BCR", "ABL1")
-        for written in ["BCR::ABL1", "ABL1::BCR", "BCR-ABL1"]:
+        for written in ["BCR::ABL1", "ABL1::BCR", "BCR--ABL1"]:
             self._assert_finds(written, gene_fusion.variant)
 
     def test_gene_copy_number(self):

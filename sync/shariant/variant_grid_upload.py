@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from classification.enums.classification_enums import ShareLevel, SpecialEKeys
 from classification.models.classification import ClassificationModification
+from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.constants import MINUTE_SECS
@@ -26,7 +27,8 @@ from sync.sync_runner import ClassificationUploadSyncRunner, SyncRunInstance, re
 
 # add variant_type to private fields as the key has been deprecated
 SHARIANT_PRIVATE_FIELDS = [
-    'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'sample_id', 'variant_type'
+    'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'redcap_record_id', 'sample_id',
+    'variant_type'
 ]
 
 # server-side processing of a 50 record batch can exceed the default minute
@@ -206,7 +208,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         lab_record_id = cm.classification.lab_record_id
         if self.remote_lab_record_url:
             path = reverse('view_classification_lab_record',
-                           kwargs={'classification_ref': f"{mapped_lab_name}/{lab_record_id}"})
+                           kwargs={'classification_ref': ClassificationRef.make_lab_id_str(mapped_lab_name, lab_record_id)})
         else:
             # remote is on a version without view_classification_lab_record, so search for it instead
             path = f"variantopedia/search?search={quote(lab_record_id)}"
@@ -223,7 +225,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         share_level = self.share_level_mappings.get(share_level, share_level)
 
         # might need to map the lab group names if we don't map them all into shariant
-        formatted_json['id'] = mapped_lab_name + '/' + vcm.classification.lab_record_id
+        formatted_json['id'] = ClassificationRef.make_lab_id_str(mapped_lab_name, vcm.classification.lab_record_id)
         data = raw_json.get('data')
         for dont_share in SHARIANT_PRIVATE_FIELDS:
             data.pop(dont_share, None)
@@ -252,6 +254,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         qs = self.records_to_sync(full_sync=sync_run_instance.full_sync)
 
         rows_uploaded = 0
+        rows_failed = 0
         record_count = qs.count()
         logging.info("%s: %d record(s) to upload", sync_run_instance.sync_destination, record_count)
 
@@ -300,12 +303,19 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
 
                 for record, result in zip(batch, results):
                     rows_uploaded += 1
+                    # the remote answers a record it couldn't process with {"internal_error": ...} inside the 200;
+                    # an unsuccessful sync record keeps it in the next delta run
+                    if internal_error := result.get("internal_error"):
+                        rows_failed += 1
+                        logging.warning("%s: remote failed to process %s: %s",
+                                        sync_run_instance.sync_destination, record, internal_error)
                     ClassificationModificationSyncRecord.objects.create(
                         run=sync_run_instance.sync_run,
                         classification_modification=record,
+                        success=not internal_error,
                         meta=result
                     )
                 logging.info("%s: uploaded %d/%d records (batch of %d: JSON build %.1fs, POST %.1fs)",
                              sync_run_instance.sync_destination, rows_uploaded, record_count,
                              len(batch), json_duration, post_duration)
-            sync_run_instance.run_completed(had_records=True)
+            sync_run_instance.run_completed(had_records=True, meta={"rows_uploaded": rows_uploaded, "rows_failed": rows_failed})

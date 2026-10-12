@@ -94,6 +94,12 @@ class AnnotationPipelineRunner(abc.ABC):
                                               max_variant_id=range_lock.max_variant_id,
                                               annotated=not self.selects_unannotated)
 
+    def handle_empty_dump(self, annotation_run):
+        """ The run has nothing to dump, so it finishes without the tool or import_results ever seeing it.
+            A pipeline whose import writes rows for variants it deliberately left out of the dump (VEP's
+            too-long SVs, #2104) writes them here instead. """
+        return
+
     def dump(self, annotation_run, dump_dir=None, task_token=None) -> int:
         """ Write this run's variants to a VCF and set the dump_* fields; returns the dump count.
 
@@ -109,8 +115,11 @@ class AnnotationPipelineRunner(abc.ABC):
         if os.path.exists(vcf_dump_filename):
             raise ValueError(f"Don't want to overwrite '{vcf_dump_filename}' which already exists!")
         mk_path_for_file(vcf_dump_filename)
+        # Only the STANDARD queryset holds short symbolic variants, so this leaves the SV pipelines' dumps symbolic
+        sv_min_size = annotation_run.variant_annotation_version.structural_variant_min_size
         vcf_dump_count = write_qs_to_vcf(vcf_dump_filename, annotation_run.genome_build,
-                                         self.get_variants_qs(annotation_run), samples=self.dump_samples)
+                                         self.get_variants_qs(annotation_run), samples=self.dump_samples,
+                                         structural_variant_min_size=sv_min_size)
 
         annotation_run.dump_count = vcf_dump_count
         annotation_run.dump_end = timezone.now()

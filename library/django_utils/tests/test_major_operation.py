@@ -10,6 +10,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.test import TestCase, override_settings
 
+from library.django_utils.database_utils import get_pg_setting
 from library.django_utils.major_operation import (
     TooManyMajorOperationsError,
     major_operation,
@@ -22,7 +23,7 @@ LOCMEM_CACHE = {
 
 
 # Patch out the Postgres-only statement_timeout so these run against any/no DB connection
-@mock.patch("library.django_utils.major_operation._statement_timeout")
+@mock.patch("library.django_utils.major_operation.pg_settings")
 @override_settings(CACHES=LOCMEM_CACHE, MAJOR_OPERATION_LIMITS_ENABLED=True,
                    MAJOR_OPERATION_MAX_CONCURRENT_PER_USER=3, MAJOR_OPERATION_SLOT_EXPIRE_SECONDS=600)
 class MajorOperationTests(TestCase):
@@ -100,12 +101,7 @@ class MajorOperationTests(TestCase):
 
 
 def _collapse_limits() -> tuple[int, int]:
-    with connection.cursor() as cursor:
-        cursor.execute("SHOW join_collapse_limit;")
-        join_limit = int(cursor.fetchone()[0])
-        cursor.execute("SHOW from_collapse_limit;")
-        from_limit = int(cursor.fetchone()[0])
-    return join_limit, from_limit
+    return int(get_pg_setting("join_collapse_limit")), int(get_pg_setting("from_collapse_limit"))
 
 
 class PlannerJoinCollapseLimitTests(TestCase):

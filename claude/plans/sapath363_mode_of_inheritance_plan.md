@@ -25,7 +25,7 @@ below that someone might want to make differently is listed under Decisions.
   `classification/models/classification.py:Classification.patch_value` -> `Classification.process_entry`, which
   splits a string on `,` and turns each part into its option key with `Classification.process_option_values`;
   a part that matches nothing is an `invalid_value` error, which blocks submitting. So no new dirty value can
-  arrive. The dirty rows are legacy data written before that path existed (VG3).
+  arrive. The dirty rows are legacy VG3 data.
 - **Matching** (`classification/models/classification.py:Classification.match_option`) compares
   case-insensitively against the key and `classification/models/evidence_key.py:EvidenceKey.pretty_label_from_string`
   (`x_linked_recessive` -> "X-linked recessive"), and again with `-` and spaces turned into `_`.

@@ -16,16 +16,27 @@ from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
-from classification.enums import SpecialEKeys, ClassificationResultValue, TestingContextFull, TestingContextBucket, \
-    TriageStatus, OverlapStatus
+from classification.enums import (
+    ClassificationResultValue,
+    OverlapStatus,
+    SpecialEKeys,
+    TestingContextBucket,
+    TestingContextFull,
+    TriageStatus,
+)
 from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models import (
+    IN_REVIEW_VALUE,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
     ClassificationLabSummary,
+    ConditionReference,
     ConditionResolved,
     ConditionTextMatch,
     EvidenceMixin,
-    ImportedAlleleInfo, OverlapContribution, ClassificationGroupingEntry, ClassificationGrouping, ConditionReference,
-    Overlap, IN_REVIEW_VALUE,
+    ImportedAlleleInfo,
+    Overlap,
+    OverlapContribution,
 )
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_groups import (
@@ -40,8 +51,8 @@ from classification.models.discordance_models_utils import (
     DiscordanceReportRowData,
     DiscordanceReportTableData,
 )
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from classification.models.evidence_mixin import VCDbRefDict
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap, VCDbRefDict
+from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from eventlog.models import ViewEvent
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from genes.models import GeneSymbol
@@ -53,6 +64,7 @@ from snpdb.models import Lab, LabLike
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant
+from uicore.views.ajax_form_view import LazyRender
 
 register = Library()
 
@@ -180,11 +192,11 @@ def classification_groupings(context, show_allele_origin_filter=True, show_summa
     </script>
     :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
     :param show_summary_counts: Set to True to show clinical significance counts above the table, worth it where the
-    table can run to many rows
+    table can run to many rows. Only shown when settings.CLASSIFICATION_GRID_SUMMARY_COUNTS is on
     """
     return {
         "show_allele_origin_filter": show_allele_origin_filter,
-        "show_summary_counts": show_summary_counts,
+        "show_summary_counts": show_summary_counts and settings.CLASSIFICATION_GRID_SUMMARY_COUNTS,
         "genome_build": GenomeBuildManager.get_current_genome_build()
     }
 
@@ -382,6 +394,7 @@ def classification_quick(context,
                          show_imported_c_hgvs=False,
                          show_values=True,
                          show_pending: bool = False,
+                         show_sample_and_user: bool = False,
                          record_count: Optional[int] = None,
                          mode: Optional[str] = "detailed"):  # other options are "split" and "compact"
     user = context.request.user
@@ -403,6 +416,14 @@ def classification_quick(context,
         id_text = " / ".join(id_texts)
     else:
         id_text = "record"
+
+    sample = None
+    username = None
+    if show_sample_and_user and vcm:
+        if settings.CLASSIFICATION_GRID_SHOW_SAMPLE:
+            sample = vcm.classification.sample
+        if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
+            username = vcm.classification.user.username
 
     category_text = None
     if show_category:
@@ -430,6 +451,8 @@ def classification_quick(context,
         "record_count": record_count,
         "show_values": show_values,
         "show_pending": show_pending,
+        "sample": sample,
+        "username": username,
         "fade_non_shared": settings.CLASSIFICATION_GRID_FADE_NON_SHARED
     }
 
@@ -739,6 +762,14 @@ def classification_lab_summaries(
         "include_acmg": include_acmg,
         "read_only": read_only
     }
+
+
+@register.filter
+def discordance_triage_embed(lab_summary: ClassificationLabSummary) -> Optional[LazyRender]:
+    if triage := lab_summary.triage:
+        return DiscordanceReportTriageView.lazy_render(triage)
+    return None
+
 
 @register.inclusion_tag("classification/tags/criteria_strength.html")
 def criteria_strength(strength: CriteriaStrength):

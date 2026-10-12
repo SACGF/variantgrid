@@ -5,7 +5,6 @@ from django.db import transaction
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from library.log_utils import AdminNotificationBuilder
 from snpdb.models import Lab, Organization, SettingsInitialGroupPermission, UserDataPrefix
-from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 
 
 def user_post_save_handler(sender, instance, **kwargs):
@@ -44,12 +43,6 @@ def group_post_save_handler(sender, instance, **kwargs):
     created = kwargs.get("created")
     if created:
         SettingsInitialGroupPermission.create_global_settings(instance)
-
-
-def backend_vcf_import_success_handler(*args, **kwargs):
-    backend_vcf = kwargs["backend_vcf"]
-
-    create_backend_vcf_bed_intersections(backend_vcf)
 
 
 def trio_post_save_handler(sender, instance, **kwargs):

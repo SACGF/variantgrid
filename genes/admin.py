@@ -5,8 +5,10 @@ from django.utils.safestring import SafeString
 from guardian.admin import GuardedModelAdmin
 
 from genes import models
+from genes.archive import archive_gene_coverage_collection, restore_gene_coverage_collection
 from genes.models import GeneCoverageCollection, GeneSymbol
 from library.django_utils.admin_utils import ModelAdminBasics, admin_action, admin_list_column
+from ontology.panel_app_ontology import update_gene_relations
 from snpdb.archive import ArchivePreconditionError
 
 
@@ -36,7 +38,6 @@ class GeneSymbolAdmin(ModelAdminBasics):
 
     @admin_action("panelapp au refresh")
     def panelapp_au_refresh(self, request, queryset: QuerySet[GeneSymbol]):
-        from ontology.panel_app_ontology import update_gene_relations
         for gene_symbol in queryset:
             update_gene_relations(gene_symbol)
 
@@ -84,7 +85,6 @@ class GeneCoverageCollectionAdmin(ModelAdminBasics):
 
     @admin_action("Archive selected")
     def archive_selected(self, request, queryset: QuerySet[GeneCoverageCollection]):
-        from genes.archive import archive_gene_coverage_collection
         for gcc in queryset:
             try:
                 archive_gene_coverage_collection(gcc, request.user, reason="Admin action")
@@ -94,7 +94,6 @@ class GeneCoverageCollectionAdmin(ModelAdminBasics):
 
     @admin_action("Restore selected")
     def restore_selected(self, request, queryset: QuerySet[GeneCoverageCollection]):
-        from genes.archive import restore_gene_coverage_collection
         for gcc in queryset:
             try:
                 restore_gene_coverage_collection(gcc, request.user)

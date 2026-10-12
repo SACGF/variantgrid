@@ -39,3 +39,15 @@ class ClassificationRefParseTest(TestCase):
                     self.assertIsNone(lab_ref)
                     self.assertEqual(record_id, vc.id_str)
                     self.assertEqual(version, str(mod.created.timestamp()))
+
+    def test_make_lab_id_str_round_trip(self):
+        """ The lab form resolves back to the same record through init_from_str """
+        lab, user = ClassificationTestUtils.lab_and_user()
+        vc = Classification.create(user=user, lab=lab, lab_record_id="REC-001", save=True, source=SubmissionSource.API)
+
+        id_str = ClassificationRef.make_lab_id_str(lab.group_name, vc.lab_record_id)
+        self.assertEqual(ClassificationRef.parse_id_str(id_str), (lab.group_name, "REC-001", None))
+        self.assertEqual(ClassificationRef.init_from_str(user, id_str).record, vc)
+
+        with self.assertRaises(ValueError):
+            ClassificationRef.make_lab_id_str(None, vc.lab_record_id)

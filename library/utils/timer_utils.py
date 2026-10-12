@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import reduce
 
-from threadlocals.threadlocals import get_request_variable, set_request_variable
+from library.request_context import get_request_variable, set_request_variable
 
 
 @dataclass

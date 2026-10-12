@@ -26,10 +26,11 @@ import requests
 import rollbar
 from bs4 import BeautifulSoup
 from celery.app.base import Celery
-from django.db import connection, transaction
+from django.db import transaction
 from django.test import Client, override_settings
 from django.urls import NoReverseMatch, Resolver404, get_resolver, resolve, reverse
 
+from library.django_utils.database_utils import pg_settings
 from library.vg.css import UnusedReport
 from library.vg.maps.urls import _is_api, _templates, _view_callable, _walk
 from library.vg.page import get_agent_user
@@ -117,9 +118,7 @@ def crawl_rendered_classes(username: str | None = None, max_pages: int = 500, pe
             if progress:
                 progress(path)
             try:
-                with transaction.atomic():
-                    with connection.cursor() as cursor:
-                        cursor.execute(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT}'")
+                with transaction.atomic(), pg_settings(local=True, statement_timeout=STATEMENT_TIMEOUT):
                     response = client.get(path)
                     transaction.set_rollback(True)
             except Exception as e:  # pylint: disable=broad-exception-caught

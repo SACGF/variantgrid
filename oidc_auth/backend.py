@@ -6,6 +6,8 @@ from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.validators import EmailValidator
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import import_from_settings
 
@@ -96,9 +98,8 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
             # Note that the user has provided a correct username and password from our system, but tried to log into the wrong account
             # No security issue reflecting their email back to them
-            message = f"This account <i>{user.email}</i> is not authorised for this environment."
-            for allowed_environment in allowed_environment_list:
-                message += "<br/>" + allowed_environment
+            message = format_html("This account <i>{}</i> is not authorised for this environment.", user.email)
+            message += format_html_join("", "<br/>{}", ((mark_safe(env),) for env in allowed_environment_list))
 
             messages.add_message(self.request, messages.ERROR, message, extra_tags="html")
             return user
@@ -167,8 +168,9 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         added_groups = groups.difference(django_groups)
 
         for removed_group in removed_groups:
-            group = Group.objects.get(name=removed_group)
-            user.groups.remove(group)
+            # Group may have been deleted out-of-band between logins - skip if gone
+            if group := Group.objects.filter(name=removed_group).first():
+                user.groups.remove(group)
 
         for added_group in added_groups:
             # note that we trust the OIDC connector as it can already make admins

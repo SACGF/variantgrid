@@ -13,6 +13,8 @@ from urllib.error import HTTPError
 
 import requests
 from Bio import Entrez, SeqIO
+from django.conf import settings
+from django.utils.module_loading import import_string
 
 from genes.models_enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript, NoTranscript
@@ -53,11 +55,10 @@ class FetchedTranscriptSequence:
 class TranscriptSequenceFetcher:
     """ Retrieves transcript sequences we don't hold locally """
 
-    override_class = None  # Tests sub in a recorded-data implementation - @see variantgrid.test_runner
-
     @classmethod
     def instance(cls) -> 'TranscriptSequenceFetcher':
-        return (cls.override_class or cls)()
+        """ settings.TRANSCRIPT_SEQUENCE_FETCHER_CLASS - tests serve recorded sequences """
+        return import_string(settings.TRANSCRIPT_SEQUENCE_FETCHER_CLASS)()
 
     def fetch(self, transcript_accession: str) -> FetchedTranscriptSequence:
         annotation_consortium = AnnotationConsortium.get_from_transcript_accession(transcript_accession)

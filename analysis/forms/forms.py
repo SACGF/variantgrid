@@ -31,24 +31,23 @@ from analysis.models.enums import (
     SNPMatrix,
     TrioSample,
 )
-from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import (
     get_node_class_choices,
     get_node_types_hash_by_class_name,
     get_nodes_by_classification,
 )
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
+from genes.models.models_gene import GeneSymbol
 from library.django_utils import get_models_dict_by_column
-from library.django_utils.autocomplete_utils import ModelSelect2
+from library.django_utils.autocomplete_utils import ModelSelect2, Select2Multiple
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models_enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
-from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
+from snpdb.forms import UserSettingsGenomeBuildMixin
 from snpdb.models import (
     CustomColumnsCollection,
     TagConfigCollection,
-    Trio,
     UserSettings,
     VariantGridColumn,
 )
@@ -316,12 +315,13 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
 
 
 class ColumnSummaryForm(forms.Form):
-    column = forms.ChoiceField()
+    """ The node Summary tab shows one summary per picked column, stacked """
+    columns = forms.MultipleChoiceField(widget=Select2Multiple(attrs={'data-placeholder': 'Columns...'}))
 
     def __init__(self, rich_columns, *args, **kwargs):
         super().__init__(*args, **kwargs)
         summarisable = ColumnSummaryForm.get_summarisable_columns(rich_columns)
-        self.fields['column'].choices = [(rc.name, rc.label) for rc in summarisable]
+        self.fields['columns'].choices = [(rc.name, rc.label) for rc in summarisable]
 
     @staticmethod
     def get_summarisable_columns(rich_columns):
@@ -364,14 +364,6 @@ class GraphTypeChoiceForm(forms.Form):
     @property
     def has_graph_types(self):
         return self.fields["graph_type"].queryset.exists()
-
-
-class UserTrioForm(GenomeBuildAutocompleteForwardMixin, forms.Form):
-    genome_build_fields = ["trio"]
-
-    trio = forms.ModelChoiceField(queryset=Trio.objects.all(),
-                                  widget=ModelSelect2(url='trio_autocomplete',
-                                                      attrs={'data-placeholder': 'Trio...'}))
 
 
 def _affected_widget() -> forms.CheckboxInput:
@@ -490,35 +482,15 @@ class UserDuoWizardForm(FamilyWizardForm):
         return next(role for role in self.roles if role != DuoSample.PROBAND)
 
 
-class KaryomappingGeneForm(forms.ModelForm):
-    """ Pass in karyomapping_analysis kwarg
-        then any models created will have this set """
-
-    class Meta:
-        exclude = ('karyomapping_analysis',)
-        model = KaryomappingGene
-        widgets = {'gene_symbol': ModelSelect2(url='gene_symbol_autocomplete',
-                                        attrs={'data-placeholder': 'Gene...'}),
-                   "upstream_kb": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'}),
-                   "downstream_kb": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'})}
-
-    def __init__(self, *args, **kwargs):
-        self.karyomapping_analysis = kwargs.pop("karyomapping_analysis")
-        super().__init__(*args, **kwargs)
-
-    def save(self, commit=True):
-        if commit:
-            # We don't want to keep creating the same genes again and again, so reuse
-            cleaned_data = self.cleaned_data
-            obj, _ = KaryomappingGene.objects.get_or_create(
-                karyomapping_analysis=self.karyomapping_analysis,
-                gene_symbol=cleaned_data["gene_symbol"],
-                upstream_kb=cleaned_data["upstream_kb"],
-                downstream_kb=cleaned_data["downstream_kb"],
-            )
-        else:
-            obj = super().save(commit=False)
-        return obj
+class TrioKaryomappingGeneForm(forms.Form):
+    """ Gene and flanks to karyomap for a trio - a GET form, nothing is saved """
+    gene_symbol = forms.ModelChoiceField(queryset=GeneSymbol.objects.all(),
+                                         widget=ModelSelect2(url='gene_symbol_autocomplete',
+                                                             attrs={'data-placeholder': 'Gene...'}))
+    upstream_kb = forms.IntegerField(min_value=0, initial=2000, label="Upstream (kb)",
+                                     widget=NumberInput(attrs={'class': 'narrow', 'step': '1000'}))
+    downstream_kb = forms.IntegerField(min_value=0, initial=2000, label="Downstream (kb)",
+                                       widget=NumberInput(attrs={'class': 'narrow', 'step': '1000'}))
 
 
 class VCFLocusFilterForm(forms.Form):

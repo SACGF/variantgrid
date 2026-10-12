@@ -24,23 +24,20 @@ from guardian.shortcuts import get_objects_for_user
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
-from library.genomics.vcf_enums import VariantClass
+from library.genomics.vcf_enums import VariantClass, VCFConstant
 from library.guardian_utils import DjangoPermission
-from library.log_utils import log_traceback
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
-from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
 from patients.models_enums import Sex
-from snpdb.models.models import LabProject
+from snpdb.models.models import CodeVersionMixin, LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
-    ProcessingStatus,
     SampleFileType,
-    VariantsType,
+    VariantOrigin,
     VCFInfoTypes,
 )
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
-from snpdb.models.models_variant import AlleleSource, Variant, VariantCollection
+from snpdb.models.models_variant import AlleleSource, Variant
 
 
 @Field.register_lookup
@@ -155,24 +152,19 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return filter_dict
 
     @staticmethod
-    def convert_from_percent_to_unit(percent):
-        from snpdb.models import CohortGenotype  # Circular import
-
-        if percent != CohortGenotype.MISSING_NUMBER_VALUE:
-            percent /= 100.0
-        return percent
-
-    @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
+        """ queryset: only check these VCFs - keeps the permission lookups to them rather than every VCF """
         if has_write_permission:
             perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         else:
             perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
 
+        if queryset is None:
+            queryset = VCF.objects.all()
         if group_data:
-            queryset = get_objects_for_user(user, perm, klass=VCF, accept_global_perms=True)
+            queryset = get_objects_for_user(user, perm, klass=queryset, accept_global_perms=True)
         else:
-            queryset = VCF.objects.filter(user=user)
+            queryset = queryset.filter(user=user)
 
         queryset = queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
         if not include_archived:
@@ -255,6 +247,11 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
             depth but nothing to make a frequency from (@see BulkGenotypeVCFProcessor) """
         allele_depths = self.allele_depth_field or (self.ref_depth_field and self.alt_depth_field)
         return self.has_sample_columns and bool(self.allele_frequency_field or allele_depths)
+
+    @property
+    def has_copy_ratio(self) -> bool:
+        """ The copy number field is a ratio against the normal (SM, FC) rather than an absolute count """
+        return VCFConstant.COPY_NUMBER_FIELD_IS_RATIO.get(self.copy_number_field, False)
 
     @cached_property
     def samples_by_vcf_name(self) -> dict[str, 'Sample']:
@@ -392,7 +389,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
 
     preview_icon_symbol = "node-icon-sample"  # SampleNode wears this too - see get_node_class_icon
 
@@ -464,6 +461,10 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return self.vcf.has_allele_frequency
 
     @property
+    def has_copy_ratio(self) -> bool:
+        return self.vcf.has_copy_ratio
+
+    @property
     def data_archived(self) -> bool:
         return self.vcf.data_archived
 
@@ -493,7 +494,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
 
     @property
     def is_somatic(self):
-        return self.variants_type in VariantsType.SOMATIC_TYPES
+        return self.variants_type in VariantOrigin.SOMATIC_TYPES
 
     @cached_property
     def enrichment_kit(self):
@@ -556,18 +557,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return self.vcf.cohort.cohort_genotype_collection
 
     def get_genotype(self, variant: Variant) -> 'SampleGenotype':
-        from snpdb.models import CohortGenotype
-
-        cgc = self.cohort_genotype_collection
-        collections = [cgc]
-        if cgc.common_collection:
-            collections.append(cgc.common_collection)
-        try:
-            cg = CohortGenotype.objects.filter(collection__in=collections).get(variant=variant)
-            sample_genotype = cg.get_sample_genotype(self)
-        except CohortGenotype.DoesNotExist:
-            sample_genotype = None
-        return sample_genotype
+        return self.cohort_genotype_collection.get_sample_genotype(self, variant)
 
     def __str__(self):
         return f"{self.name} ({self.vcf})"
@@ -632,24 +622,30 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return reverse('data')
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
-        """ May be given permission for whole VCF or just a sample """
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
+        """ May be given permission for whole VCF or just a sample.
+            queryset: only check these samples - keeps the permission lookups to them rather than every sample """
+        if queryset is None:
+            queryset = Sample.objects.all()
+            vcf_qs = None
+        else:
+            vcf_qs = VCF.objects.filter(pk__in=queryset.values("vcf"))
         vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission,
-                                   include_archived=include_archived)
+                                   include_archived=include_archived, queryset=vcf_qs)
         q_filters = [Q(vcf__in=vcfs)]
         if group_data:
             if has_write_permission:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.WRITE)
             else:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.READ)
-            queryset = get_objects_for_user(user, perm, klass=Sample, accept_global_perms=True)
-            sample_q = Q(pk__in=queryset.values_list("pk", flat=True))
+            permitted_samples = get_objects_for_user(user, perm, klass=queryset, accept_global_perms=True)
+            sample_q = Q(pk__in=permitted_samples.values_list("pk", flat=True))
             if not include_archived:
                 sample_q &= Q(vcf__data_archived_date__isnull=True)
             q_filters.append(sample_q)
 
         ored_q_filters = reduce(operator.or_, q_filters)
-        return Sample.objects.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
+        return queryset.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
 
     @staticmethod
     def get_for_user(user, sample_id):
@@ -671,14 +667,16 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         sample_mask = vcfs_marked_for_deletion & not_already_deleting
         return Sample.objects.filter(sample_mask).update(import_status=ImportStatus.MARKED_FOR_DELETION)
 
-    def get_bam_files(self) -> list[str]:
-        sfp_qs = SampleFilePath.objects.filter(sample=self, file_type=SampleFileType.BAM)
+    def get_alignment_files(self) -> list[str]:
+        """ BAMs and CRAMs """
+        sfp_qs = SampleFilePath.objects.filter(sample=self, file_type__in=SampleFileType.ALIGNMENT_TYPES)
         return list(sfp_qs.values_list("file_path", flat=True))
 
     def _get_sample_formatter_params(self) -> dict[str, str]:
         params = {
             "sample_id": self.pk,
             "sample": self.name,
+            "vcf_sample_name": self.vcf_sample_name,
         }
         if patient := self.patient:
             params["patient_id"] = patient.pk
@@ -740,17 +738,16 @@ class VCFAlleleSource(AlleleSource):
         return qs
 
 
-class SampleStatsCodeVersion(TimeStampedModel):
+class SampleStatsCodeVersion(CodeVersionMixin, TimeStampedModel):
     """ Track the version and code used to calculate sample stats, in case there are bugs/changes needed """
     name = models.TextField()
     version = models.IntegerField()
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("name", "version", "code_git_hash")
+        unique_together = ("name", "version", "code_version")
 
     def __str__(self):
-        return f"{self.name} v{self.version}, git: {self.code_git_hash}, {self.created}"
+        return f"{self.name} v{self.version}, git: {self.code_version.git_hash}, {self.created}"
 
 
 class VCFLengthStatsCollection(TimeStampedModel):
@@ -804,7 +801,7 @@ class VCFSourceSettings(models.Model):
     })
 
     source_regex = models.TextField()
-    sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    sample_variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
     # The build a source's files are called against - used when nothing else resolves one, ie the header
     # has no contigs/reference to detect from and the submitter declared none (@see resolve_genome_build)
@@ -838,47 +835,3 @@ class VCFSourceSettings(models.Model):
         return f"{self.source_regex} sample_variants_type={self.get_sample_variants_type_display()}, " \
                f"variant_zygosity_count={self.variant_zygosity_count}"
 
-
-class VCFBedIntersection(models.Model):
-    name = models.TextField()
-    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
-    error_exception = models.TextField(null=True, blank=True)
-    vcf = models.ForeignKey(VCF, on_delete=CASCADE)
-    genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, on_delete=CASCADE)
-    left_padding = models.IntegerField(default=0)
-    right_padding = models.IntegerField(default=0)
-    variant_collection = models.ForeignKey(VariantCollection, null=True, on_delete=CASCADE)
-
-    @staticmethod
-    def get_for_vcf_and_enrichment_kit(vcf, enrichment_kit):
-        pbi = None
-        try:
-            kwargs = {'vcf': vcf,
-                      'genomic_intervals': enrichment_kit.genomic_intervals,
-                      'left_padding': settings.DEFAULT_ENRICHMENT_KIT_LEFT_PADDING,
-                      'right_padding': settings.DEFAULT_ENRICHMENT_KIT_RIGHT_PADDING}
-
-            pbi = VCFBedIntersection.objects.get(**kwargs)
-        except VCFBedIntersection.DoesNotExist:
-            pass
-        except Exception:
-            log_traceback()
-        return pbi
-
-    @staticmethod
-    def get_with_enrichment_kit_for_sample(sample):
-        if sample.enrichment_kit:
-            pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(sample.vcf, sample.enrichment_kit)
-            return pbi, sample.enrichment_kit
-        return None, None
-
-    def __str__(self):
-        num_records = 0
-        if self.variant_collection:
-            num_records = self.variant_collection.variantcollectionrecord_set.count()
-
-        name = f"{self.name} ({self.get_status_display()}) proj: {self.vcf}, genomic_intervals: {self.genomic_intervals} variant_collection: {self.variant_collection} ({num_records} records)"
-        if self.error_exception:
-            name += self.error_exception
-
-        return name

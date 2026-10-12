@@ -17,5 +17,5 @@
 {% endlabelled %}
 <h5>Classification Records</h5>
 {% for record in classification_grouping.classification_modifications reversed %}
-    <div class="mt-1">{% classification_quick record show_lab=False show_condition=True show_criteria=True show_flags=False %}</div>
+    <div class="mt-1">{% classification_quick record show_lab=False show_sample_and_user=True show_condition=True show_criteria=True show_flags=False %}</div>
 {% endfor %}

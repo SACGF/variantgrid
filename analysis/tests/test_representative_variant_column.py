@@ -19,7 +19,14 @@ from genes.models import GeneSymbol
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
-from snpdb.models import CompositeColumnMember, Country, CustomColumnsCollection, Lab, Organization, UserSettings
+from snpdb.models import (
+    CompositeColumnMember,
+    Country,
+    CustomColumnsCollection,
+    Lab,
+    Organization,
+    UserSettings,
+)
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
@@ -245,7 +252,7 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
             GeneSymbol.objects.get_or_create(symbol=symbol)
 
         ordered = create_gene_fusion("CD74", "ROS1")
-        self.assertContains(self._row_detail(ordered.variant), "5\u2032 CD74 \u2192 3\u2032 ROS1")
+        self.assertContains(self._row_detail(ordered.variant), "5&prime; CD74 &rarr; 3&prime; ROS1")
 
         unordered = create_gene_fusion("CD74", "ROS1", directionality_known=False)
         self.assertContains(self._row_detail(unordered.variant), "direction not asserted")

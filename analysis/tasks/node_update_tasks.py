@@ -20,14 +20,15 @@ from analysis.exceptions import (
 from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeCache,
-    NodeColors,
     NodeStatus,
     NodeTask,
     NodeVersion,
     node_query_planner_settings,
 )
+from analysis.models.nodes.node_utils import cancel_node_tasks
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
+from library.django_utils.database_utils import query_was_cancelled
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from snpdb.models import ProcessingStatus
@@ -57,8 +58,10 @@ def _trigger_rescheduling(analysis_id):
 
 
 def _clear_lease(node_id, version):
+    # db_pid goes with the task - a worker's DB connection outlives its tasks, so a stale pid left
+    # here would have cancel_node_tasks cancel whatever that worker is running now
     NodeTask.objects.filter(node_version__node_id=node_id, node_version__version=version).update(
-        lease_expires=None, leased_by=None, celery_task=None)
+        lease_expires=None, leased_by=None, celery_task=None, db_pid=None)
 
 
 def _backoff_node(node_id, version, analysis_id) -> bool:
@@ -119,13 +122,15 @@ def update_node_task(node_id, version):
                     # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
                     with node_query_planner_settings():
                         node.load()
-                    # Check if we need to clear shadow color
-                    if node.shadow_color == NodeColors.ERROR and node.is_valid:
-                        node.update(shadow_color=None)
                 except NodeOutOfDateException:
                     logging.warning("Node %d/%d out of date - exiting", node.pk, node.version)
                     return  # version bumped - reload_analysis_nodes already re-triggered; do NOT re-trigger here
-                except OperationalError:
+                except OperationalError as e:
+                    if query_was_cancelled(e):
+                        # Someone stopped this load on purpose (analysis deleted, or a newer version
+                        # dispatched) - nothing to re-queue, and the lease is cleared in "finally"
+                        logging.info("Node %d/%d query cancelled - exiting", node.pk, node.version)
+                        return
                     # Transient (DB blip / lock timeout). VG node loads are local DB work, not
                     # network calls, so this is rare and usually clears fast - back off and retry
                     # rather than give up, until MAX_NODE_ATTEMPTS.
@@ -156,8 +161,7 @@ def update_node_task(node_id, version):
             if status is not None:
                 try:
                     logging.info("Node %d/%d status: %s errored: %s", node.pk, node.version, status, errors)
-                    shadow_color = NodeColors.ERROR if NodeStatus.is_error(status) else None
-                    node.update(status=status, errors=errors, shadow_color=shadow_color)
+                    node.update(status=status, errors=errors)
                 except (IntegrityError, NodeOutOfDateException) as e:
                     logging.warning("Node %d/%d out of date: {%s} - exiting", node.pk, node.version, e)
                     pass  # out of date or deleted - just ignore
@@ -230,8 +234,16 @@ def node_cache_task(node_id, version):
         try:
             node.write_cache(variant_collection)
             processing_status = ProcessingStatus.SUCCESS
-        except Exception:
-            log_traceback()
+        except Exception as e:
+            if isinstance(e, OperationalError) and query_was_cancelled(e):
+                # Cancelled on purpose (analysis deleted, or a newer version dispatched). Leave the
+                # node alone, and mark the half-built collection ERROR so nothing gates on it building
+                logging.info("node_cache_task %s/%d query cancelled - exiting", node_id, version)
+                variant_collection.status = ProcessingStatus.ERROR
+                variant_collection.save()
+                return
+            errors = get_traceback()
+            logging.error(errors)
             processing_status = ProcessingStatus.ERROR
 
         variant_collection.status = processing_status
@@ -239,9 +251,10 @@ def node_cache_task(node_id, version):
 
         # On success the node stays LOADING_CACHE, for the chained update_node_task to claim
         if processing_status == ProcessingStatus.ERROR and node.status != NodeStatus.READY:
-            with disable_auditlog():
-                node.status = NodeStatus.ERROR
-                node.save()
+            try:
+                node.update(status=NodeStatus.ERROR, errors=errors)
+            except NodeOutOfDateException:
+                pass  # A newer version is coming
     finally:
         if analysis_id is not None:
             _trigger_rescheduling(analysis_id)
@@ -251,6 +264,14 @@ def node_cache_task(node_id, version):
 def delete_analysis_old_node_versions(analysis_id):
     """ This is called after creating new versions, so delete anything not latest """
     logging.debug(f"Deleting stale cache for analysis_id={analysis_id}")
+
+    # A load still running against an old version holds AccessShareLock on the NodeCache partition
+    # this delete is about to drop - stop it first rather than have the two wait on each other
+    obsolete_task_qs = NodeTask.objects.filter(node_version__node__analysis_id=analysis_id,
+                                               celery_task__isnull=False) \
+        .exclude(node_version__version=F("node_version__node__version"))
+    cancel_node_tasks(obsolete_task_qs)
+
     node_versions_qs = NodeVersion.objects.filter(node__analysis_id=analysis_id)
     latest = node_versions_qs.filter(node_id=OuterRef('node_id')).order_by('-version')
     sub_query = Subquery(latest.values('pk')[:1])

@@ -1,16 +1,17 @@
 import unittest
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import get_fake_annotation_version
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from annotation.fake_data import get_fake_annotation_version
+from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import Duo, TagConfigCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import (
-    AwardPeriod,
     DuoRelationship,
     ImportStatus,
     UserAwardKind,
@@ -21,7 +22,6 @@ from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
     GenomicIntervalsCollection,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_duo, create_fake_quad, create_fake_trio
 
 
 class Test(URLTestCase):
@@ -65,8 +65,6 @@ class Test(URLTestCase):
         cls.test_tag = TagConfigCollection.objects.create(user=cls.user_owner, name="TagA", version_id=1)
         cls.custom_columns_collection = CustomColumnsCollection.objects.create(name="Test Column Collections", user=cls.user_owner, version_id=1)
         # Award cabinet on the user pages (#1819)
-        UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.TITLE, definition_key="top_tagger",
-                                 period=AwardPeriod.ALL_TIME, award_text="Top tagger (all time)", count=3)
         UserAward.objects.create(user=cls.user_owner, kind=UserAwardKind.BADGE, definition_key="tagger",
                                  award_text="Tagger", count=150, award_level=UserAwardLevel.BRONZE)
         UserAward.objects.create(user=cls.user_owner, award_text="Thanks for the help")
@@ -74,6 +72,7 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_vcf', {"vcf_id": cls.vcf.pk}, 200),
             ('get_patient_upload_csv_for_vcf', {"pk": cls.vcf.pk}, 200),
+            ('vcf_sample_files_tab', {"vcf_id": cls.vcf.pk}, 200),
 
             # Sample related
             ('view_sample', {"sample_id": cls.sample.pk}, 200),
@@ -97,6 +96,14 @@ class Test(URLTestCase):
             # Data objects
             ('view_genomic_intervals', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
             ('genomic_intervals_graphs_tab', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 200),
+        ]
+
+        # Graph views redirect to the CachedGeneratedFile they enqueue
+        cls.PRIVATE_GRAPH_URL_NAMES_AND_KWARGS = [
+            ('chrom_density_graph', {"sample_id": cls.sample.pk, "cmap": "jet"}, 302),
+            ('homozygosity_graph', {"sample_id": cls.sample.pk, "cmap": "jet"}, 302),
+            ('sample_allele_frequency_histogram_graph', {"sample_id": cls.sample.pk, "min_read_depth": 10}, 302),
+            ('genomic_intervals_graph', {"genomic_intervals_collection_id": cls.genomic_intervals_collection.pk}, 302),
         ]
 
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
@@ -143,7 +150,7 @@ class Test(URLTestCase):
 
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
-        # Make sure that GlobalLoginRequiredMiddleware bounces unauth users
+        # Make sure that the login middleware bounces unauth users
         self._test_urls(URL_NAMES_AND_KWARGS, expected_code_override=302)
 
     def testDataGridUrls(self):
@@ -159,6 +166,16 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+
+    @patch("snpdb.views.views_graphs.graphcache.async_graph", return_value="/")
+    def testGraphPermission(self, _async_graph):
+        self._test_urls(self.PRIVATE_GRAPH_URL_NAMES_AND_KWARGS, self.user_owner)
+
+    @prevent_request_warnings
+    @patch("snpdb.views.views_graphs.graphcache.async_graph", return_value="/")
+    def testGraphNoPermission(self, async_graph):
+        self._test_urls(self.PRIVATE_GRAPH_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+        async_graph.assert_not_called()
 
     def testAutocompletePermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_owner, True)

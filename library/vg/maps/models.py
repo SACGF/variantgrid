@@ -4,9 +4,9 @@ its non-default managers and (with --counts) an estimated row count from pg_clas
 Needs Django set up; never queries without --counts.
 """
 from django.apps import apps
-from django.db import connection
 from django.db.models import Manager
 
+from library.django_utils.database_utils import get_table_row_estimates
 from library.vg.markdown import MapTable
 from library.vg.repo import first_party_packages
 
@@ -47,14 +47,8 @@ def _managers(model) -> str:
     return ", ".join(dict.fromkeys(names))
 
 
-def _row_estimates() -> dict[str, int]:
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT relname, reltuples::bigint FROM pg_class WHERE relkind IN ('r', 'p')")
-        return dict(cursor.fetchall())
-
-
 def generate(counts: bool = False, app: str | None = None) -> list[MapTable]:
-    estimates = _row_estimates() if counts else {}
+    estimates = get_table_row_estimates() if counts else {}
     columns = ["Model", "Bases", "Relations", "Managers"] + (["~Rows"] if counts else [])
     tables = []
     for app_config in sorted(apps.get_app_configs(), key=lambda a: a.label):

@@ -2,7 +2,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_annotation import create_fake_variant_annotation, create_fake_variants
+from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
 from annotation.models import VariantAnnotation
 from snpdb.models import Variant
 

@@ -8,10 +8,9 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils.timezone import now
 from guardian.shortcuts import assign_perm
-from threadlocals.threadlocals import set_thread_variable
 
 from analysis.models import Analysis, VariantTag
-from annotation.fake_annotation import create_fake_variants, get_fake_annotation_version
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
@@ -19,17 +18,20 @@ from annotation.models import (
     VariantAnnotation,
     VariantAnnotationVersion,
 )
-from annotation.tests.test_data_fake_genes import (
-    create_fake_transcript_version,
-    create_gata2_transcript_version,
-)
 from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.fake_data import (
+    create_fake_transcript_version,
+    create_gata2_transcript_version,
+)
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
+from library.django_utils.unittest_utils import frozen_cache_expiry
 from library.guardian_utils import assign_permission_to_user_and_groups
+from library.request_context import set_thread_variable
 from patients.models import Patient
+from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     Allele,
     AlleleOrigin,
@@ -42,7 +44,6 @@ from snpdb.models import (
     Variant,
     VariantAllele,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_cohort
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from variantopedia.grids import TaggedVariantGrid, VariantTagCountsColumns, VariantTagsColumns
 
@@ -71,8 +72,8 @@ class TaggedVariantGridTest(TestCase):
         assign_perm(VariantTag.get_read_perm(), cls.user, other_user_tag)
 
     def setUp(self):
-        # UserSettings.get_for_user caches on the thread-local request, which a client request in an
-        # earlier test leaves behind - the sort order test would then miss its tag colours collection
+        # UserSettings.get_for_user caches on the current request - start with none, so the sort order
+        # test reads its tag colours collection
         set_thread_variable('request', None)
 
     @classmethod
@@ -574,13 +575,14 @@ class VariantTagCaseColumnsTest(TestCase):
     def test_link_permissions_cost_the_same_however_many_rows(self):
         """ Resolved per page, not per row - a pair of Guardian lookups a row is the most expensive
             thing a grid can do (@see DatatableConfig._writable_pks_for_page) """
-        self._rows_by_tag_id()  # Warm the caches the first request of a session fills
-        with CaptureQueriesContext(connection) as three_rows:
-            self.assertEqual(len(self._rows_by_tag_id()), 3)
+        with frozen_cache_expiry():
+            self._rows_by_tag_id()  # Warm the caches the first request of a session fills
+            with CaptureQueriesContext(connection) as three_rows:
+                self.assertEqual(len(self._rows_by_tag_id()), 3)
 
-        for variant in (self.mine_variant, self.theirs_variant, self.patient_only_variant):
-            self._tag(variant, sample=self.their_sample, patient=self.my_patient)
-        with CaptureQueriesContext(connection) as six_rows:
-            self.assertEqual(len(self._rows_by_tag_id()), 6)
+            for variant in (self.mine_variant, self.theirs_variant, self.patient_only_variant):
+                self._tag(variant, sample=self.their_sample, patient=self.my_patient)
+            with CaptureQueriesContext(connection) as six_rows:
+                self.assertEqual(len(self._rows_by_tag_id()), 6)
 
         self.assertEqual(len(six_rows.captured_queries), len(three_rows.captured_queries))

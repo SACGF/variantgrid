@@ -3,11 +3,11 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from classification.models import ImportedAlleleInfo
+from genes.fake_data import create_gene_level_variant
 from genes.gene_level_resolver import GeneLevelNameResolver
 from genes.gene_splice import ResolvedSpliceEvent, get_splice_event_variant
 from genes.models import HGNC, GeneSymbol, HGNCImport
 from genes.models_enums import HGNCStatus
-from genes.tests.gene_level_test_utils import create_gene_level_variant
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Variant
 
 AR_HGNC_ID = 644

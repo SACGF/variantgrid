@@ -1,75 +1,39 @@
+"""
+Per-gene karyomapping for a trio (#1754): pick a gene and flanks, see the proband's phasing variants by bin as a
+Plotly scatter and download them as CSV. The genome-wide QC counts are on the trio page (karyomapping_tags).
+"""
 import csv
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
+from typing import Optional
 
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.http.response import StreamingHttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls.base import reverse
-from django.views.decorators.cache import cache_page
-from django.views.decorators.vary import vary_on_cookie
+from django.shortcuts import render
 
-from analysis.forms import KaryomappingGeneForm, UserTrioForm
-from analysis.models.models_karyomapping import (
-    KaryomappingAnalysis,
-    KaryomappingGene,
-    KaryotypeBins,
-)
-from library.constants import DAY_SECS
-from library.django_utils import add_save_message
+from analysis.forms import TrioKaryomappingGeneForm
+from analysis.models.models_karyomapping import KaryotypeBins, TrioKaryomappingGeneRegion
 from library.utils import StashFile
 from patients.models_enums import Zygosity
 from snpdb.models import Trio
 from snpdb.models.models_variant import Variant
 
 
-def get_karyomapping_analysis_permission_check(request, pk):
-    ka = get_object_or_404(KaryomappingAnalysis, pk=pk)
-    if not request.user.has_perm(KaryomappingAnalysis.get_read_perm(), ka):
-        msg = f"{request.user} does not have permission to access {ka}"
-        raise PermissionDenied(msg)
-    return ka
-
-
-def karyomapping_analyses(request):
-    from snpdb.models import UserGridConfig
-    show_group_data = UserGridConfig.get(request.user, 'Karomapping Analyses').show_group_data
-    context = {"trio_form": UserTrioForm(), "show_group_data": show_group_data}
-    return render(request, 'analysis/karyomapping/karyomapping_analyses.html', context)
-
-
-def create_and_view_karyomapping_analysis_for_trio(trio, user):
-    karyomapping = KaryomappingAnalysis.objects.create(user=user,
-                                                       name=trio.name,
-                                                       trio=trio)
-    url = reverse("view_karyomapping_analysis", kwargs={"pk": karyomapping.pk})
-    return redirect(url)
-
-
-def create_karyomapping_analysis_for_trio_id(request, trio_id):
+def _get_trio(request, trio_id) -> Trio:
     trio = Trio.get_for_user(request.user, trio_id)
-    return create_and_view_karyomapping_analysis_for_trio(trio, request.user)
+    if trio.cohort.data_archived:
+        raise PermissionDenied("Underlying VCF data is archived")
+    return trio
 
 
-def view_karyomapping_analysis(request, pk):
-    karyomapping_analysis = get_karyomapping_analysis_permission_check(request, pk)
-
-    gene_form = KaryomappingGeneForm(request.POST or None,
-                                     karyomapping_analysis=karyomapping_analysis,
-                                     initial={"upstream_kb": 2000,
-                                              "downstream_kb": 2000})
-    created_karyomapping_gene = None
-    if request.method == "POST":
-        valid = gene_form.is_valid()
-        if valid:
-            created_karyomapping_gene = gene_form.save()
-
-        add_save_message(request, valid, "KaryomappingGene")
-
-    context = {"karyomapping_analysis": karyomapping_analysis,
-               "gene_form": gene_form,
-               "has_write_permission": karyomapping_analysis.can_write(request.user),
-               "created_karyomapping_gene": created_karyomapping_gene}
-    return render(request, 'analysis/karyomapping/view_karyomapping_analysis.html', context)
+def _get_gene_region(trio: Trio, form: TrioKaryomappingGeneForm) -> Optional[TrioKaryomappingGeneRegion]:
+    if not form.is_valid():
+        return None
+    gene_region = TrioKaryomappingGeneRegion(trio=trio, **form.cleaned_data)
+    if gene_region.gene_version is None:
+        form.add_error("gene_symbol", f"{gene_region.gene_symbol} has no gene in {trio.genome_build}")
+        return None
+    return gene_region
 
 
 def get_variant_lookup_and_scatter_data(karyomapping_bins):
@@ -79,59 +43,46 @@ def get_variant_lookup_and_scatter_data(karyomapping_bins):
     variant_id_lookup = {}
     data = defaultdict(lambda: defaultdict(list))
     for karyotype_code, variant_data in karyomapping_bins.items():
-        x = []
-        text = []
+        collapsed_code = KaryotypeBins.COLLAPSED_BINS[karyotype_code]
         for variant_id, _contig_id, chrom, position, ref, alt, svlen in variant_data:
             variant_string = Variant.format_tuple(chrom, position, ref, alt, svlen)
             variant_id_lookup[variant_string] = variant_id
-            x.append(position)
-            text.append(variant_string)
+            data[collapsed_code]["x"].append(position)
+            data[collapsed_code]["text"].append(variant_string)
 
-        collapsed_code = KaryotypeBins.COLLAPSED_BINS[karyotype_code]
-        data[collapsed_code]["x"].extend(x)
-        data[collapsed_code]["text"].extend(text)
-
-    karyotype_bin_counts = OrderedDict()
-    for kc in KaryotypeBins.KARYOTYPE_LABEL_ORDER:
-        karyotype_bin_counts[kc] = len(data[kc]["x"])
-
+    karyotype_bin_counts = {kc: len(data[kc]["x"]) for kc in KaryotypeBins.KARYOTYPE_LABEL_ORDER}
     return variant_id_lookup, data, karyotype_bin_counts
 
 
-@cache_page(DAY_SECS)  # Only caching this for a day due to high amount of development
-@vary_on_cookie
-def view_karyomapping_gene(request, pk):
-    karyomapping_gene = get_object_or_404(KaryomappingGene, pk=pk)
-    # Permission check on parent karyomapping_analysis
-    get_karyomapping_analysis_permission_check(request, karyomapping_gene.karyomapping_analysis.pk)
-
-    iv, strand = karyomapping_gene.get_genomic_interval_and_strand()
-    karyomapping_bins = karyomapping_gene.get_karyomapping_bins()
-    variant_id_lookup, karyotype_bin_scatter_data, karyotype_bin_counts = get_variant_lookup_and_scatter_data(karyomapping_bins)
-
-    context = {"kag": karyomapping_gene,
-               "iv": iv,
-               "strand": strand,
-               "karyotype_bin_labels": KaryotypeBins.KARYOTYPE_LABEL_ORDER,  # Want order
-               "variant_id_lookup": variant_id_lookup,
-               "karyotype_bin_scatter_data": karyotype_bin_scatter_data,
-               "karyotype_bin_counts": karyotype_bin_counts}
-    return render(request, 'analysis/karyomapping/view_karyomapping_gene.html', context)
+def trio_karyomapping(request, trio_id):
+    trio = _get_trio(request, trio_id)
+    form = TrioKaryomappingGeneForm(request.GET or None)
+    context = {"trio": trio, "form": form}
+    if gene_region := _get_gene_region(trio, form):
+        variant_id_lookup, scatter_data, bin_counts = get_variant_lookup_and_scatter_data(gene_region.get_karyomapping_bins())
+        gene_version = gene_region.gene_version
+        context.update({
+            "gene_region": gene_region,
+            "gene_version": gene_version,
+            "karyotype_bin_labels": KaryotypeBins.KARYOTYPE_LABEL_ORDER,  # Want order
+            "variant_id_lookup": variant_id_lookup,
+            "karyotype_bin_scatter_data": scatter_data,
+            "karyotype_bin_counts": bin_counts,
+        })
+    return render(request, 'analysis/karyomapping/trio_karyomapping.html', context)
 
 
-def download_karyomapping_gene_csv(request, pk):
-    karyomapping_gene = get_object_or_404(KaryomappingGene, pk=pk)
-    # Permission check on parent karyomapping_analysis
-    get_karyomapping_analysis_permission_check(request, karyomapping_gene.karyomapping_analysis.pk)
+def trio_karyomapping_gene_csv(request, trio_id):
+    trio = _get_trio(request, trio_id)
+    form = TrioKaryomappingGeneForm(request.GET)
+    if not (gene_region := _get_gene_region(trio, form)):
+        raise Http404(form.errors.as_text())
 
-    variant_and_genotypes = karyomapping_gene.get_variant_and_genotypes()
+    variant_and_genotypes = gene_region.get_variant_and_genotypes()
+    filename = (f"karyomapping_trio_{trio.pk}_{gene_region.gene_symbol}_"
+                f"up_{gene_region.upstream_kb}kb_down_{gene_region.downstream_kb}kb.csv")
 
-    filename = f"karyomapping_gene_{karyomapping_gene.pk}_{karyomapping_gene}.csv"
-    # TODO: merge code w/library.django_utils.grid_export.grid_export_csv
-
-    karotype_bin_lookup = KaryotypeBins.get_karotype_bin_lookup()
-
-    header = ['chrom', 'start', 'end', 'ref', 'alt', 'proband_gt', 'father_gt', 'mother_gt', 'karyotype_bin']
+    header = ['chrom', 'position', 'ref', 'alt', 'svlen', 'proband_gt', 'father_gt', 'mother_gt', 'karyotype_bin']
     pseudo_buffer = StashFile()
     writer = csv.DictWriter(pseudo_buffer, header, dialect='excel')
 
@@ -141,11 +92,6 @@ def download_karyomapping_gene_csv(request, pk):
         for variant_data, genotype_tuple in variant_and_genotypes:
             _, _contig_id, chrom, position, ref, alt, svlen = variant_data
             proband_gt, father_gt, mother_gt = genotype_tuple
-            try:
-                karotype_bin = karotype_bin_lookup[proband_gt][father_gt][mother_gt]
-            except:
-                karotype_bin = ''
-
             row = {'chrom': chrom,
                    'position': position,
                    'ref': ref,
@@ -154,7 +100,7 @@ def download_karyomapping_gene_csv(request, pk):
                    'proband_gt': Zygosity.get_genotype(proband_gt),
                    'father_gt': Zygosity.get_genotype(father_gt),
                    'mother_gt': Zygosity.get_genotype(mother_gt),
-                   'karyotype_bin': karotype_bin}
+                   'karyotype_bin': KaryotypeBins.get_bin(genotype_tuple) or ''}
             writer.writerow(row)
             yield pseudo_buffer.value
 

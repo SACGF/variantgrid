@@ -15,9 +15,9 @@ from django.test import TestCase, override_settings
 from analysis.models import Analysis, FilterNode, TrioNode
 from analysis.models.enums import NodeStatus, TrioInheritance
 from analysis.tasks.node_update_tasks import update_node_task
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild, ImportStatus
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

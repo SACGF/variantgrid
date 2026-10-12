@@ -26,9 +26,9 @@ class TestVCFExportColumns(TestCase):
         )
         column_vcf_info = _get_column_vcf_info()
 
-        af_1kg_def = next(c for c in COLUMN_VCF_INFO if c.info_id == "1KG_AF")
+        af_1kg_def = next(c for c in COLUMN_VCF_INFO if c.info_id == "AF_1KG")
         af_1kg = column_vcf_info[variant_column_by_name[af_1kg_def.column]]
-        self.assertEqual(af_1kg["info_id"], "1KG_AF")
+        self.assertEqual(af_1kg["info_id"], "AF_1KG")
         self.assertEqual(af_1kg["type"], "Float")
         self.assertEqual(af_1kg["number"], 1)
         self.assertEqual(af_1kg["column__variant_column"], variant_column_by_name[af_1kg_def.column])
@@ -41,7 +41,7 @@ class TestVCFExportColumns(TestCase):
     def test_consumer_skips_absent_columns(self):
         # A def whose grid column isn't present on this deployment is simply skipped
         # (matching the old CASCADE-delete behaviour).
-        af_1kg_def = next(c for c in COLUMN_VCF_INFO if c.info_id == "1KG_AF")
+        af_1kg_def = next(c for c in COLUMN_VCF_INFO if c.info_id == "AF_1KG")
         variant_column = VariantGridColumn.objects.get(pk=af_1kg_def.column).variant_column
         VariantGridColumn.objects.filter(pk=af_1kg_def.column).delete()
 

@@ -1,4 +1,5 @@
 import operator
+import re
 from functools import reduce
 from typing import Any
 
@@ -6,6 +7,10 @@ from django.db.models import Q
 
 # legacy filter key that tests allele origin rather than an evidence key of its own
 SOMATIC_FILTER_KEY = 'somatic'
+
+# evidence keys look like "allele_origin", "acmg:pvs1", "1000_genomes_af"
+_EVIDENCE_KEY_PATTERN = re.compile(r'[a-zA-Z0-9]+(?:[_:][a-zA-Z0-9]+)*')
+_OPERATION_PATTERN = re.compile(r'[a-z]+')
 
 
 class QueryJsonFilter:
@@ -33,6 +38,11 @@ class QueryJsonFilter:
         return QueryJsonFilter(prefix='published_evidence__', postfix='__value')
 
     def q(self, key: str, value: Any, operation: str = 'exact') -> Q:
+        # both end up in a lookup path, so neither may carry a "__" that would add a lookup of its own
+        if not _EVIDENCE_KEY_PATTERN.fullmatch(key):
+            raise ValueError(f"Filter key {key!r} is not an evidence key")
+        if not _OPERATION_PATTERN.fullmatch(operation):
+            raise ValueError(f"Filter operation {operation!r} for {key!r} is not a single lookup")
         return Q(**{f"{self.prefix}{key}{self.postfix}__{operation}": value})
 
     def convert_to_q(self, blob, op=operator.__and__) -> Q:

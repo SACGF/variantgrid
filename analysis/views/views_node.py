@@ -3,7 +3,6 @@ import inspect
 import logging
 
 import pandas as pd
-from celery.contrib.abortable import AbortableAsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import EmptyResultSet
@@ -15,7 +14,6 @@ from django.urls.base import reverse
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-from htmlmin.decorators import not_minified_response
 
 from analysis import forms
 from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
@@ -26,6 +24,7 @@ from analysis.models import AnalysisNode, NodeGraphType
 from analysis.models.enums import NodeStatus, SNPMatrix
 from analysis.models.nodes.analysis_node import NodeTask, NodeVCFFilter
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
+from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
@@ -42,13 +41,11 @@ from library.django_utils import set_form_read_only
 from library.django_utils.database_utils import (
     queryset_to_sql,
     render_empty_result_set_sql,
-    run_sql,
 )
 from library.utils import full_class_name
 from pedigree.models import Pedigree
 from snpdb.graphs import graphcache
 from snpdb.models import VCF, Cohort, CohortSample, UserSettings, Variant
-from variantgrid.celery import app
 
 
 def get_node_views_by_class():
@@ -97,7 +94,6 @@ def get_node_sql(grid):
     return node_sql, grid_sql
 
 
-@not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
 def node_debug(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
@@ -114,7 +110,8 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
 
     context = {"node": node,
                "node_data": dict(sorted(serializer.data.items()))}
-    if node.valid:
+    # A node that needs its NodeCache (eg a BED intersection) can't build its SQL until that's built
+    if node.valid and (node.node_cache or not node.use_cache):
         grid = VariantGrid(request, node, extra_filters)
         try:
             node_sql_, grid_sql = get_node_sql(grid)
@@ -125,7 +122,6 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
     return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
-@not_minified_response
 # @cache_page(WEEK_SECS)
 # @vary_on_cookie
 def node_audit_log(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
@@ -200,7 +196,7 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "node_id": node_id,
         "node_version": node_version,
         "extra_filters": extra_filters,
-        "bams_dict": node.get_bams_dict(),
+        "alignments_dict": node.get_alignments_dict(),
         # The tag pills the grid draws are read against this node's proband - @see VariantGridFormat.tags
         "node_proband_sample_id": proband.sample.pk if proband.sample else None,
         "node_proband_patient_id": proband.patient.pk if proband.patient else None,
@@ -238,6 +234,8 @@ def node_column_summary(request, analysis_id, analysis_version, node_id, node_ve
         poll_url = reverse(column_summary_boxplot, kwargs={"analysis_id": analysis_id, "node_id": node_id,
                                                            "label": label, "variant_column": variant_column})
         context["poll_url"] = poll_url
+        # The Summary tab stacks one summary per column
+        context["graph_id"] = f"node-generated-graph-{node.id}-{grid_column_name}"
         template = 'analysis/node_data/node_data_graph.html'
         return render(request, template, context)
 
@@ -312,6 +310,7 @@ def node_data_graph(request, analysis_id, analysis_version, node_id, node_versio
     poll_url = reverse(node_graph, kwargs={"analysis_id": analysis_id, "node_id": node.id,
                                            "graph_type_id": graph_type_id, "cmap": cmap})
     context["poll_url"] = poll_url
+    context["graph_id"] = f"node-generated-graph-{node.id}"
     template = 'analysis/node_data/node_data_graph.html'
     return render(request, template, context)
 
@@ -389,19 +388,10 @@ def node_load(request, analysis_id, node_id):
 
 @require_POST
 def node_cancel_load(request, analysis_id, node_id):
-    node = get_node_subclass_or_404(request.user, node_id)
-    if node_task := NodeTask.objects.filter(node_version__node=node, node_version__version=node.version).first():
-        if node_task.celery_task:
-            logging.debug("TODO: Cancelling task %s", node_task.celery_task)
-            app.control.revoke(node_task.celery_task, terminate=True)  # @UndefinedVariable
-
-            result = AbortableAsyncResult(node_task.celery_task)
-            result.abort()
-
-        if node_task.db_pid:
-            run_sql("select pg_cancel_backend(%s)", [node_task.db_pid])
-    else:
-        logging.error("No task set for node %s", node_id)
+    node = get_node_subclass_or_404(request.user, node_id, write=True)
+    node_task_qs = NodeTask.objects.filter(node_version__node=node, node_version__version=node.version)
+    if not cancel_node_tasks(node_task_qs):
+        logging.error("No running task for node %s", node_id)
 
     node.status = NodeStatus.CANCELLED
     node.save()

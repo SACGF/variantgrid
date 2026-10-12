@@ -17,6 +17,16 @@ class HGVSImplementationException(HGVSException):
     """ HGVSException subclass for when problem is with the library (users can NOT fix) """
 
 
+class HGVSNonCodingTranscriptException(HGVSNomenclatureException):
+    """ c.HGVS on a transcript without a CDS (NR_/XR_). The submitter may have meant n., or numbered from a coding
+        model of the locus, where c. and n. differ by the 5'UTR length - we can't tell which, so don't resolve it """
+
+    def __init__(self, transcript_accession: str):
+        self.transcript_accession = transcript_accession
+        super().__init__(f"c.HGVS used on non-coding transcript {transcript_accession}, which has no CDS - "
+                         f"use n.HGVS. Not converted to n. as c. and n. numbering differ by the 5' UTR length")
+
+
 class HGVSNoRepresentationException(HGVSException):
     """ The variant is valid but HGVS has no way to write it - <CNV>, <INS> and other
         symbolic alts with neither a ranged form nor an explicit ref/alt expansion """

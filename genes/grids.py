@@ -139,6 +139,12 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
             return self._extra_filters
         return self.get_query_json("extra_filters")
 
+    @cached_property
+    def show_clinvar(self) -> bool:
+        """ By default only variants with internal data (in samples, classified or tagged) - the page's
+            'Include ClinVar' toggle adds the ClinVar records """
+        return self.get_query_param("show_clinvar") == "true"
+
     def _get_rich_columns(self) -> list[RichColumn]:
         """ Drop the gene columns - they'd be the same on every row, and the page shows them above """
         rich_columns = []
@@ -152,7 +158,7 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
 
     def _get_base_queryset(self) -> QuerySet:
         genes_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, self.annotation_version)
-        return variant_qs_filter_has_internal_data(genes_qs, self.annotation_version, show_clinvar=False)
+        return variant_qs_filter_has_internal_data(genes_qs, self.annotation_version, show_clinvar=self.show_clinvar)
 
     def _get_q(self) -> Optional[Q]:
         q_list = []

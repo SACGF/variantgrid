@@ -6,8 +6,8 @@ snpdb is the core app: the genome (`GenomeBuild`, `Contig`), the variant identit
 `Variant`, `Allele`), samples and their packed genotypes (`VCF`, `Sample`, `Cohort`, `CohortGenotypeCollection`),
 liftover between builds, ClinGen Allele Registry linking, labs and organisations, user settings, the grid column
 catalogue and the DataTables engine every list page uses. The rules are in `snpdb/AGENTS.md`; the models are listed
-in `claude/maps/models.md#snpdb`; this is the story behind them. The name is historical ("SNP database" predates
-VariantGrid); nothing here is SNP-specific.
+in `claude/maps/models.md#snpdb`; this is the story behind them. The name stands for "SNP database"; nothing here is
+SNP-specific.
 
 ## Flows
 
@@ -38,10 +38,12 @@ bulk path sets the hash by hand for the same reason.
 `snpdb/models/models_variant.py:VariantCoordinate` is a pydantic value object with two exit doors: `as_external_explicit`
 for VCF and HGVS, `as_internal_symbolic` for the database. `VariantCoordinate.as_internal_symbolic` turns an alt at or
 beyond `settings.VARIANT_SYMBOLIC_ALT_SIZE` (1000 in `variantgrid/settings/components/default_settings.py`) into
-`<DUP>` (single-base ref, HGVS says dup), `<DEL>` (single-base alt equal to ref[0]) or `<INV>` (equal lengths, reverse
-complement) with an `svlen`. `VariantCoordinate.as_internal_canonical_form` is the rule "one representation per
+`<DUP>` (single-base ref, the inserted sequence copies the adjacent bases - hgvs's Babelfish over the genome FASTA,
+`snpdb/babelfish.py`), `<DEL>` (single-base alt equal to ref[0]) or `<INV>` (equal lengths, reverse complement, strictly
+longer than the threshold) with an `svlen`. `VariantCoordinate.as_vcf_coordinate` / `VariantCoordinate.from_vcf_coordinate`
+convert to and from hgvs's `VCFCoordinate`, which puts a padding base before an `<INV>` (we store its first inverted base). `VariantCoordinate.as_internal_canonical_form` is the rule "one representation per
 variant": symbolic only when `abs(svlen)` clears the threshold, otherwise explicit if `VariantCoordinate.can_be_made_explicit`
-(`<CNV>` and `<INS>` cannot be), and an alt equal to the ref becomes `Variant.REFERENCE_ALT`. `Variant.qs_from_variant_coordinate`
+(`<CNV>` and `<INS>` cannot be - and no `<INS>` is stored, as import drops it: `settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES`), and an alt equal to the ref becomes `Variant.REFERENCE_ALT`. `Variant.qs_from_variant_coordinate`
 applies this and resolves the contig up front from `GenomeBuild.chrom_contig_mappings` so the filter lands on the
 leading edge of the `(contig, position, ref)` unique index instead of joining GenomeBuildContig (#1720). `Variant` is
 unique on `(locus, alt, svlen)`: two CNVs can share an alt and differ only in length. `Variant.end` is stored, not
@@ -54,8 +56,8 @@ computed, for overlap queries.
 that made it (`AlleleConversionTool`). `snpdb/clingen_allele.py:populate_clingen_alleles_for_variants` is the batch
 path: variants that fail `Variant.can_have_clingen_allele` (gene-level, an alt that cannot form g.HGVS, or larger than
 `ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE`, with `<DUP>` counted double for a registry bug) get a bare `Allele`
-with no network call, once - a variant that can never be registered counts as done on every later call, which is what
-stopped it collecting a fresh `Allele` per call (#1361 / #1844). The rest are sent as one `hgvs_put` batch, and the
+with no network call, once - a variant that can never be registered counts as done on every later call, so it never
+collects a fresh `Allele` per call (#1361 / #1844). The rest are sent as one `hgvs_put` batch, and the
 response creates `ClinGenAllele` rows or stores the error on `VariantAllele.clingen_error`. Alleles are created with
 `ignore_conflicts=True` and re-read because the Allele may already exist from another build; any empty Allele whose
 `VariantAllele` insert was dropped as a conflict is deleted at the end of the call. The single-variant path is `snpdb/clingen_allele.py:get_variant_allele_for_variant`,
@@ -116,14 +118,14 @@ samples all sit inside one VCF cohort becomes a sub-cohort sharing the parent's 
 
 Membership is versioned. `snpdb/models/models_cohort.py:Cohort.increment_version` bumps `version`, renumbers the packed
 indexes of a custom cohort and marks older `CohortGenotypeCollection`s for deletion; `CohortSample.save` and
-`CohortSample.delete` each call it, so per-row edits rebuild the packing per row. `Cohort.set_samples` (2026-09-05) applies
+`CohortSample.delete` each call it, so per-row edits rebuild the packing per row. `Cohort.set_samples` applies
 a whole new membership under one bump. `snpdb/models/models_cohort.py:CohortVersion` (#1551) gives version-specific
 caches something to cascade from, the way `NodeVersion` does in analysis.
 
 Each collection is its own partition table: `snpdb/models/models_cohort.py:CohortGenotypeCollection` is a
 `library/django_utils/django_partition.py:RelatedModelsPartitionModel`, whose `save` runs
 `CREATE TABLE … INHERITS` with a check constraint on the collection id and whose `delete_related_objects` drops it.
-Since 2024-11 a VCF's genotypes are split in two: the UNCOMMON collection and a COMMON one holding variants above
+A VCF's genotypes are split in two: the UNCOMMON collection and a COMMON one holding variants above
 `CohortGenotypeCommonFilterVersion.gnomad_af_min` in every listed gnomAD version, so a rare-variant filter can skip the
 common partition entirely. `CohortGenotypeCollection.get_annotation_kwargs` only skips it when the analysis's gnomAD
 version is one the partition was built for (#1119, #1582); `snpdb/common_variants.py:get_classified_high_frequency_variants_qs`
@@ -131,8 +133,8 @@ keeps classified common variants out of the common side.
 
 Querying is a `FilteredRelation` on `cohortgenotype` plus a regex on `samples_zygosity`
 (`CohortGenotypeCollection.get_zygosity_q`), inverted with a negative lookahead rather than `~Q()`. The sample-level
-path uses `Substr` instead (`snpdb/models/models_vcf.py:Sample.get_annotation_kwargs`) because benchmarking (#1494) found
-substring-plus-IN faster for one sample and regex faster for wide cohorts. `Cohort.get_any_sample_called_variant_collection`
+path uses `Substr` instead (`snpdb/models/models_vcf.py:Sample.get_annotation_kwargs`) because substring-plus-IN is
+faster for one sample and regex faster for wide cohorts (#1494). `Cohort.get_any_sample_called_variant_collection`
 (#1551) pre-computes a `VariantCollection` for sub-cohorts so the analysis EXCLUDE filter becomes a hash join.
 
 ### VCF and Sample lifecycle
@@ -142,7 +144,7 @@ Permissions cascade from the VCF: `Sample.can_view` is the VCF's answer or a sam
 `Sample.filter_for_user` ORs both; `VCF.filter_for_user` also hides `ImportStatus.DELETION_STATES` and, by default,
 archived VCFs. Deleting from the UI is `snpdb/tasks/soft_delete_tasks.py:soft_delete_vcfs`, which marks rows and queues
 `snpdb/tasks/soft_delete_tasks.py:remove_soft_deleted_vcfs_task` on the single scheduling worker, one VCF at a time because
-larger deletes blew out the commit log. `VCF.delete_internal_data` keeps the VCF and Sample rows and either recreates the
+larger deletes blow out the commit log. `VCF.delete_internal_data` keeps the VCF and Sample rows and either recreates the
 partitions (reload in place) or drops them (`snpdb/archive.py:archive_vcf`, #1536), stamping
 `library/django_utils/data_archive_mixin.py:DataArchiveMixin`. Before any partition drop the archive pipeline writes a
 pg_dump (`snpdb/partition_archive.py:archive_partitioned_model`, `snpdb/tasks/partition_archive_tasks.py:perform_partition_archive`,
@@ -152,13 +154,12 @@ Per-deployment zygosity counts (`snpdb/models/models_zygosity_counts.py:VariantZ
 partition, updated by raw SQL in `snpdb/variant_zygosity_count.py:update_all_variant_zygosity_counts_for_vcf` on the
 single worker, with `VariantZygosityCountForVCF` and `VariantZygosityCountForSample` as the audit rows that let a delete
 subtract exactly what an import added. `data_version` on the collection is bumped in the same transaction as the last
-write so analysis nodes can pin what they read. Per-sample stats moved to `snpdb/models/models_cohort_stats.py:CohortGenotypeStats`,
+write so analysis nodes can pin what they read. Per-sample stats live in `snpdb/models/models_cohort_stats.py:CohortGenotypeStats`,
 whose chrX het/hom ratio is the "detected sex" (`CohortGenotypeStats.chrx_sex_guess`).
 
 `snpdb/models/models_vcf.py:VCFSourceSettings` rewrites a VCF's sample-field bindings by regex on its `source` header,
-because callers reuse standard FORMAT ids for other meanings. `snpdb/signals/signal_handlers.py:backend_vcf_import_success_handler`
-creates BED intersections for sequencing samples, and `trio_post_save_handler` launches karyomapping for a new Trio only
-(Duo and Quad do not).
+because callers reuse standard FORMAT ids for other meanings. `snpdb/signals/signal_handlers.py:trio_post_save_handler`
+launches karyomapping for a new Trio only (Duo and Quad do not).
 
 ### Labs, users and the current build
 
@@ -173,8 +174,9 @@ whose membership is decided outside VariantGrid says so through `Lab.external_me
 deriving the lab and organisation from the user's default lab when not given. `snpdb/genome_build_manager.py:GenomeBuildManager.get_current_genome_build`
 resolves the build for a request in a fixed order (GET parameter, build name in the URL path, the user's default, the
 first annotated build) and caches it on the request threadlocal; the URL regex only knows GRCh37 and GRCh38.
-`snpdb/apps.py:SnpdbConfig.ready` connects `user_post_save_handler` only outside `UNIT_TEST`, imports every
-`snpdb/signals/` module for its `@search_receiver` side effect, and connects the trio and VCF-import handlers.
+`snpdb/apps.py:SnpdbConfig.ready` connects `user_post_save_handler` only outside `UNIT_TEST`, imports the
+`snpdb/signals/` receiver modules, registers the app's searches by name with `search_registry.register`, and connects
+the trio and VCF-import handlers.
 
 ### Grids
 
@@ -188,7 +190,7 @@ renders blank instead of breaking `JSON.parse`, and inherits `library/django_uti
 
 `snpdb/grids.py:AbstractVariantGrid` is the variant table (the analysis node grid and the standalone variant lists).
 Columns are built per user from `UserSettings.columns` through `snpdb/grid_columns/custom_columns.py:get_variant_grid_columns`
-from the catalogue in `snpdb/models/models_columns.py:VariantGridColumn` (composite columns since 2026-09-02).
+from the catalogue in `snpdb/models/models_columns.py:VariantGridColumn`, composite columns included.
 `AbstractVariantGrid.get_initial_queryset` restricts the `variantallele` join to the grid's build (#1626, shared MT contig)
 and applies `_get_q` once, because applying column rules there as well would add a second join per filtered relation.
 `AbstractVariantGrid._genomic_order_by` orders contigs with a `CASE` over `GenomeBuild.standard_contigs` for the same
@@ -196,10 +198,14 @@ shared-contig reason.
 
 ### Search
 
-`snpdb/search.py:SearchInput.search` sends `search_signal` and every `@search_receiver` (`snpdb/search.py:search_receiver`)
-answers with a `SearchResponse`. The decorator does the shared work: admin-only gating, `preview_enabled`, the regex
+`@search_receiver` (`snpdb/search.py:search_receiver`) turns a generator into a `snpdb/search.py:SearchReceiver`, and
+each app's `AppConfig.ready()` registers its receivers by name with `snpdb/search.py:SearchRegistry.register` (#1690;
+`snpdb/tests/test_search_registry.py` fails on a declared but unregistered one). `snpdb/search.py:SearchInput.search` runs
+every registered receiver whose `SearchReceiver.visible_to` passes (enabled, admin-only, `preview_enabled`, classify
+admits only Variant searches) and `SearchReceiver.search` returns a `SearchResponse`, doing the shared work: the regex
 `pattern`, result caps (variants uncapped because they merge into alleles), exception capture into a
-`SearchMessageOverall`, and under `settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
+`SearchMessageOverall`, timing into `duration_seconds` (the EventLog summary names the slowest over a second), and under
+`settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
 `SearchInput.get_visible_variants` restricts to a build's contigs and, on Shariant, to classified variants.
 `SearchResultMatchStrength` decides whether the UI jumps straight to a single result. The variant receivers live in
 `snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, HGVS via `snpdb/signals/variant_search.py:_search_hgvs`, ids,
@@ -223,21 +229,6 @@ searches from `snpdb/signals/`.
   (`snpdb/gene_level_variants.py`, #1506) with the gene id as position, `svlen = 0` rather than null so the unique
   constraint still bites. `Variant.get_gene_level_q` is the one predicate; VCF writers are safe because they enumerate
   `GenomeBuild.standard_contigs`.
-
-## History
-
-- 2024-05: BCFtools liftover replaced NCBI Remap (variantgrid_private#2647); 2024-07 liftover code moved out of `Allele`
-  into `snpdb/liftover.py` (#1014) and tuples became `VariantCoordinate`.
-- 2024-11: common/rare split of CohortGenotypeCollection (variantgrid_private#3704); 2024-12 T2T-CHM13v2 (#814) and the
-  symbolic `<DEL>` representation (#1214); 2025-04 `as_internal_canonical_form` (#1275).
-- 2026-04/06: the gnomAD-version guard on the common partition (#1119, #1582); trio and quad search (#1623);
-  build-restricted grids (#1626); 2026-05 data archive (#1536) and the pre-drop pg_dump pipeline (#1537); profiling that
-  settled regex versus substring (#1494); sub-cohort VariantCollections and CohortVersion (#1551).
-- 2026-08: per-allele liftover errors for non-standard contigs (#1197); known counts for grids (#1700); gene fusions as
-  variants (#1506); contig IN lists (#1720); retired rather than deleted tags (#1751); jqGrid removed, variant grids on
-  the native DataTables engine (#1785, #1815); symbolic CNV HGVS from coordinates (#1571).
-- 2026-09: user awards (#1819); proband sex from chrX genotypes (variantgrid_sapath#439); `snpdb/views/views.py` split
-  into topic modules; composite grid columns; Duo analyses (#1829); `Cohort.set_samples` and the cohort stats tab.
 
 ## Traps
 

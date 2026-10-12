@@ -65,9 +65,11 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
         ).prefetch_related("overlapcontribution_set")
 
         for cg in queryset.iterator(chunk_size=4000):
-            yield json.dumps(cg.latest_classification_modification.as_json(
+            json_data = cg.latest_classification_modification.as_json(
                 self.json_params
-            ))
+            )
+            json_data["grouping_id"] = cg.pk
+            yield json.dumps(json_data)
 
     def footer(self) -> list[str]:
         return [']}']

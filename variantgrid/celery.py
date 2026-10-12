@@ -51,6 +51,14 @@ if SAPATH_ENABLED and getattr(settings, "SAPATH_HELIX_SHARED_FILE", None):
         'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
     }
 
+# Condition text automatch sweep (#1780): publishing flags ConditionTexts (pending_automatch)
+# instead of calling the external Monarch search API in the request; this drains the flags, and
+# skips while a bulk import is ongoing so a sync's worth is handled as one deduped batch afterwards.
+app.conf.beat_schedule['condition-text-automatch'] = {
+    'task': 'classification.tasks.condition_text_automatch_task.condition_text_automatch_task',
+    'schedule': MINUTE_SECS * 5,
+}
+
 # Reclassification timelines (issue #1523): the analytics page builds what it can in the request,
 # this picks up anything left over, e.g. the morning after a large sync.
 app.conf.beat_schedule['reclassification-events-update'] = {
@@ -86,23 +94,22 @@ app.conf.beat_schedule['reconcile-pending-extractions'] = {
     'schedule': HOUR_SECS,
 }
 
+if settings.API_REQUEST_LOG_DAYS:
+    app.conf.beat_schedule['prune-api-request-log'] = {
+        'task': 'eventlog.tasks.prune_api_request_log',
+        'schedule': crontab(hour=3, minute=45),
+    }
+
 app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'task': 'analysis.tasks.analysis_grid_export_tasks.clear_old_node_export_cached_generated_files',
     'schedule': crontab(hour=3, minute=15),
 }
 
-# User awards (#1819). The "today" trophy should move during the day; crowns, medals and badges
-# nightly. Raw seconds rather than crontab - see the timezone note above.
+# User awards (#1819). Raw seconds rather than crontab - see the timezone note above.
 if settings.USER_AWARDS_ENABLED:
-    app.conf.beat_schedule['user-awards-daily'] = {
-        'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
-        'schedule': HOUR_SECS,
-        'kwargs': {'periods': ['D']},
-    }
     app.conf.beat_schedule['user-awards-nightly'] = {
         'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
         'schedule': HOUR_SECS * 24,
-        'kwargs': {'periods': ['A', 'M'], 'badges': True},
     }
 
 # send update emails once a day (if there has been activity)

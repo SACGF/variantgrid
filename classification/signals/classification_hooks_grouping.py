@@ -66,10 +66,13 @@ def condition_set(sender, classification: Classification, **kwargs):
 @receiver(pre_delete, sender=Classification)
 def deleting_classification(sender, instance: Classification, **kwargs):  # pylint: disable=unused-argument
     # CLASSIFICATION DELETED
-    # when a classification is deleted, it will delete the corresponding ClassificationGroupingEntry
-    # so we need to mark the Allele Origin grouping (which dirty up does)
+    # delete the ClassificationGroupingEntry now (rather than waiting for the cascade) so the
+    # recalculation below doesn't count the classification being deleted - otherwise the grouping
+    # would be re-saved as clean while still including it, leaving a stale grouping behind
     if entry := ClassificationGroupingEntry.objects.filter(classification=instance).first():
-        entry.dirty_up()
+        grouping = entry.grouping
+        entry.delete()
+        grouping.dirty_up()
         _instant_undirty_check()
 
 

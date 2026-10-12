@@ -2,7 +2,7 @@ import unittest
 
 from django.contrib.auth.models import User
 
-from annotation.fake_annotation import (
+from annotation.fake_data import (
     create_fake_clinvar_data,
     create_fake_variant_annotation,
     get_fake_annotation_version,
@@ -72,9 +72,10 @@ class Test(URLTestCase):
     def testDataGridUrls(self):
         DATATABLE_GRID_LIST_URLS = [
             ("variant_annotation_version_datatable", {"genome_build_name": self.grch37.name}, 200),
-            ("annotation_run_datatable", {}, 200),
+            ("annotation_run_datatable", {}, 403),
         ]
         self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
+        self._test_datatable_urls([("annotation_run_datatable", {}, 200)], self.admin_user)
 
 if __name__ == "__main__":
     unittest.main()

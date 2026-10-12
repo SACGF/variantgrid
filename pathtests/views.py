@@ -5,8 +5,7 @@ from collections import defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.db.models.query_utils import Q
-from django.http.response import HttpResponse, JsonResponse
+from django.http.response import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -14,6 +13,7 @@ from django.views.decorators.http import require_POST
 from genes.models import GeneList, GeneListCategory, GeneSymbol
 from genes.views.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
+from library.enums import ModificationOperation
 from pathtests.forms import (
     CaseForm,
     CreatePathologyTestForm,
@@ -23,7 +23,6 @@ from pathtests.forms import (
     SelectPathologyTestVersionForm,
 )
 from pathtests.models import (
-    ActivePathologyTestVersion,
     Case,
     PathologyTest,
     PathologyTestGeneModificationOutcome,
@@ -64,7 +63,7 @@ def follow_scientist(request, follow_user_id):
 
 
 def view_cases_for_users(request, title, users_list, has_menu=True):
-    cases_qs = get_cases_qs().filter(lead_scientist__in=users_list).order_by("-created")
+    cases_qs = get_cases_qs(request.user).filter(lead_scientist__in=users_list).order_by("-created")
 
     last_checked = get_external_order_system_last_checked()
     if has_menu:
@@ -130,6 +129,7 @@ def manage_pathology_tests(request):
                     gene_list.user = request.user
                     gene_list.name = f"Clone of {gene_list.name}"
                     gene_list.category = GeneListCategory.get_pathology_test_gene_category()
+                    gene_list.locked = False  # A confirmed version's list is locked; v1 of the new test is a draft
                     gene_list.save()
                 else:
                     category = GeneListCategory.get_pathology_test_gene_category()
@@ -155,11 +155,6 @@ def manage_pathology_tests(request):
 
 def get_gene_modification_request(pathology_test_version):
     """ returns PathologyTestGeneModification separated as (gene_addition_requests, gene_deletion_requests, handled_requests) """
-    current_genes = set()
-    if pathology_test_version.gene_list:
-        current_genes.update(pathology_test_version.gene_list.get_gene_names())
-    #logging.info(current_genes)
-
     gene_addition_requests = defaultdict(list)
     gene_deletion_requests = defaultdict(list)
     handled_requests = defaultdict(list)
@@ -167,7 +162,7 @@ def get_gene_modification_request(pathology_test_version):
     for gmr in pathology_test_version.pathologytestgenemodificationrequest_set.all():
         gene_symbol = gmr.gene_symbol_id
         if gmr.outcome == PathologyTestGeneModificationOutcome.PENDING:
-            if gene_symbol in current_genes:
+            if gmr.operation == ModificationOperation.REMOVE:
                 d = gene_deletion_requests
             else:
                 d = gene_addition_requests
@@ -183,7 +178,6 @@ def get_gene_modification_request(pathology_test_version):
 
 
 def handle_modification_requests(post_dict, pathology_test_version, op_key, modification_requests, genes):
-    IGNORE = 'ignore'
     REJECT = 'reject'
     ACCEPT = 'accept'
 
@@ -193,14 +187,13 @@ def handle_modification_requests(post_dict, pathology_test_version, op_key, modi
     for gene_symbol, gene_modification_requests in modification_requests.items():
         # Looks like 'add-ALK' or 'del-ALK'
         key = f'{op_key}-{gene_symbol}'
-        outcome = None
         op = post_dict.get(key)
-        if op == IGNORE:
+        if op not in (REJECT, ACCEPT):  # ignore, or a request filed after the curator loaded the page
             continue
 
         if op == REJECT:
             outcome = PathologyTestGeneModificationOutcome.REJECTED
-        elif op == ACCEPT:
+        else:
             outcome = PathologyTestGeneModificationOutcome.ACCEPTED
             genes.add(gene_symbol)
 
@@ -272,9 +265,7 @@ def view_pathology_test_version(request, pk):
                                                            prefix='pathology-test-version')
 
     if request.method == 'POST':
-        if not pathology_test_version.is_curator(request.user):
-            msg = f"You are not the curator of pathology test {pathology_test_version.pathology_test}"
-            raise PermissionError(msg)
+        pathology_test_version.check_is_curator(request.user)
 
         confirm_test = request.POST.get("confirm_test")
         if confirm_test:
@@ -330,25 +321,20 @@ def view_pathology_test(request, name):
     pathology_test = get_object_or_404(PathologyTest, name=name)
 
     if request.method == 'POST':
-        if not pathology_test.is_curator(request.user):
-            msg = f"You are not the curator of pathology test {pathology_test}"
-            raise PermissionError(msg)
+        pathology_test.check_is_curator(request.user)
 
         msg = None
         level = messages.INFO
         restore_test = request.POST.get("restore_test")
         if restore_test:
-            pathology_test.deleted = False
-            pathology_test.save()
+            pathology_test.restore_test()
             msg = "Test restored."
 
         delete_test = request.POST.get("delete_test")
         if delete_test:
             delete_text = request.POST.get("delete_text")
             if delete_text == "delete":
-                pathology_test.deleted = True
-                pathology_test.save()
-                ActivePathologyTestVersion.objects.filter(pathology_test=pathology_test).delete()
+                pathology_test.delete_test()
                 msg = "This test has been deleted."
             else:
                 msg = "This test was NOT deleted."
@@ -372,9 +358,12 @@ def view_pathology_test(request, name):
 
 @require_POST
 def modify_pathology_test_version(request, pk):
+    """ Any user may request a gene be added/removed - the curator accepts or rejects it """
     pathology_test_version = get_object_or_404(PathologyTestVersion, pk=pk)
 
     operation = request.POST['operation']
+    if operation not in dict(ModificationOperation.CHOICES):
+        return HttpResponseBadRequest(f"Unknown operation '{operation}'")
     symbol = request.POST['gene_symbol']
     comments = request.POST['comments']
 
@@ -397,6 +386,7 @@ def add_external_manager_notice(request, obj):
 
 def view_pathology_test_order(request, pk):
     pathology_test_order = get_object_or_404(PathologyTestOrder, pk=pk)
+    pathology_test_order.check_can_view(request.user)
     form = PathologyTestOrderForm(instance=pathology_test_order)
     add_external_manager_notice(request, pathology_test_order)
 
@@ -407,11 +397,12 @@ def view_pathology_test_order(request, pk):
 
 def view_external_pathology_test_order(request, external_pk):
     pathology_test_order = get_object_or_404(PathologyTestOrder, external_pk=external_pk)
+    pathology_test_order.check_can_view(request.user)
     return redirect(pathology_test_order)
 
 
 def view_case(request, pk):
-    case = get_object_or_404(Case, pk=pk)
+    case = Case.get_for_user(request.user, pk)
     form = CaseForm(user=request.user, instance=case)
 
     add_external_manager_notice(request, case)
@@ -423,4 +414,5 @@ def view_case(request, pk):
 
 def view_external_case(request, external_pk):
     case = get_object_or_404(Case, external_pk=external_pk)
+    case.check_can_view(request.user)
     return redirect(case)

@@ -10,14 +10,14 @@ import logging
 import os
 import re
 import uuid
-from abc import ABC
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag
 from typing import Optional, TypedDict
 
+from avatar.templatetags.avatar_tags import avatar_url
 from celery import signature
 from celery.result import AsyncResult
 from django.conf import settings
@@ -40,16 +40,16 @@ from more_itertools import first
 from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
+from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
-from library.utils import JsonObjType, import_class
-from snpdb.models.models_enums import AwardPeriod, UserAwardKind, UserAwardLevel
+from library.utils import JsonObjType, import_class, string_deterministic_hash
+from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
-
 
 # A tag used for both origins is stored as UNKNOWN so AlleleOriginFilterDefault.buckets works verbatim.
 # On a tag that means "applies to both", which is what people see
@@ -141,13 +141,35 @@ class CachedGeneratedFile(TimeStampedModel):
             return True
         return not os.path.exists(self.filename)
 
+    @property
+    def generation_stalled(self) -> bool:
+        """ Still generating, but with no heartbeat for CACHED_GENERATED_FILE_STALLED_MINUTES - the worker died
+            without recording anything (SIGKILL, OOM, restart). Celery can't tell us: we don't track started, so
+            a dead task looks the same as a queued one (PENDING) """
+        if self.filename or self.exception or not self.task_id:
+            return False
+        stalled_cutoff = timezone.now() - timedelta(minutes=settings.CACHED_GENERATED_FILE_STALLED_MINUTES)
+        if self.modified > stalled_cutoff:
+            return False
+        # A task that returns its filename (eg graphs) only lands it on the row when someone polls
+        return AsyncResult(self.task_id).result is None
+
+    @property
+    def needs_regenerating(self) -> bool:
+        """ The file is gone or generation stalled - no better than never having generated it. A row that
+            failed with an exception is not retried: it stays failed (and visible) until the cause is fixed
+            and the rows are cleared with the cached_generated_file_reset command """
+        return self.file_missing or self.generation_stalled
+
     @staticmethod
     def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
         cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                  params_hash=params_hash)
-        if cgf.file_missing:
-            # Drop the row so the get_or_create below regenerates it lazily
-            logging.info("Discarding CachedGeneratedFile %s - %s is gone", cgf.pk, cgf.filename)
+        if cgf.needs_regenerating:
+            # Drop the row so the get_or_create below regenerates it lazily. A stalled generation (the worker
+            # died mid-export) is retried the same way - otherwise it is cached forever
+            logging.info("Discarding CachedGeneratedFile %s - file_missing=%s stalled=%s",
+                         cgf.pk, cgf.file_missing, cgf.generation_stalled)
             cgf.delete()
             cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
                                                                      params_hash=params_hash)
@@ -234,6 +256,34 @@ class SoftwareVersion(models.Model):
 
     class Meta:
         abstract = True
+
+
+class CodeVersion(models.Model):
+    """ A git hash of this codebase, recorded the first time something was written by it. pk increases with
+        each new hash seen, so "written between these deployments" is a pk range (#1977) """
+    git_hash = models.TextField(unique=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.git_hash[:8]} ({self.created:%Y-%m-%d})"
+
+    @staticmethod
+    def current() -> 'CodeVersion':
+        """ The code this process is running (settings.GIT_HASH) """
+        return CodeVersion.objects.get_or_create(git_hash=settings.GIT_HASH)[0]
+
+
+class CodeVersionMixin(models.Model):
+    """ Records the CodeVersion that wrote this row - set on creation if not given """
+    code_version = models.ForeignKey(CodeVersion, on_delete=PROTECT)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.code_version_id:
+            self.code_version = CodeVersion.current()
+        super().save(*args, **kwargs)
 
 
 class Wiki(TimeStampedModel):
@@ -391,7 +441,6 @@ class LabUser:
 
     @cached_property
     def preferred_label(self) -> str:
-        from snpdb.models import AvatarDetails
         return AvatarDetails.avatar_for(self.user).preferred_label
 
     def __lt__(self, other):
@@ -927,25 +976,22 @@ class LabHead(models.Model):
 
 
 class UserAward(TimeStampedModel):
-    """ Three kinds (see UserAwardKind). Computed rows (titles/badges) are keyed on
-        (definition_key, subject, period) and reused: 'created' is first earned, 'modified' the last
-        change of holder/tier. See snpdb.user_awards for the definitions and the computation """
+    """ Two kinds (see UserAwardKind). Computed badges are keyed on definition_key and reused:
+        'created' is first earned, 'modified' the last change of tier. See snpdb.user_awards for the
+        definitions and snpdb.user_award_updates for the computation """
     user = models.ForeignKey(User, on_delete=CASCADE)
     award_text = models.TextField(null=False, blank=False)
     award_level = models.TextField(max_length=1, choices=UserAwardLevel.choices, default=UserAwardLevel.GOLD)
     active = models.BooleanField(null=False, blank=True, default=True)
     kind = models.CharField(max_length=1, choices=UserAwardKind.choices, default=UserAwardKind.KUDOS)
     definition_key = models.TextField(null=True, blank=True)  # AwardDefinition.key, null for kudos
-    subject = models.TextField(null=True, blank=True)  # e.g. tag name for per-tag titles
-    period = models.CharField(max_length=1, choices=AwardPeriod.choices, null=True, blank=True)  # titles only
-    count = models.IntegerField(null=True, blank=True)  # score (titles) / raw progress (badges)
+    count = models.IntegerField(null=True, blank=True)  # raw progress (badges)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["user", "definition_key", "subject", "period"],
+            models.UniqueConstraint(fields=["user", "definition_key"],
                                     condition=models.Q(definition_key__isnull=False),
-                                    nulls_distinct=False,
-                                    name="user_award_unique_computed"),
+                                    name="user_award_unique_badge"),
         ]
 
     @property
@@ -955,8 +1001,6 @@ class UserAward(TimeStampedModel):
     @property
     def icon_name(self) -> str:
         """ font-awesome icon (without the fa-solid prefix) """
-        if self.kind == UserAwardKind.TITLE and self.period:
-            return AwardPeriod(self.period).icon
         if self.kind == UserAwardKind.BADGE:
             if definition := self.definition:
                 return definition.icon
@@ -978,32 +1022,22 @@ class UserAward(TimeStampedModel):
     def icon(self):
         return SafeString(f"<i class='{self.icon_class}'></i>")
 
-    @property
-    def period_rank(self) -> int:
-        return AwardPeriod(self.period).rank if self.period else 0
-
     def __str__(self):
         return f"{self.get_award_level_display()} {self.user}: {self.award_text}"
 
 
 class UserAwards:
-    """ A user's awards, partitioned by kind. Only titles decorate the user elsewhere on the site
-        (see AvatarDetails) - badges and kudos live on the profile pages """
+    """ A user's awards, partitioned by kind - shown on the profile pages """
 
     def __init__(self, user: User):
         award_qs = UserAward.objects.filter(user=user).all()
-        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, -x.period_rank, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
+        award_list: list[UserAward] = sorted(award_qs, key=lambda x: (not x.active, 100 - UserAwardLevel(x.award_level).int_value, x.award_text))
 
         self.all_awards = award_list
         self.awards = [award for award in award_list if award.active]
 
     def __bool__(self):
         return bool(self.awards)
-
-    @cached_property
-    def titles(self) -> list[UserAward]:
-        """ Active titles, ALL_TIME -> MONTH -> DAY """
-        return [a for a in self.awards if a.kind == UserAwardKind.TITLE]
 
     @cached_property
     def badges(self) -> list[UserAward]:
@@ -1046,6 +1080,48 @@ class UserAwards:
 
 
 @dataclass(frozen=True)
+class AvatarDetails:
+    user: User
+
+    @staticmethod
+    def avatar_for(user: User):
+        return AvatarDetails(user=user)
+
+    @cached_property
+    def awards(self) -> UserAwards:
+        return UserAwards(user=self.user)
+
+    @cached_property
+    def preferred_label(self) -> str:
+        user = self.user
+        preferred_label = user.username
+        if user.first_name or user.last_name:
+            preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
+        return preferred_label
+
+    @cached_property
+    def is_editable(self):
+        return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
+
+    @cached_property
+    def url(self) -> str:
+        if self.is_editable:
+            return avatar_url(self.user)
+        else:
+            # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
+            return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
+
+    @cached_property
+    def background_color(self) -> str:
+        if self.user.username == 'admin_bot':
+            return '#ffffff'
+
+        if self.url.startswith('/static/icons/users/'):
+            colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
+            return colors[string_deterministic_hash(self.user.username) % len(colors)]
+
+
+@dataclass(frozen=True)
 class BadgeProgress:
     """ Where a user is on a badge's bronze/silver/gold ladder - for the profile page """
     definition: object  # AwardDefinition
@@ -1075,11 +1151,6 @@ class BadgeProgress:
         if (threshold := self.next_threshold) is None:
             return 100
         return min(100, int(100 * self.count / threshold))
-
-    @property
-    def visible(self) -> bool:
-        """ Hidden definitions (Night Owl etc) only show once earned """
-        return self.earned or not self.definition.hidden
 
 
 class LabProject(models.Model):

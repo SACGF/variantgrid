@@ -24,30 +24,26 @@ against this VAV will fail" (for a missing `GeneAnnotationRelease`) but knows no
 and has no effect on scheduling: it is consulted inside `annotate_variants` after the run has been created,
 leased and launched.
 
-## Where the issue has drifted from the code
+## Where the code is
 
 Verified against master `ab90dadcc`:
 
-- The check is no longer called from `dump_and_annotate_variants` in `annotate_variants.py` (the file is
-  446 lines now); it moved to `annotation/pipelines/vep.py:VEPRunner.annotate` (line 85). The generic
-  handler is `annotation/tasks/annotate_variants.py` line 258 (not 280), the in-run blocker check line 236
-  (not 245).
-- `annotation/vep_annotation.py`: `vep_check_command_line_version_match` is at 619 (not 567),
-  `_vep_check_version_match` at 593 (not 555), `get_vep_version` at 323 (not 277), and the
-  `gencode_subset` / `distance` snapshot-field exclusion at 594-601 (not 540-546).
-- `get_annotation_run_blocker` is at `annotation/models/models.py` line 920 (not 794); the runs page
-  renders it at `annotation/templates/annotation/variant_annotation_runs.html` line 191 (not 146).
-- `_dispatch_for_vav` no longer exists. Dispatch is `annotation/tasks/annotation_scheduler_task.py:_dispatch_sweep`
+- The check is called from `annotation/pipelines/vep.py:VEPRunner.annotate` (line 85). The generic
+  handler is `annotation/tasks/annotate_variants.py` line 258, the in-run blocker check line 236.
+- `annotation/vep_annotation.py`: `vep_check_command_line_version_match` is at 619,
+  `_vep_check_version_match` at 593, `get_vep_version` at 323, and the
+  `gencode_subset` / `distance` snapshot-field exclusion at 594-601.
+- `get_annotation_run_blocker` is at `annotation/models/models.py` line 920; the runs page
+  renders it at `annotation/templates/annotation/variant_annotation_runs.html` line 191.
+- Dispatch is `annotation/tasks/annotation_scheduler_task.py:_dispatch_sweep`
   (line 348) over the list from `_dispatchable_variant_annotation_versions` (325), leasing through
   `_lease_across_vavs` (396) in two lanes: CREATED runs to `annotation_workers` (VEP), ANNOTATION_COMPLETED
   runs to `db_workers` (import).
 - The second Rollbar event per failure is `variantgrid/celery.py:on_task_failure` (the celery
-  `task_failure` signal reports any exception that is not a `RollbarIgnoreException`), not a second
-  `report_message`. That shapes the fix: staying silent after the first failure means the re-raised
-  exception must subclass `library/django_utils/rollbar_middleware.py:RollbarIgnoreException`.
-- Item 7346 (`gencode_subset`): the exclusion landed in `244397ca7` on 2026-07-03 and the item fired until
-  2026-07-07, which is consistent with vgaws deploying a few days later. Its shape is not reachable on
-  current code; nothing to do here beyond confirming vgaws is past that sha.
+  `task_failure` signal reports any exception that is not a `RollbarIgnoreException`). That shapes the
+  fix: staying silent after the first failure means the re-raised exception must subclass
+  `library/django_utils/rollbar_middleware.py:RollbarIgnoreException`.
+- Item 7346 (`gencode_subset`) is excluded by `244397ca7`; confirm vgaws is past that sha.
 
 ## Data
 
@@ -77,7 +73,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 - `VariantAnnotationVersion.unblock_annotation_runs()`: nulls both fields with `update()`.
 - `get_annotation_run_blocker()`: after the existing missing-`GeneAnnotationRelease` reason, return
   `f"VEP mismatch since {annotation_blocked_date:%Y-%m-%d %H:%M}: {annotation_blocked_reason}"` when
-  latched. Its docstring gains the scheduling effect (below) - it is no longer just a page warning.
+  latched. Its docstring gains the scheduling effect (below) - it gates dispatch as well as warning on the page.
 
 ### `annotation/tasks/annotate_variants.py`
 
@@ -161,7 +157,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 
 ## Tests (`claude/guides/testing.md`)
 
-Fixtures: `annotation/fake_annotation.py:get_fake_vep_version` via the `_make_vav` helper in
+Fixtures: `annotation/fake_data.py:get_fake_vep_version` via the `_make_vav` helper in
 `annotation/tests/test_variant_annotation_version_status.py`; runs from `_make_lock` / `_lease` in
 `annotation/tests/test_annotation_dispatch.py`; eager `annotate_variants` with the VEP stage patched as in
 `annotation/tests/test_annotation_run_lease_abort.py`.
@@ -179,9 +175,6 @@ Fixtures: `annotation/fake_annotation.py:get_fake_vep_version` via the `_make_va
   is a `RollbarIgnoreException`. A third run fails with the in-run blocker without any `report_message`.
 - `recheck_vep_version`: the check passing clears both fields and kicks the dispatcher; the check raising
   keeps the date, rewrites the reason and reports nothing.
-
-Not kept: a test that the migration adds two nullable fields, or that the template renders the button
-(`annotation/tests/test_urls.py` already covers the page at 200 for a superuser).
 
 ## Manual verification
 

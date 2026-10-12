@@ -1,0 +1,7 @@
+# Supply-chain cooldown: uv never resolves or installs a release uploaded in the last 7 days, since most
+# malicious PyPI uploads are pulled within days (#1165). This applies to `uv pip install` on deployments too.
+exclude-newer = "7 days"
+
+# Packages we publish ourselves are exempt, so a new release can be picked up straight away.
+# Their dependencies still get the cooldown. One-off on the command line: --exclude-newer-package <name>=false
+exclude-newer-package = { cdot = false }

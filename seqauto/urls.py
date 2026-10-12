@@ -1,5 +1,6 @@
 from rest_framework import routers
 
+from library.django_utils import staff_only
 from seqauto import views, views_admin, views_autocomplete, views_qc_graphs, views_rest
 from seqauto.grids.qc_data_grids import (
     FastQCColumns,
@@ -14,7 +15,7 @@ from seqauto.grids.seqauto_grids import (
     SequencingSamplesHistoricalConfig,
 )
 from seqauto.grids.sequencing_data_grids import (
-    BamFileColumns,
+    AlignmentFileColumns,
     EnrichmentKitColumns,
     ExperimentColumns,
     QCColumns,
@@ -68,7 +69,7 @@ urlpatterns = [
     path('experiments', views.experiments, name='experiments'),
     path('sequencing_runs', views.sequencing_runs, name='sequencing_runs'),
     path('unaligned_reads', views.unaligned_reads, name='unaligned_reads'),
-    path('bam_files', views.bam_files, name='bam_files'),
+    path('alignment_files', views.alignment_files, name='alignment_files'),
     path('vcf_files', views.vcf_files, name='vcf_files'),
     path('qcs', views.qcs, name='qcs'),
     path('view_experiment/<experiment_id>', views.view_experiment, name='view_experiment'),
@@ -97,7 +98,7 @@ urlpatterns = [
     path('sequencing_run/assign_data_to_current_sample_sheet/<sequencing_run_id>', views.assign_data_to_current_sample_sheet, name='assign_data_to_current_sample_sheet'),
 
     path('view_unaligned_reads/<int:unaligned_reads_id>', views.view_unaligned_reads, name='view_unaligned_reads'),
-    path('view_bam/<int:bam_file_id>', views.view_bam_file, name='view_bam_file'),
+    path('view_alignment_file/<int:alignment_file_id>', views.view_alignment_file, name='view_alignment_file'),
     path('view_joint_called_vcf/<int:joint_called_vcf_id>', views.view_joint_called_vcf, name='view_joint_called_vcf'),
     # Backwards-compat URL alias (predates the JointCalledVCF rename)
     path('view_combo_vcf_file/<int:combo_vcf_file_id>', views.view_combo_vcf_file, name='view_combo_vcf_file'),
@@ -119,7 +120,7 @@ urlpatterns = [
          name='sequencing_run_datatable'),
     path('unaligned_reads/datatable/', DatabaseTableView.as_view(column_class=UnalignedReadsColumns),
          name='unaligned_reads_datatable'),
-    path('bam_file/datatable/', DatabaseTableView.as_view(column_class=BamFileColumns), name='bam_file_datatable'),
+    path('alignment_file/datatable/', DatabaseTableView.as_view(column_class=AlignmentFileColumns), name='alignment_file_datatable'),
     path('vcf_file/datatable/', DatabaseTableView.as_view(column_class=SingleSampleVCFColumns),
          name='vcf_file_datatable'),
     path('qc/datatable/', DatabaseTableView.as_view(column_class=QCColumns), name='qc_datatable'),
@@ -142,12 +143,12 @@ urlpatterns = [
     path('qc_exec_summary/datatable/', DatabaseTableView.as_view(column_class=QCExecSummaryColumns),
          name='qc_exec_summary_datatable'),
     # Software/settings
-    path('sequencing_software_versions/library/datatables/', DatabaseTableView.as_view(column_class=LibraryColumns), name='library_datatable'),
-    path('sequencing_software_versions/sequencer/datatables/', DatabaseTableView.as_view(column_class=SequencerColumns), name='sequencer_datatable'),
-    path('sequencing_software_versions/assay/datatables/', DatabaseTableView.as_view(column_class=AssayColumns), name='assay_datatable'),
-    path('sequencing_software_versions/aligner/datatables/', DatabaseTableView.as_view(column_class=AlignerColumns), name='aligner_datatable'),
-    path('sequencing_software_versions/variant_caller/datatables/', DatabaseTableView.as_view(column_class=VariantCallerColumns), name='variant_caller_datatable'),
-    path('sequencing_software_versions/variant_calling_pipeline/datatables/', DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns), name='variant_calling_pipeline_datatable'),
+    path('sequencing_software_versions/library/datatables/', staff_only(DatabaseTableView.as_view(column_class=LibraryColumns)), name='library_datatable'),
+    path('sequencing_software_versions/sequencer/datatables/', staff_only(DatabaseTableView.as_view(column_class=SequencerColumns)), name='sequencer_datatable'),
+    path('sequencing_software_versions/assay/datatables/', staff_only(DatabaseTableView.as_view(column_class=AssayColumns)), name='assay_datatable'),
+    path('sequencing_software_versions/aligner/datatables/', staff_only(DatabaseTableView.as_view(column_class=AlignerColumns)), name='aligner_datatable'),
+    path('sequencing_software_versions/variant_caller/datatables/', staff_only(DatabaseTableView.as_view(column_class=VariantCallerColumns)), name='variant_caller_datatable'),
+    path('sequencing_software_versions/variant_calling_pipeline/datatables/', staff_only(DatabaseTableView.as_view(column_class=VariantCallingPipelineColumns)), name='variant_calling_pipeline_datatable'),
 
     path('sequencing_software_versions', views_admin.sequencing_software_versions, name='sequencing_software_versions'),
     path('view_sequencer/<pk>', SequencerUpdate.as_view(), name='view_sequencer'),

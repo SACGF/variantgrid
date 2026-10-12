@@ -43,8 +43,9 @@ class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
         if not user.is_authenticated:
             return qs.none()
 
-        if self.q:
-            name_q = Q(name__icontains=self.q)
+        if words := self.q.split():
+            # Every word, in any order: "muscular dystrophy duchenne" finds "Duchenne muscular dystrophy"
+            name_q = reduce(operator.and_, (Q(name__icontains=word) for word in words))
             if term_id_qs := self._get_term_id_q():
                 id_q, exact_q = term_id_qs
                 # The term with exactly that id first, then other ids containing the digits, then names that do
@@ -74,19 +75,6 @@ class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
             qs = qs.filter(q)
 
         return qs
-
-
-@method_decorator(cache_page(HOUR_SECS), name='dispatch')
-class OntologyTermAutocompleteView(AbstractOntologyTermAutocompleteView):
-    def _get_ontology_service(self):
-        # Passed ontology_service in forward
-        value = self.forwarded.get('ontology_service')
-        if value is None:
-            return None
-        try:
-            return OntologyService(value)
-        except ValueError:
-            return None
 
 
 @method_decorator(cache_page(HOUR_SECS), name='dispatch')

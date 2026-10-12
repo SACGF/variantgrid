@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
 from ontology.tests.test_data_ontology import create_test_ontology_version
@@ -64,10 +64,14 @@ class Test(URLTestCase):
             # Digits anywhere in the id, bare or prefixed (HP:0001061)
             ('hpo_autocomplete', self.hpo, {"q": "106"}),
             ('hpo_autocomplete', self.hpo, {"q": "HP:106"}),
+            # Each word matched separately, in any order
+            ('omim_autocomplete', self.omim, {"q": "term  fake"}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user, True)
         # The index of one term is not another term
         self._test_autocomplete_urls([('omim_autocomplete', self.omim, {"q": str(self.hpo.index)})], self.user, False)
+        # Every word has to be in the name
+        self._test_autocomplete_urls([('omim_autocomplete', self.omim, {"q": "fake hpo"})], self.user, False)
 
 
 if __name__ == "__main__":

@@ -2,8 +2,9 @@
 Telling humans and Rollbar what happened: report_exc_info / report_message for caught problems,
 log_admin_change for audit, and the NotificationBuilder family (AdminNotificationBuilder here,
 LabNotificationBuilder in snpdb) that renders header / field / markdown blocks to Slack and email.
-`send_notification` is the raw Slack hook, falling back to Rollbar when Slack is unconfigured and
-truncating at SLACK_CHARACTER_LIMIT. The current request is found through django-threadlocals.
+`send_notification` is the raw Slack hook, falling back to report_event (EventLog) when Slack is
+unconfigured and truncating at SLACK_CHARACTER_LIMIT. Messages below settings.ROLLBAR['min_level']
+are not sent to Rollbar. The current request is found through library/request_context.py.
 """
 import json
 import logging
@@ -20,6 +21,7 @@ import markdown
 import requests
 import rollbar
 from django.conf import settings
+from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.auth.models import User
 from django.db.models import Model
 from django.forms import ModelForm
@@ -27,11 +29,11 @@ from django.utils import timezone
 from markdown import markdown
 from requests import HTTPError
 from rest_framework.request import Request
-from threadlocals.threadlocals import get_current_request, get_current_user
 
 from eventlog.models import Event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
+from library.request_context import get_current_request, get_current_user
 from library.utils import pretty_label
 
 
@@ -43,11 +45,26 @@ def get_current_logged_in_user() -> Optional[User]:
     return user
 
 
-def report_event(name: str, request: Request = None, extra_data: dict = None):
-    rollbar.report_message(message=name,
-                           level='info',
+_ROLLBAR_LEVEL_SEVERITY = {level: i for i, level in enumerate(['debug', 'info', 'warning', 'error', 'critical'])}
+
+
+def _rollbar_report_message(message: str, level: str, request=None, extra_data: Optional[dict] = None):
+    """ Sends to Rollbar unless level is below settings.ROLLBAR['min_level'] """
+    if min_level := settings.ROLLBAR.get('min_level'):
+        max_severity = len(_ROLLBAR_LEVEL_SEVERITY)
+        if _ROLLBAR_LEVEL_SEVERITY.get(level, max_severity) < _ROLLBAR_LEVEL_SEVERITY.get(min_level, 0):
+            return
+    rollbar.report_message(message=message,
+                           level=level,
                            request=request,
                            extra_data=extra_data)
+
+
+def report_event(name: str, request: Request = None, extra_data: dict = None):
+    _rollbar_report_message(message=name,
+                            level='info',
+                            request=request,
+                            extra_data=extra_data)
 
     if request is None:
         request = get_current_request()
@@ -88,7 +105,6 @@ def log_admin_change(obj: Model, message: Union[str, dict], user: Optional[User]
 
     The default implementation creates an admin LogEntry object.
     """
-    from django.contrib.admin.models import CHANGE, LogEntry
     if not user:
         user = get_current_logged_in_user()
 
@@ -128,10 +144,10 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     if not request:
         request = get_current_request()
 
-    rollbar.report_message(message=message,
-                           level=level,
-                           request=request,
-                           extra_data=extra_data)
+    _rollbar_report_message(message=message,
+                            level=level,
+                            request=request,
+                            extra_data=extra_data)
 
 
 def report_exc_info(extra_data=None, request=None, report_externally=True):
@@ -474,7 +490,7 @@ def send_notification(
             # give Rollbar the Slack JSON if Slack doesn't want it
             report_exc_info(extra_data=data)
     else:
-        # fallback to Rollbar if Slack isn't configured
+        # fallback to EventLog (and Rollbar if ROLLBAR['min_level'] allows info) if Slack isn't configured
         report_event(name=message)
 
 

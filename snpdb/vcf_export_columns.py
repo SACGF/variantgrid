@@ -16,7 +16,7 @@ class VCFInfoColumnDef:
 
 
 COLUMN_VCF_INFO: tuple[VCFInfoColumnDef, ...] = (
-    VCFInfoColumnDef('1KG_AF', 'af_1kg', VCFInfoTypes.FLOAT, 'Estimated allele frequency in the range (0,1), based on AC/AN', number=1),
+    VCFInfoColumnDef('AF_1KG', 'af_1kg', VCFInfoTypes.FLOAT, 'Estimated allele frequency in the range (0,1), based on AC/AN', number=1),
     VCFInfoColumnDef('ALLELEID', 'clinvar_allele_id', VCFInfoTypes.INTEGER, 'the ClinVar Allele ID'),
     VCFInfoColumnDef('AlphaMissense_pred', 'alphamissense_pred', VCFInfoTypes.STRING, 'AlphaMissense categorical prediction', number=1),
     VCFInfoColumnDef('ALPHAMISSENSE_rankscore', 'alphamissense_rankscore', VCFInfoTypes.FLOAT, 'AlphaMissense pathogenicity rank score', number=1),
@@ -92,7 +92,7 @@ COLUMN_VCF_INFO: tuple[VCFInfoColumnDef, ...] = (
     VCFInfoColumnDef('GNOMAD_GENE_OE_LOF', 'gnomad_oe_lof', VCFInfoTypes.FLOAT, 'gnomAD Gene Constraint LoF (OE)'),
     VCFInfoColumnDef('GNOMAD_HEMI_COUNT', 'gnomad_hemi_count', VCFInfoTypes.INTEGER, 'XY count (in non-PAR regions) - only on chrX', number=1),
     VCFInfoColumnDef('gnomAD_HOM_ALT', 'gnomad_hom_alt', VCFInfoTypes.INTEGER, 'Count of homozygous individuals'),
-    VCFInfoColumnDef('GNOMAD_non_par', 'gnomad_non_par', VCFInfoTypes.FLOAT, 'non_par in genomes or exomes', number=1),
+    VCFInfoColumnDef('GNOMAD_non_par', 'gnomad_non_par', VCFInfoTypes.FLAG, 'non_par in genomes or exomes', number=0),
     VCFInfoColumnDef('GNOMAD_POPMAX', 'gnomad_popmax', VCFInfoTypes.STRING, 'gnomAD PopMax population'),
     VCFInfoColumnDef('GNOMAD_POPMAX_AF', 'gnomad_popmax_af', VCFInfoTypes.FLOAT, 'gnomAD PopMax AF'),
     VCFInfoColumnDef('GRANTHAM', 'grantham', VCFInfoTypes.INTEGER, 'Grantham', number=1),

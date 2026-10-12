@@ -8,7 +8,7 @@ report_exc_info) · `preview_request.py` (PreviewModelMixin, PreviewData, the pr
 Patterns here:
 - `library` sits below the apps: `.importlinter` (checked in CI by `lint-imports`) forbids it importing one. Code that
   needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
-  moved out for this); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
+  are examples); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
   the check, so delete it when you remove the import.
 - Give a new user-owned model permissions by inheriting
   `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsAutoInitialSaveMixin` before `models.Model`;
@@ -23,9 +23,11 @@ Patterns here:
 - Notify humans with `library/log_utils.py:AdminNotificationBuilder` (Slack, plus superuser email when
   `is_communication=True`) or snpdb's `LabNotificationBuilder`; add blocks with `add_header`/`add_field`/`add_markdown`
   (Markdown, converted to HTML and Slack) and call `send()`. `library/log_utils.py:send_notification` is the raw
-  Slack hook, falls back to Rollbar when Slack is unconfigured, and truncates blocks at `SLACK_CHARACTER_LIMIT`.
+  Slack hook, falls back to `report_event` (EventLog) when Slack is unconfigured, and truncates blocks at `SLACK_CHARACTER_LIMIT`.
 - Report caught exceptions with `library/log_utils.py:report_exc_info` (Rollbar + traceback) and non-fatal problems
-  with `library/log_utils.py:report_message`; both find the current request via django-threadlocals.
+  with `library/log_utils.py:report_message`; both find the current request via `library/request_context.py`.
+  `report_message` and `report_event` (level info) drop Rollbar messages below `ROLLBAR['min_level']` (default warning);
+  pyrollbar has no threshold setting of its own.
 - Make a model hover-previewable and searchable by implementing `library/preview_request.py:PreviewModelMixin`
   (`preview_category`, `preview_icon`, `preview`) and returning `library/preview_request.py:PreviewData` via
   `preview_with`; contribute extra key/values from another app with `@receiver(preview_extra_signal, sender=Model)`
@@ -46,9 +48,9 @@ Patterns here:
   (`ExportRow`, `export_column`) · `class_utils.py` (`import_class`, `get_all_subclasses`) · `os_utils.py`
   (`execute_cmd`) · `timer_utils.py` (`get_timer`) · `misc_utils.py` (`empty_to_none`, `ChoicesEnum`, `iter_http_lines`)
   · `xml_utils.py` (`XmlParser`); then `library/django_utils/`: `database_utils.py` (`queryset_to_sql`, `dictfetchall`,
-  `sql_delete_qs`, `IntegerFieldChoices`/`TextFieldChoices`) · `model_utils.py` (`ArrayLength`, `model_has_field`,
+  `sql_delete_qs`, `pg_settings`, `get_table_row_estimates`, `IntegerFieldChoices`/`TextFieldChoices`) · `model_utils.py` (`ArrayLength`, `model_has_field`,
   `refresh_for_update`, `AuditUtils`) · `view_utils.py` (`is_ajax`, `render_ajax_view`) · `__init__.py`
-  (`require_superuser`, `get_cached_project_git_hash`) · `django_postgres.py` (`copy_from_file`).
+  (`require_superuser`) · `django_postgres.py` (`copy_from_file`).
 Gotchas:
 - `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` caches `.get()` results
   process-wide forever and `ObjectManagerCachingRequest` per request; both are plain managers under
@@ -90,9 +92,9 @@ Gotchas:
   `env_developers/` checked before `env/`) and only logs an error when no file matches.
 - `library/vg/inspect/__init__.py:inspect` opens `transaction.atomic()` and calls `set_rollback(True)` only after the
   inspector returns: marking rollback first makes Django refuse every query in the block (TransactionManagementError).
-Tests: `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner`, which swaps `ClinGenAlleleRegistryAPI`
-and `TranscriptSequenceFetcher` for recorded mocks that raise, naming the fixture to add, when asked for anything
-unrecorded; `FastaRecordingRunner` regenerates the sparse test fastas. Page tests extend
+Tests: settings under `UNIT_TEST` swap `ClinGenAlleleRegistryAPI` and `TranscriptSequenceFetcher` for recorded mocks
+that raise, naming the fixture to add, when asked for anything unrecorded. `TEST_RUNNER` is
+`variantgrid/test_runner.py:VariantGridTestRunner`; `FastaRecordingRunner` regenerates the sparse test fastas. Page tests extend
 `library/django_utils/unittest_utils.py:URLTestCase` (Celery eager, plain static storage, annotation web resources
 off) and use `_test_urls` / `_test_datatable_urls` / `_test_autocomplete_urls` / `_test_datatables_grid_urls_contains_objs`.
 Count queries with `library/django_utils/unittest_utils.py:production_query_count`, which drops savepoints and the

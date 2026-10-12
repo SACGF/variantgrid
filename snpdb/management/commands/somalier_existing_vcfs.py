@@ -1,14 +1,14 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from snpdb.models import (
-    VCF,
-    GenomeBuild,
+from library.log_utils import log_traceback
+from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_somalier import (
     SomalierAllSamplesRelate,
     SomalierRelatePairs,
     SomalierVCFExtract,
-    log_traceback,
 )
+from snpdb.models.models_vcf import VCF
 from snpdb.tasks.somalier_tasks import somalier_all_samples, somalier_vcf_id
 
 

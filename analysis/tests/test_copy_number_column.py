@@ -2,9 +2,10 @@
 Copy number on the analysis grid (#1558 §4) - the VCF field binding, and reading the value back out
 of the stored CohortGenotype JSON at query time rather than from a packed column.
 """
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from analysis.grids import VariantGrid
+from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils import FakeRequest
 from snpdb.grid_columns.grid_sample_columns import (
@@ -154,3 +155,47 @@ class CopyNumberNotDeclaredTest(GridExportTestCase):
         lines = self._export_lines(node, export_type="vcf")
         records = [line.split("\t") for line in lines if not line.startswith("#")]
         self.assertEqual("GT:AD:AF:PL:DP:GQ", records[0][8])
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class CopyRatioThresholdTest(GridExportTestCase):
+    """ SampleNode min_copy_gain_ratio / max_copy_loss_ratio against a ratio field (DRAGEN SM) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.vcf.copy_number_field = "SM"
+        cls.vcf.save()
+
+        cgc = cls.cohort.cohort_genotype_collection
+        cls.ratio_variants = {}
+        for i, ratio in enumerate([3.0, 1.4, 1.0, 0.8, 0.4]):
+            variant = slowly_create_test_variant("1", 5000 + i, "A", "T", cls.genome_build)
+            cls._add_genotype(cgc, variant, sample_format=[{"SM": [ratio]}, {}, {}])
+            cls.ratio_variants[ratio] = variant.pk
+        cls.no_ratio_pks = {v.pk for v in cls.variants}
+
+    def _passing_ratios(self, min_copy_gain_ratio=None, max_copy_loss_ratio=None) -> set:
+        node = SampleNode.objects.create(analysis=self.analysis, sample=self.sample,
+                                         min_copy_gain_ratio=min_copy_gain_ratio,
+                                         max_copy_loss_ratio=max_copy_loss_ratio)
+        pks = set(node.get_queryset().values_list("pk", flat=True))
+        self.assertTrue(self.no_ratio_pks <= pks, "a record with no ratio always passes")
+        return {ratio for ratio, pk in self.ratio_variants.items() if pk in pks}
+
+    def test_gain_and_loss_thresholds(self):
+        self.assertEqual({3.0, 0.4}, self._passing_ratios(2.5, 0.5))
+
+    def test_null_threshold_lets_every_gain_or_loss_through(self):
+        self.assertEqual({3.0, 1.4, 0.4}, self._passing_ratios(max_copy_loss_ratio=0.5))
+        self.assertEqual({3.0, 0.8, 0.4}, self._passing_ratios(min_copy_gain_ratio=2.5))
+
+    def test_an_absolute_copy_number_is_not_filtered(self):
+        self.sample.vcf.copy_number_field = "CN"
+        self.sample.vcf.save()
+        self.assertEqual(set(self.ratio_variants), self._passing_ratios(2.5, 0.5))
+
+    def test_method_summary(self):
+        node = SampleNode.objects.create(analysis=self.analysis, sample=self.sample,
+                                         min_copy_gain_ratio=2.5, max_copy_loss_ratio=0.5)
+        self.assertIn("gain SM>=2.5 loss SM<=0.5", node.get_method_summary())

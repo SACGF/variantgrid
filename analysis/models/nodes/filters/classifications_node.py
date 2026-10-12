@@ -90,6 +90,16 @@ class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
             return True
         return False
 
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        # ClinVar comes from a fixed annotation version, so only classification filters go out of date
+        if self.has_classification_filters():
+            if num_new := Classification.objects.filter(modified__gt=self.modified).count():
+                plural = "" if num_new == 1 else "s"
+                warnings.append(f"{num_new} new or changed classification{plural} since last save - "
+                                "press save to include them")
+        return warnings
+
     def _get_node_q(self) -> Optional[Q]:
         q = self._classifications_q()
         if self.node_input == NodeMatchInput.PARENT_NOT_MATCHING:

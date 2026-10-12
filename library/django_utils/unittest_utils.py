@@ -1,9 +1,10 @@
 """
 Test bases and query accounting: URLTestCase (Celery eager, plain static storage, annotation web
 resources off) with _test_urls / _test_datatable_urls / _test_autocomplete_urls for batch status
-checks, production_query_count (drops savepoints and the tables production caches), and
-QueryProfilingClient which appends per-GET query stats when VG_QUERY_PROFILE is set (stacks for
-matching SQL under VG_QUERY_TRACE). `vg page --queries` reuses the same counting.
+checks, production_query_count (drops savepoints and the tables production caches),
+frozen_cache_expiry (so two requests' counts can be compared), and QueryProfilingClient which
+appends per-GET query stats when VG_QUERY_PROFILE is set (stacks for matching SQL under
+VG_QUERY_TRACE). `vg page --queries` reuses the same counting.
 """
 import json
 import logging
@@ -13,8 +14,11 @@ import time
 import traceback
 from collections import Counter
 from collections.abc import Mapping
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from django.core.cache.backends import locmem
 from django.db import connection
 from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -50,6 +54,18 @@ def production_query_count(captured_queries) -> int:
             continue
         count += 1
     return count
+
+
+@contextmanager
+def frozen_cache_expiry():
+    """ Stops timed_cache and (locmem, as under UNIT_TEST) Django cache entries expiring, for tests
+        comparing the query counts of two requests - otherwise a TTL filled earlier in the process
+        (GenomeBuild.get_name_or_alias 60s, SiteMessage.get_site_messages 30s) can run out between
+        them, and the refill is counted against one side """
+    now = time.time()
+    with patch("library.cache._now", return_value=now), \
+            patch.object(locmem, "time", SimpleNamespace(time=lambda: now)):
+        yield
 
 
 def _normalize_sql(sql: str) -> str:

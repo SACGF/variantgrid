@@ -1,6 +1,6 @@
 # VariantGrid domain glossary
 
-The L0 vocabulary from [agent_system.md](plans/agent_system.md) §3: one paragraph per noun - what it is, the
+The domain vocabulary: one paragraph per noun - what it is, the
 model, the invariant that is easy to get wrong. Every other doc and every `vg` output uses these names.
 Citations are `path:Symbol`; `scripts/vg outline <path>` shows the rest of the module.
 
@@ -23,7 +23,11 @@ locus); exclude them with `Variant.get_no_reference_q` when you mean real calls.
 
 **Symbolic variant / SVLEN** - alts at or beyond `settings.VARIANT_SYMBOLIC_ALT_SIZE` are stored as `<DEL>` / `<DUP>` /
 `<INV>` with `svlen`; `snpdb/models/models_variant.py:VariantCoordinate.as_internal_canonical_form` does the conversion, and
-`Variant.qs_from_variant_coordinate` applies it for you. Gene-level events are Variants on a fake contig - guard
+`Variant.qs_from_variant_coordinate` applies it for you. Symbolic is a storage form, not "a structural variant" for
+annotation: one under the annotation version's `structural_variant_min_size` (pinned from
+`settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE`) goes through the STANDARD pipeline
+(`annotation/annotation_pipeline_routing.py`), and the Variant Types page (`variantopedia/variant_types.py`) tabulates
+every such rule by size. Gene-level events are Variants on a fake contig - guard
 coordinate code with `Variant.get_gene_level_q`.
 
 **Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its
@@ -72,8 +76,9 @@ are separate facts - a depth-only caller has sample columns without a genotype. 
 **Cohort / CohortSample** - `snpdb/models/models_cohort.py:Cohort`, `CohortSample`. An ordered set of Samples. Every VCF has
 an automatic cohort of all its samples; custom cohorts pick across VCFs. Membership changes go through
 `Cohort.set_samples` (one version bump, one genotype rebuild), never a bulk update. A Cohort also carries its own
-phenotype text matched to OntologyTerms the way a Patient's is (`annotation/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`),
-so the analysis Phenotype node can read terms from either.
+phenotype text matched to OntologyTerms the way a Patient's is (`patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin`),
+so the analysis Phenotype node can read terms from either. The matched text is a
+`patients/models/models_phenotype.py:PhenotypeDescription` owned by the cohort (or patient), deleted with it.
 
 **CohortGenotypeCollection / CohortGenotype** - `snpdb/models/models_cohort.py:CohortGenotypeCollection`, `CohortGenotype`.
 Genotypes are packed one row per variant per cohort, in arrays indexed by `CohortSample.cohort_genotype_packed_field_index`;
@@ -118,7 +123,8 @@ lifecycle `status` NEW → ACTIVE → HISTORICAL. "The VAV" means the ACTIVE one
 new VAV re-annotates every variant - a shared, hours-long operation.
 
 **AnnotationRun** - `annotation/models/models.py:AnnotationRun`. One batch (an `AnnotationRangeLock` of variant pks) through
-dump → VEP → upload, with `AnnotationStatus` (`annotation/models/models_enums.py`); `vg status` counts the ones in flight.
+dump → VEP → upload, with `AnnotationStatus` (`annotation/models/models_enums.py`); `vg status` counts the ones in flight, and
+lists separately the abandoned ones nothing will dispatch (no range lock, or on a HISTORICAL version).
 
 **VariantAnnotation / VariantTranscriptAnnotation** - `annotation/models/models.py:VariantAnnotation`,
 `VariantTranscriptAnnotation`. Partitioned per VAV (`SubVersionPartition`): VariantAnnotation is the representative-transcript
@@ -169,7 +175,7 @@ down the graph into a queryset - not a stored result set. Source nodes (sample, 
 the graph; filter nodes narrow it.
 
 **NodeVersion / NodeCache / NodeTask** - `analysis/models/nodes/analysis_node.py:NodeVersion`. Each node edit bumps the
-version; counts live on NodeVersion (NodeCount was folded in, #1820), caches hold materialised variant sets for slow nodes,
+version; counts live on NodeVersion, caches hold materialised variant sets for slow nodes,
 and NodeTask is the lease the celery scheduler works from.
 
 **AnalysisTemplate** - `analysis/models/models_analysis.py`: a saved analysis with `AnalysisVariable`s, run per sample or
@@ -209,10 +215,10 @@ User, later wins) read through `UserSettings.get_for_user`; holds the default bu
 **VariantGridColumn / CustomColumnsCollection** - `snpdb/models/models_columns.py`. The catalogue of grid columns and a
 user's chosen set; every variant grid builds its columns from them (`snpdb/grid_columns/custom_columns.py`).
 
-**Patient** - `patients/models.py:Patient` with phenotype text matched to OntologyTerms; a Sample may link to one.
+**Patient** - `patients/models/models_patient.py:Patient` with phenotype text matched to OntologyTerms; a Sample may link to one.
 One patient's terms are `Patient.get_ontology_term_ids()`; many patients' at once (a samples table) is
-`annotation/models/models_phenotype_match.py:patient_phenotype_terms`, one query for the lot - the page-shaped,
-permission-filtered wrapper is `annotation/models/models_phenotype_match.py:patient_phenotypes_for_samples`.
+`patients/models/models_phenotype.py:patient_phenotype_terms`, one query for the lot - the page-shaped,
+permission-filtered wrapper is `patients/models/models_phenotype.py:patient_phenotypes_for_samples`.
 
 ## Pipelines and operations (upload, manual, flags)
 
@@ -222,7 +228,7 @@ finish. `UploadedVCF` and the other `Uploaded*` satellites link the pipeline to 
 
 **ManualMigrationTask** - `manual/models/manual_migration_models.py:ManualMigrationTask`. A deploy-time step a migration
 registered (`manual/operations/manual_operations.py:ManualOperation`): a management command or a human action, gated by
-`requires`, surfaced by `manage.py manual_outstanding` and the migrator.
+`requires`, surfaced by `manage.py manual_outstanding` and the upgrader (`scripts/upgrade.sh`).
 
 **Flag** - `flags/models/models.py:Flag`. A typed, commentable flag on any model (`FlagsMixin`), used for classification
 workflow states (suggestions, discordance, withdrawn) as much as for data quality.

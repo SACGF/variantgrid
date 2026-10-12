@@ -202,9 +202,16 @@ def count_annotation_runs(annotation_run_ids, lease_token):
             # Via the runner so the count is exactly what the dump will be, including the pipeline's own
             # selection (eg VEP's SV size cap, which a supplementary pipeline over the same variants does
             # not apply).
-            count = get_runner(annotation_run.pipeline_type).get_variants_qs(annotation_run).count()
+            runner = get_runner(annotation_run.pipeline_type)
+            count = runner.get_variants_qs(annotation_run).count()
             update = {"count": count}
             if count == 0:
+                try:
+                    runner.handle_empty_dump(annotation_run)
+                except Exception:
+                    # Not worth stalling the count lane over - fix_annotation_vep_too_long writes what's missing
+                    log_traceback()
+                    report_message(f"AnnotationRun {annotation_run_id}: handle_empty_dump failed", level="error")
                 # Empty - finish without a dump. dump_count=0 keeps get_status() consistent (-> FINISHED).
                 now = timezone.now()
                 update.update(status=AnnotationStatus.FINISHED, dump_count=0, dump_start=now, dump_end=now)

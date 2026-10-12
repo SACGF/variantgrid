@@ -367,7 +367,7 @@ class FlagsView(APIView):
         # history already assumes you got the non-history part with collections and flag types
         history = request.query_params.get('history')
         since = request.query_params.get('since')
-        flag_helper.since = ensure_timezone_aware(datetime.datetime.utcnow())
+        flag_helper.since = timezone.now()
 
         if history:
             # user has now seen the flags, mark them as such

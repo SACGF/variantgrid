@@ -26,7 +26,9 @@ from classification.models import (
     ClinVarExportSubmission,
     EvidenceKeyMap,
 )
+from classification.models.classification_ref import ClassificationRef
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
+from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.utils.clinvar_matcher import (
     ClinVarLegacyExportMatchType,
     ClinVarLegacyMatches,
@@ -55,7 +57,7 @@ from snpdb.models import Allele, ClinVarKey, GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
-class ClinVarExportBatchColumns(DatatableConfig):
+class ClinVarExportBatchColumns(DatatableConfig[ClinVarExportBatch]):
 
     def render_status(self, row: CellData):
         return ClinVarExportBatchStatus(row['status']).label
@@ -363,7 +365,7 @@ class ClinVarExportSummary(ExportRow):
     def _record_id(self):
         if modification := self.classification:
             classification = modification.classification
-            return classification.lab.group_name + "/" + classification.lab_record_id
+            return ClassificationRef.make_lab_id_str(classification.lab.group_name, classification.lab_record_id)
 
     @export_column("Allele Origin")
     def _allele_origin(self):
@@ -541,7 +543,7 @@ def clinvar_export_batch_download(request: HttpRequest, clinvar_export_batch_id:
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
 
     # code duplicated from admin, but don't feel this should go into models
-    batch_json = clinvar_export_batch.to_json()
+    batch_json = clinvar_export_batch.to_json(clinvar_export_sync.org_id)
     batch_json_str = json.dumps(batch_json)
     response = HttpResponse(batch_json_str, content_type='application/json')
     response['Content-Disposition'] = f'attachment; filename=clinvar_export_preview_{clinvar_export_batch.pk}.json'

@@ -10,8 +10,13 @@ from django.test import Client, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from annotation.fake_annotation import get_fake_annotation_version
-from library.django_utils.unittest_utils import URLTestCase, production_query_count
+from annotation.fake_data import get_fake_annotation_version
+from library.django_utils.unittest_utils import (
+    URLTestCase,
+    frozen_cache_expiry,
+    production_query_count,
+)
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import (
     Allele,
     AlleleConversionTool,
@@ -28,7 +33,6 @@ from snpdb.templatetags.related_data_tags import (
     TRIO_SAMPLES_SELECT_RELATED,
     related_data_for_samples,
 )
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
@@ -76,13 +80,14 @@ class ViewSampleScalingTest(URLTestCase):
     def test_view_sample_query_count_flat_with_more_trios(self):
         client = Client()
         client.force_login(self.user)
-        self._view_sample_production_query_count(client)  # warm up per-process caches
+        with frozen_cache_expiry():
+            self._view_sample_production_query_count(client)  # warm up per-process caches
 
-        num_queries_one_trio = self._view_sample_production_query_count(client)
-        for i in range(10):
-            Trio.objects.create(name=f"scaling_trio_{i}", user=self.user, cohort=self.trio.cohort,
-                                mother=self.trio.mother, father=self.trio.father, proband=self.trio.proband)
-        num_queries_eleven_trios = self._view_sample_production_query_count(client)
+            num_queries_one_trio = self._view_sample_production_query_count(client)
+            for i in range(10):
+                Trio.objects.create(name=f"scaling_trio_{i}", user=self.user, cohort=self.trio.cohort,
+                                    mother=self.trio.mother, father=self.trio.father, proband=self.trio.proband)
+            num_queries_eleven_trios = self._view_sample_production_query_count(client)
         self.assertEqual(num_queries_one_trio, num_queries_eleven_trios)
 
 

@@ -1,4 +1,4 @@
-{% extends menu_data_base %}
+{% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load js_tags %}
 {% load settings_tags %}
@@ -34,7 +34,7 @@
 {% endblock %}
 {% block jsdocumentready %}
 {% endblock %}
-{% block submenu_page_content %}
+{% block container_table_content %}
 	<div class="container">
 	{% comment %}
     {% load help_tags %}

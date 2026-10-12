@@ -9,6 +9,11 @@ this is for hot lookups such as GenomeBuild.get_name_or_alias.
 import time
 
 
+def _now() -> float:
+    """ Separate from time.time so tests can stop entries expiring (@see frozen_cache_expiry) """
+    return time.time()
+
+
 def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
     """
     :param size_limit: If function takes parameters, max number of parameter combos to cache
@@ -26,7 +31,7 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
             key = (*args,) + tuple(kwargs.items())
 
             # Check if the return value is already known and not expired
-            if key in storage and not (ttl != 0 and ttls[key] < time.time()):
+            if key in storage and not (ttl != 0 and ttls[key] < _now()):
                 result = storage[key]
             else:
                 if key in storage:
@@ -41,7 +46,7 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
 
                 # If a ttl has been set, remember when it is going to expire
                 if ttl != 0:
-                    ttls[key] = time.time() + ttl
+                    ttls[key] = _now() + ttl
 
                 # If quick_key_access is being used, remember the key
                 if quick_key_access:
@@ -73,7 +78,7 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                         break
 
                     # If they key has expired, remove the entry and it's quick access key if quick_key_access=True
-                    if ttls[oldest_key] < time.time():
+                    if ttls[oldest_key] < _now():
                         del storage[oldest_key]
                         if quick_key_access:
                             del keys[0]

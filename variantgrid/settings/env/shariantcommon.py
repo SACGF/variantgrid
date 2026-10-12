@@ -50,6 +50,7 @@ HEALTH_CHECK_ENABLED = True
 CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
 CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = False  # Nothing is curated on Shariant, so there's no internal/external split
 CLASSIFICATION_GRID_FADE_NON_SHARED = True
+CLASSIFICATION_GRID_SUMMARY_COUNTS = False  # Shariant turns this on once it chooses to show the counts
 CLASSIFICATION_NEW_GROUPING = True
 CLASSIFICATION_ALLOW_DELETE = False
 CLASSIFICATION_ALLOW_UNKNOWN_KEYS = False
@@ -148,8 +149,8 @@ SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing proj
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
-SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
-STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+_SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
+STATICFILES_DIRS = (_SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
@@ -175,8 +176,6 @@ CLASSIFICATION_ID_FILTER = False
 CLASSIFICATION_SHOW_SPECIMEN_ID = False
 
 VARIANT_SHOW_CANONICAL_HGVS = False
-CLASSIFICATION_MAX_REFERENCE_LENGTH = 1000000
-# Large value for MVLs that always wanted explicit nucleotides, no longer an issue, reduce when we have time to test
 
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
@@ -217,6 +216,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "gene_lists": False,
     "genes": False,
     "gene_grid": False,
+    "gene_wiki": False,
 
     # Variants
     "variants": False,
@@ -225,6 +225,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
     "variant_wiki": False,
+    "variant_types": False,  # Storage/annotation by size is a VCF-import concern - Shariant imports classifications
+    "canonical_transcripts": False,
 
     # Settings
     "change_password": False,
@@ -243,7 +245,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # Upload - list all URLS (only want them visible by admin)
     "upload": False,
-    "upload_poll": False,
+    "file_upload_datatable": False,
     "view_uploaded_file": False,
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,
@@ -258,7 +260,6 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # discordance
     "discordance_reports": True,
-
     "classification_candidate_search": False,  # This is for data mining on curation system
     "classification_upload_unmapped": True,
     "condition_matchings": True,
@@ -404,3 +405,4 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "vcgs:proband",
     "zygosity"
 ])
+CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "Shariant"

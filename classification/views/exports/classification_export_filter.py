@@ -8,7 +8,7 @@ the output.
 """
 import operator
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime
 from enum import Enum
 from functools import cached_property, reduce
@@ -20,7 +20,6 @@ from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
-from threadlocals.threadlocals import get_current_request
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
@@ -395,6 +394,7 @@ class ClassificationFilter:
     row_limit: Optional[int] = None
     _last_modified: str = None
     clinvar_export: bool = False
+    request: InitVar[Optional[HttpRequest]] = None
 
     @property
     def description(self):
@@ -415,11 +415,9 @@ class ClassificationFilter:
             return "No Filters"
         return ", ".join(parts)
 
-    def __post_init__(self):
+    def __post_init__(self, request: Optional[HttpRequest]):
         self._last_modified = http_header_date_now()
-        if self.path_info and self.request_params:
-            pass
-        elif request := get_current_request():
+        if request:
             self.record_request_details(request)
 
     @property
@@ -533,6 +531,7 @@ class ClassificationFilter:
             row_limit = int(row_limit_str)
 
         return ClassificationFilter(
+            request=request,
             user=user,
             exclude_sources=exclude_sources,
             include_sources=include_sources,
@@ -603,6 +602,31 @@ class ClassificationFilter:
             created__gte=self.since
         ))
 
+    @cached_property
+    def _since_changed_allele_ids(self) -> set[int]:
+        """
+        Allele ids with any change since the since date, mirroring the per-record checks in _passes_since
+        (which remains the authority) so the whole allele group is still exported when any member changed.
+        Used to pre-filter cms_qs so an incremental export doesn't fetch every last published record
+        only to discard almost all of them in Python.
+        """
+        allele_ids = set(ClassificationModification.objects.filter(
+            is_last_published=True,
+            modified__gte=self.since
+        ).values_list('classification__allele_info__allele_id', flat=True))
+        allele_ids.update(Classification.objects.filter(
+            modified__gt=self.since
+        ).values_list('allele_info__allele_id', flat=True))
+        if flagged_classification_ids := self._since_flagged_classification_ids:
+            allele_ids.update(Classification.objects.filter(
+                pk__in=flagged_classification_ids
+            ).values_list('allele_info__allele_id', flat=True))
+        allele_ids.update(ImportedAlleleInfo.objects.filter(
+            latest_validation__modified__gt=self.since
+        ).values_list('allele_id', flat=True))
+        allele_ids.discard(None)
+        return allele_ids
+
     def _passes_since(self, allele_data: AlleleData) -> bool:
         """
         Is there anything about this AlleleData that indicates it should be included since the since date
@@ -665,6 +689,13 @@ class ClassificationFilter:
             # only worry about withdrawn if doing 'since' (as we might need to report the withdrawing (json),
             # or at least be aware of it for changes)
             cms = cms.exclude(classification__withdrawn=True)
+        else:
+            # records without a matched allele can't be found via _since_changed_allele_ids, keep them
+            # here and let _passes_since decide
+            cms = cms.filter(
+                Q(classification__allele_info__allele_id__in=self._since_changed_allele_ids) |
+                Q(classification__allele_info__allele__isnull=True)
+            )
 
         if labs := self.include_sources:
             cms = cms.filter(classification__lab__in=labs)

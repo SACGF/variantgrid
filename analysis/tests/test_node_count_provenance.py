@@ -10,12 +10,12 @@ from analysis.models import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.sources.sample_node import SampleNode
-from annotation.fake_annotation import get_fake_annotation_version
+from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.fake_data import create_fake_trio
 from snpdb.models import BuiltInFilters, GenomeBuild, VariantZygosityCountCollection
 from snpdb.models.models_cohort import CohortGenotype, CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

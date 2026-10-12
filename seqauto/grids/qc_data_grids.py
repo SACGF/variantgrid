@@ -56,9 +56,9 @@ class FlagstatsColumns(DatatableConfig[Flagstats]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.rich_columns = [
-            RichColumn(key="bam_file__sequencing_sample__sample_sheet__sequencing_run__name", label="SequencingRun",
+            RichColumn(key="alignment_file__sequencing_sample__sample_sheet__sequencing_run__name", label="SequencingRun",
                        orderable=True, default_sort=SortOrder.DESC),
-            RichColumn(key="bam_file__name", label="BAM File", orderable=True),
+            RichColumn(key="alignment_file__name", label="BAM/CRAM", orderable=True),
             RichColumn(key="total", label="Total", orderable=True, css_class="num"),
             RichColumn(key="read1", label="Read1", orderable=True, css_class="num"),
             RichColumn(key="read2", label="Read2", orderable=True, css_class="num"),
@@ -78,9 +78,9 @@ class QCExecSummaryColumns(DatatableConfig[QCExecSummary]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.rich_columns = [
-            RichColumn(key="qc__bam_file__sequencing_sample__sample_sheet__sequencing_run__name",
+            RichColumn(key="qc__alignment_file__sequencing_sample__sample_sheet__sequencing_run__name",
                        label="SequencingRun", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn(key="qc__bam_file__sequencing_sample__sample_name", label="SampleName", orderable=True),
+            RichColumn(key="qc__alignment_file__sequencing_sample__sample_name", label="SampleName", orderable=True),
             RichColumn(key="percent_500x_goi", label="% 500x GOI", orderable=True, css_class="num"),
             RichColumn(key="percent_250x_goi", label="% 250x GOI", orderable=True, css_class="num"),
             RichColumn(key="percent_20x_goi", label="% 20x GOI", orderable=True, css_class="num"),

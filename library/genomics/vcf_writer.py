@@ -14,9 +14,20 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Optional, Union
 
-DEFAULT_FILE_FORMAT = "VCFv4.1"
+from django.conf import settings
 
 VCF_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]
+
+
+def vcf_file_format() -> str:
+    """ The ``##fileformat`` value for VCFs we write, from ``settings.VCF_EXPORT_VERSION`` """
+    return f"VCFv{settings.VCF_EXPORT_VERSION}"
+
+
+def vcf_header_description(description: Optional[str]) -> str:
+    """ Header Description values are double-quoted: VCF 4.3 escapes a backslash as ``\\\\``, and we swap
+        double quotes for single ones rather than escape them """
+    return (description or "").replace("\\", "\\\\").replace('"', "'")
 
 
 @dataclass
@@ -28,9 +39,7 @@ class VCFInfoHeader:
     number: Union[int, str] = 1
 
     def __str__(self) -> str:
-        # Description is rendered inside double quotes, so any double quotes in the text
-        # must become single quotes (kept in one place - see module docstring).
-        description = (self.description or "").replace('"', "'")
+        description = vcf_header_description(self.description)
         return f'##INFO=<ID={self.id},Number={self.number},Type={self.type},Description="{description}">'
 
 
@@ -39,7 +48,7 @@ def build_header_lines(*, meta_lines: Iterable[str] = None,
                        formats: Iterable[str] = None,
                        contig_lines: Iterable[str] = None,
                        samples: Iterable[str] = None,
-                       file_format: str = DEFAULT_FILE_FORMAT) -> list[str]:
+                       file_format: Optional[str] = None) -> list[str]:
     """ The single VCF header builder.
 
         :param meta_lines: raw ``##…`` lines placed straight after ``##fileformat`` (e.g. ``##source=VariantGrid``)
@@ -47,9 +56,10 @@ def build_header_lines(*, meta_lines: Iterable[str] = None,
         :param formats: already-rendered ``##FORMAT`` lines - only emitted when ``samples`` are also given
         :param contig_lines: already-rendered ``##contig`` / ``##reference`` lines
         :param samples: sample names - when given together with ``formats`` a ``FORMAT`` column + sample columns are added
+        :param file_format: ``##fileformat`` value, defaults to ``vcf_file_format()``
         :return: list of header lines (no trailing newlines)
     """
-    header_lines = [f"##fileformat={file_format}"]
+    header_lines = [f"##fileformat={file_format or vcf_file_format()}"]
     if meta_lines:
         header_lines.extend(meta_lines)
     if info:
@@ -110,6 +120,7 @@ class VCFWriter:
             For a binary destination (bgzip / raw pipe) wrap it in ``io.TextIOWrapper`` first.
         :param header_lines: header lines to write immediately (optional)
         :param encode_info: optional ``value -> value`` hook applied to each INFO value before joining
+        An INFO value of ``True`` is written as a Flag (the bare key)
     """
 
     def __init__(self, handle, header_lines: Iterable[str] = None, *, encode_info=None):
@@ -127,6 +138,9 @@ class VCFWriter:
             return "."
         parts = []
         for k, v in info.items():
+            if v is True:  # Flag - the key alone
+                parts.append(k)
+                continue
             if self.encode_info is not None:
                 v = self.encode_info(v)
             parts.append(f"{k}={v}")
