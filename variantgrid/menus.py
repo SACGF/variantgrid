@@ -54,7 +54,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('specimens', pages=('view_specimen',)),
         MenuItem('extractions', pages=('view_extraction', 'unmatched_extractions')),
         MenuItem('pedigrees', pages=('view_pedigree', 'view_ped_file')),
-        MenuItem('trios', pages=('view_trio',)),
+        MenuItem('trios', pages=('view_trio', 'trio_karyomapping')),
         MenuItem('quads', pages=('view_quad',)),
         MenuItem('duos', pages=('view_duo',)),
         MenuItem('patient_imports', pages=('view_patient_import', 'view_patient_record',
@@ -71,7 +71,6 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('analysis_templates', title="Templates",
                  pages=('analysis_templates_auto_launch', 'analysis_template_settings')),
         MenuItem('reanalysis_candidate_search', title="Candidate Search", pages=('new_reanalysis_candidate_search',)),
-        MenuItem('karyomapping_analyses', title="Karyomapping", pages=('view_karyomapping_analysis',)),
     ), pages=('analysis', 'analysis_node', 'trio_wizard', 'quad_wizard', 'duo_wizard', 'view_mutational_signature')),
     Menu('classifications', 'Classifications', 'classifications', items=(
         MenuItem('activity', admin_only=True, pages=('activity_lab', 'activity_user', 'activity_discordance')),

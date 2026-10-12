@@ -6,7 +6,6 @@ from analysis.grids import (
     AnalysisTemplatesColumns,
     CandidateColumns,
     CandidateSearchRunColumns,
-    KaryomappingAnalysesColumns,
     NodeColumnSummaryConfig,
     NodeGeneDiseaseClassificationGenesConfig,
     NodeGeneListGenesColumns,
@@ -198,12 +197,8 @@ urlpatterns = [
     path('view_mutational_signature/<int:pk>/', views.view_mutational_signature, name='view_mutational_signature'),
 
     # karyomapping
-    path('karyomapping/analyses/', views_karyomapping.karyomapping_analyses, name='karyomapping_analyses'),
-    path('karyomapping/create_for_trio/<int:trio_id>/', views_karyomapping.create_karyomapping_analysis_for_trio_id, name='create_karyomapping_analysis_for_trio'),
-    path('karyomapping/view_karyomapping_analysis/<int:pk>/', views_karyomapping.view_karyomapping_analysis, name='view_karyomapping_analysis'),
-    path('karyomapping/view_karyomapping_gene/<int:pk>/', views_karyomapping.view_karyomapping_gene, name='view_karyomapping_gene'),
-    path('karyomapping/download_karyomapping_gene_csv/<int:pk>/', views_karyomapping.download_karyomapping_gene_csv, name='download_karyomapping_gene_csv'),
-    path('karyomapping/analyses/datatables/', DatabaseTableView.as_view(column_class=KaryomappingAnalysesColumns), name='karyomapping_analyses_datatable'),
+    path('trio/karyomapping/<int:trio_id>/', views_karyomapping.trio_karyomapping, name='trio_karyomapping'),
+    path('trio/karyomapping/<int:trio_id>/csv/', views_karyomapping.trio_karyomapping_gene_csv, name='trio_karyomapping_gene_csv'),
 
     # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),

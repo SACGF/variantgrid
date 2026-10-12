@@ -1,0 +1,37 @@
+{% load static %}
+{% load js_tags %}
+<div class="card mb-3" id="trio-karyomapping-qc">
+    <div class="card-header">
+        Karyomapping QC
+        <a class="float-right" href="{% url 'trio_karyomapping' trio.pk %}">Per-gene karyomapping</a>
+    </div>
+    <div class="card-body">
+    {% if not genome_karyomapping_counts %}
+        <span class="text-muted">Karyomapping counts have not been calculated for this trio.</span>
+    {% else %}
+        <p>{{ genome_karyomapping_counts.relatedness_summary }}</p>
+        <p class="text-muted small">
+            At each site only one parent is het, the proband either shares that parent's variant (in phase) or not.
+            Expect ~50% for each parent: far below genome-wide suggests a sample swap or non-paternity / maternity,
+            one chromosome near 0% that the parent's copy is missing (uniparental disomy or a deletion).
+        </p>
+        <table class="table table-sm w-auto">
+            <thead><tr><th></th><th>In phase</th><th>Out of phase</th></tr></thead>
+            <tbody>
+                <tr><th>Father</th><td>{{ collapsed_counts.FATHER_1 }}</td><td>{{ collapsed_counts.FATHER_2 }}</td></tr>
+                <tr><th>Mother</th><td>{{ collapsed_counts.MOTHER_1 }}</td><td>{{ collapsed_counts.MOTHER_2 }}</td></tr>
+            </tbody>
+        </table>
+        {% if contig_qc %}
+            <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
+            <script src="{% static 'js/analysis/karyomapping.js' %}"></script>
+            <div id="karyomapping-qc-graph"></div>
+            <script>
+                $(document).ready(function() {
+                    showKaryomappingQCGraph('karyomapping-qc-graph', {{ contig_qc|jsonify }});
+                });
+            </script>
+        {% endif %}
+    {% endif %}
+    </div>
+</div>

@@ -93,22 +93,6 @@
         </table>
     {% endif %}
 
-    {% if karyomapping_analyses %}
-    <h3>Karyomapping</h3>
-    
-        <table class="table table-sm">
-        <tr>
-            <th>Name
-            <th>Created by
-        {% for ka in karyomapping_analyses %}
-        <tr>
-            <td><a href="{% url 'view_karyomapping_analysis' ka.pk %}">{{ ka }}</a>
-            <td>{{ ka.user }}
-        {% endfor %}
-        </table>
-    {% endif %}
-
-
     {% if variant_tag_genome_build_names %}
         {% load tag_config_tags %}
         {% render_tag_styles_and_formatter %}
