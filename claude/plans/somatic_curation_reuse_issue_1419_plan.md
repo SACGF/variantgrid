@@ -2,9 +2,11 @@
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-07 (Part B revised; original plan 2026-08-11);
 revised to the as-built state, and Part C/D re-specified on `Tag` properties, by
-Claude Opus 5 (claude-opus-5), 2026-09-07
-Status: in progress (A and B landed, C stage 1's list landed; C's triage drop and wizard, and D's
-analysis / specimen launch points remain)
+Claude Opus 5 (claude-opus-5), 2026-09-07; revised to the as-built state by Claude Opus 5.5
+(claude-opus-5-5), 2026-10-12
+Status: in progress (A, B, C stage 1's list, the stage 2 wizard walk and D's specimen / extraction launch
+points landed; stage 1's drop and external-lab marking, stage 2's condition step and bucket seeding, and
+D's analysis-scoped button remain)
 
 Design for [#1419](https://github.com/SACGF/variantgrid/issues/1419) (separate out gene / disease
 curation), [sapath#246](https://github.com/SACGF/variantgrid_sapath/issues/246) (SomaticReportable →
@@ -321,9 +323,14 @@ the decisions, one variant at a time.
 ### Stage 1 — triage the list
 
 **Partly landed.** The list is the Classify & Report tab (`analysis/classify_report.py`,
-`analysis/views/views_classify_report.py`): one row per queue tagging in scope, with the variant, its
-gene, the sample and what already exists for that allele. Two things in this section are still open — the
-drop gesture below, and the row's overview does not yet mark external labs as such.
+`analysis/views/views_classify_report.py`), on the sample, patient, specimen and extraction pages: one row
+per queue tagging in scope, with the variant, its gene, the tag, the sample and what already exists for
+that allele. Two things in this section are still open:
+
+- **The drop gesture** below — a row has no control to remove a tagging the lab will not report.
+- **The row's overview** shows only the count of previous classifications and their conditions. It still
+  needs the latest one's clinical significance / tier, lab and date, with external labs marked as such
+  (the dialog already marks them, "another lab – for context").
 
 A row leaves the queue by being *resolved* against a classification
 (`analysis/variant_tag_operations.py:resolve_variant_tag`) rather than deleted, so the tagging stays as
@@ -355,7 +362,20 @@ lab keeping its tags on the variants it has reported.
 
 ### Stage 2 — one variant at a time
 
-For each kept variant in turn, a single screen carrying only the decisions:
+**Partly landed.** "Classify all (wizard)" on the tab walks the unclassified rows in order, one
+`analysis/templates/analysis/classify_report_tag_dialog.html` dialog each, with a position ("tag 4 of 11")
+and Skip; a skipped row is not offered again in the same walk
+(`variantgrid/static_files/default_static/js/analysis/classify_report_tab.js`). The dialog carries
+decisions 1 and 2 below as "Apply to this sample" buttons — allele candidates, or gene groups when the
+allele has none — and posts to `analysis/views/views_classify_report.py:create_classification_for_case`.
+Sample and lab are shown as plain fields rather than behind an "advanced" disclosure. Still open:
+
+- **Decision 3, the condition** — the dialog has no condition field.
+- **Seeding the bucket** — `create_classification_for_case` seeds neither `allele_origin` nor
+  `assertion_method`, so a "none" pick creates a record with no bucket. This is where the target bucket
+  gets passed into `ClassificationConsensus` (Part B, "The bucket is an input").
+
+The screen as designed:
 
 1. **Which prior classification for this allele to copy from** — radio over the candidates, each showing
    condition, clinical significance / tier, lab, date. Plus "none".
@@ -388,20 +408,19 @@ construction, survives a browser crash, and lets two people work the same list w
 rather than a setting naming one tag — a deployment flags its own tags on the tag settings page, and a
 lab can have several. A deployment turns this feature on by flagging a tag as a somatic queue tag there;
 SA Path's already are, from `snpdb/migrations/0251_one_off_tags_requiring_classification.py`. Every
-launch point counts and scopes with the same `Tag` classmethods as stage 1's list. The sample and
-patient pages' Classify & Report tab is the launch point that came with it
-(`analysis/views/views_classify_report.py`).
+launch point counts and scopes with the same `Tag` classmethods as stage 1's list.
+
+**Landed launch points.** The Classify & Report tab on the sample, patient, specimen and extraction pages
+(`analysis/views/views_classify_report.py`, case types `sample` / `patient` / `specimen` / `extraction`;
+`patients/templates/patients/view_specimen.html`, `patients/templates/patients/view_extraction.html`). A
+specimen or extraction case resolves to its samples through `patients/sample_grouping.py:get_sample_group`.
+From the analysis, each sample pill in the Input Samples panel carries a classification count linking to
+that sample's tab (`analysis/templates/analysis/analysis_input_samples.html`).
 
 Still to do:
 
 **From the analysis**, beside the existing tags button — "Classify somatic (N)" — scoped to that
-analysis's taggings.
-
-**From the specimen and extraction pages**, scoped to the tags on variants in analyses containing a
-sample of that specimen's extractions. This waits on Phase 3 (#1706) giving `Specimen` and `Extraction`
-pages to hang it off. `VariantTag.sample` now makes the common case a lookup; a tagging with no sample
-still needs the tag → `node.get_samples()` → `Sample.extraction` → `Specimen` join, so measure before
-deciding whether `VariantTag` also wants a denormalised extraction column.
+analysis's taggings rather than the whole sample's.
 
 ---
 
@@ -418,9 +437,14 @@ deciding whether `VariantTag` also wants a denormalised extraction column.
    from" radio on the create page, the gene rows in the Classify & Report dialog.
 5. **B, the in-form helper box** and its "newer gene content" line — landed as
    `classification/views/views_gene_consensus.py` and the form's Gene Content card.
+6. **C stage 2's walk + D's specimen / extraction tabs** — landed: "Classify all (wizard)" over the
+   dialog, and the tab on the specimen and extraction pages.
+7. **Remaining:** stage 2's condition field and `allele_origin` / `assertion_method` seeding (with the
+   target bucket passed into `ClassificationConsensus`); stage 1's drop and the row's tier / lab / date
+   with external labs marked; D's analysis-scoped "Classify somatic (N)" button.
 
-#444 (multi-variant reporting) starts from stage 1's list: the same triaged set, taken to a report
-instead of one classification at a time.
+#444 (multi-variant reporting) builds from the same tab: its "Build multiple variant report" card sits
+under stage 1's list.
 
 ---
 
