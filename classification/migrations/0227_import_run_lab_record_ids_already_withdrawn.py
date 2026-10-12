@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("classification", "0217_conditiontext_pending_automatch"),
+        ("classification", "0226_remove_hgvsconverterversion_code_git_hash"),
     ]
 
     operations = [
