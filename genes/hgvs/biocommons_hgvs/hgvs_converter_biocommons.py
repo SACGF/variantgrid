@@ -307,7 +307,8 @@ class BioCommonsHGVSConverter:
             strand = None
             if var_x.type in ['c', 'n']:
                 transcript_accession = BioCommonsHGVSConverter._get_transcript_accession_from_sequence_variant(var_x)
-                tv = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+                tv = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession,
+                                                               best_attempt=True)
                 strand = tv.strand
             matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, provided_ref, calculated_ref)
             return var_x_fixed_ref, matches_reference
