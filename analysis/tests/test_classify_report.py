@@ -504,7 +504,7 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         response = self.client.get(self._dialog_url(self.variant_tag))
 
         self.assertEqual(response.content.decode().count("Apply to this sample"), 2)
-        self.assertContains(response, "and 1 other record with the same content")
+        self.assertContains(response, "2 records, latest curated")
         self.assertContains(response, "Differs between the choices")
         self.assertContains(response, "RUNX1 drives myeloid differentiation")
         self.assertContains(response, "copied_only=1")

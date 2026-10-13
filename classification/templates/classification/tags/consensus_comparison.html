@@ -29,13 +29,14 @@
                                     {% endfor %}
                                 </div>
                                 <div class="small text-muted font-weight-normal consensus-provenance">
-                                    {{ group.representative.classification.lab }}
+                                    {{ group.representative.classification.lab }}<br/>
+                                    {% if group.other_count %}{{ group.record_count }} records, latest curated{% else %}Curated{% endif %}
+                                    {% timestamp group.representative.curated_date_check.value time_ago=True tooltip=group.representative.curated_date_check.name %}
                                     &middot; <a class="hover-link" href="{% url 'view_classification' group.representative.classification_id %}" target="_blank">{{ group.representative.cr_lab_id }}</a>
-                                    &middot; {% timestamp group.representative.curated_date_check.value time_ago=True tooltip=group.representative.curated_date_check.name %}
                                     {% if group.other_count %}
-                                        <br/><a class="toggle-link collapsed" data-toggle="collapse" href="#consensus-others-{{ group.representative.pk }}">and {{ group.other_count }} other record{{ group.other_count|pluralize }} with the same content</a>
+                                        <br/><a class="toggle-link collapsed" data-toggle="collapse" href="#consensus-others-{{ group.representative.pk }}">the other {{ group.other_count }} record{{ group.other_count|pluralize }} with this content</a>
                                         <span class="collapse" id="consensus-others-{{ group.representative.pk }}">
-                                            {% for other in group.others %}<a class="hover-link mr-2" href="{% url 'view_classification' other.classification_id %}" target="_blank">{{ other.cr_lab_id }}</a>{% endfor %}
+                                            {% for other in group.others %}<a class="hover-link mr-2" href="{% url 'view_classification' other.classification_id %}" target="_blank" title="curated {{ other.curated_date_check.value|date:'j M Y' }}">{{ other.cr_lab_id }}</a>{% endfor %}
                                         </span>
                                     {% endif %}
                                 </div>
