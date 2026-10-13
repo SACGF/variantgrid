@@ -456,6 +456,20 @@ class Tissue(TimeStampedModel):
         return self.name
 
 
+class NormalizedReferenceQuerySet(QuerySet):
+    """ The bulk writes that skip save() still store reference_id in the model's canonical form """
+
+    def bulk_create(self, objs, *args, **kwargs):
+        for obj in objs:
+            obj.reference_id = self.model.normalize_reference_id(obj.reference_id)
+        return super().bulk_create(objs, *args, **kwargs)
+
+    def update(self, **kwargs):
+        if "reference_id" in kwargs:
+            kwargs["reference_id"] = self.model.normalize_reference_id(kwargs["reference_id"])
+        return super().update(**kwargs)
+
+
 class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMixin):
     """ Biological material collected from a patient - one tissue at one timepoint (block, blood draw).
         The nucleic acid taken off it lives on Extraction below """
@@ -473,6 +487,8 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
     class Meta:
         unique_together = ("patient", "reference_id")
+
+    objects = NormalizedReferenceQuerySet.as_manager()
 
     @classmethod
     def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
@@ -589,6 +605,8 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
         # Unnamed extractions are all distinct under Postgres, which is what the re-extraction
         # case wants - extraction_date tells those apart
         unique_together = ("specimen", "reference_id")
+
+    objects = NormalizedReferenceQuerySet.as_manager()
 
     @classmethod
     def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:

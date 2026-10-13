@@ -12,7 +12,7 @@ from patients.external_references import (
     ExternalReferenceError,
     resolve_reference,
 )
-from patients.models import Extraction, ExternalModelManager, ExternalPK, Patient, Specimen
+from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
 
 
@@ -201,6 +201,15 @@ class TestSpecimenReferenceNormalizer(TestCase):
         for reference_id in ("2600000001C", "26-000-00001C"):
             resolved = resolve_reference(Extraction, ExternalReference(reference_id=reference_id))
             self.assertEqual(self.extraction, resolved.obj, reference_id)
+
+    def test_bulk_writes_store_the_canonical_form(self):
+        """ bulk_create and update skip save(), so the queryset normalises for them """
+        rna, = Extraction.objects.bulk_create([Extraction(specimen=self.specimen, reference_id="2600000001B")])
+        rna.refresh_from_db()
+        self.assertEqual("26-000-00001B", rna.reference_id)
+        Specimen.objects.filter(pk=self.specimen.pk).update(reference_id="2600000002")
+        self.specimen.refresh_from_db()
+        self.assertEqual("26-000-00002", self.specimen.reference_id)
 
     def test_patient_codes_are_left_alone(self):
         resolved = resolve_reference(Patient, ExternalReference(reference_id="PATIENT-N"))
