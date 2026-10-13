@@ -12,4 +12,15 @@ $(document).ready(() => {
     $("select#api-view-name").change(reload);
     $("#api-errors-only").click(reload);
     $("#api-date-from, #api-date-to").change(reload);
+    const setDates = (value) => {
+        $("#api-date-from, #api-date-to").val(value);
+        reload();
+    };
+    // Local calendar day (toISOString would give the UTC day); the server filters on the same local day
+    $("#api-date-today").click(() => {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        setDates(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`);
+    });
+    $("#api-date-clear").click(() => setDates(""));
 });
