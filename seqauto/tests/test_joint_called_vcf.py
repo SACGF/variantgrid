@@ -1,5 +1,8 @@
 """Tests for multi-trio JointCalledVCF support (SACGF/variantgrid_sapath#343) and
    joint calls whose samples span sequencing runs (SACGF/variantgrid_sapath#415)."""
+import tempfile
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -28,7 +31,7 @@ from seqauto.models import (
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.sequencing_files.sample_sheet import current_sample_sheet_changed
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
-from snpdb.models import VCF, ImportStatus, Sample
+from snpdb.models import VCF, ImportStatus, ProcessingStatus, Sample
 from upload.models import (
     BackendVCF,
     FileUpload,
@@ -443,6 +446,27 @@ class CrossRunLinkSamplesTests(TestCase):
         self.assertIn('id="patients"', html)
         self.assertEqual(html.count(ImportStatus.ERROR.icon_css), 2)  # Data tab + Patients tab row
         self.assertNotIn("class='vcf-icon icon24 run-vcf-icon'", html)
+
+    @patch("upload.tasks.retry_upload_pipelines_task.retry_upload_pipeline_task.apply_async")
+    def test_run_page_retries_failed_imports(self, apply_async):
+        """ A failed VCF import from the run offers "Retry failed imports", which queues its pipeline (#2188) """
+        user = User.objects.create_superuser(username="retryrunadmin", password="x")
+        self.client.force_login(user)
+        backend, joint_called_vcf, _, _ = self._make_trio()
+        uploaded_vcf = backend.uploaded_vcf
+        with tempfile.NamedTemporaryFile(suffix=".vcf.gz") as vcf_file:
+            FileUpload.objects.filter(pk=uploaded_vcf.file_upload.pk).update(path=vcf_file.name)
+            JointCalledVCF.objects.filter(pk=joint_called_vcf.pk).update(path=vcf_file.name)  # VCF found by path
+            uploaded_vcf.upload_pipeline = UploadPipeline.objects.create(file_upload=uploaded_vcf.file_upload,
+                                                                         status=ProcessingStatus.ERROR)
+            uploaded_vcf.save()
+            run_kwargs = {"sequencing_run_id": joint_called_vcf.sequencing_run.pk}
+
+            response = self.client.get(reverse("view_sequencing_run", kwargs=run_kwargs))
+            self.assertIn("1 VCF import from this run failed", response.content.decode())
+
+            self.client.post(reverse("sequencing_run_retry_failed_imports", kwargs=run_kwargs))
+            apply_async.assert_called_once_with((uploaded_vcf.upload_pipeline.pk,), countdown=0)
 
     def test_new_sample_sheet_on_member_run_remaps_that_member(self):
         backend, joint_called_vcf, members, samples = self._make_trio()

@@ -250,6 +250,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,
     "upload_retry_import": False,
+    "upload_retry_failed_imports": False,
     "upload_pipeline_modified_variants_datatable": False,
     "upload_pipeline_skipped_annotation_datatable": False,
     "view_upload_stats_detail": False,

@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from annotation.views import get_build_contigs
 from library.django_utils.view_utils import render_ajax_view
 from library.guardian_utils import check_can_write
+from snpdb.models.models_enums import ProcessingStatus
 from upload import upload_stats
 from upload.grids import FileUploadColumns
 from upload.models import (
@@ -25,8 +26,15 @@ from upload.models import (
     UploadStep,
     VCFSkippedContigs,
 )
+from upload.tasks.retry_upload_pipelines_task import (
+    get_retryable_upload_pipelines,
+    retry_upload_pipelines,
+)
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, retry_upload_pipeline
 from upload.views.views_json import _get_basic_uploaded_file_context
+
+# The upload page's "Retry failed" only reaches back this far, so it doesn't relaunch long-forgotten failures
+RETRY_FAILED_IMPORTS_DAYS = 7
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS: "uploaded_vcf",
@@ -37,7 +45,9 @@ UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
 def upload(request):
     context = {"upload_enabled": settings.UPLOAD_ENABLED,
                "file_types": UploadedFileTypes.choices,
-               "all_file_types": FileUploadColumns.ALL_FILE_TYPES}
+               "all_file_types": FileUploadColumns.ALL_FILE_TYPES,
+               "processing_statuses": ProcessingStatus.choices,
+               "retry_failed_imports_days": RETRY_FAILED_IMPORTS_DAYS}
     return render(request, 'upload/upload.html', context)
 
 
@@ -158,6 +168,21 @@ def upload_retry_import(request, upload_pipeline_id):
     messages.add_message(request, status, msg, extra_tags='import-message')
 
     return HttpResponseRedirect(reverse("view_upload_pipeline", kwargs={"upload_pipeline_id": upload_pipeline.pk}))
+
+
+@require_POST
+def upload_retry_failed_imports(request):
+    """ The failed imports of the page's file type filter, from the last RETRY_FAILED_IMPORTS_DAYS (#2188) """
+    if not settings.UPLOAD_ENABLED:
+        raise PermissionDenied("Upload is disabled")
+    since = timezone.now() - timedelta(days=RETRY_FAILED_IMPORTS_DAYS)
+    file_upload_qs = FileUploadColumns.filter_file_type(FileUpload.objects.filter(created__gte=since),
+                                                        request.POST.get("file_type"))
+    upload_pipelines = get_retryable_upload_pipelines(UploadPipeline.objects.filter(file_upload__in=file_upload_qs),
+                                                      request.user)
+    num_queued = retry_upload_pipelines(upload_pipelines)
+    messages.add_message(request, messages.INFO, f"Retrying {num_queued} failed import(s)")
+    return HttpResponseRedirect(reverse("upload"))
 
 
 def download_uploaded_file(request, pk):

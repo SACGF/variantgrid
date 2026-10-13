@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from django.conf import settings
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
-from django.http.response import HttpResponse, JsonResponse
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -46,7 +47,11 @@ from seqauto.sequencing_files.sample_sheet import (
     assign_old_sample_sheet_data_to_current_sample_sheet,
 )
 from snpdb.models import VCF, Sample, UserSettings
-from upload.models import UploadedFileTypes
+from upload.models import UploadedFileTypes, UploadPipeline
+from upload.tasks.retry_upload_pipelines_task import (
+    get_retryable_upload_pipelines,
+    retry_upload_pipelines,
+)
 
 
 def sequencing_data(request):
@@ -161,6 +166,25 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
         "sequencing_sample_vcfs": dict(sequencing_sample_vcfs),
         "single_sample_vcfs": single_sample_vcfs,
     }
+
+
+def _get_retryable_upload_pipelines(run_vcfs: dict, user) -> list[UploadPipeline]:
+    """ The failed imports among the run's VCFs (from _get_sequencing_run_vcfs) the user may retry (#2188) """
+    all_run_vcfs = [*run_vcfs["multi_sample_vcfs"], *run_vcfs["single_sample_vcfs"].values()]
+    for sample_run_vcfs in run_vcfs["sequencing_sample_vcfs"].values():
+        all_run_vcfs.extend(sample_run_vcfs)
+    vcf_ids = {run_vcf.vcf.pk for run_vcf in all_run_vcfs if run_vcf.vcf}
+    return get_retryable_upload_pipelines(UploadPipeline.objects.filter(uploadedvcf__vcf__in=vcf_ids), user)
+
+
+@require_POST
+def sequencing_run_retry_failed_imports(request, sequencing_run_id):
+    sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    sample_sheet = sequencing_run.get_current_sample_sheet()
+    run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+    num_queued = retry_upload_pipelines(_get_retryable_upload_pipelines(run_vcfs, request.user))
+    messages.add_message(request, messages.INFO, f"Retrying {num_queued} failed import(s)")
+    return HttpResponseRedirect(reverse("view_sequencing_run", kwargs={"sequencing_run_id": sequencing_run.pk}))
 
 
 @dataclass
@@ -290,7 +314,10 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
             "enrichment_kit",
         ).prefetch_related("samplefromsequencingsample_set__sample__patient", "sequencingsampledata_set")
         context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
-        context.update(_get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user))
+        run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+        context.update(run_vcfs)
+        if settings.UPLOAD_ENABLED:
+            context["num_retryable_imports"] = len(_get_retryable_upload_pipelines(run_vcfs, request.user))
         context.update(_get_sequencing_run_patients(sample_sheet, request.user))
     except Exception:
         log_traceback()

@@ -176,6 +176,15 @@
         {% endwith %}
     </div>
 
+    {% if num_retryable_imports %}
+        <form class="alert alert-danger d-flex align-items-center" method="post"
+              action="{% url 'sequencing_run_retry_failed_imports' sequencing_run.pk %}">
+            {% csrf_token %}
+            <span class="mr-3">{{ num_retryable_imports }} VCF import{{ num_retryable_imports|pluralize }} from this run failed.</span>
+            <button type="submit" class="btn btn-sm btn-primary">Retry failed imports</button>
+        </form>
+    {% endif %}
+
 	<div id="sequencing-run-tabs">
 		<ul class="nav nav-tabs mb-4" role="tablist">
         {% if run_patients %}

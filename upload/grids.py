@@ -86,12 +86,19 @@ class FileUploadColumns(DatatableConfig[FileUpload]):
             qs = qs.filter(user=self.user)
         return qs
 
-    def filter_queryset(self, qs: QuerySet[FileUpload]) -> QuerySet[FileUpload]:
-        file_type = self.get_query_param("file_type")
+    @classmethod
+    def filter_file_type(cls, qs: QuerySet[FileUpload], file_type: Optional[str]) -> QuerySet[FileUpload]:
+        """ The page's file type select - also what its "Retry failed" button retries """
         if not file_type:
-            qs = qs.exclude(file_type__in=self.INTERNAL_FILE_TYPES)
-        elif file_type != self.ALL_FILE_TYPES:
+            qs = qs.exclude(file_type__in=cls.INTERNAL_FILE_TYPES)
+        elif file_type != cls.ALL_FILE_TYPES:
             qs = qs.filter(file_type=file_type)
+        return qs
+
+    def filter_queryset(self, qs: QuerySet[FileUpload]) -> QuerySet[FileUpload]:
+        qs = self.filter_file_type(qs, self.get_query_param("file_type"))
+        if status := self.get_query_param("status"):
+            qs = qs.filter(uploadpipeline__status=status)
         return qs
 
     def pre_render(self, qs: QuerySet[FileUpload], rows: list[dict]):

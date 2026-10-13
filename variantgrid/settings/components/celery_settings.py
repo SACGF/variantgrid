@@ -111,6 +111,7 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.import_dragen_tso500_metrics_output_task.ImportDragenTSO500MetricsOutputTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
+    'upload.tasks.retry_upload_pipelines_task.retry_upload_pipeline_task': WEB_WORKERS,  # removes processing files
 
     # VariantID workers
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
@@ -188,6 +189,7 @@ CELERY_IMPORTS = (
     'upload.tasks.import_ped_task',
     'upload.tasks.import_variant_tags_task',
     'upload.tasks.import_wiki_task',
+    'upload.tasks.retry_upload_pipelines_task',
     'upload.tasks.vcf.genotype_vcf_tasks',
     'upload.tasks.vcf.import_sql_copy_task',
     'upload.tasks.vcf.import_vcf_step_task',
