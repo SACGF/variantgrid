@@ -63,9 +63,9 @@ def check_vcf_split_pipe() -> bool:
         records_filename = os.path.join(tmp_dir, "records.vcf")
         split_vcf_dir = os.path.join(tmp_dir, "split")
         os.mkdir(split_vcf_dir)
-        with open(header_filename, "w") as f:
+        with open(header_filename, "w", encoding="utf-8") as f:
             f.write(_SPLIT_CHECK_VCF)
-        with open(records_filename, "w") as f:
+        with open(records_filename, "w", encoding="utf-8") as f:
             f.writelines(_SPLIT_CHECK_RECORDS)
 
         split_cmd = shlex.join(get_split_vcf_command("check", split_file_rows=2))

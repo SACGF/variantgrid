@@ -67,7 +67,7 @@ class PipelineCleanupTest(TestCase):
             path = os.path.join(working_dir, "manual_variant_entry.vcf")
         else:
             path = os.path.join(tempfile.gettempdir(), "somebody_elses.vcf")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write("##fileformat=VCFv4.2\n")
 
         file_upload = FileUpload.objects.create(user=self.user, name="manual_variant_entry", path=path,
@@ -77,7 +77,7 @@ class PipelineCleanupTest(TestCase):
         upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING,
                                                         file_upload=file_upload)
         # Something in the pipeline's own dir, so we can see it go
-        with open(os.path.join(upload_pipeline.get_pipeline_processing_dir(), "split_1.vcf"), "w") as f:
+        with open(os.path.join(upload_pipeline.get_pipeline_processing_dir(), "split_1.vcf"), "w", encoding="utf-8") as f:
             f.write("")
         return upload_pipeline
 

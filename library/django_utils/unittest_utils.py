@@ -84,7 +84,7 @@ class QueryProfilingClient(Client):
             if re.search(QUERY_TRACE_PATTERN, sql):
                 stack = [line for line in traceback.format_stack()
                          if "/site-packages/" not in line and "unittest_utils" not in line]
-                with open(QUERY_PROFILE_FILE + ".trace", "a") as f:
+                with open(QUERY_PROFILE_FILE + ".trace", "a", encoding="utf-8") as f:
                     f.write(json.dumps({"path": path, "sql": sql[:300], "stack": stack[-12:]}) + "\n")
             return execute(sql, params, many, context)
         return wrapper
@@ -111,7 +111,7 @@ class QueryProfilingClient(Client):
             "sql_ms": round(sum(float(q["time"]) for q in real_queries) * 1000, 1),
             "duplicates": duplicates,
         }
-        with open(QUERY_PROFILE_FILE, "a") as f:
+        with open(QUERY_PROFILE_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
         return response
 

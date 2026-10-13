@@ -137,14 +137,14 @@ def write_dump_metadata(annotation_run: AnnotationRun, dump_dir=None, identity: 
         Pass a precomputed `identity` (see build_dump_metadata) to avoid re-running VEP per run. """
     meta_filename = annotation_run.get_dump_metadata_filename(dump_dir=dump_dir)
     mk_path_for_file(meta_filename)
-    with open(meta_filename, "w") as f:
+    with open(meta_filename, "w", encoding="utf-8") as f:
         json.dump(build_dump_metadata(annotation_run, identity=identity), f, indent=2)
     return meta_filename
 
 
 def parse_dump_metadata(path) -> dict:
     """ Read + validate a sidecar metadata JSON written by write_dump_metadata (#1568). """
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         meta = json.load(f)
     schema = meta.get("schema")
     if schema != DUMP_METADATA_SCHEMA_VERSION:
@@ -448,7 +448,7 @@ _SNAKEFILE_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates_ex
 
 
 def render_snakefile(vep_command_template: list[str]) -> str:
-    with open(_SNAKEFILE_TEMPLATE_PATH) as f:
+    with open(_SNAKEFILE_TEMPLATE_PATH, encoding="utf-8") as f:
         template = f.read()
     return (template
             .replace("__TEMPLATE_JSON__", json.dumps(vep_command_template, indent=4))
@@ -464,11 +464,11 @@ def write_snakemake_bundle(output_dir: str,
     config = build_snakemake_config(pipeline_type=pipeline_type)
 
     config_path = os.path.join(output_dir, "config.yaml")
-    with open(config_path, "w") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         f.write(_render_config_yaml(config))
 
     snakefile_path = os.path.join(output_dir, "Snakefile")
-    with open(snakefile_path, "w") as f:
+    with open(snakefile_path, "w", encoding="utf-8") as f:
         f.write(render_snakefile(template))
 
     logging.info("Wrote Snakemake bundle: %s + %s", snakefile_path, config_path)

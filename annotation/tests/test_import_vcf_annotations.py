@@ -48,7 +48,7 @@ class TruncatedVEPOutputTests(TestCase):
         cls.vav, _ = VariantAnnotationVersion.objects.get_or_create(**kwargs)
         slowly_create_loci_and_variants_for_vcf(cls.genome_build, TEST_ANNOTATION_VCF,
                                                 get_variant_id_from_info=True)
-        with open(TEST_ANNOTATION_VCF) as f:
+        with open(TEST_ANNOTATION_VCF, encoding="utf-8") as f:
             cls.num_records = sum(1 for line in f if not line.startswith("#"))
 
     def _annotation_run(self, **kwargs) -> AnnotationRun:
@@ -96,7 +96,7 @@ class TruncatedVEPOutputTests(TestCase):
     def test_skipped_variants_file_preferred_over_warnings(self):
         skipped_variants_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, "skipped_variants.tsv")
         os.makedirs(settings.ANNOTATION_VCF_DUMP_DIR, exist_ok=True)
-        with open(skipped_variants_filename, "w") as f:
+        with open(skipped_variants_filename, "w", encoding="utf-8") as f:
             f.write("[VEP skipped the following variants from dump.vcf]\n")
             f.write("Line 5    \t1 200 . GG A . . variant_id=1  \tsomething VEP dropped\n")
         self.addCleanup(os.remove, skipped_variants_filename)

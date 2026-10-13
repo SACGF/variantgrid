@@ -123,7 +123,7 @@ class Command(BaseCommand):
         if path == "-":
             self.stdout.write(script)
         else:
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(script + "\n")
             os.chmod(path, 0o755)
             self.stdout.write(f"Wrote download script to {path}")

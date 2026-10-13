@@ -108,7 +108,7 @@ class TestCombinedVariantOutputParser(TestCase):
         """ 2.6 writes its version into the banner line """
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = os.path.join(tmp_dir, "versioned_CombinedVariantOutput.tsv")
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write("DRAGEN TruSight Oncology 500 v2.6.2 Analysis Software - Combined Variant Output\t\t\n")
             self.assertTrue(can_process_file(path))
 

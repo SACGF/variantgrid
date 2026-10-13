@@ -17,14 +17,14 @@ def _redis_oom_score_adj() -> int | None:
     client = redis.Redis.from_url(settings.CACHES["default"]["LOCATION"])
     redis_pid = client.info("server")["process_id"]
     try:
-        with open(f"/proc/{redis_pid}/oom_score_adj") as f:
+        with open(f"/proc/{redis_pid}/oom_score_adj", encoding="utf-8") as f:
             return int(f.read())
     except FileNotFoundError:
         return None
 
 
 def _swap_total_kb() -> int:
-    with open("/proc/meminfo") as f:
+    with open("/proc/meminfo", encoding="utf-8") as f:
         for line in f:
             if line.startswith("SwapTotal:"):
                 return int(line.split()[1])

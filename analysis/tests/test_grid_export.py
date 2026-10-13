@@ -441,7 +441,7 @@ class TestNodeExportLaunch(GridExportTestCase):
                 self.assertEqual(cgf.task_status, "SUCCESS")
                 self.assertEqual(cgf.progress, 1)
                 self.assertTrue(cgf.filename.endswith(".csv"), cgf.filename)
-                with open(cgf.filename) as f:
+                with open(cgf.filename, encoding="utf-8") as f:
                     lines = f.read().splitlines()
                 self.assertEqual(len(lines), self.node.count + 1)  # header
 

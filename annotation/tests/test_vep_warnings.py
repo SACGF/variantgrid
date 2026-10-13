@@ -86,7 +86,7 @@ class ParseSkippedVariantsFileTests(SimpleTestCase):
     def _parse(self, contents):
         with tempfile.TemporaryDirectory() as tmp_dir:
             filename = os.path.join(tmp_dir, "skipped_variants.tsv")
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 f.write(contents)
             return parse_skipped_variants_file(filename)
 

@@ -695,8 +695,8 @@ class AnnotationDispatchTestCase(TestCase):
             run = self._run_with_dump(tmp_dir)
             annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
             skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
-            open(annotated_filename, "w").close()  # VEP finished; row not saved yet
-            open(skipped_variants_filename, "w").close()  # ... written by Runner::finish()
+            open(annotated_filename, "w", encoding="utf-8").close()  # VEP finished; row not saved yet
+            open(skipped_variants_filename, "w", encoding="utf-8").close()  # ... written by Runner::finish()
             self.assertIsNone(run.vcf_annotated_filename)
 
             with mock.patch.object(AnnotationRun, "delete_related_objects"):
@@ -720,7 +720,7 @@ class AnnotationDispatchTestCase(TestCase):
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
             run = self._run_with_dump(tmp_dir)
             annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
-            with open(annotated_filename, "w") as f:
+            with open(annotated_filename, "w", encoding="utf-8") as f:
                 f.write("##fileformat=VCFv4.2\n")  # VEP got as far as the header
             self.assertFalse(os.path.exists(get_vep_skipped_variants_filename(annotated_filename)))
 
@@ -750,7 +750,7 @@ class AnnotationDispatchTestCase(TestCase):
             derived = get_runner(run.pipeline_type).get_output_paths(run, dump_filename)
             self.assertIn(annotated_filename, derived)
             for path in derived:
-                open(path, "w").close()
+                open(path, "w", encoding="utf-8").close()
             # Reclaim takes the scrub branch only when there's no annotated VCF to resume from
             os.remove(annotated_filename)
 

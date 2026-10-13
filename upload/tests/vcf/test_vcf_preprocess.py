@@ -53,15 +53,15 @@ class TestPreprocessVCFPipe(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
-        with open(_TEST_FASTA, "w") as f:
+        with open(_TEST_FASTA, "w", encoding="utf-8") as f:
             f.write(">placeholder\nN\n")  # Only its path is used - it goes to 'bcftools norm --fasta-ref'
-        with open(_TEST_FASTA + ".fai", "w") as f:
+        with open(_TEST_FASTA + ".fai", "w", encoding="utf-8") as f:
             for accession, length in cls.genome_build.standard_contigs.values_list("refseq_accession", "length"):
                 f.write(f"{accession}\t{length}\t0\t60\t61\n")
 
         user = User.objects.create_user(username="preprocess_test_user", password="x")
         vcf_filename = os.path.join(_TEST_DIR, "test.vcf")
-        with open(vcf_filename, "w") as f:
+        with open(vcf_filename, "w", encoding="utf-8") as f:
             f.write("##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
 
         file_upload = FileUpload.objects.create(user=user, name="test.vcf", path=vcf_filename,
@@ -134,7 +134,7 @@ class TestPreprocessVCFPipe(TestCase):
 
         split_filename = os.path.join(self.files.split_vcf_dir, "test00.vcf.gz")
         for filename in [split_filename, self.files.unsorted_marker, self.files.skipped_records_stats]:
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 f.write("partial\n")
 
         _reset_for_retry(self.files, sub_steps)
@@ -179,7 +179,7 @@ class TestPreprocessVCFPipe(TestCase):
         def side_effect(pipe_commands, *_args, **_kwargs):
             calls.append(pipe_commands)
             if len(calls) == 1:
-                with open(self.files.unsorted_marker, "w") as f:
+                with open(self.files.unsorted_marker, "w", encoding="utf-8") as f:
                     f.write("VCF is not sorted. Line 7: 1:100 comes after 1:200.\n")
                 raise CalledProcessError(1, "vcf_clean_and_filter")
 
@@ -214,7 +214,7 @@ class TestPreprocessVCFPipe(TestCase):
         self.assertFalse(SimpleVCFImportInfo.objects.filter(message_string=UNSORTED_VCF_MESSAGE).exists())
 
     def test_stale_marker_does_not_turn_another_failure_into_a_sort_pass(self):
-        with open(self.files.unsorted_marker, "w") as f:
+        with open(self.files.unsorted_marker, "w", encoding="utf-8") as f:
             f.write("left behind by an earlier attempt\n")
 
         with self.assertRaises(CalledProcessError):

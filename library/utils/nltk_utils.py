@@ -10,7 +10,7 @@ def ensure_nltk_data(resource):
         read a corpus another is still writing - find() succeeds as soon as the partial zip exists """
     download_dir = Downloader().default_download_dir()
     os.makedirs(download_dir, exist_ok=True)
-    with open(os.path.join(download_dir, ".download.lock"), "a") as lock_file:
+    with open(os.path.join(download_dir, ".download.lock"), "a", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)
         try:
             nltk.data.find(resource)

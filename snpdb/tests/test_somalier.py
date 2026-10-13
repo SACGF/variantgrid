@@ -257,7 +257,7 @@ class SomalierAllSamplesPairsTest(TestCase):
 
     def _write_pairs(self, rows: list[str], header: str = PAIRS_HEADER) -> str:
         filename = tempfile.mkstemp(suffix=".pairs.tsv")[1]
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write("\n".join([header, *rows]) + "\n")
         return filename
 

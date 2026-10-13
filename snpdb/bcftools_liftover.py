@@ -129,7 +129,7 @@ def get_reject_vcf_filename(out_vcf_filename: str) -> str:
 
 def count_non_header_lines(filename) -> int:
     count = 0
-    with open(filename) as file:
+    with open(filename, encoding="utf-8") as file:
         for line in file:
             if not line.startswith('#'):
                 count += 1
