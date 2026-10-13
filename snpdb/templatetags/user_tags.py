@@ -160,5 +160,5 @@ def award_cabinet(u: User):
     return {
         "avatar": avatar,
         "badge_progress": badge_progress,
-        "kudos": awards.kudos,
+        "kudos": awards.all_kudos,
     }

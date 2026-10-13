@@ -1048,6 +1048,11 @@ class UserAwards:
     def kudos(self) -> list[UserAward]:
         return [a for a in self.awards if a.kind == UserAwardKind.KUDOS]
 
+    @cached_property
+    def all_kudos(self) -> list[UserAward]:
+        """ Active first - the profile page lists withdrawn kudos greyed out """
+        return [a for a in self.all_awards if a.kind == UserAwardKind.KUDOS]
+
     def badge_row(self, definition_key: str) -> Optional[UserAward]:
         """ The (possibly not yet earned, hence inactive) badge row for a definition """
         return first((a for a in self.all_awards if a.kind == UserAwardKind.BADGE and a.definition_key == definition_key), None)
