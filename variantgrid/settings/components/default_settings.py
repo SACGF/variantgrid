@@ -792,7 +792,7 @@ INTEGRATION_STATUS_ENABLED = True
 # and logs every call (eventlog.models.ApiRequestLog, Settings -> API Log)
 INTEGRATION_API_TRACKING = {}
 API_REQUEST_LOG_DAYS = None  # None keeps ApiRequestLog rows forever; a number of days prunes older rows daily
-API_REQUEST_LOG_MAX_BODY = 10_000  # characters of request / error response body kept
+API_REQUEST_LOG_MAX_BODY = 100_000  # characters of request / error response body kept
 API_REQUEST_LOG_MAX_READ_BYTES = 1024 * 1024  # bigger request bodies are noted by size, not read
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
