@@ -67,7 +67,7 @@ this block selects from the germline catalogue — the same population the analy
 
 `ReclassificationTimeline._evidence_value(key)` already builds the `COALESCE(pe -> key -> 'value',
 pe -> key)` expression that copes with both the dict-wrapped and bare shapes found in `published_evidence`.
-Promote it to a module-level helper (`classification/models/evidence_json.py` or alongside `EvidenceMixin`)
+Promote it to a module-level helper (classification/models/evidence_json.py or alongside `EvidenceMixin`)
 and use it from three places: the timeline builder, the explorer filters, and the stats panel.
 
 Each selected key is annotated once and filtered on the annotation, so a key used by both a filter and the
@@ -173,14 +173,14 @@ question they are looking at and can widen it — the way `variant_tags` picks u
 |---|---|
 | `classification/models/classification_reclassification_models.py` | `evidence_changes` field + GIN index; builder writes it |
 | `classification/migrations/0175_*.py` | add column + index, reset the build watermark |
-| `classification/views/classification_explorer_view.py` | new page view, filter parsing, stats panel |
-| `classification/views/classification_explorer_datatables.py` | `ClassificationExplorerColumns(ClassificationColumns)` |
-| `classification/templates/classification/classification_explorer.html` | filter blocks, grid, stats cards |
+| classification/views/classification_explorer_view.py | new page view, filter parsing, stats panel |
+| classification/views/classification_explorer_datatables.py | `ClassificationExplorerColumns(ClassificationColumns)` |
+| classification/templates/classification/classification_explorer.html | filter blocks, grid, stats cards |
 | `classification/views/classification_reclassification_view.py` | evidence chart reads `evidence_changes`; link params |
 | `classification/templates/classification/classification_reclassification_analytics.html` | click-through links |
 | `classification/urls.py` | page + `DatabaseTableView` datatable route |
 | `variantgrid/menus.py` | `MenuItem(..., admin_only=True)` in the classifications menu |
-| `classification/models/classification.py` (or a new `evidence_json.py`) | shared evidence value accessor |
+| `classification/models/classification.py` (or a new evidence_json.py) | shared evidence value accessor |
 | `snpdb/migrations/…` or `classification/migrations/…` | GIN index on `Classification.summary` criteria labels |
 
 ## Steps
