@@ -41,6 +41,12 @@ systemd units, all restarted by `scripts/restart_services.sh` (`stop_services.sh
 | `scheduling_single_worker` | one process: schedulers that must not race (annotation, node tasks) |
 | `heavy_workers` | two processes: memory-hungry subprocesses (somalier), so a burst of imports can't OOM the box |
 
+Memory: `db_workers`, `web_workers` and `analysis_workers` default to one process per CPU (~200 MB each idle), which a
+many-core box with little RAM can't afford - pass `--concurrency` in its `config/celery/*.env`. Install the redis drop-in
+(`config/systemd/redis-server.service.d/variantgrid.conf`) and some swap: without them a sequencing run's imports can
+OOM-kill Redis, failing every in-flight task with `BusyLoadingError` (#2187). `deployment_check` warns about both
+(`variantgrid/deployment_validation/memory_check.py`).
+
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.
 `vg status` shows per-queue depth and consumer count from a passive declare.

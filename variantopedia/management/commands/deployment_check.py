@@ -20,6 +20,7 @@ from variantgrid.deployment_validation.classification_checks import check_classi
 from variantgrid.deployment_validation.column_check import check_variantgrid_columns
 from variantgrid.deployment_validation.library_version_checks import check_library_versions
 from variantgrid.deployment_validation.liftover_check import check_alleles_never_lifted_over
+from variantgrid.deployment_validation.memory_check import check_memory_protection
 from variantgrid.deployment_validation.somalier_check import check_somalier
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
 from variantgrid.deployment_validation.variant_check import check_symbolic_variants
@@ -54,6 +55,7 @@ class Command(BaseCommand):
             "VEP": check_vep(),
             "Symbolic variants": check_symbolic_variants(),
             "Liftover": check_alleles_never_lifted_over(),
+            "Memory": check_memory_protection(),
         }
         if settings.SOMALIER.get("enabled"):
             checks["somalier"] = check_somalier()
