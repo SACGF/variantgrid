@@ -24,6 +24,7 @@ from classification.models import ClassificationModification
 from library.django_utils import add_save_message, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import defaultdict_to_dict
+from patients.models.models_patient import Patient
 
 
 def view_analysis_settings(request, analysis_id):
@@ -267,8 +268,11 @@ def analysis_input_samples(request, analysis_id):
                                                                    classification__sample__in=all_samples)
     sample_classification_counts = dict(classification_qs.order_by().values_list("classification__sample")
                                         .annotate(Count("pk")))
+    patient_ids = {sample.patient_id for sample in all_samples if sample.patient_id}
+    patients_by_id = Patient.filter_for_user(request.user).in_bulk(patient_ids)
     for node_input_data in node_inputs:
-        node_input_data["samples"] = [(sample, sample_classification_counts.get(sample.pk, 0))
+        node_input_data["samples"] = [(sample, patients_by_id.get(sample.patient_id),
+                                       sample_classification_counts.get(sample.pk, 0))
                                       for sample in node_input_data["samples"]]
 
     context = {"analysis": analysis,
