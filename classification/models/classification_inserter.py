@@ -199,14 +199,7 @@ class BulkClassificationInserter:
                             self.variant_resolver.queue_resolve(allele_info)
 
                         record.save()
-
-                        # TODO remove this code if publishing just the once works
-                        # debug_timer.tick("Prepare for Variant Resolution")
-                        # PUBLISH NUMBER 1
-                        # record.publish_latest(user=user)
                         is_new_record = True
-
-                        # debug_timer.tick("Publish Complete")
                 else:
                     ignore_if_only_patch: Optional[set[str]] = None
                     # if some updates are not-meaningful and by themselves shouldn't cause a new version of the record to be made

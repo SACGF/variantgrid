@@ -145,24 +145,8 @@ class AlleleData:
             return item in cached_data
         return False
 
-    # @staticmethod
-    # def pre_process(batch: List['AlleleData']):
-    #     if batch:
-    #         genome_build = batch[0].genome_build
-    #         allele_ids = [ad.allele_id for ad in batch]
-    #         alleles = Allele.objects.filter(pk__in=allele_ids).select_related('clingen_allele')
-    #         allele_dict = {allele.pk: allele for allele in alleles}
-    #         # FIXME select related all this variant stuff outside?
-    #         variant_alleles = VariantAllele.objects.filter(allele_id__in=allele_ids, genome_build=genome_build).select_related('variant', 'variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
-    #         variant_dict = {variant_allele.allele_id: variant_allele.variant for variant_allele in variant_alleles}
-    #
-    #         for ad in batch:
-    #             ad.cached_allele = allele_dict.get(ad.allele_id)
-    #             ad.cached_variant = variant_dict.get(ad.allele_id)
-
     @property
     def allele(self) -> Allele:
-        # return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
         return self.cached_allele
 
     @cached_property

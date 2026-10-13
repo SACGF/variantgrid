@@ -85,19 +85,6 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
         return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
 
 
-_SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
-    SomaticClinicalSignificanceValue("tier_1", "A"): 10,
-    SomaticClinicalSignificanceValue("tier_1", "B"): 9,
-    SomaticClinicalSignificanceValue("tier_1"): 8,
-    SomaticClinicalSignificanceValue("tier_1_or_2"): 7,
-    SomaticClinicalSignificanceValue("tier_2", "C"): 6,
-    SomaticClinicalSignificanceValue("tier_2", "D"): 5,
-    SomaticClinicalSignificanceValue("tier_2"): 4,
-    SomaticClinicalSignificanceValue("tier_3"): 3,
-    SomaticClinicalSignificanceValue("tier_4"): 2
-}
-
-
 class ClassificationSummaryCalculator:
 
     def __init__(self, cm: 'ClassificationModification'):

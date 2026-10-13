@@ -360,12 +360,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             # AF will already be there
             self.cohort_genotypes.extend(self.locus_cohort_genotypes)
         else:
-            # TODO: In Python3.10 we can replace this check with zip(strict=True)
-            if len(self.locus_cohort_genotypes) != len(self.locus_allele_depths):
-                raise ValueError("Locus cohort genotype and locus Allele depths not equal!")
-
             # Calculate ourselves across locus
-            for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
+            for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths, strict=True):
                 vaf = ad / self.locus_ad_sum
                 vaf[np.isnan(vaf)] = CohortGenotype.MISSING_NUMBER_VALUE
                 cgt[self.cohort_gt_vaf_index] = postgres_arrays(vaf)
@@ -543,7 +539,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         cohort_genotypes_common = []
         cohort_genotypes_rare = []
 
-        # TODO: This check can be replaced with Python 3.10 zip(strict=True)
         num_variants = len(variant_ids)
         for name, array in {"variant_filters": self.variant_filters,
                             "cohort_genotypes": self.cohort_genotypes,

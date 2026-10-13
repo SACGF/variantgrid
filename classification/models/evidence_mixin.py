@@ -75,7 +75,6 @@ class SomaticClinicalSignificanceValue:
             return SomaticClinicalSignificanceValue(parts[0])
 
 
-# FIXME redundant now, remove
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
     SomaticClinicalSignificanceValue("tier_1", "A"): 9,
     SomaticClinicalSignificanceValue("tier_1", "B"): 8,

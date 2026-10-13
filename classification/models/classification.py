@@ -372,8 +372,7 @@ class ConditionResolved:
 
     @property
     def plain_text_terms(self) -> list[str]:
-        # TODO used to return None where it now returns []
-        # but some code puts this directly into JSON
+        # [] rather than None: callers put this straight into JSON
         return [t.name for t in self.references if t.term is None]
 
     @staticmethod

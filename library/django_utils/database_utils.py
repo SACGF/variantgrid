@@ -364,16 +364,6 @@ class JSONDataclassField(models.JSONField, Generic[T1]):
             fallback_value = self.dataclass_type.from_dict(fallback_value)
         return fallback_value
 
-    # def from_db_value(self, value, expression, connection) -> Optional[T1]:
-    #     if json_obj := super().from_db_value(value, expression, connection):
-    #         try:
-    #             return self.dataclass_type.from_dict(json_obj)
-    #         except Exception as ex:
-    #             # TODO raise warning
-    #             print(f"Found illegal value in database {value.__class__} \"{value}\"")
-    #             self.get_fallback_value()
-    #     return None
-
     def from_db_value(self, value, expression, connection):
         """Converts database JSON string/object to a dataclass instance."""
         if value is None:
