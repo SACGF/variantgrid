@@ -27,7 +27,9 @@ from upload.models import (
     VCFSkippedContigs,
 )
 from upload.tasks.retry_upload_pipelines_task import (
+    fail_stuck_upload_pipelines,
     get_retryable_upload_pipelines,
+    retry_message,
     retry_upload_pipelines,
 )
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, retry_upload_pipeline
@@ -178,10 +180,10 @@ def upload_retry_failed_imports(request):
     since = timezone.now() - timedelta(days=RETRY_FAILED_IMPORTS_DAYS)
     file_upload_qs = FileUploadColumns.filter_file_type(FileUpload.objects.filter(created__gte=since),
                                                         request.POST.get("file_type"))
-    upload_pipelines = get_retryable_upload_pipelines(UploadPipeline.objects.filter(file_upload__in=file_upload_qs),
-                                                      request.user)
-    num_queued = retry_upload_pipelines(upload_pipelines)
-    messages.add_message(request, messages.INFO, f"Retrying {num_queued} failed import(s)")
+    upload_pipelines_qs = UploadPipeline.objects.filter(file_upload__in=file_upload_qs)
+    num_stuck = fail_stuck_upload_pipelines(upload_pipelines_qs)
+    num_queued = retry_upload_pipelines(get_retryable_upload_pipelines(upload_pipelines_qs, request.user))
+    messages.add_message(request, messages.INFO, retry_message(num_queued, num_stuck))
     return HttpResponseRedirect(reverse("upload"))
 
 

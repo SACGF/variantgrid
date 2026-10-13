@@ -3,11 +3,14 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.utils import timezone
 
 from snpdb.models.models_enums import ImportSource, ProcessingStatus
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline
+from upload.models import FileUpload, UploadedFileTypes, UploadPipeline, UploadStep
 from upload.tasks.retry_upload_pipelines_task import (
     RETRY_STAGGER_SECONDS,
+    WORKER_LOST_MESSAGE,
+    fail_stuck_upload_pipelines,
     get_retryable_upload_pipelines,
     retry_upload_pipelines,
 )
@@ -50,3 +53,49 @@ class RetryUploadPipelinesTest(TestCase):
         countdowns = [call.kwargs["countdown"] for call in apply_async.call_args_list]
         self.assertEqual(countdowns, [0, RETRY_STAGGER_SECONDS])
         self.assertEqual(retry_upload_pipelines(upload_pipelines), 0)  # second click while queued
+
+    def test_timed_out_is_retryable(self):
+        timed_out = self._make_pipeline(status=ProcessingStatus.TIMED_OUT)
+        self.assertEqual(get_retryable_upload_pipelines(UploadPipeline.objects.all(), self.owner), [timed_out])
+
+
+class FailStuckUploadPipelinesTest(TestCase):
+    """ A step whose worker died from outside stays PROCESSING until the retry notices no worker holds its task """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.owner = User.objects.create_user(username="stuck_owner")
+
+    def _make_processing_step(self, celery_task) -> UploadStep:
+        file_upload = FileUpload.objects.create(user=self.owner, name="run.vcf", path="/tmp/run.vcf",
+                                                file_type=UploadedFileTypes.VCF, import_source=ImportSource.SEQAUTO)
+        upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
+        return UploadStep.objects.create(upload_pipeline=upload_pipeline, name="Process VCF file", script="x",
+                                         status=ProcessingStatus.PROCESSING, start_date=timezone.now(),
+                                         celery_task=celery_task, sort_order=0)
+
+    @patch("upload.tasks.retry_upload_pipelines_task._live_celery_task_ids", return_value={"alive"})
+    def test_step_with_no_worker_times_out_its_pipeline(self, _live):
+        dead = self._make_processing_step("dead")
+        alive = self._make_processing_step("alive")
+        queued = self._make_processing_step(None)  # still in the broker
+
+        self.assertEqual(fail_stuck_upload_pipelines(UploadPipeline.objects.all()), 1)
+
+        dead.refresh_from_db()
+        self.assertEqual(dead.status, ProcessingStatus.TIMED_OUT)
+        self.assertEqual(dead.error_message, WORKER_LOST_MESSAGE)
+        self.assertIsNotNone(dead.end_date)
+        self.assertEqual(dead.upload_pipeline.status, ProcessingStatus.TIMED_OUT)
+        for step in (alive, queued):
+            step.refresh_from_db()
+            self.assertEqual(step.status, ProcessingStatus.PROCESSING)
+            self.assertEqual(step.upload_pipeline.status, ProcessingStatus.PROCESSING)
+
+    @patch("upload.tasks.retry_upload_pipelines_task._live_celery_task_ids", return_value=None)
+    def test_nothing_fails_when_no_worker_answers(self, _live):
+        step = self._make_processing_step("unknown")
+        self.assertEqual(fail_stuck_upload_pipelines(UploadPipeline.objects.all()), 0)
+        step.refresh_from_db()
+        self.assertEqual(step.status, ProcessingStatus.PROCESSING)

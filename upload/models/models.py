@@ -468,14 +468,21 @@ class UploadStep(models.Model):
         self.upload_pipeline.error(self.error_message)
 
     @transaction.atomic()
-    def mark_timed_out(self, user: Optional[User] = None):
+    def mark_timed_out(self, user: Optional[User] = None, error_message: Optional[str] = None):
+        """ Close a step nothing will finish (its worker died, or an admin gave up on it) and fail its pipeline
+            so the retry can pick it up """
         self.status = ProcessingStatus.TIMED_OUT
-        if user:
+        if error_message:
+            self.error_message = error_message
+        elif user:
             self.error_message = f"Marked as timed out by {user.username}"
         else:
             self.error_message = "Timed out"
+        if self.end_date is None:
+            self.end_date = timezone.now()
 
         self.save()
+        self.close_sub_steps()
         qs = UploadPipeline.objects.filter(pk=self.upload_pipeline.pk)
         progress_status = f"Failure in import step id: {self.pk}, ({self.error_message})"
         qs.update(status=self.status, progress_status=progress_status)

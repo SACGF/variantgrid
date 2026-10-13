@@ -162,9 +162,13 @@ Gotchas:
   classification imports get back in through `manage.py classification_rematch_stuck`, which re-derives the coordinates
   and runs new pipelines.
 - Bulk retry (the upload page's "Retry failed", the sequencing run page's "Retry failed imports") goes through
-  upload/tasks/retry_upload_pipelines_task.py:retry_upload_pipelines: it claims each pipeline ERROR -> CREATED
-  ("Retry queued") before queueing, so a double click can't queue it twice, and spaces the tasks
-  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it.
+  upload/tasks/retry_upload_pipelines_task.py:retry_upload_pipelines: it claims each pipeline ERROR/TIMED_OUT ->
+  CREATED ("Retry queued") before queueing, so a double click can't queue it twice, and spaces the tasks
+  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it. A step
+  whose worker was killed from outside (OOM, restart) stays PROCESSING - the task_failure handler only sees a child
+  lost under a live master - so both buttons first run `fail_stuck_upload_pipelines`, which marks TIMED_OUT any
+  running step whose celery_task no worker reports via inspect (skipped when no worker answers). The admin's
+  "Mark process as timed out" on an UploadStep is the manual equivalent.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
