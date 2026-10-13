@@ -164,11 +164,14 @@ Gotchas:
 - Bulk retry (the upload page's "Retry failed", the sequencing run page's "Retry failed imports") goes through
   upload/tasks/retry_upload_pipelines_task.py:retry_upload_pipelines: it claims each pipeline ERROR/TIMED_OUT ->
   CREATED ("Retry queued") before queueing, so a double click can't queue it twice, and spaces the tasks
-  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it. A step
-  whose worker was killed from outside (OOM, restart) stays PROCESSING - the task_failure handler only sees a child
-  lost under a live master - so both buttons first run `fail_stuck_upload_pipelines`, which marks TIMED_OUT any
-  running step whose celery_task no worker reports via inspect (skipped when no worker answers). The admin's
-  "Mark process as timed out" on an UploadStep is the manual equivalent.
+  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it.
+- A step whose worker was killed from outside (OOM, restart) stays PROCESSING - the task_failure handler only sees a
+  child lost under a live master. A running step holds a lease (`UploadStep.lease_expires`) its worker renews on a
+  thread (`upload/tasks/upload_step_lease.py`, every UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS, guarded on its own task
+  id); `fail_stuck_upload_pipelines` marks a step with a lapsed lease TIMED_OUT, from the 5-minute beat task on
+  scheduling_single_worker and again before each retry. The admin's "Mark process as timed out" on an UploadStep is
+  the manual equivalent. Don't judge liveness by `celery_task`: launch_task sets it before any worker picks the task
+  up, and celery inspect misses a worker too loaded to answer.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is

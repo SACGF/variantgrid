@@ -4,6 +4,7 @@ import re
 import shutil
 import traceback
 from collections import namedtuple
+from datetime import timedelta
 from functools import cached_property
 from typing import Optional, Union
 
@@ -423,6 +424,8 @@ class UploadStep(models.Model):
     child_script = models.TextField(null=True)
     import_variant_table = models.TextField(null=True, blank=True)
     celery_task = models.CharField(max_length=36, null=True)
+    # Renewed by the running worker (UploadStepLeaseHeartbeat); lapsed means the worker died (#2188)
+    lease_expires = models.DateTimeField(null=True)
     tool_version = models.ForeignKey(ToolVersion, null=True, on_delete=CASCADE)
     output_text = models.TextField(null=True)
 
@@ -448,8 +451,27 @@ class UploadStep(models.Model):
             raise ValueError(msg)
 
         self.start_date = timezone.now()
+        self.lease_expires = self.start_date + timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
         self.status = ProcessingStatus.PROCESSING
         self.items_processed = 0
+
+    def renew_lease(self, celery_task: str) -> bool:
+        """ Extend the lease while still held by celery_task. False means the step was closed or taken over
+            (marked timed out and retried), so the caller should stop """
+        lease_expires = timezone.now() + timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        return bool(UploadStep.objects.filter(pk=self.pk, celery_task=celery_task, end_date__isnull=True)
+                    .update(lease_expires=lease_expires))
+
+    @staticmethod
+    def lease_lapsed_q(now=None) -> Q:
+        """ Running steps whose worker stopped renewing. A step started before lease_expires existed has none
+            and is judged on start_date instead. Sub-steps (vcf_preprocess) are closed by their parent and
+            never hold a lease """
+        if now is None:
+            now = timezone.now()
+        lease_seconds = timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        return Q(status=ProcessingStatus.PROCESSING, end_date__isnull=True, parent_upload_step__isnull=True) & (
+            Q(lease_expires__lt=now) | Q(lease_expires__isnull=True, start_date__lt=now - lease_seconds))
 
     def error_exception(self, e):
         status = ProcessingStatus.ERROR

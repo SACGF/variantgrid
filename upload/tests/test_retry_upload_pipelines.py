@@ -1,6 +1,8 @@
 import tempfile
+from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
@@ -60,42 +62,60 @@ class RetryUploadPipelinesTest(TestCase):
 
 
 class FailStuckUploadPipelinesTest(TestCase):
-    """ A step whose worker died from outside stays PROCESSING until the retry notices no worker holds its task """
+    """ A step whose worker died from outside stays PROCESSING; its lapsed lease is how the sweep notices """
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.owner = User.objects.create_user(username="stuck_owner")
 
-    def _make_processing_step(self, celery_task) -> UploadStep:
+    def _make_step(self, status=ProcessingStatus.PROCESSING, lease_expires=None, started_ago=None) -> UploadStep:
         file_upload = FileUpload.objects.create(user=self.owner, name="run.vcf", path="/tmp/run.vcf",
                                                 file_type=UploadedFileTypes.VCF, import_source=ImportSource.SEQAUTO)
         upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
+        start_date = timezone.now() - (started_ago or timedelta())
         return UploadStep.objects.create(upload_pipeline=upload_pipeline, name="Process VCF file", script="x",
-                                         status=ProcessingStatus.PROCESSING, start_date=timezone.now(),
-                                         celery_task=celery_task, sort_order=0)
+                                         status=status, start_date=start_date, lease_expires=lease_expires,
+                                         celery_task="task", sort_order=0)
 
-    @patch("upload.tasks.retry_upload_pipelines_task._live_celery_task_ids", return_value={"alive"})
-    def test_step_with_no_worker_times_out_its_pipeline(self, _live):
-        dead = self._make_processing_step("dead")
-        alive = self._make_processing_step("alive")
-        queued = self._make_processing_step(None)  # still in the broker
+    def _assert_status(self, upload_step, status):
+        upload_step.refresh_from_db()
+        self.assertEqual(upload_step.status, status)
+        self.assertEqual(upload_step.upload_pipeline.status, status)
+
+    def test_lapsed_lease_times_out_its_pipeline(self):
+        now = timezone.now()
+        dead = self._make_step(lease_expires=now - timedelta(seconds=1))
+        alive = self._make_step(lease_expires=now + timedelta(minutes=5))
+        queued = self._make_step(status=ProcessingStatus.CREATED, lease_expires=now - timedelta(hours=1))
 
         self.assertEqual(fail_stuck_upload_pipelines(UploadPipeline.objects.all()), 1)
 
-        dead.refresh_from_db()
-        self.assertEqual(dead.status, ProcessingStatus.TIMED_OUT)
+        self._assert_status(dead, ProcessingStatus.TIMED_OUT)
         self.assertEqual(dead.error_message, WORKER_LOST_MESSAGE)
         self.assertIsNotNone(dead.end_date)
-        self.assertEqual(dead.upload_pipeline.status, ProcessingStatus.TIMED_OUT)
-        for step in (alive, queued):
-            step.refresh_from_db()
-            self.assertEqual(step.status, ProcessingStatus.PROCESSING)
-            self.assertEqual(step.upload_pipeline.status, ProcessingStatus.PROCESSING)
+        self._assert_status(alive, ProcessingStatus.PROCESSING)
+        queued.refresh_from_db()
+        self.assertEqual(queued.status, ProcessingStatus.CREATED)
 
-    @patch("upload.tasks.retry_upload_pipelines_task._live_celery_task_ids", return_value=None)
-    def test_nothing_fails_when_no_worker_answers(self, _live):
-        step = self._make_processing_step("unknown")
-        self.assertEqual(fail_stuck_upload_pipelines(UploadPipeline.objects.all()), 0)
-        step.refresh_from_db()
-        self.assertEqual(step.status, ProcessingStatus.PROCESSING)
+    def test_step_without_lease_is_judged_on_start_date(self):
+        """ Started before lease_expires existed """
+        lease = timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        old = self._make_step(started_ago=lease + timedelta(seconds=1))
+        recent = self._make_step(started_ago=lease - timedelta(minutes=1))
+
+        self.assertEqual(fail_stuck_upload_pipelines(UploadPipeline.objects.all()), 1)
+        self._assert_status(old, ProcessingStatus.TIMED_OUT)
+        self._assert_status(recent, ProcessingStatus.PROCESSING)
+
+    def test_renew_lease_only_while_held(self):
+        now = timezone.now()
+        upload_step = self._make_step(lease_expires=now)
+
+        self.assertTrue(upload_step.renew_lease("task"))
+        upload_step.refresh_from_db()
+        self.assertGreater(upload_step.lease_expires, now)
+
+        self.assertFalse(upload_step.renew_lease("some other task"))
+        upload_step.mark_timed_out()
+        self.assertFalse(upload_step.renew_lease("task"))

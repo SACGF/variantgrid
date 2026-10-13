@@ -94,6 +94,13 @@ app.conf.beat_schedule['reconcile-pending-extractions'] = {
     'schedule': HOUR_SECS,
 }
 
+# Imports whose worker was killed from outside stay PROCESSING with a lapsed lease (#2188); time them out so
+# the retry buttons offer them. Cheap: one indexed query when nothing has lapsed.
+app.conf.beat_schedule['fail-stuck-upload-pipelines'] = {
+    'task': 'upload.tasks.retry_upload_pipelines_task.fail_stuck_upload_pipelines_task',
+    'schedule': MINUTE_SECS * 5,
+}
+
 if settings.API_REQUEST_LOG_DAYS:
     app.conf.beat_schedule['prune-api-request-log'] = {
         'task': 'eventlog.tasks.prune_api_request_log',
