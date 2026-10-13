@@ -1,5 +1,6 @@
 import os.path
 
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import serializers
 
@@ -248,6 +249,42 @@ class SequencingSampleExtractionLinkSerializer(serializers.Serializer):
         resolved = resolve_reference(Extraction, self.validated_data["extraction"])
         sequencing_sample.apply_extraction_match(resolved)
         return sequencing_sample
+
+
+
+class SequencingSampleExtractionLinkItemSerializer(serializers.Serializer):
+    sample_name = serializers.CharField()
+    extraction = ExternalReferenceField()
+
+
+class SequencingSampleExtractionLinksSerializer(serializers.Serializer):
+    """ A sample sheet's links in one call, keyed on sample_name as SequencingSampleLookupSerializer is.
+        The client has just created the sheet, so a sample_name not on it fails the whole batch, while
+        an extraction not yet created only parks that one row """
+    sample_sheet = SampleSheetLookupSerializer()
+    links = SequencingSampleExtractionLinkItemSerializer(many=True, allow_empty=False)
+
+    def validate(self, attrs):
+        sample_sheet = SampleSheetLookupSerializer.get_object(attrs["sample_sheet"])
+        sample_names = {link["sample_name"] for link in attrs["links"]}
+        sequencing_samples_by_name = {ss.sample_name: ss for ss in
+                                      sample_sheet.sequencingsample_set.filter(sample_name__in=sample_names)}
+        if missing := sorted(sample_names - set(sequencing_samples_by_name)):
+            raise serializers.ValidationError({"links": f"sample_name not in sample sheet: {', '.join(missing)}"})
+        attrs["sample_sheet"] = sample_sheet
+        attrs["sequencing_samples_by_name"] = sequencing_samples_by_name
+        return attrs
+
+    def save(self, **kwargs):
+        sequencing_samples_by_name = self.validated_data["sequencing_samples_by_name"]
+        sequencing_samples = []
+        with transaction.atomic():
+            for link in self.validated_data["links"]:
+                sequencing_sample = sequencing_samples_by_name[link["sample_name"]]
+                # Unscoped, as in SequencingSampleExtractionLinkSerializer
+                sequencing_sample.apply_extraction_match(resolve_reference(Extraction, link["extraction"]))
+                sequencing_samples.append(sequencing_sample)
+        return sequencing_samples
 
 
 def carry_extractions_to_new_sample_sheet(previous: SampleSheet, current: SampleSheet):

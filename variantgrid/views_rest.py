@@ -13,6 +13,7 @@ from upload.models import UploadedFileTypes
 API_FEATURES = (
     "patients",
     "link_extraction",
+    "link_extractions_bulk",
     "upload_status",
     "joint_called_vcf_cross_run",
     "upload_metadata",

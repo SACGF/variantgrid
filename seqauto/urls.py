@@ -56,6 +56,7 @@ from seqauto.views_rest import (
     SequencerViewSet,
     SequencingFilesBulkCreateView,
     SequencingRunViewSet,
+    SequencingSampleExtractionLinksView,
     SequencingSampleExtractionLinkView,
     SingleSampleVCFViewSet,
     VariantCallerViewSet,
@@ -202,6 +203,8 @@ urlpatterns += [
     path('api/v1/sequencing_files/bulk_create', SequencingFilesBulkCreateView.as_view(), name='api_sequencing_files_bulk_create'),
     path('api/v1/sequencing_sample/link_extraction', SequencingSampleExtractionLinkView.as_view(),
          name='api_sequencing_sample_link_extraction'),
+    path('api/v1/sequencing_sample/link_extractions', SequencingSampleExtractionLinksView.as_view(),
+         name='api_sequencing_sample_link_extractions'),
 
 
 ]
