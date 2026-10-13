@@ -161,6 +161,10 @@ Gotchas:
   was before UploadPipeline.objects.create has only an orphan FileUpload to show for itself and nothing to reload;
   classification imports get back in through `manage.py classification_rematch_stuck`, which re-derives the coordinates
   and runs new pipelines.
+- Bulk retry (the upload page's "Retry failed", the sequencing run page's "Retry failed imports") goes through
+  upload/tasks/retry_upload_pipelines_task.py:retry_upload_pipelines: it claims each pipeline ERROR -> CREATED
+  ("Retry queued") before queueing, so a double click can't queue it twice, and spaces the tasks
+  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
