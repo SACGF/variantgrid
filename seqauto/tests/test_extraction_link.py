@@ -124,7 +124,7 @@ class ExtractionLinkAPITest(APITestCase):
 
 
 class ExtractionLinksBulkAPITest(APITestCase):
-    """ #2176 - match status per item, a sample_id not on the sheet fails the whole batch """
+    """ #2176 - match status per item, a sample_name not on the sheet fails the whole batch """
     RNA_SAMPLE_NAME = "ExampleSample_RNA_2600000001D"
 
     @classmethod
@@ -146,7 +146,7 @@ class ExtractionLinksBulkAPITest(APITestCase):
     def _link(self, links: dict):
         data = {
             "sample_sheet": {"sequencing_run": self.sequencing_run.name, "hash": self.sample_sheet.hash},
-            "links": [{"sample_id": sample_id, "extraction": extraction} for sample_id, extraction in links.items()],
+            "links": [{"sample_name": sample_name, "extraction": extraction} for sample_name, extraction in links.items()],
         }
         return self.client.post(reverse("api_sequencing_sample_link_extractions"), data, format="json")
 
@@ -166,7 +166,7 @@ class ExtractionLinksBulkAPITest(APITestCase):
         self.assertEqual(self.dna_sample.extraction, self.dna)
         self.assertEqual(self.rna_sample.extraction_reference, {"reference_id": "2600000001D"})
 
-    def test_sample_id_not_on_sheet_fails_the_batch(self):
+    def test_sample_name_not_on_sheet_fails_the_batch(self):
         response = self._link({DNA_SAMPLE_NAME: "2600000001C", "NOT_SEQUENCED": "2600000001C"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("NOT_SEQUENCED", str(response.data))
