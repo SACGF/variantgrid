@@ -288,22 +288,6 @@ function enhanceAndMonitor() {
         }},
         // similar but for radio buttons (only change if not already checked)
         {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find(':radio:not(:checked)').prop('checked', 'checked').change();});}},
-        // is this still used?? Would like to get rid of
-        {test: '#id_import_status',
-            func: (node) => {
-                const importStatus = node.val();
-                if (importStatus !== 'S') {
-                    let className = null;
-                    if (importStatus === 'E') {
-                        className = "error";
-                    } else {
-                        className = "warning";
-                    }
-                    node.addClass(className);
-                }
-            }
-        },
-
         // fixing external link styles
         {test: `a[href^="http"], a[href^="ftp"], a[href*="google.com"]`,
             func: (node) => {

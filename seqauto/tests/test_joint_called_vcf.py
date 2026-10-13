@@ -27,7 +27,7 @@ from seqauto.models import (
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.sequencing_files.sample_sheet import current_sample_sheet_changed
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
-from snpdb.models import VCF, Sample
+from snpdb.models import VCF, ImportStatus, Sample
 from upload.models import (
     BackendVCF,
     FileUpload,
@@ -420,6 +420,23 @@ class CrossRunLinkSamplesTests(TestCase):
                                                kwargs={"sequencing_run_id": sequencing_run.pk}))
             self.assertEqual(response.status_code, 200, sequencing_run)
             self.assertIn(">cross-run<", response.content.decode(), sequencing_run)
+
+    def test_run_page_shows_failed_vcf_as_error_icon(self):
+        """ The run page draws the import status like the runs grid does: a failed VCF is a red cross,
+            not the plain VCF icon (#2175) """
+        user = User.objects.create_superuser(username="failedvcfadmin", password="x")
+        self.client.force_login(user)
+        backend, joint_called_vcf, _, _ = self._make_trio()
+        vcf = backend.uploaded_vcf.vcf
+        vcf.import_status = ImportStatus.ERROR
+        vcf.save()
+
+        response = self.client.get(reverse("view_sequencing_run",
+                                           kwargs={"sequencing_run_id": joint_called_vcf.sequencing_run.pk}))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn(ImportStatus.ERROR.icon_css, html)
+        self.assertNotIn("class='vcf-icon icon24 run-vcf-icon'", html)
 
     def test_new_sample_sheet_on_member_run_remaps_that_member(self):
         backend, joint_called_vcf, members, samples = self._make_trio()
