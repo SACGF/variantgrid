@@ -112,9 +112,14 @@ Gotchas:
   distinct set of GENE-scope values, most used first then newest, capped at ten, each later row naming the fields it
   differs from the first in. Most records in a gene carry identical gene content because they were copied from each
   other. The pick is always a human's: AMP tiering and therapy content are gene *and* tumour type, so the row leads with
-  the content and the spread of conditions it was used for (`GeneConsensusGroup.conditions`), not the record's tier.
+  the content and the spread of conditions it was used for (`ConsensusGroup.conditions`), not the record's tier.
   The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
   views/views_gene_consensus.py) all call that one function and render templates/classification/tags/gene_consensus_group.html.
+- The allele level pick (create page "Copy values from", the Classify & Report dialog's previous classifications) is the
+  same grouping over every copied key (models/classification.py:ClassificationConsensus.consensus_groups): one column
+  per distinct set of copied values, rendered side by side by templates/classification/tags/consensus_comparison.html
+  with the fields the choices differ in first and the shared ones folded away (ConsensusComparison.of). Record
+  identity (lab id, curator) is provenance, not the choice - the diff page (`?cids=...&copied_only=1`) is the full view.
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.

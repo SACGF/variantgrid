@@ -8,8 +8,9 @@ from classification.models import (
     Classification,
     ClassificationConsensus,
     ClassificationModification,
+    ConsensusComparison,
 )
-from classification.models.classification import COPY_SCOPES_GENE
+from classification.models.classification import COPY_SCOPES_ALL, COPY_SCOPES_GENE
 from classification.models.classification_variant_fields_validation import (
     apply_somatic_tier_from_amp_level,
 )
@@ -135,6 +136,59 @@ class GeneConsensusGroupsTestCase(TestCase):
     def test_a_record_with_no_gene_content_is_not_a_candidate(self):
         self._classify("no_gene_content", "somatic", "", "2024-01-01")
         self.assertEqual(self._groups(), [])
+
+
+class ConsensusComparisonTestCase(TestCase):
+    """ The side by side view of the allele's previous classifications - what a pick would copy, with the fields the
+        choices differ in separated from the ones they all carry """
+
+    def setUp(self):
+        ClassificationTestUtils.setUp()
+        self.lab, self.user = ClassificationTestUtils.lab_and_user()
+
+    def _modification(self, lab_record_id: str, curation_date: str, **evidence) -> ClassificationModification:
+        classification = Classification.create(
+            user=self.user, lab=self.lab, lab_record_id=lab_record_id, source=SubmissionSource.VARIANT_GRID,
+            data={SpecialEKeys.ALLELE_ORIGIN: "somatic", SpecialEKeys.CURATION_DATE: curation_date, **evidence})
+        classification.publish_latest(self.user)
+        return classification.last_published_version
+
+    def _comparison(self, *modifications) -> ConsensusComparison:
+        keys = ClassificationConsensus.copy_keys(COPY_SCOPES_ALL, AlleleOriginBucket.SOMATIC)
+        return ConsensusComparison.of(ClassificationConsensus.consensus_groups(modifications, keys))
+
+    def test_records_differing_only_in_uncopied_keys_are_one_choice_with_everything_shared(self):
+        same_content = {"h_summary": "RUNX1 is a transcription factor", "condition": "MONDO:0018874"}
+        comparison = self._comparison(
+            self._modification("a", "2024-01-01", **same_content, **{"somatic:tmb_value": 12}),
+            self._modification("b", "2024-02-01", **same_content, **{"somatic:tmb_value": 30}),
+        )
+        self.assertEqual(len(comparison.groups), 1)
+        self.assertEqual(comparison.groups[0].record_count, 2)
+        self.assertEqual(comparison.differing, [])
+        shared_keys = {row.key for row in comparison.shared}
+        self.assertTrue({"h_summary", "condition"} <= shared_keys)
+        self.assertNotIn("somatic:tmb_value", shared_keys)
+
+    def test_the_fields_the_choices_differ_in_come_apart_from_the_shared_ones(self):
+        comparison = self._comparison(
+            self._modification("a", "2024-01-01", h_summary="RUNX1 is a transcription factor", condition="MONDO:0018874"),
+            self._modification("b", "2024-02-01", h_summary="RUNX1 drives myeloid differentiation", condition="MONDO:0018874"),
+        )
+        self.assertEqual(len(comparison.groups), 2)
+        self.assertEqual([row.key for row in comparison.differing], ["h_summary"])
+        self.assertEqual([cell.value for cell in comparison.differing[0].cells],
+                         ["RUNX1 drives myeloid differentiation", "RUNX1 is a transcription factor"])
+        self.assertIn("condition", {row.key for row in comparison.shared})
+
+    def test_a_field_only_one_choice_has_is_a_difference_with_an_empty_cell(self):
+        comparison = self._comparison(
+            self._modification("a", "2024-01-01", h_summary="RUNX1 is a transcription factor"),
+            self._modification("b", "2024-02-01", h_summary="RUNX1 is a transcription factor", condition="MONDO:0018874"),
+        )
+        [row] = comparison.differing
+        self.assertEqual(row.key, "condition")
+        self.assertEqual([cell is None for cell in row.cells], [False, True])
 
 
 class ResolveDefaultValueTestCase(TestCase):

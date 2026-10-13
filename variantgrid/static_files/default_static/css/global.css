@@ -3667,6 +3667,41 @@ table.overlap-summary .overlap-criteria {
   text-align: left;
 }
 
+/* Previous classifications of an allele side by side, grouped by what applying one would copy
+   (classification/tags/consensus_comparison.html) */
+.consensus-comparison table.consensus-compare th.consensus-label {
+  width: 160px;
+  font-weight: normal;
+  color: #666;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.consensus-comparison table.consensus-compare th.consensus-choice {
+  font-weight: normal;
+  vertical-align: top;
+  min-width: 220px;
+}
+.consensus-comparison table.consensus-compare td {
+  white-space: pre-wrap;
+  vertical-align: top;
+}
+.consensus-comparison table.consensus-compare tr.differences td {
+  background-color: #fff8f0;
+}
+.consensus-comparison table.consensus-compare tr.consensus-section th {
+  font-weight: normal;
+  color: #666;
+  background-color: #f7f7f7;
+}
+.consensus-comparison .gene-content-text.clamp {
+  max-height: 4.5em;
+  overflow: hidden;
+}
+.consensus-comparison .consensus-conditions .badge {
+  white-space: normal;
+  text-align: left;
+}
+
 /* Feature tips (see variantgrid/tips.py) - sits over a grid loading overlay or under a page
    heading, so it reads as a friendly aside rather than a warning */
 .tip-box {
