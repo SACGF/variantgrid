@@ -173,6 +173,8 @@ splits the hits from our own `@deprecated` markers by name; `manage.py check` un
 adds the `warnings.warn` deprecations Django and packages raise at import, which no stub records.
 `library/vg/health.py:render_health` lists the pylint errors from `lint.txt`; `agent-maps.yml` runs
 `scripts/linting/run_pylint.sh --errors-only` on every push and turns each into a warning annotation, not a failure.
+`library/vg/health.py:ruff_health` runs `ruff check` live for the count per rule, and the same workflow writes
+ruff's per-rule statistics to the job summary, annotating only the pyflakes and bugbear families.
 `scripts/linting/pylint_model_utils.py` is a pylint plugin that drops django-model-utils' `TYPE_CHECKING` manager
 stubs, without which every query through an `InheritanceManager` reads as assignment-from-no-return.
 

@@ -82,8 +82,8 @@ python3 manage.py vg settings NAME [--diff]       # resolved value and every set
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
 scripts/vg health [--no-ci]                       # the ratchets: docstring coverage, dead citations, one-off
-                                                  #   commands, pylint messages (errors listed), deprecated calls,
-                                                  #   last CI suite time
+                                                  #   commands, pylint messages (errors listed), ruff findings,
+                                                  #   deprecated calls, last CI suite time
 scripts/vg deprecations                           # calls to deprecated APIs as the next Python sees them
                                                   #   (basedpyright) plus warnings raised at import
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk

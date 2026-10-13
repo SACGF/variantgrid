@@ -9,6 +9,8 @@ name: Agent maps
 # The import checks are gates: `lint-imports` holds the contracts in .importlinter and `vg imports cycles`
 # fails on any cycle among module-load imports. Pylint errors (E-class only) are reported like the citations:
 # a warning annotation on each line and the count in the job summary, failing only if pylint itself can't run.
+# Ruff findings are reported the same way: the per-rule statistics in the job summary, annotations only for the
+# pyflakes (F) and bugbear (B) families, since GitHub shows at most ten per step - never a failure.
 
 on:
   push:
@@ -77,3 +79,16 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           # 1 is a fatal message, 32 a usage error: pylint did not finish, so the count above means nothing
           if (( status & 33 )); then cat pylint_errors.txt; exit 1; fi
+
+      - name: Report ruff findings
+        continue-on-error: true
+        run: |
+          .venv/bin/ruff check --quiet --output-format concise --exit-zero . > ruff_findings.txt
+          grep -E '^[^ ]+:[0-9]+:[0-9]+: [FB][0-9]+ ' ruff_findings.txt \
+            | sed -E 's/^([^:]+):([0-9]+):([0-9]+): ([A-Z]+[0-9]+) (.*)$/::warning file=\1,line=\2,col=\3,title=ruff \4::\5/' || true
+          {
+            echo "### ruff findings: $(wc -l < ruff_findings.txt)"
+            echo '```'
+            .venv/bin/ruff check --quiet --statistics --exit-zero .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
