@@ -1,9 +1,11 @@
 import logging
 import os
 import subprocess
+import time
 from concurrent.futures.thread import ThreadPoolExecutor
 
 import cyvcf2
+import redis
 from django.conf import settings
 from django.core.cache import cache
 
@@ -135,22 +137,37 @@ class AnnotateImportedVCFTask(ImportVCFStepTask):
 class InsertUnknownVariantsTask(ImportVCFStepTask):
     """ Loci/Variants may have been inserted since the unknown variants were written, so we need to check
         in this process (which runs under a lock and in variant_id_single_workers so will avoid race conditions """
+    LOCK_ID = "insert-unknown-variants-lock"
+    LOCK_EXPIRE = 60 * 5  # 5 minutes
+    # Longer than LOCK_EXPIRE, so a lock left by a killed worker expires and is taken, and long enough
+    # for Redis to come back after a restart (BusyLoadingError while it reloads its dataset) #2189
+    LOCK_WAIT = 60 * 15
+    LOCK_POLL_SECONDS = 10
 
     def process_items(self, upload_step):
-        LOCK_EXPIRE = 60 * 5  # 5 minutes
-        LOCK_ID = "insert-unknown-variants-lock"
-
         if not settings.UPLOAD_ENABLED:
             raise ValueError("Uploads disabled, this should not have been called!")
 
-        if cache.add(LOCK_ID, "true", LOCK_EXPIRE):  # fails if already exists
+        self._acquire_lock()
+        try:
+            return InsertUnknownVariantsTask.process_items_in_lock(upload_step)
+        finally:
+            logging.info("Releasing %s", self.LOCK_ID)
+            cache.delete(self.LOCK_ID)
+
+    def _acquire_lock(self):
+        """ Never skip the insert: the step would report success with its unknown variants missing """
+        deadline = time.monotonic() + self.LOCK_WAIT
+        while True:
             try:
-                return InsertUnknownVariantsTask.process_items_in_lock(upload_step)
-            finally:
-                logging.info("Releasing %s", LOCK_ID)
-                cache.delete(LOCK_ID)
-        else:
-            logging.info("Someone else is doing the import")
+                if cache.add(self.LOCK_ID, "true", self.LOCK_EXPIRE):  # fails if already exists
+                    return
+                logging.info("%s is held, waiting", self.LOCK_ID)
+            except redis.exceptions.ConnectionError as e:  # includes BusyLoadingError
+                logging.warning("Redis unavailable acquiring %s: %s", self.LOCK_ID, e)
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"Could not acquire '{self.LOCK_ID}' within {self.LOCK_WAIT} seconds")
+            time.sleep(self.LOCK_POLL_SECONDS)
 
     @staticmethod
     def process_items_in_lock(upload_step):
