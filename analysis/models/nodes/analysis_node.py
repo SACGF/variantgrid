@@ -783,7 +783,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
             Nodes can restrict queries to contigs (though we don't actually use this yet)
             Gene-level variants are on a contig of their own so should always be included
             @see snpdb.gene_level_variants """
-        node_contigs = self._get_node_contigs()
+        node_contigs = self._get_node_contigs()  # pylint: disable=assignment-from-none
         if node_contigs is not None:
             node_contigs = node_contigs | {Contig.get_gene_level()}
         return node_contigs

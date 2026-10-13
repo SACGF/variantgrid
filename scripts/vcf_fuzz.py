@@ -195,8 +195,10 @@ def main():
                 continue
             if any(int(f[1]) + candidate < 1 for f in parsed):
                 continue
-            if feature and not all(feature[0] < int(f[1]) + candidate <= feature[1] for f in parsed):
-                continue
+            if feature:
+                feature_start, feature_end = feature
+                if not all(feature_start < int(f[1]) + candidate <= feature_end for f in parsed):
+                    continue
             spread = max(int(f[1]) for f in parsed) - anchor
             if reference.fetch(contig, anchor + candidate, spread + longest) is None:
                 continue

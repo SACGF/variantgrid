@@ -312,7 +312,7 @@ def postgres_arrays(array):
 T1 = TypeVar('T1', bound=DataClassJsonMixin)
 
 
-class JSONDataclassField(models.JSONField, Generic[T1]):
+class JSONDataclassField(models.JSONField, Generic[T1]):  # pylint: disable=inconsistent-mro
     """
     DO NOT USE - doesn't work well with auditlog which double encodes, likely a problem with serialize as well
     """
