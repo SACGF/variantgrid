@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from patients.models.models_patient import Patient
 from seqauto.models import (
     Aligner,
     AlignmentFile,
@@ -423,19 +424,24 @@ class CrossRunLinkSamplesTests(TestCase):
 
     def test_run_page_shows_failed_vcf_as_error_icon(self):
         """ The run page draws the import status like the runs grid does: a failed VCF is a red cross,
-            not the plain VCF icon (#2175) """
+            not the plain VCF icon - on the Data tab and on the Patients tab's sample rows (#2175) """
         user = User.objects.create_superuser(username="failedvcfadmin", password="x")
         self.client.force_login(user)
-        backend, joint_called_vcf, _, _ = self._make_trio()
+        backend, joint_called_vcf, members, samples = self._make_trio()
         vcf = backend.uploaded_vcf.vcf
         vcf.import_status = ImportStatus.ERROR
         vcf.save()
+        # A sample with a patient puts a row on the Patients tab
+        samples[0].patient = Patient.objects.create(first_name="FAILED", last_name="VCF")
+        samples[0].save()
+        _link_samples([members[0]], [samples[0]])
 
         response = self.client.get(reverse("view_sequencing_run",
                                            kwargs={"sequencing_run_id": joint_called_vcf.sequencing_run.pk}))
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertIn(ImportStatus.ERROR.icon_css, html)
+        self.assertIn('id="patients"', html)
+        self.assertEqual(html.count(ImportStatus.ERROR.icon_css), 2)  # Data tab + Patients tab row
         self.assertNotIn("class='vcf-icon icon24 run-vcf-icon'", html)
 
     def test_new_sample_sheet_on_member_run_remaps_that_member(self):
