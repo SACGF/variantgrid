@@ -1,5 +1,6 @@
 import logging
-from typing import Any
+from datetime import date
+from typing import Any, Optional
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import QuerySet
@@ -91,9 +92,23 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             return ApiRequestLog.for_object(content_type, object_pk)
         return ApiRequestLog.objects.all()
 
+    def _get_query_date(self, param: str) -> Optional[date]:
+        """ An ISO yyyy-mm-dd param (what <input type="date"> submits); anything else is no filter """
+        if raw := self.get_query_param(param):
+            try:
+                return date.fromisoformat(raw)
+            except ValueError:
+                pass
+        return None
+
     def filter_queryset(self, qs: QuerySet[ApiRequestLog]) -> QuerySet[ApiRequestLog]:
         if view_name := self.get_query_param('view_name'):
             qs = qs.filter(view_name=view_name)
         if self.get_query_json('errors_only'):
             qs = qs.filter(status_code__gte=400)
+        # __date is the local (TIME_ZONE) day, so a day picked on the page means that day as the user sees it
+        if date_from := self._get_query_date('date_from'):
+            qs = qs.filter(created__date__gte=date_from)
+        if date_to := self._get_query_date('date_to'):
+            qs = qs.filter(created__date__lte=date_to)
         return qs

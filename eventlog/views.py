@@ -47,6 +47,8 @@ def api_request_log(request):
     context = {
         "view_names": view_names,
         "view_name": request.GET.get("view_name"),
+        "date_from": request.GET.get("date_from"),
+        "date_to": request.GET.get("date_to"),
         "retention_days": settings.API_REQUEST_LOG_DAYS,
     }
     return render(request, 'api_request_log.html', context=context)
