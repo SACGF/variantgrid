@@ -37,5 +37,8 @@ API:
   have several (one per VCF post, eg a BAM and its recalibrated BAM). They reach IGV as `SampleFilePath` rows, copied at
   VCF import (`upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing`) and, for a file posted after that, by
   `seqauto/models/models_seqauto.py:AlignmentFile.link_to_samples`.
+- Serializers write through `library/django_utils/change_tracking.py:update_or_create_if_changed` (and
+  `get_or_create_recorded` where an existing row is left alone), never `objects.update_or_create`, so a replayed post
+  is a true no-op: `modified` means a field changed, and the API Log row shows the call as unchanged (#1413).
 - A client-visible API change needs a name in `variantgrid/views_rest.py:API_FEATURES` (see
   claude/guides/operations.md#authentication-surface).

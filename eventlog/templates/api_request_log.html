@@ -31,6 +31,10 @@
                 <input class="form-check-input" type="checkbox" id="api-errors-only">
                 <label class="form-check-label ml-1" for="api-errors-only">Errors only</label>
             </div>
+            <div class="form-check ml-4">
+                <input class="form-check-input" type="checkbox" id="api-wrote-data">
+                <label class="form-check-label ml-1" for="api-wrote-data">Wrote data</label>
+            </div>
         </form>
 
         <table id="api-request-log-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'api_request_log_datatable' %}" data-datatable-data="apiRequestLogFilter"></table>
