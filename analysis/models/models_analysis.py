@@ -369,8 +369,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 edge.pk = None
                 edge.save()
 
-            # re-save all the nodes to re-validate them after all joined up
+            # Edges are copied after the nodes, so validate them now they're joined up
             for node in nodes:
+                node.valid = node.is_valid
                 node.save()
 
             for av in AnalysisVariable.objects.filter(node__analysis_id=analysis_id):

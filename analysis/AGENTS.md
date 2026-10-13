@@ -23,7 +23,9 @@ Patterns here:
   `analysis/models/nodes/analysis_node.py:AnalysisNode._save` bumps `version`, sets DIRTY, cascades the bump to every
   descendant and creates the NodeVersion row. Everything version-scoped (Redis Q cache keyed on NodeVersion pk, NodeCache,
   NodeTask) cascades from NodeVersion; `analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions`
-  drops the old ones. Move/connect edits go through `analysis/views/views_json.py:NodeUpdate`.
+  drops the old ones. The stored `valid` is only recomputed when a save changes its inputs
+  (`AnalysisNode._validity_inputs_changed`) - code that joins a node up without `add_parent` (`add_child`,
+  copying edges in a clone) sets `node.valid = node.is_valid` itself. Move/connect edits go through `analysis/views/views_json.py:NodeUpdate`.
 - Scheduling is state-driven, not a prebuilt chain: `analysis/tasks/analysis_update_tasks.py:create_and_launch_analysis_tasks`
   (on `scheduling_single_worker`) calls `analysis/tasks/analysis_update_tasks.py:lease_ready_nodes`, which claims DIRTY
   nodes whose parents are all in `analysis/models/enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
