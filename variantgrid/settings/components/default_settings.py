@@ -466,6 +466,8 @@ PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
 # posted, so it can never override a client. The group names only the extraction, and reference_id is
 # unique per specimen rather than globally, so a match under two specimens parks as Needs attention
 PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
+# Dotted path to a str -> str function giving Specimen / Extraction reference_ids one canonical form
+PATIENT_SPECIMEN_REFERENCE_NORMALIZER = None
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False

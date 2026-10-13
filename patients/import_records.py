@@ -290,7 +290,7 @@ def process_record(patient_records, record_id, row):
     else:
         patient_deceased = None
 
-    specimen_reference_id = row[PatientColumns.SPECIMEN_REFERENCE_ID]
+    specimen_reference_id = Specimen.normalize_reference_id(row[PatientColumns.SPECIMEN_REFERENCE_ID])
     specimen_description = row[PatientColumns.SPECIMEN_DESCRIPTION]
     specimen_collected_by = row[PatientColumns.SPECIMEN_COLLECTED_BY]
     specimen_collection_date = parse_date(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
