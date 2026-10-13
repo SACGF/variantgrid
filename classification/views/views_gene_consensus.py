@@ -9,9 +9,9 @@ patches the empty fields as SubmissionSource.CONSENSUS.
 Entry points: gene_consensus_panel (the card, its dialog rows, and the apply POST), reached at
 classification_gene_consensus.
 """
-from dataclasses import dataclass
+from dataclasses import replace
 from datetime import date, datetime
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
@@ -28,21 +28,6 @@ from classification.models import (
 )
 from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
-
-
-@dataclass(frozen=True)
-class GeneContentValue:
-    """ One gene scope key: what this record has now, and what the candidate would bring """
-    label: str
-    current: Any
-    candidate: Any
-
-
-@dataclass(frozen=True)
-class GeneContentComparison:
-    """ A candidate row in the dialog - the group, and its content beside this record's own """
-    group: GeneConsensusGroup
-    values: list[GeneContentValue]
 
 
 def _as_date(value: Union[date, datetime]) -> date:
@@ -103,7 +88,7 @@ def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpRe
         "record_count": sum(group.record_count for group in groups),
     }
     if request.GET.get("rows"):
-        context["comparisons"] = _comparisons(classification, groups, allele_origin_bucket)
+        context["groups"] = _with_current_values(classification, groups)
         return render(request, 'classification/gene_consensus_rows.html', context)
 
     # The box only takes space while it is useful - once gene content has been copied in it collapses to a
@@ -116,24 +101,17 @@ def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpRe
     return render(request, 'classification/gene_consensus_card.html', context)
 
 
-def _comparisons(classification: Classification, groups: list[GeneConsensusGroup],
-                 allele_origin_bucket: Optional[AlleleOriginBucket]) -> list[GeneContentComparison]:
-    """ What each candidate would bring, beside what the record already has - only the empty ones are filled """
+def _with_current_values(classification: Classification, groups: list[GeneConsensusGroup]) -> list[GeneConsensusGroup]:
+    """ The same rows the create page shows, each value beside what this record already has - only the empty
+        ones are filled """
     e_keys = EvidenceKeyMap.cached()
-    gene_scope_keys = ClassificationConsensus.gene_scope_keys(allele_origin_bucket)
-    comparisons = []
-    for group in groups:
-        evidence = group.representative.published_evidence or {}
-        values = []
-        for key in gene_scope_keys:
-            candidate = (evidence.get(key) or {}).get("value")
-            if candidate is None or candidate == "" or candidate == []:
-                continue
-            values.append(GeneContentValue(label=e_keys.get(key).pretty_label,
-                                           current=classification.get(key),
-                                           candidate=candidate))
-        comparisons.append(GeneContentComparison(group=group, values=values))
-    return comparisons
+
+    def current(key: str):
+        value = classification.get(key)
+        return e_keys.get(key).pretty_value(value) if value is not None else None
+
+    return [replace(group, content=[replace(value, current=current(value.key)) for value in group.content])
+            for group in groups]
 
 
 def _apply_gene_consensus(request: HttpRequest, classification: Classification) -> HttpResponseBase:

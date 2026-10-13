@@ -346,11 +346,13 @@
                                 </label>
                             </div>
                             {% for group in option.gene_groups %}
-                                <div class="my-2 border-top pt-2">
-                                    <label class="form-check-label">
+                                <div class="my-2 border-top pt-2 d-flex align-items-start">
+                                    <label class="form-check-label pt-1">
                                         <input class='mr-2' type="radio" name="copy_gene_from_vcm_id" value="{{ group.representative.pk }}" />
                                     </label>
-                                    {% include "classification/tags/gene_consensus_group.html" %}
+                                    <div class="flex-grow-1">
+                                        {% include "classification/tags/gene_consensus_group.html" %}
+                                    </div>
                                 </div>
                             {% endfor %}
                         </div>

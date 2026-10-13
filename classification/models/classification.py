@@ -17,7 +17,7 @@ import re
 import uuid
 from collections import Counter, defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
@@ -2811,6 +2811,17 @@ BUCKET_ALLELE_ORIGIN = {  # what the allele_origin evidence key is seeded with p
 
 
 @dataclass(frozen=True)
+class GeneContentValue:
+    """ One gene scope key's content on a candidate - the thing a gene row is chosen for. `current` is what the
+        record being filled already holds, set only where there is one (the form's Gene Content dialog) """
+    key: str
+    label: str
+    value: Any
+    note: Optional[str] = None
+    current: Any = None
+
+
+@dataclass(frozen=True)
 class GeneConsensusGroup:
     """
     Classifications in a gene whose gene level content is identical - they were copied from each other, so
@@ -2819,6 +2830,8 @@ class GeneConsensusGroup:
     """
     representative: ClassificationModification
     others: list[ClassificationModification]
+    content: list[GeneContentValue]
+    differs_in: list[str] = field(default_factory=list)  # labels of the fields that differ from the first group
 
     @property
     def other_count(self) -> int:
@@ -2827,6 +2840,20 @@ class GeneConsensusGroup:
     @property
     def record_count(self) -> int:
         return len(self.others) + 1
+
+    @property
+    def records(self) -> list[ClassificationModification]:
+        return [self.representative, *self.others]
+
+    @cached_property
+    def conditions(self) -> list[ConditionResolved]:
+        """ The distinct conditions this gene content has been used for, most used first - the tumour type
+            spread is usually what decides whether a row applies to the case in hand """
+        counts: Counter[ConditionResolved] = Counter()
+        for modification in self.records:
+            if condition := modification.condition_resolution_obj_fallback:
+                counts[condition] += 1
+        return [condition for condition, _ in counts.most_common()]
 
 
 @dataclass
@@ -2908,7 +2935,8 @@ class ClassificationConsensus:
                               limit: int = GENE_CONSENSUS_GROUP_LIMIT) -> list[GeneConsensusGroup]:
         """
         The gene level content available to copy in a gene, one row per distinct set of values - most records
-        in a gene carry the same content because they were copied from each other. Newest representative first.
+        in a gene carry the same content because they were copied from each other. The most used content first,
+        then newest; each later row names the fields in which it differs from the first (`differs_in`).
 
         AMP tiering and therapy content are gene *and* tumour type, so this only ever lists: which row applies
         to the case in hand is the curator's call.
@@ -2932,12 +2960,43 @@ class ClassificationConsensus:
             if content := ClassificationConsensus._gene_content(cm, gene_scope_keys):
                 by_content[content].append(cm)
 
+        e_keys = EvidenceKeyMap.cached()
         groups = []
         for members in by_content.values():
             members.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
-            groups.append(GeneConsensusGroup(representative=members[0], others=members[1:]))
-        groups.sort(key=lambda group: group.representative.curated_date_check, reverse=True)
-        return groups[:limit]
+            groups.append(GeneConsensusGroup(
+                representative=members[0], others=members[1:],
+                content=ClassificationConsensus._gene_content_values(members[0], gene_scope_keys, e_keys)))
+        # The widest used content first - a gene's summary gets re-worded over time, and the many near copies
+        # of it are told apart by what differs from the first row, not by reading each one
+        groups.sort(key=lambda group: (group.record_count, group.representative.curated_date_check), reverse=True)
+        groups = groups[:limit]
+        if len(groups) > 1:
+            first = {value.key: (value.value, value.note) for value in groups[0].content}
+            labels = {value.key: value.label for group in groups for value in group.content}
+            for index, group in enumerate(groups[1:], start=1):
+                this = {value.key: (value.value, value.note) for value in group.content}
+                differing = [key for key in gene_scope_keys if first.get(key) != this.get(key)]
+                groups[index] = replace(group, differs_in=[labels[key] for key in differing])
+        return groups
+
+    @staticmethod
+    def _gene_content_values(modification: ClassificationModification, gene_scope_keys: list[str],
+                             e_keys: EvidenceKeyMap) -> list[GeneContentValue]:
+        """ The gene level content of a record as the row shows it - labelled, options resolved to their labels """
+        evidence = modification.published_evidence or {}
+        values = []
+        for key in gene_scope_keys:
+            blob = evidence.get(key)
+            if blob is None:
+                continue
+            e_key = e_keys.get(key)
+            value = e_key.pretty_value(blob)
+            note = blob.get('note') or None
+            if value in (None, '', []) and not note:
+                continue
+            values.append(GeneContentValue(key=key, label=e_key.pretty_label, value=value, note=note))
+        return values
 
     @property
     def allele_origin_bucket(self) -> Optional[AlleleOriginBucket]:

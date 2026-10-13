@@ -1,18 +1,55 @@
 {% load classification_tags %}
-{# One deduplicated gene content row - the representative, and the spread of tumour types the same #}
-{# content has been used for, which is usually what decides whether it applies to the case in hand. #}
+{% load js_tags %}
+{# One deduplicated gene content row, shared by the create page, the Classify & Report dialog and the form's #}
+{# Gene Content dialog. The content being chosen comes first, then the spread of tumour types it has been   #}
+{# used for (usually what decides whether it applies), and the records it came from last. `compare` adds   #}
+{# the "This record" column, for the dialog on an existing record (GeneContentValue.current).              #}
 <div class="gene-consensus-group">
-    {% classification_quick group.representative show_condition=True %}
-    {% if group.other_count %}
-        <div>
-            <a class="toggle-link collapsed" data-toggle="collapse" href="#gene-group-{{ group.representative.pk }}">
-                and {{ group.other_count }} other record{{ group.other_count|pluralize }} with the same gene content
-            </a>
-            <div class="collapse pl-3" id="gene-group-{{ group.representative.pk }}">
-                {% for other in group.others %}
-                    <div class="small">{% classification_quick other show_condition=True %}</div>
-                {% endfor %}
-            </div>
-        </div>
+    <table class="table table-sm gene-content mb-1">
+        {% if compare %}
+        <thead>
+            <tr>
+                <th></th>
+                <th>This record</th>
+                <th>{{ group.representative.classification.lab }}</th>
+            </tr>
+        </thead>
+        {% endif %}
+        <tbody>
+        {% for value in group.content %}
+            <tr>
+                <th class="gene-content-label">{{ value.label }}</th>
+                {% if compare %}
+                    <td>{% if value.current %}<div class="gene-content-text clamp">{{ value.current }}</div>{% else %}<span class="no-value">-</span>{% endif %}</td>
+                {% endif %}
+                <td>
+                    {% if value.value %}
+                        <div class="gene-content-text{% if value.value|length > 300 %} clamp{% endif %}">{{ value.value }}</div>
+                        {% if value.value|length > 300 %}<a class="hover-link small" href="javascript:void(0)" data-toggle="clamp">show more</a>{% endif %}
+                    {% endif %}
+                    {% if value.note %}<div class="gene-content-text text-secondary small">{{ value.note }}</div>{% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if group.differs_in %}
+        <div class="small text-muted">Differs from the first row in: {{ group.differs_in|join:", " }}</div>
     {% endif %}
+    <div class="gene-content-conditions">
+        {% for condition in group.conditions %}
+            <span class="badge badge-light border font-weight-normal mr-1 mb-1">{% condition condition limit=60 show_link=False %}</span>
+        {% endfor %}
+    </div>
+    <div class="small text-muted gene-content-provenance">
+        {{ group.representative.classification.lab }}
+        &middot; curated {% timestamp group.representative.curated_date_check.value time_ago=True tooltip=group.representative.curated_date_check.name %}
+        &middot; <a class="hover-link" href="{% url 'view_classification' group.representative.classification_id %}">{{ group.representative.cr_lab_id }}</a>
+        {% if group.other_count %}
+            &middot; <a class="toggle-link collapsed" data-toggle="collapse" href="#gene-group-{{ group.representative.pk }}">and {{ group.other_count }} other record{{ group.other_count|pluralize }} with the same gene content</a>
+            <span class="collapse" id="gene-group-{{ group.representative.pk }}">
+                {% for other in group.others %}<a class="hover-link mr-2" href="{% url 'view_classification' other.classification_id %}">{{ other.cr_lab_id }}</a>{% endfor %}
+            </span>
+        {% endif %}
+    </div>
 </div>
