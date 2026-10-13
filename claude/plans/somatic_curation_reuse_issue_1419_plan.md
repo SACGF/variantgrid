@@ -203,13 +203,19 @@ them all is noise. Group the candidates by the values of their `GENE`-scope keys
 after the `copy_allele_origin` filter, so two records that differ only in a variant-level field are the
 same group). Each group is one row:
 
-- **Representative** — the most recently curated record in the group. The row shows its curated date,
-  clinical significance / tier, condition and lab, which is enough to judge tumour-type relevance.
-- **"and N other records"** — a disclosure on the row. Expanded, it lists the rest of the group as one
-  overview line each (tier, condition, date, lab), so the curator can see the spread of tumour types this
-  gene content has been used for. That spread is often the deciding information.
+- **Content first** — the row body is the `GENE`-scope values themselves, labelled, long text clamped with
+  a "show more" (`GeneConsensusGroup.content`, `GeneContentValue`). That is what is being chosen, and it is
+  small: a few fields, often only the gene summary.
+- **Disease second** — the distinct conditions across the whole group as chips, most used first
+  (`GeneConsensusGroup.conditions`). The spread of tumour types is usually the deciding information, so it
+  is on the row rather than behind a disclosure.
+- **Records last** — one provenance line: lab, the representative's curated date (the most recently
+  curated record in the group) and a link to it, and "and N other records" as a disclosure of links. No
+  tier badge: the classification of the record it came from is the least important thing on the row.
 
-Groups are ordered by the representative's curated date, newest first, capped at ten groups. Whichever
+Groups are ordered by record count then curated date, capped at ten groups. A gene summary gets re-worded
+over time, so most groups are near copies of the biggest one; each later row says which fields differ
+from the first (`GeneConsensusGroup.differs_in`) rather than making the curator read ten summaries. Whichever
 record is picked, only its `GENE`-scope keys travel (`copy_scopes=COPY_SCOPES_GENE`). A record whose
 gene-scope keys are all empty is not a candidate — a row with nothing to copy is noise.
 
@@ -217,7 +223,9 @@ gene-scope keys are all empty is not a candidate — a row with nothing to copy 
 
 **1. Create-from-variant page** (`classification/views/views.py:CreateClassificationForVariantView`, the
 primary place). A second radio group, "Gene information from", under "Copy values from", with the
-deduplicated rows above and "none" selected. It posts `copy_gene_from_vcm_id`. The autofill preview labels
+deduplicated rows above (one shared template,
+`classification/templates/classification/tags/gene_consensus_group.html`, used by all three surfaces) and
+"none" selected. It posts `copy_gene_from_vcm_id`. The autofill preview labels
 each key's source as annotation, allele copy (`copy from latest`) or gene copy (`copy from gene`);
 `used_keys` ordering in `AutopopulateView` gives autopopulate over allele over gene.
 
@@ -235,8 +243,8 @@ the same button. Both surfaces call `ClassificationConsensus.gene_consensus_grou
 card in `classification/templates/classification/classification.html`, right column beside Criteria
 Summary). For the records the create page never sees: created from the Classify & Report tab with no
 candidate, created by API or import, or created before the gene was curated. The card reads "Gene content
-available from N classifications in *GENE*" and opens a dialog with the same deduplicated rows, each row
-also showing its `GENE`-scope values beside this record's current ones. Apply patches empty fields only,
+available from N classifications in *GENE*" and opens a dialog with the same deduplicated rows, the shared
+template with its "This record" column on (`GeneContentValue.current`). Apply patches empty fields only,
 as `SubmissionSource.CONSENSUS`, then reloads the form. Both card and dialog are AJAX-loaded, so the
 candidate query stays off the form's own page load.
 

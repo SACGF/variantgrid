@@ -3649,6 +3649,24 @@ table.overlap-summary .overlap-criteria {
   color: #444;
 }
 
+.gene-consensus-group table.gene-content th.gene-content-label {
+  width: 160px;
+  font-weight: normal;
+  color: #666;
+  white-space: nowrap;
+}
+.gene-consensus-group table.gene-content td {
+  white-space: pre-wrap;
+}
+.gene-consensus-group .gene-content-text.clamp {
+  max-height: 4.5em;
+  overflow: hidden;
+}
+.gene-consensus-group .gene-content-conditions .badge {
+  white-space: normal;
+  text-align: left;
+}
+
 /* Feature tips (see variantgrid/tips.py) - sits over a grid loading overlay or under a page
    heading, so it reads as a friendly aside rather than a warning */
 .tip-box {
