@@ -187,42 +187,21 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
 
     export_methods = cls.export_methods
     if categories:
+        def as_set(value) -> set:
+            if isinstance(value, (set, tuple, list)):
+                return set(value)
+            return {value}
+
         def passes_filter(export_method) -> bool:
-            nonlocal categories
-            # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
-            if not export_method.categories:
-                return True
-
-            decorated_values = export_method.categories or {}
-
-            # for every requirement of the export method
-            for key, value in decorated_values.items():
-                required_set: set
-                if isinstance(value, (set, tuple, list)):
-                    required_set = set(value)
-                else:
-                    required_set = {value}
-
-                if provided_value := categories.get(key):
-                    provided_set: set
-                    if isinstance(provided_value, (set, tuple, list)):
-                        provided_set = set(provided_value)
-                    else:
-                        provided_set = {provided_value}
-
-                    # if just one of the values in categories of the method
-                    # matches one of the values in the provided categories, the export is in
-                    # allows you to say categories={"tsv", "json"} on a method and then have
-                    # categories="tsv" pass that
-                    if not provided_set.intersection(required_set):
-                        return False
-
-                else:
-                    if False not in required_set:
-                        # can require something to be False, which passes it through if there
-                        # are no other values
-                        return False
-            # either there was no requirements, or they were all met
+            """
+            A column passes when, for each category it is tagged with that the export provides, at least one tagged
+            value is among the provided ones, e.g. a column tagged {"system": {"generic", "varseq"}} is in for
+            {"system": "varseq"}. Providing None or False for a category excludes the columns tagged True for it.
+            Categories the export doesn't provide don't restrict the column.
+            """
+            for key, required_value in (export_method.categories or {}).items():
+                if key in categories and not as_set(categories[key]).intersection(as_set(required_value)):
+                    return False
             return True
 
         export_methods = [em for em in export_methods if passes_filter(em)]

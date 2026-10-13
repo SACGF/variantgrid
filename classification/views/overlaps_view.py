@@ -442,11 +442,7 @@ def download_overlaps(request, lab_id: str):
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
     qs = qs.prefetch_related("overlapcontributionnextstep_set")
-    categories: dict
-    if solved_mode:
-        categories = {"solved": True}
-    else:
-        categories = {"outstanding": True}
+    categories = {"solved": solved_mode, "outstanding": not solved_mode}
 
     return OverlapDownloadRow.streaming_csv(
         data=qs.iterator(chunk_size=1000),
