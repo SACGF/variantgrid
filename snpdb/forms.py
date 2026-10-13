@@ -275,8 +275,8 @@ class OrganizationForm(forms.ModelForm, ROFormMixin):
 class VCFForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.VCF
-        fields = ['name', 'date', 'genome_build', 'user', 'project', 'import_status']
-        read_only = ('date', 'import_status')
+        fields = ['name', 'date', 'genome_build', 'user', 'project']
+        read_only = ('date',)
         widgets = {'name': TextInput(),
                    'user': ModelSelect2(url='user_autocomplete',
                                         attrs={'data-placeholder': 'User...'})}
@@ -377,9 +377,8 @@ class SampleForm(forms.ModelForm, ROFormMixin):
 
     class Meta:
         model = models.Sample
-        exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'uploaded_by', 'vcf_sample_name', 'import_status',
-                     'grid_sample_label') + EXTRACTION_MATCH_FIELDS
+        exclude = ['vcf', 'has_genotype', 'import_status']
+        read_only = ('genome_build', 'uploaded_by', 'vcf_sample_name', 'grid_sample_label') + EXTRACTION_MATCH_FIELDS
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
                    'extraction_reference': TextInput(),

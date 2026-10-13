@@ -60,6 +60,20 @@ class ImportStatus(models.TextChoices):
 
     DELETION_STATES = Constant([e[0] for e in (MARKED_FOR_DELETION, DELETING)])
 
+    @property
+    def icon_css(self) -> str:
+        """ Font Awesome classes for the status - the one place the icons are chosen, so the data grids,
+            the VCF / sample pages and the sequencing run page all agree (#2175) """
+        return {
+            ImportStatus.CREATED: "fas fa-spinner fa-spin text-warning",
+            ImportStatus.IMPORTING: "fas fa-spinner fa-spin text-warning",
+            ImportStatus.REQUIRES_USER_INPUT: "fas fa-exclamation-triangle text-warning",
+            ImportStatus.ERROR: "fas fa-times-circle text-danger",
+            ImportStatus.SUCCESS: "fas fa-check-circle text-success",
+            ImportStatus.MARKED_FOR_DELETION: "fas fa-trash-alt text-muted",
+            ImportStatus.DELETING: "fas fa-trash-alt text-muted",
+        }[self]
+
 
 class ProcessingStatus(models.TextChoices):
     CREATED = 'C', 'Created'
