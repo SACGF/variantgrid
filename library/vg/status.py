@@ -67,7 +67,7 @@ def gather_status() -> Status:
     _section(status, "db", _db)
     _section(status, "builds", _builds)
     _section(status, "services", _services)
-    _section(status, "queues", _queues)
+    _section(status, "queues", lambda: broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES]))
     _section(status, "annotation_runs", _annotation_runs)
     _section(status, "annotation_runs_abandoned", _annotation_runs_abandoned)
     _section(status, "manual_outstanding", _manual_outstanding)
@@ -120,16 +120,22 @@ def _services() -> dict[str, str]:
     return dict(zip(names, states)) if len(states) == len(names) else {"error": result.stderr.strip() or result.stdout.strip()}
 
 
-def _queues() -> dict[str, Any]:
-    """ Message and consumer counts per queue via a passive declare on the broker (no queue is created) """
+def broker_queue_depths(queue_names) -> dict[str, dict]:
+    """ Message and consumer counts per queue via a passive declare on the broker (no queue is created).
+        A broker that can't be reached reports its error against every queue, so callers render it
+        like any other per-queue failure. """
     queues = {}
-    with celery_app.connection_for_read() as connection_, connection_.channel() as channel:
-        for queue in settings.CELERY_TASK_QUEUES:
-            try:
-                declared = channel.queue_declare(queue=queue.name, passive=True)
-                queues[queue.name] = {"messages": declared.message_count, "consumers": declared.consumer_count}
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                queues[queue.name] = {"error": type(e).__name__}
+    try:
+        with celery_app.connection_for_read() as connection_, connection_.channel() as channel:
+            for queue_name in queue_names:
+                try:
+                    declared = channel.queue_declare(queue=queue_name, passive=True)
+                    queues[queue_name] = {"messages": declared.message_count, "consumers": declared.consumer_count}
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    queues[queue_name] = {"error": type(e).__name__}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        for queue_name in queue_names:
+            queues.setdefault(queue_name, {"error": type(e).__name__})
     return queues
 
 
