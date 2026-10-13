@@ -9,11 +9,8 @@
 </td>
 <td>
     {% if row.sample %}
-        {% if row.can_view_vcf %}
-            <a href="{% url 'view_vcf' row.sample.vcf.pk %}" title="VCF: {{ row.sample.vcf }}"><div class='vcf-icon icon24 run-vcf-icon'></div> {{ row.sample.vcf }}</a>
-        {% else %}
-            <div title="You don't have permission to view this VCF" class='vcf-icon icon24 run-vcf-icon'></div>
-        {% endif %}
+        {% include "seqauto/tags/vcf_status_icon.html" with vcf=row.sample.vcf can_view=row.can_view_vcf %}
+        {% if row.can_view_vcf %}<a href="{% url 'view_vcf' row.sample.vcf.pk %}">{{ row.sample.vcf }}</a>{% endif %}
     {% else %}
         -
     {% endif %}

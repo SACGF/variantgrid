@@ -840,9 +840,7 @@ TableFormat.importStatus = (data, type, row) => {
     if (!data) {
         return '';
     }
-    const dom = $('<span>', {title: data.label});
-    dom.append($('<i>', {class: data.icon_css}), ` ${data.label}`);
-    return dom.prop('outerHTML');
+    return $('<i>', {class: data.icon_css, title: data.label}).prop('outerHTML');
 };
 
 TableFormat.flags = (data, type, row) => {
