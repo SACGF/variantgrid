@@ -325,3 +325,12 @@ function renderColumnSummaryFilterChildLink(data, type, row, renderContext) {
         html: data
     }).prop('outerHTML');
 }
+
+
+// eventlog/grids.py:ApiRequestLogColumns - rows logged before #1413 have nothing recorded
+function renderApiRequestLogChanges(data, type, row) {
+    if (!data.recorded) {
+        return $('<span>', {class: 'no-value', text: '-'}).prop('outerHTML');
+    }
+    return $('<span>', {class: 'hover-detail', text: data.num_changes, title: data.summary}).prop('outerHTML');
+}

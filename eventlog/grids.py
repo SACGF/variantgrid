@@ -10,7 +10,7 @@ from eventlog.models import ApiRequestLog, Event
 from library.enums.log_level import LogLevel
 from library.guardian_utils import bot_group
 from library.utils import emoji_to_unicode
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class EventColumns(DatatableConfig[Event]):
@@ -79,9 +79,20 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             RichColumn('view_name', label='View', orderable=True),
             RichColumn('status_code', label='Status', orderable=True),
             RichColumn('duration_ms', label='ms', orderable=True),
+            RichColumn('num_changes', label='Changes', orderable=True, extra_columns=['changes'],
+                       renderer=self.render_changes, client_renderer='renderApiRequestLogChanges'),
             RichColumn('path', search=['path', 'request_body'], client_renderer='TableFormat.limit.bind(null, 75)'),
             RichColumn('id', visible=False)
         ]
+
+    @staticmethod
+    def render_changes(row: CellData) -> dict[str, Any]:
+        changes = row['changes']
+        return {
+            "recorded": bool(changes),
+            "num_changes": row['num_changes'],
+            "summary": ApiRequestLog.changes_summary(changes),
+        }
 
     def get_initial_queryset(self) -> QuerySet[ApiRequestLog]:
         if not self.user.is_superuser:
@@ -106,6 +117,8 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             qs = qs.filter(view_name=view_name)
         if self.get_query_json('errors_only'):
             qs = qs.filter(status_code__gte=400)
+        if self.get_query_json('wrote_data'):
+            qs = qs.filter(num_changes__gt=0)
         # __date is the local (TIME_ZONE) day, so a day picked on the page means that day as the user sees it
         if date_from := self._get_query_date('date_from'):
             qs = qs.filter(created__date__gte=date_from)
