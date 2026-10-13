@@ -88,7 +88,8 @@ class ManualMigrationOutstanding:
             outstanding = ManualMigrationOutstanding.outstanding_task(task)
             if outstanding:
                 outstandings.append(outstanding)
-        return outstandings
+        # In the order migrations registered them, so the upgrader's numbering is stable between runs
+        return sorted(outstandings, key=lambda o: o.outstanding_required[0].created)
 
     def to_json(self) -> dict[str, Any]:
         data: dict[str, Any] = {}

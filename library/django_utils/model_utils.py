@@ -3,6 +3,7 @@ Model-level helpers: ModelUtilsMixin (accept an instance or its pk), the ArrayLe
 functions, model_has_field, refresh_for_update (re-read a row under SELECT FOR UPDATE),
 get_model_content_type_dict, and AuditUtils.last_change_for (a field's latest value from django-auditlog).
 """
+import datetime
 import json
 from dataclasses import dataclass
 from typing import Callable, Generic, Optional, TypeVar, Union
@@ -85,7 +86,7 @@ class AuditSingleChange(Generic[T]):
         return self.log_entry.actor
 
     @property
-    def timestamp(self):
+    def timestamp(self) -> datetime:
         return self.log_entry.timestamp
 
 

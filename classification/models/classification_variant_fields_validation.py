@@ -39,7 +39,7 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
         )
 
         allele_origin = patch_meta.get(SpecialEKeys.ALLELE_ORIGIN, fallback_existing=True)
-        bucket = AlleleOriginBucket.bucket_for_allele_origin(allele_origin)
+        bucket = EvidenceKeyMap.allele_origin_bucket(allele_origin)
 
         if bucket == AlleleOriginBucket.GERMLINE:
             if not patch_meta.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):

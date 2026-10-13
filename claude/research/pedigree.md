@@ -71,15 +71,6 @@ uv venv under systemd (#1572). `variantgrid/deployment_validation/tool_version_c
 - **Export lives here but is used by snpdb**: `pedigree/ped/export_ped.py` writes the trio and unrelated PED files that
   `snpdb/models/models_somalier.py` passes to `somalier relate --ped`.
 
-## History
-
-- 2020-12 (#46): Somalier work added `SomalierPedigreeRelate`, which was never wired up (below).
-- 2026-03 (#1460, 879657742): pedigree grids moved from jqGrid to DataTables; a unit-testing pass fixed parser bugs
-  (the trio export wrote affection as 1/0 rather than PED's 2/1, so somalier read the
-  affected proband as unaffected; blank parent cells and lower-case sex now parse).
-- 2026-06 (#1572): `ped_parser` invoked through the interpreter.
-- 2026-09 (#183): somalier 0.3.5 support in snpdb; the pedigree subclass was not touched.
-
 ## Traps
 
 - **Changing a pedigree's cohort orphans its mappings.** `pedigree/views.py:view_pedigree` lets the form repoint `cohort`,

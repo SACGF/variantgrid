@@ -6,6 +6,8 @@ from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
 
 from classification.models import Overlap
+from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
+from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.services.overlaps_services import OverlapServices
 from library.django_utils.admin_utils import (
     GuardedModelAdminBasics,
@@ -188,7 +190,6 @@ class ClinVarKeyAdmin(ModelAdminBasics):
     inlines = (ClinVarKeyExcludePatternAdmin,)
 
     def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
-        from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
         for clinvar_key in queryset:
             ignore_util = ClinVarExcludePatternUtil(clinvar_key)
             test_results = ignore_util.run_all(apply=apply)
@@ -211,7 +212,6 @@ class ClinVarKeyAdmin(ModelAdminBasics):
 
     @admin_action("ClinVar Export Prepare")
     def prepare_clinvar(self, request, queryset):
-        from classification.models.clinvar_export_prepare import ClinvarExportPrepare
         report = ClinvarExportPrepare().update_export_records_for_keys(set(queryset.all()))
         if len(report) > 10:
             self.message_user(request, message="Showing first 10 messages", level=messages.INFO)

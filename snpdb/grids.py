@@ -5,7 +5,17 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Case, F, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, Value, When
+from django.db.models import (
+    Case,
+    F,
+    IntegerField,
+    OuterRef,
+    QuerySet,
+    StringAgg,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import TextField
 from django.db.models.query_utils import Q
@@ -15,14 +25,18 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.models import PATIENT_ONTOLOGY_TERM_PATH, AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
+from annotation.models import AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
+from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
 from patients.models_enums import GnomADPopulation, Sex
-from snpdb.grid_columns.custom_columns import get_variant_grid_columns, get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import (
+    get_variant_grid_columns,
+    get_variantgrid_extra_annotate,
+)
 from snpdb.models import (
     VCF,
     Allele,
@@ -49,13 +63,21 @@ from snpdb.models import (
     UserSettings,
     Variant,
     VariantAllele,
-    VariantsType,
+    VariantOrigin,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
-from uicore.templatetags.js_tags import jsonify_for_js
+from uicore.templatetags.js_tags import jsonify_pretty_for_html
 from variantgrid.perm_path import get_visible_url_names
+
+
+def render_import_status(cell: CellData) -> JsonDataType:
+    """ For TableFormat.importStatus - the icon and label of an ImportStatus column (@see ImportStatus.icon_css) """
+    if status := cell.value:
+        import_status = ImportStatus(status)
+        return {"icon_css": import_status.icon_css, "label": import_status.label}
+    return None
 
 
 def url_if_visible(url_name: str, **kwargs) -> Optional[str]:
@@ -81,7 +103,7 @@ class VCFListColumns(DatatableConfig[VCF]):
             RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key="data_archived_date", label="Archived", orderable=True, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True),
@@ -149,10 +171,10 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(VariantsType.choices)),
+                       client_renderer=RichColumn.choices_client_renderer(VariantOrigin.choices)),
             self.user_column("vcf__user", label="Uploaded by"),
             RichColumn(key="vcf__source", label="VCF source", orderable=True),
             RichColumn(key="vcf__name", label="VCF Name", orderable=True, extra_columns=["vcf__id"],
@@ -362,7 +384,7 @@ class CohortListColumns(DatatableConfig[Cohort]):
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='import_status', label='Status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             self.user_column(label='User'),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -454,7 +476,7 @@ class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='import_status', label='Status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key='genome_build__name', label='Genome Build', orderable=True),
             self.user_column(label='Uploaded by'),
             RichColumn(key='id', name='delete', label='', orderable=False,
@@ -878,7 +900,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 return "Swapped Ref/Alt due to SWAP=1"
         if js is None:
             return "-"
-        return jsonify_for_js(js, pretty=True)
+        return jsonify_pretty_for_html(js)
 
     def render_error_json(self, row: dict[str, Any]) -> JsonDataType:
         if js := row["error"]:
@@ -886,7 +908,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 return js.get("message")
         if js is None:
             return "-"
-        return jsonify_for_js(js, pretty=True)
+        return jsonify_pretty_for_html(js)
 
 
 class LiftoverRunAlleleLiftoverColumns(AbstractAlleleLiftoverColumns):
@@ -938,16 +960,10 @@ class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryColl
             RichColumn('id', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
             self.user_column(),
-            RichColumn('import_status', orderable=True, renderer=self._render_import_status),
+            RichColumn('import_status', orderable=True, renderer=render_import_status,
+                       client_renderer='TableFormat.importStatus'),
             RichColumn('genome_build', orderable=True),
         ]
-
-    def _render_import_status(self, row: dict[str, Any]) -> JsonDataType:
-        label = ""
-        if status := row['import_status']:
-            import_status = ImportStatus(status)
-            label = import_status.label
-        return label
 
     def get_initial_queryset(self) -> QuerySet[ManualVariantEntryCollection]:
         qs = ManualVariantEntryCollection.objects.all()

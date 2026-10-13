@@ -11,6 +11,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import link_combined_variant_outputs
+from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     SampleFromSequencingSample,
@@ -220,6 +221,23 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertEqual(1, Patient.objects.filter(patient_code="C0000001").count())
         self.assertEqual(2, Extraction.objects.filter(specimen=first.specimen).count())
 
+    @override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
+    def test_joins_a_chain_another_system_wrote_in_its_own_form(self):
+        """ The LIMS accessioned the specimen as '26-000-00001'; DRAGEN writes '2600000001' """
+        patient = Patient.objects.create(patient_code="C0000001")
+        assign_permission_to_user_and_groups(self.user, patient)
+        specimen = Specimen.objects.create(patient=patient, reference_id="26-000-00001")
+        dna = Extraction.objects.create(specimen=specimen, reference_id="26-000-00001C",
+                                        nucleic_acid_source=None)
+
+        resolved = resolve_pair(parse_pair_identifiers(self.analysis_details), self.user)
+        self.assertEqual(specimen, resolved.specimen)
+        self.assertEqual(dna, resolved.extractions[self.identifiers.dna.sample_id])
+        dna.refresh_from_db()
+        self.assertEqual(NucleicAcid.DNA, dna.nucleic_acid_source, "The file names the arm the LIMS didn't")
+        self.assertEqual({"26-000-00001B", "26-000-00001C"},
+                         set(specimen.extraction_set.values_list("reference_id", flat=True)))
+
     def test_specimen_held_by_another_patient_is_not_taken_over(self):
         other = Patient.objects.create(patient_code="C0009999")
         assign_permission_to_user_and_groups(self.user, other)
@@ -243,6 +261,27 @@ class TestCombinedVariantOutputRecords(TestCase):
             sample.refresh_from_db()
             self.assertEqual(resolved.extractions[sample_id], sample.extraction)
             self.assertEqual(MatchStatus.MATCHED, sample.extraction_match_status)
+
+    def test_patient_the_arm_samples_are_linked_to_takes_the_code(self):
+        """ The sheet's order number linked the samples to their patient before it had a code -
+            that patient is the pair's, rather than a stub made beside it """
+        patient = Patient.objects.create(last_name="Linked")
+        sample = self._make_sample(self.identifiers.dna.sample_id)
+        sample.patient = patient
+        sample.save()
+        resolved = resolve_pair(self.identifiers, self.user)
+        self.assertEqual(patient, resolved.patient)
+        patient.refresh_from_db()
+        self.assertEqual("C0000001", patient.patient_code)
+
+    def test_arm_samples_patient_with_another_code_is_not_taken(self):
+        patient = Patient.objects.create(patient_code="C0009999")
+        sample = self._make_sample(self.identifiers.dna.sample_id)
+        sample.patient = patient
+        sample.save()
+        resolved = resolve_pair(self.identifiers, self.user)
+        self.assertNotEqual(patient, resolved.patient)
+        self.assertEqual("C0000001", resolved.patient.patient_code)
 
     def _write(self, sequencing_run_name="TSO500_CVO", sequencing_run=None, resolve=True):
         resolved = resolve_pair(self.identifiers, self.user) if resolve else None

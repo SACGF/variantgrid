@@ -58,7 +58,7 @@ class ExtractionSampleTestCase(TestCase):
         cls.sample, cls.cgc = cls._create_vcf_sample("small_variants", cls.grch37)
         cls.other_build_sample, _ = cls._create_vcf_sample("other_build", cls.grch38)
 
-        code_version = SampleStatsCodeVersion.objects.create(name="test", version=1, code_git_hash="abc")
+        code_version = SampleStatsCodeVersion.objects.create(name="test", version=1)
         CohortGenotypeStats.objects.create(cohort_genotype_collection=cls.cgc, sample=cls.sample,
                                            passing_filter=False, code_version=code_version,
                                            variant_count=93)

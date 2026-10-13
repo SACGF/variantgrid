@@ -34,8 +34,9 @@ Reading the log: `email_manager/views/email_manager_views.py:email_manager_view`
 `EmailColumns` raises `PermissionDenied` for non-superusers, searches subject and recipients in `power_search`, sorts
 newest first and expands each row through `email_detail` (`DatatableConfig._row_expand_ajax`). `email_detail` splits
 `recipient_list` back into addresses, matches them to `User.email` and lists the unrecognised remainder; `email_pure` renders
-only the body. Both detail templates put the stored HTML in a sandboxed `<iframe srcdoc>` rather than inlining it
-(`email_manager/templates/email_detail.html`, `email_manager/templates/email_pure.html`). `EmailLog` is a
+only the body. Both are superuser-only, since a notification can carry another lab's details, and both templates put
+the stored HTML in a sandboxed `<iframe srcdoc>` rather than inlining it (#1521,
+`email_manager/templates/email_detail.html`, `email_manager/templates/email_pure.html`). `EmailLog` is a
 `library/preview_request.py:PreviewModelMixin`, so the nightly health check can hover-preview each email:
 `eventlog/signals/active_users_health_check.py:email_health_check` counts the window's rows and lists subjects, collapsing to a
 count once there are more than ten distinct subjects so Slack is not flooded.
@@ -49,14 +50,6 @@ record of what it would have sent, which is how notification templates are check
 sending is the default because most traffic is discordance and lab notifications where the recipient list is itself
 sensitive; batch mode is opt-in and used only for admin broadcasts. The admin `email_manager/admin.py:EmailLogAdmin` denies
 add, change and delete so the log stays an audit trail.
-
-## History
-
-The app began as the discordance-notification sender ("Switching over discordance notifications to new framework") and
-gained its admin, ID column and the "pure" view as people needed to inspect rendered HTML. The detail and pure views were
-moved into a sandboxed iframe (#1521) and then restricted to superusers ("Require super_user to view content of automated
-emails"), closing the hole where any logged-in user could read another lab's notifications. `mme/apps.py:MMEConfig.ready`
-was added with MatchMaker Exchange, when a silent no-op send became a compliance problem rather than a convenience.
 
 ## Traps
 

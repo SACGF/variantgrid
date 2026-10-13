@@ -1,6 +1,7 @@
 const endpointColor = "#121212";
 const ACTIVE_CLASS = "node-selected";
 const DELETING_CLASS = "node-deleting";  // fade out transition, see analysis_nodes.css
+const FLASH_CLASS = "node-flash";  // new node arrival animation, see analysis_nodes.css
 const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
 const NODE_COUNT_TOTAL = "T";  // snpdb.models.models_enums.BuiltInFilters.TOTAL
 const SHOW_NODE_IDS_IN_TOOLTIPS = true;
@@ -382,19 +383,22 @@ function addNewNodeToPage(data) {
 	return newNode;
 }
 
+// The endpoints flash along with the card via a CSS class, never by hiding them: a hidden endpoint
+// drops out of jsPlumb's redraw, so dragging the node mid-flash left them behind at the spawn
+// position (#2177). jsPlumb rewrites the endpoint canvas style attribute on every paint, so an
+// inline opacity animation would not survive a drag either.
 function addNewNodeAndFlash(data) {
 	const newNode = addNewNodeToPage(data);
-	const endPoints = jsPlumbInstance.getEndpoints(newNode[0]);
-	const endpointVis = function (visible) {
-		$.each(endPoints, function () {
-			this.setVisible(visible);
-		});
-	};
-	endpointVis(false);
-
 	bringNodeToFront(newNode);
-	$(newNode).fadeOut(500).fadeIn(500, function() {
-		endpointVis(true);
+
+	let flashingElements = newNode.get();
+	$.each(jsPlumbInstance.getEndpoints(newNode[0]) || [], function(_, endpoint) {
+		flashingElements = flashingElements.concat(getJsPlumbElements(endpoint));
+	});
+	$(flashingElements).addClass(FLASH_CLASS).on("animationend", function(e) {
+		if (e.originalEvent.animationName === FLASH_CLASS) {  // not a child's own animation bubbling up
+			$(this).removeClass(FLASH_CLASS).off(e);
+		}
 	});
 }
 
@@ -790,39 +794,41 @@ function setupConnections(nodes_selector, readOnly) {
 
 	const orientation = getNodeOrientation();
 
+	// Every endpoint has a uuid so that running this again on a node (an appearance refresh) finds
+	// the existing one instead of stacking another on top of it
+	const addEndpointOnce = function(el, uuid, anchor, params) {
+		if (jsPlumbInstance.getEndpoint(uuid)) {
+			return null;
+		}
+		return jsPlumbInstance.addEndpoint(el, {anchor: anchor, uuid: uuid}, params);
+	};
+
 	nodes_selector.each(function() {
 		// Nodes without endpoints still need to be managed, so they can be dragged
 		jsPlumbInstance.manage(this);
 
-		const uuid = "input-endpoint-" + $(this).attr("node_id");
-		const existingEndpoint = jsPlumbInstance.getEndpoint(uuid);
+		const nodeId = $(this).attr("node_id");
+		const uuid = "input-endpoint-" + nodeId;
 
 		if ($(this).attr("input_endpoint") == "true") {
 			if ($(this).hasClass("VennNode")) {
-				const inputLeft = uuid + "-left";
-				const inputRight = uuid + "-right";
-				jsPlumbInstance.addEndpoint(this, { anchor: orientation.vennInputs[0], uuid: inputLeft}, inputEndpoint);
-				jsPlumbInstance.addEndpoint(this, { anchor: orientation.vennInputs[1], uuid: inputRight}, inputEndpoint);
-            } else if ($(this).hasClass("MergeNode")) {
+				addEndpointOnce(this, uuid + "-left", orientation.vennInputs[0], inputEndpoint);
+				addEndpointOnce(this, uuid + "-right", orientation.vennInputs[1], inputEndpoint);
+			} else if ($(this).hasClass("MergeNode")) {
 				const commonInputEndpoint = $.extend({}, inputEndpoint);
 				commonInputEndpoint["endpoint"] = {type: "Dot", options: {radius: 18}};
-                commonInputEndpoint["maxConnections"] = -1;
-                jsPlumbInstance.addEndpoint(this, { anchor: orientation.input, uuid: uuid}, commonInputEndpoint);
+				commonInputEndpoint["maxConnections"] = -1;
+				addEndpointOnce(this, uuid, orientation.input, commonInputEndpoint);
 			} else {
-			    // Keep existing, so we don't
-			    if (!existingEndpoint) {
-				    jsPlumbInstance.addEndpoint(this, { anchor: orientation.input, uuid: uuid}, inputEndpoint);
-				}
+				addEndpointOnce(this, uuid, orientation.input, inputEndpoint);
 			}
-		} else {
-            if (existingEndpoint) {
-                jsPlumbInstance.deleteEndpoint(uuid);
-            }
+		} else if (jsPlumbInstance.getEndpoint(uuid)) {
+			jsPlumbInstance.deleteEndpoint(uuid);
 		}
 
 		if ($(this).attr("output_endpoint") == "true") {
-			const e = jsPlumbInstance.addEndpoint(this, {anchor: orientation.output}, outputEndpoint);
-			if (!readOnly) {
+			const e = addEndpointOnce(this, "output-endpoint-" + nodeId, orientation.output, outputEndpoint);
+			if (e && !readOnly) {
 				add_click_overlay(e);
 			}
 		}
@@ -1110,7 +1116,7 @@ function changeAnalysisSettings(oldAnalysisSettings) {
     }
     
     if (requireReload) {
-        reloadNodes();
+        reloadNodes(ANALYSIS_ID);
     }        
 }
 

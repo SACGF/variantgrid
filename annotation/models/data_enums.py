@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Optional, Union
+
 from dataclasses_json import DataClassJsonMixin
 from django.db.models import TextChoices
 
@@ -39,16 +40,10 @@ class EffectiveDate(DataClassJsonMixin):
 
     @staticmethod
     def from_datetime(value: Union[datetime, date], date_type: EffectiveDateType = EffectiveDateType.UNKNOWN):
-        date_str: Optional[str] = None
-        value_date: Optional[date]
-        if isinstance(value, date):
-            value_date = value
-        elif isinstance(value, datetime):
-            value_date = datetime.date()
-        else:
+        # datetime is a subclass of date
+        if not isinstance(value, date):
             raise ValueError(f"Not datetime or date {value}")
-        if value_date:
-            date_str = f"{value_date.year:04}-{value_date.month:02}-{value_date.day:02}"
+        date_str = f"{value.year:04}-{value.month:02}-{value.day:02}"
         return EffectiveDate(date=date_str, date_type=date_type)
 
     @staticmethod

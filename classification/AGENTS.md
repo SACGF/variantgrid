@@ -10,7 +10,7 @@ Start with:
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
 Patterns here:
 - Evidence is JSON keyed by EvidenceKey.key; each value is a blob of value/note/explain/db_refs/validation
-  (models/evidence_mixin.py:VCBlobDict). Read it with models/evidence_mixin.py:EvidenceMixin.get and name keys via
+  (models/evidence_key.py:VCBlobDict). Read it with models/evidence_mixin.py:EvidenceMixin.get and name keys via
   enums/classification_enums.py:SpecialEKeys rather than string literals.
 - Change evidence only through models/classification.py:Classification.patch_value (or Classification.create_with_response /
   models/classification_inserter.py:BulkClassificationInserter.insert): it validates, honours per-field immutability by
@@ -38,8 +38,8 @@ Patterns here:
   services/overlap_calculator.py onto the enums/classification_enums.py:OverlapStatus ladder
   (enums/classification_enums.py:OverlapStatus.is_discordant is the threshold), and only records at a
   ShareLevel.is_discordant_level (logged_in_users, public) count.
-- ClinicalContext, DiscordanceStatus and DiscordanceReport are the previous generation: still rendered for existing rows
-  and still behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
+- ClinicalContext, DiscordanceStatus and DiscordanceReport are a legacy path: rendered for existing rows
+  and behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
   Bucketing on that legacy path comes from the
   "bucket" attribute on the clinical_significance EvidenceKey options
   (models/evidence_key.py:EvidenceKeyMap.clinical_significance_to_bucket), not from the ClinicalSignificance enum.
@@ -109,11 +109,12 @@ Gotchas:
   & Report dialog from Tag.allele_origin_bucket, the in-form box from the record's own bucket. External labs' records are
   shown for context with no copy control - their evidence was assembled under a config reviewed elsewhere.
 - Gene level candidates come from models/classification.py:ClassificationConsensus.gene_consensus_groups - one row per
-  distinct set of GENE-scope values, newest representative first, capped at ten. Most records in a gene carry identical gene
-  content because they were copied from each other. The pick is always a human's: AMP tiering and therapy content are gene
-  *and* tumour type, so the row's "and N other records" spread is the deciding information, not something to automate.
+  distinct set of GENE-scope values, most used first then newest, capped at ten, each later row naming the fields it
+  differs from the first in. Most records in a gene carry identical gene content because they were copied from each
+  other. The pick is always a human's: AMP tiering and therapy content are gene *and* tumour type, so the row leads with
+  the content and the spread of conditions it was used for (`GeneConsensusGroup.conditions`), not the record's tier.
   The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
-  views/views_gene_consensus.py) all call that one function.
+  views/views_gene_consensus.py) all call that one function and render templates/classification/tags/gene_consensus_group.html.
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.
@@ -150,7 +151,7 @@ Gotchas:
 - What kind of event the case report prints a record as comes off its gene-level alt
   (`classification/report/case_report_context.py:_kind_and_alteration`) - a fusion, a copy number call or a splice
   junction. A SpliceGirl VCF imports as gene-level splice junctions (`upload/tasks/import_splicegirl_vcf_task.py`);
-  the coordinate `<DEL>`s it made before #1903 still read as small variants - the kind is the alt's, not the caller's.
+  SpliceGirl junctions stored as coordinate `<DEL>`s read as small variants - the kind is the alt's, not the caller's.
   The printed name of the event ("MET exon 14 skipping") is the `splice_label` evidence
   key, autopopulated from the junction's label through `genes/gene_splice.py:display_splice_label` - the panel's own
   wording where a `genes/models/models_splice_event.py:SpliceEvent` names it, and the breakpoints written out
@@ -158,8 +159,8 @@ Gotchas:
 - A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
   runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
   before any HGVS conversion. A gene-level value keeps its spaces - `tidy_hgvs_whitespace` strips them from an HGVS
-  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; records imported before
-  that hold `EGFRamplification`, which `gene_level_strings_respace` puts right. What takes that path is the *shape* of the
+  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; a stored record holding
+  `EGFRamplification` is put right by `gene_level_strings_respace`. What takes that path is the *shape* of the
   value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
   gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
   HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
@@ -191,9 +192,10 @@ Gotchas:
   where the flag means "did the caller's library QC pass for that category" - the Amplifications / Variants / Fusions
   flags. Its `tick_when` rules are `{"passed": true|false}` and `{"completed": false}` against the category's
   `seqauto/models/models_seqauto.py:LibraryQC` row (`classification/models/classification_report_models.py:library_qc_tick`;
-  `tick_for` picks which of the two a field is judged by), the newest run per category winning
-  (`report/case_report_context.py:specimen_library_qc`, which reads the specimen's rows directly - a `LibraryQC` is
-  keyed on the run and the pair, and claims the specimen rather than either extraction). The form lists the category's
+  `tick_for` picks which of the two a field is judged by) - `report/case_report_context.py:case_library_qc` takes the
+  rows of the pair the case's analysis came off, so a patient case has them too, and without an analysis the specimen's,
+  the newest run per category winning (a `LibraryQC` is keyed on the run and the pair, and claims the specimen rather
+  than either extraction). The form lists the category's
   metrics against the guidelines DRAGEN's own file quotes, `settings.TSO500_LIBRARY_QC_GUIDELINES` overriding one
   where the lab's own number differs.
 - report/__init__.py stays empty on purpose: models/classification_report_models.py imports report/template_validation.py
@@ -206,5 +208,5 @@ Tests:
 - tests/utils/test_urls.py is this app's URLTestCase (create_fake_variants, then admin / owner / non-owner passes with 403 checks);
   tests/views/test_query_scaling.py asserts the classification datatable query count stays flat as rows grow.
 - URLTestCase already sets CELERY_TASK_ALWAYS_EAGER and LIFTOVER_CLASSIFICATIONS=False, so import tests run inline without liftover.
-- tests/utils/data_utils.py:ConditionMock is stale by its own docstring (the ontology mock no longer builds); mock ontology lookups instead.
+- tests/utils/data_utils.py:ConditionMock is stale by its own docstring (the ontology mock doesn't build); mock ontology lookups instead.
 Deep reference: __classification_readme.md · __discordance_readme.md · claude/research/classifications.md · claude/maps/models.md#classification

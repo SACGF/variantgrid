@@ -2,7 +2,7 @@
 {% block create_analyses %}
 {% if trio.cohort.import_status == "S" %}
     <ul>
-        <li><a href="{% url 'create_karyomapping_analysis_for_trio' trio.pk %}">Create Karyomapping analysis for trio</a></li>
+        <li><a href="{% url 'trio_karyomapping' trio.pk %}">View gene karyomapping for this trio</a></li>
     </ul>
 
     {% load related_analyses_tags %}

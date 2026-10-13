@@ -111,12 +111,14 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.import_dragen_tso500_metrics_output_task.ImportDragenTSO500MetricsOutputTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
+    'upload.tasks.retry_upload_pipelines_task.retry_upload_pipeline_task': WEB_WORKERS,  # removes processing files
 
     # VariantID workers
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.UpdateVariantZygosityCountsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.reload_vcf_task': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.SomalierVCFTask': HEAVY_WORKERS,  # somalier ancestry is ~1GB RSS
+    'snpdb.tasks.somalier_tasks.somalier_patient_relate': HEAVY_WORKERS,  # where the .somalier files are made
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
@@ -128,6 +130,8 @@ CELERY_TASK_ROUTES = {
     # #2667: single-authority annotation dispatcher - all run leasing/merge serialises here
     'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
+    # Off db_workers, which are the ones an import OOM takes down
+    'upload.tasks.retry_upload_pipelines_task.fail_stuck_upload_pipelines_task': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.user_award_tasks.update_user_awards': SCHEDULING_SINGLE_WORKER,
     # Nightly all-vs-all relate rewrites every SomalierRelatePairs row - two runs must never overlap
@@ -187,6 +191,7 @@ CELERY_IMPORTS = (
     'upload.tasks.import_ped_task',
     'upload.tasks.import_variant_tags_task',
     'upload.tasks.import_wiki_task',
+    'upload.tasks.retry_upload_pipelines_task',
     'upload.tasks.vcf.genotype_vcf_tasks',
     'upload.tasks.vcf.import_sql_copy_task',
     'upload.tasks.vcf.import_vcf_step_task',

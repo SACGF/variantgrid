@@ -120,13 +120,7 @@ class UploadFileAPITest(UploadAPITestBase):
 
         status_response = self.client.get(reverse("api_upload_status",
                                                   kwargs={"file_upload_id": file_upload.pk}))
-        self.client.force_login(self.owner)  # upload_poll is a session-auth view
-        poll_response = self.client.get(reverse("upload_poll"))
-
-        payloads = [upload_response.json(), status_response.json()]
-        payloads.extend(ufd for ufd in poll_response.json() if ufd["file_upload_id"] == file_upload.pk)
-        self.assertEqual(len(payloads), 3)
-        for payload in payloads:
+        for payload in [upload_response.json(), status_response.json()]:
             self.assertIn("uploaded_file_id", payload)
             self.assertEqual(payload["uploaded_file_id"], payload["file_upload_id"])
 

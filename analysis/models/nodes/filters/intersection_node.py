@@ -1,5 +1,4 @@
 import operator
-import os
 import subprocess
 from functools import cached_property, reduce
 from io import TextIOWrapper
@@ -17,6 +16,7 @@ from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.variant_text import get_variant_text_summary, parse_region, resolve_variant_text
 from snpdb.models import GenomicIntervalsCollection, VariantCollection
+from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import Contig
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
@@ -77,6 +77,10 @@ class IntersectionNode(AnalysisNode):
         if self.genomic_intervals_collection:
             errors.extend(self._get_genome_build_errors("genomic_intervals_collection",
                                                         self.genomic_intervals_collection.genome_build))
+        if gic := self.valid_selected_genomic_intervals_collection():
+            gic.check_processed_file_exists()
+            if gic.import_status != ImportStatus.SUCCESS:
+                errors.append(f"{gic}: {gic.error_message or gic.get_import_status_display()}")
         return errors
 
     def _get_variants_q(self) -> Q:
@@ -199,10 +203,10 @@ class IntersectionNode(AnalysisNode):
 
     def write_cache(self, variant_collection: VariantCollection):
         if self.valid_selected_genomic_intervals_collection():
-            bed_file = self.genomic_intervals_collection.processed_file
-            if bed_file is None or not os.path.exists(bed_file):
-                msg = f"BED file: {bed_file} does not exist"
-                raise ValueError(msg)
+            gic = self.genomic_intervals_collection
+            if not gic.check_processed_file_exists():
+                raise ValueError(gic.error_message)
+            bed_file = gic.processed_file
 
             # Open a pipe to intersectBed, which also uploads into the VariantCollection
             args = [settings.INTERSECT_BED_SCRIPT, bed_file, str(variant_collection.pk)]

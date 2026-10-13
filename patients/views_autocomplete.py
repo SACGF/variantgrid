@@ -12,7 +12,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
-from patients.models import Clinician, Extraction, ExternalPK, Patient, Specimen
+from patients.models import ExternalPK, Extraction, Patient, Specimen
 from patients.models_enums import SampleSourceLevel
 from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView, SampleAutocompleteView
 
@@ -57,14 +57,6 @@ class ExtractionAutocompleteView(GenomeBuildAutocompleteView):
             qs = qs.filter(specimen=specimen)
         # An analysis is one genome build, so only offer extractions it can actually read
         return self.filter_to_readable_samples(qs, ["sample"])
-
-
-@method_decorator(cache_page(MINUTE_SECS), name='dispatch')
-class ClinicianAutocompleteView(AutocompleteView):
-    fields = ['last_name', 'first_name']
-
-    def get_user_queryset(self, user):
-        return Clinician.objects.all()
 
 
 @method_decorator(cache_page(30), name='dispatch')

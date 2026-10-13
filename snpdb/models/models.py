@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import uuid
-from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property, total_ordering
@@ -18,6 +17,7 @@ from html import escape
 from re import RegexFlag
 from typing import Optional, TypedDict
 
+from avatar.templatetags.avatar_tags import avatar_url
 from celery import signature
 from celery.result import AsyncResult
 from django.conf import settings
@@ -40,16 +40,16 @@ from more_itertools import first
 from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
+from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
-from library.utils import JsonObjType, import_class
+from library.utils import JsonObjType, import_class, string_deterministic_hash
 from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
-
 
 # A tag used for both origins is stored as UNKNOWN so AlleleOriginFilterDefault.buckets works verbatim.
 # On a tag that means "applies to both", which is what people see
@@ -258,6 +258,34 @@ class SoftwareVersion(models.Model):
         abstract = True
 
 
+class CodeVersion(models.Model):
+    """ A git hash of this codebase, recorded the first time something was written by it. pk increases with
+        each new hash seen, so "written between these deployments" is a pk range (#1977) """
+    git_hash = models.TextField(unique=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.git_hash[:8]} ({self.created:%Y-%m-%d})"
+
+    @staticmethod
+    def current() -> 'CodeVersion':
+        """ The code this process is running (settings.GIT_HASH) """
+        return CodeVersion.objects.get_or_create(git_hash=settings.GIT_HASH)[0]
+
+
+class CodeVersionMixin(models.Model):
+    """ Records the CodeVersion that wrote this row - set on creation if not given """
+    code_version = models.ForeignKey(CodeVersion, on_delete=PROTECT)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.code_version_id:
+            self.code_version = CodeVersion.current()
+        super().save(*args, **kwargs)
+
+
 class Wiki(TimeStampedModel):
     # Inherit and add a 1-to-1 field for whatever object you want
     objects = InheritanceManager()
@@ -413,7 +441,6 @@ class LabUser:
 
     @cached_property
     def preferred_label(self) -> str:
-        from snpdb.models import AvatarDetails
         return AvatarDetails.avatar_for(self.user).preferred_label
 
     def __lt__(self, other):
@@ -1021,6 +1048,11 @@ class UserAwards:
     def kudos(self) -> list[UserAward]:
         return [a for a in self.awards if a.kind == UserAwardKind.KUDOS]
 
+    @cached_property
+    def all_kudos(self) -> list[UserAward]:
+        """ Active first - the profile page lists withdrawn kudos greyed out """
+        return [a for a in self.all_awards if a.kind == UserAwardKind.KUDOS]
+
     def badge_row(self, definition_key: str) -> Optional[UserAward]:
         """ The (possibly not yet earned, hence inactive) badge row for a definition """
         return first((a for a in self.all_awards if a.kind == UserAwardKind.BADGE and a.definition_key == definition_key), None)
@@ -1028,19 +1060,14 @@ class UserAwards:
     def progress(self, definition) -> "BadgeProgress":
         return BadgeProgress(definition=definition, award=self.badge_row(definition.key))
 
-    @cached_property
-    def highest_award(self) -> Optional[UserAward]:
-        return first(self.awards, None)
-
     @property
-    def award_text_html(self):
-        return "<br/>".join([f"<i class='{award.icon_class}'></i>" + escape(award.award_text) for award in self.awards])
-
-    @property
-    def html(self):
-        if not self.awards:
-            return ""
-        return SafeString(f'<i class="{self.highest_award.icon_class}" title="{ self.award_text_html }"></i>')
+    def kudos_html(self) -> SafeString:
+        """ Overlay on the avatar wherever a user is shown: the highest kudos' trophy, all of them in the
+            tooltip. Badges stay on the profile page """
+        if not self.kudos:
+            return SafeString("")
+        tooltip = "<br/>".join(f"<i class='{award.icon_class}'></i>" + escape(award.award_text) for award in self.kudos)
+        return SafeString(f'<i class="{self.kudos[0].icon_class}" title="{tooltip}"></i>')
 
     def __iter__(self):
         return iter(self.awards)
@@ -1050,6 +1077,48 @@ class UserAwards:
 
     def __getitem__(self, item):
         return self.awards[item]
+
+
+@dataclass(frozen=True)
+class AvatarDetails:
+    user: User
+
+    @staticmethod
+    def avatar_for(user: User):
+        return AvatarDetails(user=user)
+
+    @cached_property
+    def awards(self) -> UserAwards:
+        return UserAwards(user=self.user)
+
+    @cached_property
+    def preferred_label(self) -> str:
+        user = self.user
+        preferred_label = user.username
+        if user.first_name or user.last_name:
+            preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
+        return preferred_label
+
+    @cached_property
+    def is_editable(self):
+        return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
+
+    @cached_property
+    def url(self) -> str:
+        if self.is_editable:
+            return avatar_url(self.user)
+        else:
+            # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
+            return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
+
+    @cached_property
+    def background_color(self) -> str:
+        if self.user.username == 'admin_bot':
+            return '#ffffff'
+
+        if self.url.startswith('/static/icons/users/'):
+            colors = ['#ddddff', '#ffbbbb', '#aaddaa', '#dddddd', '#ddddbb']
+            return colors[string_deterministic_hash(self.user.username) % len(colors)]
 
 
 @dataclass(frozen=True)

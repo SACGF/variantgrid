@@ -23,6 +23,7 @@ from upload.models import (
     UploadStepTaskType,
     VCFPipelineStage,
 )
+from upload.tasks.upload_step_lease import UploadStepLeaseHeartbeat
 
 
 class ImportVCFStepTask(Task):
@@ -87,7 +88,8 @@ class ImportVCFStepTask(Task):
             if upload_pipeline.status != ProcessingStatus.PROCESSING:
                 upload_step.status = ProcessingStatus.SKIPPED
             else:
-                items_processed = self.process_items(upload_step)
+                with UploadStepLeaseHeartbeat(upload_step, this_task):
+                    items_processed = self.process_items(upload_step)
                 upload_step = load_upload_step()  # Reload from DB (other processes may have modified)
                 upload_step.items_processed = items_processed
 

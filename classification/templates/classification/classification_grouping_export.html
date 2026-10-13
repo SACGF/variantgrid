@@ -87,7 +87,7 @@
                         {% endfor %}
                     {% endfor %}
                 </div>
-                <div id="custom-lab-warning">{{ 'W' | severity_icon }} At least one lab must be selected</div>
+                <div id="custom-lab-warning" class="mt-1" style="display: none">{{ 'W' | severity_icon }} At least one lab must be selected.</div>
             {% end_ui_register_tab_embedded %}
             {% ui_render_tabs tab_set="lab-selection" mode="pills" %}
         {% endlabelled %}
@@ -95,16 +95,19 @@
 
         {% labelled label="Allele Origin" %}
             {% allele_origin_toggle show_label=False %}
+            <div id="franklin-allele-origin-warning" style="display: none">{{ 'W' | severity_icon }} Franklin exports must be set to Germline only for now.</div>
         {% endlabelled %}
 
         {% labelled label="Rows per File" %}
             <input class="form-control" id="rows_per_file" type="number" value="" placeholder="Unlimited"/>
-            <span class="text-muted">Set this to a value to download a zip of the export broken into files, where no file exceeds that many rows.</span>
+            <div id="rows-per-file-warning" style="display: none" class="mt-2">{{ 'W' | severity_icon }} Minimum of 100 rows per file.</div>
+            <div class="text-muted mt-1">Set this to a value to download a zip of the export broken into files, where no file exceeds that many rows. Min 100</div>
         {% endlabelled %}
 
         {% labelled label="Since" %}
             <input class="form-control" id="since" type="text" value="" placeholder="YYYY-MM-DD or <number of days>"/>
-            <span class="text-muted">Only download the records that have changed since this date.</span>
+            <div id="since-warning" style="display: none" class="mt-1">{{ 'W' | severity_icon }} Since must be a past date in the format YYYY-MM-DD or the number 0 or larger (days ago)</div>
+            <div class="text-muted mt-1">Only download the records that have changed since this date, or this many days ago.</div>
         {% endlabelled %}
         <hr/>
 
@@ -192,74 +195,10 @@
         {% endlabelled %}
     </div>
 
+    <script src="{% static 'js/classification/classification_grouping_export.js' %}"></script>
     <script>
-        function alleleOriginToggle(filterValue) {
-            updateLink();
-        }
-
-        function updateLink() {
-            let params = {};
-
-            let labSelectionTab = $('#lab-selection .nav-link.active').attr('id');
-            labSelectionTab = labSelectionTab.substring(1, labSelectionTab.length - 4); // drop off leading t and trailing -lab
-            $("#custom-lab-warning").hide();
-            if (labSelectionTab === 'custom') {
-                let labGroupNames = [];
-                $('.custom-lab-selection:checked').each((index, value) => {
-                    labGroupNames.push($(value).attr('id'));
-                });
-                if (labGroupNames.length == 0) {
-                    $("#custom-lab-warning").show();
-                    $('#download-link').attr('href', '#').text('-');
-                    return;
-                }
-                labSelectionTab = labGroupNames.join(',');
-            }
-            params.labs = labSelectionTab;
-            let rowsPerFile = $('#rows_per_file').val();
-            if (rowsPerFile) {
-                params.rows_per_file = `${rowsPerFile}`;
-            }
-            let since = $('#since').val();
-            if (since) {
-                params.since = `${since}`;
-            }
-            let allele_origin = $("input[name='allele-origin-toggle']:checked").val();
-            if (allele_origin !== "A") {
-                params.allele_origin = allele_origin
-            }
-
-            let formatTab = $('#format .nav-link.active').attr('id');
-            formatTab = formatTab.substring(1, formatTab.length - 4);
-            params.format = formatTab;
-            if (formatTab === 'vcf') {
-                params.vcf_target_system = $('input[name=vcf_target_system]:checked').val();
-                params.genome_build = $('input[name=vcf_genome_build]:checked').val();
-            } else if (formatTab === 'franklin') {
-                params.genome_build = $('input[name=franklin_genome_build]:checked').val();
-            }
-
-            let paramParts = [];
-            for (let [key, value] of Object.entries(params)) {
-                paramParts.push(`${key}=${encodeURIComponent(value)}`);
-            }
-            paramString = '?' + paramParts.join('&');
-
-            let downloadLink = `{{ base_url }}${ paramString }`;
-            $('#download-link').attr('href', downloadLink).text(downloadLink);
-        }
-
         $(document).ready(() => {
-            $('a[data-toggle="tab"]').on('shown.bs.tab', (e) => {
-                updateLink();
-            });
-            $('input').change((e) => {
-                updateLink();
-            });
-            $('input').keyup((e) => {
-                updateLink();
-            });
-            updateLink();
+            initClassificationGroupingExport({{ base_url|jsonify }});
         });
     </script>
 

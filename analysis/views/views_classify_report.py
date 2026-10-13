@@ -46,9 +46,9 @@ from classification.report.case_report_builder import build_case_report, preview
 from classification.report.case_report_context import (
     build_report_variants,
     case_combined_variant_output,
+    case_library_qc,
     case_measures,
     case_specimen,
-    specimen_library_qc,
 )
 from classification.views.views import classification_created_response, create_classification_object
 from patients.models import Extraction, Patient, Specimen
@@ -280,8 +280,8 @@ def _case_values_for_form(template: Optional[ClassificationReportTemplate],
 
 def _measure_notes(template: Optional[ClassificationReportTemplate], measures: dict,
                    library_qc: Optional[dict] = None) -> dict[str, list[dict]]:
-    """ Per case_field group, what each measure or library QC backed checkbox was started from: the
-        row as it stands, the rule, and the policy that made the call - a measure records the
+    """ Per case_field group, what each measure and/or library QC backed checkbox was started from: the
+        rows as they stand, the rule, and the policy that made the call - a measure records the
         threshold it was called against and the setting it came from, and a QC category its metrics
         against the file's own guidelines. On the form so a scientist who disagrees with a tick sees
         the numbers behind it and can ask for the policy to change rather than just untick """
@@ -297,7 +297,9 @@ def _measure_notes(template: Optional[ClassificationReportTemplate], measures: d
         measure = measures.get(measure_key) if measure_key else None
         notes.setdefault(field.get("group") or "", []).append({
             "label": field.get("label") or field.get("key"),
+            "has_measure": bool(measure_key),
             "measure": measure,
+            "has_qc": bool(qc_key),
             "qc": library_qc.get(qc_key) if qc_key else None,
             "rule": describe_tick_when(field["tick_when"], measure.unit if measure else None)
                     if field.get("tick_when") else "",
@@ -328,8 +330,9 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
 
     draft = case.latest_draft_report()
     specimen = case_specimen(case.source_level, case.obj)
-    measures = case_measures(case_combined_variant_output(case.samples, specimen), specimen)
-    library_qc = specimen_library_qc(specimen)
+    cvo = case_combined_variant_output(case.samples, specimen)
+    measures = case_measures(cvo, specimen)
+    library_qc = case_library_qc(cvo, specimen)
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     context = {
         "case": case,
@@ -343,6 +346,7 @@ def case_report_build_dialog(request, case_type: str, case_id: int):
         "case_values": _case_values_for_form(template, modifications, draft, measures, library_qc),
         "measures": measures,
         "library_qc": library_qc,
+        "library_qc_rows": sorted(library_qc.values(), key=lambda qc: (qc.nucleic_acid, qc.category)),
         "measure_notes": _measure_notes(template, measures, library_qc),
         "lab": lab,
         "lab_error": lab_error,

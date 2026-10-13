@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Iterator
 
-from classification.enums import ClassificationResultValue, TriageStatus
+from classification.enums import TriageStatus
 from classification.models import EvidenceKeyMap, ClassificationGrouping, OverlapContribution
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_formatter_csv import CSVCellFormatting

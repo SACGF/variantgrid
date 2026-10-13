@@ -16,9 +16,9 @@ from django.contrib.auth.models import User
 from django.db.models import Count, F
 from django.db.models.query_utils import Q
 
+from library.django_utils.data_archive_mixin import DataArchivedError
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import SampleSourceLevel, TissueStatus
-from snpdb.archive import DataArchivedError
 from snpdb.models import (
     CohortGenotypeCollection,
     CohortGenotypeCollectionType,
@@ -28,6 +28,7 @@ from snpdb.models import (
     Sample,
     VCFFilter,
 )
+
 
 @dataclass(frozen=True)
 class SourceLevel:

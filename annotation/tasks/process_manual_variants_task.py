@@ -33,7 +33,10 @@ def get_manual_variant_coordinates(mve: ManualVariantEntry) -> list[VariantCoord
         vc = hgvs_matcher.get_variant_coordinate(hgvs_string)
         variant_coordinates.append(vc)
     elif mve.entry_type == ManualVariantEntryType.VARIANT:
-        variant_coordinates.append(VariantCoordinate.from_string(mve.entry_text, mve.genome_build))
+        vc = VariantCoordinate.from_string(mve.entry_text, mve.genome_build)
+        if message := vc.unsupported_symbolic_alt_message:
+            raise ValueError(message)
+        variant_coordinates.append(vc)
     else:
         raise ValueError(f"Could not convert entry type of {mve.entry_type}")
     return variant_coordinates

@@ -122,6 +122,58 @@ class ExtractionLinkAPITest(APITestCase):
         self.assertIn("external_type", str(response.data))
 
 
+
+class ExtractionLinksBulkAPITest(APITestCase):
+    """ #2176 - match status per item, a sample_name not on the sheet fails the whole batch """
+    RNA_SAMPLE_NAME = "ExampleSample_RNA_2600000001D"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_superuser(username="extraction_links_user")
+        cls.sequencing_run = make_sequencing_run("TSO500_BULK")
+        cls.sample_sheet, (cls.dna_sample, cls.rna_sample) = make_sample_sheet(
+            cls.sequencing_run, [DNA_SAMPLE_NAME, cls.RNA_SAMPLE_NAME])
+
+        patient = Patient.objects.create(first_name="BULK", last_name="PATIENT")
+        specimen = Specimen.objects.create(patient=patient, reference_id="2600000001")
+        cls.dna = Extraction.objects.create(specimen=specimen, reference_id="2600000001C",
+                                            nucleic_acid_source=NucleicAcid.DNA)
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user)
+
+    def _link(self, links: dict):
+        data = {
+            "sample_sheet": {"sequencing_run": self.sequencing_run.name, "hash": self.sample_sheet.hash},
+            "links": [{"sample_name": sample_name, "extraction": extraction} for sample_name, extraction in links.items()],
+        }
+        return self.client.post(reverse("api_sequencing_sample_link_extractions"), data, format="json")
+
+    def test_all_matched_is_200(self):
+        response = self._link({DNA_SAMPLE_NAME: "2600000001C"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data[0]["extraction"], str(self.dna))
+
+    def test_one_pending_is_202_and_the_rest_still_link(self):
+        response = self._link({DNA_SAMPLE_NAME: "2600000001C", self.RNA_SAMPLE_NAME: "2600000001D"})
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED, response.data)
+        self.assertEqual([r["match_status"] for r in response.data],
+                         [MatchStatus.MATCHED.label, MatchStatus.PENDING.label])
+
+        self.dna_sample.refresh_from_db()
+        self.rna_sample.refresh_from_db()
+        self.assertEqual(self.dna_sample.extraction, self.dna)
+        self.assertEqual(self.rna_sample.extraction_reference, {"reference_id": "2600000001D"})
+
+    def test_sample_name_not_on_sheet_fails_the_batch(self):
+        response = self._link({DNA_SAMPLE_NAME: "2600000001C", "NOT_SEQUENCED": "2600000001C"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("NOT_SEQUENCED", str(response.data))
+
+        self.dna_sample.refresh_from_db()
+        self.assertIsNone(self.dna_sample.extraction)
+
 class ExtractionCarriedDownToSamplesTest(TestCase):
     """ One link call reaches all of that arm's VCFs, since link_samples_and_vcfs_to_sequencing
         carries the extraction down to every Sample it creates """

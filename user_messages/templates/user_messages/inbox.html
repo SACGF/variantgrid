@@ -1,39 +1,12 @@
 {% extends "user_messages/base.html" %}
 {% load i18n %}
+{% load static %}
 
 {% block content %}
     <div class="container">
         <h3>{% trans "Inbox" %}</h3>
         {% if message_list %}
-            <script>
-            function deleteSelectedMessages() {
-                var selectedMessages = [];
-                $("input.message-checkbox:checked").each(function() {
-                    selectedMessages.push($(this).attr("message_id"));
-                });
-                if (selectedMessages) {
-                    var data = 'message_ids=' + JSON.stringify(selectedMessages);;
-
-                    $.ajax({
-                        type: "POST",
-                        data: data,
-                        url: "{% url 'messages_bulk_delete' %}",
-                        success: function(data) {
-                            window.location.reload();
-                        }
-                    });
-                }
-            }
-
-            $(document).ready(function() {
-                $("#select-all-checkbox").click(function() {
-                    var checked = $(this).is(":checked");
-                    $("input.message-checkbox").each(function() {
-                        $(this).prop('checked', checked);
-                    });
-                });
-            });
-        </script>
+            <script src="{% static 'js/user_messages/inbox.js' %}"></script>
 
         <div id='message-inbox'>
             <div id='bulk-actions' class="text-right">

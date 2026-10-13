@@ -7,29 +7,30 @@ is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also
 ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
 ClassificationConsensus and CuratedDate.
 """
+from __future__ import annotations
+
 import copy
 import json
 import logging
 import operator
 import re
 import uuid
-import pydantic
-from collections import Counter, namedtuple, defaultdict
+from collections import Counter, defaultdict, namedtuple
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
     TypedDict,
     Union,
 )
 
-from typing_extensions import deprecated
-
 import django.dispatch
+import pydantic
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
@@ -47,28 +48,38 @@ from django.urls.base import reverse
 from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from typing_extensions import deprecated
 
-from annotation.models.data_enums import ClassificationDate, ClassificationDateType, EffectiveDate, EffectiveDateType
+from annotation.models.data_enums import (
+    ClassificationDate,
+    ClassificationDateType,
+    EffectiveDate,
+    EffectiveDateType,
+)
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import (
     CRITERIA_NOT_MET,
     AlleleOriginBucket,
     ClinicalSignificance,
+    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
+    TestingContextBucket,
     ValidationCode,
-    WithdrawReason, TestingContextBucket, CopyScope,
+    WithdrawReason,
 )
+from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import (
     ClassificationJsonParams,
     ClassificationPatchResponse,
     PatchMeta,
-    ValidationMerger, classification_gene_symbol_filter,
+    ValidationMerger,
+    classification_gene_symbol_filter,
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
@@ -82,11 +93,13 @@ from classification.models.evidence_key import (
     EvidenceKeyValueType,
     VCDataCell,
     VCDataDict,
+    VCPatch,
     WipeMode,
     resolve_default_value,
 )
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.evidence_mixin import EvidenceMixin
 from classification.models.evidence_mixin_summary_cache import (
+    ClassificationSummaryCacheObj,
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
@@ -99,7 +112,7 @@ from flags.models.models import (
     flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
-from genes.models import Gene, NoTranscript, GeneSymbol
+from genes.models import Gene, GeneSymbol, NoTranscript
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -117,9 +130,13 @@ from library.utils import (
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
+from snpdb.models.models import CodeVersion, CodeVersionMixin
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
+
+if TYPE_CHECKING:
+    from classification.models import ClinicalContext, ConditionText, MultiCondition
 
 ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
@@ -215,7 +232,6 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
     :param user: The current user
     :param kwargs: Required by @receiver
     """
-    from classification.enums.discordance_enums import DiscordanceReportResolution
     from classification.models.discordance_models import DiscordanceReportClassification
 
     vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
@@ -257,7 +273,7 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
-class ConditionResolvedReferenceDict(TypedDict):
+class ConditionResolvedReferenceDict(TypedDict, total=False):
     term_id: Optional[str]
     name: str  # name of the term if term_id is provided, otherwise from a plain text condition
     count: Optional[int]  # assumed to be 1 if not provided
@@ -339,7 +355,7 @@ class ConditionResolved:
     # terms: list[OntologyTerm]
     # plain_text_terms: list[str] = None
     references: list[ConditionReference]
-    join: Optional['MultiCondition'] = None
+    join: Optional[MultiCondition] = None
     plain_text: Optional[str] = None  # fallback, not populated in all contexts
 
     def __hash__(self) -> int:
@@ -387,14 +403,14 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
+        from classification.models import MultiCondition
         if not condition_dict:
             return ConditionResolved(references=[])
 
-        join: Optional['MultiCondition'] = None
+        join: Optional[MultiCondition] = None
         plain_text = condition_dict.get("display_text")
 
         if resolved_join_text := condition_dict.get("resolved_join"):
-            from classification.models import MultiCondition
             join = MultiCondition(resolved_join_text)
 
         if references_list := condition_dict.get("references"):
@@ -439,13 +455,13 @@ class ConditionResolved:
         else:
             return None
 
-    def as_mondo_if_possible(self) -> 'ConditionResolved':
+    def as_mondo_if_possible(self) -> ConditionResolved:
         if mondo_term := self.mondo_term:
             return ConditionResolved.from_uncounted_terms(terms=[mondo_term])
         else:
             return self
 
-    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+    def is_same_or_more_specific(self, other: ConditionResolved) -> bool:
         """
         Returns the number of steps to go from this condition to the specific other condition
         Returns None if self doesn't appear to be a descendant of other
@@ -553,7 +569,7 @@ class ConditionResolved:
                 pass
         return None
 
-    def __eq__(self, other: 'ConditionResolved') -> bool:
+    def __eq__(self, other: ConditionResolved) -> bool:
         if (s_terms := self.terms) and (o_terms := other.terms):
             return s_terms == o_terms and self.join == other.join
         elif self.terms or other.terms:
@@ -561,7 +577,7 @@ class ConditionResolved:
         else:
             return self.plain_text == other.plain_text
 
-    def __lt__(self, other: 'ConditionResolved') -> bool:
+    def __lt__(self, other: ConditionResolved) -> bool:
         self_terms = self.terms or []
         other_terms = other.terms or []
         if len(self_terms) != len(other_terms):
@@ -674,7 +690,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
 
     @property
-    def summary_obj(self) -> 'ClassificationSummaryCacheObj':
+    def summary_obj(self) -> ClassificationSummaryCacheObj:
         from classification.models import ClassificationSummaryCacheObj
         return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
@@ -730,7 +746,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        from classification.models import ClassificationSummaryCacheObj
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         if bucket := summary_obj.somatic.testing_context_bucket:
             return TestingContextBucket(bucket)
@@ -742,7 +757,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         Runs off the ClassificationSummary
         """
-        from classification.models import ClassificationSummaryCacheObj
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         return summary_obj.somatic.tumor_type_category
 
@@ -784,7 +798,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return 'not-matched'
 
     @property
-    def condition_text_record(self) -> 'ConditionText':
+    def condition_text_record(self) -> ConditionText:
         try:
             if ctm := self.conditiontextmatch:
                 return ctm.condition_text
@@ -897,7 +911,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self.get(SpecialEKeys.G_HGVS)
 
     def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
-        return AlleleOriginBucket.bucket_for_allele_origin(self.get(SpecialEKeys.ALLELE_ORIGIN))
+        return EvidenceKeyMap.allele_origin_bucket(self.get(SpecialEKeys.ALLELE_ORIGIN))
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
@@ -1921,6 +1935,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 delta = pending_modification.delta
                 delta.update(diffs_only_patch)
                 pending_modification.delta = delta
+                pending_modification.code_version = CodeVersion.current()
 
             else:
                 if save and last_edited:
@@ -2006,7 +2021,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                           exclude_withdrawn=exclude_withdrawn).first()
 
     @property
-    def last_published_version(self) -> 'ClassificationModification':
+    def last_published_version(self) -> Optional['ClassificationModification']:
+        if not self.pk:
+            return None
         return ClassificationModification.objects.filter(classification=self, is_last_published=True) \
             .select_related('classification', 'classification__lab', 'classification__lab__organization') \
             .first()
@@ -2369,7 +2386,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             raise CreateNoClassificationForbidden()
 
 
-class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models.Model):
+class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVersionMixin, models.Model):
     """ Tracks history of changes to Classification
         Created in Classification.patch_value() if any changes applied
 
@@ -2464,6 +2481,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     is_last_published = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
+    # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
+    code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
 
     @classmethod
     def order_by_evidence(cls, key_id: str) -> RawSQL:
@@ -2519,7 +2538,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         variant: Optional[Union[Variant, Iterable[Variant]]] = None,
                         allele: Allele = None,
                         published: bool = None,
-                        clinical_context: Optional['ClinicalContext'] = None,
+                        clinical_context: Optional[ClinicalContext] = None,
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
                         allele_origin_bucket: Optional[AlleleOriginBucket] = None,
@@ -2792,6 +2811,17 @@ BUCKET_ALLELE_ORIGIN = {  # what the allele_origin evidence key is seeded with p
 
 
 @dataclass(frozen=True)
+class GeneContentValue:
+    """ One gene scope key's content on a candidate - the thing a gene row is chosen for. `current` is what the
+        record being filled already holds, set only where there is one (the form's Gene Content dialog) """
+    key: str
+    label: str
+    value: Any
+    note: Optional[str] = None
+    current: Any = None
+
+
+@dataclass(frozen=True)
 class GeneConsensusGroup:
     """
     Classifications in a gene whose gene level content is identical - they were copied from each other, so
@@ -2800,6 +2830,8 @@ class GeneConsensusGroup:
     """
     representative: ClassificationModification
     others: list[ClassificationModification]
+    content: list[GeneContentValue]
+    differs_in: list[str] = field(default_factory=list)  # labels of the fields that differ from the first group
 
     @property
     def other_count(self) -> int:
@@ -2808,6 +2840,20 @@ class GeneConsensusGroup:
     @property
     def record_count(self) -> int:
         return len(self.others) + 1
+
+    @property
+    def records(self) -> list[ClassificationModification]:
+        return [self.representative, *self.others]
+
+    @cached_property
+    def conditions(self) -> list[ConditionResolved]:
+        """ The distinct conditions this gene content has been used for, most used first - the tumour type
+            spread is usually what decides whether a row applies to the case in hand """
+        counts: Counter[ConditionResolved] = Counter()
+        for modification in self.records:
+            if condition := modification.condition_resolution_obj_fallback:
+                counts[condition] += 1
+        return [condition for condition, _ in counts.most_common()]
 
 
 @dataclass
@@ -2889,7 +2935,8 @@ class ClassificationConsensus:
                               limit: int = GENE_CONSENSUS_GROUP_LIMIT) -> list[GeneConsensusGroup]:
         """
         The gene level content available to copy in a gene, one row per distinct set of values - most records
-        in a gene carry the same content because they were copied from each other. Newest representative first.
+        in a gene carry the same content because they were copied from each other. The most used content first,
+        then newest; each later row names the fields in which it differs from the first (`differs_in`).
 
         AMP tiering and therapy content are gene *and* tumour type, so this only ever lists: which row applies
         to the case in hand is the curator's call.
@@ -2913,12 +2960,43 @@ class ClassificationConsensus:
             if content := ClassificationConsensus._gene_content(cm, gene_scope_keys):
                 by_content[content].append(cm)
 
+        e_keys = EvidenceKeyMap.cached()
         groups = []
         for members in by_content.values():
             members.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
-            groups.append(GeneConsensusGroup(representative=members[0], others=members[1:]))
-        groups.sort(key=lambda group: group.representative.curated_date_check, reverse=True)
-        return groups[:limit]
+            groups.append(GeneConsensusGroup(
+                representative=members[0], others=members[1:],
+                content=ClassificationConsensus._gene_content_values(members[0], gene_scope_keys, e_keys)))
+        # The widest used content first - a gene's summary gets re-worded over time, and the many near copies
+        # of it are told apart by what differs from the first row, not by reading each one
+        groups.sort(key=lambda group: (group.record_count, group.representative.curated_date_check), reverse=True)
+        groups = groups[:limit]
+        if len(groups) > 1:
+            first = {value.key: (value.value, value.note) for value in groups[0].content}
+            labels = {value.key: value.label for group in groups for value in group.content}
+            for index, group in enumerate(groups[1:], start=1):
+                this = {value.key: (value.value, value.note) for value in group.content}
+                differing = [key for key in gene_scope_keys if first.get(key) != this.get(key)]
+                groups[index] = replace(group, differs_in=[labels[key] for key in differing])
+        return groups
+
+    @staticmethod
+    def _gene_content_values(modification: ClassificationModification, gene_scope_keys: list[str],
+                             e_keys: EvidenceKeyMap) -> list[GeneContentValue]:
+        """ The gene level content of a record as the row shows it - labelled, options resolved to their labels """
+        evidence = modification.published_evidence or {}
+        values = []
+        for key in gene_scope_keys:
+            blob = evidence.get(key)
+            if blob is None:
+                continue
+            e_key = e_keys.get(key)
+            value = e_key.pretty_value(blob)
+            note = blob.get('note') or None
+            if value in (None, '', []) and not note:
+                continue
+            values.append(GeneContentValue(key=key, label=e_key.pretty_label, value=value, note=note))
+        return values
 
     @property
     def allele_origin_bucket(self) -> Optional[AlleleOriginBucket]:

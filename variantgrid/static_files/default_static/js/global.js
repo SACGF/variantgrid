@@ -109,6 +109,17 @@ function enhanceAndMonitor() {
             target.on('hidden.bs.collapse', () => {alterAjaxCount(-1, "toggle hide end");});
         }},
 
+        // a long text clamped to a few lines, with a show more / show less link after it
+        {test: '[data-toggle="clamp"]', func: (node) => {
+            const $node = $(node);
+            $node.click(() => {
+                const text = $node.prev('.gene-content-text');
+                text.toggleClass('clamp');
+                $node.text(text.hasClass('clamp') ? 'show more' : 'show less');
+                return false;
+            });
+        }},
+
         {test: '[data-toggle="embed-content"]', func: (node) => {
             const $node = $(node);
             const url = $node.attr('href');
@@ -288,22 +299,6 @@ function enhanceAndMonitor() {
         }},
         // similar but for radio buttons (only change if not already checked)
         {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find(':radio:not(:checked)').prop('checked', 'checked').change();});}},
-        // is this still used?? Would like to get rid of
-        {test: '#id_import_status',
-            func: (node) => {
-                const importStatus = node.val();
-                if (importStatus !== 'S') {
-                    let className = null;
-                    if (importStatus === 'E') {
-                        className = "error";
-                    } else {
-                        className = "warning";
-                    }
-                    node.addClass(className);
-                }
-            }
-        },
-
         // fixing external link styles
         {test: `a[href^="http"], a[href^="ftp"], a[href*="google.com"]`,
             func: (node) => {
@@ -512,7 +507,7 @@ function enhanceAndMonitor() {
             $(processor.test).each((index, node) => {
                 node = $(node);
                 let isGood = true;
-                for (const badTest in badElementTests) {
+                for (const badTest of badElementTests) {
                     if (node.is(badTest)) {
                         isGood = false;
                         break;
@@ -603,6 +598,9 @@ function loadAjaxModal(linkDom, size) {
     const body = modalContent.find('.modal-body');
     modalContent.find('.modal-footer').remove();
     const content = $('<div>').appendTo(body);
+    // attach before loading: jQuery only runs inline scripts in content that is in the document,
+    // and Bootstrap doesn't attach the modal until its backdrop has faded in
+    modalContent.appendTo('body');
     const modalDialog = modalContent.modal({focus:true, show:false});
 
     loadAjaxBlock(content, url).then(() => {

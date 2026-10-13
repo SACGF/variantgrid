@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -17,9 +17,9 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.forms import ExtractionForm
 from patients.import_records import process_record
 from patients.models import (
-    Extraction,
     ExternalModelManager,
     ExternalPK,
+    Extraction,
     Patient,
     PatientColumns,
     PatientImport,
@@ -28,11 +28,12 @@ from patients.models import (
     Specimen,
 )
 from patients.models_enums import NucleicAcid, TissueStatus
+from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from patients.views import CREATE_EXTRACTION
 from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAutocompleteView
 from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, Sample
+from snpdb.models.models_enums import VariantOrigin
 from snpdb.search import SearchResultMatchStrength, search_data
-from snpdb.models.models_enums import VariantsType
 from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 
 _FAKE_CSV = os.path.join(os.path.dirname(__file__), "test_data", "fake_patient_records.csv")
@@ -162,26 +163,26 @@ class TestSpecimenTissueStatus(TestCase):
         return data[SpecialEKeys.ALLELE_ORIGIN]
 
     def test_reference_specimen_germline_call_set_is_germline(self):
-        self.assertEqual(self._allele_origin(TissueStatus.REFERENCE, VariantsType.GERMLINE), "germline")
+        self.assertEqual(self._allele_origin(TissueStatus.REFERENCE, VariantOrigin.GERMLINE), "germline")
 
     def test_somatic_only_call_set_is_somatic_whatever_the_tissue(self):
         for tissue_status in TissueStatus:
-            self.assertEqual(self._allele_origin(tissue_status, VariantsType.SOMATIC_ONLY), "somatic",
+            self.assertEqual(self._allele_origin(tissue_status, VariantOrigin.SOMATIC_ONLY), "somatic",
                              f"{tissue_status} + somatic only")
 
     def test_affected_specimen_mixed_call_set_is_unset(self):
         """ A tumour sample carrying both origins is per-variant, so the curator decides """
-        self.assertIsNone(self._allele_origin(TissueStatus.AFFECTED, VariantsType.MIXED))
+        self.assertIsNone(self._allele_origin(TissueStatus.AFFECTED, VariantOrigin.MIXED))
 
     def test_unknown_tissue_germline_call_set_is_unset(self):
-        self.assertIsNone(self._allele_origin(TissueStatus.UNKNOWN, VariantsType.GERMLINE))
+        self.assertIsNone(self._allele_origin(TissueStatus.UNKNOWN, VariantOrigin.GERMLINE))
 
     def test_affected_specimen_germline_call_set_is_unset(self):
-        self.assertIsNone(self._allele_origin(TissueStatus.AFFECTED, VariantsType.GERMLINE))
+        self.assertIsNone(self._allele_origin(TissueStatus.AFFECTED, VariantOrigin.GERMLINE))
 
     def test_sample_without_extraction_is_unset(self):
         sample = Sample.objects.create(name="no_extraction", vcf=self.vcf, patient=self.patient,
-                                       variants_type=VariantsType.GERMLINE)
+                                       variants_type=VariantOrigin.GERMLINE)
         data = get_evidence_fields_for_sample_and_patient(None, sample)
         self.assertIsNone(data[SpecialEKeys.ALLELE_ORIGIN])
 
@@ -696,3 +697,32 @@ class TestSpecimenExtractionSearch(TestCase):
         preferred = search_data(self.user, "SPECIMEN1", False).single_preferred_result()
         self.assertIsNotNone(preferred, "A whole specimen reference has somewhere to jump to")
         self.assertEqual(preferred.preview.internal_url, self.specimen.get_absolute_url())
+
+
+@override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
+class TestSpecimenExtractionSearchNormalized(TestCase):
+    """ A reference typed the way another system writes it still names the row """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("search_norm_user", password="x")
+        cls.patient = Patient.objects.create(first_name="SEARCH", last_name="NORMALIZED")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def setUp(self):
+        self.specimen = Specimen.objects.create(reference_id="26-000-00001", patient=self.patient)
+        self.dna = Extraction.objects.create(specimen=self.specimen, reference_id="26-000-00001C")
+
+    def _strengths(self, search_string) -> dict:
+        results = search_data(self.user, search_string, False).results
+        return {r.preview.internal_url: r.match_strength for r in results}
+
+    def test_the_other_form_names_the_specimen(self):
+        strengths = self._strengths("2600000001")
+        self.assertEqual(strengths[self.specimen.get_absolute_url()], SearchResultMatchStrength.ID_MATCH)
+        self.assertEqual(strengths[self.dna.get_absolute_url()], SearchResultMatchStrength.FUZZY_MATCH)
+
+    def test_the_other_form_names_the_extraction(self):
+        strengths = self._strengths("2600000001C")
+        self.assertEqual(strengths[self.dna.get_absolute_url()], SearchResultMatchStrength.ID_MATCH)

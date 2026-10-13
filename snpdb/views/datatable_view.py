@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import auto
 from functools import cached_property, reduce
-from typing import Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union, get_args
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -641,12 +641,7 @@ class DatatableConfig(Generic[DC]):
     def get_csv_name(self) -> str:
         if csv_name := self.csv_name:
             return csv_name
-        try:
-            return nice_class_name(self._model)
-        except Exception:
-            # The definition names the download before any request filtering, and a config whose
-            # queryset needs those params raises here - a generic filename is fine
-            return "export"
+        return nice_class_name(self._model)
 
     def initial_order(self) -> Optional[list]:
         """ The client's initial sort - None leaves the table unsorted """
@@ -746,8 +741,25 @@ class DatatableConfig(Generic[DC]):
         self._page_rows = rows
         self._page_writable_pks = None
 
+    @classmethod
+    def _declared_model(cls) -> Optional[type[DC]]:
+        """ The model a subclass named in DatatableConfig[Model], read off __orig_bases__ (set when a class
+            subscripts a Generic) - also found through an intermediate [DC] base or a parameterised abstract one """
+        for klass in cls.__mro__:
+            for base in getattr(klass, "__orig_bases__", ()):
+                for arg in get_args(base):
+                    if isinstance(arg, type) and issubclass(arg, models.Model):
+                        return arg
+        return None
+
     @cached_property
     def _model(self) -> type[DC]:
+        if model := self._declared_model():
+            return model
+        # Building the initial queryset can be expensive (permission lookups, request params) and the
+        # definition request has no reason to pay for it - name the model instead (#1913)
+        logger.warning("%s should subclass DatatableConfig[Model] - resolving the model via get_initial_queryset()",
+                       full_class_name(type(self)))
         return self.get_initial_queryset().model
 
     def view_primary_key(self, row: CellData) -> JsonDataType:

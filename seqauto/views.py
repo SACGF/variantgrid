@@ -4,14 +4,16 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from django.conf import settings
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http import Http404
-from django.http.response import HttpResponse, JsonResponse
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from eventlog.models import create_event
+from eventlog.models import ApiRequestLog, create_event
 from genes.models import CanonicalTranscriptCollection
 from library.log_utils import log_traceback
 from patients.models import Extraction, Patient
@@ -31,6 +33,7 @@ from seqauto.models import (
     GoldReference,
     JointCalledVCF,
     LibraryQC,
+    LibraryQCMetric,
     QCGeneCoverage,
     QCType,
     SequencingRun,
@@ -45,7 +48,14 @@ from seqauto.sequencing_files.sample_sheet import (
     assign_old_sample_sheet_data_to_current_sample_sheet,
 )
 from snpdb.models import VCF, Sample, UserSettings
-from upload.models import UploadedFileTypes
+from snpdb.models.models_enums import ProcessingStatus
+from upload.models import UploadedFileTypes, UploadPipeline
+from upload.tasks.retry_upload_pipelines_task import (
+    fail_stuck_upload_pipelines,
+    get_retryable_upload_pipelines,
+    retry_message,
+    retry_upload_pipelines,
+)
 
 
 def sequencing_data(request):
@@ -162,6 +172,37 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
     }
 
 
+def _get_run_upload_pipelines_qs(run_vcfs: dict) -> QuerySet[UploadPipeline]:
+    """ The import pipelines of the run's VCFs (from _get_sequencing_run_vcfs) """
+    all_run_vcfs = [*run_vcfs["multi_sample_vcfs"], *run_vcfs["single_sample_vcfs"].values()]
+    for sample_run_vcfs in run_vcfs["sequencing_sample_vcfs"].values():
+        all_run_vcfs.extend(sample_run_vcfs)
+    vcf_ids = {run_vcf.vcf.pk for run_vcf in all_run_vcfs if run_vcf.vcf}
+    return UploadPipeline.objects.filter(uploadedvcf__vcf__in=vcf_ids)
+
+
+def _get_run_import_counts(run_vcfs: dict, user) -> dict:
+    """ For the run page's retry form (#2188): failed imports the user may retry, and imports still processing -
+        the retry checks whether a worker is still running those """
+    upload_pipelines_qs = _get_run_upload_pipelines_qs(run_vcfs)
+    return {
+        "num_retryable_imports": len(get_retryable_upload_pipelines(upload_pipelines_qs, user)),
+        "num_processing_imports": upload_pipelines_qs.filter(status=ProcessingStatus.PROCESSING).count(),
+    }
+
+
+@require_POST
+def sequencing_run_retry_failed_imports(request, sequencing_run_id):
+    sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    sample_sheet = sequencing_run.get_current_sample_sheet()
+    run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+    upload_pipelines_qs = _get_run_upload_pipelines_qs(run_vcfs)
+    num_stuck = fail_stuck_upload_pipelines(upload_pipelines_qs)
+    num_queued = retry_upload_pipelines(get_retryable_upload_pipelines(upload_pipelines_qs, request.user))
+    messages.add_message(request, messages.INFO, retry_message(num_queued, num_stuck))
+    return HttpResponseRedirect(reverse("view_sequencing_run", kwargs={"sequencing_run_id": sequencing_run.pk}))
+
+
 @dataclass
 class RunSampleRow:
     """ A sample sheet row with the Sample imported for it (None if not imported yet). The Sample's
@@ -218,11 +259,31 @@ def _get_sequencing_run_patients(sample_sheet, user) -> dict:
         else:
             unmatched.append(row)
 
-    run_patients = [
-        {"patient": patient, "extractions": list(rows_by_extraction.items())}
-        for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0]))
-    ]
+    pair_urls_by_sequencing_sample = _tso500_pair_urls_by_sequencing_sample(sample_sheet.sequencing_run)
+    run_patients = []
+    for patient, rows_by_extraction in sorted(extractions_by_patient.items(), key=lambda pe: str(pe[0])):
+        tso500_pairs = {}
+        for rows_for_extraction in rows_by_extraction.values():
+            for row in rows_for_extraction:
+                tso500_pairs.update(pair_urls_by_sequencing_sample.get(row.sequencing_sample.pk, {}))
+        run_patients.append({"patient": patient, "extractions": list(rows_by_extraction.items()),
+                             "tso500_pairs": sorted(tso500_pairs.items())})
     return {"run_patients": run_patients, "unmatched_run_samples": unmatched}
+
+
+def _tso500_pair_urls_by_sequencing_sample(sequencing_run) -> dict[int, dict[str, str]]:
+    """ {sequencing_sample_id: {pair_id: url}} - joined on the arms' sheet rows rather than the specimen, as the
+        pair's accession can be a different specimen of the patient than the one the sheet row was claimed for """
+    pair_urls = defaultdict(dict)
+    cvo_qs = DragenTSO500CombinedVariantOutput.objects.filter(sequencing_run_name=sequencing_run.name)
+    for cvo in cvo_qs.only("sequencing_run_name", "pair_id", "dna_sequencing_sample", "rna_sequencing_sample"):
+        for sequencing_sample_id in (cvo.dna_sequencing_sample_id, cvo.rna_sequencing_sample_id):
+            if sequencing_sample_id:
+                pair_urls[sequencing_sample_id][cvo.pair_id] = cvo.get_absolute_url()
+    qc_qs = LibraryQC.objects.filter(sequencing_run_name=sequencing_run.name, sequencing_sample__isnull=False)
+    for qc in qc_qs.only("sequencing_run_name", "pair_id", "sequencing_sample"):
+        pair_urls[qc.sequencing_sample_id][qc.pair_id] = qc.get_absolute_url()
+    return pair_urls
 
 
 def view_sequencing_run(request, sequencing_run_id, tab=None):
@@ -248,6 +309,7 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
         'tab': tab,
+        "show_api_log": request.user.is_superuser and ApiRequestLog.has_any_for_model(SequencingRun),
         "combined_variant_outputs": DragenTSO500CombinedVariantOutput.objects.filter(
             sequencing_run_name=sequencing_run.name).select_related("specimen").order_by("pair_id"),
         "library_qc_summaries": summarise_library_qc(
@@ -268,7 +330,10 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
             "enrichment_kit",
         ).prefetch_related("samplefromsequencingsample_set__sample__patient", "sequencingsampledata_set")
         context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
-        context.update(_get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user))
+        run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+        context.update(run_vcfs)
+        if settings.UPLOAD_ENABLED:
+            context.update(_get_run_import_counts(run_vcfs, request.user))
         context.update(_get_sequencing_run_patients(sample_sheet, request.user))
     except Exception:
         log_traceback()
@@ -317,6 +382,34 @@ def _tso500_pair_arms(cvo: Optional[DragenTSO500CombinedVariantOutput],
     return arms
 
 
+@dataclass
+class LibraryQCRow:
+    """ One line of the pair page's Library QC table - a metric under the arm and category it belongs to.
+        The arm and category cells span their metrics' lines, so are set on the first line of each only """
+    metric: Optional[LibraryQCMetric]
+    arm: Optional[TSO500PairArm] = None
+    arm_rowspan: int = 0
+    qc: Optional[LibraryQC] = None
+    qc_rowspan: int = 0
+
+
+def _library_qc_rows(arms: list[TSO500PairArm]) -> list[LibraryQCRow]:
+    """ Every arm's categories and their metrics as one table. A category with no metrics still gets a line
+        so its call is shown """
+    rows = []
+    for arm in arms:
+        arm_rows = []
+        for qc in arm.library_qc:
+            metrics = qc.metric_rows or [None]
+            arm_rows.append(LibraryQCRow(metric=metrics[0], qc=qc, qc_rowspan=len(metrics)))
+            arm_rows.extend(LibraryQCRow(metric=metric) for metric in metrics[1:])
+        if arm_rows:
+            arm_rows[0].arm = arm
+            arm_rows[0].arm_rowspan = len(arm_rows)
+            rows.extend(arm_rows)
+    return rows
+
+
 def view_tso500_pair(request, sequencing_run_name, pair_id):
     """ One sequenced TSO 500 pair on one run: the DRAGEN analysis of it and the library QC of its arms,
         which are keyed the same way and are the two halves of what a scientist asks about a case """
@@ -337,6 +430,7 @@ def view_tso500_pair(request, sequencing_run_name, pair_id):
         # Nothing to read it through - the pair claims no specimen and names no run we have registered
         raise PermissionDenied(f"'{pair_id}' is attached to no specimen or sequencing run")
 
+    arms = _tso500_pair_arms(cvo, library_qc, request.user)
     context = {
         "sequencing_run_name": sequencing_run_name,
         "pair_id": pair_id,
@@ -347,10 +441,10 @@ def view_tso500_pair(request, sequencing_run_name, pair_id):
         "cvo": cvo,
         "cvo_file_upload": cvo.file_upload if cvo and cvo.file_upload and
                            cvo.file_upload.can_view(request.user) else None,
-        "qc_file_upload": next((qc.file_upload for qc in library_qc
-                                if qc.file_upload and qc.file_upload.can_view(request.user)), None),
-        "has_library_qc": bool(library_qc),
-        "arms": _tso500_pair_arms(cvo, library_qc, request.user),
+        # [Analysis Status] and the measured date are the pair's, carried by each of its QC rows
+        "library_qc": library_qc[0] if library_qc else None,
+        "arms": arms,
+        "library_qc_rows": _library_qc_rows(arms),
     }
     return render(request, 'seqauto/view_tso500_pair.html', context)
 

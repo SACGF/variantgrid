@@ -4,6 +4,7 @@ import re
 import shutil
 import traceback
 from collections import namedtuple
+from datetime import timedelta
 from functools import cached_property
 from typing import Optional, Union
 
@@ -12,12 +13,12 @@ from django.contrib.auth.models import Group, User
 from django.contrib.postgres.indexes import HashIndex, OpClass
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import CharField, F, Func, Q, Value
+from django.db.models import CharField, F, Func, Q, TextField, Value
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
-from django.db.models.functions import Substr
+from django.db.models.functions import Concat, Substr
 from django.db.models.query import QuerySet
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -45,12 +46,12 @@ from seqauto.models import (
 )
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
+from snpdb.models.models import CodeVersionMixin
 from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
 from upload.models.models_enums import (
     ModifiedImportedVariantOperation,
-    TimeFilterMethod,
     UploadedFileTypes,
     UploadStepOrigin,
     UploadStepTaskType,
@@ -188,6 +189,17 @@ class UploadData(models.Model):
         return None
 
 
+class UploadUserError(Exception):
+    """ The uploaded file (or what was sent with it) is wrong, not our code - the import fails showing the user
+        this message, and summary on the upload grid, without a traceback or an error report """
+    summary = "Problem with uploaded file"
+
+    def __init__(self, message: str, summary: Optional[str] = None):
+        super().__init__(message)
+        if summary:
+            self.summary = summary
+
+
 class PipelineFailedJobTerminateEarlyException(Exception):
     """ Throw this if pipeline fails elsewhere, and want to exit early but not log exception """
 
@@ -206,6 +218,7 @@ class UploadPipeline(models.Model):
     progress_status = models.TextField(null=True)
     progress_percent = models.FloatField(default=0)
     celery_task = models.CharField(max_length=36, null=True)
+    error_summary = models.TextField(null=True)  # Set for an UploadUserError, shown next to the upload grid's cross
 
     @property
     def file_type(self):
@@ -287,7 +300,18 @@ class UploadPipeline(models.Model):
         # FIXME remove this, cause of error might not be the most recent exception
         report_exc_info()
         logging.error("upload_pipeline.error(%s, %s)", self, error_message)
+        self._fail(error_message)
+        message = f"UploadPipeline {self.pk} failed. " \
+            f"Filename: {self.get_file_type_display()} Error: {error_message}"
+        report_message(message, level='error')
 
+    def user_error(self, user_error: UploadUserError):
+        """ The file is wrong, not our code - so nothing to report """
+        logging.warning("upload_pipeline.user_error(%s, %s)", self, user_error)
+        self.error_summary = user_error.summary
+        self._fail(str(user_error))
+
+    def _fail(self, error_message: str):
         self.status = ProcessingStatus.ERROR
         self.progress_status = f"Error: {error_message}"
         self.save()
@@ -298,9 +322,6 @@ class UploadPipeline(models.Model):
         name = f"import_{self.file_type}_failed"
         filename = self.file_upload.get_filename()
         create_event(user, name, error_message, filename=filename, severity=LogLevel.ERROR)
-        message = f"UploadPipeline {self.pk} failed. " \
-            f"Filename: {self.get_file_type_display()} Error: {error_message}"
-        report_message(message, level='error')
 
     def _set_related_data_import_status(self, import_status: ImportStatus):
         if vcf := self.vcf:
@@ -403,6 +424,8 @@ class UploadStep(models.Model):
     child_script = models.TextField(null=True)
     import_variant_table = models.TextField(null=True, blank=True)
     celery_task = models.CharField(max_length=36, null=True)
+    # Renewed by the running worker (UploadStepLeaseHeartbeat); lapsed means the worker died (#2188)
+    lease_expires = models.DateTimeField(null=True)
     tool_version = models.ForeignKey(ToolVersion, null=True, on_delete=CASCADE)
     output_text = models.TextField(null=True)
 
@@ -428,13 +451,35 @@ class UploadStep(models.Model):
             raise ValueError(msg)
 
         self.start_date = timezone.now()
+        self.lease_expires = self.start_date + timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
         self.status = ProcessingStatus.PROCESSING
         self.items_processed = 0
+
+    def renew_lease(self, celery_task: str) -> bool:
+        """ Extend the lease while still held by celery_task. False means the step was closed or taken over
+            (marked timed out and retried), so the caller should stop """
+        lease_expires = timezone.now() + timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        return bool(UploadStep.objects.filter(pk=self.pk, celery_task=celery_task, end_date__isnull=True)
+                    .update(lease_expires=lease_expires))
+
+    @staticmethod
+    def lease_lapsed_q(now=None) -> Q:
+        """ Running steps whose worker stopped renewing. A step started before lease_expires existed has none
+            and is judged on start_date instead. Sub-steps (vcf_preprocess) are closed by their parent and
+            never hold a lease """
+        if now is None:
+            now = timezone.now()
+        lease_seconds = timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        return Q(status=ProcessingStatus.PROCESSING, end_date__isnull=True, parent_upload_step__isnull=True) & (
+            Q(lease_expires__lt=now) | Q(lease_expires__isnull=True, start_date__lt=now - lease_seconds))
 
     def error_exception(self, e):
         status = ProcessingStatus.ERROR
         self.status = status
         self.error_message = str(e)
+        if isinstance(e, UploadUserError):
+            self.upload_pipeline.user_error(e)
+            return
         try:
             # self.error_message += "\n" + get_traceback()
             # try just regular traceback as the fancy one above isn't working
@@ -445,14 +490,21 @@ class UploadStep(models.Model):
         self.upload_pipeline.error(self.error_message)
 
     @transaction.atomic()
-    def mark_timed_out(self, user: Optional[User] = None):
+    def mark_timed_out(self, user: Optional[User] = None, error_message: Optional[str] = None):
+        """ Close a step nothing will finish (its worker died, or an admin gave up on it) and fail its pipeline
+            so the retry can pick it up """
         self.status = ProcessingStatus.TIMED_OUT
-        if user:
+        if error_message:
+            self.error_message = error_message
+        elif user:
             self.error_message = f"Marked as timed out by {user.username}"
         else:
             self.error_message = "Timed out"
+        if self.end_date is None:
+            self.end_date = timezone.now()
 
         self.save()
+        self.close_sub_steps()
         qs = UploadPipeline.objects.filter(pk=self.upload_pipeline.pk)
         progress_status = f"Failure in import step id: {self.pk}, ({self.error_message})"
         qs.update(status=self.status, progress_status=progress_status)
@@ -498,19 +550,18 @@ class UploadStepMultiFileOutput(models.Model):
     items_to_process = models.IntegerField(null=True)
 
 
-class VCFImporter(models.Model):
+class VCFImporter(CodeVersionMixin, models.Model):
     """ Keep track of how the processing is done, in case we need to audit/fix import bugs later """
     name = models.TextField()
     version = models.IntegerField()
     vcf_parser = models.TextField()
     vcf_parser_version = models.TextField()
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("name", "version", "vcf_parser", "vcf_parser_version", "code_git_hash")
+        unique_together = ("name", "version", "vcf_parser", "vcf_parser_version", "code_version")
 
     def __str__(self):
-        return f"{self.name} (v.{self.version}). Git: {self.code_git_hash}. Uses {self.vcf_parser} (v.{self.vcf_parser_version})"
+        return f"{self.name} (v.{self.version}). Git: {self.code_version.git_hash}. Uses {self.vcf_parser} (v.{self.vcf_parser_version})"
 
 
 # UploadedVCF and the satellites in models_uploaded_files are heading towards being FileUpload
@@ -804,7 +855,7 @@ class ModifiedImportedVariant(models.Model):
     # Set from bcftools --old-rec-tag when the record was a multi-allelic
     # Legacy rows hold vt OLD_MULTIALLELIC: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
     old_multiallelic = models.TextField(null=True)
-    # Set from bcftools --old-rec-tag when the record was normalized
+    # Set from bcftools --old-rec-tag when the record was normalized (moved or trimmed)
     # Legacy rows hold vt OLD_VARIANT: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
@@ -891,6 +942,22 @@ class ModifiedImportedVariant(models.Model):
         # This doesn't handle symbolic alts with SVLEN but BCF tools don't record SVLEN in old tag anyway
         return f"{vc.chrom}:{int(vc.position)}:{vc.ref}/{vc.alt}"
 
+    @staticmethod
+    def get_variant_coordinate_from_old_variant(old_variant_formatted: str) -> VariantCoordinate:
+        """ Inverse of get_old_variant_from_variant_coordinate (rsplit as alt contig names can contain ':') """
+        chrom, position, ref_alt = old_variant_formatted.rsplit(":", 2)
+        ref, alt = ref_alt.split("/")
+        return VariantCoordinate.model_construct(chrom=chrom, position=int(position), ref=ref, alt=alt)
+
+    @staticmethod
+    def q_normalised() -> Q:
+        """ Records bcftools changed, rather than only split from a multi-allelic. Compares the original with
+            the variant it became, as imports before #2126 only set old_variant when the position moved """
+        variant_formatted = Concat("variant__locus__contig__name", Value(":"), "variant__locus__position", Value(":"),
+                                   "variant__locus__ref__seq", Value("/"), "variant__alt__seq", output_field=TextField())
+        return Q(operation=ModifiedImportedVariantOperation.NORMALIZATION, old_variant_formatted__isnull=False) & \
+            ~Q(old_variant_formatted=variant_formatted)
+
     @classmethod
     def _filter_old_variant_formatted(cls, old_variant: str, startswith=False) -> QuerySet['ModifiedImportedVariant']:
         """ Also filters on the indexed prefix (see Meta.indexes) so the lookup can use the index """
@@ -912,15 +979,19 @@ class ModifiedImportedVariant(models.Model):
         return miv.variant
 
     @classmethod
-    def get_variants_for_unnormalized_variant(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+    def get_variants_for_unnormalized_variant(cls, variant_qs: QuerySet[Variant],
+                                              variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+        """ old_variant_formatted has no genome build, so variant_qs scopes the result to the build (and whatever
+            else the caller may see) """
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
-        return Variant.objects.filter(pk__in=cls._filter_old_variant_formatted(old_variant).values("variant_id"))
+        return variant_qs.filter(pk__in=cls._filter_old_variant_formatted(old_variant).values("variant_id"))
 
     @classmethod
-    def get_variants_for_unnormalized_variant_any_alt(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+    def get_variants_for_unnormalized_variant_any_alt(cls, variant_qs: QuerySet[Variant],
+                                                      variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
         miv_qs = cls._filter_old_variant_formatted(old_variant, startswith=True)
-        return Variant.objects.filter(pk__in=miv_qs.values("variant_id"))
+        return variant_qs.filter(pk__in=miv_qs.values("variant_id"))
 
     @classmethod
     def get_other_loci_variants_by_multiallelic(cls, variant: Variant) -> dict[str, set['ModifiedImportedVariant']]:
@@ -958,53 +1029,3 @@ class VCFSkippedContig(models.Model):
     import_info = models.ForeignKey(VCFSkippedContigs, on_delete=CASCADE, null=True)
     contig = models.TextField()
     num_skipped = models.IntegerField()
-
-
-class UploadSettings(models.Model):
-    user = models.OneToOneField(User, on_delete=CASCADE)
-    time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
-    time_filter_value = models.IntegerField(default=5)
-
-    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
-                      UploadedFileTypes.GENE_LEVEL_INSERT_VARIANTS_ONLY}
-
-    @cached_property
-    def file_types(self) -> set:
-        return set(self.uploadsettingsfiletype_set.values_list("file_type", flat=True))
-
-    def file_types_description(self) -> str:
-        description = "Custom"
-        if self.file_types == set(UploadedFileTypes):
-            description = "All"
-        elif self.file_types == self.non_internal_types:
-            description = "Non internal"
-        return description
-
-    @property
-    def non_internal_types(self) -> set:
-        return set(UploadedFileTypes) - self.INTERNAL_TYPES
-
-    def create_default_visible_file_types(self):
-        self.uploadsettingsfiletype_set.all().delete()
-        records = []
-        for uft in self.non_internal_types:
-            records.append(UploadSettingsFileType(upload_settings=self, file_type=uft))
-        if records:
-            UploadSettingsFileType.objects.bulk_create(records)
-
-    def __str__(self):
-        return f"User: {self.user}, {self.time_filter_value} {self.time_filter_method}"
-
-
-class UploadSettingsFileType(models.Model):
-    upload_settings = models.ForeignKey(UploadSettings, null=False, on_delete=CASCADE)
-    file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
-
-    class Meta:
-        unique_together = ('upload_settings', 'file_type')
-
-
-@receiver(post_save, sender=UploadSettings)
-def upload_settings_post_save_handler(sender, instance, **kwargs):
-    if kwargs.get("created"):
-        instance.create_default_visible_file_types()

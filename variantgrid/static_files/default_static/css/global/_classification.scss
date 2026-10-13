@@ -655,3 +655,25 @@ table.overlap-summary {
 		color: #444;
 	}
 }
+
+.gene-consensus-group {
+	table.gene-content {
+		th.gene-content-label {
+			width: 160px;
+			font-weight: normal;
+			color: #666;
+			white-space: nowrap;
+		}
+		td {
+			white-space: pre-wrap;
+		}
+	}
+	.gene-content-text.clamp {
+		max-height: 4.5em;
+		overflow: hidden;
+	}
+	.gene-content-conditions .badge {
+		white-space: normal;
+		text-align: left;
+	}
+}

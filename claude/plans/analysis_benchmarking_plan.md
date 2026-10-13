@@ -4,7 +4,7 @@ Status: draft
 
 Admin-only feature for capturing reload-time snapshots of an analysis, storing them with code/environment provenance, and auto-running them on a Celery Beat schedule so we can spot regressions and confirm tuning wins (e.g. `random_page_cost`, #1547 max_af gate, future #1551 sub-cohort caches) without ad-hoc `profile_analysis_nodes` runs.
 
-Motivating context: the `random_page_cost = 1.1` win that closed out #1546 was discovered manually with `profile_analysis_nodes --planner-diagnostic`. The same kind of regression in the other direction — say, a query plan that accidentally falls back to a sequential scan — would today only surface as a user complaint. This feature catches those before deploy by snapshotting periodically.
+Without it, a planner regression — say, a query plan that accidentally falls back to a sequential scan — only surfaces as a user complaint or a manual `profile_analysis_nodes --planner-diagnostic` run. Periodic snapshots catch it before deploy.
 
 ## Design summary (locked decisions)
 
@@ -12,7 +12,7 @@ Motivating context: the `random_page_cost = 1.1` win that closed out #1546 was d
 - **Discard-first warmup.** Each benchmark run does a configurable `prewarm_passes` number of throwaway reloads, then the measured one. Warm cache + warm Q-cache state is the user-perceived workload; cold-start variance dwarfs real signal. Default `prewarm_passes = 1`.
 - **Snapshot history is per-analysis.** No cross-analysis aggregation in the model layer; the comparison view computes deltas at read time.
 - **Per-node breakdown stored alongside.** Without it, the only triage tool for a regression would be re-running. With it, the snapshot itself shows which node moved.
-- **Celery Beat drives the auto-bucket.** No cron involvement. A boolean field on `Analysis` opts an analysis into a single weekly bucket; the bucket task fires Saturday 03:00 local and queues per-analysis benchmarks on a dedicated low-concurrency queue. Multi-bucket (different schedules per group) is out of scope for v1; revisit if/when needed.
+- **Celery Beat drives the auto-bucket.** No cron involvement. A boolean field on `Analysis` opts an analysis into a single weekly bucket; the bucket task fires Saturday 03:00 local and queues per-analysis benchmarks on a dedicated low-concurrency queue.
 - **Snapshot creation is non-destructive.** Reload happens against the live analysis but uses the same code path users hit on "reload nodes" — no separate fork.
 
 ## Schema preconditions (already landed)
@@ -116,7 +116,7 @@ For the wall-time measurement to be meaningful, the synchronous wrapper has to a
 | `total` down, `wall` flat | parallelism regressed but each piece got faster |
 | `total` and `wall` both down | unambiguous win |
 
-The `random_page_cost = 1.1` change manifests as the third row: same work, smaller wall via better plans. The benchmark catches this only because both metrics are stored.
+A planner-cost tuning such as `random_page_cost = 1.1` shows as the third row: same work, smaller wall via better plans. The benchmark catches this only because both metrics are stored.
 
 ## Cache-state discipline
 
@@ -149,7 +149,7 @@ app.conf.beat_schedule['analysis-benchmark-weekly'] = {
 }
 ```
 
-Saturday 03:00 was chosen to land outside the existing scheduled work that's visible in the project today: the daily DB activity in the early evening (`notify-server-status` at 19:00), the weekly classification email job (Mon 10:00), the seqauto scans (06:00 and 19:00), and the routine RDS-snapshot windows AWS schedules in the early hours of weekdays. Saturday 03:00 is empty as far as the codebase knows.
+Saturday 03:00 lands outside the existing scheduled work that's visible in the project today: the daily DB activity in the early evening (`notify-server-status` at 19:00), the weekly classification email job (Mon 10:00), the seqauto scans (06:00 and 19:00), and the routine RDS-snapshot windows AWS schedules in the early hours of weekdays. Saturday 03:00 is empty as far as the codebase knows.
 
 The bucket task in `analysis/tasks/benchmark_tasks.py`:
 
@@ -201,7 +201,7 @@ Runs the same `benchmark_analysis_task` body inline (no Celery hop) for each ana
 
 - **Alerting**: if `wall_seconds > 1.5 * trailing_30_day_average`, fire a notification via the existing `library.log_utils.NotificationBuilder` pipeline. Triggered at the end of `benchmark_analysis_task`.
 - **Per-node EXPLAIN auto-capture on regression**: when a node's `load_seconds` exceeds its previous snapshot by > 50%, automatically re-run with EXPLAIN ANALYZE and stash the plan as a JSON blob. Targeted forensics, only triggers on regressions, low storage.
-- **Settings sweep mode**: `benchmark_analyses --analyses 21 --pg-setting random_page_cost=1.1 --pg-setting random_page_cost=4.0` runs each analysis once per setting variant. Mirrors the `--planner-diagnostic` flag we added to `profile_analysis_nodes`.
+- **Settings sweep mode**: `benchmark_analyses --analyses 21 --pg-setting random_page_cost=1.1 --pg-setting random_page_cost=4.0` runs each analysis once per setting variant. Mirrors the `--planner-diagnostic` flag on `profile_analysis_nodes`.
 - **Multiple auto-bucket schedules**: a M2M `AnalysisBenchmarkBucket(name, schedule_crontab)` model so different analyses can run on different cadences (e.g. critical sentinels nightly, others weekly). Skipped in v1 because a single weekly cadence covers the regression-detection use case; add when there's a concrete need.
 - **CI integration**: nightly job runs sentinel analyses on a test DB, fails the build if `wall_seconds` regressed by > 25 % vs the prior `master` snapshot. Catches code regressions before deploy. Belongs in CI config, not the application.
 

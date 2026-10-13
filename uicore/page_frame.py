@@ -20,7 +20,7 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from snpdb.models.models import SiteMessage
+from snpdb.models.models import SiteMessage, UserAwards
 from uicore.menus import MenuItem, current_menu, get_menus
 from user_messages.models import inbox_count_for
 from variantgrid.perm_path import get_visible_url_names
@@ -119,6 +119,7 @@ def _messages_html(request: HttpRequest) -> str:
 def _user_html(user) -> str:
     return render_to_string("uicore/page/navbar_user.html", {
         'user': user,
+        'kudos_html': UserAwards(user=user).kudos_html if settings.USER_AWARDS_ENABLED else '',
         'inbox_enabled': settings.INBOX_ENABLED,
         'mail_count': inbox_count_for(user) if settings.INBOX_ENABLED else 0,
     })

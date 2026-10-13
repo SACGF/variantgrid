@@ -7,7 +7,7 @@ JointCalledVCF), QC models, EnrichmentKit and gold coverage, and the seqauto RES
   `Sample_Type` columns, which the pipeline posts as `SequencingSampleData`
   (`seqauto/models/models_seqauto.py:sequencing_sample_for_pair`); a sheet posted without them leaves the link null
   and `patients/tasks/extraction_matching_tasks.py:link_library_qc_to_sequencing_samples` fills it later. Reports
-  read it by specimen (`classification/report/case_report_context.py:specimen_library_qc`).
+  read it by the case's pair, falling back to the specimen (`classification/report/case_report_context.py:case_library_qc`).
 - `DragenTSO500CombinedVariantOutput` is one DRAGEN analysis of one pair (#1904) - TMB, MSI, GIS, the caller's tumour
   fraction and ploidy - keyed on (run name, pair) like `LibraryQC`, sharing its specimen claim
   (`seqauto/models/models_seqauto.py:SpecimenClaimMixin`). The lab's MSI / TMB calls are properties over the
@@ -30,6 +30,9 @@ API:
 - Reads are open to any logged-in user; writes need a superuser or a member of `SEQAUTO_API_WRITE_GROUP` (the
   pipeline's token user). A new write endpoint subclasses `seqauto/views_rest.py:SeqAutoModelViewSet` or
   `seqauto/views_rest.py:SeqAutoWriteAPIView`; a POST that only reads (batch lookups) stays a plain `APIView`.
+- An endpoint for records of a run subclasses `seqauto/views_rest.py:SequencingRunModelViewSet` or
+  `seqauto/views_rest.py:SequencingRunWriteAPIView` (calling `log_sequencing_runs` with what it saved), so its calls
+  appear on the run page's API Log tab.
 - The API's `alignment_files` (an old client's single `bam_file` is `[bam_file]`) are `AlignmentFile`s: BAM or CRAM,
   by `file_type` or a `.cram` extension, several per sequencing sample. `SingleSampleVCF` and `QC` link all of theirs
   (M2M, never one picked out) and carry `sequencing_sample` directly - query through that, not the alignment files.
@@ -39,5 +42,8 @@ API:
   `seqauto/serializers/seqauto_qc_serializers.py:QCSerializer`). They reach IGV as `SampleFilePath` rows, copied at
   VCF import (`upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing`) and, for a file posted after that, by
   `seqauto/models/models_seqauto.py:AlignmentFile.link_to_samples`.
+- Serializers write through `library/django_utils/change_tracking.py:update_or_create_if_changed` (and
+  `get_or_create_recorded` where an existing row is left alone), never `objects.update_or_create`, so a replayed post
+  is a true no-op: `modified` means a field changed, and the API Log row shows the call as unchanged (#1413).
 - A client-visible API change needs a name in `variantgrid/views_rest.py:API_FEATURES` (see
   claude/guides/operations.md#authentication-surface).

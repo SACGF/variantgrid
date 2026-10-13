@@ -40,7 +40,6 @@ from snpdb.models import (
     VCF,
     AbstractVCFField,
     Cohort,
-    CohortSample,
     ImportStatus,
     Sample,
     UserSettings,
@@ -49,7 +48,7 @@ from snpdb.models import (
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, VariantsType, VCFInfoTypes
+from snpdb.models.models_enums import ImportSource, VariantOrigin, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (
@@ -68,6 +67,7 @@ from upload.models import (
     UploadStepTaskType,
     VCFPipelineStage,
 )
+from upload.models.models import UploadUserError
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.upload_metadata import (
     SAMPLE_EXTRACTIONS,
@@ -207,23 +207,19 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_reader):
                 "user": vcf.user}
     cohort, created = Cohort.objects.update_or_create(vcf=vcf, defaults=defaults)
     logging.info("Cohort: %s (created: %s) version=%d", cohort, created, cohort.version)
+
+    samples_by_vcf_name = vcf.samples_by_vcf_name
+    vcf_samples = [samples_by_vcf_name[sample_name] for sample_name in _get_vcf_sample_names(vcf, vcf_reader)]
+    if removed_samples := cohort.get_samples().exclude(pk__in=[s.pk for s in vcf_samples]):
+        removed_names = ", ".join(s.vcf_sample_name for s in removed_samples)
+        raise VCFSamplesRemovedException(f"This file no longer has samples loaded from it previously: "
+                                         f"{removed_names}. Delete those samples, or upload the file as a new VCF.")
+
     if not created:
         cohort.cohortgenotypecollection_set.all().delete()
 
     assign_permission_to_user_and_groups(vcf.user, cohort)
-
-    sample_names = _get_vcf_sample_names(vcf, vcf_reader)
-    for i, sample_name in enumerate(sample_names):
-        sample = vcf.samples_by_vcf_name[sample_name]
-        logging.info("Creating cohort sample for: %s", sample)
-        CohortSample.objects.get_or_create(cohort=cohort,
-                                           sample=sample,
-                                           defaults={
-                                                "cohort_genotype_packed_field_index": i,
-                                                "sort_order": i,
-                                           })
-        logging.info("Done creating cohorts...")
-
+    cohort.set_vcf_samples(vcf_samples)
     logging.info("Cohort: %s version=%d", cohort, cohort.version)
     create_cohort_genotype_collection(cohort)
 
@@ -380,6 +376,9 @@ def _get_vcf_sample_names(vcf, vcf_reader) -> list[str]:
 def configure_vcf_from_header(vcf, vcf_reader):
     """ Needs to have UploadedVCF saved against VCF
         Can also be called on an existing VCF during reload """
+    # A reload's file may have gained or reordered samples
+    vcf.header = vcf_reader.raw_header
+    vcf.genotype_samples = len(vcf_reader.samples)
     header_types = cyvcf2_header_types(vcf_reader)
     create_vcf_info(vcf, header_types.get("INFO", {}))
     create_vcf_filters(vcf, header_types.get("FILTER", {}))
@@ -590,7 +589,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
             modified_sample = False
             # Set sample.variants_type from EnrichmentKit (eg to Mixed somatic for somatic panels)
             if ek := sequencing_sample.enrichment_kit:
-                if ek.sample_variants_type != VariantsType.UNKNOWN:
+                if ek.sample_variants_type != VariantOrigin.UNKNOWN:
                     sample.variants_type = ek.sample_variants_type
                     modified_sample = True
 
@@ -674,13 +673,21 @@ class GenomeBuildDetectionException(Exception):
     pass
 
 
-class GenomeBuildMismatchException(Exception):
+class GenomeBuildMismatchException(UploadUserError):
     """ Declared genome build contradicts the one detected from the header - fail rather than guess """
+    summary = "Genome build disagrees with upload metadata"
 
 
-class ExtractionMismatchException(Exception):
+class ExtractionMismatchException(UploadUserError):
     """ A file's declared extraction contradicts the one its sequencing sample was linked to, or names
         a sample the VCF doesn't have - fail rather than guess, as no later arrival fixes either """
+    summary = "Extraction disagrees with upload metadata"
+
+
+class VCFSamplesRemovedException(UploadUserError):
+    """ A reload in place whose file dropped samples the VCF already has - their CohortSamples would point at
+        no column, and deleting them cascades to Trios/pedigrees, so the user decides """
+    summary = "Reloaded VCF is missing samples"
 
 
 class ContigMismatchException(GenomeBuildDetectionException):

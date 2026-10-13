@@ -14,20 +14,29 @@ from django.views.decorators.http import require_POST
 from annotation.views import get_build_contigs
 from library.django_utils.view_utils import render_ajax_view
 from library.guardian_utils import check_can_write
-from upload import forms, upload_stats
-from upload.import_task_factories.import_task_factory import get_import_tasks_by_extension
+from snpdb.models.models_enums import ProcessingStatus
+from upload import upload_stats
+from upload.grids import FileUploadColumns
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
     SimpleVCFImportInfo,
     UploadedFileTypes,
     UploadPipeline,
-    UploadSettings,
     UploadStep,
     VCFSkippedContigs,
 )
+from upload.tasks.retry_upload_pipelines_task import (
+    fail_stuck_upload_pipelines,
+    get_retryable_upload_pipelines,
+    retry_message,
+    retry_upload_pipelines,
+)
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, retry_upload_pipeline
-from upload.views.views_json import _get_basic_uploaded_file_context, get_file_dicts_list
+from upload.views.views_json import _get_basic_uploaded_file_context
+
+# The upload page's "Retry failed" only reaches back this far, so it doesn't relaunch long-forgotten failures
+RETRY_FAILED_IMPORTS_DAYS = 7
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.DRAGEN_TSO500_ALL_FUSIONS: "uploaded_vcf",
@@ -36,20 +45,11 @@ UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
 
 
 def upload(request):
-    upload_settings, _ = UploadSettings.objects.get_or_create(user=request.user)
-
-    form = forms.UploadSettingsForm(request.POST or None, instance=upload_settings, user=request.user)
-    if request.method == "POST":
-        if form.is_valid():
-            upload_settings = form.save()
-
-    file_dicts_list = get_file_dicts_list(upload_settings)
-    extensions = get_import_tasks_by_extension().keys()
-    accept_file_types = fr"/(\.|\/)({'|'.join(extensions)})$/i"
-    context = {'existing_files': file_dicts_list,
-               'form': form,
-               "upload_enabled": settings.UPLOAD_ENABLED,
-               "accept_file_types": accept_file_types}
+    context = {"upload_enabled": settings.UPLOAD_ENABLED,
+               "file_types": UploadedFileTypes.choices,
+               "all_file_types": FileUploadColumns.ALL_FILE_TYPES,
+               "processing_statuses": ProcessingStatus.choices,
+               "retry_failed_imports_days": RETRY_FAILED_IMPORTS_DAYS}
     return render(request, 'upload/upload.html', context)
 
 
@@ -170,6 +170,21 @@ def upload_retry_import(request, upload_pipeline_id):
     messages.add_message(request, status, msg, extra_tags='import-message')
 
     return HttpResponseRedirect(reverse("view_upload_pipeline", kwargs={"upload_pipeline_id": upload_pipeline.pk}))
+
+
+@require_POST
+def upload_retry_failed_imports(request):
+    """ The failed imports of the page's file type filter, from the last RETRY_FAILED_IMPORTS_DAYS (#2188) """
+    if not settings.UPLOAD_ENABLED:
+        raise PermissionDenied("Upload is disabled")
+    since = timezone.now() - timedelta(days=RETRY_FAILED_IMPORTS_DAYS)
+    file_upload_qs = FileUploadColumns.filter_file_type(FileUpload.objects.filter(created__gte=since),
+                                                        request.POST.get("file_type"))
+    upload_pipelines_qs = UploadPipeline.objects.filter(file_upload__in=file_upload_qs)
+    num_stuck = fail_stuck_upload_pipelines(upload_pipelines_qs)
+    num_queued = retry_upload_pipelines(get_retryable_upload_pipelines(upload_pipelines_qs, request.user))
+    messages.add_message(request, messages.INFO, retry_message(num_queued, num_stuck))
+    return HttpResponseRedirect(reverse("upload"))
 
 
 def download_uploaded_file(request, pk):

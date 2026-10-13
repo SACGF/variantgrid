@@ -17,6 +17,7 @@ from genes.models import (
     TranscriptVersion,
 )
 from genes.models_enums import AnnotationConsortium
+from genes.transcript_parts import get_cdot_transcript_id_and_version
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
@@ -117,11 +118,11 @@ class Command(BaseCommand):
             them), then we seek back to the start and stream the transcripts. """
         def genes_iter():
             file_obj.seek(0)
-            return ijson.kvitems(file_obj, "genes")
+            return ijson.kvitems(file_obj, "genes", use_float=True)
 
         def transcripts_iter():
             file_obj.seek(0)
-            return ijson.kvitems(file_obj, "transcripts")
+            return ijson.kvitems(file_obj, "transcripts", use_float=True)
 
         cls._import_cdot_data(genome_build, annotation_consortium, cdot_version, genes_iter, transcripts_iter)
         CdotDataVersion.objects.update_or_create(genome_build=genome_build, annotation_consortium=annotation_consortium,
@@ -265,11 +266,9 @@ class Command(BaseCommand):
                 existing_transcript_versions.clear()
 
         for transcript_accession, tv_data in transcripts_iter():
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            transcript_id, version = get_cdot_transcript_id_and_version(transcript_accession)
             if version is None:
-                # cdot has some fake transcripts - ok to skip these
-                if not transcript_accession.startswith("fake"):
-                    logging.info("Warning: Skipping transcript accession '%s' w/o version", transcript_accession)
+                logging.info("Warning: Skipping transcript accession '%s' w/o version", transcript_accession)
                 continue
 
             if transcript_id not in known_transcript_ids:
@@ -291,7 +290,8 @@ class Command(BaseCommand):
                                                    biotype=biotype,
                                                    data=tv_data,
                                                    modified_cdot_version=cdot_version)
-            if pk := transcript_version_ids_by_accession.get(transcript_accession):
+            # Keyed 'transcript_id.version' - a cdot fake transcript's accession has no version to match on
+            if pk := transcript_version_ids_by_accession.get(f"{transcript_id}.{version}"):
                 transcript_version.pk = pk
                 existing_transcript_versions.append(transcript_version)
             else:

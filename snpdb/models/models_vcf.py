@@ -27,13 +27,13 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass, VCFConstant
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
-from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
 from patients.models_enums import Sex
-from snpdb.models.models import LabProject
+from snpdb.models.models import CodeVersionMixin, LabProject
 from snpdb.models.models_enums import (
     ImportStatus,
     SampleFileType,
-    VariantsType,
+    VariantOrigin,
     VCFInfoTypes,
 )
 from snpdb.models.models_genome import GenomeBuild
@@ -152,24 +152,19 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return filter_dict
 
     @staticmethod
-    def convert_from_percent_to_unit(percent):
-        from snpdb.models import CohortGenotype  # Circular import
-
-        if percent != CohortGenotype.MISSING_NUMBER_VALUE:
-            percent /= 100.0
-        return percent
-
-    @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
+        """ queryset: only check these VCFs - keeps the permission lookups to them rather than every VCF """
         if has_write_permission:
             perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         else:
             perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
 
+        if queryset is None:
+            queryset = VCF.objects.all()
         if group_data:
-            queryset = get_objects_for_user(user, perm, klass=VCF, accept_global_perms=True)
+            queryset = get_objects_for_user(user, perm, klass=queryset, accept_global_perms=True)
         else:
-            queryset = VCF.objects.filter(user=user)
+            queryset = queryset.filter(user=user)
 
         queryset = queryset.exclude(import_status__in=ImportStatus.DELETION_STATES)
         if not include_archived:
@@ -394,7 +389,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     research_consent = models.BooleanField(null=True, blank=True)
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
 
     preview_icon_symbol = "node-icon-sample"  # SampleNode wears this too - see get_node_class_icon
 
@@ -499,7 +494,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
 
     @property
     def is_somatic(self):
-        return self.variants_type in VariantsType.SOMATIC_TYPES
+        return self.variants_type in VariantOrigin.SOMATIC_TYPES
 
     @cached_property
     def enrichment_kit(self):
@@ -562,18 +557,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return self.vcf.cohort.cohort_genotype_collection
 
     def get_genotype(self, variant: Variant) -> 'SampleGenotype':
-        from snpdb.models import CohortGenotype
-
-        cgc = self.cohort_genotype_collection
-        collections = [cgc]
-        if cgc.common_collection:
-            collections.append(cgc.common_collection)
-        try:
-            cg = CohortGenotype.objects.filter(collection__in=collections).get(variant=variant)
-            sample_genotype = cg.get_sample_genotype(self)
-        except CohortGenotype.DoesNotExist:
-            sample_genotype = None
-        return sample_genotype
+        return self.cohort_genotype_collection.get_sample_genotype(self, variant)
 
     def __str__(self):
         return f"{self.name} ({self.vcf})"
@@ -638,24 +622,30 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return reverse('data')
 
     @staticmethod
-    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True):
-        """ May be given permission for whole VCF or just a sample """
+    def filter_for_user(user, group_data=True, has_write_permission=False, include_archived=True, queryset=None):
+        """ May be given permission for whole VCF or just a sample.
+            queryset: only check these samples - keeps the permission lookups to them rather than every sample """
+        if queryset is None:
+            queryset = Sample.objects.all()
+            vcf_qs = None
+        else:
+            vcf_qs = VCF.objects.filter(pk__in=queryset.values("vcf"))
         vcfs = VCF.filter_for_user(user, group_data, has_write_permission=has_write_permission,
-                                   include_archived=include_archived)
+                                   include_archived=include_archived, queryset=vcf_qs)
         q_filters = [Q(vcf__in=vcfs)]
         if group_data:
             if has_write_permission:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.WRITE)
             else:
                 perm = DjangoPermission.perm(Sample, DjangoPermission.READ)
-            queryset = get_objects_for_user(user, perm, klass=Sample, accept_global_perms=True)
-            sample_q = Q(pk__in=queryset.values_list("pk", flat=True))
+            permitted_samples = get_objects_for_user(user, perm, klass=queryset, accept_global_perms=True)
+            sample_q = Q(pk__in=permitted_samples.values_list("pk", flat=True))
             if not include_archived:
                 sample_q &= Q(vcf__data_archived_date__isnull=True)
             q_filters.append(sample_q)
 
         ored_q_filters = reduce(operator.or_, q_filters)
-        return Sample.objects.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
+        return queryset.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
 
     @staticmethod
     def get_for_user(user, sample_id):
@@ -748,17 +738,16 @@ class VCFAlleleSource(AlleleSource):
         return qs
 
 
-class SampleStatsCodeVersion(TimeStampedModel):
+class SampleStatsCodeVersion(CodeVersionMixin, TimeStampedModel):
     """ Track the version and code used to calculate sample stats, in case there are bugs/changes needed """
     name = models.TextField()
     version = models.IntegerField()
-    code_git_hash = models.TextField()
 
     class Meta:
-        unique_together = ("name", "version", "code_git_hash")
+        unique_together = ("name", "version", "code_version")
 
     def __str__(self):
-        return f"{self.name} v{self.version}, git: {self.code_git_hash}, {self.created}"
+        return f"{self.name} v{self.version}, git: {self.code_version.git_hash}, {self.created}"
 
 
 class VCFLengthStatsCollection(TimeStampedModel):
@@ -812,7 +801,7 @@ class VCFSourceSettings(models.Model):
     })
 
     source_regex = models.TextField()
-    sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+    sample_variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
     # The build a source's files are called against - used when nothing else resolves one, ie the header
     # has no contigs/reference to detect from and the submitter declared none (@see resolve_genome_build)

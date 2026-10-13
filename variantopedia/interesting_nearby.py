@@ -214,10 +214,15 @@ def filter_variant_range(qs, variant: Variant, distance):
     return qs.filter(locus__contig=variant.locus.contig, locus__position__lte=end, end__gte=start)
 
 
+def _variant_transcript_annotation_qs(variant: Variant, vav: VariantAnnotationVersion):
+    """ Only rows with a transcript_id - a NULL key becomes 'transcript_id IS NULL' in the nearby filters,
+        which matches every unmatched transcript in the version and seq-scans the VTA partition (#2137) """
+    return variant.varianttranscriptannotation_set.filter(version=vav, transcript_id__isnull=False)
+
+
 def get_transcripts_and_codons(variant: Variant, vav: VariantAnnotationVersion) -> dict:
     transcript_codons = {}
-    transcript_qs = variant.varianttranscriptannotation_set.filter(version=vav, exon__isnull=False,
-                                                                   hgvs_c__isnull=False)
+    transcript_qs = _variant_transcript_annotation_qs(variant, vav).filter(exon__isnull=False, hgvs_c__isnull=False)
     for t, hgvs_c in transcript_qs.values_list("transcript_id", "hgvs_c"):
         if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out e.g. ":c.1057"
             codon = m.group(1)
@@ -240,7 +245,7 @@ def filter_variant_codon(qs, variant: Variant, vav: VariantAnnotationVersion):
 
 
 def get_transcript_and_exons(variant: Variant, vav: VariantAnnotationVersion) -> dict:
-    transcript_qs = variant.varianttranscriptannotation_set.filter(version=vav, exon__isnull=False)
+    transcript_qs = _variant_transcript_annotation_qs(variant, vav).filter(exon__isnull=False)
     return dict(transcript_qs.values_list("transcript_id", "exon"))
 
 
@@ -258,7 +263,7 @@ def filter_variant_exon(qs, variant: Variant, vav: VariantAnnotationVersion):
 
 def get_transcript_and_domains(variant: Variant, vav: VariantAnnotationVersion) -> dict[str, set]:
     transcript_and_domain = defaultdict(set)
-    transcript_qs = variant.varianttranscriptannotation_set.filter(version=vav, interpro_domain__isnull=False)
+    transcript_qs = _variant_transcript_annotation_qs(variant, vav).filter(interpro_domain__isnull=False)
     for t, interpro_domain in transcript_qs.values_list("transcript_id", "interpro_domain"):
         transcript_and_domain[t].update(interpro_domain.split("&"))  # VEP separator
     return transcript_and_domain

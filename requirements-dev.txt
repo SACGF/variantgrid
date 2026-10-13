@@ -69,6 +69,10 @@ astroid==4.0.4 \
     --hash=sha256:52f39653876c7dec3e3afd4c2696920e05c83832b9737afc21928f2d2eb7a753 \
     --hash=sha256:986fed8bcf79fb82c78b18a53352a0b287a73817d6dbcfba3162da36667c49a0
     # via pylint
+basedpyright==1.40.2 \
+    --hash=sha256:3a53aeb93a86675ded0e12bc27bd8476c1742356de07ad8cab67bff18110c690 \
+    --hash=sha256:d4db36d095230379acc66c7e5fba7e4b50ca902f6e803d696782dd031cb8d7d7
+    # via -r requirements-dev.in
 dill==0.4.1 \
     --hash=sha256:1e1ce33e978ae97fcfcff5638477032b801c46c7c65cf717f95fbc2248f79a9d \
     --hash=sha256:423092df4182177d4d8ba8290c8a5b640c66ab35ec7da59ccfa00f6fa3eea5fa
@@ -337,6 +341,17 @@ mypy-extensions==1.1.0 \
     #   -c requirements.txt
     #   isort
     #   mypy
+nodejs-wheel-binaries==24.19.0 \
+    --hash=sha256:1c890adf4b7e6556ccc1ca66c866bb81884b6c9a581dee4e530dc7f78fb9d514 \
+    --hash=sha256:28d078b2ced9e2069516e652dc4b1380e7a1a7f2d3934eccd1611586d283ba4c \
+    --hash=sha256:352e048ab4dd35e7de5f338d1cc4fcbf77a0e93da30bf7336a8217ee246b31d7 \
+    --hash=sha256:4196a947bcc883f2003ab101762d729f3e99b5e86b75bd09151563403e2eceb8 \
+    --hash=sha256:4e029dadfae1295876063c96b236f673487e8c27379fe146c1e2250283520227 \
+    --hash=sha256:67e3abeb9c3830cae8c8487ae8a2af7cc27dfa75af06145cee5ca7d1857c81bd \
+    --hash=sha256:d9074c665ea68b04e183d82482c86dc907d3a9bd15eb6cf85542cb785266bb36 \
+    --hash=sha256:db217eef8cab8551667863379b08db4d9067403f6cbbe87481eb40edceb8aa9b \
+    --hash=sha256:e12cbfd69089504e42fb14194ce734a9dcf3eb38c820ca63dd511d36fb964e9c
+    # via basedpyright
 pathspec==1.1.1 \
     --hash=sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a \
     --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189

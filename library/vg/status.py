@@ -1,7 +1,7 @@
 """
 `vg status`: the running deployment in one call - settings module, git, database size and the big
 tables, current annotation version per build, celery services and queue depths, annotation runs in
-flight (and abandoned ones nothing will dispatch), recent ERROR events, outstanding manual migration tasks and free disk on the data roots.
+flight (and abandoned ones nothing will dispatch), phenotype sentences matched with an older matcher or awaiting matching, recent ERROR events, outstanding manual migration tasks and free disk on the data roots.
 
 Each section is gathered independently and a failure becomes that section's `error` rather than
 aborting the whole report, because the point of the command is to work when the box is unwell.
@@ -26,6 +26,7 @@ from library.enums.log_level import LogLevel
 from library.vg.repo import REPO_ROOT, git
 from library.vg.settings_chain import resolved_settings_module
 from manual.models import ManualMigrationOutstanding
+from patients.models.models_phenotype import TextPhenotype
 from snpdb.models import GenomeBuild
 from variantgrid.celery import app as celery_app
 
@@ -48,6 +49,7 @@ class Status:
     annotation_runs: dict[str, int] = field(default_factory=dict)
     annotation_runs_abandoned: dict[str, int] = field(default_factory=dict)
     manual_outstanding: list[str] = field(default_factory=list)
+    phenotype_sentences: dict[str, int] = field(default_factory=dict)
     recent_errors: list[dict[str, str]] = field(default_factory=list)
     disk: dict[str, str] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
@@ -65,10 +67,11 @@ def gather_status() -> Status:
     _section(status, "db", _db)
     _section(status, "builds", _builds)
     _section(status, "services", _services)
-    _section(status, "queues", _queues)
+    _section(status, "queues", lambda: broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES]))
     _section(status, "annotation_runs", _annotation_runs)
     _section(status, "annotation_runs_abandoned", _annotation_runs_abandoned)
     _section(status, "manual_outstanding", _manual_outstanding)
+    _section(status, "phenotype_sentences", _phenotype_sentences)
     _section(status, "recent_errors", _recent_errors)
     _section(status, "disk", _disk)
     return status
@@ -117,16 +120,22 @@ def _services() -> dict[str, str]:
     return dict(zip(names, states)) if len(states) == len(names) else {"error": result.stderr.strip() or result.stdout.strip()}
 
 
-def _queues() -> dict[str, Any]:
-    """ Message and consumer counts per queue via a passive declare on the broker (no queue is created) """
+def broker_queue_depths(queue_names) -> dict[str, dict]:
+    """ Message and consumer counts per queue via a passive declare on the broker (no queue is created).
+        A broker that can't be reached reports its error against every queue, so callers render it
+        like any other per-queue failure. """
     queues = {}
-    with celery_app.connection_for_read() as connection_, connection_.channel() as channel:
-        for queue in settings.CELERY_TASK_QUEUES:
-            try:
-                declared = channel.queue_declare(queue=queue.name, passive=True)
-                queues[queue.name] = {"messages": declared.message_count, "consumers": declared.consumer_count}
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                queues[queue.name] = {"error": type(e).__name__}
+    try:
+        with celery_app.connection_for_read() as connection_, connection_.channel() as channel:
+            for queue_name in queue_names:
+                try:
+                    declared = channel.queue_declare(queue=queue_name, passive=True)
+                    queues[queue_name] = {"messages": declared.message_count, "consumers": declared.consumer_count}
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    queues[queue_name] = {"error": type(e).__name__}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        for queue_name in queue_names:
+            queues.setdefault(queue_name, {"error": type(e).__name__})
     return queues
 
 
@@ -158,6 +167,12 @@ def _annotation_runs_abandoned() -> dict[str, int]:
 
 def _manual_outstanding() -> list[str]:
     return [task.to_json()["line"] for task in ManualMigrationOutstanding.outstanding_tasks()]
+
+
+def _phenotype_sentences() -> dict[str, int]:
+    return {"matched": TextPhenotype.objects.filter(match_version__isnull=False).count(),
+            "stale": TextPhenotype.stale_qs().count(),
+            "awaiting": TextPhenotype.awaiting_qs().count()}
 
 
 def _recent_errors() -> list[dict[str, str]]:
@@ -204,6 +219,11 @@ def render_status(status: Status) -> str:
                      + ", ".join(f"{k} {v}" for k, v in status.annotation_runs_abandoned.items()))
     lines.append(f"manual tasks outstanding: {len(status.manual_outstanding)}"
                  + ("".join(f"\n  {line}" for line in status.manual_outstanding) if status.manual_outstanding else ""))
+    if status.phenotype_sentences:
+        stale = status.phenotype_sentences["stale"]
+        awaiting = status.phenotype_sentences["awaiting"]
+        lines.append(f"phenotype sentences: {status.phenotype_sentences['matched']:,} matched, {stale:,} stale, "
+                     f"{awaiting:,} awaiting" + ("  (run match_patient_phenotypes --stale)" if stale or awaiting else ""))
     lines.append(f"recent ERROR events ({len(status.recent_errors)}):")
     lines += [f"  {e['date']} {e['app']}/{e['name']}: {e['details']}" for e in status.recent_errors]
     for root, usage in status.disk.items():

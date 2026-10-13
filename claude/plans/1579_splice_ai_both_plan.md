@@ -2,7 +2,7 @@
 
 Status: draft
 
-## Background & decision
+## Design
 
 SpliceAI ships two precomputed score sets: **raw** and **masked**. The masked files
 zero out splice-site changes Illumina flags as typically less pathogenic and are the
@@ -11,15 +11,13 @@ is a lab call (research vs diagnostic), so #1579 wants **both** stored per annot
 version, with a setting to show/hide each on the variant details page and the
 damage/splicing analysis node.
 
-**Decision (settled in scoping):**
-
 - Store both as **parallel flat column sets** — `spliceai_raw_*` and `spliceai_masked_*`
   — not a JSON/array blob. The individual sub-fields are wired into the flat-column
   machinery (selectable grid columns, classification autopopulate via flat ORM paths,
   export, template), and there have only ever been two flavours in 5+ years, so there is
   no future-proofing payoff to justify a JSON refactor.
-- Historically all real data is **raw**, and masked was only ever deployed to a test
-  server. So **rename** the existing `spliceai_*` columns to `spliceai_raw_*` (a cheap
+- All production data in the existing `spliceai_*` columns is **raw**; masked exists only
+  in a test server's annotation. So **rename** the existing `spliceai_*` columns to `spliceai_raw_*` (a cheap
   Postgres metadata-only `RENAME COLUMN`, index preserved, prod data correct under its
   true name) and **add** a new `spliceai_masked_*` set.
 - This rides a **columns_version bump (4 → 5)** and therefore a new
@@ -40,10 +38,10 @@ damage/splicing analysis node.
 source fields. The two indexed `*_max_ds` columns stay real scalar columns — DamageNode
 filters on them.)
 
-## The VEP execution (single pass, both flavours via `--custom`) — DECIDED
+## The VEP execution (single pass, both flavours via `--custom`)
 
 The Ensembl **SpliceAI plugin emits fixed field names** (`SpliceAI_pred_DS_AG`, …) with
-no prefix option, so it cannot be invoked twice. Instead, **both** flavours are annotated
+no prefix option, so it cannot be invoked twice. **Both** flavours are annotated
 as VEP `--custom` VCF sources with **distinct `short_name` prefixes** (`SpliceAI_raw`,
 `SpliceAI_masked`) — symmetric, no plugin/custom asymmetry, one VEP pass. The
 `VEPPlugin.SPLICEAI` path is retired for columns_version ≥ 5 (kept only for historical
@@ -177,11 +175,11 @@ reproduces the precomputed lookup on a handful of known SNV + indel variants.
 - `annotation/tests/test_spliceai.py`: extend for both flavours' `*_max_ds` computation.
 - `analysis/tests/test_damage_node_spliceai_raw_warning.py`: update — warning now keyed to
   the selected flavour; add masked-default coverage.
-- New: bulk-inserter test that a VEP VCF with plugin(masked) + custom(raw) populates both
-  column sets correctly (Approach A parsing).
+- New: bulk-inserter test that a VEP VCF with both custom fields (`SpliceAI_raw`,
+  `SpliceAI_masked`) populates both column sets correctly.
 - Autopopulate/export tests pointing at the default flavour.
-- If Approach A: a validation check comparing custom-raw allele matching vs plugin output
-  on known variants (gate the A-vs-B decision).
+- A validation check that `--custom type=exact` matches the precomputed plugin lookup on
+  known SNV + indel variants.
 
 ## Open questions / decisions to confirm
 
@@ -189,7 +187,3 @@ reproduces the precomputed lookup on a handful of known SNV + indel variants.
    recommended. Confirm with the labs.
 2. **Show/hide granularity** — per-flavour booleans vs a single setting; and whether the
    default hides raw by default (diagnostic) or shows both.
-
-**Decided:** both flavours via `--custom` with distinct `short_name` prefixes
-(`SpliceAI_raw` / `SpliceAI_masked`), single VEP pass, `VEPPlugin.SPLICEAI` retired for
-columns_version ≥ 5.

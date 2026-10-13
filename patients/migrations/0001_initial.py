@@ -5,7 +5,7 @@ import django_extensions.db.fields
 from django.conf import settings
 from django.db import migrations, models
 
-import annotation.models.has_phenotype_description_mixin
+import patients.models.has_phenotype_description_mixin
 import library.django_utils.django_file_system_storage
 import library.django_utils.guardian_permissions_mixin
 
@@ -87,7 +87,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin, annotation.models.has_phenotype_description_mixin.HasPhenotypeDescriptionMixin, models.Model),
+            bases=(library.django_utils.guardian_permissions_mixin.GuardianPermissionsMixin, patients.models.has_phenotype_description_mixin.HasPhenotypeDescriptionMixin, models.Model),
         ),
         migrations.CreateModel(
             name='PatientImport',

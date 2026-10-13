@@ -54,7 +54,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('specimens', pages=('view_specimen',)),
         MenuItem('extractions', pages=('view_extraction', 'unmatched_extractions')),
         MenuItem('pedigrees', pages=('view_pedigree', 'view_ped_file')),
-        MenuItem('trios', pages=('view_trio',)),
+        MenuItem('trios', pages=('view_trio', 'trio_karyomapping')),
         MenuItem('quads', pages=('view_quad',)),
         MenuItem('duos', pages=('view_duo',)),
         MenuItem('patient_imports', pages=('view_patient_import', 'view_patient_record',
@@ -66,12 +66,11 @@ MENUS: tuple[Menu, ...] = (
                  pages=('view_pathology_test', 'view_pathology_test_version')),
     )),
     Menu('analysis', 'Analysis', 'analyses', items=(
-        MenuItem('analysis_issues', title="Analysis Issues", admin_only=True),
+        MenuItem('analysis_status', title="Analysis Status", admin_only=True),
         MenuItem('analyses'),
         MenuItem('analysis_templates', title="Templates",
                  pages=('analysis_templates_auto_launch', 'analysis_template_settings')),
         MenuItem('reanalysis_candidate_search', title="Candidate Search", pages=('new_reanalysis_candidate_search',)),
-        MenuItem('karyomapping_analyses', title="Karyomapping", pages=('view_karyomapping_analysis',)),
     ), pages=('analysis', 'analysis_node', 'trio_wizard', 'quad_wizard', 'duo_wizard', 'view_mutational_signature')),
     Menu('classifications', 'Classifications', 'classifications', items=(
         MenuItem('activity', admin_only=True, pages=('activity_lab', 'activity_user', 'activity_discordance')),
@@ -118,6 +117,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('manual_variant_entry', title="Enter Variants", pages=('watch_manual_variant_entry',)),
         MenuItem('variants', pages=('genome_build_variants',)),
         MenuItem('variant_wiki', title="Variant Wiki", pages=('genome_build_variant_wiki',)),
+        MenuItem('variant_types', title="Variant Types"),
     ), pages=('view_allele', 'view_allele_compact', 'view_variant', 'view_variant_genome_build',
               'view_variant_annotation_history', 'nearby_variants_annotation_version')),
     Menu('annotation', 'Annotation', 'annotation', items=(
@@ -132,6 +132,8 @@ MENUS: tuple[Menu, ...] = (
     Menu('settings', 'Settings', None, footer_template="uicore/menus/logout.html", items=(
         MenuItem('admin', href="/admin/", admin_only=True, external=True),
         MenuItem('eventlog', title="Event Log", admin_only=True),
+        MenuItem('api_request_log', title="API Log", admin_only=True,
+                 condition=lambda: bool(settings.INTEGRATION_API_TRACKING)),
         MenuItem('email_log', title="Email Log", admin_only=True, pages=('email_detail',)),
         MenuItem('keycloak_admin', title="Keycloak", admin_only=True),
         MenuItem('server_status', admin_only=True),

@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from typing import Optional
 
@@ -13,6 +14,20 @@ from library.oauth import ServerAuth
 from library.utils import batch_iterator, make_json_safe_in_place
 from snpdb.models.models import Country, Lab, Organization
 from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
+
+ORG_GROUP_NAME_PATTERN = re.compile(r'[\w\-]+')
+LAB_GROUP_NAME_PATTERN = re.compile(r'[\w\-]+/[\w\-]+')
+
+
+def _group_names_param(config: dict, key: str, pattern: re.Pattern) -> Optional[str]:
+    """ Comma separated group names for the export API, which silently ignores a name it can't match -
+        so fail on a malformed one rather than download records we meant to exclude """
+    if group_names := config.get(key):
+        for group_name in group_names:
+            if not (isinstance(group_name, str) and pattern.fullmatch(group_name)):
+                raise ValueError(f"SyncDestination config {key} has malformed group name {group_name!r}")
+        return ','.join(group_names)
+    return None
 
 
 @register_sync_runner(config={"type": {"shariant", "variantgrid"}, "direction": "download"})
@@ -32,13 +47,11 @@ class VariantGridDownloadSyncer(SyncRunner):
                   'type': 'json',
                   'build': required_build}
 
-        exclude_labs = config.get('exclude_labs', None)
-        if exclude_labs:
-            params['exclude_labs'] = ','.join(exclude_labs)
+        if exclude_labs := _group_names_param(config, 'exclude_labs', LAB_GROUP_NAME_PATTERN):
+            params['exclude_labs'] = exclude_labs
 
-        exclude_orgs = config.get('exclude_orgs', None)
-        if exclude_orgs:
-            params['exclude_orgs'] = ','.join(exclude_orgs)
+        if exclude_orgs := _group_names_param(config, 'exclude_orgs', ORG_GROUP_NAME_PATTERN):
+            params['exclude_orgs'] = exclude_orgs
 
         if not sync_run_instance.full_sync:
             if since := sync_run_instance.last_success_server_date():
@@ -92,12 +105,23 @@ class VariantGridDownloadSyncer(SyncRunner):
                 return None
 
             if not lab:
-                parts = lab_group_name.split('/')
-                org, org_created = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
+                # the remote names the Lab and Organization we create, so hold it to the group name format
+                if not (isinstance(lab_group_name, str) and LAB_GROUP_NAME_PATTERN.fullmatch(lab_group_name)):
+                    report_message("Sync download skipped record with malformed lab", extra_data={
+                        "target": repr(lab_group_name),
+                        "sync_destination": sync_run_instance.sync_destination.name,
+                    })
+                    return None
+
+                org_group_name, lab_short_group_name = lab_group_name.split('/')
+                lab_name = meta.get('lab_name')
+                if not (isinstance(lab_name, str) and lab_name.strip()):
+                    lab_name = lab_short_group_name
+                org, org_created = Organization.objects.get_or_create(group_name=org_group_name, defaults={"name": org_group_name})
                 australia, _ = Country.objects.get_or_create(name='Australia')
                 Lab.objects.create(
                     group_name=lab_group_name,
-                    name=meta.get('lab_name'),
+                    name=lab_name,
                     organization=org,
                     city='Unknown',
                     country=australia,
@@ -105,7 +129,7 @@ class VariantGridDownloadSyncer(SyncRunner):
                 )
                 report_message("Sync download created external lab", extra_data={
                     "target": lab_group_name,
-                    "lab_name": meta.get('lab_name'),
+                    "lab_name": lab_name,
                     "organization_created": org_created,
                     "sync_destination": sync_run_instance.sync_destination.name,
                 })

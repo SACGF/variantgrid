@@ -37,6 +37,10 @@ JS_REVERSE_OUTPUT_PATH = './variantgrid/static_files/default_static/django_js_re
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
 UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
+# A running UploadStep holds a lease its worker renews every UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS
+# (UploadStepLeaseHeartbeat); one whose lease has lapsed had its worker killed and is marked TIMED_OUT (#2188)
+UPLOAD_STEP_LEASE_SECONDS = 600
+UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS = 60
 # Request body / upload size is bounded by nginx (client_max_body_size); no Django-side cap needed.
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
@@ -128,7 +132,7 @@ MAJOR_OPERATION_SLOT_EXPIRE_SECONDS = 10 * 60  # Safety TTL so a crashed request
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 56  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 57  # increment to flush caches (eg if invalid due to upgrade)
 if UNIT_TEST:
     # In-process cache, so tests don't read/write the dev Redis (state leaking between runs)
     CACHES = {
@@ -147,13 +151,13 @@ if UNIT_TEST:
 else:
     CACHES = {
         'default': {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "library.django_utils.redis_cache.UnpickleTolerantRedisCache",
             "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
             'TIMEOUT': TIMEOUT,
             'VERSION': CACHE_VERSION,
         },
         'debug-panel': {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "library.django_utils.redis_cache.UnpickleTolerantRedisCache",
             "LOCATION": "redis://127.0.0.1:%d/1" % REDIS_PORT,
             'TIMEOUT': TIMEOUT,
             'OPTIONS': {
@@ -454,7 +458,7 @@ HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE = False  # Biocommons only - attempt to retrie
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 # If set, patient phenotype text containing this string is treated as unreviewed:
-# matched ontology terms will not be persisted to the DB (PatientTextPhenotype / TextPhenotypeMatch).
+# matched ontology terms will not be persisted to the DB (PhenotypeDescription / TextPhenotypeMatch).
 # Users can still see live preview matches on the patient page along with a warning.
 # Set to None / empty to disable.
 PATIENT_PHENOTYPE_EXCLUDE_STRING = "----needs human review"
@@ -466,6 +470,8 @@ PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
 # posted, so it can never override a client. The group names only the extraction, and reference_id is
 # unique per specimen rather than globally, so a match under two specimens parks as Needs attention
 PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
+# Dotted path to a str -> str function giving Specimen / Extraction reference_ids one canonical form
+PATIENT_SPECIMEN_REFERENCE_NORMALIZER = None
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False
@@ -493,6 +499,7 @@ LIFTOVER_BATCH_SIZE = 10_000
 LIFTOVER_BCFTOOLS_ENABLED = True
 # 2025-02-13 - bcftools liftover currently gives a warning about symbolic variants
 LIFTOVER_BCFTOOLS_SYMBOLIC = False
+# Also lets a symbolic del/dup/inv shorter than this through, lifted over as its explicit sequence (#1358)
 LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
 # When False (default), BCFTools liftover SWAP=1 variants are rejected and the AlleleLiftover
@@ -715,6 +722,8 @@ SITE_NAME = "VariantGrid"
 # Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
 VARIANTGRID_MAJOR_VERSION = 4
 VARIANTGRID_VERSION = Git(BASE_DIR).version(VARIANTGRID_MAJOR_VERSION)
+# Read once at startup: the code this process is running, which after a git pull differs from what's on disk until restart
+GIT_HASH = Git(BASE_DIR).hash
 SITE_SHORT_NAME = "VG"  # Prefixes page titles, where there's no room for the full name
 SITE_DESCRIPTION = "VariantGrid - genomic variant curation and classification platform"
 
@@ -762,7 +771,7 @@ ROLLBAR = {
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
-    'code_version': Git(BASE_DIR).hash,
+    'code_version': GIT_HASH,
     # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
     'min_level': 'warning',
     'ignorable_404_urls': (
@@ -783,19 +792,23 @@ HEALTH_CHECK_ENABLED = True
 # if true, the Server Status page shows an "Integrations" section of registered integration statuses
 INTEGRATION_STATUS_ENABLED = True
 
-# {url path prefix: display name} - records when each external client last called those endpoints
+# {url path prefix: display name} - records when each external client last called those endpoints,
+# and logs every call (eventlog.models.ApiRequestLog, Settings -> API Log)
 INTEGRATION_API_TRACKING = {}
+API_REQUEST_LOG_DAYS = None  # None keeps ApiRequestLog rows forever; a number of days prunes older rows daily
+API_REQUEST_LOG_MAX_BODY = 100_000  # characters of request / error response body kept
+API_REQUEST_LOG_MAX_READ_BYTES = 1024 * 1024  # bigger request bodies are noted by size, not read
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
 USER_FEEDBACK_ENABLED = True  # note that Rollbar enabled must also be true to enable user feedback
 
 HEARTBEAT_URL = None  # URL to ping to prove scheduler is still alive
 
-STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "default_static")
+_DEFAULT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "default_static")
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    STATIC_FILES_DIR,
+    _DEFAULT_STATIC_FILES_DIR,
     # Use absolute paths, not relative paths.
 )
 
@@ -1273,6 +1286,8 @@ VARIANT_DETAILS_SHOW_SAMPLES = True
 VARIANT_DETAILS_SAMPLES_MAX_ROWS = 1000
 VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_DETAILS_NEARBY_SHOW_GENE = False
+# The nearby tab gives up after this rather than hold a web worker until DATABASE_STATEMENT_TIMEOUT_SECONDS
+VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS = 30
 
 # Can only use block or allow list. Use "text" value of link (see vc_links.js)
 VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST = []
@@ -1282,10 +1297,13 @@ VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 
-# Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
-# structural variants and use symbolic
+# A del/dup/inv of at least this size is stored as a symbolic <DEL>/<DUP>/<INV> with svlen rather than
+# ref/alt sequences - 50bp is the usual definition of a structural variant (#1358). Which annotation
+# pipeline it goes to is a separate cut-off, ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 VARIANT_SYMBOLIC_ALT_ENABLED = True
-VARIANT_SYMBOLIC_ALT_SIZE = 1000
+VARIANT_SYMBOLIC_ALT_SIZE = 50
+# Any other symbolic ALT is dropped at import (vcf_clean_alts). <INS> is left out on purpose: Manta's often has no
+# SVLEN and END=POS, so it would store with svlen 0 and unrelated insertions would collapse into one Variant
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
                                     VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
 
@@ -1308,10 +1326,12 @@ VIEW_GENE_WIKI = True
 
 TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
 
-# User awards (#1819): computed titles (crown/medal/trophy) and badges, plus admin-given kudos.
-# Off = no computation, no decoration on grids, settings UI hidden. Individual definitions
-# (see <app>/user_awards.py) can be switched off by key, e.g. {"top_classifier"}
+# User awards (#1819): admin-given kudos plus computed badges, shown on the profile pages.
+# USER_AWARDS_ENABLED off hides the lot. USER_AWARDS_BADGES_ENABLED off keeps kudos but drops the
+# computed badges: no nightly recompute, none listed. Individual badge definitions
+# (see <app>/user_awards.py) can be switched off by key, e.g. {"tagger"}
 USER_AWARDS_ENABLED = True
+USER_AWARDS_BADGES_ENABLED = True
 USER_AWARDS_DISABLED_KEYS = set()
 
 KEY_CLOAK_REALM = None

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from genes.serializers import GeneListSerializer
+from library.django_utils.change_tracking import get_or_create_recorded
 from seqauto.models import EnrichmentKit
 
 
@@ -25,7 +26,8 @@ class EnrichmentKitSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         name = validated_data.get('name')
         version = validated_data.get('version')
-        instance, _created = EnrichmentKit.objects.get_or_create(
+        instance, _outcome = get_or_create_recorded(
+            EnrichmentKit,
             name=name,
             version=version,
             defaults=validated_data

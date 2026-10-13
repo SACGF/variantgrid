@@ -9,36 +9,7 @@
 {% load lab_tags %}
 {% load classification_tags %}
 
-<script>
-    $(document).ready(() => {
-        $('input[name=discordances-filter]').click(() => {
-            let selected = $("input[name=discordances-filter]:checked").val();
-
-            $('.contact-details').hide();
-            $(`.contact-details[data-lab=${selected}]`).show();
-            $('.discordance-row').each((index, row) => {
-                row = $(row);
-                let data_labs = row.attr('data-labs')
-                let show = false;
-                if (selected == "all" || !data_labs) {
-                    show = true;
-                } else {
-                    if (selected == "internal") {
-                        show = data_labs == 'internal'
-                    } else {
-                        let labs = data_labs.split(";");
-                        show = labs.includes(selected);
-                    }
-                }
-                if (show) {
-                    row.show();
-                } else {
-                    row.hide();
-                }
-            });
-        });
-    });
-</script>
+<script src="{% static 'js/classification/discordance_reports_active_detail.js' %}"></script>
 
 <div>
     {% with dr_categories=dlab.discordance_reports %}

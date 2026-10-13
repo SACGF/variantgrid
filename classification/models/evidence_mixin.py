@@ -2,42 +2,23 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Optional, TypedDict, Union
+from typing import Any, Optional
 
 from django.conf import settings
 
 from annotation.models.models_citations import CitationFetchRequest, CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
+from classification.models.evidence_key import (
+    EvidenceKeyMap,
+    VCDbRefDict,
+    VCPatch,
+    VCStore,
+)
 from genes.hgvs import PHGVS, HGVSComponents
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
-
-
-class VCDbRefDict(TypedDict, total=False):
-    id: str
-    db: str
-    idx: Union[str, int]
-    url: str
-    summary: str
-    internal_id: int
-
-
-class VCValidation(TypedDict, total=True):
-    severity: str
-    code: str
-    message: str
-    options: Optional[Any]
-
-
-class VCBlobDict(TypedDict, total=False):
-    value: Any
-    note: str
-    explain: str
-    immutable: str
-    db_refs: list[VCDbRefDict]
-    validation: list[VCValidation]
 
 
 @dataclass(frozen=True)
@@ -76,7 +57,6 @@ class SomaticClinicalSignificanceValue:
 
     @property
     def pretty_str(self):
-        from classification.models import EvidenceKeyMap
         pretty_tier = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(self.tier_level)
         if amp_level := self.amp_level:
             return f"{pretty_tier}{amp_level}"
@@ -107,12 +87,6 @@ _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
     SomaticClinicalSignificanceValue("tier_3"): 2,
     SomaticClinicalSignificanceValue("tier_4"): 1
 }
-
-
-VCStoreValue = VCBlobDict
-VCPatchValue = Union[None, VCStoreValue]
-VCStore = dict[str, VCStoreValue]
-VCPatch = dict[str, VCPatchValue]
 
 
 class EvidenceMixin:
@@ -213,7 +187,6 @@ class EvidenceMixin:
         return True
 
     def criteria_strengths(self, e_keys: Optional['EvidenceKeyMap'] = None) -> CriteriaStrengths:
-        from classification.models import EvidenceKeyMap
         if not e_keys:
             e_keys = EvidenceKeyMap.instance()
 
@@ -226,7 +199,6 @@ class EvidenceMixin:
 
     def met_criteria_strengths(self) -> set[CriteriaStrength]:
         """ Met ACMG criteria plus each AMP level value as a custom strength, e.g. "A_<pretty sub value>" """
-        from classification.models import EvidenceKeyMap
         strengths: set[CriteriaStrength] = set()
         for e_key in EvidenceKeyMap.cached().criteria():
             strength = self.get(e_key.key)
@@ -303,7 +275,6 @@ class EvidenceMixin:
         cs = self.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         if not cs:
             return None
-        from classification.models import EvidenceKeyMap
         options = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).matched_options(cs)
         if options:
             return options[0].get('vg')
@@ -331,7 +302,6 @@ class EvidenceMixin:
         :return: A VCStore where all keys are clean str keys and all values are dicts
         """
 
-        from classification.models import EvidenceKeyMap
         keys = EvidenceKeyMap.instance()
 
         clean: VCPatch = {}

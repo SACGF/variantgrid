@@ -9,7 +9,7 @@ import uuid
 from datetime import timedelta
 from unittest import mock
 
-import psycopg2
+import psycopg
 from celery.canvas import Signature, _chain
 from django.conf import settings
 from django.db.models import F
@@ -752,7 +752,7 @@ class TestCancelledLoad(AnalysisSetupMixin, TestCase):
         node = AllVariantsNode.objects.create(analysis=self.analysis)
         lease_ready_nodes(self.analysis.pk, "worker")
         cancelled = OperationalError("canceling statement due to user request")
-        cancelled.__cause__ = psycopg2.errors.QueryCanceled()
+        cancelled.__cause__ = psycopg.errors.QueryCanceled()
 
         with mock.patch.object(Signature, "apply_async"):
             # No Variants in the fixture, so AllVariantsNode has no max_variant to report on

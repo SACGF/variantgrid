@@ -149,8 +149,8 @@ SITE_DESCRIPTION = "Shariant - Australian Genomics Variant Curation sharing proj
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
-SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
-STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+_SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
+STATICFILES_DIRS = (_SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
@@ -225,6 +225,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "manual_variant_entry": False,
     "variantopedia_wiki": False,
     "variant_wiki": False,
+    "variant_types": False,  # Storage/annotation by size is a VCF-import concern - Shariant imports classifications
     "canonical_transcripts": False,
 
     # Settings
@@ -244,11 +245,12 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # Upload - list all URLS (only want them visible by admin)
     "upload": False,
-    "upload_poll": False,
+    "file_upload_datatable": False,
     "view_uploaded_file": False,
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,
     "upload_retry_import": False,
+    "upload_retry_failed_imports": False,
     "upload_pipeline_modified_variants_datatable": False,
     "upload_pipeline_skipped_annotation_datatable": False,
     "view_upload_stats_detail": False,
@@ -405,3 +407,4 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "zygosity"
 ])
 CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "Shariant"
+USER_AWARDS_BADGES_ENABLED = False  # Shariant keeps its admin-given kudos, not the computed badges

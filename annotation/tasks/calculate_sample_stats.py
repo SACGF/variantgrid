@@ -5,7 +5,6 @@ from typing import Optional
 
 import celery
 import numpy as np
-from django.conf import settings
 from django.db import transaction
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -21,7 +20,6 @@ from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
-from library.git import Git
 from library.log_utils import get_traceback
 from snpdb.models import (
     VCF,
@@ -36,6 +34,7 @@ from snpdb.models import (
     VCFLengthStatsCollection,
     Zygosity,
 )
+from snpdb.models.models import CodeVersion
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
@@ -70,7 +69,7 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
     code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
                                                                 name="SampleStats",
                                                                 version=SAMPLE_STATS_CODE_VERSION,
-                                                                code_git_hash=Git(settings.BASE_DIR).hash)
+                                                                code_version=CodeVersion.current())
     return code_version
 
 
@@ -252,6 +251,15 @@ def _trio_predicates(mum_zyg, dad_zyg, proband_zyg, contig, mother_affected, fat
     return modes
 
 
+def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
+    """ The filter_key buckets calculate_cohort_stats populates: the raw aggregate (None) row, plus
+        the inheritance modes when the cohort has a Trio. """
+    keys = [None]
+    if trio := cohort.trio_set.first():
+        keys.extend(trio.get_stats_filter_keys())
+    return keys
+
+
 def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion):
     """ Iterate the cohort's variant queryset once and populate the four
         CohortGenotype*Stats classes for:
@@ -285,19 +293,12 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
     """ Accumulate the four CohortGenotype*Stats families for the cohort and persist
         them via _persist_cohort_stats. Must run inside the per-CGC locked
         transaction opened by calculate_cohort_stats, using the locked cgc. """
-    from analysis.models.nodes.stats_cache import (
-        get_filter_keys_to_precompute_for_cohort,
-        inheritance_filter_key,
-    )
-
     cohort_samples = list(cohort.get_cohort_samples())
     sample_index_pairs = [(cs.sample, cs.cohort_genotype_packed_field_index) for cs in cohort_samples]
     has_filters = bool(_cohort_has_filters(cohort))
 
     # Filter-keyed buckets to precompute (always includes None for raw aggregate).
-    precompute_keys = list(get_filter_keys_to_precompute_for_cohort(cohort))
-    if None not in precompute_keys:
-        precompute_keys = [None, *precompute_keys]
+    precompute_keys = get_filter_keys_to_precompute_for_cohort(cohort)
 
     # Trio context, if present (used to evaluate inheritance predicates per variant).
     trio = cohort.trio_set.first()
@@ -542,7 +543,7 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
                                     else UNK)
                 f_z, f_z_hm, f_z_omim, f_z_cv = PRIORITY_TO_F[proband_priority]
                 for mode in modes:
-                    key = inheritance_filter_key(mode, trio)
+                    key = trio.get_stats_filter_key(mode)
                     if key not in precompute_keys:
                         continue
                     bucket = aggregate_counters[(key, pf_pass)]
@@ -574,8 +575,8 @@ def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollect
 
     # Compound het post-processing — only genes with both "mum" and "dad"
     # sources contribute. Add to the compound_het filter_key bucket.
-    chet_key = inheritance_filter_key("compound_het", trio)
-    if chet_key in precompute_keys:
+    if chet_pending:
+        chet_key = trio.get_stats_filter_key("compound_het")
         for entry in chet_pending:
             (gene_id, pf_pass, type_field, dbsnp, dbsnp_class_field,
              has_transcript, clinvar, clinvar_path, impact_high_mod, has_omim,

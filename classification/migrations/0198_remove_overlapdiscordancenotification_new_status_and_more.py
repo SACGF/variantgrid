@@ -22,11 +22,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='overlapdiscordancenotification',
             name='new_state',
-            field=models.JSONField(default=classification.enums.overlaps_enums.OverlapState.default_json),
+            field=models.JSONField(default=classification.enums.overlaps_enums.OverlapSnapshot.default_json),
         ),
         migrations.AddField(
             model_name='overlapdiscordancenotification',
             name='old_state',
-            field=models.JSONField(default=classification.enums.overlaps_enums.OverlapState.default_json),
+            field=models.JSONField(default=classification.enums.overlaps_enums.OverlapSnapshot.default_json),
         ),
     ]

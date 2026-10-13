@@ -78,13 +78,15 @@ class GeneConsensusGroupsTestCase(TestCase):
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         create_fake_gene_version(genome_build, "ENSG00000159216", "RUNX1", AnnotationConsortium.ENSEMBL)
 
-    def _classify(self, lab_record_id: str, allele_origin: str, h_summary: str, curation_date: str) -> Classification:
+    def _classify(self, lab_record_id: str, allele_origin: str, h_summary: str, curation_date: str,
+                  condition: str = "Acute myeloid leukaemia") -> Classification:
         classification = Classification.create(
             user=self.user, lab=self.lab, lab_record_id=lab_record_id, source=SubmissionSource.VARIANT_GRID,
             data={
                 SpecialEKeys.GENE_SYMBOL: "RUNX1",
                 SpecialEKeys.ALLELE_ORIGIN: allele_origin,
                 SpecialEKeys.CURATION_DATE: curation_date,
+                SpecialEKeys.CONDITION: condition,
                 "h_summary": h_summary,
                 "interpretation_summary": f"about {lab_record_id}",  # variant level, so not part of the grouping
             })
@@ -104,6 +106,26 @@ class GeneConsensusGroupsTestCase(TestCase):
         self.assertEqual([group.record_count for group in groups], [2, 1])
         self.assertEqual(groups[0].representative.classification, newest)
         self.assertEqual(groups[0].other_count, 1)
+
+    def test_the_most_used_content_comes_first_and_later_rows_name_what_differs(self):
+        self._classify("copy_1", "somatic", "RUNX1 is a transcription factor", "2024-01-01")
+        self._classify("copy_2", "somatic", "RUNX1 is a transcription factor", "2024-02-01")
+        self._classify("reworded_newest", "somatic", "RUNX1 is a core transcription factor", "2024-06-01")
+
+        groups = self._groups()
+        self.assertEqual([group.record_count for group in groups], [2, 1])
+        self.assertEqual([value.label for value in groups[0].content], ["Summary"])
+        self.assertEqual(groups[0].content[0].value, "RUNX1 is a transcription factor")
+        self.assertEqual(groups[0].differs_in, [])
+        self.assertEqual(groups[1].differs_in, ["Summary"])
+
+    def test_the_conditions_spread_is_distinct_and_most_used_first(self):
+        self._classify("aml_1", "somatic", "RUNX1 is a transcription factor", "2024-01-01", condition="AML")
+        self._classify("mds", "somatic", "RUNX1 is a transcription factor", "2024-02-01", condition="MDS")
+        self._classify("aml_2", "somatic", "RUNX1 is a transcription factor", "2024-03-01", condition="AML")
+
+        [group] = self._groups()
+        self.assertEqual([condition.references[0].name for condition in group.conditions], ["AML", "MDS"])
 
     def test_the_other_bucket_is_not_offered(self):
         self._classify("germline_record", "germline", "RUNX1 is a transcription factor", "2024-01-01")

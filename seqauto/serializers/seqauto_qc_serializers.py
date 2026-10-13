@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
 from genes.serializers import GeneCoverageCollectionSerializer, SampleGeneListSerializer
+from library.django_utils.change_tracking import (
+    WriteOutcome,
+    get_or_create_recorded,
+    update_or_create_if_changed,
+)
 from seqauto.models import (
     QC,
     AlignmentFile,
@@ -84,14 +89,15 @@ class QCSerializer(serializers.ModelSerializer):
             qc_path = QC.get_path_from_vcf(vcf_file)
         defaults["path"] = qc_path
 
-        qc, created = QC.objects.get_or_create(
+        qc, outcome = get_or_create_recorded(
+            QC,
             sequencing_sample=sequencing_sample,
             vcf_file=vcf_file,
             defaults=defaults
         )
         if alignment_files:
             qc.alignment_files.set(alignment_files)
-        elif created:
+        elif outcome == WriteOutcome.CREATED:
             qc.alignment_files.set(vcf_file.alignment_files.all())
         return qc
 
@@ -132,9 +138,7 @@ class QCGeneListCreateSerializer(serializers.ModelSerializer):
         defaults = {
             "custom_text_gene_list": custom_text_gene_list,
         }
-        instance, _created = QCGeneList.objects.update_or_create(qc=qc,
-                                                                 path=path,
-                                                                 defaults=defaults)
+        instance, _outcome = update_or_create_if_changed(QCGeneList, qc=qc, path=path, defaults=defaults)
 
         # With API - whatever we sent is always the active one
         instance.link_samples_if_exist(force_active=True)
@@ -174,8 +178,7 @@ class QCGeneCoverageSerializer(serializers.ModelSerializer):
         defaults = {
             "path": path,
         }
-        instance, _created = QCGeneCoverage.objects.update_or_create(qc=qc,
-                                                                     defaults=defaults)
+        instance, _outcome = update_or_create_if_changed(QCGeneCoverage, qc=qc, defaults=defaults)
         return instance
 
 
@@ -190,8 +193,7 @@ class QCExecSummarySerializer(serializers.ModelSerializer):
         qc_data = validated_data.pop("qc")
         qc = QCSerializer.get_object(qc_data)
         validated_data["sequencing_run"] = qc.sequencing_run
-        instance, _created = QCExecSummary.objects.update_or_create(qc=qc,
-                                                                    defaults=validated_data)
+        instance, _outcome = update_or_create_if_changed(QCExecSummary, qc=qc, defaults=validated_data)
         return instance
 
 

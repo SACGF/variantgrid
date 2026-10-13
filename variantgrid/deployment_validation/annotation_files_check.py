@@ -1,5 +1,7 @@
 import os
 
+import requests
+from cdot.data_release import _get_version_from_tag_name, get_latest_data_release_tag_name
 from django.conf import settings
 
 from annotation.vep_annotation import VEPConfig
@@ -91,23 +93,23 @@ def check_cdot_data() -> dict:
             "fix": f"python3 manage.py import_cdot_latest --genome-build={genome_build.name}",
         }
 
+    # Only the build/consortium combinations a deployment has imported - one never imported is cdot_{build}'s job
+    cdot_qs = CdotDataVersion.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation())
+    our_cdot_versions = set(cdot_qs.values_list("cdot_version", flat=True))
     try:
-        # Check that latest exists
-        from cdot.data_release import _get_version_from_tag_name, get_latest_data_release_tag_name
-
         tag_name = get_latest_data_release_tag_name()
+    except requests.RequestException as e:
+        # Unauthenticated GitHub API calls are limited to 60/hour per IP - not worth failing a deploy over
+        cdot_checks["latest_cdot_data"] = {
+            "valid": True,
+            "warning": f"Could not check latest cdot data release (have {', '.join(sorted(our_cdot_versions))}): {e}",
+        }
+    else:
         cdot_data_version = _get_version_from_tag_name(tag_name, data_version=True)
-        # Only the build/consortium combinations a deployment has imported - one never imported is cdot_{build}'s job
-        cdot_qs = CdotDataVersion.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation())
-        our_cdot_versions = set(cdot_qs.values_list("cdot_version", flat=True))
-        cdot_data = {
+        cdot_checks["latest_cdot_data"] = {
             "valid": our_cdot_versions == {cdot_data_version},
             "notes": f"data version ({', '.join(sorted(our_cdot_versions))}) = latest ({cdot_data_version})",
             "fix": "python3 manage.py import_cdot_latest"
         }
-        cdot_checks["latest_cdot_data"] = cdot_data
-    except ImportError:
-        # Will already be covered in library version > 0.2.26
-        pass
 
     return cdot_checks

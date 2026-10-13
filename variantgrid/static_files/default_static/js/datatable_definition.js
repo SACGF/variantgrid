@@ -835,6 +835,14 @@ TableFormat.choices = (choices, data, type, row) => {
     return $('<span>', {class:`val-${data}`, text:choices[data] || data}).prop('outerHTML');
 };
 
+// Server sends {icon_css, label} from snpdb.grids.render_import_status (the icon is chosen in ImportStatus.icon_css)
+TableFormat.importStatus = (data, type, row) => {
+    if (!data) {
+        return '';
+    }
+    return $('<i>', {class: data.icon_css, title: data.label}).prop('outerHTML');
+};
+
 TableFormat.flags = (data, type, row) => {
     if (data) {
         return $('<div>', {'data-flags': data, class:'flags', text:'...'}).prop('outerHTML');

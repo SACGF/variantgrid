@@ -1,0 +1,15 @@
+{# An imported VCF on the sequencing run page: the VCF icon once it loaded, else the same cross / spinner as the sequencing runs grid (renderSequencingRunVCFs), linked when the user can view it (#2175) #}
+{% load import_status_tags %}
+{% if vcf.import_status == 'S' %}
+    {% if can_view %}
+        <a href="{% url 'view_vcf' vcf.pk %}" title="VCF: {{ vcf }}"><div class='vcf-icon icon24 run-vcf-icon'></div></a>
+    {% else %}
+        <div title="You don't have permission to view this VCF" class='vcf-icon icon24 run-vcf-icon'></div>
+    {% endif %}
+{% else %}
+    {% if can_view %}
+        <a href="{% url 'view_vcf' vcf.pk %}" title="VCF: {{ vcf }}">{% import_status_icon vcf.import_status show_label=False %}</a>
+    {% else %}
+        {% import_status_icon vcf.import_status show_label=False %}
+    {% endif %}
+{% endif %}

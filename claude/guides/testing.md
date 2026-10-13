@@ -3,7 +3,7 @@
 Verified against fbff51279 on 2026-09-10
 
 The fixture index for "how do I conjure a Variant / Sample / Trio / Classification / Analysis in three
-lines of a test" (`claude/plans/agent_system.md` §4.3). Every builder line is `path:function(signature)`;
+lines of a test". Every builder line is `path:function(signature)`;
 read the builder before relying on a detail not stated here.
 
 ## Running tests
@@ -16,7 +16,7 @@ python3 manage.py vg tests --changed                                        # on
 ```
 
 - `--keepdb` skips re-running hundreds of migrations; always use it. Drop it only when a migration you wrote changes.
-- `vg tests --changed` (contract in `agent_system.md` §4.2) maps changed files to test labels through the
+- `vg tests --changed` maps changed files to test labels through the
   first-party import graph and prints `manage.py test` args: a changed module selects every test module that
   transitively imports it, templates / JS / `urls.py` select the app's `tests.test_urls`, a migration selects the
   app's whole `tests` package. The engine is `library/vg/test_selection.py:select_tests(changed=None, base=None)`.

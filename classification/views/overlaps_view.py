@@ -13,7 +13,7 @@ from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, Overl
     OverlapOverrideStatus
 from classification.models import ClassificationResultValue, \
     EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionNextStep
-from classification.enums.overlaps_enums import TriageState, TriageStatus
+from classification.enums.overlaps_enums import TriageDecision, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
 from classification.views.overlaps_datatables import OverlapColumns
@@ -64,6 +64,7 @@ class ClassificationGroupingValueTriageForm(forms.Form):
         required=True,
         widget=forms.Textarea({"rows": 5})
     )
+
 
 def _onc_path_choices():
     return [("undecided", "Undecided")] + \
@@ -192,7 +193,7 @@ class TriageView(AjaxFormView[OverlapContribution]):
             if triage_status != TriageStatus.REVIEWED_WILL_FIX or new_value == 'undecided':
                 new_value = None
 
-            triage.triage_state_obj = TriageState(
+            triage.triage_state_obj = TriageDecision(
                 triage_status,
                 new_value
             )
@@ -292,9 +293,9 @@ def action_overlap_review(request: HttpRequest, review_id: int) -> HttpResponseB
                         old_effective_value = contribution.effective_value
                         if updated_value == contribution.value:
                             # actually doing a review to change a pending value back to the value that was originally there
-                            contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_SATISFACTORY)
+                            contribution.triage_state_obj = TriageDecision(TriageStatus.REVIEWED_SATISFACTORY)
                         else:
-                            contribution.triage_state_obj = TriageState(TriageStatus.REVIEWED_WILL_FIX, updated_value)
+                            contribution.triage_state_obj = TriageDecision(TriageStatus.REVIEWED_WILL_FIX, updated_value)
                         changes_dict.append({
                             "lab": contribution.lab.group_name,
                             "from": old_effective_value,
@@ -391,14 +392,14 @@ class OverlapDownloadRow(ExportRow):
         rows = []
         for cont in self.overlap.contributions_list:
             if cont.is_amending:
-                value = f"{cont.lab_like} : {cont.pretty_value} -> {cont.pretty_effective_value}"
+                value = f"{cont.lab_like} : {cont.effective_date_obj.date} | {cont.pretty_value} -> {cont.pretty_effective_value}"
             else:
-                value = f"{cont.lab_like} : {cont.pretty_effective_value}"
+                value = f"{cont.lab_like} : {cont.effective_date_obj.date} | {cont.pretty_effective_value}"
             rows.append(value)
             if last_comment_entry := cont.last_comment:
                 if last_comment := last_comment_entry.value:
                     if text := last_comment.text:
-                        rows.append(f"    \"{text}\" - {last_comment_entry.user}")
+                        rows.append(f"    \"{text}\" - {last_comment_entry.timestamp.strftime('%Y-%m-%d')} {last_comment_entry.user}")
                         rows.append("")
 
         return "\n".join(rows)
