@@ -406,4 +406,4 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "zygosity"
 ])
 CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "Shariant"
-USER_AWARDS_ENABLED = False
+USER_AWARDS_BADGES_ENABLED = False  # Shariant keeps its admin-given kudos, not the computed badges

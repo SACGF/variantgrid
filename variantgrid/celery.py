@@ -106,7 +106,7 @@ app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
 }
 
 # User awards (#1819). Raw seconds rather than crontab - see the timezone note above.
-if settings.USER_AWARDS_ENABLED:
+if settings.USER_AWARDS_ENABLED and settings.USER_AWARDS_BADGES_ENABLED:
     app.conf.beat_schedule['user-awards-nightly'] = {
         'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
         'schedule': HOUR_SECS * 24,

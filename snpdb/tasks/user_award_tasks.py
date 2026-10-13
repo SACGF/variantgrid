@@ -7,6 +7,6 @@ from snpdb.user_award_updates import update_user_awards as update_user_awards_no
 @celery.shared_task
 def update_user_awards():
     """ Beat: nightly - see variantgrid/celery.py """
-    if not settings.USER_AWARDS_ENABLED:
+    if not (settings.USER_AWARDS_ENABLED and settings.USER_AWARDS_BADGES_ENABLED):
         return
     update_user_awards_now()
