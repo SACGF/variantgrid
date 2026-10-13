@@ -338,14 +338,14 @@ def analysis_export(request, analysis_id):
 
 
 @user_passes_test(is_superuser)
-def view_analysis_issues(request):
+def view_analysis_status(request):
     if request.method == "POST":
         if "unpause-jobs" in request.POST:
             JobsControl.resume(by=str(request.user))
             messages.add_message(request, messages.INFO,
                                  "Resumed analysis + annotation job dispatch")
         if "pause-jobs" in request.POST:
-            JobsControl.pause(reason=f"Paused from analysis issues page by {request.user}",
+            JobsControl.pause(reason=f"Paused from analysis status page by {request.user}",
                               by=str(request.user))
             messages.add_message(request, messages.WARNING,
                                  "Paused analysis + annotation job dispatch")
@@ -359,7 +359,7 @@ def view_analysis_issues(request):
             messages.add_message(request, messages.INFO,
                                  f"Reloading {num_nodes} failed nodes in {len(analysis_ids)} analyses")
             query_string = urlencode({k: v for k, v in filter_form.cleaned_data.items() if v})
-            return redirect(f"{reverse('analysis_issues')}?{query_string}")
+            return redirect(f"{reverse('analysis_status')}?{query_string}")
 
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
@@ -377,7 +377,7 @@ def view_analysis_issues(request):
                "jobs_paused": bool(jobs_control and jobs_control.paused),
                "filter_form": AnalysisNodeIssuesFilterForm(request.GET or None),
                "node_types_display": get_node_display_data_by_class_name()}
-    return render(request, 'analysis/view_analysis_issues.html', context)
+    return render(request, 'analysis/view_analysis_status.html', context)
 
 
 def view_mutational_signature(request, pk):

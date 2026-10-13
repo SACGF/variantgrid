@@ -2,7 +2,7 @@
 {% load static %}
 {% load ui_utils %}
 {% load js_tags %}
-{% block title %}Analysis Issues{% endblock title %}
+{% block title %}Analysis Status{% endblock title %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -95,7 +95,7 @@
 {% block content %}
 
     <div class="container-table">
-        <h3>Analysis Issues</h3>
+        <h3>Analysis Status</h3>
 
         {% if jobs_paused %}
             <div class="alert alert-danger" role="alert">
