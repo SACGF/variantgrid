@@ -13,5 +13,17 @@ subprocess (eg somalier) stops the whole unit, SIGTERMing every in-flight task o
 After copying the files: sudo systemctl daemon-reload, then restart the celery units.
 
 redis-server.service.d/variantgrid.conf is a drop-in for the distribution's redis unit (not a unit of
-ours): copy it to /etc/systemd/system/redis-server.service.d/ (redis.service.d/ on RHEL), daemon-reload
-and restart redis. It lowers redis's OOM score so the kernel kills a celery worker instead.
+ours). It lowers redis's OOM score so the kernel kills a celery worker instead. The drop-in directory is
+named after the unit, which differs by distribution - check with `systemctl list-units 'redis*'`:
+
+    Ubuntu/Debian (redis-server.service):
+        sudo mkdir -p /etc/systemd/system/redis-server.service.d
+        sudo cp config/systemd/redis-server.service.d/variantgrid.conf /etc/systemd/system/redis-server.service.d/
+        sudo systemctl daemon-reload && sudo systemctl restart redis-server
+
+    RHEL (redis.service):
+        sudo mkdir -p /etc/systemd/system/redis.service.d
+        sudo cp config/systemd/redis-server.service.d/variantgrid.conf /etc/systemd/system/redis.service.d/
+        sudo systemctl daemon-reload && sudo systemctl restart redis
+
+Verify with `systemctl show redis -p OOMScoreAdjust` (expect -900).
