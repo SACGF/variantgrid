@@ -99,6 +99,12 @@ def user(context, u: User,
             return us
 
         @property
+        def kudos_html(self) -> str:
+            if not settings.USER_AWARDS_ENABLED:
+                return ""
+            return self.avatar.awards.kudos_html
+
+        @property
         def email_weekly_updates(self):
             return self.user_settings.email_weekly_updates
 

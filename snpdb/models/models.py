@@ -1055,19 +1055,14 @@ class UserAwards:
     def progress(self, definition) -> "BadgeProgress":
         return BadgeProgress(definition=definition, award=self.badge_row(definition.key))
 
-    @cached_property
-    def highest_award(self) -> Optional[UserAward]:
-        return first(self.awards, None)
-
     @property
-    def award_text_html(self):
-        return "<br/>".join([f"<i class='{award.icon_class}'></i>" + escape(award.award_text) for award in self.awards])
-
-    @property
-    def html(self):
-        if not self.awards:
-            return ""
-        return SafeString(f'<i class="{self.highest_award.icon_class}" title="{ self.award_text_html }"></i>')
+    def kudos_html(self) -> SafeString:
+        """ Overlay on the avatar wherever a user is shown: the highest kudos' trophy, all of them in the
+            tooltip. Badges stay on the profile page """
+        if not self.kudos:
+            return SafeString("")
+        tooltip = "<br/>".join(f"<i class='{award.icon_class}'></i>" + escape(award.award_text) for award in self.kudos)
+        return SafeString(f'<i class="{self.kudos[0].icon_class}" title="{tooltip}"></i>')
 
     def __iter__(self):
         return iter(self.awards)
