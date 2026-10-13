@@ -7,7 +7,8 @@ name: Agent maps
 # next works in that app to fix, not a reason to redden a build. It needs Django importable but no
 # database, so it runs on every push - including the docs-only pushes that django-tests.yml skips.
 # The import checks are gates: `lint-imports` holds the contracts in .importlinter and `vg imports cycles`
-# fails on any cycle among module-load imports.
+# fails on any cycle among module-load imports. Pylint errors (E-class only) are reported like the citations:
+# a warning annotation on each line and the count in the job summary, failing only if pylint itself can't run.
 
 on:
   push:
@@ -59,3 +60,20 @@ jobs:
 
       - name: Check for import cycles
         run: .venv/bin/python scripts/vg imports cycles
+
+      - name: Report pylint errors
+        continue-on-error: true
+        run: |
+          status=0
+          PATH="$PWD/.venv/bin:$PATH" scripts/linting/run_pylint.sh --errors-only --jobs=0 \
+            --msg-template='{path}:{line}:{column}: {msg_id}: {msg} ({symbol})' > pylint_errors.txt || status=$?
+          grep -E '^[^ ]+:[0-9]+:[0-9]+: E[0-9]{4}' pylint_errors.txt > pylint_error_lines.txt || true
+          sed -E 's/^([^:]+):([0-9]+):([0-9]+): (.*)$/::warning file=\1,line=\2,col=\3,title=pylint::\4/' pylint_error_lines.txt
+          {
+            echo "### pylint errors: $(wc -l < pylint_error_lines.txt)"
+            echo '```'
+            cat pylint_error_lines.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # 1 is a fatal message, 32 a usage error: pylint did not finish, so the count above means nothing
+          if (( status & 33 )); then cat pylint_errors.txt; exit 1; fi

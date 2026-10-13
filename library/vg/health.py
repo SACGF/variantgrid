@@ -2,10 +2,11 @@
 `vg health`: the ratchet numbers in one place, so a monthly look (or a before/after on a change) is one call.
 
 Each number should only move one way: module docstring coverage up; dead doc citations, one-off management
-commands, pylint messages and deprecated calls down; the test suite's wall time down. Entry points are `gather_health` and
-`render_health`. No Django: coverage, citations and command categories are read from the tree by AST; the lint
-count comes from the last `scripts/linting/run_pylint.sh` run (`lint.txt`, gitignored, so it is as old as that
-run); deprecations are `library/vg/deprecations.py:find_deprecations` (basedpyright plus `manage.py check`, ~25s,
+commands, pylint messages (the errors listed, heading for zero) and deprecated calls down; the test suite's wall
+time down. Entry points are `gather_health` and `render_health`. No Django: coverage, citations and command categories
+are read from the tree by AST; the lint counts come from the last `scripts/linting/run_pylint.sh` run (`lint.txt`,
+gitignored, so it is as old as that run - CI reports the errors fresh on every push, in `agent-maps.yml`);
+deprecations are `library/vg/deprecations.py:find_deprecations` (basedpyright plus `manage.py check`, ~25s,
 skipped with --no-deprecations); the suite time is the "Run unit tests" step of the last green Django Tests run on master, through `gh`.
 A number that can't be had (no lint.txt, no `gh` or network) is reported as unavailable rather than failing.
 """
@@ -28,6 +29,7 @@ LINT_REPORT = REPO_ROOT / "lint.txt"
 CI_WORKFLOW = "django-tests.yml"
 CI_TEST_STEP = "Run unit tests"
 UNDECLARED = "(undeclared)"
+LISTED_LINT_ERRORS = 20
 
 _PYLINT_MESSAGE_RE = re.compile(r"^\S+:\d+:\d+: ([CRWEFI])\d{4}")
 _PYLINT_SCORE_RE = re.compile(r"rated at (-?[\d.]+)/10")
@@ -39,6 +41,7 @@ class LintHealth:
     by_type: dict[str, int]
     score: str | None
     age_days: int
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -109,12 +112,18 @@ def lint_health(report: Path = LINT_REPORT) -> LintHealth | None:
     if not report.exists():
         return None
     text = report.read_text(errors="replace")
-    by_type = Counter(m.group(1) for m in map(_PYLINT_MESSAGE_RE.match, text.splitlines()) if m)
+    by_type = Counter()
+    errors = []
+    for line in text.splitlines():
+        if m := _PYLINT_MESSAGE_RE.match(line):
+            by_type[m.group(1)] += 1
+            if m.group(1) == "E":
+                errors.append(line)
     score = _PYLINT_SCORE_RE.search(text)
     modified = datetime.fromtimestamp(report.stat().st_mtime, tz=UTC)
     return LintHealth(messages=sum(by_type.values()), by_type=dict(by_type.most_common()),
                       score=score.group(1) if score else None,
-                      age_days=(datetime.now(tz=UTC) - modified).days)
+                      age_days=(datetime.now(tz=UTC) - modified).days, errors=errors)
 
 
 def _gh_api(endpoint: str):
@@ -195,6 +204,10 @@ def render_health(health: Health) -> str:
         detail = ", ".join(f"{t} {n}" for t, n in lint.by_type.items())
         score = f", {lint.score}/10" if lint.score else ""
         lines.append(f"  pylint messages    {lint.messages} ({detail}{score}; lint.txt {lint.age_days} day(s) old)")
+        lines.append(f"  pylint errors      {len(lint.errors)}")
+        lines.extend(f"    {error}" for error in lint.errors[:LISTED_LINT_ERRORS])
+        if len(lint.errors) > LISTED_LINT_ERRORS:
+            lines.append(f"    ... and {len(lint.errors) - LISTED_LINT_ERRORS} more in lint.txt")
     else:
         lines.append(f"  pylint messages    unavailable: {health.unavailable['lint']}")
     if deprecated := health.deprecations:

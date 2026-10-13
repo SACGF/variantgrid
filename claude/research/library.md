@@ -171,6 +171,10 @@ and `path:Symbol` is resolved by AST against the working tree, live plans includ
 `LOOKAHEAD_PYTHON`, so a call typeshed marks deprecated in a Python we haven't deployed shows before the upgrade, and
 splits the hits from our own `@deprecated` markers by name; `manage.py check` under `-W always::DeprecationWarning`
 adds the `warnings.warn` deprecations Django and packages raise at import, which no stub records.
+`library/vg/health.py:render_health` lists the pylint errors from `lint.txt`; `agent-maps.yml` runs
+`scripts/linting/run_pylint.sh --errors-only` on every push and turns each into a warning annotation, not a failure.
+`scripts/linting/pylint_model_utils.py` is a pylint plugin that drops django-model-utils' `TYPE_CHECKING` manager
+stubs, without which every query through an `InheritanceManager` reads as assignment-from-no-return.
 
 ## Why it is shaped this way
 
