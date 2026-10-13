@@ -12,8 +12,7 @@ from snpdb.models import Cohort
 class ReadOnlyPedFileForm(ModelForm, ROFormMixin):
     class Meta:
         model = PedFile
-        fields = ALL_FIELDS
-        read_only = ('import_status', )
+        fields = ['name', 'user']
         read_only_display = ('user', )
         widgets = {'name': TextInput()}
 

@@ -863,8 +863,8 @@ class UserSettingsGenomeBuildMixin:
 class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = GenomicIntervalsCollection
-        exclude = ['category']
-        read_only = ('processed_file', 'processed_records', 'import_status', 'error_message')
+        exclude = ['category', 'import_status']
+        read_only = ('processed_file', 'processed_records', 'error_message')
         widgets = {'name': TextInput(),
                    'processed_file': TextInput(),
                    'user': ModelSelect2(url='user_autocomplete',

@@ -1,6 +1,8 @@
 {% extends "uicore/page/base_container_table.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load ui_utils %}
+{% load import_status_tags %}
 
 {% block title %}{{ ped_file.name }}{% endblock title %}
 {% block head %}
@@ -66,6 +68,7 @@
                 <div class="tab-pane show active" role="tabpanel" id="details">
                 <form>
                     {% crispy ped_file_form form_helper.horizontal %}
+                    {% labelled label="Import Status" %}{% import_status_icon ped_file.import_status %}{% endlabelled %}
                 </form>
                 </div>
                 {% if has_write_permission %}
