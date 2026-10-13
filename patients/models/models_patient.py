@@ -34,7 +34,7 @@ from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
-from patients.external_references import ResolvedReference
+from patients.external_references import ResolvedReference, normalize_specimen_reference
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import (
     MatchStatus,
@@ -107,6 +107,11 @@ class ExternallyManagedModel(TimeStampedModel):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        """ The form LOCAL_REFERENCE_FIELD is stored in, so a lookup can be handed any other """
+        return reference_id
 
     @property
     def short_identifier(self):
@@ -470,6 +475,14 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
         unique_together = ("patient", "reference_id")
 
     @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        return normalize_specimen_reference(reference_id)
+
+    def save(self, *args, **kwargs):
+        self.reference_id = self.normalize_reference_id(self.reference_id)
+        super().save(*args, **kwargs)
+
+    @classmethod
     def get_permission_class(cls):
         return Patient
 
@@ -576,6 +589,14 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
         # Unnamed extractions are all distinct under Postgres, which is what the re-extraction
         # case wants - extraction_date tells those apart
         unique_together = ("specimen", "reference_id")
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        return normalize_specimen_reference(reference_id)
+
+    def save(self, *args, **kwargs):
+        self.reference_id = self.normalize_reference_id(self.reference_id)
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_permission_class(cls):
