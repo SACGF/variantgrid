@@ -29,6 +29,9 @@ Patterns here:
   nodes whose parents are all in `analysis/models/enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
   fails fast with ERROR_WITH_PARENT); each `analysis/tasks/node_update_tasks.py:update_node_task` re-triggers the
   dispatcher when it finishes. `analysis/tasks/analysis_update_tasks.py:dispatch_analysis_backlog` is the periodic sweep.
+- `analysis/scheduler_status.py` is the operator's view of the lease state (the superuser Analysis Status page):
+  waiting / backing off / dispatched / running / lapsed. Its buckets are defined with `_live_lease_q` and the
+  `run_after` gate of `lease_ready_nodes`, so the page and the dispatcher cannot disagree - change them together.
 - Node-specific load work goes in `_load`, returning a dict of fields to persist;
   `analysis/models/nodes/analysis_node.py:AnalysisNode.load` then runs `node_counts` (one aggregate per configured count
   label, plus the exact pk list for nodes under `ANALYSIS_NODE_STORE_ID_SIZE_MAX`) and writes via `AnalysisNode.update`.

@@ -13,6 +13,7 @@ from django.db.models import Count
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
@@ -51,6 +52,8 @@ from analysis.models.nodes.node_types import (
     get_node_display_data_by_class_name,
     get_node_types_hash,
 )
+from analysis.scheduler_status import get_analyses_with_work, get_scheduler_status
+from analysis.tasks.analysis_update_tasks import dispatch_analysis_backlog
 from analysis.variant_tag_operations import (
     resolve_launching_variant_tag,
     resolve_requires_classification_tags,
@@ -349,6 +352,9 @@ def view_analysis_status(request):
                               by=str(request.user))
             messages.add_message(request, messages.WARNING,
                                  "Paused analysis + annotation job dispatch")
+        if "dispatch-backlog" in request.POST:
+            dispatch_analysis_backlog.si().apply_async()
+            messages.add_message(request, messages.INFO, "Queued the analysis backlog dispatcher")
         if "reload-matching" in request.POST:
             filter_form = AnalysisNodeIssuesFilterForm(request.POST)
             nodes_qs = filter_form.get_queryset()
@@ -371,7 +377,10 @@ def view_analysis_status(request):
     field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
     # Don't force-create the singleton just by viewing the page
     jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
-    context = {"nodes_status_summary": summary_data,
+    now = timezone.now()
+    context = {"scheduler_status": get_scheduler_status(now),
+               "analyses_with_work": get_analyses_with_work(now),
+               "nodes_status_summary": summary_data,
                "field_counts": field_counts,
                "jobs_control": jobs_control,
                "jobs_paused": bool(jobs_control and jobs_control.paused),

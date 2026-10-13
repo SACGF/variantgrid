@@ -7,81 +7,14 @@
     <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/node_type_select.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/analysis/view_analysis_status.js' %}"></script>
     <link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
     <script>
         $(document).ready(() => {
-            let nodesStatusSummary = {{ nodes_status_summary |jsonify }};
-
-            function showSummaryGraph(selector, summaryData) {
-                let data = [];
-                let summary_and_colors = [
-                    ["Queued", 'rgb(50, 50, 50)'],
-                    ["Running", 'rgb(50,171, 96)'],
-                    ["User Error", 'rgb(255, 79, 0)'],
-                    ["Error", 'rgb(170, 50, 50)'],
-                    ["Finished", 'rgb(35, 110, 80)'],
-                ];
-
-                for (let i=0 ; i<summary_and_colors.length ; ++i) {
-                    let name = summary_and_colors[i][0];
-                    let color = summary_and_colors[i][1];
-                    let c = summaryData[name] || 0;
-                    let trace = {
-                        x: [c],
-                        y: ["counts"],
-                        orientation: 'h',
-                        name: name,
-                        marker: {
-                            color: color
-                        },
-                        type: 'bar'
-                    };
-                    data.push(trace);
-                }
-
-                var layout = {
-                    width: 800,
-                    height: 100,
-                    barmode: 'stack',
-                    showlegend: true,
-                    legend: {orientation: 'h'},
-                    xaxis: {
-                        autorange: true,
-                        showgrid: false,
-                        zeroline: false,
-                        showline: false,
-                        ticks: '',
-                        showticklabels: false
-                    },
-                    margin: {
-                        l: 100,
-                        r: 100,
-                        b: 50,
-                        t: 20,
-                        //pad: 4
-                    },
-                };
-                Plotly.newPlot(selector, data, layout);
-            }
-
-            showSummaryGraph("analysis-node-summary-graph", nodesStatusSummary);
-
-            setupNodeTypeSelect("#id_node_class", {{ node_types_display | jsonify }});
-
-            let filterForm = $("#analysis-node-issues-filter");
-            let reloadGrid = () => $('#analysis-node-issues-datatable').DataTable().ajax.reload();
-            filterForm.find("select, input").on("change", reloadGrid);
-            $("#clear-filters").on("click", () => {
-                filterForm.find("select, input:not([type=hidden])").val("");
-                filterForm.find("select").trigger("change.nodeTypeSelect");
-                history.replaceState(null, "", window.location.pathname);  // drop the 'Reload matching' redirect's filters
-                reloadGrid();
-            });
-            filterForm.on("submit", (event) => {
-                let numNodes = $('#analysis-node-issues-datatable').DataTable().page.info().recordsDisplay;
-                if (!confirm(`Reload ${numNodes} failed nodes (and the other failed nodes in their analyses)?`)) {
-                    event.preventDefault();
-                }
+            initViewAnalysisStatus({
+                schedulerSummary: {% if scheduler_status.has_work %}{{ scheduler_status.graph_counts|jsonify }}{% else %}null{% endif %},
+                nodesStatusSummary: {{ nodes_status_summary|jsonify }},
+                nodeTypesDisplay: {{ node_types_display|jsonify }},
             });
         });
 
@@ -108,19 +41,92 @@
                     <button name="unpause-jobs" class="btn btn-success">Unpause jobs</button>
                 </form>
             </div>
-        {% else %}
-            <form method="post" class="mb-3">
-                {% csrf_token %}
-                <button name="pause-jobs" class="btn btn-outline-warning">Pause jobs</button>
-            </form>
+        {% endif %}
+        <form method="post" class="mb-3">
+            {% csrf_token %}
+            <div class="btn-toolbar">
+                {% if jobs_paused %}
+                    <span class="d-inline-block" tabindex="0" title="Jobs are paused - the dispatcher would exit without leasing anything">
+                        <button name="dispatch-backlog" class="btn btn-outline-primary" style="pointer-events: none;" disabled>Dispatch backlog now</button>
+                    </span>
+                {% else %}
+                    <button name="dispatch-backlog" class="btn btn-outline-primary">Dispatch backlog now</button>
+                    <button name="pause-jobs" class="btn btn-outline-warning ml-2">Pause jobs</button>
+                {% endif %}
+            </div>
+        </form>
+
+        <div id="analysis-scheduler" class="card mb-3">
+            <div class="card-header">Scheduler</div>
+            <div class="card-body">
+                {% if scheduler_status.has_work %}
+                    <div id="analysis-scheduler-graph" style="height: 100px"></div>
+                {% else %}
+                    <p class="text-muted">Nothing queued</p>
+                {% endif %}
+                {% labelled label="Waiting" hint="Dirty nodes, leased as their parents finish and capacity allows" %}{{ scheduler_status.waiting }}{% endlabelled %}
+                {% labelled label="Backing off" hint="Dirty nodes retrying after a transient error, not leasable until their backoff ends" %}{{ scheduler_status.backing_off }}{% endlabelled %}
+                {% labelled label="Dispatched" hint="Queued with a live lease - sent to analysis_workers, not yet started" %}{{ scheduler_status.dispatched }}{% endlabelled %}
+                {% labelled label="Running" hint="Loading with a live lease" %}{{ scheduler_status.running }}{% endlabelled %}
+                {% labelled label="Lapsed" hint="Queued or loading with no live lease - the next dispatch re-leases a queued node and fails a loading one" %}{{ scheduler_status.lapsed }}{% endlabelled %}
+                {% labelled label="In flight / target" hint="Dispatched + running, against what the periodic backlog dispatch tops up to" %}{{ scheduler_status.in_flight }} / {{ scheduler_status.in_flight_target }}{% endlabelled %}
+                {% labelled label="Analyses with work" %}{{ scheduler_status.analyses_with_work }}{% endlabelled %}
+                {% for queue_name, depth in scheduler_status.queues.items %}
+                    {% labelled label=queue_name hint="Broker queue" %}
+                        {% if depth.error %}
+                            <span class="text-danger">{{ depth.error }}</span>
+                        {% else %}
+                            {{ depth.messages }} message{{ depth.messages|pluralize }}, {{ depth.consumers }} consumer{{ depth.consumers|pluralize }}
+                        {% endif %}
+                    {% endlabelled %}
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if analyses_with_work %}
+            <div id="analyses-with-work" class="card mb-3">
+                <div class="card-header">Analyses with outstanding work</div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Analysis</th>
+                                <th>User</th>
+                                <th class="text-right">Waiting</th>
+                                <th class="text-right">Dispatched</th>
+                                <th class="text-right">Running</th>
+                                <th class="text-right">Lapsed</th>
+                                <th>Oldest modified</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for work in analyses_with_work %}
+                                <tr>
+                                    <td><a href="{% url 'analysis' work.analysis_id %}">{{ work.analysis_name|default:work.analysis_id }}</a></td>
+                                    <td>{{ work.username }}</td>
+                                    <td class="text-right">{{ work.waiting }}</td>
+                                    <td class="text-right">{{ work.dispatched }}</td>
+                                    <td class="text-right">{{ work.running }}</td>
+                                    <td class="text-right{% if work.lapsed %} text-danger{% endif %}">{{ work.lapsed }}</td>
+                                    <td>{% timestamp work.oldest_modified time_ago=True %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         {% endif %}
 
-        <div class="container">
-            <div id="analysis-node-summary-graph" style="height: 100px"></div>
-            {% for field, count in field_counts.items %}
-                {% labelled label=field %}{{ count }}{% endlabelled %}
-            {% endfor %}
+        <div class="card mb-3">
+            <div class="card-header">All nodes</div>
+            <div class="card-body">
+                <div id="analysis-node-summary-graph" style="height: 100px"></div>
+                {% for field, count in field_counts.items %}
+                    {% labelled label=field %}{{ count }}{% endlabelled %}
+                {% endfor %}
+            </div>
         </div>
+
         <form id="analysis-node-issues-filter" method="post" class="form-inline mb-2">
             {% csrf_token %}
             {% for field in filter_form %}
