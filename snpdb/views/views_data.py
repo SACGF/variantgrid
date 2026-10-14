@@ -198,11 +198,9 @@ def view_vcf(request, vcf_id):
                                              widgets=SampleForm.Meta.widgets)
 
     cohort = None
-    cohort_id = None
     try:
         # Some legacy data was too hard to fix and relies on being re-imported
         cohort = vcf.cohort
-        cohort_id = cohort.pk
         _ = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
         messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
@@ -271,8 +269,8 @@ def view_vcf(request, vcf_id):
 
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
-        if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
-            annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort_id)
+        if vcf.import_status == ImportStatus.SUCCESS and cohort:
+            annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort)
 
     vcf_length_stats = _get_vcf_length_stats(vcf)
 
@@ -553,7 +551,7 @@ def view_sample(request, sample_id):
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
         if sample.import_status == ImportStatus.SUCCESS:
-            annotated_download_files = get_annotated_download_files_cgf("export_sample_to_downloadable_file", sample.pk)
+            annotated_download_files = get_annotated_download_files_cgf("export_sample_to_downloadable_file", sample)
 
     context = {
         'annotated_download_files': annotated_download_files,

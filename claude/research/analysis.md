@@ -149,9 +149,13 @@ analysis) and `analysis/tasks/auto_analysis_tasks.py:reload_auto_analyses_for_vc
 cohort-export analyses of a re-imported VCF. A template that `requires_sample_gene_list` is skipped until the QC gene list
 arrives, and `analysis/signals/signal_handlers.py:handle_active_sample_gene_list_created` retries then. The sample tab
 and the cohort VCF export use `analysis/analysis_templates.py:get_sample_analysis` /
-`analysis/analysis_templates.py:get_cohort_analysis`, one hidden run per object per template version recorded in
+`analysis/analysis_templates.py:get_cohort_analysis`, one hidden run per object per template version and annotation
+version (a run on a superseded annotation version is left behind and a new one made, #2209) recorded in
 `SampleAnalysisTemplateRun` / `CohortAnalysisTemplateRun`, named by `ANALYSIS_TEMPLATES_AUTO_SAMPLE` and
-`ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT`.
+`ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT`. The annotated sample/cohort export files
+(`analysis/tasks/analysis_grid_export_tasks.py:export_sample_to_downloadable_file`) are keyed on the annotation
+version too, and carry every column it annotates rather than the template's collection
+(`snpdb/grid_columns/custom_columns.py:get_all_variant_grid_columns`).
 
 ### Tags
 

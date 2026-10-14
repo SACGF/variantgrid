@@ -23,6 +23,7 @@ from analysis.models import (
 from analysis.models.nodes.analysis_node import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.fake_data import get_fake_annotation_version
+from annotation.models import AnnotationVersion
 from library.django_utils.unittest_utils import prevent_request_warnings
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
 from snpdb.models import (
@@ -175,6 +176,24 @@ class TestTemplateRunVersion(AnalysisTemplateDraftTestCase):
 
         analysis = get_sample_analysis(self.sample, self.template)
         self.assertEqual(get_sample_analysis(self.sample, self.template), analysis)
+
+    def test_get_sample_analysis_makes_a_new_run_for_a_new_annotation_version(self):
+        """ #2209 - a run on a superseded annotation version would export the old annotation for ever """
+        self._new_version().activate()
+        analysis = get_sample_analysis(self.sample, self.template)
+        old_annotation_version = analysis.annotation_version
+
+        newer = AnnotationVersion.objects.get(pk=old_annotation_version.pk)
+        newer.pk = None
+        newer.save()  # annotation_date is auto_now, so this is now the build's latest
+        self.assertEqual(AnnotationVersion.latest(self.grch37), newer)
+
+        current = get_sample_analysis(self.sample, self.template)
+        self.assertNotEqual(current, analysis)
+        self.assertEqual(current.annotation_version, newer)
+        self.assertEqual(get_sample_analysis(self.sample, self.template), current, "and is reused from here")
+        self.assertEqual(get_sample_analysis(self.sample, self.template, annotation_version=old_annotation_version),
+                         analysis, "an export launched against the old version still finds its run")
 
 
 class TestLaunchViews(AnalysisTemplateDraftTestCase):

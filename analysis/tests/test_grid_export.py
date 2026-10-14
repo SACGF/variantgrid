@@ -7,8 +7,10 @@ entry point the view and the Celery export tasks use.
 """
 import csv
 import json
+import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+import zipfile
+from datetime import UTC, datetime, timedelta, timezone
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -22,6 +24,7 @@ from django.test.client import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls.base import resolve, reverse
 
+from analysis.analysis_templates import get_sample_analysis
 from analysis.grid_export import (
     format_items_iterator,
     get_canonical_transcript_collection_filename_part,
@@ -29,7 +32,7 @@ from analysis.grid_export import (
     node_grid_get_export_iterator,
 )
 from analysis.grids import ExportVariantGrid, VariantGrid
-from analysis.models import Analysis
+from analysis.models import Analysis, AnalysisTemplate, AnalysisTemplateType, AnalysisVariable
 from analysis.models.enums import NodeStatus
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.sources.cohort_node import CohortNode
@@ -37,8 +40,12 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_node_to_downloadable_file,
+    export_sample_to_downloadable_file,
+    get_annotated_download_files_cgf,
+    get_grid_downloadable_file_params_hash,
 )
 from annotation.fake_data import get_fake_annotation_version
+from annotation.models import AnnotationVersion
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
@@ -47,7 +54,16 @@ from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_
 from library.genomics.vcf_writer import percent_encode_info_value
 from snpdb.fake_data import create_fake_cohort
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
-from snpdb.models import CachedGeneratedFile, CohortGenotype, GenomeBuild, Tag, VCFInfo
+from snpdb.models import (
+    CachedGeneratedFile,
+    CohortGenotype,
+    CustomColumn,
+    CustomColumnsCollection,
+    GenomeBuild,
+    Tag,
+    VariantGridColumn,
+    VCFInfo,
+)
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.models.models_enums import CohortGenotypeCollectionType, VCFInfoTypes
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -200,7 +216,7 @@ class TestFormatItemsIterator(GridExportTestCase):
     def test_tags_fresh_counts_with_stale_cutoff(self):
         payload = "foo:2024-03-01:|foo:2019-07-12:|foo:2019-06-01:|bar:2019-01-01:|baz:2024-05-06:"
         items = [{"id": 1, "tags_global": payload, "tags": None}]
-        stale_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        stale_date = datetime(2020, 1, 1, tzinfo=UTC)
         formatted = list(format_items_iterator(iter(items), tag_stale_date=stale_date))
         # Multi-event tags show fresh of total; a single entirely-stale tag shows (0 fresh);
         # a single fresh tag stays as today
@@ -353,7 +369,7 @@ class TestNodeExportLaunch(GridExportTestCase):
 
     def _stall(self, cgf):
         stalled_minutes = settings.CACHED_GENERATED_FILE_STALLED_MINUTES + 1
-        stalled_modified = datetime.now(tz=timezone.utc) - timedelta(minutes=stalled_minutes)
+        stalled_modified = datetime.now(tz=UTC) - timedelta(minutes=stalled_minutes)
         CachedGeneratedFile.objects.filter(pk=cgf.pk).update(modified=stalled_modified)
 
     @mock.patch("snpdb.models.models.AsyncResult")
@@ -559,3 +575,129 @@ class TestFusionCallsColumn(GridExportTestCase):
                          "SpliceGirl chr4:55133909→chr4:55138560 (40 reads)",
                          by_variant[self.gene_fusion.variant.pk])
         self.assertEqual("", by_variant[self.variants[0].pk], "blank on a row that isn't a fusion")
+
+
+class TestAnnotatedExportColumns(GridExportTestCase):
+    """ #2209 - a composite column draws its members client side, so it has nothing to write: the export
+        carries the members under their own labels, never an empty column under the composite's """
+
+    def _collection(self, column_ids: list[str]) -> CustomColumnsCollection:
+        ccc = CustomColumnsCollection.objects.create(name="test annotated export", user=self.user)
+        ccc.customcolumn_set.all().delete()
+        for sort_order, column_id in enumerate(column_ids):
+            CustomColumn.objects.create(custom_columns_collection=ccc, column_id=column_id, sort_order=sort_order)
+        return ccc
+
+    def test_composite_in_the_collection_exports_its_members_only(self):
+        self.analysis.custom_columns_collection = self._collection(["variant", "consequence_impact", "Sample"])
+        self.analysis.save()
+        header, rows = self._export_csv(self._sample_node())
+        self.assertEqual(1, header.count("Consequence"), header)
+        self.assertIn("Impact", header)
+        self.assertEqual(len(rows), self.node_count())
+
+    def test_all_columns_export_carries_every_annotated_column(self):
+        """ The annotated sample/cohort export takes every column the version annotates, not a collection """
+        node = self._sample_node()
+        _filename, file_iterator = node_grid_get_export_iterator(self._request(), node, "csv",
+                                                                 grid_kwargs={"all_columns": True})
+        rows = list(csv.reader("".join(file_iterator).splitlines()))
+        header = rows[0]
+        self.assertEqual(len(rows) - 1, node.count)
+        spliceai = VariantGridColumn.objects.prefetch_related("composite_members__column").get(pk="spliceai")
+        for member in spliceai.member_columns:
+            self.assertIn(member.label, header)
+        self.assertNotIn(spliceai.label, header)
+        self.assertEqual("variant_id", header[0])
+        self.assertEqual(len(header), len(set(header)), "every label once")
+
+    def test_all_columns_vcf_export(self):
+        node = self._sample_node()
+        _filename, file_iterator = node_grid_get_export_iterator(self._request(), node, "vcf",
+                                                                 grid_kwargs={"all_columns": True})
+        records = [line for line in "".join(file_iterator).splitlines() if not line.startswith("#")]
+        self.assertEqual(len(records), node.count)
+
+    def node_count(self) -> int:
+        return SampleNode.objects.get(analysis=self.analysis).count
+
+
+AUTO_SAMPLE_TEMPLATE_NAME = "test auto sample export"
+
+
+@override_settings(ANALYSIS_TEMPLATES_AUTO_SAMPLE=AUTO_SAMPLE_TEMPLATE_NAME,
+                   ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT=AUTO_SAMPLE_TEMPLATE_NAME)
+class TestAnnotatedSampleExport(GridExportTestCase):
+    """ #2209 - the sample export is keyed on the build's annotation version: an annotation upgrade means a
+        new auto analysis and a new file, and the one for the superseded version goes """
+
+    GENERATOR = "export_sample_to_downloadable_file"
+    FAKE_TASK_ID = "fake-sample-export-task-id"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        template_analysis = Analysis(genome_build=cls.genome_build, template_type=AnalysisTemplateType.TEMPLATE)
+        template_analysis.set_defaults_and_save(cls.user)
+        node = SampleNode.objects.create(analysis=template_analysis, output_node=True)
+        AnalysisVariable.objects.create(node=node, field="sample", class_name="snpdb.Sample")
+        cls.template = AnalysisTemplate.objects.create(name=AUTO_SAMPLE_TEMPLATE_NAME, user=cls.user,
+                                                       analysis=template_analysis)
+        cls.template.new_version("%(template)s for %(input)s").activate()
+        cls.annotation_version = AnnotationVersion.latest(cls.genome_build)
+
+    def _superseded_annotation_version(self) -> AnnotationVersion:
+        superseded = AnnotationVersion.objects.get(pk=self.annotation_version.pk)
+        superseded.pk = None
+        superseded.save()
+        AnnotationVersion.objects.filter(pk=superseded.pk).update(annotation_date=datetime(2000, 1, 1, tzinfo=UTC))
+        return superseded
+
+    def _cgf(self, annotation_version, **kwargs) -> CachedGeneratedFile:
+        params_hash = get_grid_downloadable_file_params_hash(self.sample.pk, "csv", annotation_version.pk)
+        return CachedGeneratedFile.objects.create(generator=self.GENERATOR, params_hash=params_hash, **kwargs)
+
+    def _ready_output_node(self, analysis) -> SampleNode:
+        """ Nothing runs the node under test - make it ready the way the scheduler would """
+        node = SampleNode.objects.get(analysis=analysis, output_node=True)
+        node.count = node.get_queryset().count()
+        node.status = NodeStatus.READY
+        node.save()
+        return node
+
+    def test_export_task_writes_every_column_and_drops_the_superseded_file(self):
+        superseded_cgf = self._cgf(self._superseded_annotation_version(), filename="/nowhere/old.csv.zip")
+        cgf = self._cgf(self.annotation_version, task_id=self.FAKE_TASK_ID)
+        analysis = get_sample_analysis(self.sample, self.template, annotation_version=self.annotation_version)
+        node = self._ready_output_node(analysis)
+
+        with tempfile.TemporaryDirectory() as generated_dir:
+            with override_settings(GENERATED_DIR=generated_dir):
+                export_sample_to_downloadable_file.apply(args=(self.sample.pk, "csv", self.annotation_version.pk),
+                                                         task_id=self.FAKE_TASK_ID)
+                cgf.refresh_from_db()
+                self.assertEqual(cgf.task_status, "SUCCESS", cgf.exception)
+                self.assertIn(f"_annotated_v{self.annotation_version.pk}_", cgf.filename)
+                with zipfile.ZipFile(cgf.filename) as zipf:
+                    csv_name = zipf.namelist()[0]
+                    with zipf.open(csv_name) as f:
+                        rows = list(csv.reader(f.read().decode().splitlines()))
+        self.assertEqual(len(rows) - 1, node.count)
+        self.assertIn(VariantGridColumn.objects.get(pk="spliceai_max_ds").label, rows[0],
+                      "every annotated column, whatever the template's collection holds")
+        self.assertFalse(CachedGeneratedFile.objects.filter(pk=superseded_cgf.pk).exists())
+
+    def test_annotated_download_files_follow_the_annotation_version(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            filename = os.path.join(media_root, "annotated.csv.zip")
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("x")
+            cgf = self._cgf(self.annotation_version, filename=filename, task_status="SUCCESS")
+            with override_settings(MEDIA_ROOT=media_root):
+                self.assertEqual(cgf, get_annotated_download_files_cgf(self.GENERATOR, self.sample)["csv"])
+
+                newer = AnnotationVersion.objects.get(pk=self.annotation_version.pk)
+                newer.pk = None
+                newer.save()  # annotation_date is auto_now, so this is now the build's latest
+                self.assertIsNone(get_annotated_download_files_cgf(self.GENERATOR, self.sample)["csv"],
+                                  "offered for generating against the new version, not served from the old")
