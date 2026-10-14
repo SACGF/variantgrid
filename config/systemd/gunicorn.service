@@ -4,6 +4,9 @@ After=network.target
 
 [Service]
 User=variantgrid
+# Both files are read, in order, and merged: variantgrid.env is shared by every VariantGrid unit and holds the
+# install location (VG_INSTALL_DIR, copied from config/variantgrid.env - the one per-host setting); the second
+# file is this unit's own (copied from config/gunicorn/), with paths relative to that directory.
 EnvironmentFile=/etc/variantgrid/variantgrid.env
 EnvironmentFile=/etc/variantgrid/gunicorn/gunicorn.env
 ExecStartPre=/bin/mkdir -p /var/log/variantgrid

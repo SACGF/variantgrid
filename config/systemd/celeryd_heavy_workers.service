@@ -8,6 +8,9 @@ User=variantgrid
 ExecStartPre=/bin/mkdir -p /var/log/variantgrid
 Restart=always
 OOMPolicy=continue
+# Both files are read, in order, and merged: variantgrid.env is shared by every VariantGrid unit and holds the
+# install location (VG_INSTALL_DIR, copied from config/variantgrid.env - the one per-host setting); the second
+# file is this unit's own (copied from config/celery/), with paths relative to that directory.
 EnvironmentFile=/etc/variantgrid/variantgrid.env
 EnvironmentFile=/etc/variantgrid/celery/celeryd_heavy_workers.env
 ExecStart=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} multi start ${CELERYD_NODES} \
