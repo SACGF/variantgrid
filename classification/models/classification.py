@@ -2606,8 +2606,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
                     return ClassificationModification.objects.none()
 
             else:
-                # FIXME this will not get classifications with outstanding edits that the user can see
-                qs = qs.filter(is_last_edited=True)
+                # Users outside the owning lab can't read unpublished edits, so fall back to the last published
+                visible_last_edited_qs = qs.filter(is_last_edited=True)
+                qs = qs.filter(
+                    Q(is_last_edited=True) |
+                    (Q(is_last_published=True) & ~Q(classification__in=visible_last_edited_qs.values('classification')))
+                )
 
         return qs
 
