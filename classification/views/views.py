@@ -732,10 +732,11 @@ def get_classification_attachment_file_dicts(classification) -> list[dict]:
 
 
 def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponse:
-    """ This is not done via static files, so we add security later """
+    """ Served through a view rather than static files so only users who can view the classification get it """
 
-    # TODO: Check security/access to Classification
     vc_attachment = get_object_or_404(ClassificationAttachment, pk=pk)
+    # Same check as the classification page - a lab can see its own unpublished record
+    ClassificationRef.init_from_obj(request.user, vc_attachment.classification).check_security()
 
     if thumbnail and vc_attachment.thumbnail_path:
         filename = vc_attachment.thumbnail_path
