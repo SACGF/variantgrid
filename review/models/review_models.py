@@ -234,6 +234,7 @@ class Review(TimeStampedModel):
                 return [ValueOther.from_str(method, ReviewMedium)]
             else:
                 return sorted(ValueOther.from_str(m, ReviewMedium) for m in method)
+        return []
 
     @property
     def participants(self) -> list[ValueOther]:
@@ -243,20 +244,18 @@ class Review(TimeStampedModel):
 
     @property
     def answers(self) -> list[ReviewAnswer]:
-        if answers := self.meeting_meta.get("answers", {}):
-            answer_list = []
-            for key, answer in answers.items():
-                # TODO, put safety if no question can be found
-                if question := ReviewQuestion.objects.get(topic=self.topic, key=key):
-                    answer_list.append(
-                        ReviewAnswer(
-                            question=question,
-                            details=answer.get("details"),
-                            resolution=DifferenceResolution(answer.get("resolution"))
-                        )
-                    )
-            return answer_list
-        return []
+        answers = self.meeting_meta.get("answers") or {}
+        # a question deleted in the admin (rather than disabled) drops out of historical reviews
+        questions = ReviewQuestion.objects.filter(topic=self.topic, key__in=answers.keys()).in_bulk()
+        return [
+            ReviewAnswer(
+                question=question,
+                details=answer.get("details"),
+                resolution=DifferenceResolution(answer.get("resolution"))
+            )
+            for key, answer in answers.items()
+            if (question := questions.get(key))
+        ]
 
     @cached_property
     def post_review_data_formatted(self) -> str:
