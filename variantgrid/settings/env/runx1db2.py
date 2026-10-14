@@ -12,8 +12,6 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 
 # import all the base settings #
 # Overwrite settings for your system below
-ANALYSIS_TEMPLATES_RUNX1 = True
-
 ANNOTATION_ENTREZ_EMAIL = 'your@email.com'
 ALLOWED_HOSTS = ["runx1db.runx1-fpd.org", "runx1db.runx1.com", "144.6.226.231", "43.240.97.68", "localhost"]
 DEBUG = False
