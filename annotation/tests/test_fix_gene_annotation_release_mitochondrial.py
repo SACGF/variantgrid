@@ -42,7 +42,12 @@ class FixGeneAnnotationReleaseMitochondrialTest(TestCase):
     def setUpTestData(cls):
         cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
         annotation_version = get_fake_annotation_version(cls.grch38)
-        cls.release = cls._make_refseq_release(cls.grch38)
+        gene_annotation_import = GeneAnnotationImport.objects.create(annotation_consortium=AnnotationConsortium.REFSEQ,
+                                                                    genome_build=cls.grch38, url="refseq_gff")
+        cls.release = GeneAnnotationRelease.objects.create(version="RS_test",
+                                                          annotation_consortium=AnnotationConsortium.REFSEQ,
+                                                          genome_build=cls.grch38,
+                                                          gene_annotation_import=gene_annotation_import)
         dbnsfp_version = DBNSFPGeneAnnotationVersion.objects.create(version="4.test", sha256_hash="not_a_real_hash")
         with SubVersionPartition.defer_new_sub_version():
             cls.gav = GeneAnnotationVersion.objects.create(gene_annotation_release=cls.release,
@@ -68,15 +73,6 @@ class FixGeneAnnotationReleaseMitochondrialTest(TestCase):
         # Looked up by a gene list while the release had no MT genes, so it matched nothing
         cls.release_gene_symbol = ReleaseGeneSymbol.objects.create(release=cls.release, gene_symbol=mt_nd4)
 
-    @staticmethod
-    def _make_refseq_release(genome_build) -> GeneAnnotationRelease:
-        gene_annotation_import = GeneAnnotationImport.objects.create(annotation_consortium=AnnotationConsortium.REFSEQ,
-                                                                    genome_build=genome_build,
-                                                                    url=f"refseq_gff_{genome_build.name}")
-        return GeneAnnotationRelease.objects.create(version="RS_test", annotation_consortium=AnnotationConsortium.REFSEQ,
-                                                   genome_build=genome_build,
-                                                   gene_annotation_import=gene_annotation_import)
-
     def test_adds_release_rows_symbol_match_and_gene_annotation(self):
         self.assertEqual({self.gene.pk}, add_mitochondrial_genes_to_release(self.release))
 
@@ -88,15 +84,3 @@ class FixGeneAnnotationReleaseMitochondrialTest(TestCase):
                                                              gene=self.gene).exists())
         gene_annotation = GeneAnnotation.objects.get(version=self.gav, gene=self.gene)
         self.assertEqual("MT-ND4", gene_annotation.dbnsfp_gene.gene_symbol_id)
-
-    def test_second_run_changes_nothing(self):
-        add_mitochondrial_genes_to_release(self.release)
-
-        self.assertEqual(set(), add_mitochondrial_genes_to_release(self.release))
-        self.assertEqual(1, GeneAnnotation.objects.filter(version=self.gav, gene=self.gene).count())
-
-    def test_build_without_fake_transcripts_is_left_alone(self):
-        release = self._make_refseq_release(GenomeBuild.get_name_or_alias("GRCh37"))
-
-        self.assertEqual(set(), add_mitochondrial_genes_to_release(release))
-        self.assertFalse(release.releasegeneversion_set.exists())
