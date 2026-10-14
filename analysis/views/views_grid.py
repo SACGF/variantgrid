@@ -11,6 +11,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis import grids
+from analysis.exceptions import NonFatalNodeError
 from analysis.models import AnalysisNode
 from analysis.models.nodes.analysis_node import node_query_planner_settings
 from analysis.tasks.analysis_grid_export_tasks import (
@@ -18,10 +19,10 @@ from analysis.tasks.analysis_grid_export_tasks import (
     export_cohort_to_downloadable_file,
     export_node_to_downloadable_file,
     export_sample_to_downloadable_file,
+    get_export_annotation_version,
     get_grid_downloadable_file_params_hash,
     get_node_grid_downloadable_file_params_hash,
 )
-from analysis.exceptions import NonFatalNodeError
 from analysis.views.analysis_permissions import (
     get_node_subclass_or_404,
     get_node_subclass_or_non_fatal_exception,
@@ -147,11 +148,12 @@ def _check_export_type(export_type: str):
 def _source_grid_export(request, model, obj_id: int, export_type: str, export_task, generator_name: str):
     """ Launches (or joins) a Celery export of a source node's whole grid and redirects to the
         CachedGeneratedFile poll URL. generator_name is stored against the cached file, so it stays put """
-    model.get_for_user(request.user, obj_id)  # Permission check
+    obj = model.get_for_user(request.user, obj_id)  # Permission check
     _check_export_type(export_type)
 
-    params_hash = get_grid_downloadable_file_params_hash(obj_id, export_type)
-    task = export_task.si(obj_id, export_type)
+    annotation_version = get_export_annotation_version(obj)
+    params_hash = get_grid_downloadable_file_params_hash(obj_id, export_type, annotation_version.pk)
+    task = export_task.si(obj_id, export_type, annotation_version.pk)
     cgf = CachedGeneratedFile.get_or_create_and_launch(generator_name, params_hash, task)
     if cgf.exception:
         raise ValueError(cgf.exception)
