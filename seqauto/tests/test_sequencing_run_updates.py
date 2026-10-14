@@ -123,10 +123,10 @@ class Gene20xCoverageCountTest(APITestCase):
                                           sequencing_run=sequencing_run, sequencing_sample=sequencing_sample,
                                           aligner=self.aligner)
         vcf_file = SingleSampleVCF.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}.vcf",
-                                                  sequencing_run=sequencing_run, alignment_file=alignment_file,
+                                                  sequencing_run=sequencing_run, sequencing_sample=sequencing_sample,
                                                   variant_caller=self.variant_caller)
         qc = QC.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}_qc.txt", sequencing_run=sequencing_run,
-                               alignment_file=alignment_file, vcf_file=vcf_file)
+                               sequencing_sample=sequencing_sample, vcf_file=vcf_file)
         collection = GeneCoverageCollection.objects.create(path=f"/data/{sequencing_run.name}/{sample_name}.cov.tsv",
                                                            data_state=DataState.COMPLETE,
                                                            genome_build=self.genome_build)

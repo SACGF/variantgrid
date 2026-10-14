@@ -41,8 +41,8 @@ class AlignmentFileForm(forms.ModelForm, ROFormMixin):
 class QCFileForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.QC
-        fields = ('path', 'alignment_file', 'vcf_file')
-        read_only = ('path', 'alignment_file', 'vcf_file')
+        fields = ('path', 'sequencing_sample', 'vcf_file')
+        read_only = ('path', 'sequencing_sample', 'vcf_file')
 
 
 class QCColumnForm(BaseDeclareForm):
