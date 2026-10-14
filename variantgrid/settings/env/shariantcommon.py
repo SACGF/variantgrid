@@ -30,6 +30,12 @@ aws_dict = get_aws_secrets()
 AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
         [aws_dict[k] for k in ('AWS_SES_ACCESS_KEY_ID', 'AWS_SES_SECRET_ACCESS_KEY', 'AWS_SES_REGION')]
 
+# Read by django-storages S3Boto3Storage (classification file uploads), not by VariantGrid code
+aws_s3_dict = get_s3_secrets()
+AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
+    [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
+AWS_DEFAULT_ACL = None
+
 LAB_HEAD_MANAGE_MEMBERS = False
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 
@@ -104,6 +110,8 @@ OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
+# Read by mozilla_django_oidc's callback view on a failed login (generally an inactive user)
+LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout/'
 
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 # Overwrite settings for your system below
@@ -272,9 +280,11 @@ VIEW_GENE_WIKI = False
 TIPS_ENABLED = False
 
 USER_SETTINGS_SHOW_GROUPS = False
+USER_SETTINGS_SHOW_BUILDS = False
 
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = True
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = False
+SEARCH_CLASSIFICATION_HGVS_SUFFIX = False
 SEARCH_USER_ADMIN_ONLY = True
 SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY = True
 # SEARCH_HGVS_GENE_SYMBOL_USE_MANE = False

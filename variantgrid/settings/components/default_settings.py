@@ -1420,3 +1420,16 @@ def get_aws_secrets() -> dict:
         "AWS_SES_REGION": get_secret("AWS.SES.region")
     }
 
+
+def get_s3_secrets() -> dict:
+    """
+    Read by django-storages' S3Boto3Storage (classification/models/uploaded_file_types.py), not by VariantGrid directly:
+
+    aws_s3_dict = get_s3_secrets()
+    AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
+        [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
+    """
+    return {
+        "AWS_S3_ACCESS_KEY_ID": get_secret("AWS.S3.access_key_id"),
+        "AWS_S3_SECRET_ACCESS_KEY": get_secret("AWS.S3.secret_access_key")
+    }
