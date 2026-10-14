@@ -179,7 +179,7 @@ class ClinicalGroupingOverlap:
             lab=cm.classification.lab,
             allele_origin_bucket=cm.classification.allele_origin_bucket,
             clinical_significance_from=clinical_sig,
-            clinical_significance_to=pending_clin_sig or clinical_sig,  # FIXME, check flags for pending
+            clinical_significance_to=pending_clin_sig or clinical_sig,
             somatic_clinical_significance=cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),
             amp_level=cm.amp_level,
             pending=bool(pending_clin_sig)
