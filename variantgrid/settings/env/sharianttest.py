@@ -15,6 +15,9 @@ SITE_NAME = "Shariant Test"
 SITE_SHORT_NAME = "Shariant Test"
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
 
+# Discordance emails are logged, not sent, on this host (SEND_EMAILS is False in shariantcommon)
+SILENCED_SYSTEM_CHECKS = [*SILENCED_SYSTEM_CHECKS, "variantgrid.W001"]
+
 SLACK['emoji'] = ':mouse:'
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m785768698-f47e172d7c428063e2f452af783dadfcc07da004'
 CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True

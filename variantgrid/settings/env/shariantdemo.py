@@ -12,7 +12,9 @@ SITE_NAME = "Shariant Demo"
 SITE_SHORT_NAME = "Shariant Demo"
 SITE_MESSAGE = "This is the demo version of Shariant. Please avoid sharing real data in this environment."
 
-OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
+# Discordance emails are logged, not sent, on this host (SEND_EMAILS is False in shariantcommon)
+SILENCED_SYSTEM_CHECKS = [*SILENCED_SYSTEM_CHECKS, "variantgrid.W001"]
+
 SLACK['emoji'] = ':tv:'
 
 # OIDC SETTINGS

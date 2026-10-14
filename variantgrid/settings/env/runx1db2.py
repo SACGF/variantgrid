@@ -12,8 +12,6 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 
 # import all the base settings #
 # Overwrite settings for your system below
-ANALYSIS_TEMPLATES_RUNX1 = True
-
 ANNOTATION_ENTREZ_EMAIL = 'your@email.com'
 ALLOWED_HOSTS = ["runx1db.runx1-fpd.org", "runx1db.runx1.com", "144.6.226.231", "43.240.97.68", "localhost"]
 DEBUG = False
@@ -52,6 +50,7 @@ PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = None  # was 5
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = True
 PUBLIC_SAMPLE_GENE_MATRIX_TYPE = 'RUNX1_classified_damage'
 PUBLIC_SAMPLE_GENE_MATRIX_HIGHLIGHT_GENE_SYMBOLS = ["RUNX1"]
+URLS_NAME_REGISTER.update({"public_global_sample_gene_matrix": True})  # map_matrix.html loads it without a login
 
 LOGIN_REDIRECT_URL = '/snpdb/index'
 SITE_NAME = "RUNX1db"

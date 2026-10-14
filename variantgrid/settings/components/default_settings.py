@@ -338,7 +338,7 @@ MME_DISCLAIMER = (
 MME_TERMS = ""
 
 # From-address for match notifications. Required (with SEND_EMAILS) when MME_ENABLED -
-# email sending is silently a no-op without it, so mme/apps.py refuses to start.
+# email sending is silently a no-op without it (system check variantgrid.E007).
 MME_FROM_EMAIL = None
 
 # --- Beacon v2 ------------------------------------------------------------
@@ -526,7 +526,7 @@ GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False,
 
 # "PanelApp Australia"
 
-# Non-authenticated (no login) sample gene matrix
+# Non-authenticated (no login) sample gene matrix - the 'public_global_sample_gene_matrix' URL, off by default
 PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD = None  # Must be set if system has multiple genome builds
 PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = None  # Sample gene matrix of these genes
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = False  # True = show all samples
@@ -540,8 +540,9 @@ INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_uplo
 PUBLIC_GROUP_NAME = "public"
 LOGGED_IN_USERS_GROUP_NAME = "logged_in_users"
 
-# key/value = Organization.group_name : lab group name pattern
-# Org must already exist, lab pattern is filled with User values (if you want to create a group for each user)
+# key/value = Organization.group_name : lab group name pattern. Both are created if missing; the lab pattern is
+# filled with User values (if you want to create a group for each user). Not for OIDC deployments, where Keycloak
+# owns group membership (system check variantgrid.E003)
 USER_CREATE_ORG_LABS = {
     # "test_organization": "test_lab",
     # "test_organization": "user_group_%(username)s",
@@ -1242,14 +1243,11 @@ _URLS_NAME_REGISTER_DEFAULT = True
 # Keys are url names (eg 'view_sample' or 'node_edit')
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
-    "classification_import_tool": False,
+    "public_global_sample_gene_matrix": False,
     "hgvs_resolution_tool": False,
     "classification_view_metrics": False,
-    "clinvar_key_summary": False,
-    "clinvar_match": False,
     "condition_matchings": False,
     "condition_match_test": False,
-    "discordance_reports": False,
     "vus": False,
 }
 
@@ -1259,6 +1257,11 @@ URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME
 URLS_NAME_REGISTER_SETTINGS = {
     "maps": "USE_MAPS",
     "lab_members_tab": "LAB_HEAD_MANAGE_MEMBERS",
+    "discordance_reports": "DISCORDANCE_ENABLED",
+    "clinvar_key_summary": "CLINVAR_EXPORT",
+    "clinvar_match": "CLINVAR_EXPORT",
+    "classification_import_tool": "CLASSIFICATION_OMNI_IMPORTER_APP_DIR",
+    "keycloak_admin": "KEYCLOAK_SYNC_DETAILS",
 }
 
 # The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default
@@ -1276,7 +1279,6 @@ TERMS_BASE_TEMPLATE = 'base_tc.html'
 
 # Lock down menu
 URLS_NAME_REGISTER.update({"classification_dashboard": False,
-                           "keycloak_admin": False,
                            "classification_upload_unmapped": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
@@ -1418,15 +1420,3 @@ def get_aws_secrets() -> dict:
         "AWS_SES_REGION": get_secret("AWS.SES.region")
     }
 
-
-def get_s3_secrets() -> dict:
-    """
-    aws_s3_dict = get_s3_secrets()
-    AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
-        [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
-    :return:
-    """
-    return {
-        "AWS_S3_ACCESS_KEY_ID": get_secret("AWS.S3.access_key_id"),
-        "AWS_S3_SECRET_ACCESS_KEY": get_secret("AWS.S3.secret_access_key")
-    }
