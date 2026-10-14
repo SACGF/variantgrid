@@ -107,6 +107,12 @@ def check_tool_versions() -> dict:
         somalier_bin = cfg.get_annotation("command")
         tools["somalier"] = (lambda: _run_ensure_success([somalier_bin]), "https://github.com/brentp/somalier")
 
+    if settings.ANNOTATION_ANNOTSV_ENABLED:
+        tools["AnnotSV"] = (lambda: _run_ensure_success([settings.ANNOTATION_ANNOTSV_BIN, "-version"]),
+                            "Install AnnotSV and set ANNOTATION_ANNOTSV_BIN")
+        tools["AnnotSV annotations"] = (lambda: os.path.isdir(settings.ANNOTATION_ANNOTSV_ANNOTATIONS_DIR),
+                                        "ANNOTATION_ANNOTSV_ANNOTATIONS_DIR must be the directory containing Annotations_Human")
+
     if madeline2_cmd := settings.PEDIGREE_MADELINE2_COMMAND:
         tools["ped_parser"] = (lambda: _run_ensure_success([*get_ped_parser_command(), "--version"]), _INSTALL_PED_PARSER_MADELINE2)
         tools["madeline2"] = (lambda: _run_ensure_success([madeline2_cmd, "--version"]), _INSTALL_PED_PARSER_MADELINE2)
