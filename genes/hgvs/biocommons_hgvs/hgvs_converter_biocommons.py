@@ -98,7 +98,7 @@ class BioCommonsHGVSConverter:
         assembly_name = genome_build.name
         symbolic_alt_min_length = settings.VARIANT_SYMBOLIC_ALT_SIZE if settings.VARIANT_SYMBOLIC_ALT_ENABLED else None
         self.babelfish = Babelfish(self.hdp, babelfish_assembly_name(genome_build),
-                                   symbolic_alt_min_length=symbolic_alt_min_length, vcf_version="4.3")
+                                   symbolic_alt_min_length=symbolic_alt_min_length)
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=assembly_name,
                                  alt_aln_method='splign',

@@ -1270,7 +1270,7 @@ gunicorn==26.2.0 \
     --hash=sha256:62b864895d9ebff0b2f9867ba04fe811c93121596540830c9c916d0769668447 \
     --hash=sha256:bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3
     # via -r requirements.in
-hgvs @ git+https://github.com/davmlaw/hgvs@ce8f8437aec9c630ee51d1568e2d3eca12c1da12
+hgvs @ git+https://github.com/biocommons/hgvs@13289ab3b9db3c751918906c543991c74917ff61
     # via
     #   -r requirements.in
     #   cdot
