@@ -37,7 +37,7 @@ class ClassificationTestCaseUtils(TestCase):
         self.assertEqual(patch['d']['validation'][0]['code'], 'z_untested')  # but z_untested left alone
 
         self.assertEqual(patch['a'].get('value', None), None)  # remade entry with None value
-        self.assertEqual(patch['a']['validation'][0]['code'], 'bad')  # and new bad validation
+        self.assertEqual(patch['a']['validation'][0]['code'], 'bad')  # and new bad validation  # pylint: disable=unsubscriptable-object
 
         self.assertEqual(len(patch['b']['validation']), 2)  # has z_untested and new bad
 

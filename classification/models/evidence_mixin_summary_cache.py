@@ -1,5 +1,5 @@
+import datetime
 from dataclasses import dataclass
-from datetime import date
 from functools import cached_property
 from typing import Optional, Self
 
@@ -25,9 +25,9 @@ class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
         return bool(self.date)
 
     @property
-    def as_date(self) -> Optional[date]:
+    def as_date(self) -> Optional[datetime.date]:
         try:
-            return date.fromisoformat(self.date)
+            return datetime.date.fromisoformat(self.date)
         except (TypeError, ValueError):
             return None
 

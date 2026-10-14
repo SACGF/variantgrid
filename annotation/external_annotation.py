@@ -527,16 +527,14 @@ def explain_unmatched_variant_annotation_version(meta: dict) -> str:
     genome_build = GenomeBuild.get_name_or_alias(meta["genome_build"])
     annotation_consortium = meta["annotation_consortium"]
     expected = _expected_matchable_identity(meta)
-    best = None  # (variant_annotation_version, diff)
+    candidates = []  # (variant_annotation_version, diff)
     for variant_annotation_version in VariantAnnotationVersion.objects.filter(
             genome_build=genome_build, annotation_consortium=annotation_consortium):
         actual = _matchable_identity(variant_annotation_version_identity(variant_annotation_version))
-        diff = _identity_diff(expected, actual)
-        if best is None or len(diff) < len(best[1]):
-            best = (variant_annotation_version, diff)
-    if best is None:
+        candidates.append((variant_annotation_version, _identity_diff(expected, actual)))
+    if not candidates:
         return f"no local VariantAnnotationVersion exists for {genome_build}/{annotation_consortium}"
-    variant_annotation_version, diff = best
+    variant_annotation_version, diff = min(candidates, key=lambda candidate: len(candidate[1]))
     fields = "; ".join(f"{key}: dump={dump_value!r} local={local_value!r}"
                        for key, (dump_value, local_value) in sorted(diff.items()))
     return (f"closest local VAV {variant_annotation_version.pk} ({variant_annotation_version}) "

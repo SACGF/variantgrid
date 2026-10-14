@@ -150,12 +150,12 @@ class TestPathogenicOverlapsAssembly(TestCase):
         }
         overlaps = _extract_pathogenic_overlaps(row)
         self.assertEqual(set(overlaps.keys()), {"loss", "inv"})
-        self.assertEqual(overlaps["loss"], {
+        self.assertEqual(overlaps["loss"], {  # pylint: disable=unsubscriptable-object
             "source": "ClinGen",
             "phen": "Hereditary breast cancer",
             "coord": "chr17:41200000-41260000",
         })
-        self.assertEqual(overlaps["inv"], {
+        self.assertEqual(overlaps["inv"], {  # pylint: disable=unsubscriptable-object
             "source": "ClinVar&dbVar",
             "hpo": "HP:0001234",
             "coord": "chr3:127500000-128800000",

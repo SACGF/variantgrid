@@ -310,7 +310,7 @@ class PathologyTestOrderPopulation(models.Model):
 def get_external_order_system_last_checked():
     # TODO: Make this more general - e.g. register somewhere in settings?
     try:
-        from sapath.models.sapath_helix import HelixNGSOrdersImport
+        from sapath.models.sapath_helix import HelixNGSOrdersImport  # pylint: disable=import-error
         return HelixNGSOrdersImport.get_last_checked()
     except Exception:  # App not registered?
         return None

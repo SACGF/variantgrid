@@ -2722,10 +2722,11 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
     def get_visible_evidence(self, user: User) -> dict[str, dict]:
         """ Driven by EvidenceKey.max_share_level """
         lowest_share_level = self.classification.lowest_share_level(user)
-        return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
+        # astroid infers self.classification as a ClassificationModification, from patch_value's assignment to it
+        return self.classification.get_visible_evidence(self.evidence, lowest_share_level)  # pylint: disable=too-many-function-args
 
     def c_hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
-        return self.classification.c_hgvs_best(preferred_genome_build=genome_build)
+        return self.classification.c_hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """

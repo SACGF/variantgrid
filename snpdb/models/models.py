@@ -296,7 +296,7 @@ class Wiki(TimeStampedModel):
         return None
 
     def can_write(self, user) -> bool:
-        obj = self._get_restricted_object()
+        obj = self._get_restricted_object()  # pylint: disable=assignment-from-none
         if obj and not obj.can_write(user):
             return False
         return True
