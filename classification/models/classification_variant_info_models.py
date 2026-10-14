@@ -149,8 +149,9 @@ class ResolvedVariantInfo(TimeStampedModel):
 
     @property
     def resolved_hgvs_obj(self) -> Optional[HGVSComponents]:
-        if self.resolved_hgvs:
-            return HGVSComponents(self.resolved_hgvs)
+        if resolved := self.resolved_hgvs:
+            return HGVSComponents(resolved)
+        return None
 
     @property
     def resolved_hgvs_display(self) -> Optional[HGVSDisplay]:
@@ -788,7 +789,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             for genome_build in GenomeBuild.builds_with_annotation_cached():
                 if alternative := self[genome_build]:
-                    if hgvs_obj := HGVSComponents(alternative.resolved_hgvs_obj):
+                    if hgvs_obj := alternative.resolved_hgvs_obj:
                         return HGVSDisplay(
                             hgvs_obj,
                             is_desired_build=False,
