@@ -12,6 +12,13 @@ ExecReload = /bin/kill -s HUP $MAINPID
 ExecStop = /bin/kill -s TERM $MAINPID
 PIDFile=/run/gunicorn/gunicorn.pid
 Restart=always
+# Percentages are of the box's physical RAM, so the same file suits every deployment. The cap is on the
+# whole unit (master + workers): a request that balloons (an unstreamed queryset over a big table) gets
+# its worker OOM-killed and respawned instead of swapping the box to death. OOMPolicy=continue keeps
+# that to the one worker - systemd's default (stop) would restart all of gunicorn.
+MemoryHigh=40%
+MemoryMax=50%
+OOMPolicy=continue
 PrivateTmp=true
 RuntimeDirectory=gunicorn
 RuntimeDirectoryMode=0750

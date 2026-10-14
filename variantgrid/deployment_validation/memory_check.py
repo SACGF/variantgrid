@@ -1,15 +1,19 @@
 """
 Whether this box survives running out of memory: Redis protected from the kernel OOM killer (it is often the
-largest single process, and losing it fails every in-flight task at once), and swap to absorb a spike (#2187).
+largest single process, and losing it fails every in-flight task at once), swap to absorb a spike (#2187), and
+the gunicorn unit capped so one request that pulls a whole table into a worker loses that worker, not the box.
 
-Entry point: `check_memory_protection`, run by `manage.py deployment_check`.
+Entry point: `check_memory_protection`, run by `manage.py deployment_check`. `gunicorn_unit_memory_settings`
+is shared with the manual migration that registers the deploy step for the cap.
 """
 import os
+import subprocess
 
 import redis
 from django.conf import settings
 
 REDIS_OOM_DROP_IN = "config/systemd/redis-server.service.d/variantgrid.conf"
+GUNICORN_UNIT = "config/systemd/gunicorn.service"
 
 
 def _redis_oom_score_adj() -> int | None:
@@ -31,6 +35,35 @@ def _swap_total_kb() -> int:
     return 0
 
 
+def gunicorn_unit_memory_settings() -> dict[str, str] | None:
+    """ MemoryMax / OOMPolicy of the installed gunicorn systemd unit, or None where there is no such unit
+        (a dev box running runserver, a host without systemd) and so nothing to check """
+    try:
+        result = subprocess.run(["systemctl", "show", "gunicorn", "-p", "LoadState", "-p", "MemoryMax",
+                                 "-p", "OOMPolicy"], capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    props = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    if props.get("LoadState") != "loaded":
+        return None
+    return props
+
+
+def gunicorn_unit_missing_memory_cap() -> str | None:
+    """ What the installed gunicorn unit lacks, or None when it is capped as the repo unit is """
+    props = gunicorn_unit_memory_settings()
+    if props is None:
+        return None
+    missing = []
+    if props.get("MemoryMax") == "infinity":
+        missing.append("no MemoryMax")
+    if props.get("OOMPolicy") != "continue":
+        missing.append(f"OOMPolicy={props.get('OOMPolicy')}")
+    return ", ".join(missing) or None
+
+
 def check_memory_protection() -> dict:
     if not os.path.exists("/proc/meminfo"):
         return {}  # not Linux
@@ -46,7 +79,13 @@ def check_memory_protection() -> dict:
     if not _swap_total_kb():
         swap_check["warning"] = "No swap - a memory spike (eg a sequencing run's imports) goes straight to the OOM killer"
 
+    gunicorn_check = {"valid": True}
+    if missing := gunicorn_unit_missing_memory_cap():
+        gunicorn_check["warning"] = (f"gunicorn unit has {missing} - one request loading a big table takes the box "
+                                     f"down rather than its worker, install {GUNICORN_UNIT}")
+
     return {
         "Redis OOM score": redis_check,
         "Swap": swap_check,
+        "gunicorn memory cap": gunicorn_check,
     }

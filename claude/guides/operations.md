@@ -45,7 +45,10 @@ Memory: `db_workers`, `web_workers` and `analysis_workers` default to one proces
 many-core box with little RAM can't afford - pass `--concurrency` in its `config/celery/*.env`. Install the redis drop-in
 (`config/systemd/redis-server.service.d/variantgrid.conf`) and some swap: without them a sequencing run's imports can
 OOM-kill Redis, failing every in-flight task with `BusyLoadingError` (#2187). `deployment_check` warns about both
-(`variantgrid/deployment_validation/memory_check.py`).
+(`variantgrid/deployment_validation/memory_check.py`). The gunicorn unit (`config/systemd/gunicorn.service`) caps itself at a percentage of the box's
+RAM with `OOMPolicy=continue`: a request that materialises a whole table (an unstreamed admin export was the case) gets its
+one worker OOM-killed and respawned rather than swapping the box out; Postgres cannot bound a result set, and
+`statement_timeout` never fires because the query itself is quick. `deployment_check` warns while the installed unit lacks it.
 
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.

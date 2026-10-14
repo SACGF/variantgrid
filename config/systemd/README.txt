@@ -12,6 +12,11 @@ The celery units set OOMPolicy=continue: under systemd's default (stop) a kernel
 subprocess (eg somalier) stops the whole unit, SIGTERMing every in-flight task on that queue.
 After copying the files: sudo systemctl daemon-reload, then restart the celery units.
 
+gunicorn.service caps the unit's memory (MemoryHigh/MemoryMax as a percentage of the box's RAM, so
+no per-host edit) with OOMPolicy=continue: one request that pulls a whole table into a worker gets that
+worker killed and respawned, the other workers keep serving. `manage.py deployment_check` warns when
+the installed unit lacks the cap; `systemctl show gunicorn -p MemoryMax` prints the resolved bytes.
+
 redis-server.service.d/variantgrid.conf is a drop-in for the distribution's redis unit (not a unit of
 ours). It lowers redis's OOM score so the kernel kills a celery worker instead. The drop-in directory is
 named after the unit, which differs by distribution - check with `systemctl list-units 'redis*'`:
