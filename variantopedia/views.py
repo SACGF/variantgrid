@@ -43,7 +43,6 @@ from library.git import Git
 from library.log_utils import log_traceback
 from library.utils import StashFile
 from library.utils.date_utils import local_date_string
-from pathtests.models import cases_for_user
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.forms import TagForm, UserSelectForm, get_settings_form_features
@@ -114,10 +113,7 @@ def dashboard(request):
         latest_sequencing_vcfs = qs[:NUM_SEQUENCING_PROJECTS]
         sample_enrichment_kits_df = get_sample_enrichment_kits_df()
 
-    user_has_cases = cases_for_user(request.user).exists()
-
     context = {'git': Git(settings.BASE_DIR),
-               'user_has_cases': user_has_cases,
                'sample_enrichment_kits_df': sample_enrichment_kits_df,
                "latest_sequencing_vcfs": latest_sequencing_vcfs}
     return render(request, "variantopedia/dashboard.html", context)

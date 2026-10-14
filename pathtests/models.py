@@ -23,7 +23,6 @@ from patients.models import (
     Clinician,
     ExternallyManagedModel,
     Patient,
-    get_lead_scientist_users_for_user,
 )
 from patients.models_enums import PopulationGroup
 from seqauto.models import EnrichmentKit, Experiment, SequencingRun
@@ -245,12 +244,6 @@ def get_cases_qs(user):
     except Exception:
         pass
     return cases_qs
-
-
-def cases_for_user(user):
-    """ The cases the "My cases" page shows: led by the user or a lead scientist they follow """
-    users_list = get_lead_scientist_users_for_user(user)
-    return get_cases_qs(user).filter(lead_scientist__in=users_list)
 
 
 class PathologyTestOrder(PreviewModelMixin, ExternallyManagedModel):
