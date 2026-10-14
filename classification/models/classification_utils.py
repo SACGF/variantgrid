@@ -55,6 +55,7 @@ class ClassificationPatchResponse(VarsDict):
         self.published = False
         self.saved = False
         self.status = ClassificationPatchStatus.UNKNOWN
+        self.lab_record_id: Optional[str] = None
 
     def __iadd__(self, other: 'ClassificationPatchResponse'):
         self.warnings += other.warnings

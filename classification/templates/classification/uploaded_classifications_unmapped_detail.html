@@ -31,6 +31,23 @@
             {% comment %}For all the fields that are rare occurances, don't bother to show them unless they've actually occurred in this import{% endcomment %}
             {% if import_run.row_count_already_withdrawn %}{% labelled label="Classification records that have been previously withdrawn" %}
             {{ import_run.row_count_already_withdrawn }} {{ 'W' | severity_icon }}
+            {% with lab_record_ids=import_run.lab_record_ids_already_withdrawn %}
+                {% if lab_record_ids %}
+                    {% if lab_record_ids|length > 10 %}
+                        <div><a class="toggle-link collapsed" data-toggle="collapse" href="#already-withdrawn-{{ import_run.pk }}">Toggle lab record IDs</a></div>
+                    {% endif %}
+                    <ul id="already-withdrawn-{{ import_run.pk }}" class="list-unstyled mb-0{% if lab_record_ids|length > 10 %} collapse{% endif %}">
+                        {% for lab_record_id in lab_record_ids %}
+                            {% with classification_id=classification_ids_by_lab_record_id|get_item:lab_record_id %}
+                                <li>{% if classification_id %}<a href="{% url 'view_classification' classification_id %}">{{ lab_record_id }}</a>{% else %}{{ lab_record_id }}{% endif %}</li>
+                            {% endwith %}
+                        {% endfor %}
+                        {% if import_run.lab_record_ids_already_withdrawn_truncated %}
+                            <li class="text-muted">Only the first {{ lab_record_ids|length }} are listed</li>
+                        {% endif %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
             {% endlabelled %}{% endif %}
             {% if import_run.row_count_un_withdrawn %}{% labelled label="Records un-withdrawn" %}{{ import_run.row_count_un_withdrawn | number}}{% endlabelled %}{% endif %}
             {% if import_run.row_count_withdrawn %}{% labelled label="Records withdrawn" %}{{ import_run.row_count_withdrawn | number}}{% endlabelled %}{% endif %}

@@ -204,7 +204,7 @@ class ClassificationImportMapInsertTask(Task):
                         for row in batch:
                             response = bci.insert(data=row, submission_source=SubmissionSource.API, import_run=import_run)
                             response.notify_if_required()
-                            import_run.increment_status(response.status)
+                            import_run.increment_status(response)
                         import_run.save()
                         bci.finish()
 
