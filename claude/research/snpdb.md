@@ -94,7 +94,7 @@ asks the ClinGen record for the destination g.HGVS (`ClinGenAllele.get_g_hgvs`) 
 (off by default), dbSNP; and `snpdb/liftover.py:_liftover_using_source_variant_coordinate`, whose only option is
 `AlleleConversionTool.BCFTOOLS_LIFTOVER` (`snpdb/bcftools_liftover.py:bcftools_liftover`). `PICARD` and `CROSSMAP` exist
 in the enum but have no code path. The VCF ID column is the Allele pk, only standard contigs are written
-(`snpdb/liftover.py:_non_standard_contig_error` records a per-allele error instead of failing the run, #1197), and the
+(`snpdb/liftover.py:_check_vcf_contig_is_standard` records a per-allele error instead of failing the run, #1197), and the
 file goes through the normal upload pipeline as `upload/import_task_factories/import_task_factories.py:LiftoverImportFactory`.
 Results land in `upload/vcf/bulk_allele_linking_vcf_processor.py:BulkAlleleLinkingVCFProcessor.batch_handle_variant_ids`,
 which sets each `AlleleLiftover.status` and merges alleles into the lowest pk when the destination variant is already

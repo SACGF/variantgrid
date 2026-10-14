@@ -20,7 +20,7 @@ from library.django_utils.django_file_utils import get_import_processing_dir
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import (
     bcftools_liftover_variant_coordinate,
-    bcftools_pre_liftover_error_check,
+    check_bcftools_can_liftover,
 )
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_dbsnp import DbSNP
@@ -122,10 +122,7 @@ def _create_liftover_pipelines_for_batch(user: User, alleles: list[Allele],
             variant_coordinates = []
             for allele, variant_coordinate, error_message in allele_variant_coordinate_error:
                 if variant_coordinate is not None:
-                    contig_error = _non_standard_contig_error(vcf_genome_build, variant_coordinate)
-                    if not contig_error and vcf_genome_build != genome_build:
-                        contig_error = _missing_destination_contig_error(genome_build, variant_coordinate)
-                    if contig_error:
+                    if contig_error := _check_vcf_contig_is_standard(vcf_genome_build, variant_coordinate):
                         variant_coordinate = None
                         error_message = contig_error
 
@@ -168,9 +165,10 @@ def _create_liftover_pipelines_for_batch(user: User, alleles: list[Allele],
                 logging.info("LiftoverRun %s doesn't need to be run", liftover)
 
 
-def _non_standard_contig_error(vcf_genome_build: GenomeBuild, variant_coordinate: VariantCoordinate) -> Optional[str]:
-    """ Liftover VCFs are written with standard contigs only (and tools like BCFTools look the chrom up in the
-        reference fasta) so an alt/unlocalized contig would fail the entire run - see issue #1197 """
+def _check_vcf_contig_is_standard(vcf_genome_build: GenomeBuild, variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ Returns an error if the chrom isn't a standard contig, or None. Liftover VCFs are written with standard
+        contigs only (and tools like BCFTools look the chrom up in the reference fasta) so an alt/unlocalized
+        contig would fail the entire run - see issue #1197 """
     if variant_coordinate.chrom in vcf_genome_build.chrom_standard_contig_mappings:
         return None
 
@@ -179,16 +177,6 @@ def _non_standard_contig_error(vcf_genome_build: GenomeBuild, variant_coordinate
     else:
         description = f"'{variant_coordinate.chrom}' is not in {vcf_genome_build}"
     return f"Liftover VCFs only contain standard contigs - {description}"
-
-
-def _missing_destination_contig_error(dest_genome_build: GenomeBuild,
-                                     variant_coordinate: VariantCoordinate) -> Optional[str]:
-    """ BCFTools maps a source chrom through the chain into the destination fasta - a chrom the destination build
-        doesn't have (T2T has no MT: CHM13's own mitochondrion is a rotated, non-rCRS sequence) is written with no
-        header contig, failing the entire run """
-    if variant_coordinate.chrom in dest_genome_build.chrom_standard_contig_mappings:
-        return None
-    return f"'{variant_coordinate.chrom}' has no standard contig in {dest_genome_build}"
 
 
 def _liftover_allele_qs(allele_ids: list[int]) -> QuerySet[Allele]:
@@ -436,7 +424,7 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
     options = [
         # Enabled, Tool Enum, form of the coordinate the tool takes, Requires reference to match genome build
         (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER,
-         bcftools_liftover_variant_coordinate, bcftools_pre_liftover_error_check),
+         bcftools_liftover_variant_coordinate, check_bcftools_can_liftover),
     ]
 
     for enabled, conversion_tool, tool_variant_coordinate, check_liftover_errors in options:
@@ -450,7 +438,7 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
 
             tool_vc = tool_variant_coordinate(variant_coordinate, source_genome_build)
             if check_liftover_errors is not None:
-                if error_message := check_liftover_errors(tool_vc, source_genome_build):
+                if error_message := check_liftover_errors(tool_vc, source_genome_build, dest_genome_build):
                     yield conversion_tool, None, error_message
                     continue
 
