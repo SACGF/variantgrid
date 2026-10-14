@@ -11,6 +11,7 @@ from snpdb.liftover import (
     _liftover_using_dest_variant_coordinate,
     _liftover_using_existing_contig,
     _liftover_using_source_variant_coordinate,
+    _missing_destination_contig_error,
     _non_standard_contig_error,
     _run_liftover_using_same_contig,
     allele_can_attempt_liftover,
@@ -137,6 +138,12 @@ class TestLiftover(TestCase):
         scaffold_vc = VariantCoordinate(chrom=scaffold.name, position=1000, ref='A', alt='T')
         error = _non_standard_contig_error(grch37, scaffold_vc)
         self.assertIn(scaffold.get_role_display(), error)
+
+    def test_mitochondrial_rejected_before_t2t_vcf(self):
+        # T2T has no MT contig - one MT record in a bcftools VCF killed the whole liftover run
+        mt_vc = VariantCoordinate(chrom='MT', position=3796, ref='A', alt='G')
+        self.assertIsNone(_missing_destination_contig_error(GenomeBuild.grch37(), mt_vc))
+        self.assertIsNotNone(_missing_destination_contig_error(GenomeBuild.t2tv2(), mt_vc))
 
 
 class TestLiftoverBatching(TestCase):

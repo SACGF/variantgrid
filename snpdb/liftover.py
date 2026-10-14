@@ -122,7 +122,10 @@ def _create_liftover_pipelines_for_batch(user: User, alleles: list[Allele],
             variant_coordinates = []
             for allele, variant_coordinate, error_message in allele_variant_coordinate_error:
                 if variant_coordinate is not None:
-                    if contig_error := _non_standard_contig_error(vcf_genome_build, variant_coordinate):
+                    contig_error = _non_standard_contig_error(vcf_genome_build, variant_coordinate)
+                    if not contig_error and vcf_genome_build != genome_build:
+                        contig_error = _missing_destination_contig_error(genome_build, variant_coordinate)
+                    if contig_error:
                         variant_coordinate = None
                         error_message = contig_error
 
@@ -176,6 +179,16 @@ def _non_standard_contig_error(vcf_genome_build: GenomeBuild, variant_coordinate
     else:
         description = f"'{variant_coordinate.chrom}' is not in {vcf_genome_build}"
     return f"Liftover VCFs only contain standard contigs - {description}"
+
+
+def _missing_destination_contig_error(dest_genome_build: GenomeBuild,
+                                     variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ BCFTools maps a source chrom through the chain into the destination fasta - a chrom the destination build
+        doesn't have (T2T has no MT: CHM13's own mitochondrion is a rotated, non-rCRS sequence) is written with no
+        header contig, failing the entire run """
+    if variant_coordinate.chrom in dest_genome_build.chrom_standard_contig_mappings:
+        return None
+    return f"'{variant_coordinate.chrom}' has no standard contig in {dest_genome_build}"
 
 
 def _liftover_allele_qs(allele_ids: list[int]) -> QuerySet[Allele]:
