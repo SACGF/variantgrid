@@ -433,8 +433,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             genes_canonical_transcripts = get_genes_canonical_transcripts(variant, annotation_version)
 
-        except Exception:  # May not have been annotated?
+        except Exception as e:
             log_traceback()
+            messages.add_message(request, messages.ERROR, f"Could not load this variant's annotation: {e!r}")
 
     old_variants_qs = variant.modifiedimportedvariant_set.filter(ModifiedImportedVariant.q_normalised())
     old_variants_qs = old_variants_qs.order_by("old_variant_formatted").distinct("old_variant_formatted")

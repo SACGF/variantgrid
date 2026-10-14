@@ -50,7 +50,7 @@ Patterns here:
   GeneAnnotationRelease (annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release) →
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
-- VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id) and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.
+- VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id), ahead of a gene-named 'ND4.1' row a pre-cdot import may have left (no genome_builds data), and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.
