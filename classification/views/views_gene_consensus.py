@@ -24,7 +24,7 @@ from classification.models import (
     Classification,
     ClassificationConsensus,
     ClassificationModification,
-    GeneConsensusGroup,
+    ConsensusGroup,
 )
 from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
@@ -57,7 +57,7 @@ def gene_content_applied_at(classification: Classification,
     return None
 
 
-def newer_than(groups: list[GeneConsensusGroup], applied_at: datetime) -> list[GeneConsensusGroup]:
+def newer_than(groups: list[ConsensusGroup], applied_at: datetime) -> list[ConsensusGroup]:
     """ The gene has been re-curated since this record copied from it """
     applied_date = _as_date(applied_at)
     return [group for group in groups if _as_date(group.representative.curated_date) > applied_date]
@@ -101,7 +101,7 @@ def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpRe
     return render(request, 'classification/gene_consensus_card.html', context)
 
 
-def _with_current_values(classification: Classification, groups: list[GeneConsensusGroup]) -> list[GeneConsensusGroup]:
+def _with_current_values(classification: Classification, groups: list[ConsensusGroup]) -> list[ConsensusGroup]:
     """ The same rows the create page shows, each value beside what this record already has - only the empty
         ones are filled """
     e_keys = EvidenceKeyMap.cached()

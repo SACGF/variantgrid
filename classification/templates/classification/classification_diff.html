@@ -14,7 +14,8 @@
                 keys,
                 {
                     userId: '{{user.id}}'
-                }
+                },
+                {copiedOnly: {{ copied_only|jsonify }}}
             );
             diff.render();
         });

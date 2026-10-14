@@ -474,7 +474,8 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
                                "variant_tag_id": variant_tag.pk})
 
     def test_dialog_offers_the_previous_classifications_of_the_allele(self):
-        previous = self._classify(self.mother, data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
+        previous = self._classify(self.mother, data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"},
+                                                     SpecialEKeys.CONDITION: {"value": "MONDO:0018874"}})
         previous.publish_latest(self.user)
 
         response = self.client.get(self._dialog_url(self.variant_tag))
@@ -482,6 +483,31 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Apply to this sample")
         self.assertContains(response, f'data-vcm-id="{previous.last_published_version.pk}"')
+
+    def test_a_previous_record_with_nothing_to_copy_is_context_not_a_choice(self):
+        previous = self._classify(self.mother, data={SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}})
+        previous.publish_latest(self.user)
+
+        response = self.client.get(self._dialog_url(self.variant_tag))
+
+        self.assertContains(response, previous.cr_lab_id)
+        self.assertNotContains(response, "Apply to this sample")
+
+    def test_dialog_tells_the_choices_apart_by_what_they_would_copy(self):
+        """ Two records with the same copied content are one column; a third that differs shows the field it differs in """
+        same = {SpecialEKeys.CLINICAL_SIGNIFICANCE: {"value": "VUS"}, "h_summary": {"value": "RUNX1 is a transcription factor"}}
+        self._classify(self.mother, data=same).publish_latest(self.user)
+        self._classify(self.father, data=same).publish_latest(self.user)
+        reworded = self._classify(self.proband, data={**same, "h_summary": {"value": "RUNX1 drives myeloid differentiation"}})
+        reworded.publish_latest(self.user)
+
+        response = self.client.get(self._dialog_url(self.variant_tag))
+
+        self.assertEqual(response.content.decode().count("Apply to this sample"), 2)
+        self.assertContains(response, "2 records, latest curated")
+        self.assertContains(response, "Differs between the choices")
+        self.assertContains(response, "RUNX1 drives myeloid differentiation")
+        self.assertContains(response, "copied_only=1")
 
     def test_dialog_shows_another_labs_record_without_a_copy_control(self):
         """ An external record was curated under another lab's config and assertion method - context, not a source """

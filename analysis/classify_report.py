@@ -102,6 +102,11 @@ class ClassifyQueueRow:
         return [previous for previous in self.previous if previous.can_copy]
 
     @property
+    def external(self) -> list[PreviousClassification]:
+        """ Other labs' records of the allele - shown for context, never copied from """
+        return [previous for previous in self.previous if not previous.can_copy]
+
+    @property
     def conditions(self) -> list[str]:
         """ Distinct conditions the allele has been classified for before - they rarely agree, which is why
             picking one is left to the scientist """
