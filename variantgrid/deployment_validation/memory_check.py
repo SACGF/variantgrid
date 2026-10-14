@@ -3,8 +3,8 @@ Whether this box survives running out of memory: Redis protected from the kernel
 largest single process, and losing it fails every in-flight task at once), swap to absorb a spike (#2187), and
 the gunicorn unit capped so one request that pulls a whole table into a worker loses that worker, not the box.
 
-Entry point: `check_memory_protection`, run by `manage.py deployment_check`. `gunicorn_unit_memory_settings`
-is shared with the manual migration that registers the deploy step for the cap.
+Entry point: `check_memory_protection`, run by `manage.py deployment_check`. `redis_unprotected_from_oom_killer`
+and `gunicorn_unit_missing_memory_cap` are shared with the manual migrations that register the deploy steps.
 """
 import os
 import subprocess
@@ -25,6 +25,16 @@ def _redis_oom_score_adj() -> int | None:
             return int(f.read())
     except FileNotFoundError:
         return None
+
+
+def redis_unprotected_from_oom_killer() -> bool:
+    """ Redis runs on this box with a non-negative OOM score, so the kernel may pick it before a worker.
+        False when Redis is remote or unreachable: neither is a reason to fail a migrate """
+    try:
+        oom_score_adj = _redis_oom_score_adj()
+    except redis.RedisError:
+        return False
+    return oom_score_adj is not None and oom_score_adj >= 0
 
 
 def _swap_total_kb() -> int:
