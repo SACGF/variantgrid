@@ -250,6 +250,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         self.parents_changed = False
         self.queryset_dirty = False
         self.update_children = True
+        self._saved_by_parent = False  # Cascade save - the parent's save holds the analysis lock
         self._cached_parents = None
         self._cached_analysis_errors = None
         self._cache_node_q = settings.ANALYSIS_NODE_CACHE_Q  # Disable for unit tests
@@ -1271,6 +1272,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         if not existing_connect.exists():
             AnalysisEdge.objects.create(parent=parent, child=self)
             self.parents_changed = True
+            self._cached_parents = None
         else:
             logging.error("Node(pk=%d).add_parent(pk=%d) already exists!", self.pk, parent.pk)
 
@@ -1285,6 +1287,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         if edge:  # could be some kind of race condition?
             edge.delete()
         self.parents_changed = True
+        self._cached_parents = None
 
     def parents(self):
         """ Base AnalysisNode rows, so parents of every node type are found """
@@ -1305,15 +1308,25 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
         with transaction.atomic():
-            # Lock the analysis row first so concurrent node-tree saves serialize in a consistent order.
-            # Saving a node cascades version bumps to its children (see below), and each NodeVersion insert
-            # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
-            # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
-            Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
-            return self._save(*args, **kwargs)
+            if not self._saved_by_parent:
+                # Lock the analysis row first so concurrent node-tree saves serialize in a consistent order.
+                # Saving a node cascades version bumps to its children (see below), and each NodeVersion insert
+                # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
+                # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
+                Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
+            result = self._save(*args, **kwargs)
+            if not self._saved_by_parent:
+                Analysis.objects.filter(pk=self.analysis_id).update(modified=timezone.now())
+            return result
+
+    def _validity_inputs_changed(self) -> bool:
+        """ valid is stored at save time - recomputing it (get_errors) costs queries for the node, its
+            parents and the analysis, so only do so when something it is computed from has changed.
+            Edges made behind the node's back (add_child, cloning) leave these unset: set valid yourself """
+        return self.pk is None or self._state.adding or self.parents_changed or self.queryset_dirty or \
+            self.ancestor_input_samples_changed
 
     def _save(self, *args, **kwargs):
-        # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
         super_save = super().save
 
         if self.parents_changed or self.ancestor_input_samples_changed:
@@ -1322,8 +1335,10 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
         if self.auto_node_name:
             self.name = self.get_node_name()
 
-        # TODO: This causes lots of DB queries... should we change this?
-        self.valid = self.is_valid
+        if self._validity_inputs_changed():
+            self.valid = self.is_valid
+        elif self.errors:
+            self.valid = False
 
         if self.appearance_dirty:
             self.appearance_version += 1
@@ -1333,21 +1348,42 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
 
             super_save(*args, **kwargs)
             if self.update_children:
-                # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
-                # So we could go from having multiple proband samples to only one later (thus can set descendants)
-                for kid in self.children.select_subclasses():
-                    kid.ancestor_input_samples_changed = self.is_source or self.ancestor_input_samples_changed or \
-                                                         self.get_samples_from_node_only_not_ancestors()
-                    kid.appearance_dirty = False
-                    kid.queryset_dirty = True
-                    kid.save()  # Will bump versions
+                self._save_children()
         else:
             super_save(*args, **kwargs)
 
         # Make sure this always exists
-        NodeVersion.objects.get_or_create(node=self, version=self.version)
-        # Modify our analyses last updated time
-        Analysis.objects.filter(pk=self.analysis.pk).update(modified=timezone.now())
+        NodeVersion.objects.bulk_create([NodeVersion(node=self, version=self.version)], ignore_conflicts=True)
+
+    def _save_children(self):
+        """ Bump every child's version, which cascades on down. Each child is handed what this save already
+            knows - the analysis and its errors, and this node where it is the child's only parent - so it
+            doesn't query them again, nor re-walk every ancestor above it to find its samples """
+        kids = list(self.children.select_subclasses())
+        if not kids:
+            return
+
+        # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
+        # So we could go from having multiple proband samples to only one later (thus can set descendants)
+        ancestor_input_samples_changed = self.is_source or self.ancestor_input_samples_changed or \
+            bool(self.get_samples_from_node_only_not_ancestors())
+        analysis_errors = self._get_analysis_errors()
+        parent_ids_by_kid_id = defaultdict(set)
+        for kid_id, parent_id in AnalysisEdge.objects.filter(child__in=kids).values_list("child_id", "parent_id"):
+            parent_ids_by_kid_id[kid_id].add(parent_id)
+        # A parent is read through its subclass (samples, status) - a base row would answer for no node type
+        is_subclass = type(self) is not AnalysisNode
+
+        for kid in kids:
+            kid.analysis = self.analysis
+            kid._cached_analysis_errors = analysis_errors
+            if is_subclass and parent_ids_by_kid_id[kid.pk] == {self.pk}:
+                kid._cached_parents = [self]
+            kid._saved_by_parent = True
+            kid.ancestor_input_samples_changed = ancestor_input_samples_changed
+            kid.appearance_dirty = False
+            kid.queryset_dirty = True
+            kid.save()  # Will bump versions
 
     def set_node_task_and_status(self, celery_task, status):
         with connection.cursor() as cursor:
@@ -1402,6 +1438,7 @@ class AnalysisNode(NodeAuditLogMixin, TimeStampedModel):
             # Store cloned_from so we can use original's counts
             copy.cloned_from = original_node_version
             copy.save()
+            copy._cached_parents = None  # The caller connects the copy's edges
 
             for npf in NodeVCFFilter.objects.filter(node_id=node_id):
                 npf.pk = None
