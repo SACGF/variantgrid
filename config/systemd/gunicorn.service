@@ -1,15 +1,20 @@
+# One unit for every install location: nothing here is hardcoded (/opt/variantgrid, /mnt/variantgrid). The
+# install dir is VG_INSTALL_DIR from /etc/variantgrid/variantgrid.env, and the unit's own .env uses paths
+# relative to it.
 [Unit]
 Description=VG web server
 After=network.target
 
 [Service]
 User=variantgrid
-# Both files are read, in order, and merged: variantgrid.env is shared by every VariantGrid unit and holds the
-# install location (VG_INSTALL_DIR, copied from config/variantgrid.env - the one per-host setting); the second
-# file is this unit's own (copied from config/gunicorn/), with paths relative to that directory.
-EnvironmentFile=/etc/variantgrid/variantgrid.env
-EnvironmentFile=/etc/variantgrid/gunicorn/gunicorn.env
+# Read in order and merged: variantgrid.env is shared by every unit, the second is this unit's own
+# (copied from config/gunicorn/). Optional (-) so a missing file reaches the ExecStartPre check below, which
+# names the fix - systemd's own failure for a missing EnvironmentFile does not say which file.
+EnvironmentFile=-/etc/variantgrid/variantgrid.env
+EnvironmentFile=-/etc/variantgrid/gunicorn/gunicorn.env
 ExecStartPre=/bin/mkdir -p /var/log/variantgrid
+ExecStartPre=/bin/sh -c 'test -n "${VG_INSTALL_DIR}" && cd "${VG_INSTALL_DIR}" && test -x "${GUNICORN_BIN}" || { echo "VG_INSTALL_DIR=${VG_INSTALL_DIR} GUNICORN_BIN=${GUNICORN_BIN} - the /etc/variantgrid env files are not installed, see config/systemd/README.txt"; exit 1; }'
+# WorkingDirectory= does not expand variables, so cd to VG_INSTALL_DIR here instead.
 ExecStart=bash -c 'cd "${VG_INSTALL_DIR}" && exec ${GUNICORN_BIN} --bind 127.0.0.1:8000 -t 3600 -w 8 --pid /run/gunicorn/gunicorn.pid --log-level debug --log-file /var/log/variantgrid/gunicorn.log variantgrid.wsgi:application'
 ExecReload = /bin/kill -s HUP $MAINPID
 ExecStop = /bin/kill -s TERM $MAINPID

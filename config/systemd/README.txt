@@ -8,6 +8,11 @@ Set where VariantGrid is installed once, in config/variantgrid.env (copied to
 Everything else is relative to that - the services cd there before starting, and the
 celery/gunicorn .env files run out of .venv/bin (see the "Install system services" wiki page).
 
+A unit installed without those env files fails to start with the fix in `systemctl status <unit>`
+(an ExecStartPre check - systemd's own error for a missing EnvironmentFile names no file), and
+`manage.py deployment_check` is invalid, stopping an upgrade before the restart that would fail. Copy
+the env files with `cp -rn` so a host's tuned celery .env files are kept.
+
 The celery units set OOMPolicy=continue: under systemd's default (stop) a kernel OOM kill of one
 subprocess (eg somalier) stops the whole unit, SIGTERMing every in-flight task on that queue.
 After copying the files: sudo systemctl daemon-reload, then restart the celery units.

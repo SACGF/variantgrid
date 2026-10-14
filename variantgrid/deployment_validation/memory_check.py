@@ -7,10 +7,11 @@ Entry point: `check_memory_protection`, run by `manage.py deployment_check`. `re
 and `gunicorn_unit_missing_memory_cap` are shared with the manual migrations that register the deploy steps.
 """
 import os
-import subprocess
 
 import redis
 from django.conf import settings
+
+from variantgrid.deployment_validation.systemd_check import systemctl_show
 
 REDIS_OOM_DROP_IN = "config/systemd/redis-server.service.d/variantgrid.conf"
 GUNICORN_UNIT = "config/systemd/gunicorn.service"
@@ -29,10 +30,11 @@ def _redis_oom_score_adj() -> int | None:
 
 def redis_unprotected_from_oom_killer() -> bool:
     """ Redis runs on this box with a non-negative OOM score, so the kernel may pick it before a worker.
-        False when Redis is remote or unreachable: neither is a reason to fail a migrate """
+        False when Redis is remote or unreachable, or the cache isn't Redis at all (the test settings):
+        none is a reason to fail a migrate """
     try:
         oom_score_adj = _redis_oom_score_adj()
-    except redis.RedisError:
+    except (redis.RedisError, ValueError):
         return False
     return oom_score_adj is not None and oom_score_adj >= 0
 
@@ -48,17 +50,10 @@ def _swap_total_kb() -> int:
 def gunicorn_unit_memory_settings() -> dict[str, str] | None:
     """ MemoryMax / OOMPolicy of the installed gunicorn systemd unit, or None where there is no such unit
         (a dev box running runserver, a host without systemd) and so nothing to check """
-    try:
-        result = subprocess.run(["systemctl", "show", "gunicorn", "-p", "LoadState", "-p", "MemoryMax",
-                                 "-p", "OOMPolicy"], capture_output=True, text=True, check=False)
-    except FileNotFoundError:
+    props = systemctl_show("gunicorn", "MemoryMax", "OOMPolicy")
+    if props is None:
         return None
-    if result.returncode != 0:
-        return None
-    props = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
-    if props.get("LoadState") != "loaded":
-        return None
-    return props
+    return {key: values[0] for key, values in props.items()}
 
 
 def gunicorn_unit_missing_memory_cap() -> str | None:

@@ -49,6 +49,10 @@ OOM-kill Redis, failing every in-flight task with `BusyLoadingError` (#2187). `d
 RAM with `OOMPolicy=continue`: a request that materialises a whole table (an unstreamed admin export was the case) gets its
 one worker OOM-killed and respawned rather than swapping the box out; Postgres cannot bound a result set, and
 `statement_timeout` never fires because the query itself is quick. `deployment_check` warns while the installed unit lacks it.
+The units are one file per service for every install location: `/etc/variantgrid/variantgrid.env` sets `VG_INSTALL_DIR` and each
+unit's own `.env` is relative to it (`config/systemd/README.txt`). `variantgrid/deployment_validation/systemd_check.py` makes
+`deployment_check` invalid when an installed unit reads an env file that is missing or `VG_INSTALL_DIR` is another checkout, since
+the restart after the upgrade would fail; the manual step that installs them registers only on such a box.
 
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.

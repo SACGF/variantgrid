@@ -21,7 +21,9 @@ class Migration(migrations.Migration):
         ManualOperation.operation_other(
             args=["Install config/systemd/gunicorn.service (MemoryHigh/MemoryMax/OOMPolicy=continue): "
                   "sudo cp config/systemd/gunicorn.service /lib/systemd/system/ && "
-                  "sudo systemctl daemon-reload && sudo systemctl restart gunicorn"],
+                  "sudo systemctl daemon-reload && sudo systemctl restart gunicorn. The unit reads "
+                  "/etc/variantgrid/variantgrid.env - if that is missing, do the env files step first "
+                  "(config/systemd/README.txt)"],
             note="Caps the gunicorn unit's memory at a percentage of the box's RAM so a request that pulls a whole "
                  "table into a worker loses that worker, not the box. deployment_check warns until it is installed.",
             test=_gunicorn_unit_needs_memory_cap),

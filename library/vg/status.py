@@ -24,6 +24,7 @@ from eventlog.models import Event
 from library.django_utils.database_utils import get_table_row_estimates
 from library.enums.log_level import LogLevel
 from library.vg.repo import REPO_ROOT, git
+from library.vg.services import service_names
 from library.vg.settings_chain import resolved_settings_module
 from manual.models import ManualMigrationOutstanding
 from patients.models.models_phenotype import TextPhenotype
@@ -33,7 +34,6 @@ from variantgrid.celery import app as celery_app
 # pg_class estimates for the tables whose size shapes how a change must be written (see claude/guides/operations.md#scale)
 SCALE_TABLES = ("snpdb_variant", "snpdb_allele", "snpdb_locus", "snpdb_sample", "snpdb_vcf",
                 "classification_classification", "analysis_analysis", "analysis_varianttag", "annotation_annotationrun")
-SERVICES = ("gunicorn", "celeryd_beat")
 RECENT_ERRORS = 10
 
 
@@ -107,14 +107,10 @@ def _builds() -> dict[str, Any]:
     return builds
 
 
-def _service_names() -> list[str]:
-    return [*SERVICES, *(f"celeryd_{queue.name}" for queue in settings.CELERY_TASK_QUEUES)]
-
-
 def _services() -> dict[str, str]:
     if shutil.which("systemctl") is None:
         return {"error": "systemctl not available"}
-    names = _service_names()
+    names = service_names()
     result = subprocess.run(["systemctl", "is-active", *names], capture_output=True, text=True, check=False)
     states = result.stdout.split()
     return dict(zip(names, states)) if len(states) == len(names) else {"error": result.stderr.strip() or result.stdout.strip()}
