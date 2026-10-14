@@ -172,6 +172,11 @@ Gotchas:
   nothing has to be pre-registered beyond that. claude/research/classifications.md has the table of written forms.
 - With `VARIANT_GENE_LEVEL_ENABLED` off (Shariant), `genes/gene_level_strings.py:looks_gene_level` is always False, so
   'BCR::ABL1' takes the HGVS path and fails as an HGVS - `cant_resolve_to_variant_coordinate`, never `gene_level_unresolved`.
+- Shariant records arrive through the API (`models/classification_inserter.py:BulkClassificationInserter`), already curated
+  elsewhere. An unpublished edit there usually means an update the inserter saved but refused to share (`share_failure`:
+  the record has errors) or one sent without `publish`. A pending clinical significance only comes from discordance
+  resolution. A change to editing UI needs testing on a curation deployment; a change to the API, cross-lab visibility,
+  overlaps or the exports labs download (CSV column set included) needs testing on Shariant test.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path
