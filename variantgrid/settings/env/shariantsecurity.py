@@ -11,6 +11,9 @@ SITE_ID = 9
 SITE_NAME = "Security Shariant"
 SITE_SHORT_NAME = "Shariant Sec"
 SITE_MESSAGE = "This is the security testing version of Shariant. Please avoid sharing real data in this environment."
+
+# Discordance emails are logged, not sent, on this host (SEND_EMAILS is False in shariantcommon)
+SILENCED_SYSTEM_CHECKS = [*SILENCED_SYSTEM_CHECKS, "variantgrid.W001"]
 SLACK['emoji'] = ':cop:'
 
 # OIDC SETTINGS

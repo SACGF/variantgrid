@@ -63,7 +63,12 @@ Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and
 dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then it execs `manage.py upgrade`
 (`manual/upgrader.py:Upgrader`), which runs everything in one process. Its standard steps (`manual/upgrader.py:Upgrader.standard_steps`)
 are git pull (re-execing on new code), `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
-and `deployed` (records the deploy in Rollbar). It also surfaces the deploy-time steps migrations registered with
+and `deployed` (records the deploy in Rollbar). `deployment_check` (`variantopedia/management/commands/deployment_check.py`)
+verifies the box against the settings - annotation files, VEP and tool versions, celery routes, memory - and reruns the Django
+system checks on the settings themselves (`snpdb/checks.py`: a feature on without what it needs, OIDC against local account
+management, thresholds out of order, dotted paths and URL names that don't resolve) plus the rows settings name
+(`variantgrid/deployment_validation/settings_check.py`). An Error from either stops `--quick`; a check a deployment trips on
+purpose is listed in its env file's `SILENCED_SYSTEM_CHECKS`. It also surfaces the deploy-time steps migrations registered with
 `manual/operations/manual_operations.py:ManualOperation` (`manual/__manual_readme.md`).
 `manage` steps auto-run once their `requires` gates (`manual/gates.py`) clear and the command still exists; `other` steps are
 printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed.sh` records the deploy in Rollbar and runs
