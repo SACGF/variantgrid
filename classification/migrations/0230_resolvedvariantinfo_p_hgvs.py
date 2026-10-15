@@ -15,7 +15,7 @@ def _has_resolved_variant_info_needing_p_hgvs(apps):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('classification', '0227_data_evidencekeys'),
+        ('classification', '0229_curation_system_migration_index_lab_share_level'),
     ]
 
     operations = [

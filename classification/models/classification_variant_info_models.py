@@ -46,7 +46,10 @@ from genes.hgvs import (
     HGVSNoRepresentationException,
     hgvs_diff_description,
 )
-from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
+from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
+    BioCommonsHGVSConverter,
+    HgvsMatchTranscriptAndGenomeRefAllele,
+)
 from genes.hgvs.phgvs_canonical import (
     canonical_from_sequence_variant,
     canonical_p_hgvs,
@@ -456,6 +459,7 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'missing_38': "W",
     'cant_resolve_to_variant_coordinate': "E",
     'gene_level_unresolved': "E",
+    'transcript_genome_ref_differ': "W",
     'hgvs_issue': "E"  # deprecated as too generic
 }
 
@@ -476,6 +480,7 @@ class ImportedAlleleValidationTagsGeneral(TypedDict, total=False):
     transcript_type_not_supported: ALLELE_INFO_VALIDATION_SEVERITY
     cant_resolve_to_variant_coordinate: ALLELE_INFO_VALIDATION_SEVERITY
     gene_level_unresolved: ALLELE_INFO_VALIDATION_SEVERITY
+    transcript_genome_ref_differ: ALLELE_INFO_VALIDATION_SEVERITY
     hgvs_issue: ALLELE_INFO_VALIDATION_SEVERITY
 
 
@@ -607,6 +612,8 @@ class CalculatedVariantCoordinate:
     hgvs_converter_version: Optional[HGVSConverterVersion]
     hgvs_converter_data_version: str = ''
     """ cdot data version or ClinGen date used during this resolution """
+    transcript_genome_ref_differ: Optional[bool] = None
+    """ None when it couldn't be checked - resolved via ClinGen, intronic, or no stored sequence for the transcript """
 
     @property
     def variant_coordinate_str(self) -> Optional[str]:
@@ -731,6 +738,11 @@ class ImportedAlleleInfo(TimeStampedModel):
     message = TextField(null=True, blank=True)
     """ used to describe information about the matching process (or failure) """
 
+    transcript_genome_ref_differ = BooleanField(null=True, blank=True)
+    """ The transcript sequence and the imported build's genome differ over the variant's reference.
+        None means it couldn't be checked: resolved via ClinGen, intronic, no stored sequence for the transcript, or
+        matched before the check existed (one_off_backfill_transcript_genome_ref_differ fills those in) """
+
     status = CharField(max_length=1, choices=ImportedAlleleInfoStatus.choices, default=ImportedAlleleInfoStatus.PROCESSING)
     """ If true, indicates that this is not matchable, see the message for details """
 
@@ -837,6 +849,8 @@ class ImportedAlleleInfo(TimeStampedModel):
                 general["gene_level_unresolved"] = _VALIDATION_TO_SEVERITY.get("gene_level_unresolved", "E")
             else:
                 general["cant_resolve_to_variant_coordinate"] = _VALIDATION_TO_SEVERITY.get("cant_resolve_to_variant_coordinate", "E")
+        if self.transcript_genome_ref_differ:
+            general["transcript_genome_ref_differ"] = _VALIDATION_TO_SEVERITY.get("transcript_genome_ref_differ", "E")
         if general:
             validation_dict["general"] = general
 
@@ -1082,6 +1096,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         version = hgvs_matcher.hgvs_converter.get_version()
         used_converter_type = hgvs_converter_type
         data_version = ''
+        transcript_genome_ref_differ = None
 
         try:
             vc_extra = hgvs_matcher.get_variant_coordinate_and_details(use_hgvs)
@@ -1089,6 +1104,10 @@ class ImportedAlleleInfo(TimeStampedModel):
             used_converter_type = vc_extra.converter_info.used_converter_type
             data_version = vc_extra.converter_info.hgvs_converter_data_version
             vc = vc_extra.variant_coordinate
+            if isinstance(vc_extra.matches_reference, HgvsMatchTranscriptAndGenomeRefAllele):
+                transcript_genome_ref_differ = vc_extra.matches_reference.transcript_and_genome_ref_differ
+                if ref_message := vc_extra.matches_reference.get_transcript_and_genome_ref_message():
+                    message += f"\n{ref_message}"
         except Exception as ex:
             message = str(ex)
 
@@ -1101,7 +1120,8 @@ class ImportedAlleleInfo(TimeStampedModel):
                                                           used_converter_type=used_converter_type)
         return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build,
                                            message=message, hgvs_converter_version=hgvs_converter_version,
-                                           hgvs_converter_data_version=data_version)
+                                           hgvs_converter_data_version=data_version,
+                                           transcript_genome_ref_differ=transcript_genome_ref_differ)
 
     def resolve_gene_level(self) -> bool:
         """ A lab submitting 'BCR::ABL1', 'EGFR amplification' or 'AR V7' names genes, not a coordinate - so
@@ -1141,6 +1161,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.hgvs_converter_version = cvc.hgvs_converter_version
         self.hgvs_converter_data_version = cvc.hgvs_converter_data_version
         self.variant_coordinate = cvc.variant_coordinate_str
+        self.transcript_genome_ref_differ = cvc.transcript_genome_ref_differ
         if not cvc.is_valid:
             self.status = ImportedAlleleInfoStatus.FAILED
 

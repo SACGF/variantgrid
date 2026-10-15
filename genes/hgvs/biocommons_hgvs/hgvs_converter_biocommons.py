@@ -54,9 +54,38 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         self.provided_transcript_ref = provided_ref
         self.calculated_transcript_ref = calculated_ref
         self.strand = strand
+        # Set once mapped to the genome - the transcript ref at the mapped span and the genome ref there
+        self.mapped_transcript_ref: Optional[str] = None
+        self.genome_ref: Optional[str] = None
+        # Only a ref read from a stored transcript sequence can differ from the genome: an intronic position, or any
+        # position when no sequence is stored (cdot stitches one from the genome), is read from the genome itself
+        self.transcript_ref_from_sequence = False
 
         provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
         super().__init__(provided_g_ref, calculated_g_ref)
+
+    def _transcript_strand(self, sequence: str) -> str:
+        if self.strand == "-":
+            return reverse_complement(sequence)
+        return sequence
+
+    @property
+    def transcript_and_genome_ref_differ(self) -> Optional[bool]:
+        """ The transcript sequence differs from the genome (eg F5 Leiden in GRCh37) so the genomic variant
+            isn't what the transcript HGVS describes - it can even come out ref-only (#1266).
+            None when it couldn't be checked: not mapped yet, or the transcript ref came from the genome """
+        if self.transcript_ref_from_sequence and self.mapped_transcript_ref and self.genome_ref:
+            return self._transcript_strand(self.mapped_transcript_ref) != self.genome_ref
+        return None
+
+    def get_transcript_and_genome_ref_message(self) -> str:
+        if not self.transcript_and_genome_ref_differ:
+            return ""
+        genome_ref = self._transcript_strand(self.genome_ref)
+        message = f'Transcript reference "{self.mapped_transcript_ref}" differs from genome reference "{genome_ref}"'
+        if self.strand == "-":
+            message += " (both on the transcript strand)"
+        return message
 
     def _get_genomic_provided_and_calculated_ref_from_transcript(self):
         if self.strand and self.strand == "-":
@@ -72,7 +101,7 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
 
     def get_message(self) -> str:
         if self.provided_ref:
-            provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
+            provided_g_ref, _ = self._get_genomic_provided_and_calculated_ref_from_transcript()
             if self.provided_transcript_ref != provided_g_ref:
                 message = f'Using transcript reference "{self.calculated_transcript_ref}" from transcript sequence in place of provided reference "{self.provided_transcript_ref}". ' \
                           f'Transcript (strand="{self.strand}") and genome reference "{self.calculated_ref}" differ.'
@@ -324,6 +353,18 @@ class BioCommonsHGVSConverter:
         alt_ac = self.am._alt_ac_for_tx_ac(tx_ac)
         return self.am._fetch_AlignmentMapper(tx_ac, alt_ac, self.am.alt_aln_method)
 
+    def _transcript_ref_from_sequence(self, var_x: SequenceVariant) -> bool:
+        """ Whether the ref biocommons filled in came from a stored transcript sequence, so can be compared with
+            the genome (#1266). An intronic position is read from the genome, and so is every position of a
+            transcript with no stored sequence, which cdot stitches out of the genome """
+        if not self._is_transcript_variant(var_x):
+            return False
+        pos = var_x.posedit.pos
+        if pos.start.is_intronic or pos.end.is_intronic:
+            return False
+        transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x)
+        return self.hdp.db_transcript_seqfetcher.has_sequence(transcript_accession)
+
     def _fix_ref(self, var_x: SequenceVariant) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
         if provided_ref := var_x.posedit.edit.ref_s:
             strand = None
@@ -334,7 +375,7 @@ class BioCommonsHGVSConverter:
                 # instead, but only when told which contig the transcript is aligned to. Without it the provided
                 # reference is returned untouched and a wrong base passes as a match.
                 alignment = self._alignment_mapper(var_x.ac)
-                strand = alignment.strand
+                strand = "-" if alignment.strand == -1 else "+"
                 alt_ac = alignment.alt_ac
                 alt_aln_method = alignment.alt_aln_method
             var_x_fixed_ref = self.no_validate_mapper._replace_reference(copy.deepcopy(var_x), alt_ac=alt_ac,
@@ -453,6 +494,10 @@ class BioCommonsHGVSConverter:
             if not matches_reference:
                 # Set from genomic coord in case it's diff than transcript
                 matches_reference.calculated_ref = var_g.posedit.edit.ref_s
+            if isinstance(matches_reference, HgvsMatchTranscriptAndGenomeRefAllele):
+                matches_reference.mapped_transcript_ref = var_x.posedit.edit.ref_s
+                matches_reference.genome_ref = var_g.posedit.edit.ref_s
+                matches_reference.transcript_ref_from_sequence = self._transcript_ref_from_sequence(var_x)
         else:
             var_g = var_x
 

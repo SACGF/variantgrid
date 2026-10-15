@@ -20,7 +20,7 @@ using cdot's protein accession and the transcript sequences we hold. On a dev da
 ## Data
 
 `classification/models/classification_variant_info_models.py:ResolvedVariantInfo` gains two columns
-(migration classification/migrations/0228_resolvedvariantinfo_p_hgvs.py (new file), after `classification/migrations/0227_data_evidencekeys.py`):
+(migration classification/migrations/0230_resolvedvariantinfo_p_hgvs.py (new file), after `classification/migrations/0229_curation_system_migration_index_lab_share_level.py`):
 
 ```python
 class ResolvedVariantInfo(TimeStampedModel):
