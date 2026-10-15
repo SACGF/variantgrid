@@ -2,7 +2,15 @@ from django.test import TestCase
 
 from annotation.cosmic import CosmicAPI
 from genes.hgvs import HGVSMatcher
-from snpdb.models import GenomeBuild, Sequence, VariantCoordinate
+from library.preview_request import PreviewData
+from snpdb.models import GenomeBuild, Sample, Sequence, Variant, VariantCoordinate
+from snpdb.search import (
+    SearchInput,
+    SearchResponse,
+    SearchResponsesCombined,
+    SearchResult,
+    SearchResultMatchStrength,
+)
 from snpdb.signals.variant_search import _alt_description, _alt_mismatch_message
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -69,3 +77,27 @@ class CosmicSearchGenomeBuildTestCase(TestCase):
     def test_grch37_and_38_are_supported(self):
         for build_name in ["GRCh37", "GRCh38"]:
             self.assertTrue(CosmicAPI.supports_genome_build(GenomeBuild.get_name_or_alias(build_name)))
+
+
+class SearchAutoOpenGenomeBuildTestCase(TestCase):
+    """ A single result outside the preferred build auto-opens only if it can never be in that build (#2174) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.search_input = SearchInput(user=None, search_string="x",
+                                       genome_build_preferred=GenomeBuild.get_name_or_alias("GRCh38"))
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+
+    def _single_preferred_result(self, search_type):
+        preview = PreviewData.for_object(obj=None, category=search_type.preview_category(), internal_url="/result",
+                                         genome_builds={self.grch37})
+        result = SearchResult(preview=preview, match_strength=SearchResultMatchStrength.STRONG_MATCH)
+        response = SearchResponse(search_input=self.search_input, search_type=search_type, matched_pattern=True,
+                                  results=[result], total_count=1)
+        return SearchResponsesCombined(self.search_input, [response]).single_preferred_result()
+
+    def test_fixed_build_result_in_other_build_auto_opens(self):
+        self.assertIsNotNone(self._single_preferred_result(Sample))
+
+    def test_variant_in_other_build_does_not_auto_open(self):
+        self.assertIsNone(self._single_preferred_result(Variant))
