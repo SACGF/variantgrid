@@ -37,6 +37,10 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- upload/vcf/vcf_preprocess.py:run_pipe detects failure from a `${PIPESTATUS[*]}` status file, not pipefail, and gives
+  every stage its own stderr file. The stage blamed (upload/vcf/vcf_preprocess.py:_failed_stage) is the first non-zero
+  exit that is not SIGPIPE-shaped (141, or a Python `BrokenPipeError`) - those stages were killed because the one after
+  them died. Every stage is a sub step and its stderr is its `output_text`; the blamed one's is also its `error_message`.
 - Symbolic alts outside settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES (`<CNV>`/`<DEL>`/`<DUP>`/`<INV>`) never become
   Variants: management/commands/vcf_clean_alts.py:Command skips them into the upload's skipped-record stats. `<INS>` is
   one of them - the `<INS>` branches in snpdb, annotation and genes are written ahead of any `<INS>` Variant existing.
@@ -193,7 +197,8 @@ Tests:
 - Whole pipeline in-process: create a FileUpload, then process_uploaded_file(file_upload, run_async=False) under
   CELERY_TASK_ALWAYS_EAGER (library/django_utils/unittest_utils.py:URLTestCase sets it) —
   upload/tests/test_import_patient_records.py:TestPatientUploadImport is the pattern. The VCF pipeline needs bcftools
-  and a reference fasta, so tests stop short of preprocess_vcf (upload/tests/vcf/test_vcf_preprocess.py mocks run_pipe).
+  and a reference fasta, so tests stop short of preprocess_vcf (upload/tests/vcf/test_vcf_preprocess.py mocks run_pipe,
+  and runs the real run_pipe on toy stages in TestRunPipe).
 - Processors without celery: upload/tests/vcf/test_vcf_processors.py:TestVCFProcessors builds an UploadStep + VCF from
   a cyvcf2 reader via create_vcf_from_vcf and feeds process_entry directly (needs Sequence rows for GATC).
 - Test VCFs: upload/test_data/vcf (grch38_brca1.vcf, no_genotype.GRCh37.vcf, symbolic_alt/, detect_build_by_header/)
