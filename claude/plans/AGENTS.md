@@ -19,7 +19,8 @@ the code that uses it. Same for a dataclass or other data holder: show the membe
 properties out of the plan; they belong in the implementation.
 
 `scripts/vg docs check` verifies a plan's citations while its `Status:` is draft, approved or in progress. A landed plan
-whose knowledge has moved into docs is deleted.
+whose knowledge has moved into docs is deleted. A backticked path is a claim the file exists, so write a file the plan
+will create as plain text (analysis/tasks/new_tasks.py (new file)).
 
 ## Implementation prompts
 When asked to draft a prompt for an agent to implement a plan in another conversation:

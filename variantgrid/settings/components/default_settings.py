@@ -37,6 +37,10 @@ JS_REVERSE_OUTPUT_PATH = './variantgrid/static_files/default_static/django_js_re
 UPLOAD_RELATIVE_PATH = "data/uploads"  # Needed for FileSystemStorage
 UPLOAD_DIR = os.path.join(BASE_DIR, UPLOAD_RELATIVE_PATH)
 UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg if out of disk)
+# A running UploadStep holds a lease its worker renews every UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS
+# (UploadStepLeaseHeartbeat); one whose lease has lapsed had its worker killed and is marked TIMED_OUT (#2188)
+UPLOAD_STEP_LEASE_SECONDS = 600
+UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS = 60
 # Request body / upload size is bounded by nginx (client_max_body_size); no Django-side cap needed.
 
 # Absolute filesystem path to the directory that will hold GLOBALLY VISIBLE user-uploaded files.
@@ -334,7 +338,7 @@ MME_DISCLAIMER = (
 MME_TERMS = ""
 
 # From-address for match notifications. Required (with SEND_EMAILS) when MME_ENABLED -
-# email sending is silently a no-op without it, so mme/apps.py refuses to start.
+# email sending is silently a no-op without it (system check variantgrid.E007).
 MME_FROM_EMAIL = None
 
 # --- Beacon v2 ------------------------------------------------------------
@@ -466,6 +470,8 @@ PATIENT_EXTRACTION_MATCH_PENDING_DAYS = 3
 # posted, so it can never override a client. The group names only the extraction, and reference_id is
 # unique per specimen rather than globally, so a match under two specimens parks as Needs attention
 PATIENT_EXTRACTION_SAMPLE_NAME_REGEX = None  # eg r"(?P<extraction>\d{10}[A-Z])$"
+# Dotted path to a str -> str function giving Specimen / Extraction reference_ids one canonical form
+PATIENT_SPECIMEN_REFERENCE_NORMALIZER = None
 # An external_manager the API doesn't recognise is a typo on an intranet deployment, where the set of
 # tracking systems is known - so only a superuser creates one via the API. A public server taking
 # records from systems it has never seen would set this False
@@ -520,7 +526,7 @@ GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False,
 
 # "PanelApp Australia"
 
-# Non-authenticated (no login) sample gene matrix
+# Non-authenticated (no login) sample gene matrix - the 'public_global_sample_gene_matrix' URL, off by default
 PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD = None  # Must be set if system has multiple genome builds
 PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = None  # Sample gene matrix of these genes
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = False  # True = show all samples
@@ -534,8 +540,9 @@ INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_uplo
 PUBLIC_GROUP_NAME = "public"
 LOGGED_IN_USERS_GROUP_NAME = "logged_in_users"
 
-# key/value = Organization.group_name : lab group name pattern
-# Org must already exist, lab pattern is filled with User values (if you want to create a group for each user)
+# key/value = Organization.group_name : lab group name pattern. Both are created if missing; the lab pattern is
+# filled with User values (if you want to create a group for each user). Not for OIDC deployments, where Keycloak
+# owns group membership (system check variantgrid.E003)
 USER_CREATE_ORG_LABS = {
     # "test_organization": "test_lab",
     # "test_organization": "user_group_%(username)s",
@@ -790,7 +797,7 @@ INTEGRATION_STATUS_ENABLED = True
 # and logs every call (eventlog.models.ApiRequestLog, Settings -> API Log)
 INTEGRATION_API_TRACKING = {}
 API_REQUEST_LOG_DAYS = None  # None keeps ApiRequestLog rows forever; a number of days prunes older rows daily
-API_REQUEST_LOG_MAX_BODY = 10_000  # characters of request / error response body kept
+API_REQUEST_LOG_MAX_BODY = 100_000  # characters of request / error response body kept
 API_REQUEST_LOG_MAX_READ_BYTES = 1024 * 1024  # bigger request bodies are noted by size, not read
 
 SERVER_MIN_DISK_WARNING_GIGS = 1
@@ -1236,14 +1243,11 @@ _URLS_NAME_REGISTER_DEFAULT = True
 # Keys are url names (eg 'view_sample' or 'node_edit')
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
-    "classification_import_tool": False,
+    "public_global_sample_gene_matrix": False,
     "hgvs_resolution_tool": False,
     "classification_view_metrics": False,
-    "clinvar_key_summary": False,
-    "clinvar_match": False,
     "condition_matchings": False,
     "condition_match_test": False,
-    "discordance_reports": False,
     "vus": False,
 }
 
@@ -1253,6 +1257,11 @@ URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME
 URLS_NAME_REGISTER_SETTINGS = {
     "maps": "USE_MAPS",
     "lab_members_tab": "LAB_HEAD_MANAGE_MEMBERS",
+    "discordance_reports": "DISCORDANCE_ENABLED",
+    "clinvar_key_summary": "CLINVAR_EXPORT",
+    "clinvar_match": "CLINVAR_EXPORT",
+    "classification_import_tool": "CLASSIFICATION_OMNI_IMPORTER_APP_DIR",
+    "keycloak_admin": "KEYCLOAK_SYNC_DETAILS",
 }
 
 # The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default
@@ -1270,7 +1279,6 @@ TERMS_BASE_TEMPLATE = 'base_tc.html'
 
 # Lock down menu
 URLS_NAME_REGISTER.update({"classification_dashboard": False,
-                           "keycloak_admin": False,
                            "classification_upload_unmapped": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
@@ -1320,10 +1328,12 @@ VIEW_GENE_WIKI = True
 
 TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
 
-# User awards (#1819): computed titles (crown/medal/trophy) and badges, plus admin-given kudos.
-# Off = no computation, no decoration on grids, settings UI hidden. Individual definitions
-# (see <app>/user_awards.py) can be switched off by key, e.g. {"top_classifier"}
+# User awards (#1819): admin-given kudos plus computed badges, shown on the profile pages.
+# USER_AWARDS_ENABLED off hides the lot. USER_AWARDS_BADGES_ENABLED off keeps kudos but drops the
+# computed badges: no nightly recompute, none listed. Individual badge definitions
+# (see <app>/user_awards.py) can be switched off by key, e.g. {"tagger"}
 USER_AWARDS_ENABLED = True
+USER_AWARDS_BADGES_ENABLED = True
 USER_AWARDS_DISABLED_KEYS = set()
 
 KEY_CLOAK_REALM = None
@@ -1413,10 +1423,11 @@ def get_aws_secrets() -> dict:
 
 def get_s3_secrets() -> dict:
     """
+    Read by django-storages' S3Boto3Storage (classification/models/uploaded_file_types.py), not by VariantGrid directly:
+
     aws_s3_dict = get_s3_secrets()
     AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
         [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
-    :return:
     """
     return {
         "AWS_S3_ACCESS_KEY_ID": get_secret("AWS.S3.access_key_id"),

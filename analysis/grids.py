@@ -59,7 +59,7 @@ from library.utils import (
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import get_all_variant_grid_columns, get_variantgrid_extra_annotate
 from snpdb.grid_columns.grid_sample_columns import (
     COPY_NUMBER_COLUMN,
     SAMPLE_COMPOSITE_COLUMNS,
@@ -444,9 +444,23 @@ class VariantGrid(AbstractVariantGrid):
 
 
 class ExportVariantGrid(VariantGrid):
-    """ This is for exporting into VCF/CSV - ie not using any paging """
+    """ This is for exporting into VCF/CSV - ie not using any paging.
+
+        all_columns: every catalogue column this version annotates rather than the analysis' collection -
+        the annotated sample/cohort exports (@see get_all_variant_grid_columns) """
 
     EXPORT_PK_BATCH_SIZE = 10000
+
+    def __init__(self, request: HttpRequest, node, extra_filters=None, af_show_in_percent=None,
+                 all_columns=False):
+        self.all_columns = all_columns
+        super().__init__(request, node, extra_filters, af_show_in_percent=af_show_in_percent)
+
+    def _build_variant_grid_columns(self) -> tuple[list[RichColumn], Optional[int]]:
+        if self.all_columns:
+            return get_all_variant_grid_columns(self._get_annotation_version(),
+                                                self._get_standard_overrides(self.af_show_in_percent))
+        return super()._build_variant_grid_columns()
 
     def iter_export_rows(self, qs: QuerySet) -> Iterator[dict]:
         """ Take the PKs a contig at a time off the node queryset - that has no annotation joins or

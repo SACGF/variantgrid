@@ -184,7 +184,7 @@ class ClinGenAlleleRegistryAPI:
                 "data": data,
             }
             api_failure_output_filename = self._get_api_failure_output_filename()
-            with open(api_failure_output_filename, "w") as f:
+            with open(api_failure_output_filename, "w", encoding="utf-8") as f:
                 json.dump(api_failure, f)
 
             msg = f"API call failed, debug info written to '{api_failure_output_filename}'"

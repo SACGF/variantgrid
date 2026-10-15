@@ -1,9 +1,11 @@
 from datetime import date
 from typing import Optional
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SubmissionSource
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import (
     AlleleOriginGrouping,
     Classification,
@@ -11,6 +13,7 @@ from classification.models import (
     ClassificationGroupingEntry,
     ClassificationModification,
 )
+from classification.models.classification_grouping import ClassificationGroupingPathogenicDifference
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.utils import strip_json
 from snpdb.models import Allele
@@ -118,3 +121,51 @@ class ClassificationGroupingSortColumnsTestCase(TestCase):
             Classification.objects.all().delete()
             grouping = self._grouping({"date": {"date": date_value}})
             self.assertIsNone(grouping.latest_curated_date, date_value)
+
+
+class ClassificationGroupingUpdateQueriesTestCase(TestCase):
+
+    def setUp(self):
+        ClassificationTestUtils.setUp()
+        self.lab, self.user = ClassificationTestUtils.lab_and_user()
+
+    def _grouping(self, record_count: int) -> ClassificationGrouping:
+        grouping = ClassificationGrouping.objects.create(
+            allele_origin_grouping=AlleleOriginGrouping.objects.create(allele=Allele.objects.create(),
+                                                                       allele_origin_bucket=AlleleOriginBucket.GERMLINE),
+            lab=self.lab,
+            share_level=ShareLevel.ALL_USERS
+        )
+        for i in range(record_count):
+            classification = Classification.objects.create(
+                lab=self.lab, user=self.user, lab_record_id=f"test_{grouping.pk}_{i}",
+                summary={"pathogenicity": {"classification": ["P", "LP", "VUS"][i % 3], "sort": i}})
+            ClassificationModification.objects.create(
+                classification=classification, user=self.user, source=SubmissionSource.API, is_last_published=True,
+                published_evidence={SpecialEKeys.ZYGOSITY: {"value": ["heterozygous", "homozygous"][i % 2]},
+                                    SpecialEKeys.CONDITION: {"value": f"condition {i % 2}"}})
+            ClassificationGroupingEntry.objects.create(classification=classification, grouping=grouping)
+        return grouping
+
+    @staticmethod
+    def _update_queries(grouping: ClassificationGrouping) -> list[str]:
+        grouping = ClassificationGrouping.objects.get(pk=grouping.pk)
+        with CaptureQueriesContext(connection) as ctx:
+            grouping.update()
+        return [q["sql"] for q in ctx.captured_queries]
+
+    def test_update_queries_do_not_grow_with_classifications(self):
+        self._update_queries(self._grouping(1))  # Fill the evidence key cache
+        single_queries = self._update_queries(self._grouping(1))
+        several = self._grouping(6)
+        several_queries = self._update_queries(several)
+        self.assertEqual(len(single_queries), len(several_queries))
+        # SAVEPOINT/RELEASE, the last published modifications (one query, select_related), search terms
+        # (allele info + resolved variant info, ClinVar SCVs, DELETE), the grouping UPDATE, and the post_save
+        # refresh of its OverlapContribution (contributions + allele origin grouping)
+        self.assertLessEqual(len(several_queries), 10)
+
+        several.refresh_from_db()
+        self.assertEqual(several.classification_count, 6)
+        self.assertEqual(several.pathogenic_difference, ClassificationGroupingPathogenicDifference.CLIN_SIG_DIFFS)
+        self.assertEqual(several.zygosity_values, ["heterozygous", "homozygous"])

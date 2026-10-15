@@ -30,6 +30,7 @@ aws_dict = get_aws_secrets()
 AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
         [aws_dict[k] for k in ('AWS_SES_ACCESS_KEY_ID', 'AWS_SES_SECRET_ACCESS_KEY', 'AWS_SES_REGION')]
 
+# Read by django-storages S3Boto3Storage (classification file uploads), not by VariantGrid code
 aws_s3_dict = get_s3_secrets()
 AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
     [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
@@ -69,25 +70,24 @@ AUTHENTICATION_BACKENDS = (
     'guardian.backends.ObjectPermissionBackend',
 )
 
-MIDDLEWARE += (
+_AXES_MIDDLEWARE = 'axes.middleware.AxesMiddleware'
+MIDDLEWARE = tuple(m for m in MIDDLEWARE if m != _AXES_MIDDLEWARE) + (
     'oidc_auth.session_refresh.VariantGridSessionRefresh',
     'oidc_auth.oidc_error_handler.HandleOIDC400Middleware',
+    'eventlog.middleware.PageViewsMiddleware',  # user logging
+    _AXES_MIDDLEWARE,  # Must be last
 )
+LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontology"}
 
+# Only authentication changes: the rest (DEFAULT_SCHEMA_CLASS for the /api/docs schema, exception handler)
+# is inherited from the default
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
+    **REST_FRAMEWORK,
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'mozilla_django_oidc.contrib.drf.OIDCAuthentication',
         'rest_framework.authentication.SessionAuthentication'
     ],
-    'EXCEPTION_HANDLER': 'rollbar.contrib.django_rest_framework.post_exception_handler'
 }
-
-# user logging
-MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
-LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontology"}
 
 #OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 
@@ -108,10 +108,9 @@ OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
-# login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
-# LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
+# Read by mozilla_django_oidc's callback view on a failed login (generally an inactive user)
 LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout/'
 
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
@@ -223,7 +222,6 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "variant_tags": False,
     "tag_stats": False,
     "manual_variant_entry": False,
-    "variantopedia_wiki": False,
     "variant_wiki": False,
     "variant_types": False,  # Storage/annotation by size is a VCF-import concern - Shariant imports classifications
     "canonical_transcripts": False,
@@ -236,12 +234,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "tag_retire": False,
     "tag_reinstate": False,
     "igv_integration": False,
-    "sequencing_software_versions": False,
     "classification_dashboard": True,
-    "classification_import_tool": True,
     "hgvs_resolution_tool": True,
-    "keycloak_admin": True,
-    "hgvs_issues": True,
 
     # Upload - list all URLS (only want them visible by admin)
     "upload": False,
@@ -250,6 +244,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "view_upload_pipeline": False,
     "view_upload_pipeline_warnings_and_errors": False,
     "upload_retry_import": False,
+    "upload_retry_failed_imports": False,
     "upload_pipeline_modified_variants_datatable": False,
     "upload_pipeline_skipped_annotation_datatable": False,
     "view_upload_stats_detail": False,
@@ -258,21 +253,13 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "upload_file_delete": False,
     "download_uploaded_file": False,
 
-    # discordance
-    "discordance_reports": True,
     "classification_candidate_search": False,  # This is for data mining on curation system
     "classification_upload_unmapped": True,
     "condition_matchings": True,
     "condition_match_test": True,
     "classification_view_metrics": True,
 
-    # ClinVarExport
-    "clinvar_key_summary": True,
-    "clinvar_match": True,
     "vus": True,
-
-    # New Overlaps page
-    "allele_groupings": True
 })
 
 PREFER_ALLELE_LINKS = True
@@ -406,3 +393,4 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "zygosity"
 ])
 CLASSIFICATION_FRANKLIN_EXPORT_TAGS = "Shariant"
+USER_AWARDS_BADGES_ENABLED = False  # Shariant keeps its admin-given kudos, not the computed badges

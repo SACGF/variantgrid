@@ -260,7 +260,7 @@ double-join shown in SQL inspection) forces it. The default plan is the no-proto
 
 ## Testing plan
 
-New test module: `analysis/tests/test_merge_node_single_pass.py`. Model the fixtures on
+New test module: analysis/tests/test_merge_node_single_pass.py. Model the fixtures on
 `test_explicit_pk_substitution.py` (it already builds a trio cohort with UNCOMMON + COMMON partitions,
 inserts genotypes with explicit `samples_zygosity` strings, and has `_ready()` / `_child()` helpers). Run every
 equivalence test **twice** — once with `ANALYSIS_MERGE_NODE_SINGLE_PASS=True` (new path) and once `False`

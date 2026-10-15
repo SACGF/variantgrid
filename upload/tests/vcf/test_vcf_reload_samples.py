@@ -33,7 +33,7 @@ class TestVCFReloadSamples(TestCase):
     def _write_vcf(self, name, sample_names) -> str:
         filename = os.path.join(self.temp_dir.name, name)
         columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", *sample_names]
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write(VCF_HEADER + "\t".join(columns) + "\n")
         return filename
 

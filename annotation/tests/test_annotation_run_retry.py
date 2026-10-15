@@ -123,7 +123,7 @@ class AnnotationRunRetryTestCase(TestCase):
                 scratch_dir = os.path.join(import_processing_dir, f"annotation_run_{run.pk}")
                 os.makedirs(scratch_dir)
                 stale_tsv = os.path.join(scratch_dir, "annotation_run_annotation_variantannotation_0.tsv")
-                with open(stale_tsv, "w") as f:
+                with open(stale_tsv, "w", encoding="utf-8") as f:
                     f.write("stale data from a previous attempt")
                 self.assertTrue(os.path.exists(stale_tsv))
 

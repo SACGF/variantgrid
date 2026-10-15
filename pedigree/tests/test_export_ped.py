@@ -21,7 +21,7 @@ from pedigree.ped.import_ped import import_ped
 
 
 def _import_file(path, user):
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         return import_ped(f, "test.ped", user)
 
 
@@ -38,7 +38,7 @@ class _TmpPedFile(django.test.TestCase):
 
     def _read_rows(self):
         """Return dict of sample_name → list of PED columns."""
-        with open(self.fname) as f:
+        with open(self.fname, encoding='utf-8') as f:
             rows = [line.strip().split('\t') for line in f if line.strip()]
         return {row[1]: row for row in rows}
 

@@ -32,27 +32,29 @@
         {% if row.previous %}
             <hr/>
             <h6>Previous classifications for this allele</h6>
-            <p class="text-muted small">
-                Whether one of these applies to this patient is your call - applying copies its consensus into a
-                new classification for this sample.
-            </p>
-            {% for previous in row.previous %}
-                <div class="d-flex align-items-start border-top py-2">
-                    <div class="flex-grow-1">
-                        {% classification_quick previous.modification show_condition=True %}
-                        <div class="text-muted small">curated by {{ previous.modification.classification.user }}</div>
-                        {% if previous.interpretation_summary %}
-                            <div class="text-muted small mt-1">{{ previous.interpretation_summary|truncatewords:60 }}</div>
-                        {% endif %}
-                    </div>
-                    {% if previous.can_copy %}
-                        <button type="button" class="btn btn-outline-primary btn-sm ml-2 apply-previous"
-                                data-vcm-id="{{ previous.modification.pk }}">Apply to this sample</button>
-                    {% else %}
-                        <span class="text-muted small ml-2 align-self-center">another lab &ndash; for context</span>
-                    {% endif %}
-                </div>
-            {% endfor %}
+            {% if comparison %}
+                <p class="text-muted small">
+                    Applying copies the content below into a new classification for this sample - whether it
+                    applies to this patient is your call. Choices are told apart by what they would copy, not by
+                    which record they came from.
+                </p>
+                {% include "classification/tags/consensus_comparison.html" with mode="apply" apply_class="apply-previous" compare_url=compare_url %}
+                {% if not_shown %}
+                    <div class="text-muted small">{{ not_shown }} more record{{ not_shown|pluralize }} with other content {{ not_shown|pluralize:"is,are" }} not shown - the comparison link above has them all.</div>
+                {% endif %}
+            {% endif %}
+            {% if uncopyable %}
+                <div class="text-muted small mt-2">Carrying nothing that copies into a new record, so for context only:</div>
+                {% for previous in uncopyable %}
+                    <div class="my-1">{% classification_quick previous.modification show_condition=True %}</div>
+                {% endfor %}
+            {% endif %}
+            {% if row.external %}
+                <div class="text-muted small mt-2">Other labs, for context - curated under another config, so not copied from:</div>
+                {% for previous in row.external %}
+                    <div class="my-1">{% classification_quick previous.modification show_condition=True %}</div>
+                {% endfor %}
+            {% endif %}
         {% endif %}
 
         {% if gene_groups %}

@@ -26,7 +26,7 @@ The snapshot's primary `wall_seconds` field still comes from an explicit timer (
 
 ## Schema
 
-`analysis/models/analysis_benchmark.py` (new file):
+analysis/models/analysis_benchmark.py (new file):
 
 ```python
 class AnalysisBenchmarkSnapshot(TimeStampedModel):
@@ -151,7 +151,7 @@ app.conf.beat_schedule['analysis-benchmark-weekly'] = {
 
 Saturday 03:00 lands outside the existing scheduled work that's visible in the project today: the daily DB activity in the early evening (`notify-server-status` at 19:00), the weekly classification email job (Mon 10:00), the seqauto scans (06:00 and 19:00), and the routine RDS-snapshot windows AWS schedules in the early hours of weekdays. Saturday 03:00 is empty as far as the codebase knows.
 
-The bucket task in `analysis/tasks/benchmark_tasks.py`:
+The bucket task in analysis/tasks/benchmark_tasks.py:
 
 ```python
 @celery.shared_task(queue="benchmark_workers")
@@ -180,7 +180,7 @@ Opting an analysis in: small "Add to weekly benchmark" admin action on the analy
 
 ## Management command (for ad-hoc / CI)
 
-`analysis/management/commands/benchmark_analyses.py`:
+analysis/management/commands/benchmark_analyses.py:
 
 ```bash
 python3 manage.py benchmark_analyses --analyses 21 50 51 \
@@ -207,13 +207,13 @@ Runs the same `benchmark_analysis_task` body inline (no Celery hop) for each ana
 
 ## Files touched
 
-- `analysis/models/analysis_benchmark.py` — new models (snapshot, node row, opt-in).
-- `analysis/migrations/00XX_analysis_benchmarking.py` — three `CreateModel`s plus indexes.
-- `analysis/tasks/benchmark_tasks.py` — `benchmark_analysis_task`, `run_weekly_benchmark_bucket`, the synchronous reload-wait wrapper.
-- `analysis/views/benchmark_views.py` — admin button POST handler, snapshot history view, snapshot detail view, compare view.
+- analysis/models/analysis_benchmark.py — new models (snapshot, node row, opt-in).
+- analysis/migrations/00XX_analysis_benchmarking.py — three `CreateModel`s plus indexes.
+- analysis/tasks/benchmark_tasks.py — `benchmark_analysis_task`, `run_weekly_benchmark_bucket`, the synchronous reload-wait wrapper.
+- analysis/views/benchmark_views.py — admin button POST handler, snapshot history view, snapshot detail view, compare view.
 - `analysis/templates/analysis/benchmark/{history,detail,compare}.html` — new templates.
 - `analysis/urls.py` — three new URL patterns under `/analysis/{pk}/benchmarks/`.
-- `analysis/management/commands/benchmark_analyses.py` — CLI entry point.
+- analysis/management/commands/benchmark_analyses.py — CLI entry point.
 - `variantgrid/celery.py` — add `analysis-benchmark-weekly` to `app.conf.beat_schedule`.
 - `variantgrid/settings/components/celery_settings.py` — add `benchmark_workers` queue.
 - `analysis/admin.py` — register the three models for inspection.

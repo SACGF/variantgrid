@@ -54,9 +54,6 @@ class ClassificationCandidateSearchMixin:
         if config.get("internal_requires_sample"):
             cm_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
 
-        # TODO
-        config.get("user")
-
         # Classifications must be local (not external) and matched to a variant
         cm_qs = ClassificationModification.latest_for_user(
             user=user,

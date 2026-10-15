@@ -34,7 +34,7 @@ from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
-from patients.external_references import ResolvedReference
+from patients.external_references import ResolvedReference, normalize_specimen_reference
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import (
     MatchStatus,
@@ -107,6 +107,11 @@ class ExternallyManagedModel(TimeStampedModel):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        """ The form LOCAL_REFERENCE_FIELD is stored in, so a lookup can be handed any other """
+        return reference_id
 
     @property
     def short_identifier(self):
@@ -451,6 +456,20 @@ class Tissue(TimeStampedModel):
         return self.name
 
 
+class NormalizedReferenceQuerySet(QuerySet):
+    """ The bulk writes that skip save() still store reference_id in the model's canonical form """
+
+    def bulk_create(self, objs, *args, **kwargs):
+        for obj in objs:
+            obj.reference_id = self.model.normalize_reference_id(obj.reference_id)
+        return super().bulk_create(objs, *args, **kwargs)
+
+    def update(self, **kwargs):
+        if "reference_id" in kwargs:
+            kwargs["reference_id"] = self.model.normalize_reference_id(kwargs["reference_id"])
+        return super().update(**kwargs)
+
+
 class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMixin):
     """ Biological material collected from a patient - one tissue at one timepoint (block, blood draw).
         The nucleic acid taken off it lives on Extraction below """
@@ -468,6 +487,16 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
     class Meta:
         unique_together = ("patient", "reference_id")
+
+    objects = NormalizedReferenceQuerySet.as_manager()
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        return normalize_specimen_reference(reference_id)
+
+    def save(self, *args, **kwargs):
+        self.reference_id = self.normalize_reference_id(self.reference_id)
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_permission_class(cls):
@@ -576,6 +605,16 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
         # Unnamed extractions are all distinct under Postgres, which is what the re-extraction
         # case wants - extraction_date tells those apart
         unique_together = ("specimen", "reference_id")
+
+    objects = NormalizedReferenceQuerySet.as_manager()
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        return normalize_specimen_reference(reference_id)
+
+    def save(self, *args, **kwargs):
+        self.reference_id = self.normalize_reference_id(self.reference_id)
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_permission_class(cls):

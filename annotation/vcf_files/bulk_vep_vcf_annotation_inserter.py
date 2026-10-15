@@ -660,12 +660,13 @@ class BulkVEPVCFAnnotationInserter:
         transcript_version_id: Optional[str] = None
         if transcript_accession:
             t_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            if refseq_mitochondrial:
+                # VEP's 'ND4' is cdot's 'fake-rna-ND4' (coding genes only - tRNA/rRNA have neither). Preferred over
+                # a gene-named 'ND4.1' row left by a pre-cdot import, which has no data to read a transcript from
+                fake_t_id = get_cdot_fake_transcript_id(t_id)
+                if fake_t_id in self.transcript_versions_by_id:
+                    t_id, version = fake_t_id, CDOT_FAKE_TRANSCRIPT_VERSION
             transcript_versions = self.transcript_versions_by_id.get(t_id)
-            if not transcript_versions and refseq_mitochondrial:
-                # VEP's 'ND4' is cdot's 'fake-rna-ND4' (coding genes only - tRNA/rRNA have neither)
-                t_id = get_cdot_fake_transcript_id(t_id)
-                version = CDOT_FAKE_TRANSCRIPT_VERSION
-                transcript_versions = self.transcript_versions_by_id.get(t_id)
             if transcript_versions:
                 transcript_id = t_id  # Know it's valid to link
                 transcript_version_id = transcript_versions.get(version)

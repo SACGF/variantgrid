@@ -945,6 +945,15 @@ span.node-counts {
 	transition: opacity 300ms ease-out;
 }
 
+/* A new node flashes together with its endpoints - see addNewNodeAndFlash() */
+.node-flash {
+	animation: node-flash 1s ease-in-out;
+}
+
+@keyframes node-flash {
+	50% { opacity: 0; }
+}
+
 /*
 	Horizontal mode (analysis.analysis_horizontal_mode) - nodes flow left to right on a full width
 	canvas, with the editor/grid panel docked along the bottom. See analysis.js

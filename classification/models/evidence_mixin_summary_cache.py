@@ -1,5 +1,5 @@
+import datetime
 from dataclasses import dataclass
-from datetime import date
 from functools import cached_property
 from typing import Optional, Self
 
@@ -25,9 +25,9 @@ class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
         return bool(self.date)
 
     @property
-    def as_date(self) -> Optional[date]:
+    def as_date(self) -> Optional[datetime.date]:
         try:
-            return date.fromisoformat(self.date)
+            return datetime.date.fromisoformat(self.date)
         except (TypeError, ValueError):
             return None
 
@@ -83,19 +83,6 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
             if man_sub_field not in data_copy:
                 data_copy[man_sub_field] = {}
         return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
-
-
-_SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
-    SomaticClinicalSignificanceValue("tier_1", "A"): 10,
-    SomaticClinicalSignificanceValue("tier_1", "B"): 9,
-    SomaticClinicalSignificanceValue("tier_1"): 8,
-    SomaticClinicalSignificanceValue("tier_1_or_2"): 7,
-    SomaticClinicalSignificanceValue("tier_2", "C"): 6,
-    SomaticClinicalSignificanceValue("tier_2", "D"): 5,
-    SomaticClinicalSignificanceValue("tier_2"): 4,
-    SomaticClinicalSignificanceValue("tier_3"): 3,
-    SomaticClinicalSignificanceValue("tier_4"): 2
-}
 
 
 class ClassificationSummaryCalculator:

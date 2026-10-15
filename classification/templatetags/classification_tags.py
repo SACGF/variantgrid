@@ -253,9 +253,6 @@ def clinical_significance_values(vcm: ClassificationModification, show_pending: 
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
     value = summary_obj.pathogenicity.classification
-    # if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
-    #     pending_from = germline_key.pretty_value(value, value) or "No Data"
-    #     value = pending_classification_value
     grouping: Optional[ClassificationGrouping] = None
 
     if show_pending:

@@ -96,11 +96,11 @@ class AnnotationRunCleanupTestCase(TestCase):
             annotsv_dir = get_annotsv_dir(run)
             os.makedirs(annotsv_dir, exist_ok=True)
             # AnnotSV writes more than just the TSV into its directory
-            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w").close()
+            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w", encoding="utf-8").close()
 
         paths = runner.get_output_paths(run, run.vcf_dump_filename)
         for path in paths:
-            open(path, "w").close()
+            open(path, "w", encoding="utf-8").close()
         runner.record_resume_state(run, run.vcf_dump_filename)
         for k, v in run_kwargs.items():
             setattr(run, k, v)

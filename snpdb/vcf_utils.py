@@ -292,7 +292,7 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
     contig_lengths = dict(genome_build.contigs.values_list("pk", "length"))
     contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
 
-    with open(output_filename, "w") as f:
+    with open(output_filename, "w", encoding="utf-8") as f:
         found_column_names_line = False
         for line in header_lines:
             if line.startswith("#CHROM"):

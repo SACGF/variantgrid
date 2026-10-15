@@ -186,7 +186,8 @@ class VariantTranscriptSelections:
         transcript_canonical_score = 0
         if obj.transcript_version:
             data["tags"] = obj.transcript_version.tags
-            data["protein_length"] = obj.transcript_version.protein_length
+            if obj.transcript_version.has_valid_data:  # A legacy pre-cdot row has no exons to measure
+                data["protein_length"] = obj.transcript_version.protein_length
             transcript_canonical_score = obj.transcript_version.canonical_score
             ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
             if ggc:

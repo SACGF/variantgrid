@@ -15,6 +15,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from analysis.classify_report import (
@@ -39,8 +40,10 @@ from classification.models import (
     ClassificationConsensus,
     ClassificationModification,
     ClassificationReportTemplate,
+    ConsensusComparison,
     get_case_report_deliveries,
 )
+from classification.models.classification import COPY_SCOPES_ALL
 from classification.models.classification_report_models import describe_tick_when, tick_for
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import (
@@ -146,10 +149,28 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     lab_form = UserLabChoiceForm(user=request.user, default_lab=lab) if lab else None
 
-    # Gene content is what's left to reuse when the lab has never seen this variant before - same
-    # deduplicated rows as the create-from-variant page, so the two can't drift
+    # The allele's previous classifications grouped by what applying one would copy, as the create-from-variant
+    # page offers them; gene content is what's left to reuse when nothing on the allele would copy
+    comparison = None
+    compare_url = None
+    uncopyable = []
+    not_shown = 0
+    groups = []
+    if row.copyable:
+        copied_keys = ClassificationConsensus.copy_keys(COPY_SCOPES_ALL, row.allele_origin_bucket)
+        with_content = [previous for previous in row.copyable
+                        if ClassificationConsensus.has_copyable_content(previous.modification, copied_keys)]
+        uncopyable = [previous for previous in row.copyable if previous not in with_content]
+        groups = ClassificationConsensus.consensus_groups([previous.modification for previous in with_content],
+                                                          copied_keys)
+        if groups:
+            comparison = ConsensusComparison.of(groups)
+            not_shown = len(with_content) - sum(group.record_count for group in groups)
+            # The compare link takes every record, the cap on columns included
+            classification_ids = ",".join(str(previous.modification.classification_id) for previous in with_content)
+            compare_url = f"{reverse('classification_diff')}?cids={classification_ids}&copied_only=1"
     gene_groups = []
-    if not row.copyable and row.gene_symbol:
+    if not groups and row.gene_symbol:
         gene_groups = ClassificationConsensus.gene_consensus_groups(
             gene_symbol=row.gene_symbol, user=request.user, allele_origin_bucket=row.allele_origin_bucket)
 
@@ -167,6 +188,10 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
         "lab_form": lab_form,
         "sample_options": sample_options,
         "selected_sample_option": next((option for option in sample_options if option.selected), None),
+        "comparison": comparison,
+        "compare_url": compare_url,
+        "uncopyable": uncopyable,
+        "not_shown": not_shown,
         "gene_groups": gene_groups,
     }
     return render(request, 'analysis/classify_report_tag_dialog.html', context)

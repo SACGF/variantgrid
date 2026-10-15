@@ -30,7 +30,7 @@ class MockTranscriptSequenceFetcher(TranscriptSequenceFetcher):
         if cls._sequence_by_accession is None:
             sequences = {}
             for basename in TRANSCRIPT_SEQUENCE_FASTAS.values():
-                with open(os.path.join(TEST_DATA_DIR, basename)) as f:
+                with open(os.path.join(TEST_DATA_DIR, basename), encoding="utf-8") as f:
                     for record in SeqIO.parse(f, "fasta"):
                         sequences[record.id] = str(record.seq)
             cls._sequence_by_accession = sequences

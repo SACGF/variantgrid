@@ -121,6 +121,13 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
         """ How a re-post finds the row it made last time, where no ExternalPK was sent """
         raise NotImplementedError
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        field = self.Meta.model.LOCAL_REFERENCE_FIELD
+        if reference_id := attrs.get(field):
+            attrs[field] = self.Meta.model.normalize_reference_id(reference_id)
+        return attrs
+
     def _post_create(self, instance, user):
         """ Anything a brand new row needs beyond being saved """
 

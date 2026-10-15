@@ -1,3 +1,6 @@
+from django.urls.conf import path as path_standard
+from django.views.generic import RedirectView
+
 from analysis.grids import (
     AnalysesColumns,
     AnalysesListColumns,
@@ -188,7 +191,8 @@ urlpatterns = [
          DatabaseTableView.as_view(column_class=NodeGeneListGenesColumns),
          name='analysis_node_gene_list_genes_datatable'),
 
-    path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
+    path('analysis_status', views.view_analysis_status, name='analysis_status'),
+    path_standard('analysis_issues', RedirectView.as_view(pattern_name='analysis_status', permanent=True, query_string=True)),
     path('analysis_log_entry/datatable',
          DatabaseTableView.as_view(column_class=AnalysisLogEntryColumns),
          name='analysis_log_entry_datatable'),

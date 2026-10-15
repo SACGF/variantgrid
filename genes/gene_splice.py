@@ -43,6 +43,7 @@ from genes.gene_level_resolver import (
     unknown_gene_reason,
 )
 from genes.models import GeneLevelId
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.models.models_splice_event import SpliceEvent
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.gene_level_variants import (
@@ -400,7 +401,10 @@ def resolve_splice_string(splice_string: str, genome_build: GenomeBuild = None,
     gene_name, label = parsed
     if resolver is None:
         resolver = GeneLevelNameResolver()
-    resolved_gene = resolver.resolve_gene(gene_name, allow_unknown=False)
+    try:
+        resolved_gene = resolver.resolve_gene(gene_name, allow_unknown=False)
+    except AmbiguousGeneSymbolAlias as ambiguous:
+        return GeneLevelResolution.refused(str(ambiguous))
     if resolved_gene is None:
         return GeneLevelResolution.refused(unknown_gene_reason(gene_name))
 

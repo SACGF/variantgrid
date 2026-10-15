@@ -26,7 +26,6 @@
                     <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}" {% if not show_id %}title="{{ vcm.cr_lab_id }}"{% endif %}>
                         {% if show_share_level or not vcm.share_level_enum.is_discordant_level %}&nbsp;<img src="{% static vcm.share_level_enum.icon %}" width="12px" height="12px" style="margin-right:4px;" />{% endif %}
                         <span {% if vcm.vc.withdrawn %}style="text-decoration: line-through"{% endif %}>{{ id_text }}</span>
-						{% if show_lab %}{{vcm.classification.lab.name}} / {% endif %}
                     </a>
                 </strong>
                 {% if mode == "split" %}<br/>{% endif %}

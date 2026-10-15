@@ -211,7 +211,9 @@ def nodes_copy(request, analysis_id):
                 new_parent.add_child(clone_node)
                 edges.append(clone_node.get_connection_data(new_parent))
 
-            if not clone_node.is_valid:
+            # Connected via add_child, so the clone's save doesn't revalidate it
+            clone_node.valid = clone_node.is_valid
+            if not clone_node.valid:
                 clone_node.count = None
 
             clone_node.save()

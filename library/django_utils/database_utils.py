@@ -312,7 +312,7 @@ def postgres_arrays(array):
 T1 = TypeVar('T1', bound=DataClassJsonMixin)
 
 
-class JSONDataclassField(models.JSONField, Generic[T1]):
+class JSONDataclassField(models.JSONField, Generic[T1]):  # pylint: disable=inconsistent-mro
     """
     DO NOT USE - doesn't work well with auditlog which double encodes, likely a problem with serialize as well
     """
@@ -363,16 +363,6 @@ class JSONDataclassField(models.JSONField, Generic[T1]):
         if isinstance(fallback_value, dict):
             fallback_value = self.dataclass_type.from_dict(fallback_value)
         return fallback_value
-
-    # def from_db_value(self, value, expression, connection) -> Optional[T1]:
-    #     if json_obj := super().from_db_value(value, expression, connection):
-    #         try:
-    #             return self.dataclass_type.from_dict(json_obj)
-    #         except Exception as ex:
-    #             # TODO raise warning
-    #             print(f"Found illegal value in database {value.__class__} \"{value}\"")
-    #             self.get_fallback_value()
-    #     return None
 
     def from_db_value(self, value, expression, connection):
         """Converts database JSON string/object to a dataclass instance."""

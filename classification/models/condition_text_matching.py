@@ -33,7 +33,8 @@ from classification.models.condition_text_search import condition_text_search
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
-from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models import GeneSymbol
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.constants import MINUTE_SECS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.model_utils import ArrayLength
@@ -373,35 +374,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return
 
         lab = classification.lab
-        gene_symbol: Optional[GeneSymbol] = None
-        gene_symbol_str = cm.get(SpecialEKeys.GENE_SYMBOL)
-        if gene_symbol_str:
-            gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
-
-        # see if there's a single gene symbol alias that this links to, if it's not a gene symbol itself
+        try:
+            gene_symbol = cm.gene_symbol_best()
+        except AmbiguousGeneSymbolAlias:
+            gene_symbol = None
         if not gene_symbol:
-            if alias_qs := GeneSymbolAlias.objects.filter(alias__iexact=gene_symbol_str):
-                if alias_qs.count() == 1:
-                    gene_symbol = alias_qs.first().gene_symbol
-
-        # if the imported gene symbol doesn't work, see what gene symbols we can extract from the c.hgvs
-        if not gene_symbol:
-            try:
-                genome_build = cm.get_genome_build()
-                resolved_gene_symbol_str = cm.c_hgvs_best(genome_build).gene_symbol
-                gene_symbol = GeneSymbol.objects.filter(symbol=resolved_gene_symbol_str).first()
-            except ValueError:
-                # couldn't extract genome build
-                pass
-
-        if not gene_symbol:
-            # if gene_symbol_str:
-            #     report_message("Classification has unrecognised gene symbol, cannot link it to condition text",
-            #                    extra_data={
-            #                        "target": gene_symbol_str or "<blank>",
-            #                        "classification_id": classification.id,
-            #                        "gene_symbol": gene_symbol_str
-            #                    })
             debug_timer.tick("Condition Text Matching - no valid gene symbol")
             return
 
@@ -457,6 +434,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     old_text = existing.condition_text
                     existing.parent = mode_of_inheritance_level
                     existing.condition_text = ct
+                    existing.gene_symbol = gene_symbol
                     existing.mode_of_inheritance = mode_of_inheritance
                     existing.save()
                     if update_counts:

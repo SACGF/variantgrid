@@ -150,12 +150,12 @@ class TestPathogenicOverlapsAssembly(TestCase):
         }
         overlaps = _extract_pathogenic_overlaps(row)
         self.assertEqual(set(overlaps.keys()), {"loss", "inv"})
-        self.assertEqual(overlaps["loss"], {
+        self.assertEqual(overlaps["loss"], {  # pylint: disable=unsubscriptable-object
             "source": "ClinGen",
             "phen": "Hereditary breast cancer",
             "coord": "chr17:41200000-41260000",
         })
-        self.assertEqual(overlaps["inv"], {
+        self.assertEqual(overlaps["inv"], {  # pylint: disable=unsubscriptable-object
             "source": "ClinVar&dbVar",
             "hpo": "HP:0001234",
             "coord": "chr3:127500000-128800000",
@@ -260,7 +260,7 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
         def _execute_cmd(cmd, **kwargs):  # pylint: disable=unused-argument
             output_dir = cmd[cmd.index("-outputDir") + 1]
             svinput = cmd[cmd.index("-SVinputFile") + 1]
-            with open(get_annotsv_tsv_filename(svinput, output_dir), "w") as f:
+            with open(get_annotsv_tsv_filename(svinput, output_dir), "w", encoding="utf-8") as f:
                 f.write("AnnotSV_ID\n")
             return 0, "ok", ""
 
@@ -282,7 +282,7 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
                 cmd_called = execute_cmd_mock.call_args.args[0]
                 self.assertIn(dump_filename, cmd_called)
 
-                with open(dump_filename) as f:
+                with open(dump_filename, encoding="utf-8") as f:
                     lines = f.read().splitlines()
                 column_line = [line for line in lines if line.startswith("#CHROM")][0]
                 self.assertTrue(column_line.endswith("\tFORMAT\tvariantgrid"))
@@ -323,7 +323,7 @@ class TestDumpSamples(TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             vcf_filename = os.path.join(tmp_dir, "sites_only.vcf")
             write_qs_to_vcf(vcf_filename, self.genome_build, qs)
-            with open(vcf_filename) as f:
+            with open(vcf_filename, encoding="utf-8") as f:
                 lines = f.read().splitlines()
         column_line = [line for line in lines if line.startswith("#CHROM")][0]
         self.assertNotIn("FORMAT", column_line)

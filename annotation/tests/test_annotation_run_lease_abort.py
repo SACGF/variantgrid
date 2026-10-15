@@ -168,7 +168,7 @@ class AnnotationRunUnwindOwnershipTest(AnnotationRunLeaseTestCase):
         loser_annotated = os.path.join(
             self._dump_dir, f"{name_from_filename(loser_dump)}.vep_annotated_{self.grch37.name}.vcf.gz")
         for path in (loser_dump, loser_annotated):
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write("partial VEP output\n")
 
         def _reclaimed_then_killed(annotation_run, **kwargs):

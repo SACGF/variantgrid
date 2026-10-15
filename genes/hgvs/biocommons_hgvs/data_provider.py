@@ -52,6 +52,14 @@ class DBTranscriptSeqFetcher:
             end_i = len(transcript_seq)
         return transcript_seq[start_i:end_i]
 
+    def has_sequence(self, ac) -> bool:
+        """ Whether fetch_seq serves a stored sequence for this transcript. Without one the chained fasta fetcher
+            stitches the transcript out of the genome, so the two can't be compared (#1266) """
+        try:
+            return TranscriptVersionSequenceInfo.get(ac, retrieve=self.retrieve_transcripts) is not None
+        except NoTranscript:
+            return False
+
 
 class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
     """ We want this to fail with ContigNotInBuildError if asked for a contig not in the

@@ -1,11 +1,9 @@
-import json
 import logging
 from collections import defaultdict
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
-from django.http.response import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http.response import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -29,67 +27,10 @@ from pathtests.models import (
     PathologyTestGeneModificationRequest,
     PathologyTestOrder,
     PathologyTestVersion,
-    get_cases_qs,
     get_external_order_system_last_checked,
 )
 from patients.forms import external_pk_autocomplete_form_factory
-from patients.models import FollowLeadScientist, get_lead_scientist_users_for_user
 from snpdb.models.models_enums import ImportStatus
-
-
-def my_cases(request, has_menu=True):
-    users_list = get_lead_scientist_users_for_user(request.user)
-    title = "My cases"
-    return view_cases_for_users(request, title, users_list, has_menu=has_menu)
-
-
-def scientist_cases(request, user_id, has_menu=True):
-    user = get_object_or_404(User, pk=user_id)
-    title = f"Cases for {user}"
-    return view_cases_for_users(request, title, [user], has_menu=has_menu)
-
-
-@require_POST
-def follow_scientist(request, follow_user_id):
-    checked = json.loads(request.POST["checked"])
-    follow_user = get_object_or_404(User, pk=follow_user_id)
-
-    if checked:
-        FollowLeadScientist.objects.get_or_create(user=request.user, follow=follow_user)
-    else:
-        FollowLeadScientist.objects.filter(user=request.user, follow=follow_user).delete()
-
-    return HttpResponse()
-
-
-def view_cases_for_users(request, title, users_list, has_menu=True):
-    cases_qs = get_cases_qs(request.user).filter(lead_scientist__in=users_list).order_by("-created")
-
-    last_checked = get_external_order_system_last_checked()
-    if has_menu:
-        template_name = 'pathtests/cases/cases_menu.html'
-    else:
-        template_name = 'pathtests/cases/show_cases.html'
-
-    is_following = False
-    if len(users_list) == 1:
-        single_lead_scientist = users_list[0]
-        is_following = request.user.following.filter(follow=single_lead_scientist).exists()
-    else:
-        single_lead_scientist = None
-
-    context = {"title": title,
-               "single_lead_scientist": single_lead_scientist,
-               "is_following": is_following,
-               "is_clinician": False,
-               "cases_qs": cases_qs,
-               "last_checked": last_checked}
-
-    return render(request, template_name, context)
-
-
-def my_cases_tab(request):
-    return my_cases(request, has_menu=False)
 
 
 def pathology_tests(request):

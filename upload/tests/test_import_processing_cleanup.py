@@ -49,7 +49,7 @@ class ImportProcessingCleanupTest(TestCase):
         path = os.path.join(import_processing_dir, name)
         os.makedirs(path)
         if not empty:
-            with open(os.path.join(path, "scratch.txt"), "w") as f:
+            with open(os.path.join(path, "scratch.txt"), "w", encoding="utf-8") as f:
                 f.write("x")
         os.utime(path, (OLD_MTIME, OLD_MTIME))
         return path

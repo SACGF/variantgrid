@@ -6,6 +6,8 @@ Start with:
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
 - enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
+  Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
+  not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
 Patterns here:
@@ -109,11 +111,17 @@ Gotchas:
   & Report dialog from Tag.allele_origin_bucket, the in-form box from the record's own bucket. External labs' records are
   shown for context with no copy control - their evidence was assembled under a config reviewed elsewhere.
 - Gene level candidates come from models/classification.py:ClassificationConsensus.gene_consensus_groups - one row per
-  distinct set of GENE-scope values, newest representative first, capped at ten. Most records in a gene carry identical gene
-  content because they were copied from each other. The pick is always a human's: AMP tiering and therapy content are gene
-  *and* tumour type, so the row's "and N other records" spread is the deciding information, not something to automate.
+  distinct set of GENE-scope values, most used first then newest, capped at ten, each later row naming the fields it
+  differs from the first in. Most records in a gene carry identical gene content because they were copied from each
+  other. The pick is always a human's: AMP tiering and therapy content are gene *and* tumour type, so the row leads with
+  the content and the spread of conditions it was used for (`ConsensusGroup.conditions`), not the record's tier.
   The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
-  views/views_gene_consensus.py) all call that one function.
+  views/views_gene_consensus.py) all call that one function and render templates/classification/tags/gene_consensus_group.html.
+- The allele level pick (create page "Copy values from", the Classify & Report dialog's previous classifications) is the
+  same grouping over every copied key (models/classification.py:ClassificationConsensus.consensus_groups): one column
+  per distinct set of copied values, rendered side by side by templates/classification/tags/consensus_comparison.html
+  with the fields the choices differ in first and the shared ones folded away (ConsensusComparison.of). Record
+  identity (lab id, curator) is provenance, not the choice - the diff page (`?cids=...&copied_only=1`) is the full view.
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.
@@ -166,6 +174,11 @@ Gotchas:
   nothing has to be pre-registered beyond that. claude/research/classifications.md has the table of written forms.
 - With `VARIANT_GENE_LEVEL_ENABLED` off (Shariant), `genes/gene_level_strings.py:looks_gene_level` is always False, so
   'BCR::ABL1' takes the HGVS path and fails as an HGVS - `cant_resolve_to_variant_coordinate`, never `gene_level_unresolved`.
+- Shariant records arrive through the API (`models/classification_inserter.py:BulkClassificationInserter`), already curated
+  elsewhere. An unpublished edit there usually means an update the inserter saved but refused to share (`share_failure`:
+  the record has errors) or one sent without `publish`. A pending clinical significance only comes from discordance
+  resolution. A change to editing UI needs testing on a curation deployment; a change to the API, cross-lab visibility,
+  overlaps or the exports labs download (CSV column set included) needs testing on Shariant test.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path

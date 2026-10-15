@@ -65,6 +65,7 @@ class ClassificationGroupingValueTriageForm(forms.Form):
         widget=forms.Textarea({"rows": 5})
     )
 
+
 def _onc_path_choices():
     return [("undecided", "Undecided")] + \
             [(m.get("key"), m.get("label")) for m in EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).virtual_options]
@@ -391,14 +392,14 @@ class OverlapDownloadRow(ExportRow):
         rows = []
         for cont in self.overlap.contributions_list:
             if cont.is_amending:
-                value = f"{cont.lab_like} : {cont.pretty_value} -> {cont.pretty_effective_value}"
+                value = f"{cont.lab_like} : {cont.effective_date_obj.date} | {cont.pretty_value} -> {cont.pretty_effective_value}"
             else:
-                value = f"{cont.lab_like} : {cont.pretty_effective_value}"
+                value = f"{cont.lab_like} : {cont.effective_date_obj.date} | {cont.pretty_effective_value}"
             rows.append(value)
             if last_comment_entry := cont.last_comment:
                 if last_comment := last_comment_entry.value:
                     if text := last_comment.text:
-                        rows.append(f"    \"{text}\" - {last_comment_entry.user}")
+                        rows.append(f"    \"{text}\" - {last_comment_entry.timestamp.strftime('%Y-%m-%d')} {last_comment_entry.user}")
                         rows.append("")
 
         return "\n".join(rows)
@@ -441,11 +442,7 @@ def download_overlaps(request, lab_id: str):
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
     qs = qs.prefetch_related("overlapcontributionnextstep_set")
-    categories: dict
-    if solved_mode:
-        categories = {"solved": True}
-    else:
-        categories = {"outstanding": True}
+    categories = {"solved": solved_mode, "outstanding": not solved_mode}
 
     return OverlapDownloadRow.streaming_csv(
         data=qs.iterator(chunk_size=1000),

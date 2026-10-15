@@ -564,7 +564,8 @@ class EvidenceKey(TimeStampedModel):
             'examples': self.examples,
             'hide': self.hide,
             'mandatory': self.mandatory,
-            'see': self.see
+            'see': self.see,
+            'copy_scope': self.copy_scope
         })
 
     @staticmethod

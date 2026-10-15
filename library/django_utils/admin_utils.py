@@ -193,7 +193,7 @@ def export_as_csv(modeladmin, request, queryset) -> HttpResponseBase:
 
         yield delimited_row(field_names)
 
-        for qs_obj in queryset:
+        for qs_obj in queryset.iterator():
             yield delimited_row([get_formatted_attr(qs_obj, field) for field in field_names])
 
     response = StreamingHttpResponse(data_generator(), content_type='text/csv')

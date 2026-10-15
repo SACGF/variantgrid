@@ -30,7 +30,6 @@ ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 ANNOTATION_SHOW_LEGACY_RANKSCORES = True
 
 _BIG_DISK_BASE_DIR = "/data"
-ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.expanduser("~/perlbrew_runner.sh")
 
 ANNOTATION[BUILD_GRCH38]["enabled"] = True

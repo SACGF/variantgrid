@@ -434,9 +434,10 @@ class ClassificationGrouping(TimeStampedModel):
 
     @transaction.atomic
     def update(self):
-
-        # FIXME there's a bunch of overlap calculation here that doesn't need to happen
-        # as that is now managed by Overlaps
+        """ Recalculates the grouping from its classifications' last published modifications - the latest one
+            (shown in grids) and what the grouping holds across all of them: conditions, zygosities and whether
+            they differ in (somatic) clinical significance within this lab. Comparisons across labs are
+            OverlapContribution's, which the save signal refreshes from here """
 
         if all_modifications := self.classification_modifications:
             # FIND THE MOST RECENT CLASSIFICATION
@@ -451,14 +452,8 @@ class ClassificationGrouping(TimeStampedModel):
             self._set_latest_cached_summary(best_classification.classification.summary)
             self.latest_allele_info = best_classification.classification.allele_info
 
-            # TODO check for dirty values
             all_terms = Counter()
             all_free_text_conditions = Counter()
-
-            all_terms.keys()
-
-            # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
-            # TODO - CLINICAL SIGNIFICANCE
             all_zygosities: set[str] = set()
 
             all_buckets = set()
@@ -471,18 +466,11 @@ class ClassificationGrouping(TimeStampedModel):
                 if condition := modification.classification.condition_resolution_obj:
                     for term in condition.terms:
                         all_terms[term] += 1
-                    # all_terms |= set(condition.terms)
-                    # if plain_text := condition.plain_text:
-                    #     all_free_text_conditions.add(plain_text)
                 elif condition_text := modification.get(SpecialEKeys.CONDITION):
                     all_free_text_conditions[condition_text] += 1
-                    # all_free_text_conditions.add(condition_text)
 
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
-                # only store valid terms as quick links to the classification
-                # all_terms = {term for term in all_terms if term.is_valid_for_condition}
-                # self._update_conditions(all_terms)
                 summary_obj = modification.classification.summary_obj
 
                 if bucket := summary_obj.pathogenicity.bucket:
@@ -503,10 +491,6 @@ class ClassificationGrouping(TimeStampedModel):
             all_zygosities = sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities))
             self.zygosity_values = all_zygosities
 
-            # self.conditions = strip_json(ConditionResolved.from_uncounted_terms(
-            #     terms=list(sorted(all_terms)),
-            #     plain_text_terms=list(sorted(all_free_text_conditions))
-            # ).to_json(include_join=False))
             for term, count in all_terms.items():
                 condition_references.append(ConditionReference(term=term, count=count))
             for text, count in all_free_text_conditions.items():
@@ -542,9 +526,7 @@ class ClassificationGrouping(TimeStampedModel):
             if previous_summary and previous_summary != new_summary:
                 classification_grouping_summary_signal.send(sender=ClassificationGrouping, instance=self, old_summary=previous_summary, new_summary=new_summary)
         else:
-            # soft delete
-            # share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
-
+            # soft delete - leaving the share level and allele info alone
             self.classification_count = 0
             # these differences are internal within a lab, even if it's medical significant the overall
             self.pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
@@ -553,11 +535,6 @@ class ClassificationGrouping(TimeStampedModel):
             self.zygosity_values = None
             self.latest_classification_modification = None
             self._set_latest_cached_summary({})
-            # leaving the share level and allele info alone
-            # latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
-
-            # TODO if we're never shared or if the overlap was single only, maybe hard delete?
-            # self.delete()
         self.dirty = False
         self.save()
         # note the save signal will update the OverlapContribution

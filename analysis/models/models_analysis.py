@@ -369,8 +369,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 edge.pk = None
                 edge.save()
 
-            # re-save all the nodes to re-validate them after all joined up
+            # Edges are copied after the nodes, so validate them now they're joined up
             for node in nodes:
+                node.valid = node.is_valid
                 node.save()
 
             for av in AnalysisVariable.objects.filter(node__analysis_id=analysis_id):
@@ -721,7 +722,9 @@ class AnalysisTemplateRun(TimeStampedModel):
 
     @staticmethod
     def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None,
-               template_version: 'AnalysisTemplateVersion' = None):
+               template_version: 'AnalysisTemplateVersion' = None,
+               annotation_version: AnnotationVersion = None):
+        """ annotation_version: the build's latest unless the caller has already settled on one """
         if user is None:
             user = admin_bot()
 
@@ -730,10 +733,13 @@ class AnalysisTemplateRun(TimeStampedModel):
             if template_version is None:
                 raise ValueError(f"{analysis_template} has no active version")
 
+        if annotation_version is None:
+            annotation_version = AnnotationVersion.latest(genome_build, validate=True)
+
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
         analysis.genome_build = genome_build
-        analysis.annotation_version = AnnotationVersion.latest(genome_build, validate=True)
+        analysis.annotation_version = annotation_version
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments
@@ -837,7 +843,8 @@ class AnalysisTemplateRunArgument(models.Model):
 
 
 class CohortAnalysisTemplateRun(models.Model):
-    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT) automatically run once against a cohort  """
+    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT) automatically run against a cohort - one per
+        template version and annotation version (@see analysis.analysis_templates.get_cohort_analysis) """
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     analysis_template_run = models.ForeignKey(AnalysisTemplateRun, on_delete=CASCADE)
 
@@ -846,7 +853,8 @@ class CohortAnalysisTemplateRun(models.Model):
 
 
 class SampleAnalysisTemplateRun(models.Model):
-    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE) automatically run once against a sample  """
+    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE) automatically run against a sample - one per
+        template version and annotation version (@see analysis.analysis_templates.get_sample_analysis) """
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     analysis_template_run = models.ForeignKey(AnalysisTemplateRun, on_delete=CASCADE)
 

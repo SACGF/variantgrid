@@ -17,6 +17,7 @@ from seqauto.models import (
     SequencingRun,
     SequencingRunCurrentSampleSheet,
     SequencingSample,
+    SingleSampleVCF,
     UnalignedReads,
 )
 from seqauto.models.models_enums import DataGeneration
@@ -25,6 +26,7 @@ from seqauto.serializers.seqauto_qc_serializers import QCSerializer
 from seqauto.serializers.sequencing_serializers import (
     AlignmentFileSerializer,
     SequencingFilesBulkCreateSerializer,
+    SingleSampleVCFSerializer,
 )
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models.models_enums import SampleFileType
@@ -95,7 +97,7 @@ class SequencingFilesBulkCreateTests(TestCase):
         """ Goes through the QC API path, which resolves the sample then finds its BAM/VCF """
         qc_data = {
             "sequencing_sample": self._sequencing_sample_lookup(sample_name),
-            "alignment_file": {"path": f"/data/RUN_357/1_BAM/{sample_name}.hg38.bam"},
+            "alignment_files": [{"path": f"/data/RUN_357/1_BAM/{sample_name}.hg38.bam"}],
             "vcf_file": {"path": f"/data/RUN_357/2_variants/{sample_name}.gatk.hg38.vcf.gz"},
             "path": f"/data/RUN_357/4_QC/exec_stats/{sample_name}_qc_summary.txt",
         }
@@ -128,7 +130,7 @@ class SequencingFilesBulkCreateTests(TestCase):
         # QCGeneCoverage is reached from the sample via the same path the gene coverage queries use
         QCGeneCoverage.objects.create(qc=qc, sequencing_run=self.sequencing_run,
                                       path=f"/data/RUN_357/4_QC/{sample_name}.per_gene_coverage.tsv")
-        coverage_qs = QCGeneCoverage.objects.filter(qc__alignment_file__sequencing_sample=sequencing_sample)
+        coverage_qs = QCGeneCoverage.objects.filter(qc__sequencing_sample=sequencing_sample)
         self.assertEqual(coverage_qs.count(), 1)
 
         grid_rows = list(self._alignment_file_grid_rows())
@@ -148,6 +150,8 @@ class SequencingFilesBulkCreateTests(TestCase):
 
         qc = self._make_qc(sample_name)
         self.assertEqual(qc.sequencing_sample, sequencing_sample)
+        # Older clients still read the one alignment file as 'bam_file'
+        self.assertEqual(SingleSampleVCFSerializer(qc.vcf_file).data["bam_file"]["path"], bam_file.path)
 
     def test_bam_params_without_fastqs(self):
         self._bulk_create(self._record(SAMPLE_NAMES[0], fastqs=False))
@@ -207,3 +211,94 @@ class SequencingFilesBulkCreateTests(TestCase):
         qc = self._make_qc(sample_name)
         sequencing_sample = SequencingSample.objects.get(sample_sheet=self.sample_sheet, sample_name=sample_name)
         self.assertEqual(sequencing_sample.get_single_qc(), qc)
+
+    def _alignment_files_record(self, sample_name, *alignment_files):
+        record = self._record(sample_name, fastqs=False)
+        record.pop("bam_file")
+        record["alignment_files"] = list(alignment_files)
+        return record
+
+    def _qc_from_api(self, qc_data):
+        qc_serializer = QCSerializer(data=qc_data)
+        qc_serializer.is_valid(raise_exception=True)
+        return QCSerializer.get_object(qc_serializer.validated_data)
+
+    def _qc_data(self, sample_name, **kwargs):
+        return {
+            "sequencing_sample": self._sequencing_sample_lookup(sample_name),
+            "vcf_file": {"path": f"/data/RUN_357/2_variants/{sample_name}.gatk.hg38.vcf.gz"},
+            **kwargs,
+        }
+
+    def test_vcf_and_qc_link_every_alignment_file(self):
+        sample_name = SAMPLE_NAMES[0]
+        aligner = {"name": "BWA", "version": "0.7.18"}
+        bam_path = f"/data/RUN_357/1_BAM/{sample_name}.hg38.bam"
+        cram_path = f"/data/RUN_357/1_BAM/{sample_name}.hg38.cram"
+        no_extension_path = f"/data/RUN_357/1_BAM/{sample_name}.hg38.alignment"
+        alignment_files = [{"path": bam_path, "aligner": aligner},
+                           {"path": cram_path, "aligner": aligner},
+                           {"path": no_extension_path, "aligner": aligner, "file_type": "cram"}]
+        self._bulk_create(self._alignment_files_record(sample_name, *alignment_files))
+        file_types = dict(AlignmentFile.objects.values_list("path", "file_type"))
+        self.assertEqual(file_types, {bam_path: SampleFileType.BAM,
+                                      cram_path: SampleFileType.CRAM,
+                                      no_extension_path: SampleFileType.CRAM})
+
+        # Order doesn't key the VCF - a re-post in another order is the same record
+        self._bulk_create(self._alignment_files_record(sample_name, *reversed(alignment_files)))
+        vcf_file = SingleSampleVCF.objects.get()
+        all_paths = {bam_path, cram_path, no_extension_path}
+        self.assertEqual(set(vcf_file.alignment_files.values_list("path", flat=True)), all_paths)
+
+        # QC sent without alignment files takes the VCF's, a re-post naming some replaces them
+        qc = self._qc_from_api(self._qc_data(sample_name))
+        self.assertEqual(set(qc.alignment_files.values_list("path", flat=True)), all_paths)
+        reposted_qc = self._qc_from_api(self._qc_data(sample_name, alignment_files=[{"path": cram_path}]))
+        self.assertEqual(reposted_qc.pk, qc.pk)
+        self.assertEqual(list(reposted_qc.alignment_files.values_list("path", flat=True)), [cram_path])
+
+    def test_bam_file_and_alignment_files_merged(self):
+        sample_name = SAMPLE_NAMES[0]
+        record = self._record(sample_name)
+        cram_path = f"/data/RUN_357/1_BAM/{sample_name}.hg38.cram"
+        record["alignment_files"] = [{"path": cram_path, "aligner": {"name": "BWA", "version": "0.7.18"}}]
+        result = self._bulk_create(record)
+
+        sequencing_sample = SequencingSample.objects.get(sample_sheet=self.sample_sheet, sample_name=sample_name)
+        self.assertTrue(all(af.unaligned_reads for af in sequencing_sample.alignmentfile_set.all()))
+        vcf_file = result["records"][0]["vcf_file"]
+        self.assertEqual(set(vcf_file.alignment_files.values_list("path", flat=True)),
+                         {record["bam_file"]["path"], cram_path})
+
+    def test_alignment_files_required(self):
+        with self.assertRaises(ValidationError):
+            self._bulk_create(self._alignment_files_record(SAMPLE_NAMES[0]))
+
+    def test_vcf_alignment_files_from_one_sequencing_sample(self):
+        aligner = {"name": "BWA", "version": "0.7.18"}
+        alignment_files = [{"path": f"/data/RUN_357/1_BAM/{sample_name}.bam", "aligner": aligner,
+                            "sequencing_sample": self._sequencing_sample_lookup(sample_name)}
+                           for sample_name in SAMPLE_NAMES]
+        with self.assertRaises(ValidationError):
+            self._bulk_create(self._alignment_files_record(SAMPLE_NAMES[0], *alignment_files))
+
+    def test_aligner_only_needed_for_new_alignment_file(self):
+        sample_name = SAMPLE_NAMES[0]
+        path = f"/data/RUN_357/1_BAM/{sample_name}.hg38.bam"
+        with self.assertRaises(ValidationError):
+            self._bulk_create(self._alignment_files_record(sample_name, {"path": path}))
+
+        self._bulk_create(self._record(sample_name, fastqs=False))
+        self._bulk_create(self._alignment_files_record(sample_name, {"path": path}))
+        self.assertEqual(AlignmentFile.objects.get().aligner.version, "0.7.18")
+
+    def test_qc_bam_file_still_accepted(self):
+        sample_name = SAMPLE_NAMES[0]
+        self._bulk_create(self._record(sample_name))
+        bam_file = {"path": f"/data/RUN_357/1_BAM/{sample_name}.hg38.bam"}
+        qc = self._qc_from_api(self._qc_data(sample_name, bam_file=bam_file))
+        self.assertEqual(QCSerializer(qc).data["bam_file"], bam_file)
+
+        with self.assertRaises(AlignmentFile.DoesNotExist):
+            self._qc_from_api(self._qc_data(sample_name, alignment_files=[{"path": "/data/other.bam"}]))

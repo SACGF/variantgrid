@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from analysis.models import AnalysisTemplate
 from analysis.tasks.analysis_grid_export_tasks import (
     export_cohort_to_downloadable_file,
+    get_export_annotation_version,
     get_grid_downloadable_file_params_hash,
 )
 from library.log_utils import report_exc_info
@@ -188,8 +189,9 @@ class APIAnnotatedDownloadView(APIView):
         except ValueError as e:
             return JsonResponse({"error": str(e)}, status=HTTPStatus.NOT_IMPLEMENTED)
 
-        params_hash = get_grid_downloadable_file_params_hash(cohort.pk, export_type)
-        task = export_cohort_to_downloadable_file.si(cohort.pk, export_type)
+        annotation_version = get_export_annotation_version(cohort)
+        params_hash = get_grid_downloadable_file_params_hash(cohort.pk, export_type, annotation_version.pk)
+        task = export_cohort_to_downloadable_file.si(cohort.pk, export_type, annotation_version.pk)
         cgf = CachedGeneratedFile.get_or_create_and_launch("export_cohort_to_downloadable_file", params_hash, task)
 
         if cgf.exception:

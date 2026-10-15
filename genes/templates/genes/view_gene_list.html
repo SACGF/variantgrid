@@ -3,6 +3,7 @@
 {% load tz %}
 {% load crispy_forms_tags %}
 {% load ui_utils %}
+{% load import_status_tags %}
 {% load help_tags %}
 {% load datatable_tags %}
 {% load wiki_tags %}
@@ -37,6 +38,7 @@
                         {% labelled label="Created" %}{{ gene_list.created|localtime }}{% endlabelled %}
                         {% labelled label="Modified" %}{{ gene_list.modified|localtime }}{% endlabelled %}
                         {% crispy gene_list_form form_helper.horizontal %}
+                        {% labelled label="Import Status" %}{% import_status_icon gene_list.import_status %}{% endlabelled %}
                     </div>
                     {% if has_write_permission %}
                     <div class="card-footer">

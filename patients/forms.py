@@ -6,8 +6,8 @@ from django.forms.widgets import TextInput
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import (
-    Extraction,
     ExternalPK,
+    Extraction,
     Patient,
     PatientModification,
     PatientRecordOriginType,
@@ -171,7 +171,7 @@ class ExtractionForm(forms.ModelForm):
     def clean_reference_id(self):
         # Unnamed extractions are all distinct under Postgres (@see Extraction.Meta), so an empty box
         # means unnamed rather than named ""
-        return self.cleaned_data['reference_id'] or None
+        return Extraction.normalize_reference_id(self.cleaned_data['reference_id']) or None
 
     def clean(self):
         cleaned_data = super().clean()

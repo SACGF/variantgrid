@@ -72,6 +72,14 @@ from uicore.templatetags.js_tags import jsonify_pretty_for_html
 from variantgrid.perm_path import get_visible_url_names
 
 
+def render_import_status(cell: CellData) -> JsonDataType:
+    """ For TableFormat.importStatus - the icon and label of an ImportStatus column (@see ImportStatus.icon_css) """
+    if status := cell.value:
+        import_status = ImportStatus(status)
+        return {"icon_css": import_status.icon_css, "label": import_status.label}
+    return None
+
+
 def url_if_visible(url_name: str, **kwargs) -> Optional[str]:
     """ Deployments without patients (eg Shariant) unregister these urls entirely """
     if get_visible_url_names().get(url_name):
@@ -95,7 +103,7 @@ class VCFListColumns(DatatableConfig[VCF]):
             RichColumn(key="date", label="Date", orderable=True, default_sort=SortOrder.DESC, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key="data_archived_date", label="Archived", orderable=True, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True),
@@ -163,7 +171,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
                        client_renderer=RichColumn.choices_client_renderer(VariantOrigin.choices)),
@@ -376,7 +384,7 @@ class CohortListColumns(DatatableConfig[Cohort]):
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='import_status', label='Status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             self.user_column(label='User'),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -468,7 +476,7 @@ class GenomicIntervalsListColumns(DatatableConfig[GenomicIntervalsCollection]):
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='import_status', label='Status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key='genome_build__name', label='Genome Build', orderable=True),
             self.user_column(label='Uploaded by'),
             RichColumn(key='id', name='delete', label='', orderable=False,
@@ -952,16 +960,10 @@ class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryColl
             RichColumn('id', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
             self.user_column(),
-            RichColumn('import_status', orderable=True, renderer=self._render_import_status),
+            RichColumn('import_status', orderable=True, renderer=render_import_status,
+                       client_renderer='TableFormat.importStatus'),
             RichColumn('genome_build', orderable=True),
         ]
-
-    def _render_import_status(self, row: dict[str, Any]) -> JsonDataType:
-        label = ""
-        if status := row['import_status']:
-            import_status = ImportStatus(status)
-            label = import_status.label
-        return label
 
     def get_initial_queryset(self) -> QuerySet[ManualVariantEntryCollection]:
         qs = ManualVariantEntryCollection.objects.all()

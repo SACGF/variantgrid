@@ -12,9 +12,8 @@ from pathtests.models import (
     PathologyTestGeneModificationOutcome,
     PathologyTestGeneModificationRequest,
     PathologyTestVersion,
-    cases_for_user,
 )
-from patients.models import FollowLeadScientist, Patient
+from patients.models import Patient
 from snpdb.models import ImportStatus
 
 
@@ -135,19 +134,3 @@ class PathologyTestVersionTest(TestCase):
         self.assertEqual(400, self.client.post(url, {**data, "operation": "X"}).status_code)
         self.assertEqual(200, self.client.post(url, {**data, "operation": ModificationOperation.ADD}).status_code)
 
-
-class CasesForUserTest(TestCase):
-    def test_cases_led_by_user_or_followed_scientist(self):
-        scientist = User.objects.create_user("pathtests_lead_scientist")
-        follower = User.objects.create_user("pathtests_follower")
-        stranger = User.objects.create_user("pathtests_stranger")
-        patient = Patient.objects.create(first_name="Cases", last_name="ForUser")
-        for user in (scientist, follower, stranger):
-            assign_permission_to_user_and_groups(user, patient)
-        case = Case.objects.create(name="led_case", patient=patient, lead_scientist=scientist)
-
-        self.assertEqual([case], list(cases_for_user(scientist)))
-        self.assertFalse(cases_for_user(follower).exists())
-        FollowLeadScientist.objects.create(user=follower, follow=scientist)
-        self.assertEqual([case], list(cases_for_user(follower)))
-        self.assertFalse(cases_for_user(stranger).exists())

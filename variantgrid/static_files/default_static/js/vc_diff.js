@@ -5,9 +5,12 @@
 
 const Diff = (function() {
 
-    const Diff = function(records, diffDom, eKeys, flagParams) {
+    // options.copiedOnly starts the view on the fields a copy from a previous classification would write
+    // (EvidenceKey.copy_scope other than None) - what the Classify & Report pick is actually choosing between
+    const Diff = function(records, diffDom, eKeys, flagParams, options) {
         
         this.flagParams = flagParams;
+        this.copiedOnly = Boolean((options || {}).copiedOnly);
         this.versions = records.map(r => {
             const merged = Object.assign({}, r, r.data); 
             delete merged['data'];
@@ -124,6 +127,15 @@ const Diff = (function() {
                 $('.diff tr.empty.criteria').hide();
             }
         },
+
+        toggledCopiedOnly() {
+            this.copiedOnly = !!$('#copied_only').prop('checked');
+            this.applyCopiedOnly();
+        },
+
+        applyCopiedOnly() {
+            $('.diff').toggleClass('copied-only', this.copiedOnly);
+        },
        
         configureColumns() {
             const modalContent = createModalShell('configureColumnsModal', 'Choose which columns to compare');
@@ -201,6 +213,14 @@ const Diff = (function() {
                         $('<label>', {class:'form-check-label', html:[
                             $('<input>', {class:'form-check-input', type: 'checkbox', id: 'show_all_acmg', click: ()=>this.toggledCriteriaHiding(), 'checked': this.showAllAcmg}),
                             ' Show unmet ACMG criteria'
+                        ]})
+                    ]})
+                }),
+                $('<div>', {class:'form-inline', html:
+                    $('<div>', {class: 'form-check', html: [
+                        $('<label>', {class:'form-check-label', html:[
+                            $('<input>', {class:'form-check-input', type: 'checkbox', id: 'copied_only', click: ()=>this.toggledCopiedOnly(), 'checked': this.copiedOnly}),
+                            ' Only fields copied from a previous classification'
                         ]})
                     ]})
                 })
@@ -447,6 +467,9 @@ const Diff = (function() {
                         }
                         if (isCriteria) {
                             row.addClass('criteria');
+                        }
+                        if (eKey.copy_scope === 'N') {
+                            row.addClass('not-copied');
                         }
 
                         includedVersions.forEach((v, index) => {
