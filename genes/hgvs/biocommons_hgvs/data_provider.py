@@ -9,6 +9,7 @@ from hgvs.exceptions import HGVSDataNotAvailableError
 from genes.models import MANE, NoTranscript, TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.models_enums import MANEStatus
 from genes.transcripts_utils import get_refseq_type
+from library.utils.hash_utils import md5sum_str
 from snpdb.models import Contig
 
 # cdot tag spellings expected by cdot's DEFAULT_TAG_PRIORITY list
@@ -105,6 +106,11 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
     def _get_transcript(self, tx_ac):
         tv = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac, best_attempt=True)
         return tv.data
+
+    def get_acs_for_protein_seq(self, seq):
+        """ c_to_p's fallback when the cdot data has no "protein" accession - cdot returns [], which c_to_p
+            indexes into. Name it by sequence hash as UTA does """
+        return [f"MD5_{md5sum_str(seq)}"]
 
     def _get_transcripts(self, tx_acs) -> dict:
         """ Retrieve many transcripts in one query, rather than cdot's default of one each.

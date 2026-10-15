@@ -1165,10 +1165,14 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'genome_build',
         'variant',
         'resolved_hgvs',
+        'p_hgvs',
+        'p_hgvs_short',
+        'p_hgvs_source',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
-        'error'
+        'error',
+        'p_hgvs_error',
     )
 
     search_fields = (

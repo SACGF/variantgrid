@@ -10,9 +10,11 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import lru_cache
 from typing import Any, Literal, Optional, TypedDict
 
 import django.dispatch
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
@@ -32,6 +34,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
+from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (
@@ -42,6 +45,13 @@ from genes.hgvs import (
     HGVSMatcher,
     HGVSNoRepresentationException,
     hgvs_diff_description,
+)
+from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
+from genes.hgvs.phgvs_canonical import (
+    canonical_from_sequence_variant,
+    canonical_p_hgvs,
+    is_frameshift_in_disguise,
+    short_p_hgvs,
 )
 from genes.models import (
     GeneCopyNumberEvent,
@@ -125,6 +135,31 @@ class HGVSResolution:
     gene_symbol: Optional[str]
 
 
+class PHGVSSource(TextChoices):
+    VEP = "V", "VEP"  # VariantTranscriptAnnotation.hgvs_p, exact transcript version, latest VariantAnnotationVersion
+    COMPUTED = "C", "Computed"  # biocommons c_to_p from resolved_hgvs
+    CLINGEN = "G", "ClinGen"  # cached ClinGenAllele proteinEffect
+    EVIDENCE = "E", "Evidence"  # a classification's p_hgvs evidence value, parsed
+
+
+@dataclass(frozen=True)
+class PHGVSResolution:
+    p_hgvs: Optional[str]
+    source: Optional[PHGVSSource]
+    error: Optional[str]
+
+
+NO_P_HGVS_SOURCE = "No p.HGVS source"
+
+
+@lru_cache
+def p_hgvs_converter(genome_build: GenomeBuild, retrieve_transcripts: Optional[bool] = None) -> BioCommonsHGVSConverter:
+    """ Always biocommons - HGVSMatcher's converter may be ClinGen by configuration. Shared, as construction opens
+        the genome fasta. retrieve_transcripts fetches missing transcript sequences (slow, network) and defaults
+        to settings.HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE """
+    return BioCommonsHGVSConverter(genome_build, retrieve_transcripts=retrieve_transcripts)
+
+
 class ResolvedVariantInfo(TimeStampedModel):
     """
     Stores information about a genome_build_patch_version/allele combo, generally stuff we have to have access quickly for sorting classifications.
@@ -176,6 +211,23 @@ class ResolvedVariantInfo(TimeStampedModel):
     error = TextField(null=True, blank=True)
     """ If there was an error generating the c.HGVS, put it here """
 
+    p_hgvs = TextField(null=True, blank=True)
+    """ Canonical p.HGVS for resolved_hgvs: p-dot only (no protein accession), 3-letter, Ter, always in predicted
+        brackets - p.(Gly12Asp), p.(Met246IlefsTer14), p.?, p.(=). Null when the row has no transcript_version
+        (gene-level, mito, g.HGVS-only) or no source could translate it (see p_hgvs_error) """
+
+    p_hgvs_source = TextField(null=True, blank=True, choices=PHGVSSource.choices)
+    """ Which source p_hgvs came from """
+
+    p_hgvs_error = TextField(null=True, blank=True)
+    """ Why p_hgvs is null when a transcript_version is set - the computed translation's error text
+        (e.g. an Ensembl CDS not divisible by 3) """
+
+    @property
+    def p_hgvs_short(self) -> Optional[str]:
+        """ p.(G12D), p.(M246Ifs*14) - derived for display, nothing sorts or searches on it """
+        return short_p_hgvs(self.p_hgvs)
+
     objects = ObjectManagerCachingRequest()
 
     class Meta:
@@ -203,6 +255,9 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.resolved_hgvs = None
         self.gene_symbol = None
         self.transcript_version: Optional[TranscriptVersion] = None
+        self.p_hgvs = None
+        self.p_hgvs_source = None
+        self.p_hgvs_error = None
         self.variant = variant
         self.genomic_sort = variant.sort_string
 
@@ -222,6 +277,8 @@ class ResolvedVariantInfo(TimeStampedModel):
             self.transcript_version = hgvs_resolution.transcript_version
             self.gene_symbol = hgvs_resolution.gene_symbol
             self.hgvs_converter_data_version = hgvs_resolution.hgvs_converter_data_version
+            if self.transcript_version:
+                self.set_p_hgvs()
         except NoTranscript as nt:
             # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
             self.error = str(nt)
@@ -241,6 +298,88 @@ class ResolvedVariantInfo(TimeStampedModel):
 
         self.save()
         return self
+
+    def set_p_hgvs(self, converter: Optional[BioCommonsHGVSConverter] = None):
+        """ Sets p_hgvs, p_hgvs_source and p_hgvs_error (doesn't save). A p.HGVS problem is recorded,
+            never raised - it must not stop the c.HGVS saving """
+        try:
+            p_resolution = self.recalc_p_hgvs(converter=converter)
+        except Exception as e:
+            report_exc_info(extra_data={"resolved_variant_info": self.pk, "resolved_hgvs": self.resolved_hgvs})
+            p_resolution = PHGVSResolution(p_hgvs=None, source=None, error=str(e))
+        self.p_hgvs = p_resolution.p_hgvs
+        self.p_hgvs_source = p_resolution.source
+        self.p_hgvs_error = p_resolution.error
+
+    def recalc_p_hgvs(self, converter: Optional[BioCommonsHGVSConverter] = None) -> PHGVSResolution:
+        """ First canonical p.HGVS of VEP, computed (c_to_p), cached ClinGen, then classification evidence.
+            VEP goes first as biocommons can't name some frameshifts - @see is_frameshift_in_disguise (#1383) """
+        if not (self.transcript_version and self.resolved_hgvs):
+            return PHGVSResolution(p_hgvs=None, source=None, error=NO_P_HGVS_SOURCE)
+
+        if p_hgvs := self._vep_p_hgvs():
+            return PHGVSResolution(p_hgvs=p_hgvs, source=PHGVSSource.VEP, error=None)
+
+        if converter is None:
+            converter = p_hgvs_converter(self.genome_build)
+        computed_p_hgvs = None
+        try:
+            var_p = converter.c_hgvs_to_p_sequence_variant(self.resolved_hgvs)
+            computed_p_hgvs = canonical_from_sequence_variant(var_p)
+            protein_length = converter.get_protein_length(self.transcript_version.accession)
+            if is_frameshift_in_disguise(var_p, protein_length):
+                computed_error = f"Computed {computed_p_hgvs} is a frameshift biocommons could not name"
+            else:
+                return PHGVSResolution(p_hgvs=computed_p_hgvs, source=PHGVSSource.COMPUTED, error=None)
+        except Exception as e:
+            # Not just HGVSError - eg an Ensembl CDS not divisible by 3 is NotImplementedError
+            computed_error = str(e) or e.__class__.__name__
+
+        if p_hgvs := self._clingen_p_hgvs(allow_unknown_stop=computed_p_hgvs is None):
+            return PHGVSResolution(p_hgvs=p_hgvs, source=PHGVSSource.CLINGEN, error=None)
+
+        if p_hgvs := self._evidence_p_hgvs():
+            return PHGVSResolution(p_hgvs=p_hgvs, source=PHGVSSource.EVIDENCE, error=None)
+
+        return PHGVSResolution(p_hgvs=None, source=None, error=computed_error)
+
+    def _vep_p_hgvs(self) -> Optional[str]:
+        """ Exact transcript version only - another version can have a different protein """
+        if vav := VariantAnnotationVersion.latest(self.genome_build):
+            vta_qs = VariantTranscriptAnnotation.objects.filter(version=vav, variant=self.variant,
+                                                                transcript_version=self.transcript_version)
+            if hgvs_p := vta_qs.values_list("hgvs_p", flat=True).first():
+                return canonical_p_hgvs(hgvs_p)
+        return None
+
+    def _clingen_p_hgvs(self, allow_unknown_stop: bool) -> Optional[str]:
+        """ Cached JSON only, never calls the registry. ClinGen returns NP_x:n.123+1G>A for intronic variants
+            (should be p.?) and fsTer? where the stop is computable """
+        allele = self.allele_info.allele if self.allele_info else None
+        if not (allele and allele.clingen_allele):
+            return None
+        raw = allele.clingen_allele.get_p_hgvs(self.transcript_version.accession, match_version=True)
+        if not raw or not raw.split(":", 1)[-1].startswith("p."):
+            return None
+        if raw.endswith("fsTer?") and not allow_unknown_stop:
+            return None
+        return canonical_p_hgvs(raw)
+
+    def _evidence_p_hgvs(self) -> Optional[str]:
+        """ First parsable p_hgvs evidence of this allele info's classifications, latest published first """
+        if not self.allele_info_id:
+            return None
+        # Looked up by name as classification.py imports this module
+        classification_modification_model = apps.get_model("classification", "ClassificationModification")
+        evidence_qs = classification_modification_model.objects.filter(
+            classification__allele_info=self.allele_info_id,
+            is_last_published=True,
+            published_evidence__p_hgvs__value__isnull=False,
+        ).order_by("-created").values_list("published_evidence__p_hgvs__value", flat=True)
+        for raw in evidence_qs:
+            if p_hgvs := canonical_p_hgvs(raw):
+                return p_hgvs
+        return None
 
     def recalc_resolved_hgvs(self) -> HGVSResolution:
         variant = self.variant

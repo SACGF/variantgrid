@@ -30,9 +30,9 @@ from genes.hgvs.hgvs_converter import (
     HGVSConverterType,
     HGVSException,
     HGVSImplementationException,
+    HgvsMatchRefAllele,
     HGVSNomenclatureException,
     HGVSNonCodingTranscriptException,
-    HgvsMatchRefAllele,
     HgvsOriginallyNormalized,
 )
 from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
@@ -89,12 +89,14 @@ class BioCommonsHGVSConverter:
     """
     hgvs_span_trailing_int_length_pattern = re.compile(r"(.*(?:del|dup|inv))(\d+)$")
 
-    def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
+    def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True,
+                 retrieve_transcripts: Optional[bool] = None):
+        """ retrieve_transcripts: fetch missing transcript sequences (default settings.HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE) """
         self.genome_build = genome_build
         self.local_resolution = local_resolution
         self.clingen_resolution = clingen_resolution
 
-        self.hdp = DjangoTranscriptDataProvider(genome_build)
+        self.hdp = DjangoTranscriptDataProvider(genome_build, retrieve_transcripts=retrieve_transcripts)
         assembly_name = genome_build.name
         symbolic_alt_min_length = settings.VARIANT_SYMBOLIC_ALT_SIZE if settings.VARIANT_SYMBOLIC_ALT_ENABLED else None
         self.babelfish = Babelfish(self.hdp, babelfish_assembly_name(genome_build),
@@ -230,6 +232,17 @@ class BioCommonsHGVSConverter:
         sequence_variant = self._parser_hgvs(hgvs_string)
         sequence_variant.gene = None
         return sequence_variant.format()
+
+    def c_hgvs_to_p_sequence_variant(self, c_hgvs_string: str) -> SequenceVariant:
+        """ Translate a c.HGVS (gene in brackets allowed) to a p. SequenceVariant on the cdot protein accession """
+        var_c = self._parser_hgvs(c_hgvs_string)
+        var_c.gene = None
+        return self.am.c_to_p(var_c)
+
+    def get_protein_length(self, transcript_accession: str) -> int:
+        """ Residues in the transcript's protein, excluding the stop codon """
+        tx_info = self.hdp.get_tx_identity_info(transcript_accession)
+        return (tx_info["cds_end_i"] - tx_info["cds_start_i"]) // 3 - 1
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
         """ Only returns anything if c. HGVS """
