@@ -19,7 +19,7 @@ from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource
+from classification.enums import AlleleOriginBucket, SubmissionSource
 from classification.models import (
     Classification,
     ClassificationConsensus,
@@ -28,6 +28,7 @@ from classification.models import (
 )
 from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 
 
 def _as_date(value: Union[date, datetime]) -> date:
@@ -35,12 +36,13 @@ def _as_date(value: Union[date, datetime]) -> date:
 
 
 def classification_gene_symbol(classification: Classification) -> Optional[str]:
-    """ The gene the record is about - what it says itself, else what its allele resolved to """
-    if gene_symbol := classification.get(SpecialEKeys.GENE_SYMBOL):
-        return gene_symbol
-    if allele_info := classification.allele_info:
-        if gene_symbols := allele_info.gene_symbols:
-            return str(gene_symbols[0])
+    """ The gene the record is about, by its current symbol (ClassificationModification.gene_symbol_best), so a
+        record submitted with an old name or alias finds the gene's other records. None for an ambiguous alias """
+    try:
+        if gene_symbol := classification.last_edited_version.gene_symbol_best():
+            return gene_symbol.symbol
+    except AmbiguousGeneSymbolAlias:
+        pass
     return None
 
 

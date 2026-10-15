@@ -24,7 +24,8 @@ from typing import Optional
 from django.conf import settings
 
 from classification.enums.classification_enums import SpecialEKeys
-from genes.models import GeneSymbol, GeneSymbolAlias, GeneVersion
+from genes.models import GeneSymbol, GeneVersion
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.constants import HOUR_SECS
 
@@ -161,21 +162,19 @@ def _identity_for_gene_identifier(identifier: str, annotation_consortium: str) -
 
 
 def _identity_for_symbol_str(symbol_str: str) -> Optional[GeneIdentity]:
-    """ GeneSymbol.symbol has a case-insensitive collation, so this matches any spelling.
-        A plain query rather than GeneSymbol.cast(), since the identity cache above already
-        covers the repeat lookups cast() exists for. """
+    """ The name is taken to its current symbol (GeneSymbol.resolve_name), so a peer's old name or
+        alias finds the gene. An alias of several genes resolves to none, and is compared as written. """
     cache = _identity_cache()
     cache_key = symbol_str.upper()
     if cache_key in cache:
         return cache[cache_key]
 
-    gene_symbol = GeneSymbol.objects.filter(symbol=symbol_str).first()
-    if gene_symbol is None:
-        # Symbols outside our GeneVersion history - the alias table is the last route in
-        if alias := GeneSymbolAlias.objects.filter(alias=symbol_str).select_related("gene_symbol").first():
-            gene_symbol = alias.gene_symbol
+    try:
+        gene_symbol_id, _hgnc = GeneSymbol.resolve_name(symbol_str)
+    except AmbiguousGeneSymbolAlias:
+        gene_symbol_id = None
 
-    identity = _identity_for_symbol(gene_symbol) if gene_symbol else None
+    identity = _identity_for_symbol(GeneSymbol.objects.get(pk=gene_symbol_id)) if gene_symbol_id else None
     cache[cache_key] = identity
     return identity
 
