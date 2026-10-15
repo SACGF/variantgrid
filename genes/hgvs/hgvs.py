@@ -1,9 +1,13 @@
 import enum
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Self, Union, Iterable
+
+from django.conf import settings
+
+from genes.hgvs.phgvs_canonical import short_p_hgvs
 from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
 from genes.transcripts_utils import clean_transcript_accession
 from snpdb.models.models_genome import GenomeBuild
@@ -219,20 +223,23 @@ class HGVSDisplay:
     user asked for, and whether it's our normalised representation or exactly what the lab submitted.
     is_resolved_without_hgvs: matched a variant on genome_build, but we have no HGVS for it (gene-level event, or
     generating the HGVS failed) so this is the imported value
+    p_hgvs: the canonical p.HGVS resolved for this c.HGVS (ResolvedVariantInfo.p_hgvs), only set for resolved HGVS.
+    It follows from the c.HGVS so it takes no part in equality or sorting
     """
     components: HGVSComponents
     genome_build: Optional[GenomeBuild] = None
     is_normalised: Optional[bool] = None
     is_desired_build: Optional[bool] = None
     is_resolved_without_hgvs: bool = False
+    p_hgvs: Optional[str] = field(default=None, compare=False)
 
     @staticmethod
     def parse(full_hgvs: str, transcript: str = None, genome_build: Optional[GenomeBuild] = None,
               is_normalised: Optional[bool] = None, is_desired_build: Optional[bool] = None,
-              is_resolved_without_hgvs: bool = False) -> 'HGVSDisplay':
+              is_resolved_without_hgvs: bool = False, p_hgvs: Optional[str] = None) -> 'HGVSDisplay':
         return HGVSDisplay(HGVSComponents(full_hgvs, transcript), genome_build=genome_build,
                            is_normalised=is_normalised, is_desired_build=is_desired_build,
-                           is_resolved_without_hgvs=is_resolved_without_hgvs)
+                           is_resolved_without_hgvs=is_resolved_without_hgvs, p_hgvs=p_hgvs)
 
     @property
     def full_hgvs(self) -> str:
@@ -250,6 +257,11 @@ class HGVSDisplay:
     def nomen(self) -> Optional[str]:
         return self.components.nomen
 
+    @property
+    def p_hgvs_short(self) -> Optional[str]:
+        """ p.(G12D) - for a compact cell, with p_hgvs as its tooltip """
+        return short_p_hgvs(self.p_hgvs)
+
     def to_json(self):
         """ The shape VCTable.format_hgvs in vc_form.js consumes """
         return {
@@ -261,7 +273,12 @@ class HGVSDisplay:
             "desired": self.is_desired_build,
             "normalized": self.is_normalised,
             "resolved_without_hgvs": self.is_resolved_without_hgvs,
-        }
+        } | self.p_hgvs_json()
+
+    def p_hgvs_json(self) -> dict:
+        if not (self.p_hgvs and settings.CLASSIFICATION_GRID_SHOW_PHGVS):
+            return {}
+        return {"p_hgvs": self.p_hgvs_short, "p_hgvs_full": self.p_hgvs}
 
     @cached_property
     def sort_str(self) -> str:

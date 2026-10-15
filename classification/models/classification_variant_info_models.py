@@ -194,7 +194,7 @@ class ResolvedVariantInfo(TimeStampedModel):
     @property
     def resolved_hgvs_display(self) -> Optional[HGVSDisplay]:
         if components := self.resolved_hgvs_obj:
-            return HGVSDisplay(components, genome_build=self.genome_build)
+            return HGVSDisplay(components, genome_build=self.genome_build, p_hgvs=self.p_hgvs)
 
     hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to generate resolved_hgvs  """
@@ -939,7 +939,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             genome_build = GenomeBuildManager.get_current_genome_build()
 
         if preferred := self[genome_build]:
-            return HGVSDisplay(preferred.resolved_hgvs_obj, genome_build=genome_build)
+            return HGVSDisplay(preferred.resolved_hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
         else:
             for genome_build in GenomeBuild.builds_with_annotation_cached():
                 if alternative := self[genome_build]:
@@ -947,7 +947,8 @@ class ImportedAlleleInfo(TimeStampedModel):
                         return HGVSDisplay(
                             hgvs_obj,
                             is_desired_build=False,
-                            genome_build=genome_build
+                            genome_build=genome_build,
+                            p_hgvs=alternative.p_hgvs
                         )
 
         imported_hgvs = self.imported_hgvs_obj()

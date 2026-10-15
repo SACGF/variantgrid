@@ -72,8 +72,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             for index, genome_build in enumerate(self.genome_build_prefs):
                 try:
                     if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
+                        p_hgvs = row.get(ClassificationModification.column_name_for_build(genome_build, 'p_hgvs'))
                         c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
-                                                   is_desired_build=index == 0)
+                                                   is_desired_build=index == 0, p_hgvs=p_hgvs)
                         return c_hgvs.to_json()
                 except ValueError:
                     pass
@@ -100,13 +101,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             return json_data
 
         response = get_preferred_chgvs_json()
-        if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-            if p_hgvs := row.get('published_evidence__p_hgvs__value'):
-                p_dot = p_hgvs.find('p.')
-                if p_dot != -1:
-                    p_hgvs = p_hgvs[p_dot::]
-            response['p_hgvs'] = p_hgvs
-
         response['allele_id'] = row.get('classification__allele_info__allele_id')
         response['allele_info_id'] = row.get('classification__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
@@ -216,11 +210,12 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 extra_columns=[
                     "classification__allele_info__grch37__resolved_hgvs",
                     "classification__allele_info__grch38__resolved_hgvs",
+                    "classification__allele_info__grch37__p_hgvs",
+                    "classification__allele_info__grch38__p_hgvs",
                     "classification__allele_info__grch37__variant_id",
                     "classification__allele_info__grch38__variant_id",
                     'published_evidence__c_hgvs__value',
                     'published_evidence__g_hgvs__value',
-                    'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
                     'classification__allele_info__id',
                     'classification__allele_info__allele_id',

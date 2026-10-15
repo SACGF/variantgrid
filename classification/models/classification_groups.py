@@ -20,7 +20,7 @@ from classification.models import (
 )
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
-from genes.hgvs import PHGVS, HGVSDisplay
+from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
@@ -315,7 +315,8 @@ class ClassificationGroup:
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
         if c_str := cm.classification.get_resolved_hgvs(genome_build):
-            return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True)
+            return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True,
+                                     p_hgvs=cm.classification.get_resolved_p_hgvs(genome_build))
         if (allele_info := cm.classification.allele_info) and \
                 (matched := allele_info.matched_without_resolved_hgvs_display(genome_build)):
             return matched
@@ -361,15 +362,6 @@ class ClassificationGroup:
     @cached_property
     def variant_matching_issues(self) -> bool:
         return not self.most_recent.classification.allele_info.latest_validation.include
-
-    def p_hgvses(self) -> list[PHGVS]:
-        unique_p = set()
-        for cm in self.modifications:
-            if p_hgvs := cm.p_parts:
-                unique_p.add(p_hgvs.without_transcript)
-        p_list = list(unique_p)
-        p_list.sort()
-        return p_list
 
     def count(self) -> int:
         return len(self.modifications)

@@ -36,9 +36,6 @@
             {% endif %}
             </div>
         {% endfor %}
-        {% for p_hgvs in group.p_hgvses %}
-            <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
-        {% endfor %}
     </td>
     <td style="width:100px" class="text-center" data-order="{{ group.clinical_significance_score }}{{ group.clinical_grouping }}">
         {% if group.clinical_significance_old %}

@@ -556,7 +556,8 @@ def _to_c_hgvs(c_hgvs: Any) -> HGVSDisplay:
     if isinstance(c_hgvs, ClassificationModification):
         genome_build = GenomeBuildManager.get_current_genome_build()
         if c_hgvs_str := c_hgvs.classification.get_resolved_hgvs(genome_build):
-            return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build)
+            return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build,
+                                     p_hgvs=c_hgvs.classification.get_resolved_p_hgvs(genome_build))
         # might have got a none c.hgvs from the ClassificationModification
         return HGVSDisplay.parse("")
     if isinstance(c_hgvs, str):
@@ -576,7 +577,8 @@ def c_hgvs(c_hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification
     if show_genome_build is None:
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline}
+    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline,
+            "show_p_hgvs": bool(c_hgvs.p_hgvs) and settings.CLASSIFICATION_GRID_SHOW_PHGVS}
 
 
 @register.inclusion_tag("classification/tags/allele.html")
@@ -635,13 +637,6 @@ def classification_row(
         can_write = vc.can_write(user_or_group=user)
 
     c_hgvs = vc.c_hgvs_best(preferred_genome_build=genome_build)
-    p_hgvs = None
-    if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-        p_hgvs = record.get(SpecialEKeys.P_HGVS)
-        if p_hgvs:
-            p_dot = p_hgvs.find('p.')
-            if p_dot != -1:
-                p_hgvs = p_hgvs[p_dot::]
 
     return {
         "evidence": record.evidence,
@@ -652,7 +647,6 @@ def classification_row(
         "vc": vc,
         "vcm": vcm,
         "icon": icon,
-        "p_hgvs": p_hgvs,
         "can_write": can_write,
         "show_variant_link": show_variant_link,
         "show_clinical_context": show_clinical_context,

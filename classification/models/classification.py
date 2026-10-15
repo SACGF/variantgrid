@@ -2300,19 +2300,22 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         all_chgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_resolved_hgvs(genome_build):
-                all_chgvs.append(HGVSDisplay.parse(text, genome_build=genome_build, is_normalised=True))
+                all_chgvs.append(HGVSDisplay.parse(text, genome_build=genome_build, is_normalised=True,
+                                                   p_hgvs=self.get_resolved_p_hgvs(genome_build)))
         return all_chgvs
 
     def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
         if c_hgvs_str := self.get_resolved_hgvs(preferred_genome_build):
             return HGVSDisplay.parse(c_hgvs_str, genome_build=preferred_genome_build,
-                                     is_normalised=True, is_desired_build=True)
+                                     is_normalised=True, is_desired_build=True,
+                                     p_hgvs=self.get_resolved_p_hgvs(preferred_genome_build))
         for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
             if preferred_genome_build == alt_genome_build:
                 continue
             if c_hgvs_str := self.get_resolved_hgvs(alt_genome_build):
                 return HGVSDisplay.parse(c_hgvs_str, genome_build=alt_genome_build,
-                                         is_normalised=True, is_desired_build=False)
+                                         is_normalised=True, is_desired_build=False,
+                                         p_hgvs=self.get_resolved_p_hgvs(alt_genome_build))
         if (allele_info := self.allele_info) and \
                 (matched := allele_info.matched_without_resolved_hgvs_display(preferred_genome_build)):
             return matched
@@ -2356,6 +2359,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if genome_build == genome_build.grch38():
             return self.resolved_hgvs_grch38
         return self._generate_resolved_hgvs(genome_build)
+
+    def get_resolved_p_hgvs(self, genome_build: GenomeBuild) -> Optional[str]:
+        """ Canonical p.HGVS of get_resolved_hgvs (GRCh37/GRCh38 only - other builds aren't stored) """
+        if allele_info := self.allele_info:
+            if resolved := allele_info[genome_build]:
+                return resolved.p_hgvs
+        return None
 
     def __str__(self) -> str:
         parts = [f"({self.id!s})"]

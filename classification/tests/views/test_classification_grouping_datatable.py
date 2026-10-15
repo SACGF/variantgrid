@@ -1,7 +1,7 @@
 """
-The sample filter on the default /classifications grid (ClassificationGroupingColumns), gated on
-CLASSIFICATION_GRID_SHOW_SAMPLE: the groupings it matches say how many of their records are from that sample, and
-expanding one leads with those records.
+The default /classifications grid (ClassificationGroupingColumns). Its c.HGVS cell carries the resolved p.HGVS
+(gated on CLASSIFICATION_GRID_SHOW_PHGVS). Its sample filter, gated on CLASSIFICATION_GRID_SHOW_SAMPLE: the groupings it
+matches say how many of their records are from that sample, and expanding one leads with those records.
 """
 from django.contrib.auth.models import User
 from django.test import Client, override_settings
@@ -90,3 +90,23 @@ class ClassificationGroupingSampleFilterTest(URLTestCase):
         self.assertEqual([record.classification_id for record in response.context["sample_records"]],
                          [self.proband_classification.pk])
         self.assertEqual(len(response.context["other_records"]), 1)
+
+    def _set_resolved_p_hgvs(self) -> int:
+        allele_info = self.proband_classification.allele_info
+        resolved = allele_info.grch37
+        resolved.resolved_hgvs = "NM_000483.3(APOC2):c.1438G>T"
+        resolved.p_hgvs = "NP_000474.2:p.(Gly480Cys)"
+        resolved.save()
+        return allele_info.pk
+
+    @override_settings(CLASSIFICATION_GRID_SHOW_PHGVS=True)
+    def test_c_hgvs_cell_shows_resolved_p_hgvs(self):
+        self._set_resolved_p_hgvs()
+        cell = next(row["c_hgvs"] for row in self._get_rows() if row["id"]["id"] == self.shared_grouping.pk)
+        self.assertEqual((cell["p_hgvs"], cell["p_hgvs_full"]), ("p.(G480C)", "NP_000474.2:p.(Gly480Cys)"))
+
+    @override_settings(CLASSIFICATION_GRID_SHOW_PHGVS=False)
+    def test_c_hgvs_cell_hides_p_hgvs_when_setting_off(self):
+        self._set_resolved_p_hgvs()
+        cell = next(row["c_hgvs"] for row in self._get_rows() if row["id"]["id"] == self.shared_grouping.pk)
+        self.assertNotIn("p_hgvs", cell)

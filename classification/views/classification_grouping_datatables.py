@@ -146,8 +146,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
+                    p_hgvs = row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "p_hgvs"))
                     c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
-                                               is_desired_build=index == 0)
+                                               is_desired_build=index == 0, p_hgvs=p_hgvs)
                     return c_hgvs.to_json()
 
             imported_hgvs = row["latest_allele_info__imported_c_hgvs"] or row["latest_allele_info__imported_g_hgvs"]
@@ -174,13 +175,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 return {}
 
         response = get_preferred_chgvs_json()
-        if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-            if p_hgvs := row['latest_classification_modification__published_evidence__p_hgvs__value']:
-                p_dot = p_hgvs.find('p.')
-                if p_dot != -1:
-                    p_hgvs = p_hgvs[p_dot::]
-                response['p_hgvs'] = p_hgvs
-
         response['allele_id'] = row.get('latest_allele_info__allele_id')
         response['allele_info_id'] = row.get('latest_allele_info__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
@@ -475,6 +469,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     "latest_allele_info__pk",
                     "latest_allele_info__grch37__resolved_hgvs",
                     "latest_allele_info__grch38__resolved_hgvs",
+                    "latest_allele_info__grch37__p_hgvs",
+                    "latest_allele_info__grch38__p_hgvs",
                     "latest_allele_info__grch37__variant_id",
                     "latest_allele_info__grch38__variant_id",
                     'latest_allele_info__id',
@@ -484,7 +480,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'latest_allele_info__imported_c_hgvs',
                     'latest_allele_info__imported_g_hgvs',
                     'latest_allele_info__imported_genome_build_patch_version__genome_build',
-                    'latest_classification_modification__published_evidence__p_hgvs__value'  # TODO move this to allele info
                 ]
             ),
             RichColumn(

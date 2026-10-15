@@ -2488,7 +2488,7 @@ VCTable.format_hgvs = (parts) => {
     }
 
     if (pHgvs) {
-        $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
+        $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs), title: parts.p_hgvs_full || pHgvs}).appendTo(dom);
     }
     return outterDom;
 };

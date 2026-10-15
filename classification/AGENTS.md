@@ -8,6 +8,7 @@ Start with:
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
   Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
   not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
+  Pages and grids show it, never the `p_hgvs` evidence, by passing it to `HGVSDisplay(p_hgvs=...)` from the same build as the c.HGVS; `to_json` and the `c_hgvs` tag render it short with the full form as tooltip, gated on `CLASSIFICATION_GRID_SHOW_PHGVS` (#19).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
 Patterns here:

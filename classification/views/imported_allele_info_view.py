@@ -33,20 +33,23 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         c_hgvs: Optional[HGVSDisplay]
         variant_id: Optional[int] = None
         error: Optional[str] = None
+        p_hgvs: Optional[str] = None
 
         if '37' in data.key:
             c_hgvs_str = data.get('grch37__resolved_hgvs')
             variant_id = data.get('grch37__variant')
             error = data.get('grch37__error')
+            p_hgvs = data.get('grch37__p_hgvs')
         elif '38' in data.key:
             c_hgvs_str = data.get('grch38__resolved_hgvs')
             variant_id = data.get('grch38__variant')
             error = data.get('grch38__error')
+            p_hgvs = data.get('grch38__p_hgvs')
         else:
             c_hgvs_str = data.get(data.key)
 
         if c_hgvs_str:
-            if c_hgvs := HGVSDisplay.parse(c_hgvs_str):
+            if c_hgvs := HGVSDisplay.parse(c_hgvs_str, p_hgvs=p_hgvs):
                 json_data = c_hgvs.to_json()
                 # json_data['variant_id'] = variant_id
                 return json_data
@@ -106,7 +109,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 key='grch37__resolved_hgvs',
                 label='Resolved GRCh37<br/>c.HGVS',
                 orderable=True,
-                extra_columns=['grch37__variant', 'grch37__error'],
+                extra_columns=['grch37__variant', 'grch37__error', 'grch37__p_hgvs'],
                 renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
@@ -114,7 +117,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 key='grch38__resolved_hgvs',
                 label='Resolved GRCh38<br/>c.HGVS',
                 orderable=True,
-                extra_columns=['grch38__variant', 'grch38__error'],
+                extra_columns=['grch38__variant', 'grch38__error', 'grch38__p_hgvs'],
                 renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),

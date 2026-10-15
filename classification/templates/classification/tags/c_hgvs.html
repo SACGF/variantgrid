@@ -34,6 +34,10 @@
             <span class="c-hgvs-nomen">{{ c_hgvs.nomen }}</span>
         </span>
         {% endif %}
+        {% if show_p_hgvs %}
+            {% if inline %}&#32;<span style="color:#6c757d" title="{{ c_hgvs.p_hgvs }}">{{ c_hgvs.p_hgvs_short }}</span>
+            {% else %}<div style="color:#6c757d" title="{{ c_hgvs.p_hgvs }}">{{ c_hgvs.p_hgvs_short }}</div>{% endif %}
+        {% endif %}
     {% else %}
         {% comment %}Anything we couldn't split (gene fusions, legacy junk) - show it as it came in{% endcomment %}
         <span class="c-hgvs-nomen">{{ c_hgvs.full_hgvs }}</span>
