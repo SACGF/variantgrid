@@ -9,6 +9,7 @@ converter produced it.
 import logging
 import re
 from dataclasses import dataclass
+from dataclasses import replace as dataclass_replace
 from datetime import timedelta
 from functools import lru_cache
 from typing import Any, Literal, Optional, TypedDict
@@ -194,7 +195,7 @@ class ResolvedVariantInfo(TimeStampedModel):
     @property
     def resolved_hgvs_display(self) -> Optional[HGVSDisplay]:
         if components := self.resolved_hgvs_obj:
-            return HGVSDisplay(components, genome_build=self.genome_build)
+            return HGVSDisplay(dna_hgvs=components, genome_build=self.genome_build, p_hgvs=self.p_hgvs)
 
     hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to generate resolved_hgvs  """
@@ -908,8 +909,30 @@ class ImportedAlleleInfo(TimeStampedModel):
         if c_hgvs := self.imported_c_hgvs_obj:
             return c_hgvs
         if g_hgvs := self.imported_g_hgvs_obj:
-            return HGVSDisplay(g_hgvs)
+            return HGVSDisplay(dna_hgvs=g_hgvs)
         return None
+
+    @property
+    def imported_p_hgvs(self) -> Optional[str]:
+        """ p.HGVS of the imported c.HGVS as normalised on the imported build - none for a g.HGVS import """
+        if self.imported_c_hgvs and (imported_genome_build := self.imported_genome_build):
+            if variant_info := self[imported_genome_build]:
+                return variant_info.p_hgvs
+        return None
+
+    def with_imported_p_hgvs(self, hgvs: Optional[HGVSDisplay]) -> Optional[HGVSDisplay]:
+        """ The imported c.HGVS as the lab gave it, carrying imported_p_hgvs for display """
+        if hgvs and (p_hgvs := self.imported_p_hgvs):
+            return dataclass_replace(hgvs, p_hgvs=p_hgvs)
+        return hgvs
+
+    @property
+    def imported_hgvs_display(self) -> Optional[HGVSDisplay]:
+        return self.with_imported_p_hgvs(self.imported_hgvs_obj())
+
+    @property
+    def imported_c_hgvs_display(self) -> Optional[HGVSDisplay]:
+        return self.with_imported_p_hgvs(self.imported_c_hgvs_obj)
 
     def matched_without_resolved_hgvs_display(self, preferred_genome_build: GenomeBuild) -> Optional[HGVSDisplay]:
         """ A variant HGVS has no way to write (a gene-level event, a symbolic CNV) matches but gets no c.HGVS,
@@ -918,8 +941,10 @@ class ImportedAlleleInfo(TimeStampedModel):
         for genome_build in builds:
             if (variant_info := self[genome_build]) and variant_info.variant_id and not variant_info.resolved_hgvs:
                 display_genome_build = self.imported_genome_build or genome_build
-                return HGVSDisplay(self.imported_hgvs_obj() or HGVSComponents(""), genome_build=display_genome_build,
-                                   is_normalised=True, is_desired_build=display_genome_build == preferred_genome_build,
+                imported_hgvs = self.imported_hgvs_obj()
+                return HGVSDisplay(dna_hgvs=imported_hgvs.dna_hgvs if imported_hgvs else HGVSComponents(""),
+                                   genome_build=display_genome_build, is_normalised=True,
+                                   is_desired_build=display_genome_build == preferred_genome_build,
                                    is_resolved_without_hgvs=True)
         return None
 
@@ -929,8 +954,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         if imported_c_hgvs := self.imported_c_hgvs:
             c_hgvs = HGVSComponents(imported_c_hgvs)
             if imported_genome_build := self.imported_genome_build:
-                return HGVSDisplay(c_hgvs, genome_build=imported_genome_build, is_normalised=False)
-            return HGVSDisplay(c_hgvs)
+                return HGVSDisplay(dna_hgvs=c_hgvs, genome_build=imported_genome_build, is_normalised=False)
+            return HGVSDisplay(dna_hgvs=c_hgvs)
         else:
             return None
 
@@ -939,21 +964,22 @@ class ImportedAlleleInfo(TimeStampedModel):
             genome_build = GenomeBuildManager.get_current_genome_build()
 
         if preferred := self[genome_build]:
-            return HGVSDisplay(preferred.resolved_hgvs_obj, genome_build=genome_build)
+            return HGVSDisplay(dna_hgvs=preferred.resolved_hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
         else:
             for genome_build in GenomeBuild.builds_with_annotation_cached():
                 if alternative := self[genome_build]:
                     if hgvs_obj := alternative.resolved_hgvs_obj:
                         return HGVSDisplay(
-                            hgvs_obj,
+                            dna_hgvs=hgvs_obj,
                             is_desired_build=False,
-                            genome_build=genome_build
+                            genome_build=genome_build,
+                            p_hgvs=alternative.p_hgvs
                         )
 
         imported_hgvs = self.imported_hgvs_obj()
         if imported_hgvs.genome_build and imported_hgvs.genome_build != genome_build:
             imported_hgvs = HGVSDisplay(
-                imported_hgvs.components,
+                dna_hgvs=imported_hgvs.dna_hgvs,
                 is_desired_build=False,
                 is_normalised=False,
                 genome_build=imported_hgvs.genome_build)

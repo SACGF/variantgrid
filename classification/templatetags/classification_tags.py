@@ -12,6 +12,7 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
@@ -55,6 +56,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap, VCDb
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from eventlog.models import ViewEvent
 from genes.hgvs import HGVSComponents, HGVSDisplay
+from genes.hgvs.phgvs_canonical import short_p_hgvs
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
@@ -552,31 +554,42 @@ def classification_table(
     }
 
 
-def _to_c_hgvs(c_hgvs: Any) -> HGVSDisplay:
-    if isinstance(c_hgvs, ClassificationModification):
+def _to_hgvs(hgvs: Any) -> HGVSDisplay:
+    if isinstance(hgvs, ClassificationModification):
         genome_build = GenomeBuildManager.get_current_genome_build()
-        if c_hgvs_str := c_hgvs.classification.get_resolved_hgvs(genome_build):
-            return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build)
+        if c_hgvs_str := hgvs.classification.get_resolved_hgvs(genome_build):
+            return HGVSDisplay.parse(dna_hgvs=c_hgvs_str, genome_build=genome_build,
+                                     p_hgvs=hgvs.classification.get_resolved_p_hgvs(genome_build))
         # might have got a none c.hgvs from the ClassificationModification
-        return HGVSDisplay.parse("")
-    if isinstance(c_hgvs, str):
-        return HGVSDisplay.parse(c_hgvs)
-    if isinstance(c_hgvs, HGVSComponents):
-        return HGVSDisplay(c_hgvs)
-    if c_hgvs is None:
-        return HGVSDisplay.parse("")
+        return HGVSDisplay.parse(dna_hgvs="")
+    if isinstance(hgvs, str):
+        return HGVSDisplay.parse(dna_hgvs=hgvs)
+    if isinstance(hgvs, HGVSComponents):
+        return HGVSDisplay(dna_hgvs=hgvs)
+    if hgvs is None:
+        return HGVSDisplay.parse(dna_hgvs="")
 
-    return c_hgvs
+    return hgvs
 
 
-@register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
-    c_hgvs = _to_c_hgvs(c_hgvs)
+@register.inclusion_tag("classification/tags/hgvs.html")
+def hgvs(hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
+    hgvs = _to_hgvs(hgvs)
 
     if show_genome_build is None:
-        show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
+        show_genome_build = hgvs.is_desired_build is False or hgvs.is_normalised is False
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline}
+    return {"hgvs": hgvs, "show_genome_build": show_genome_build and hgvs.genome_build is not None, "inline": inline}
+
+
+@register.simple_tag
+def p_hgvs(canonical: Optional[str]) -> str:
+    """ A resolved p.HGVS to sit inline after its c.HGVS: short form, the canonical one as tooltip.
+        Styles are inline (matching .p-hgvs) as c_hgvs.html is also used in emails """
+    if not (canonical and settings.CLASSIFICATION_GRID_SHOW_PHGVS):
+        return ""
+    return format_html('<span class="p-hgvs" style="margin-left:0.4em; color:#6c757d; font-size:0.9em; '
+                       'white-space:nowrap" title="{}">{}</span>', canonical, short_p_hgvs(canonical))
 
 
 @register.inclusion_tag("classification/tags/allele.html")
@@ -634,25 +647,17 @@ def classification_row(
     if user:
         can_write = vc.can_write(user_or_group=user)
 
-    c_hgvs = vc.c_hgvs_best(preferred_genome_build=genome_build)
-    p_hgvs = None
-    if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-        p_hgvs = record.get(SpecialEKeys.P_HGVS)
-        if p_hgvs:
-            p_dot = p_hgvs.find('p.')
-            if p_dot != -1:
-                p_hgvs = p_hgvs[p_dot::]
+    hgvs = vc.hgvs_best(preferred_genome_build=genome_build)
 
     return {
         "evidence": record.evidence,
         "condition_obj": vc.condition_resolution_obj,
         "curated": curated,
-        "c_hgvs": c_hgvs,
+        "hgvs": hgvs,
         "gene_symbol": vcm.get(SpecialEKeys.GENE_SYMBOL),
         "vc": vc,
         "vcm": vcm,
         "icon": icon,
-        "p_hgvs": p_hgvs,
         "can_write": can_write,
         "show_variant_link": show_variant_link,
         "show_clinical_context": show_clinical_context,
@@ -947,5 +952,5 @@ def overlap_row_email(overlap: Overlap, lab: Lab, genome_build: GenomeBuild):
     return {
         "date_str": date_str,
         "overlap": overlap,
-        "c_hgvs": overlap.c_hgvs(lab=lab, genome_build=genome_build)
+        "hgvs": overlap.hgvs(lab=lab, genome_build=genome_build)
     }

@@ -3432,6 +3432,13 @@ a .c-hgvs-body .c-hgvs-nomen {
   letter-spacing: 0.5px;
 }
 
+.p-hgvs {
+  margin-left: 0.4em;
+  color: #6c757d;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
 .genome-build {
   font-size: 8px;
   margin-right: 4px;

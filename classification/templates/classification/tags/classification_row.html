@@ -15,10 +15,7 @@
     </td>
     <td class="gene_symbol">{{ gene_symbol | default_if_none:""}}</td>
     <td class="hgvs">
-        {% c_hgvs c_hgvs %}
-        {% if p_hgvs %}
-            <span class="d-block mt-1 text-secondary">{{ p_hgvs }}</span>
-        {% endif %}
+        {% hgvs hgvs %}
     </td>
     {% if show_clinical_context %}
     <td class="cc ccs-editing" style="display:none">

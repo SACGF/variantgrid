@@ -66,15 +66,16 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 pass
         return None
 
-    def render_c_hgvs(self, row: dict[str, Any]) -> JsonDataType:
-        def get_preferred_chgvs_json() -> dict:
+    def render_hgvs(self, row: dict[str, Any]) -> JsonDataType:
+        def get_preferred_hgvs_json() -> dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 try:
                     if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
-                        c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
-                                                   is_desired_build=index == 0)
-                        return c_hgvs.to_json()
+                        p_hgvs = row.get(ClassificationModification.column_name_for_build(genome_build, 'p_hgvs'))
+                        hgvs = HGVSDisplay.parse(dna_hgvs=c_hgvs_string, genome_build=genome_build,
+                                                 is_desired_build=index == 0, p_hgvs=p_hgvs)
+                        return hgvs.to_json()
                 except ValueError:
                     pass
 
@@ -85,28 +86,21 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 try:
                     if row.get(ClassificationModification.column_name_for_build(genome_build, 'variant_id')):
                         imported_genome_build = self._imported_genome_build(row) or genome_build
-                        c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=imported_genome_build,
-                                                   is_normalised=True,
-                                                   is_desired_build=imported_genome_build == self.genome_build_preferred,
-                                                   is_resolved_without_hgvs=True)
-                        return c_hgvs.to_json()
+                        hgvs = HGVSDisplay.parse(dna_hgvs=imported_hgvs, genome_build=imported_genome_build,
+                                                 is_normalised=True,
+                                                 is_desired_build=imported_genome_build == self.genome_build_preferred,
+                                                 is_resolved_without_hgvs=True)
+                        return hgvs.to_json()
                 except ValueError:
                     pass
 
-            c_hgvs = HGVSDisplay.parse(imported_hgvs, is_normalised=False)
-            json_data = c_hgvs.to_json()
+            hgvs = HGVSDisplay.parse(dna_hgvs=imported_hgvs, is_normalised=False)
+            json_data = hgvs.to_json()
             # use this rather than genome build object so we can get a patch version
             json_data['genome_build'] = row.get('published_evidence__genome_build__value')
             return json_data
 
-        response = get_preferred_chgvs_json()
-        if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-            if p_hgvs := row.get('published_evidence__p_hgvs__value'):
-                p_dot = p_hgvs.find('p.')
-                if p_dot != -1:
-                    p_hgvs = p_hgvs[p_dot::]
-            response['p_hgvs'] = p_hgvs
-
+        response = get_preferred_hgvs_json()
         response['allele_id'] = row.get('classification__allele_info__allele_id')
         response['allele_info_id'] = row.get('classification__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
@@ -210,17 +204,18 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 sort_keys=[genomic_sort, 'c_hgvs'],
                 name='c_hgvs',
                 label=f'HGVS ({self.genome_build_preferred.name})',
-                renderer=self.render_c_hgvs,
+                renderer=self.render_hgvs,
                 client_renderer='VCTable.hgvs',
                 orderable=True,
                 extra_columns=[
                     "classification__allele_info__grch37__resolved_hgvs",
                     "classification__allele_info__grch38__resolved_hgvs",
+                    "classification__allele_info__grch37__p_hgvs",
+                    "classification__allele_info__grch38__p_hgvs",
                     "classification__allele_info__grch37__variant_id",
                     "classification__allele_info__grch38__variant_id",
                     'published_evidence__c_hgvs__value',
                     'published_evidence__g_hgvs__value',
-                    'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
                     'classification__allele_info__id',
                     'classification__allele_info__allele_id',

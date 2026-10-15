@@ -225,7 +225,7 @@ class ClassificationExportFormatterFranklin(ClassificationExportFormatter):
             return []
         c_data = CHGVSData(
             allele=allele_data,
-            chgvs=allele_data.cms[0].c_hgvs_best(self.genome_build),
+            chgvs=allele_data.cms[0].hgvs_best(self.genome_build),
             different_chgvs=False,
             cms=allele_data.cms
         )

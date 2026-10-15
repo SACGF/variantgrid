@@ -51,8 +51,8 @@
                                 {% if forloop.first %}
                                 <td>
                                     <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link">
-                                    {% for hgvs in overlap.c_hgvses %}
-                                        <div>{% c_hgvs hgvs %}</div>
+                                    {% for hgvs in overlap.hgvses %}
+                                        <div>{% hgvs hgvs %}</div>
                                     {% endfor %}
                                     </a>
                                     <br/>

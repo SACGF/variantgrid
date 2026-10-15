@@ -2297,23 +2297,26 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if variant := self.get_variant_for_build(variant_annotation_version.genome_build):
             return variant.variantannotation_set.filter(version=variant_annotation_version).first()
 
-    def c_hgvs_all(self) -> list[HGVSDisplay]:
-        all_chgvs: list[HGVSDisplay] = []
+    def all_hgvs(self) -> list[HGVSDisplay]:
+        all_hgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_resolved_hgvs(genome_build):
-                all_chgvs.append(HGVSDisplay.parse(text, genome_build=genome_build, is_normalised=True))
-        return all_chgvs
+                all_hgvs.append(HGVSDisplay.parse(dna_hgvs=text, genome_build=genome_build, is_normalised=True,
+                                                 p_hgvs=self.get_resolved_p_hgvs(genome_build)))
+        return all_hgvs
 
-    def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
+    def hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
         if c_hgvs_str := self.get_resolved_hgvs(preferred_genome_build):
-            return HGVSDisplay.parse(c_hgvs_str, genome_build=preferred_genome_build,
-                                     is_normalised=True, is_desired_build=True)
+            return HGVSDisplay.parse(dna_hgvs=c_hgvs_str, genome_build=preferred_genome_build,
+                                     is_normalised=True, is_desired_build=True,
+                                     p_hgvs=self.get_resolved_p_hgvs(preferred_genome_build))
         for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
             if preferred_genome_build == alt_genome_build:
                 continue
             if c_hgvs_str := self.get_resolved_hgvs(alt_genome_build):
-                return HGVSDisplay.parse(c_hgvs_str, genome_build=alt_genome_build,
-                                         is_normalised=True, is_desired_build=False)
+                return HGVSDisplay.parse(dna_hgvs=c_hgvs_str, genome_build=alt_genome_build,
+                                         is_normalised=True, is_desired_build=False,
+                                         p_hgvs=self.get_resolved_p_hgvs(alt_genome_build))
         if (allele_info := self.allele_info) and \
                 (matched := allele_info.matched_without_resolved_hgvs_display(preferred_genome_build)):
             return matched
@@ -2323,7 +2326,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             imported_genome_build = self.get_genome_build()
         except ValueError:
             pass
-        return HGVSDisplay.parse(self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "",
+        return HGVSDisplay.parse(dna_hgvs=self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "",
                                  genome_build=imported_genome_build, is_normalised=False,
                                  is_desired_build=preferred_genome_build == imported_genome_build)
 
@@ -2357,6 +2360,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if genome_build == genome_build.grch38():
             return self.resolved_hgvs_grch38
         return self._generate_resolved_hgvs(genome_build)
+
+    def get_resolved_p_hgvs(self, genome_build: GenomeBuild) -> Optional[str]:
+        """ Canonical p.HGVS of get_resolved_hgvs (GRCh37/GRCh38 only - other builds aren't stored) """
+        if allele_info := self.allele_info:
+            if resolved := allele_info[genome_build]:
+                return resolved.p_hgvs
+        return None
 
     def __str__(self) -> str:
         parts = [f"({self.id!s})"]
@@ -2419,7 +2429,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
                 genome_build = self.get_genome_build()
             except ValueError:
                 pass
-            return HGVSDisplay.parse(c_hgvs, genome_build=genome_build)
+            return HGVSDisplay.parse(dna_hgvs=c_hgvs, genome_build=genome_build)
         return None
 
     @property
@@ -2722,12 +2732,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
         """ Driven by EvidenceKey.max_share_level """
         return EvidenceVisibility(user).visible_evidence(self.classification, self.evidence)
 
-    def c_hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
-        return self.classification.c_hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
+    def hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
+        return self.classification.hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
 
     def gene_symbol_best(self, genome_build: Optional[GenomeBuild] = None) -> Optional[GeneSymbol]:
         """
-        The gene symbol of the best c.HGVS (see c_hgvs_best) wins over the one the lab submitted, which may be an
+        The gene symbol of the best c.HGVS (see hgvs_best) wins over the one the lab submitted, which may be an
         alias or out of date. Until the variant is matched the best c.HGVS is the imported one, so this is the
         submitted symbol when the import included it. Either is taken to its current name (see GeneSymbol.resolve_name).
         :param genome_build: build to prefer for the c.HGVS, defaults to the record's own
@@ -2735,7 +2745,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
         """
         candidates: list[str] = []
         if genome_build := genome_build or self.get_genome_build_opt():
-            if best := self.c_hgvs_best(genome_build).gene_symbol:
+            if best := self.hgvs_best(genome_build).gene_symbol:
                 candidates.append(best)
         if submitted := self.get(SpecialEKeys.GENE_SYMBOL):
             candidates.append(submitted)

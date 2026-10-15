@@ -20,8 +20,8 @@ from snpdb.models import Country, Lab, Organization
 
 
 def _resolved(c_hgvs: str):
-    """ What c_hgvs_best returns once the variant has matched: our normalised HGVS, gene symbol included """
-    return lambda self, genome_build: HGVSDisplay.parse(c_hgvs, genome_build=genome_build, is_normalised=True)
+    """ What hgvs_best returns once the variant has matched: our normalised HGVS, gene symbol included """
+    return lambda self, genome_build: HGVSDisplay.parse(dna_hgvs=c_hgvs, genome_build=genome_build, is_normalised=True)
 
 
 class ConditionTextSyncTest(TestCase):
@@ -50,7 +50,7 @@ class ConditionTextSyncTest(TestCase):
         return vc
 
     def _variant_matched(self, vc: Classification, c_hgvs: str):
-        with patch.object(ClassificationModification, "c_hgvs_best", _resolved(c_hgvs)):
+        with patch.object(ClassificationModification, "hgvs_best", _resolved(c_hgvs)):
             allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=vc.allele_info)
 
     def _match_gene(self, vc: Classification):

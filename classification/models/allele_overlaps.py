@@ -118,7 +118,7 @@ class LegacyOverlapState(ABC):
 
     @property
     @abstractmethod
-    def c_hgvses(self):
+    def hgvses(self):
         pass
 
 
@@ -169,8 +169,8 @@ class ClinicalGroupingOverlap:
         return self.state.calculator_state
 
     @property
-    def c_hgvses(self):
-        return self.state.c_hgvses
+    def hgvses(self):
+        return self.state.hgvses
 
     def add_classification(self, cm: ClassificationModification):
         clinical_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -265,7 +265,7 @@ class AlleleLegacyOverlap(LegacyOverlapState):
         self._calculator_state = calculator_state
         self.allele = allele
         self.context_map: dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
-        self._c_hgvses: set[HGVSDisplay] = set()
+        self._hgvses: set[HGVSDisplay] = set()
 
         # need to keep track of the below for sorting
         self.shared_labs = set()
@@ -277,8 +277,8 @@ class AlleleLegacyOverlap(LegacyOverlapState):
         return self._calculator_state
 
     def add_classification(self, cms: ClassificationModification):
-        c_hgvs = cms.classification.c_hgvs_best(preferred_genome_build=self.calculator_state.perspective.genome_build)
-        self._c_hgvses.add(c_hgvs)
+        hgvs = cms.classification.hgvs_best(preferred_genome_build=self.calculator_state.perspective.genome_build)
+        self._hgvses.add(hgvs)
         lab = cms.classification.lab
 
         is_shared = cms.classification.share_level_enum.is_discordant_level
@@ -303,8 +303,8 @@ class AlleleLegacyOverlap(LegacyOverlapState):
         return sorted(self.context_map.values())
 
     @property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        return sorted(self._c_hgvses)
+    def hgvses(self) -> list[HGVSDisplay]:
+        return sorted(self._hgvses)
 
     @property
     def _sort_value(self):

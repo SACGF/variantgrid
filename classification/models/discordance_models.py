@@ -78,10 +78,10 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
     @property
     def preview(self) -> 'PreviewData':
-        c_hgvs_key_values = []
-        for c_hgvs in self.all_c_hgvs():
-            c_hgvs_key_values.append(
-                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
+        hgvs_key_values = []
+        for hgvs in self.all_hgvs():
+            hgvs_key_values.append(
+                PreviewKeyValue(key=f"{hgvs.genome_build} c.HGVS", value=str(hgvs), dedicated_row=True)
             )
 
         status_text: str
@@ -96,7 +96,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             summary_extra=
                 [PreviewKeyValue(key="Status", value=status_text, dedicated_row=True)] +
                 [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
-                c_hgvs_key_values
+                hgvs_key_values
         )
 
     class LabInvolvement(int, Enum):
@@ -417,13 +417,13 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                         return True
         return False
 
-    def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> list[HGVSDisplay]:
+    def all_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> list[HGVSDisplay]:
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
-        c_hgvs = set()
+        all_hgvs = set()
         for cm in self.all_classification_modifications:
-            c_hgvs.add(cm.c_hgvs_best(genome_build))
-        return sorted(c_hgvs)
+            all_hgvs.add(cm.hgvs_best(genome_build))
+        return sorted(all_hgvs)
 
     @property
     def is_pending_concordance(self):

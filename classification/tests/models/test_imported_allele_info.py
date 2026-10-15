@@ -150,7 +150,7 @@ class ImportedAlleleInfoValidationTest(TestCase):
         allele_info = self._gene_level_allele_info(
             "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>", grch37=self._resolved(grch37))
         display = allele_info.matched_without_resolved_hgvs_display(grch38)
-        self.assertEqual("ARV7", display.full_hgvs)
+        self.assertEqual("ARV7", display.full_dna_hgvs)
         # the imported value is shown, so it carries the imported build rather than the one that matched
         self.assertEqual(grch38, display.genome_build)
         self.assertTrue(display.is_normalised)
