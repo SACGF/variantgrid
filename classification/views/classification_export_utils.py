@@ -9,7 +9,7 @@ from django.db.models import Count
 from django.db.models.query import QuerySet
 
 from classification.enums import CriteriaEvaluation
-from classification.models.classification import ClassificationModification
+from classification.models.classification import ClassificationModification, EvidenceVisibility
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from genes.hgvs import HGVSComponents
 from library.cache import clear_cached_property
@@ -105,6 +105,7 @@ class UsedKeyTracker:
                  ignore_evidence_keys: Optional[set[str]] = None,
                  include_only_evidence_keys: Optional[set[str]] = None):
         self.user = user
+        self.evidence_visibility = EvidenceVisibility(user)
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
         self.calc_dict: dict[str, UsedKey] = {}
@@ -199,7 +200,7 @@ class UsedKeyTracker:
 
     def row(self, classification_modification: ClassificationModification, formatter: Callable[[Any], Any]) -> list[Optional[str]]:
         cols: list[Optional[str]] = []
-        evidence = classification_modification.get_visible_evidence(self.user)
+        evidence = self.evidence_visibility.visible_evidence(classification_modification.classification, classification_modification.evidence)
         for used_key in self.ordered_keys:
             value_obj = evidence.get(used_key.ekey.key)
             if used_key.has_value:
