@@ -24,6 +24,9 @@ from genes.hgvs import (
     HGVSNoRepresentationException,
     HGVSVariant,
 )
+from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
+    HgvsMatchTranscriptAndGenomeRefAllele,
+)
 from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
@@ -453,3 +456,29 @@ class TestSymbolicHGVS(TestCase):
         mock_report.assert_not_called()
         with self.assertRaises(HGVSNoRepresentationException):
             matcher.variant_to_c_hgvs_parts(variant, "NM_001145661.2", throw_on_issue=True)
+
+
+class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
+    """ #1266 - the genome ref is on the forward strand, the transcript ref on the transcript's """
+
+    @staticmethod
+    def _mapped(strand: str, transcript_ref: str, genome_ref: str) -> HgvsMatchTranscriptAndGenomeRefAllele:
+        matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, transcript_ref, transcript_ref)
+        matches_reference.mapped_transcript_ref = transcript_ref
+        matches_reference.genome_ref = genome_ref
+        return matches_reference
+
+    def test_minus_strand_same(self):
+        self.assertFalse(self._mapped("-", "G", "C").transcript_and_genome_ref_differ)
+
+    def test_minus_strand_differ(self):
+        # F5 Leiden NM_000130.5:c.1601G>A in GRCh37 - the genome carries the alt
+        matches_reference = self._mapped("-", "G", "T")
+        self.assertTrue(matches_reference.transcript_and_genome_ref_differ)
+        self.assertIn('genome reference "A"', matches_reference.get_transcript_and_genome_ref_message())
+
+    def test_plus_strand_differ(self):
+        self.assertTrue(self._mapped("+", "T", "A").transcript_and_genome_ref_differ)
+
+    def test_not_mapped(self):
+        self.assertFalse(HgvsMatchTranscriptAndGenomeRefAllele("+", "T", "T").transcript_and_genome_ref_differ)

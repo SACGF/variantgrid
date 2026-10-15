@@ -30,9 +30,9 @@ from genes.hgvs.hgvs_converter import (
     HGVSConverterType,
     HGVSException,
     HGVSImplementationException,
+    HgvsMatchRefAllele,
     HGVSNomenclatureException,
     HGVSNonCodingTranscriptException,
-    HgvsMatchRefAllele,
     HgvsOriginallyNormalized,
 )
 from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
@@ -53,9 +53,34 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         self.provided_transcript_ref = provided_ref
         self.calculated_transcript_ref = calculated_ref
         self.strand = strand
+        # Set once mapped to the genome - the transcript ref at the mapped span and the genome ref there
+        self.mapped_transcript_ref: Optional[str] = None
+        self.genome_ref: Optional[str] = None
 
         provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
         super().__init__(provided_g_ref, calculated_g_ref)
+
+    def _transcript_strand(self, sequence: str) -> str:
+        if self.strand == "-":
+            return reverse_complement(sequence)
+        return sequence
+
+    @property
+    def transcript_and_genome_ref_differ(self) -> bool:
+        """ The transcript sequence differs from the genome (eg F5 Leiden in GRCh37) so the genomic variant
+            isn't what the transcript HGVS describes - it can even come out ref-only (#1266) """
+        if self.mapped_transcript_ref and self.genome_ref:
+            return self._transcript_strand(self.mapped_transcript_ref) != self.genome_ref
+        return False
+
+    def get_transcript_and_genome_ref_message(self) -> str:
+        if not self.transcript_and_genome_ref_differ:
+            return ""
+        genome_ref = self._transcript_strand(self.genome_ref)
+        message = f'Transcript reference "{self.mapped_transcript_ref}" differs from genome reference "{genome_ref}"'
+        if self.strand == "-":
+            message += " (both on the transcript strand)"
+        return message
 
     def _get_genomic_provided_and_calculated_ref_from_transcript(self):
         if self.strand and self.strand == "-":
@@ -71,7 +96,7 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
 
     def get_message(self) -> str:
         if self.provided_ref:
-            provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
+            provided_g_ref, _ = self._get_genomic_provided_and_calculated_ref_from_transcript()
             if self.provided_transcript_ref != provided_g_ref:
                 message = f'Using transcript reference "{self.calculated_transcript_ref}" from transcript sequence in place of provided reference "{self.provided_transcript_ref}". ' \
                           f'Transcript (strand="{self.strand}") and genome reference "{self.calculated_ref}" differ.'
@@ -381,6 +406,9 @@ class BioCommonsHGVSConverter:
             if not matches_reference:
                 # Set from genomic coord in case it's diff than transcript
                 matches_reference.calculated_ref = var_g.posedit.edit.ref_s
+            if isinstance(matches_reference, HgvsMatchTranscriptAndGenomeRefAllele):
+                matches_reference.mapped_transcript_ref = var_x.posedit.edit.ref_s
+                matches_reference.genome_ref = var_g.posedit.edit.ref_s
         else:
             var_g = var_x
 
