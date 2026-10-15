@@ -1,7 +1,7 @@
 """
 Somalier: what we hand to `somalier extract` (issue #183 - the exported depths decide how somalier
-genotypes), what `relate` is run with (--unknown, and the sites VCF of brentp/somalier#163), and that
-a failing stage never takes the import down.
+genotypes), what `relate` is run with (--unknown, and the sites VCF of brentp/somalier#163), how ancestry
+is batched across VCFs (#1850), and that a failing stage never takes the import down.
 """
 import os
 import tempfile
@@ -15,13 +15,18 @@ from django.test import TestCase, override_settings
 
 from patients.models import Patient
 from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
+from snpdb.management.commands.somalier_existing_vcfs import batch_by_sample_count
 from snpdb.models import (
+    AbstractSomalierModel,
     CohortGenotype,
     GenomeBuild,
     ImportStatus,
     ProcessingStatus,
     Sample,
     SomalierAllSamplesRelate,
+    SomalierAncestry,
+    SomalierAncestryBatch,
+    SomalierAncestryRun,
     SomalierCohortRelate,
     SomalierConfig,
     SomalierPatientRelate,
@@ -29,14 +34,18 @@ from snpdb.models import (
     SomalierRelatePairs,
     SomalierSampleExtract,
     SomalierVCFExtract,
+    SuperPopulationCode,
     Zygosity,
 )
 from snpdb.models.models_somalier import get_same_individual_relatedness
 from snpdb.tasks.somalier_tasks import (
+    ANCESTRY_TSV_FILENAME,
     SOMALIER_PAIRS_FILENAME,
     _create_somalier_pairs,
+    _load_ancestry_tsv,
     _load_somalier_pairs,
     _read_somalier_pairs,
+    somalier_ancestry_batch,
     somalier_patient_relate,
     somalier_vcf_id,
 )
@@ -398,6 +407,94 @@ class SomalierVCFTaskTest(TestCase):
         vcf_extract = SomalierVCFExtract.objects.get(vcf=self.vcf)
         self.assertEqual(processing.pk, vcf_extract.pk)
         self.assertEqual(ProcessingStatus.PROCESSING, vcf_extract.status)
+
+
+ANCESTRY_TSV_HEADER = "#sample_id\tpredicted_ancestry\tgiven_ancestry\tEAS_prob\tAFR_prob\tAMR_prob\t" \
+                      "SAS_prob\tEUR_prob"
+
+
+class SomalierAncestryBatchTest(TestCase):
+    """ #1850 - one somalier ancestry call over several VCFs """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get_or_create(username='somalier_ancestry_user')[0]
+        genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.vcf_extracts = []
+        for _ in range(3):
+            vcf = create_fake_cohort(cls.user, genome_build).vcf
+            vcf_extract = SomalierVCFExtract.objects.create(vcf=vcf, status=ProcessingStatus.SUCCESS)
+            for sample in vcf.sample_set.all():
+                SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample,
+                                                     het_count=5000, hom_count=5000)
+            cls.vcf_extracts.append(vcf_extract)
+
+    def setUp(self):
+        report_dir = tempfile.mkdtemp()
+        self.enterContext(override_settings(SOMALIER={**settings.SOMALIER, "report_base_dir": report_dir,
+                                                      "vcf_base_dir": report_dir, "ancestry_enabled": True,
+                                                      "min_genotyped_sites": 100}))
+
+    @staticmethod
+    def _write_tsv(batch: SomalierAncestryBatch, sample_names: list[str]):
+        report_dir = Path(batch.get_report_dir())
+        report_dir.mkdir(parents=True, exist_ok=True)
+        rows = [f"{name}\tEUR\t\t0.01\t0.02\t0.03\t0.04\t0.9" for name in sample_names]
+        (report_dir / ANCESTRY_TSV_FILENAME).write_text("\n".join([ANCESTRY_TSV_HEADER, *rows]) + "\n")
+
+    def _fake_ancestry(self, batch: SomalierAncestryBatch, runs, _processing_dir):
+        self._write_tsv(batch, [AbstractSomalierModel.sample_name(s) for r in runs for s in r.get_samples()])
+        batch.status = ProcessingStatus.SUCCESS
+        batch.save()
+
+    def test_load_ancestry_tsv_splits_samples_by_run(self):
+        batch = SomalierAncestryBatch.objects.create()
+        runs = [SomalierAncestryRun.objects.create(vcf_extract=ve, batch=batch) for ve in self.vcf_extracts]
+        sample_names = [AbstractSomalierModel.sample_name(s) for r in runs for s in r.get_samples()]
+        self._write_tsv(batch, [*sample_names, "not_ours_999999"])
+
+        _load_ancestry_tsv(batch, runs)
+        for run in runs:
+            self.assertEqual({s.pk for s in run.get_samples()},
+                             set(run.somalierancestry_set.values_list("sample_extract__sample", flat=True)))
+        self.assertEqual(9, SomalierAncestry.objects.count())
+        self.assertEqual(SuperPopulationCode.EUR, SomalierAncestry.objects.first().predicted_ancestry)
+
+    def test_too_few_sites_skipped_while_neighbour_runs(self):
+        too_few, runs_ok = self.vcf_extracts[:2]
+        too_few.somaliersampleextract_set.update(het_count=10, hom_count=10)
+        with patch("snpdb.tasks.somalier_tasks._somalier_ancestry", side_effect=self._fake_ancestry):
+            somalier_ancestry_batch([too_few.pk, runs_ok.pk])
+
+        skipped = SomalierAncestryRun.objects.get(vcf_extract=too_few)
+        self.assertEqual(ProcessingStatus.SKIPPED, skipped.status)
+        self.assertIsNone(skipped.batch)
+        ran = SomalierAncestryRun.objects.get(vcf_extract=runs_ok)
+        self.assertEqual(ProcessingStatus.SUCCESS, ran.status)
+        self.assertEqual(3, ran.somalierancestry_set.count())
+
+    def test_all_skipped_makes_no_batch(self):
+        SomalierSampleExtract.objects.update(het_count=10, hom_count=10)
+        with patch("snpdb.tasks.somalier_tasks._somalier_ancestry") as mock_ancestry:
+            somalier_ancestry_batch([ve.pk for ve in self.vcf_extracts])
+        mock_ancestry.assert_not_called()
+        self.assertFalse(SomalierAncestryBatch.objects.exists())
+        self.assertEqual(3, SomalierAncestryRun.objects.filter(status=ProcessingStatus.SKIPPED).count())
+
+    def test_failure_marks_batch_and_every_run(self):
+        """ The command isn't in the (empty) annotation dir, so somalier never runs """
+        with override_settings(SOMALIER={**settings.SOMALIER, "annotation_base_dir": tempfile.mkdtemp()}):
+            somalier_ancestry_batch([ve.pk for ve in self.vcf_extracts])
+        batch = SomalierAncestryBatch.objects.get()
+        self.assertEqual(ProcessingStatus.ERROR, batch.status)
+        statuses = set(SomalierAncestryRun.objects.filter(batch=batch).values_list("status", flat=True))
+        self.assertEqual({ProcessingStatus.ERROR}, statuses)
+        self.assertEqual(3, SomalierAncestryRun.objects.count())
+
+    def test_batch_by_sample_count(self):
+        self.assertEqual([[1], [2, 3]], batch_by_sample_count([(1, 600), (2, 600), (3, 300)], 1000))
+        self.assertEqual([[1], [2]], batch_by_sample_count([(1, 1500), (2, 10)], 1000),
+                         "an extract over the limit is a batch of its own")
 
 
 class SomalierPatientRelateTest(TestCase):

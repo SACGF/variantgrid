@@ -119,6 +119,8 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.vcf.genotype_vcf_tasks.reload_vcf_task': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.SomalierVCFTask': HEAVY_WORKERS,  # somalier ancestry is ~1GB RSS
     'snpdb.tasks.somalier_tasks.somalier_patient_relate': HEAVY_WORKERS,  # where the .somalier files are made
+    'snpdb.tasks.somalier_tasks.somalier_vcf_extract': HEAVY_WORKERS,
+    'snpdb.tasks.somalier_tasks.somalier_ancestry_batch': HEAVY_WORKERS,
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,

@@ -1,7 +1,7 @@
 # #1850 — somalier_existing_vcfs: batch ancestry across VCFs, fan extracts out to celery
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-09
-Status: draft
+Status: in progress - implemented on branch 1850_somalier_batch_ancestry, awaiting review
 
 [#1850](https://github.com/SACGF/variantgrid/issues/1850). The numbers below are the #1147 measurements. #1842 (skip ancestry/relate below a minimum number of genotyped sites) is already in
 the code as `settings.SOMALIER["min_genotyped_sites"]` and this plan keeps that behaviour per VCF.

@@ -2,8 +2,11 @@
 Somalier stages: extract a VCF's calls at the somalier sites, predict ancestry, and relate samples
 (within a cohort, a trio, a patient, or nightly across every sample on the box).
 
-Entry points: `somalier_vcf_id` (run by the VCF import pipeline, which relates the VCF's patients too),
-`somalier_cohort_relate`, `somalier_trio_relate`, `somalier_patient_relate` (also queued by
+A VCF's stages are `somalier_vcf_extract` (extract, then relate the VCF's cohort and patients) and
+`somalier_ancestry_batch` (one 'somalier ancestry' over the extracts of any number of VCFs, as fitting the 1kg
+background dominates its cost). `somalier_vcf_id` runs both for one VCF - it is what the VCF import pipeline
+calls - while snpdb/management/commands/somalier_existing_vcfs.py fans the two out separately for a backfill.
+Other entry points: `somalier_cohort_relate`, `somalier_trio_relate`, `somalier_patient_relate` (also queued by
 snpdb/signals/somalier_patient_relate.py) and the beat-scheduled `somalier_all_samples`. Every stage records its own
 ProcessingStatus, so one failing never takes the others - or the import - down with it.
 """
@@ -15,6 +18,7 @@ import time
 from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
+from typing import Optional
 
 import celery
 import pandas as pd
@@ -35,6 +39,7 @@ from snpdb.models import (
     Sample,
     SomalierAllSamplesRelate,
     SomalierAncestry,
+    SomalierAncestryBatch,
     SomalierAncestryRun,
     SomalierCohortRelate,
     SomalierConfig,
@@ -55,16 +60,17 @@ from snpdb.variants_to_vcf import vcf_export_to_file
 STALE_PROCESSING_AGE = timedelta(hours=1)
 
 SOMALIER_PAIRS_FILENAME = "somalier.pairs.tsv"  # in the relate's output dir
+ANCESTRY_TSV_FILENAME = "somalier-ancestry.somalier-ancestry.tsv"  # in the batch's report dir
 
 
 @contextmanager
-def _stage_timing(stage: str, vcf_id: int):
+def _stage_timing(stage: str, subject: str):
     """ #1147 - so how long each stage takes can be answered from the celery log on prod """
     start = time.time()
     try:
         yield
     finally:
-        logging.info("somalier %s vcf=%s took %.1fs", stage, vcf_id, time.time() - start)
+        logging.info("somalier %s %s took %.1fs", stage, subject, time.time() - start)
 
 
 def _record_error(somalier_model: AbstractSomalierModel, stage: str):
@@ -102,58 +108,93 @@ def _max_genotyped_sites(vcf_extract: SomalierVCFExtract) -> int:
 
 @celery.shared_task
 def somalier_vcf_id(vcf_id: int):
-    """ Extract, Ancestry, and Relate (Cohort) - each stage independent so one failure isn't fatal """
+    """ Extract, Relate (Cohort) and Ancestry - each stage independent so one failure isn't fatal """
+    if vcf_extract_id := somalier_vcf_extract(vcf_id):
+        somalier_ancestry_batch([vcf_extract_id])
+
+
+@celery.shared_task
+def somalier_vcf_extract(vcf_id: int) -> Optional[int]:
+    """ Extract, then relate the VCF's cohort and patients. Returns the extract pk if it succeeded """
     vcf = VCF.objects.get(pk=vcf_id)
     vcf_extract = _create_vcf_extract(vcf)
     if vcf_extract is None:
-        return
+        return None
 
     if not vcf.has_genotype:
         _set_skipped(vcf_extract, "VCF has no genotype field")
-        return
+        return None
 
+    subject = f"vcf={vcf_id}"
     processing_dir = get_import_processing_dir(vcf_extract.pk, "somalier_vcf_extract")
     try:
-        with _stage_timing("extract", vcf_id):
+        with _stage_timing("extract", subject):
             _somalier_vcf_extract(vcf_extract, processing_dir)
     except Exception:
-        _record_error(vcf_extract, f"extract vcf={vcf_id}")
-        return
+        _record_error(vcf_extract, f"extract {subject}")
+        return None
     finally:
         if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
             shutil.rmtree(processing_dir, ignore_errors=True)
 
-    genotyped_sites = _max_genotyped_sites(vcf_extract)
-    too_few_sites = genotyped_sites < settings.SOMALIER["min_genotyped_sites"]
-    skip_reason = f"Only {genotyped_sites} genotyped sites in the best sample"
-
-    ancestry_run = SomalierAncestryRun.objects.create(vcf_extract=vcf_extract)
-    if not settings.SOMALIER["ancestry_enabled"]:
-        _set_skipped(ancestry_run, "settings.SOMALIER['ancestry_enabled'] is off")
-    elif too_few_sites:
-        _set_skipped(ancestry_run, skip_reason)
-    else:
-        try:
-            with _stage_timing("ancestry", vcf_id):
-                _somalier_ancestry(ancestry_run)
-        except Exception:
-            _record_error(ancestry_run, f"ancestry vcf={vcf_id}")
-
     SomalierCohortRelate.objects.filter(cohort=vcf.cohort).delete()  # Delete any previous versions
     relate = SomalierCohortRelate.objects.create(cohort=vcf.cohort, cohort_version=vcf.cohort.version)
-    if too_few_sites:
+    if skip_reason := _too_few_sites_reason(vcf_extract):
         _set_skipped(relate, skip_reason)
     else:
         try:
-            with _stage_timing("relate", vcf_id):
+            with _stage_timing("relate", subject):
                 _somalier_relate(relate)
         except Exception:
-            _record_error(relate, f"cohort relate vcf={vcf_id}")
+            _record_error(relate, f"cohort relate {subject}")
 
     # Patient relates are small, so a sample swap shows now rather than after the nightly relate
     for patient_id in get_sample_patient_ids(vcf.sample_set.all()):
-        with _stage_timing(f"patient {patient_id} relate", vcf_id):
+        with _stage_timing(f"patient {patient_id} relate", subject):
             somalier_patient_relate(patient_id)
+    return vcf_extract.pk
+
+
+def _too_few_sites_reason(vcf_extract: SomalierVCFExtract) -> Optional[str]:
+    genotyped_sites = _max_genotyped_sites(vcf_extract)
+    if genotyped_sites < settings.SOMALIER["min_genotyped_sites"]:
+        return f"Only {genotyped_sites} genotyped sites in the best sample"
+    return None
+
+
+@celery.shared_task
+def somalier_ancestry_batch(vcf_extract_ids: list[int]):
+    """ An ancestry run per extract, and one somalier call (the batch) for those not skipped """
+    runs = []
+    vcf_extracts = SomalierVCFExtract.objects.filter(pk__in=vcf_extract_ids, somalierancestryrun__isnull=True)
+    for vcf_extract in vcf_extracts.order_by("pk"):
+        ancestry_run = SomalierAncestryRun.objects.create(vcf_extract=vcf_extract)
+        if not settings.SOMALIER["ancestry_enabled"]:
+            _set_skipped(ancestry_run, "settings.SOMALIER['ancestry_enabled'] is off")
+        elif skip_reason := _too_few_sites_reason(vcf_extract):
+            _set_skipped(ancestry_run, skip_reason)
+        else:
+            runs.append(ancestry_run)
+    if not runs:
+        return
+
+    batch = SomalierAncestryBatch.objects.create()
+    batch_runs = SomalierAncestryRun.objects.filter(pk__in=[r.pk for r in runs])
+    batch_runs.update(batch=batch, status=ProcessingStatus.PROCESSING, modified=timezone.now())
+
+    subject = f"batch={batch.pk} ({len(runs)} VCFs)"
+    processing_dir = get_import_processing_dir(batch.pk, "somalier_ancestry_batch")
+    try:
+        with _stage_timing("ancestry", subject):
+            _somalier_ancestry(batch, runs, processing_dir)
+            _load_ancestry_tsv(batch, runs)
+    except Exception:
+        _record_error(batch, f"ancestry {subject}")
+    finally:
+        if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
+            shutil.rmtree(processing_dir, ignore_errors=True)
+
+    batch_runs.update(status=batch.status, error_exception=batch.error_exception, modified=timezone.now())
 
 
 def _somalier_vcf_extract(vcf_extract: SomalierVCFExtract, processing_dir):
@@ -191,33 +232,53 @@ def _write_somalier_vcf(cfg: SomalierConfig, processing_dir, vcf_extract: Somali
     return exported_vcf_filename
 
 
-def _somalier_ancestry(ancestry_run: SomalierAncestryRun):
+def _somalier_ancestry(batch: SomalierAncestryBatch, runs: list[SomalierAncestryRun], processing_dir):
+    """ The query samples go in as a glob over a dir of symlinks (somalier expands it), so a batch of
+        thousands never nears ARG_MAX """
+    query_dir = os.path.join(processing_dir, "query")
+    os.makedirs(query_dir, exist_ok=True)
+    for ancestry_run in runs:
+        somalier_dir = ancestry_run.vcf_extract.get_somalier_dir()
+        for sample in ancestry_run.get_samples():
+            somalier_filename = AbstractSomalierModel.sample_name(sample) + ".somalier"
+            os.symlink(os.path.join(somalier_dir, somalier_filename), os.path.join(query_dir, somalier_filename))
+
     cfg = SomalierConfig()
     compare_samples = os.path.join(cfg.get_annotation("ancestry_somalier_dir"), "*.somalier")
-    ancestry_report_dir = Path(ancestry_run.get_report_dir())
+    ancestry_report_dir = Path(batch.get_report_dir())
     ancestry_report_dir.mkdir(parents=True, exist_ok=True)
     somalier_bin = cfg.get_annotation("command")
     ancestry_cmd = [somalier_bin, "ancestry", "--labels", cfg.get_annotation("ancestry_labels"),
-                    compare_samples, "++", *ancestry_run.get_sample_somalier_filenames()]
+                    compare_samples, "++", os.path.join(query_dir, "*.somalier")]
     # Force Somalier to only use 1 thread - have had it run very slow with multi-core
     # https://github.com/brentp/somalier/issues/61#issuecomment-750492570
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
-    ancestry_run.execute(ancestry_cmd, cwd=ancestry_report_dir, env=env)
+    batch.execute(ancestry_cmd, cwd=ancestry_report_dir, env=env)
 
-    # Use TSV to write sample specific files
-    df = pd.read_csv(ancestry_report_dir / "somalier-ancestry.somalier-ancestry.tsv", sep='\t', index_col=0)
-    for sample_extract in ancestry_run.vcf_extract.somaliersampleextract_set.all():
-        row = df.loc[AbstractSomalierModel.sample_name(sample_extract.sample)]
+
+def _load_ancestry_tsv(batch: SomalierAncestryBatch, runs: list[SomalierAncestryRun]):
+    """ The batch's one TSV covers every run's samples - each sample's row goes to its own VCF's run """
+    df = pd.read_csv(Path(batch.get_report_dir()) / ANCESTRY_TSV_FILENAME, sep='\t', index_col=0)
+    run_by_vcf_extract_id = {r.vcf_extract_id: r for r in runs}
+    sample_extracts = SomalierSampleExtract.objects.filter(vcf_extract__in=run_by_vcf_extract_id) \
+        .select_related("sample")
+    ancestries = []
+    for sample_extract in sample_extracts:
+        sample_name = AbstractSomalierModel.sample_name(sample_extract.sample)
+        if sample_name not in df.index:
+            continue  # A no-DNA control, which isn't handed to somalier
+        row = df.loc[sample_name]
         predicted_ancestry = getattr(SuperPopulationCode, row["predicted_ancestry"])  # Get enum ie 'EAS'
-        SomalierAncestry.objects.create(ancestry_run=ancestry_run,
-                                        sample_extract=sample_extract,
-                                        predicted_ancestry=predicted_ancestry,
-                                        EAS_prob=row["EAS_prob"],
-                                        AFR_prob=row["AFR_prob"],
-                                        AMR_prob=row["AMR_prob"],
-                                        SAS_prob=row["SAS_prob"],
-                                        EUR_prob=row["EUR_prob"])
+        ancestries.append(SomalierAncestry(ancestry_run=run_by_vcf_extract_id[sample_extract.vcf_extract_id],
+                                           sample_extract=sample_extract,
+                                           predicted_ancestry=predicted_ancestry,
+                                           EAS_prob=row["EAS_prob"],
+                                           AFR_prob=row["AFR_prob"],
+                                           AMR_prob=row["AMR_prob"],
+                                           SAS_prob=row["SAS_prob"],
+                                           EUR_prob=row["EUR_prob"]))
+    SomalierAncestry.objects.bulk_create(ancestries, batch_size=2000)
 
 
 def _somalier_relate(somalier_relate: SomalierRelate) -> Path:
