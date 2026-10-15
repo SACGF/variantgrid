@@ -213,7 +213,7 @@ class BioCommonsHGVSConverter:
     ) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         try:
             var_x = self._parser_hgvs(hgvs_string)
-            if var_x.type in ('c', 'n'):
+            if self._is_transcript_variant(var_x):
                 self._check_transcript_hgvs(var_x)
             var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(var_x)
             # A del/dup/inv too big to normalize hasn't read any sequence, so a contig from another build gets this far
@@ -242,6 +242,12 @@ class BioCommonsHGVSConverter:
             sequence_variant = self._parser_hgvs(hgvs_string)
             transcript_accession = self._get_transcript_accession_from_sequence_variant(sequence_variant)
         return transcript_accession
+
+    @staticmethod
+    def _is_transcript_variant(var_x: SequenceVariant) -> bool:
+        """ Positions are on a transcript, so mapping to g. needs its alignment. The coordinate type is the
+            authoritative signal (an LRG c. has no transcript-looking accession); r. is parsed but never mapped """
+        return var_x.type in ('c', 'n')
 
     @staticmethod
     def _get_transcript_accession_from_sequence_variant(sequence_variant: SequenceVariant) -> str:
@@ -307,7 +313,7 @@ class BioCommonsHGVSConverter:
             strand = None
             alt_ac = None
             alt_aln_method = None
-            if var_x.type in ('c', 'n'):
+            if self._is_transcript_variant(var_x):
                 # An intronic position has no transcript sequence to check against: biocommons reads the genome
                 # instead, but only when told which contig the transcript is aligned to. Without it the provided
                 # reference is returned untouched and a wrong base passes as a match.
