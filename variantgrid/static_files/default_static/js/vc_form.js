@@ -940,7 +940,7 @@ const VCForm = (function() {
                 }
             }
 
-            let p_hgvs = this.value(SpecialEKeys.P_HGVS);
+            let p_hgvs = this.record.allele?.resolved?.p_hgvs ? null : this.value(SpecialEKeys.P_HGVS);
             if (p_hgvs) {
                 const p_dot = p_hgvs.indexOf('p.');
                 if (p_dot !== -1) {
@@ -2478,6 +2478,9 @@ VCTable.format_hgvs = (parts) => {
         cDom = $('<a>', {href: url, html: cDom, class: 'hover-link'});
     }
     dom.append(cDom);
+    if (pHgvs) {
+        dom.append($('<span>', {class: 'p-hgvs', text: limitLength(pHgvs), title: parts.p_hgvs_full || pHgvs}));
+    }
     if (icon) {
         const iconData = {"class": icon};
         if (tooltip) {
@@ -2487,9 +2490,6 @@ VCTable.format_hgvs = (parts) => {
         iconDom.appendTo(dom);
     }
 
-    if (pHgvs) {
-        $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs), title: parts.p_hgvs_full || pHgvs}).appendTo(dom);
-    }
     return outterDom;
 };
 

@@ -9,6 +9,7 @@ converter produced it.
 import logging
 import re
 from dataclasses import dataclass
+from dataclasses import replace as dataclass_replace
 from datetime import timedelta
 from functools import lru_cache
 from typing import Any, Literal, Optional, TypedDict
@@ -910,6 +911,28 @@ class ImportedAlleleInfo(TimeStampedModel):
         if g_hgvs := self.imported_g_hgvs_obj:
             return HGVSDisplay(g_hgvs)
         return None
+
+    @property
+    def imported_p_hgvs(self) -> Optional[str]:
+        """ p.HGVS of the imported c.HGVS as normalised on the imported build - none for a g.HGVS import """
+        if self.imported_c_hgvs and (imported_genome_build := self.imported_genome_build):
+            if variant_info := self[imported_genome_build]:
+                return variant_info.p_hgvs
+        return None
+
+    def with_imported_p_hgvs(self, hgvs: Optional[HGVSDisplay]) -> Optional[HGVSDisplay]:
+        """ The imported c.HGVS as the lab gave it, carrying imported_p_hgvs for display """
+        if hgvs and (p_hgvs := self.imported_p_hgvs):
+            return dataclass_replace(hgvs, p_hgvs=p_hgvs)
+        return hgvs
+
+    @property
+    def imported_hgvs_display(self) -> Optional[HGVSDisplay]:
+        return self.with_imported_p_hgvs(self.imported_hgvs_obj())
+
+    @property
+    def imported_c_hgvs_display(self) -> Optional[HGVSDisplay]:
+        return self.with_imported_p_hgvs(self.imported_c_hgvs_obj)
 
     def matched_without_resolved_hgvs_display(self, preferred_genome_build: GenomeBuild) -> Optional[HGVSDisplay]:
         """ A variant HGVS has no way to write (a gene-level event, a symbolic CNV) matches but gets no c.HGVS,

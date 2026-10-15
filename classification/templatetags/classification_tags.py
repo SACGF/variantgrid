@@ -12,6 +12,7 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
@@ -55,6 +56,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap, VCDb
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from eventlog.models import ViewEvent
 from genes.hgvs import HGVSComponents, HGVSDisplay
+from genes.hgvs.phgvs_canonical import short_p_hgvs
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
@@ -577,8 +579,17 @@ def c_hgvs(c_hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification
     if show_genome_build is None:
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline,
-            "show_p_hgvs": bool(c_hgvs.p_hgvs) and settings.CLASSIFICATION_GRID_SHOW_PHGVS}
+    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline}
+
+
+@register.simple_tag
+def p_hgvs(canonical: Optional[str]) -> str:
+    """ A resolved p.HGVS to sit inline after its c.HGVS: short form, the canonical one as tooltip.
+        Styles are inline (matching .p-hgvs) as c_hgvs.html is also used in emails """
+    if not (canonical and settings.CLASSIFICATION_GRID_SHOW_PHGVS):
+        return ""
+    return format_html('<span class="p-hgvs" style="margin-left:0.4em; color:#6c757d; font-size:0.9em; '
+                       'white-space:nowrap" title="{}">{}</span>', canonical, short_p_hgvs(canonical))
 
 
 @register.inclusion_tag("classification/tags/allele.html")

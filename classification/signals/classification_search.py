@@ -10,6 +10,7 @@ from django.dispatch import receiver
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
+from genes.hgvs import HGVSDisplay
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -103,11 +104,14 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     if cms.exists():
         extras += classification_qs_to_extras(cms)
         column = ClassificationModification.column_name_for_build(genome_build)
+        p_column = ClassificationModification.column_name_for_build(genome_build, 'p_hgvs')
         # provide the c.HGVS for alleles
-        if c_hgvs := sorted(
-                c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
-            for hgvs in c_hgvs:
-                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", hgvs, dedicated_row=True))
+        c_and_p_qs = cms.order_by(column, p_column).values_list(column, p_column).distinct()
+        if c_and_p := sorted(((c_hgvs, p_hgvs) for c_hgvs, p_hgvs in c_and_p_qs if c_hgvs),
+                             key=lambda pair: (pair[0], pair[1] or "")):
+            for c_hgvs, p_hgvs in c_and_p:
+                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", HGVSDisplay.parse(c_hgvs, p_hgvs=p_hgvs),
+                                                   dedicated_row=True))
 
     if not hgvs_extras:
         try:

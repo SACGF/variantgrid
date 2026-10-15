@@ -263,11 +263,13 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         parts.append(MultiDiffInput(label, rvi.resolved_hgvs if rvi else None,
                                     is_reference=is_reference))
         c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.hgvs_converter_version if rvi else "",
-                                              label + " c.HGVS data version", rvi.hgvs_converter_data_version if rvi else ""))
+                                              label + " c.HGVS data version", rvi.hgvs_converter_data_version if rvi else "",
+                                              rvi.p_hgvs if rvi else None))
 
     diff_output = multi_diff.diffs(parts)
     if not allele_info.imported_c_hgvs:
         diff_output = [None] + diff_output
+        c_hgvs_resolved_variant_info = [None, *c_hgvs_resolved_variant_info]
 
     normalized_diff: Optional[HGVSDiff] = None
     liftover_diff: Optional[HGVSDiff] = None
