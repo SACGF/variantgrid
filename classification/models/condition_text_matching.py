@@ -15,6 +15,7 @@ from django.db.models import CASCADE, SET_NULL, Q, QuerySet
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils.timezone import now
 from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
@@ -81,7 +82,9 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     # imports can't run it in the publishing request (#1780). Text entered on the form is searched once the publish
     # commits, with a short timeout, and stays flagged for the sweep if that search fails
     pending_automatch = models.BooleanField(default=False)
-    pending_automatch = models.BooleanField(default=False)
+    # when the last automatch's Monarch search raised (and it settled for the local fallback); None once an
+    # automatch completes without one. Retried hourly by retry_failed_condition_text_automatch (#1744)
+    search_failed = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("normalized_text", "lab")
@@ -309,11 +312,15 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 if defer_search:
                     match = embedded_ids_check(condition_text.normalized_text)
                     condition_text.pending_automatch = not match
-                elif search_timeout:
-                    match = top_level_suggestion(condition_text.normalized_text, search_timeout=search_timeout,
-                                                 raise_search_errors=True)
+                    if match:
+                        condition_text.search_failed = None
                 else:
-                    match = top_level_suggestion(condition_text.normalized_text)
+                    if search_timeout:
+                        match = top_level_suggestion(condition_text.normalized_text, search_timeout=search_timeout,
+                                                     raise_search_errors=True)
+                    else:
+                        match = top_level_suggestion(condition_text.normalized_text)
+                    condition_text.search_failed = now() if match.search_failed else None
                 if match:
                     if match.is_auto_assignable():
                         if not root.condition_xrefs:
@@ -340,6 +347,21 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 # whatever failed here, the sweep still gets a go at the text
                 condition_text.pending_automatch = True
                 condition_text.save(update_fields=["pending_automatch"])
+
+    @staticmethod
+    def retry_failed_automatch() -> int:
+        """
+        Re-run automatch on ConditionTexts whose Monarch search failed, oldest failure first. Stops at the first
+        one that fails again - Monarch is still down, and each attempt can take minutes to time out.
+        @return how many were cleared
+        """
+        cleared = 0
+        for condition_text in ConditionText.objects.filter(search_failed__isnull=False).order_by("search_failed"):
+            ConditionTextMatch.attempt_automatch(condition_text=condition_text)
+            if condition_text.search_failed:
+                break
+            cleared += 1
+        return cleared
 
     @staticmethod
     def automatch_manual_entry(condition_text_id: int):
@@ -570,6 +592,9 @@ class ConditionMatchingSuggestion:
 
         self.merged = False
         """ Was this suggestion merged, e.g. if there was an condition text 'BAM' that matched Best At Motoneuron and Blood Attacked Myliver """
+
+        self.search_failed = False
+        """ the Monarch search raised while building this; terms, if any, are the local OMIM fallback """
 
     @property
     def term_str_array(self) -> list[str]:
@@ -1031,11 +1056,13 @@ def search_suggestion(text: str, search_timeout: float = MINUTE_SECS,
         if raise_search_errors:
             raise
         report_exc_info()
+        search_failed = True
+    else:
+        search_failed = False
 
-    if local_omim := find_local_term(match_text, OntologyService.OMIM):
-        return local_omim
-
-    return ConditionMatchingSuggestion()
+    suggestion = find_local_term(match_text, OntologyService.OMIM) or ConditionMatchingSuggestion()
+    suggestion.search_failed = search_failed
+    return suggestion
 
 
 def _is_descendant_ids(term_ids: set[int], ancestors_ids: set[int], seen_ids: set[int], check_levels: int):

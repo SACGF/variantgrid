@@ -1,7 +1,7 @@
 # #1744 — ConditionText: record when the Monarch search failed so automatch can be retried
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14
-Status: draft
+Status: in progress - implemented on branch 1744_condition_text_search_failed, awaiting review
 
 [#1744](https://github.com/SACGF/variantgrid/issues/1744). Sibling of #1742 (make the propagated error
 name Monarch), which is partly landed (`98136e191`) and stays separate.
@@ -49,7 +49,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
         unique_together = ("normalized_text", "lab")
 ```
 
-New migration classification/migrations/0182_conditiontext_search_failed.py: one `AddField`, no data
+New migration `classification/migrations/0231_conditiontext_search_failed.py`: one `AddField`, no data
 migration, no `ManualOperation`. Existing rows start as `None` - a text that was left unmatched by a
 past outage is not distinguishable now and stays a job for `sync_condition_text_matches`.
 
@@ -73,7 +73,9 @@ not an audit log.
   `condition_text.save()` at the end of the `try` persists it. Assignment logic is unchanged - a flagged
   match still goes through `is_auto_assignable` (an OMIM fallback can legitimately assign). The outer
   `except Exception` stays as it is and does not touch the field: the field means "the Monarch search
-  failed", which is what the retry re-runs.
+  failed", which is what the retry re-runs. With `defer_search` (publish, #1780) Monarch isn't called:
+  an embedded-ID match clears the field, otherwise it is left for the `pending_automatch` sweep to settle.
+  With `search_timeout` (form entry) the search raises instead, and the text goes back to the sweep.
 - `condition_matching_suggestions` is untouched: it runs on GET and must not write. The flag it gets
   back from `top_level_suggestion` is simply ignored there.
 - New `ConditionTextMatch.retry_failed_automatch() -> int`: for each `ConditionText` with
@@ -83,16 +85,18 @@ not an audit log.
   (`classification/models/condition_text_search.py`), so one probe per run is the right amount of
   hammering. The remaining rows keep their older timestamp and are first in line next run.
 
-### classification/tasks/condition_text_tasks.py (new file)
+### `classification/tasks/condition_text_automatch_task.py`
+
+Next to the #1780 `pending_automatch` sweep:
 
 ```python
-@celery.shared_task(queue='db_workers')
+@celery.shared_task
 def retry_failed_condition_text_automatch():
     cleared = ConditionTextMatch.retry_failed_automatch()
     logging.info("Condition text automatch retry: cleared %d", cleared)
 ```
 
-Module docstring: owns the beat entry point for #1744; the logic lives on `ConditionTextMatch`.
+Module docstring: owns the condition text automatch beat entry points; the logic lives on `ConditionTextMatch`.
 
 ### `variantgrid/celery.py`
 
@@ -138,8 +142,7 @@ Then `scripts/vg map` (new field, task, beat entry).
 
 ## Tests
 
-New file classification/tests/models/test_condition_text_matching.py, a `TestCase` using
-`classification/tests/models/test_utils.py:ClassificationTestUtils.setUp` for the lab, a
+`ConditionTextSearchFailedTest` in `classification/tests/models/test_condition_text_automatch.py`, with its own lab, a
 `ConditionText` with a root `ConditionTextMatch` (`gene_symbol=None`, `classification=None`) and a text
 with no local match (e.g. `"zzz no such syndrome"`; `find_local_term` runs against the seeded test
 ontology). Patch `classification.models.condition_text_matching.condition_text_search` - that name, not

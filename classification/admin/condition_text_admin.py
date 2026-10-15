@@ -12,12 +12,15 @@ class ConditionTextStatusFilter(admin.SimpleListFilter):
     default_value = None
 
     def lookups(self, request, model_admin):
-        return [("outstanding", "Only with outstanding classifications")]
+        return [("outstanding", "Only with outstanding classifications"),
+                ("search_failed", "Monarch search failed")]
 
     def queryset(self, request, queryset):
         if value := self.value():
             if value == "outstanding":
                 queryset = queryset.exclude(classifications_count_outstanding=0)
+            elif value == "search_failed":
+                queryset = queryset.filter(search_failed__isnull=False)
         return queryset
 
 
@@ -37,7 +40,7 @@ class ConditionTextMatchAdmin(admin.TabularInline):
 class ConditionTextAdmin(ModelAdminBasics):
     inlines = (ConditionTextMatchAdmin,)
     search_fields = ('id', 'normalized_text')
-    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding"]
+    list_display = ["pk", "lab", "normalized_text", "classifications_count", "classifications_count_outstanding", "search_failed"]
     list_filter = (ConditionTextStatusFilter, ('lab', RelatedFieldListFilter))
 
     def has_add_permission(self, request):

@@ -100,6 +100,12 @@ app.conf.beat_schedule['reconcile-pending-extractions'] = {
     'schedule': HOUR_SECS,
 }
 
+# Condition texts whose automatch fell back to local terms because the Monarch search failed (#1744)
+app.conf.beat_schedule['retry-failed-condition-text-automatch'] = {
+    'task': 'classification.tasks.condition_text_automatch_task.retry_failed_condition_text_automatch',
+    'schedule': HOUR_SECS,
+}
+
 # Imports whose worker was killed from outside stay PROCESSING with a lapsed lease (#2188); time them out so
 # the retry buttons offer them. Cheap: one indexed query when nothing has lapsed.
 app.conf.beat_schedule['fail-stuck-upload-pipelines'] = {
