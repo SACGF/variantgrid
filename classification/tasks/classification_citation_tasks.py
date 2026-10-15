@@ -1,7 +1,8 @@
 """
 Prefetch of the PubMed/PMC/Bookshelf citations referenced by published classifications (#1687), so exports read
-citations from the database instead of calling Entrez mid-download. Runs nightly (celery beat) for the refresh of
-stale or errored citations, and after each classification import so newly imported ones are loaded straight away.
+citations from the database instead of calling Entrez per classification mid-download. Runs nightly (celery beat) for
+the refresh of stale or errored citations, and after each classification import so newly imported ones are loaded
+straight away. An export bulk-loads whatever is still missing per batch (EvidenceMixin.prefetch_citations).
 
 Entry points: `prefetch_classification_citations` (celery task) and `classification_citation_ids`.
 """

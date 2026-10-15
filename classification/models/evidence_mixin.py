@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
@@ -177,9 +177,16 @@ class EvidenceMixin:
         return CitationFetchRequest.fetch_all_now(self.db_refs)
 
     def stored_citations(self) -> list[Citation]:
-        """ Citations as already in the database, without calling Entrez - populated nightly by
-            classification.tasks.classification_citation_tasks.prefetch_classification_citations """
+        """ Citations as already in the database, without calling Entrez. Populated by
+            classification.tasks.classification_citation_tasks.prefetch_classification_citations (nightly and after
+            imports) and by prefetch_citations over each batch an export is about to write """
         return CitationFetchRequest.get_unfetched_citations(self.db_refs)
+
+    @staticmethod
+    def prefetch_citations(records: Iterable['EvidenceMixin']) -> None:
+        """ Loads the citations of several records in one go: one Entrez request per source for those not yet in
+            the database (or errored / stale), so stored_citations() on each record is then database-only """
+        CitationFetchRequest.fetch_all_now([db_ref for record in records for db_ref in record.db_refs])
 
     @property
     def is_likely_acmg(self) -> bool:
