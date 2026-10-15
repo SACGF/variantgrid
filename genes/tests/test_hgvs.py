@@ -25,6 +25,9 @@ from genes.hgvs import (
     HGVSNoRepresentationException,
     HGVSVariant,
 )
+from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
+    HgvsMatchTranscriptAndGenomeRefAllele,
+)
 from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
@@ -171,6 +174,18 @@ class TestHGVS(TestCase):
 
     def test_hgvs_biocommons(self):
         self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def test_transcript_ref_strand_and_intronic(self):
+        """ GATA2 is on the minus strand, which drives the reverse complement of the transcript ref (#1266);
+            an intronic ref is read from the genome, so can't be compared with it """
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+        exonic = matcher.get_variant_coordinate_and_details("NM_001145661.2(GATA2):c.1121G>A").matches_reference
+        self.assertEqual("-", exonic.strand)
+        intronic = matcher.get_variant_coordinate_and_details("NM_001145661.2(GATA2):c.1017+572C>T").matches_reference
+        self.assertFalse(intronic.transcript_ref_from_sequence)
+        self.assertIsNone(intronic.transcript_and_genome_ref_differ)
 
     def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType):
         # GATA2 ClinVar
@@ -494,3 +509,37 @@ class TestSymbolicHGVS(TestCase):
         mock_report.assert_not_called()
         with self.assertRaises(HGVSNoRepresentationException):
             matcher.variant_to_c_hgvs_parts(variant, "NM_001145661.2", throw_on_issue=True)
+
+
+class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
+    """ #1266 - the genome ref is on the forward strand, the transcript ref on the transcript's """
+
+    @staticmethod
+    def _mapped(strand: str, transcript_ref: str, genome_ref: str) -> HgvsMatchTranscriptAndGenomeRefAllele:
+        matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, transcript_ref, transcript_ref)
+        matches_reference.transcript_ref_from_sequence = True
+        matches_reference.mapped_transcript_ref = transcript_ref
+        matches_reference.genome_ref = genome_ref
+        return matches_reference
+
+    def test_minus_strand_same(self):
+        self.assertFalse(self._mapped("-", "G", "C").transcript_and_genome_ref_differ)
+
+    def test_minus_strand_differ(self):
+        # F5 Leiden NM_000130.5:c.1601G>A in GRCh37 - the genome carries the alt
+        matches_reference = self._mapped("-", "G", "T")
+        self.assertTrue(matches_reference.transcript_and_genome_ref_differ)
+        self.assertIn('genome reference "A"', matches_reference.get_transcript_and_genome_ref_message())
+
+    def test_plus_strand_differ(self):
+        self.assertTrue(self._mapped("+", "T", "A").transcript_and_genome_ref_differ)
+
+    def test_not_mapped(self):
+        self.assertIsNone(HgvsMatchTranscriptAndGenomeRefAllele("+", "T", "T").transcript_and_genome_ref_differ)
+
+    def test_transcript_ref_from_genome(self):
+        # Intronic, or stitched from the genome - the refs match by construction, so unchecked rather than same
+        matches_reference = self._mapped("+", "T", "T")
+        matches_reference.transcript_ref_from_sequence = False
+        self.assertIsNone(matches_reference.transcript_and_genome_ref_differ)
+        self.assertEqual("", matches_reference.get_transcript_and_genome_ref_message())
