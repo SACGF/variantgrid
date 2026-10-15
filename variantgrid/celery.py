@@ -66,6 +66,12 @@ app.conf.beat_schedule['reclassification-events-update'] = {
     'schedule': crontab(hour=3, minute=30),
 }
 
+# Exports read citations from the database rather than calling Entrez mid-download (#1687)
+app.conf.beat_schedule['prefetch-classification-citations'] = {
+    'task': 'classification.tasks.classification_citation_tasks.prefetch_classification_citations',
+    'schedule': crontab(hour=2, minute=30),
+}
+
 app.conf.beat_schedule['notify-server-status'] = {
     'task': 'variantopedia.tasks.server_status_tasks.notify_server_status',
     'schedule': crontab(hour=19, minute=0),

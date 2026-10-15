@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from django.conf import settings
 
-from annotation.models.models_citations import CitationFetchRequest, CitationFetchResponse
+from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
 from classification.models.evidence_key import (
@@ -175,6 +175,11 @@ class EvidenceMixin:
 
     def loaded_citations(self) -> CitationFetchResponse:
         return CitationFetchRequest.fetch_all_now(self.db_refs)
+
+    def stored_citations(self) -> list[Citation]:
+        """ Citations as already in the database, without calling Entrez - populated nightly by
+            classification.tasks.classification_citation_tasks.prefetch_classification_citations """
+        return CitationFetchRequest.get_unfetched_citations(self.db_refs)
 
     @property
     def is_likely_acmg(self) -> bool:

@@ -161,6 +161,7 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_import_task',
     'classification.tasks.classification_candidate_search_tasks',
     'classification.tasks.classification_create_tasks',
+    'classification.tasks.classification_citation_tasks',
     'classification.tasks.classification_reclassification_tasks',
     'classification.tasks.condition_text_automatch_task',
     'classification.views.classification_email_view',
