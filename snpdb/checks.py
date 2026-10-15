@@ -137,7 +137,7 @@ def check_feature_dependencies(app_configs, **kwargs):
                                   hint="Override BEACON_CONFIG in the env settings file as vgaws.py does.",
                                   id="variantgrid.E008"))
     if settings.DISCORDANCE_ENABLED and not settings.DISCORDANCE_EMAIL:
-        messages.append(Error("DISCORDANCE_ENABLED without DISCORDANCE_EMAIL - discordance notifications are never sent",
+        messages.append(Warning("DISCORDANCE_ENABLED without DISCORDANCE_EMAIL - discordance notifications are never sent",
                               id="variantgrid.E009"))
     if settings.DISCORDANCE_EMAIL and not settings.SEND_EMAILS:
         messages.append(Warning("DISCORDANCE_EMAIL is set but SEND_EMAILS is False - discordance emails are logged, "
