@@ -132,6 +132,18 @@ class UniProt(models.Model):
     def __str__(self):
         return self.accession
 
+
+class AmbiguousGeneSymbolAlias(ValueError):
+    """ A name that is an alias for several genes, with nothing to settle which - rather than pick one, the user is
+        told the genes it could be so they can write the one they meant """
+
+    def __init__(self, name: str, gene_symbol_ids: Iterable[str]):
+        self.name = name
+        self.gene_symbol_ids = sorted(gene_symbol_ids)
+        super().__init__(f"'{name}' is an ambiguous alias for {', '.join(self.gene_symbol_ids)} - "
+                         f"change it to the explicit gene symbol")
+
+
 class GeneSymbol(models.Model, PreviewModelMixin):
     """
         If you want to do a like on symbol and get an error:
@@ -166,6 +178,54 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     @timed_cache(ttl=3600)
     def _cast(symbol_str: str) -> Optional['GeneSymbol']:
         return GeneSymbol.objects.filter(symbol=symbol_str).first()
+
+    @staticmethod
+    def resolve_name(name: str) -> tuple[Optional[str], Optional[HGNC]]:
+        """ (gene symbol, HGNC) for a gene name as written - the symbol is the approved one where 'name' is an old name.
+
+            A name that is a current HGNC symbol in its own right is taken as written. Otherwise HGNC's rename is the
+            strongest evidence two names are one gene, so it outranks an alias: SEPT2 is SEPTIN2's previous symbol and
+            also, on an unrelated gene, one of SEPTIN6's aliases. An alias resolves only when it names a single gene.
+            :raises AmbiguousGeneSymbolAlias: when 'name' is no symbol itself, and an alias for several genes
+
+            One name, a few indexed queries: the HGNC import stores every previous and alias symbol as a
+            GeneSymbolAlias, so the alias rows are what find the HGNC records to check """
+        name = name.strip()
+        uc_name = name.upper()
+
+        def approved_first(hgnc_qs) -> list[HGNC]:
+            # gene_symbol isn't unique in HGNC (eg MMP21 has multiple entries) so prefer the approved one
+            return sorted(hgnc_qs, key=lambda hgnc: (hgnc.status != HGNCStatus.APPROVED, hgnc.pk))
+
+        def lists_name(hgnc: HGNC, field: str) -> bool:
+            return uc_name in {symbol.strip().upper() for symbol in (getattr(hgnc, field) or "").split(",")}
+
+        def single_gene(hgncs: list[HGNC]) -> Optional[HGNC]:
+            if len({hgnc.gene_symbol_id for hgnc in hgncs}) == 1:
+                return hgncs[0]
+            return None
+
+        exact = GeneSymbol.objects.filter(symbol=name).first()
+        if exact:
+            if hgncs := approved_first(HGNC.objects.filter(gene_symbol=exact)):
+                return exact.symbol, hgncs[0]
+
+        alias_symbol_ids = set(GeneSymbolAlias.objects.filter(alias=name).values_list("gene_symbol_id", flat=True))
+        alias_hgncs = approved_first(HGNC.objects.filter(gene_symbol_id__in=alias_symbol_ids))
+        for hgnc in alias_hgncs:
+            if lists_name(hgnc, "previous_symbols"):
+                return hgnc.gene_symbol_id, hgnc
+        # an alias is a nickname rather than a rename, so it counts only when it names one gene
+        if hgnc := single_gene(alias_hgncs) or single_gene([h for h in alias_hgncs if lists_name(h, "alias_symbols")]):
+            return hgnc.gene_symbol_id, hgnc
+
+        if exact:
+            return exact.symbol, None
+        if len(alias_symbol_ids) > 1:
+            raise AmbiguousGeneSymbolAlias(name, alias_symbol_ids)
+        if alias_symbol_ids:
+            return alias_symbol_ids.pop(), None
+        return None, None
 
     @property
     def metrics_logging_key(self) -> tuple[str, Any]:
