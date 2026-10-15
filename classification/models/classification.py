@@ -2132,11 +2132,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             namespaces=namespaces
         )
 
+    @staticmethod
+    def lab_evidence_key_overrides(lab: Lab) -> EvidenceKeyOverrides:
+        return EvidenceKeyOverrides.merge(
+            EvidenceKeyOverrides.from_dict(lab.organization.classification_config),
+            EvidenceKeyOverrides.from_dict(lab.classification_config)
+        )
+
     @cached_property
     def evidence_key_overrides(self) -> EvidenceKeyOverrides:
         return EvidenceKeyOverrides.merge(
-            EvidenceKeyOverrides.from_dict(self.lab.organization.classification_config),
-            EvidenceKeyOverrides.from_dict(self.lab.classification_config),
+            self.lab_evidence_key_overrides(self.lab),
             self._evidence_key_overrides_from_evidence_fields
         )
 
@@ -2151,22 +2157,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def lowest_share_level(self, user) -> ShareLevel:
         """ lower = less restricted """
-
-        if user.is_superuser:
-            return ShareLevel.CURRENT_USER
-
-        is_in_lab = user.groups.filter(name=self.lab.group_name).exists()
-        is_in_org = user.groups.filter(name=self.lab.organization.group_name).exists()
-
-        if self.user == user:
-            return ShareLevel.CURRENT_USER
-        if is_in_lab:
-            return ShareLevel.LAB
-        if is_in_org:
-            return ShareLevel.ORGANISATION
-        if user.is_authenticated:
-            return ShareLevel.ALL_USERS
-        return ShareLevel.PUBLIC
+        return EvidenceVisibility(user).lowest_share_level(self)
 
     def get_visible_evidence(self, evidence, lowest_share_level: ShareLevel) -> dict[str, dict]:
         """ Driven by EvidenceKey.max_share_level """
@@ -2175,7 +2166,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return evidence
 
         visible_ekeys = self.evidence_keys.share_level_and_higher(lowest_share_level)
-        visible_keys = {ek.key for ek in visible_ekeys}
+        return self.hide_evidence(evidence, visible_keys={ek.key for ek in visible_ekeys})
+
+    @staticmethod
+    def hide_evidence(evidence, visible_keys: set[str]) -> dict[str, dict]:
         visible_evidence = {}
         for k, v in evidence.items():
             if k in visible_keys:
@@ -2725,9 +2719,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
 
     def get_visible_evidence(self, user: User) -> dict[str, dict]:
         """ Driven by EvidenceKey.max_share_level """
-        lowest_share_level = self.classification.lowest_share_level(user)
-        # astroid infers self.classification as a ClassificationModification, from patch_value's assignment to it
-        return self.classification.get_visible_evidence(self.evidence, lowest_share_level)  # pylint: disable=too-many-function-args
+        return EvidenceVisibility(user).visible_evidence(self.classification, self.evidence)
 
     def c_hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
         return self.classification.c_hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
@@ -2812,6 +2804,54 @@ BUCKET_ALLELE_ORIGIN = {  # what the allele_origin evidence key is seeded with p
     AlleleOriginBucket.GERMLINE: "germline",
     AlleleOriginBucket.SOMATIC: "somatic",
 }
+
+
+class EvidenceVisibility:
+    """
+    Hides evidence above a user's share level (EvidenceKey.max_share_level). Keep one per user across many
+    classifications (e.g. an export): the user's groups are read once, their share level resolved once per lab and the
+    visible keys once per lab and share level, rather than per classification.
+    """
+
+    def __init__(self, user: User):
+        self.user = user
+        self._lab_share_levels: dict[int, ShareLevel] = {}
+        self._visible_keys: dict[tuple[int, ShareLevel], set[str]] = {}
+
+    @cached_property
+    def _group_names(self) -> set[str]:
+        return set(self.user.groups.values_list('name', flat=True))
+
+    def lowest_share_level(self, classification: Classification) -> ShareLevel:
+        """ lower = less restricted """
+        if self.user.is_superuser or classification.user_id == self.user.pk:
+            return ShareLevel.CURRENT_USER
+
+        lab = classification.lab
+        if (share_level := self._lab_share_levels.get(lab.pk)) is None:
+            if lab.group_name in self._group_names:
+                share_level = ShareLevel.LAB
+            elif lab.organization.group_name in self._group_names:
+                share_level = ShareLevel.ORGANISATION
+            elif self.user.is_authenticated:
+                share_level = ShareLevel.ALL_USERS
+            else:
+                share_level = ShareLevel.PUBLIC
+            self._lab_share_levels[lab.pk] = share_level
+        return share_level
+
+    def visible_evidence(self, classification: Classification, evidence) -> dict[str, dict]:
+        share_level = self.lowest_share_level(classification)
+        if share_level.index == 0:  # No restrictions
+            return evidence
+
+        # max_share_level can only be overridden by lab / org config, so the evidence's own namespaces don't matter
+        cache_key = (classification.lab_id, share_level)
+        if (visible_keys := self._visible_keys.get(cache_key)) is None:
+            e_keys = EvidenceKeyMap.instance().with_overrides(Classification.lab_evidence_key_overrides(classification.lab))
+            visible_keys = {ek.key for ek in e_keys.share_level_and_higher(share_level)}
+            self._visible_keys[cache_key] = visible_keys
+        return Classification.hide_evidence(evidence, visible_keys)
 
 
 @dataclass(frozen=True)
