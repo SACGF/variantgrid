@@ -87,6 +87,9 @@ Gotchas:
 - In a template, `classification.sample_id` is the `sample_id` evidence value, not the FK: Django tries `obj[key]` before
   the attribute and models/evidence_mixin.py:EvidenceMixin.__getitem__ answers any evidence key. Resolve model fields in
   the view or tag (templatetags/classification_tags.py:classification_quick passes `sample` / `username`).
+- Legacy (VG3-era) records can hold a select key's option label or a comma separated string of labels ("Autosomal
+  recessive") instead of the list of option keys every write now stores (models/classification.py:Classification.option_value_parts).
+  management/commands/classification_normalise_option_values.py converts them; compare on normalised values until it has run.
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
   assuming every classification has a variant.
