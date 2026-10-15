@@ -12,7 +12,9 @@ from classification.models.classification_variant_info_models import (
 )
 from classification.models.condition_text_matching import ConditionTextMatch
 from genes.hgvs import HGVSDisplay
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
+from genes.models_enums import GeneSymbolAliasSource
 from library.request_context import set_thread_variable
 from snpdb.models import Country, Lab, Organization
 
@@ -68,3 +70,16 @@ class ConditionTextSyncTest(TestCase):
 
         self._variant_matched(vc, "NM_001252006.1(PAPOLA):c.1A>C")
         self.assertEqual(self._match_gene(vc), self.papola)
+
+    def test_gene_symbol_best_resolves_aliases(self):
+        GeneSymbolAlias.objects.create(alias="PAP", gene_symbol=self.papola, source=GeneSymbolAliasSource.HGNC)
+        GeneSymbolAlias.objects.create(alias="SHARED", gene_symbol=self.papola, source=GeneSymbolAliasSource.HGNC)
+        GeneSymbolAlias.objects.create(alias="SHARED", gene_symbol=self.brca1, source=GeneSymbolAliasSource.HGNC)
+
+        def best(c_hgvs: str, gene_symbol: Optional[str] = None) -> Optional[GeneSymbol]:
+            return self._classification(c_hgvs, gene_symbol=gene_symbol).last_published_version.gene_symbol_best()
+
+        self.assertEqual(best("NM_001252006.1:c.1A>C", gene_symbol="PAP"), self.papola)
+        with self.assertRaises(AmbiguousGeneSymbolAlias):
+            best("NM_001252006.1:c.1A>C", gene_symbol="SHARED")
+        self.assertEqual(best("NM_001252006.1(PAP):c.1A>C", gene_symbol="BRCA1"), self.papola)

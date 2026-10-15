@@ -33,7 +33,8 @@ from classification.models.condition_text_search import condition_text_search
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
-from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models import GeneSymbol
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.constants import MINUTE_SECS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.model_utils import ArrayLength
@@ -349,32 +350,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                                                  search_timeout=MANUAL_ENTRY_SEARCH_TIMEOUT)
 
     @staticmethod
-    def _gene_symbol_for(cm: ClassificationModification) -> Optional[GeneSymbol]:
-        """
-        The gene symbol of the resolved transcript wins over the one the lab submitted, which may be an alias or
-        out of date. Until the variant is matched the best c.HGVS is the imported one, so this is the submitted
-        symbol when the import included it and nothing otherwise - the sync is run again when matching completes.
-        """
-        candidates: list[str] = []
-        try:
-            if resolved := cm.c_hgvs_best(cm.get_genome_build()).gene_symbol:
-                candidates.append(resolved)
-        except ValueError:
-            # no usable genome build on the record
-            pass
-        if submitted := cm.get(SpecialEKeys.GENE_SYMBOL):
-            candidates.append(submitted)
-
-        for candidate in candidates:
-            if gene_symbol := GeneSymbol.objects.filter(symbol=candidate).first():
-                return gene_symbol
-        for candidate in candidates:
-            alias_qs = GeneSymbolAlias.objects.filter(alias__iexact=candidate)
-            if alias_qs.count() == 1:
-                return alias_qs.first().gene_symbol
-        return None
-
-    @staticmethod
     def sync_condition_text_classification(cm: ClassificationModification, update_counts=True, attempt_automatch=False):
         """
         @param cm ClassificationModification - verify or create ConditionTextMatches for this classification
@@ -399,7 +374,10 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return
 
         lab = classification.lab
-        gene_symbol = ConditionTextMatch._gene_symbol_for(cm)
+        try:
+            gene_symbol = cm.gene_symbol_best()
+        except AmbiguousGeneSymbolAlias:
+            gene_symbol = None
         if not gene_symbol:
             debug_timer.tick("Condition Text Matching - no valid gene symbol")
             return
