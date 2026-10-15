@@ -1,7 +1,7 @@
 # #1870 — Patient CSV names the DNA and RNA arms of one specimen
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14
-Status: draft
+Status: in progress - implemented on branch 1870_patient_csv_extraction_arms, awaiting review
 
 [#1870](https://github.com/SACGF/variantgrid/issues/1870), split out of the TSO 500 plan (SACGF/variantgrid_sapath#431)
 and left over from #1704. The patient CSV (`patients/import_records.py`) can put two extractions on one specimen but
@@ -82,7 +82,7 @@ class PatientRecord(TimeStampedModel):
     specimen_age_at_collection_date = models.IntegerField(null=True, blank=True)
 ```
 
-Migration patients/migrations/0019_patientrecord_extraction.py: `RenameField` for the nucleic acid column, `AddField`
+Migration patients/migrations/0025_patientrecord_extraction.py: `RenameField` for the nucleic acid column, `AddField`
 x3. No `Extraction` change - `reference_id`, `nucleic_acid_source`, `extraction_date` and `unique_together
 ("specimen", "reference_id")` are what the CSV writes to.
 
@@ -277,7 +277,7 @@ On this box, as a user with a VCF whose sample names end in `..._2600000001C` / 
 - `scripts/vg tests --explain` names `patients.tests.test_specimen_extraction`,
   `patients.tests.test_patients_edge_cases` and `upload.tests.test_import_patient_records`; all pass with
   `--keepdb`; the kept tests are those above.
-- Migration 0019 applied on this box (ask first); `scripts/vg map` refreshed.
+- Migration 0025 applied on this box (ask first); `scripts/vg map` refreshed.
 - `Specimen.get_or_create_extraction`'s docstring carries the matching order; `patients/import_records.py`'s
   module docstring describes the one-pass import; `claude/research/patients.md` updated;
   `scripts/vg docs check` passes.

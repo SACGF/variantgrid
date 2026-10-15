@@ -62,9 +62,16 @@ phenotype text is appended under a dated "From Imported CSV" line rather than re
 is found by `(patient, reference_id)`; a reference_id already used by a *different* patient fails the row with
 `specimen_patient_clash_message` (the lookup is unrestricted, so the other patient is only described if the user can
 view it), and its fields are updated from the row by `patients/import_records.py:set_fields_from_row` - a blank column
-is "no answer" and leaves the stored value alone. `patients/models/models_patient.py:Specimen.get_or_create_extraction` picks the extraction the row describes - the sample's
-own extraction if it already has one, else one with the same nucleic acid, else an unnamed one - so a TSO 500 specimen's
-DNA and RNA arms stay separate on re-import. `assign_patient_to_sample` / `assign_extraction_to_sample` write a
+is "no answer" and leaves the stored value alone. A row is one extraction (#1870): the `Extraction Reference id`,
+`Extraction Nucleic acid source` and `Extraction date` columns name it, so the DNA and RNA arms of block `2600000001`
+are two rows repeating the specimen columns. `patients/models/models_patient.py:Specimen.get_or_create_extraction`
+(its docstring holds the order) matches the reference first - the `(specimen, reference_id)` key the API upserts on,
+so a row naming another arm relinks the sample - then the sample's own extraction, then the specimen's extractions
+filtered by acid and date: several raise `patients/models/models_patient.py:AmbiguousExtraction`, a validation message
+on the row with no sample link. An extraction reference without a specimen reference is a validation message too. The
+`PatientRecord` keeps the three values as typed beside the matched `extraction` and `extraction_match`, and when any
+row created an extraction the import fires `reconcile_pending_extractions` so VCF samples parked on that reference
+resolve. `assign_patient_to_sample` / `assign_extraction_to_sample` write a
 `patients/models/models_patient.py:PatientModification` for every change, hung off the PatientImport. Phenotype matching for touched
 patients runs once in bulk at the end (`patients/phenotype_matching.py:bulk_patient_phenotype_matching`).
 
