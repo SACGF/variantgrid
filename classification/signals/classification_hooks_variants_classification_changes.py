@@ -9,6 +9,7 @@ from classification.models import (
     variants_classification_changed_signal,
 )
 from classification.models.classification_variant_info_models import allele_info_changed_signal
+from classification.models.condition_text_matching import ConditionTextMatch
 from snpdb.models import Allele
 
 """
@@ -46,6 +47,9 @@ def allele_info_changed_update_classifications(sender, allele_info: ImportedAlle
     for classification in allele_info.classification_set.all():
         classification.apply_allele_info_to_classification()
         classification.save()
+        # the resolved transcript's gene symbol is what condition matching keys on, and it only exists now
+        if published := classification.last_published_version:
+            ConditionTextMatch.sync_condition_text_classification(published, attempt_automatch=True)
 
     # update variants_classification_changed_signal
     if allele := allele_info.allele:
