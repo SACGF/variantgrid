@@ -83,7 +83,10 @@ def _allele_info(classification: Classification) -> dict[str, Any] | None:
         for build in ("grch37", "grch38"):
             resolved = getattr(allele_info, build)
             if resolved:
-                info[build] = {"variant": resolved.variant_id, "resolved_hgvs": resolved.resolved_hgvs, "gene": resolved.gene_symbol_id, "transcript": resolved.transcript_version_id and str(resolved.transcript_version)}
+                info[build] = {"variant": resolved.variant_id, "resolved_hgvs": resolved.resolved_hgvs,
+                               "p_hgvs": resolved.p_hgvs, "p_hgvs_short": resolved.p_hgvs_short,
+                               "p_hgvs_source": resolved.get_p_hgvs_source_display() if resolved.p_hgvs_source else None,
+                               "p_hgvs_error": resolved.p_hgvs_error, "gene": resolved.gene_symbol_id, "transcript": resolved.transcript_version_id and str(resolved.transcript_version)}
         validation = allele_info.latest_validation
         if validation:
             info["validation"] = {"include": validation.include, "confirmed": validation.confirmed, "tags": validation.validation_tags_list if hasattr(validation, "validation_tags_list") else None}
