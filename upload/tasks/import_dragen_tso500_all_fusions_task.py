@@ -29,12 +29,13 @@ so the sample node's minimum-reads threshold and allele frequency work on fusion
 """
 import json
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Optional
 
 from django.conf import settings
 
 from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_writer import (
     VCFInfoHeader,
     VCFWriter,
@@ -49,6 +50,7 @@ from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
     ModifiedImportedVariants,
+    SimpleVCFImportInfo,
     UploadStep,
 )
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -102,21 +104,30 @@ def _source_from_comments(comments) -> str:
     return ""
 
 
-def _observations_by_variant_coordinate(rows, genome_build: Optional[GenomeBuild]) -> dict:
-    """ {variant coordinate: [the rows that named that gene pair, as the caller wrote them]}
+AMBIGUOUS_MESSAGE_PREFIX = "Fusion rows skipped - "
+
+
+def _observations_by_variant_coordinate(rows, genome_build: Optional[GenomeBuild]) -> tuple[dict, Counter[str]]:
+    """ ({variant coordinate: [the rows that named that gene pair, as the caller wrote them]},
+         {AmbiguousGeneSymbolAlias message: rows skipped for it})
 
         The breakpoints decide which gene each side is where we know the build to look them up in;
         with no build resolvable the names are all there is, which is where this started """
     resolver = GeneFusionResolver()
     observations = defaultdict(list)
+    ambiguous = Counter()
     for row in rows:
-        gene_a = resolver.resolve_side(row.gene_a, breakpoint=row.gene_a_breakpoint,
-                                       genome_build=genome_build)
-        gene_b = resolver.resolve_side(row.gene_b, breakpoint=row.gene_b_breakpoint,
-                                       genome_build=genome_build)
+        try:
+            gene_a = resolver.resolve_side(row.gene_a, breakpoint=row.gene_a_breakpoint,
+                                           genome_build=genome_build)
+            gene_b = resolver.resolve_side(row.gene_b, breakpoint=row.gene_b_breakpoint,
+                                           genome_build=genome_build)
+        except AmbiguousGeneSymbolAlias as ambiguous_alias:
+            ambiguous[str(ambiguous_alias)] += 1
+            continue
         resolved_fusion = resolver.resolve_fusion(gene_a, gene_b, row.directionality_known)
         observations[resolved_fusion].append(row.data)
-    return observations
+    return observations, ambiguous
 
 
 def _read_support(observations: list[dict]) -> tuple[Optional[int], Optional[int]]:
@@ -206,9 +217,11 @@ class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
         # The VCF this step writes is what the build would normally be resolved from, so the source
         # line has to answer it here - @see upload.vcf.vcf_import.resolve_genome_build
         genome_build = resolve_genome_build_from_source(source, file_upload)
-        observations = _observations_by_variant_coordinate(rows, genome_build)
+        observations, ambiguous = _observations_by_variant_coordinate(rows, genome_build)
         _write_gene_level_vcf(upload_step.output_filename, observations,
                               sample_name=arm_sample_name(file_upload.name), source=source)
+        for ambiguous_message, count in ambiguous.items():
+            SimpleVCFImportInfo.add_message_count(count, AMBIGUOUS_MESSAGE_PREFIX + ambiguous_message, upload_step)
         return len(rows)
 
 

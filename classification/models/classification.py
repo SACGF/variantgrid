@@ -113,6 +113,7 @@ from flags.models.models import (
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
 from genes.models import Gene, GeneSymbol, NoTranscript
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -2733,6 +2734,34 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
 
     def hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
         return self.classification.hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
+
+    def gene_symbol_best(self, genome_build: Optional[GenomeBuild] = None) -> Optional[GeneSymbol]:
+        """
+        The gene symbol of the best c.HGVS (see hgvs_best) wins over the one the lab submitted, which may be an
+        alias or out of date. Until the variant is matched the best c.HGVS is the imported one, so this is the
+        submitted symbol when the import included it. Either is taken to its current name (see GeneSymbol.resolve_name).
+        :param genome_build: build to prefer for the c.HGVS, defaults to the record's own
+        :raises AmbiguousGeneSymbolAlias: when neither places the gene and one is an ambiguous alias
+        """
+        candidates: list[str] = []
+        if genome_build := genome_build or self.get_genome_build_opt():
+            if best := self.hgvs_best(genome_build).gene_symbol:
+                candidates.append(best)
+        if submitted := self.get(SpecialEKeys.GENE_SYMBOL):
+            candidates.append(submitted)
+
+        ambiguities = []
+        for candidate in candidates:
+            try:
+                gene_symbol_id, _hgnc = GeneSymbol.resolve_name(candidate)
+            except AmbiguousGeneSymbolAlias as ambiguous:
+                ambiguities.append(ambiguous)
+                continue
+            if gene_symbol_id:
+                return GeneSymbol.objects.get(pk=gene_symbol_id)
+        if ambiguities:
+            raise ambiguities[0]
+        return None
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """

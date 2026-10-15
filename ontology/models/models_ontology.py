@@ -24,7 +24,6 @@ from model_utils.models import TimeStampedModel, now
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
-from genes.gene_matching import HGNCMatcher
 from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
@@ -478,24 +477,28 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         Returns the OntologyTerm for a GeneSymbol (which exists just to make relationship nodes)
         This should be used as little as possible and only to bridge between GeneSymbols and OntologyTerms
         aka if you're talking about GeneSymbols, pass around the GeneSymbol object, not the OntologyTerm
+        :raises ValueError: when no HGNC record has the name, or it's an alias of several genes (AmbiguousGeneSymbolAlias)
         """
         if isinstance(gene_symbol, GeneSymbol):
             gene_symbol = gene_symbol.symbol
 
         if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, name=gene_symbol).first():
             return gene_ontology
-        if gene_ontology := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, aliases__contains=[gene_symbol]).first():
-            return gene_ontology
+        # a name shared by several genes' terms is settled by GeneSymbol.resolve_name below
+        alias_terms = list(OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, aliases__contains=[gene_symbol])[:2])
+        if len(alias_terms) == 1:
+            return alias_terms[0]
 
-        hgnc_matcher = HGNCMatcher.instance()
-        if hgnc := hgnc_matcher.match_hgnc(gene_symbol):
+        _symbol, hgnc = GeneSymbol.resolve_name(gene_symbol)
+        if hgnc:
             if hgnc_term := OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC, index=hgnc.id).first():
                 # we found an Ontology Term for HGNC, but the ID is already in use for another sybmol
                 # prioritise the name as defined by HGNCGeneNames but keep the other names in the aliases
                 # Also only lazily load aliases, we shouldn't have too many sources of data that request based on
                 # deprecated gene names
-                hgnc_term.aliases.append(gene_symbol)
-                hgnc_term.save()
+                if gene_symbol not in hgnc_term.aliases:
+                    hgnc_term.aliases.append(gene_symbol)
+                    hgnc_term.save()
                 return hgnc_term
             # every term needs an import
             o_import = OntologyImport.objects.create(
