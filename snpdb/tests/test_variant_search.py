@@ -89,8 +89,8 @@ class SearchAutoOpenGenomeBuildTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
 
     def _single_preferred_result(self, search_type):
-        preview = PreviewData.for_object(obj=None, category=search_type.preview_category(), internal_url="/result",
-                                         genome_builds={self.grch37})
+        preview = PreviewData(category=search_type.preview_category(), identifier="x", internal_url="/result",
+                              genome_builds={self.grch37}, can_liftover=search_type.preview_can_liftover())
         result = SearchResult(preview=preview, match_strength=SearchResultMatchStrength.STRONG_MATCH)
         response = SearchResponse(search_input=self.search_input, search_type=search_type, matched_pattern=True,
                                   results=[result], total_count=1)

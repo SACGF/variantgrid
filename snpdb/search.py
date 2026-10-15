@@ -409,7 +409,7 @@ class SearchResult:
         A variant missing from the preferred build may still be lifted over (or its liftover failed), so don't jump
         to another build. An analysis, sample, contig etc. belongs to one build forever, so jumping to it is fine (#2174)
         """
-        return self.genome_build_mismatch and self.parent.search_type in (Variant, Allele)
+        return self.genome_build_mismatch and self.preview.can_liftover
 
     @cached_property
     def has_multiple_genome_builds(self) -> bool:
