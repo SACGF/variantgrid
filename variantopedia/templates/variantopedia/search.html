@@ -138,7 +138,7 @@
             <input id="search-mode" name="mode" type="hidden" value="{{ form.mode.value }}" />
             <label class="form-check-label form-check-inline mt-2">
                 <input id='feeling-lucky' type='checkbox' value="lucky" class="form-check mr-2" {% if form.mode.value != 'preview' %}checked{% endif %} onclick="updateSearchMode()"/>
-                Automatically open single valid search result
+                Automatically open single valid search result (variants only in your preferred genome build)
             </label>
         </form>
 
