@@ -31,6 +31,7 @@ from classification.models import (
 )
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -363,12 +364,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         )
 
     def gene_symbol_filter(self, gene_symbol: str) -> Optional[Q]:
-        if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
-            all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
-            all_strs = [gs.upper() for gs in all_strs]
-            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
+        """ An old name or alias filters on the gene it names, an alias of several genes on each of them """
+        try:
+            gene_symbol_id, _hgnc = GeneSymbol.resolve_name(gene_symbol)
+            gene_symbol_ids = [gene_symbol_id] if gene_symbol_id else []
+        except AmbiguousGeneSymbolAlias as ambiguous:
+            gene_symbol_ids = ambiguous.gene_symbol_ids
+
+        all_strs = []
+        for gene_symbol_obj in GeneSymbol.objects.filter(pk__in=gene_symbol_ids):
+            all_strs += [gene_symbol_obj.symbol, *gene_symbol_obj.alias_meta.alias_symbol_strs]
+        if all_strs:
+            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL,
+                                                             [gs.upper() for gs in all_strs])
         return None
-        # FIXME add support for gene symbol alias
 
     @staticmethod
     def get_ontology_q(ontology_terms: str) -> Q | None:
