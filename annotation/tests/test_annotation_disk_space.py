@@ -20,6 +20,7 @@ from annotation.annotation_run_files import get_annotsv_dir
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    link_fake_gene_annotation_release,
     retire_seeded_annotation_version,
 )
 from annotation.models import (
@@ -217,6 +218,7 @@ class AnnotationDiskGateTestCase(TestCase):
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+        link_fake_gene_annotation_release(cls.vav)
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
     def _make_run(self, lo_idx, hi_idx, status=AnnotationStatus.CREATED):

@@ -115,7 +115,13 @@
                                             {% if run_blocker %}
                                                 <div class="alert alert-warning" role="alert">
                                                     <i class="fas fa-exclamation-triangle"></i>
-                                                    <strong>{{ vav.short_string }}</strong> {{ run_blocker }} — annotation runs against this version will fail. Assign a GeneAnnotationRelease before running pipelines.
+                                                    <strong>{{ vav.short_string }}</strong> {{ run_blocker }} — annotation runs against this version will fail, so no new VEP runs are launched for it. Failed runs stay in Error; retry them with "Retry all failed runs" once unblocked.
+                                                    {% if vav.annotation_blocked_date %}
+                                                        <div class="mt-2">
+                                                            <button name="recheck-vep-version-{{ vav.pk }}" class="btn btn-sm btn-warning">Re-check VEP version</button>
+                                                            <span class="ml-2">The check runs on an annotation worker. After a VEP upgrade create a new version instead, and restart annotation_workers if this version is meant to run again.</span>
+                                                        </div>
+                                                    {% endif %}
                                                 </div>
                                             {% endif %}
                                         {% endwith %}

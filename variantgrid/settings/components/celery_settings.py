@@ -85,6 +85,8 @@ CELERY_TASK_ROUTES = {
     # slot - the dispatcher runs it once a run reaches ANNOTATION_COMPLETED. See #1649.
     "annotation.tasks.annotate_variants.annotate_variants": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.import_annotation_run": DB_WORKERS,
+    # #1679: re-runs VEP on the fake VCF, so it must run where annotate_variants does.
+    "annotation.tasks.annotate_variants.recheck_vep_version": ANNOTATION_WORKERS,
     'annotation.tasks.calculate_sample_stats.calculate_vcf_stats': ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CalculateCohortSampleGeneDamageCountsTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleGeneDamageCountTask": ANNOTATION_WORKERS,

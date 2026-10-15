@@ -5,6 +5,7 @@ from django.test.utils import override_settings
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    link_fake_gene_annotation_release,
     retire_seeded_annotation_version,
 )
 from annotation.models import (
@@ -112,6 +113,24 @@ class VariantAnnotationVersionStatusTests(TestCase):
         # Assign after creation - creating with it set while no GeneAnnotationVersion exists raises in new_sub_version
         vav.gene_annotation_release = gar
         vav.save(update_fields=["gene_annotation_release"])
+        self.assertIsNone(vav.get_annotation_run_blocker())
+
+    def test_vep_mismatch_latch(self):
+        """ #1679: only the first block reports (returns True), and its reason/date survive later blocks. """
+        vav = _make_vav(self.grch37)
+        link_fake_gene_annotation_release(vav)
+        self.assertTrue(vav.block_annotation_runs("first"))
+        first_date = vav.annotation_blocked_date
+        self.assertFalse(vav.block_annotation_runs("second"))
+
+        vav.refresh_from_db()
+        self.assertEqual(vav.annotation_blocked_reason, "first")
+        self.assertEqual(vav.annotation_blocked_date, first_date)
+        self.assertIn("VEP mismatch", vav.get_annotation_run_blocker())
+        self.assertIn("first", vav.get_annotation_run_blocker())
+
+        vav.unblock_annotation_runs()
+        vav.refresh_from_db()
         self.assertIsNone(vav.get_annotation_run_blocker())
 
     def test_latest_default_returns_active_only(self):

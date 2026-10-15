@@ -1,7 +1,7 @@
 # #1679 — VEPVersionMismatchError: latch it on the VAV, gate the dispatcher, unblock explicitly
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14
-Status: draft
+Status: in progress - implemented on branch 1679_vep_mismatch_latch, awaiting review
 
 [#1679](https://github.com/SACGF/variantgrid/issues/1679). Related: #1642 (the vgaws `gencode_subset`
 instance, closed), #1658 / #1660 (lease and reclaim, same task file), #1665 (dispatcher may not be on the
