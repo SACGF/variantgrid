@@ -254,7 +254,7 @@ def populate_classification_json(classification: Classification, params: Classif
             data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url()) + "?refer=json&seen=" + params.date_str}
 
         if params.populate_literature_with_citations:
-            if citations := classification.loaded_citations().all_citations:
+            if citations := classification.stored_citations():
                 data[SpecialEKeys.LITERATURE] = f"Citations scanned from this classification by {settings.SITE_NAME}\n" + "\n".join(f"{citation}" for citation in citations)
             else:
                 data[SpecialEKeys.LITERATURE] = None
