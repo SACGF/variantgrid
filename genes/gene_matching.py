@@ -1,6 +1,7 @@
 """
-Matching text to genes: GeneSymbolMatcher and HGNCMatcher resolve symbols and aliases to GeneSymbol
-rows, ReleaseGeneMatcher records which Gene a symbol meant in a particular GeneAnnotationRelease (symbols
+Matching text to genes: GeneSymbolMatcher resolves gene names to GeneSymbol rows a batch at a time with
+GeneSymbol.resolve_names (the rules GeneSymbol.resolve_name applies to one name), ReleaseGeneMatcher
+records which Gene a symbol meant in a particular GeneAnnotationRelease (symbols
 move between genes over time, so matching is per release), and tokenize_gene_symbols /
 partition_oversized_names split gene-list text and reject tokens over MAX_GENE_SYMBOL_LENGTH with a
 recorded warning.
@@ -16,7 +17,6 @@ from django.db.models import Q
 from django.db.models.functions import Upper
 
 from genes.models import (
-    HGNC,
     GeneAnnotationRelease,
     GeneListGeneSymbol,
     GeneSymbol,
@@ -25,21 +25,27 @@ from genes.models import (
     ReleaseGeneSymbol,
     ReleaseGeneSymbolGene,
 )
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
-from library.cache import timed_cache
+from genes.models.models_gene import GeneNameResolution
 from library.utils import clean_string
 
 TokenizeResult = namedtuple("TokenizeResult", ["valid", "oversized"])
 
 
 class GeneSymbolMatcher:
-    @cached_property
-    def _gene_symbol_lookup(self):
-        return GeneSymbol.get_upper_case_lookup()
+    """ Resolves gene names with GeneSymbol.resolve_names, remembering each one so a matcher can serve a whole
+        import. Resolve a file's names together up front: get_gene_symbol_id on a name not seen yet queries for it """
 
-    @cached_property
-    def _alias_dict(self):
-        return GeneSymbolAlias.get_upper_case_lookup()
+    def __init__(self):
+        self._resolutions: dict[Optional[str], GeneNameResolution] = {}
+
+    def resolve_names(self, names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResolution]:
+        names = set(names)
+        if unresolved := names - self._resolutions.keys():
+            self._resolutions.update(GeneSymbol.resolve_names(unresolved))
+        return {name: self._resolutions[name] for name in names}
+
+    def get_gene_symbol_id(self, original_gene_symbol: str) -> Optional[str]:
+        return self.resolve_names([original_gene_symbol])[original_gene_symbol].gene_symbol_id
 
     @cached_property
     def _release_gene_matchers(self):
@@ -52,19 +58,6 @@ class GeneSymbolMatcher:
     def _match_unmatched_symbols_in_releases(self, gene_symbol_ids):
         for gm in self._release_gene_matchers:
             gm.match_unmatched_symbols(gene_symbol_ids)
-
-    def get_gene_symbol_id_and_alias_id(self, original_gene_symbol: str):
-        uc_original_gene_symbol = clean_string(original_gene_symbol).upper()
-        gene_symbol_id = self._gene_symbol_lookup.get(uc_original_gene_symbol)
-        alias_id = None
-        if gene_symbol_id is None:
-            if gene_symbol_and_alias := self._alias_dict.get(uc_original_gene_symbol):
-                gene_symbol_id, alias_id = gene_symbol_and_alias
-        return gene_symbol_id, alias_id
-
-    def get_gene_symbol_id(self, original_gene_symbol: str):
-        gene_symbol_id, _alias_id = self.get_gene_symbol_id_and_alias_id(original_gene_symbol)
-        return gene_symbol_id
 
     def create_gene_list_gene_symbols_from_text(self, gene_list, gene_text, save=True):
         tokens = tokenize_gene_symbols(gene_text)
@@ -79,19 +72,25 @@ class GeneSymbolMatcher:
         valid_names, oversized_here = partition_oversized_names(gene_names_list)
         all_oversized = list(oversized_skipped or []) + oversized_here
 
+        resolutions = self.resolve_names(valid_names)
         gene_list_gene_symbols = []
+        ambiguous_aliases = []
         for original_name in valid_names:
-            gene_symbol_id, alias_id = self.get_gene_symbol_id_and_alias_id(original_name)
+            resolution = resolutions[original_name]
+            if resolution.ambiguous_alias:
+                ambiguous_aliases.append(str(resolution.ambiguous_alias))
             gene_list_gene_symbols.append(GeneListGeneSymbol(gene_list=gene_list,
                                                              original_name=original_name,
-                                                             gene_symbol_id=gene_symbol_id,
-                                                             gene_symbol_alias_id=alias_id,
+                                                             gene_symbol_id=resolution.gene_symbol_id,
+                                                             gene_symbol_alias_id=resolution.gene_symbol_alias_id,
                                                              modification_info=modification_info))
 
         if save:
             GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols, ignore_conflicts=True)
             if all_oversized:
-                apply_oversized_warning(gene_list, all_oversized)
+                append_gene_list_warning(gene_list, format_oversized_warning(all_oversized))
+            for ambiguous_alias in sorted(set(ambiguous_aliases)):
+                append_gene_list_warning(gene_list, ambiguous_alias)
             gene_list.set_modified_to_now()
             # Only the symbols this list added can be unmatched - rematching every HGNC and gene list
             # symbol per release scans the whole gene list table and is what the import commands do
@@ -99,43 +98,6 @@ class GeneSymbolMatcher:
             self._match_unmatched_symbols_in_releases(gene_symbol_ids)
 
         return gene_list_gene_symbols
-
-
-class HGNCMatcher:
-    @staticmethod
-    @timed_cache(ttl=3600)
-    def instance():
-        return HGNCMatcher()
-
-    @cached_property
-    def _aliases(self) -> dict[str, list[str]]:
-        """ Upper case alias -> upper case gene symbols it can redirect to. An alias can have
-            multiple targets, so keep them all (ordered by pk for stable results) rather than
-            collapsing to an arbitrary one. """
-        alias_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.HGNC)
-        alias_qs = alias_qs.annotate(uc_alias=Upper("alias"), uc_symbol=Upper("gene_symbol_id"))
-        aliases = defaultdict(list)
-        for uc_alias, uc_symbol in alias_qs.order_by("pk").values_list("uc_alias", "uc_symbol"):
-            aliases[uc_alias].append(uc_symbol)
-        return aliases
-
-    @cached_property
-    def _hgnc_by_uc_gene_symbol(self) -> dict:
-        hgnc_qs = HGNC.objects.filter(status=HGNCStatus.APPROVED)
-        return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
-
-    def match_hgnc(self, gene_symbol: str) -> Optional[HGNC]:
-        gene_symbol = clean_string(gene_symbol).upper()
-        # An approved symbol outranks any alias redirect. HGNC's approved symbols are a current
-        # snapshot, while alias rows accumulate across every import and are never pruned - and they
-        # include HGNC's informal alias_symbol synonyms, which are frequently another gene's
-        # approved symbol (e.g. AURKAIP1 lists "AIP", TADA2A lists "ADA2").
-        if hgnc := self._hgnc_by_uc_gene_symbol.get(gene_symbol):
-            return hgnc
-        for alias_symbol in self._aliases.get(gene_symbol, []):
-            if hgnc := self._hgnc_by_uc_gene_symbol.get(alias_symbol):
-                return hgnc
-        return None
 
 
 class ReleaseGeneMatcher:
@@ -271,7 +233,7 @@ MAX_GENE_SYMBOL_LENGTH = 100
 def tokenize_gene_symbols(text) -> TokenizeResult:
     """ Returns TokenizeResult(valid, oversized) where valid is a set of accepted symbols and
         oversized is a list of raw tokens that exceeded MAX_GENE_SYMBOL_LENGTH. Callers should
-        surface the oversized list to the user (e.g. via apply_oversized_warning). """
+        surface the oversized list to the user (e.g. via append_gene_list_warning). """
     text = clean_string(text)
     tokens = re.findall(r'[^,;\s]+', text.upper())
     valid, oversized = partition_oversized_names(tokens)
@@ -301,10 +263,9 @@ def format_oversized_warning(oversized: list[str]) -> str:
             f"Check the input is a plain gene list.")
 
 
-def apply_oversized_warning(gene_list, oversized: list[str]):
-    """ Append an oversized-tokens warning to gene_list.error_message and persist it.
+def append_gene_list_warning(gene_list, warning: str):
+    """ Append a warning to gene_list.error_message and persist it.
         Modifies the in-memory instance so subsequent caller saves preserve the message. """
-    warning = format_oversized_warning(oversized)
     if gene_list.error_message:
         gene_list.error_message = f"{gene_list.error_message}\n{warning}"
     else:

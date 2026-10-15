@@ -76,12 +76,16 @@ release without a GeneAnnotationVersion makes `AnnotationVersion.validate` raise
 `genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI gene_info, legacy UCSC and manual entry. Most
 come from `genes/cached_web_resource/hgnc.py:save_hgnc_records`, which upserts a GeneSymbol per approved symbol and
 an alias per `prev_symbol` / `alias_symbol`; `genes/cached_web_resource/hgnc.py:store_hgnc_from_web` then re-matches
-every release. Resolving one string is
-`genes/models/models_gene.py:GeneSymbol.cast` (exact, cached); resolving text or aliases is
-`genes/gene_matching.py:GeneSymbolMatcher`, which loads the whole symbol and alias tables into upper-cased dicts on
-first use and records which alias matched on the `GeneListGeneSymbol`. `genes/gene_matching.py:HGNCMatcher.match_hgnc`
-is the HGNC-id variant: an approved symbol always outranks an alias redirect, because HGNC's `alias_symbol` synonyms
-are frequently another gene's approved symbol (AURKAIP1 lists AIP).
+every release. Resolving one exact string is
+`genes/models/models_gene.py:GeneSymbol.cast` (cached). A name that may be old or an alias goes through
+`genes/models/models_gene.py:GeneSymbol.resolve_names` (`resolve_name` for one), three indexed queries per batch of
+names feeding one decision, `genes/models/models_gene.py:resolve_gene_name`: a symbol with an HGNC record of its own
+is taken as written, then an HGNC previous symbol outranks an alias (SEPT2 is SEPTIN2's rename and SEPTIN6's alias),
+and an alias counts only when it names one gene - otherwise the resolution carries an `AmbiguousGeneSymbolAlias`
+naming the candidates. An approved symbol always outranks an alias redirect because HGNC's `alias_symbol` synonyms
+are frequently another gene's approved symbol (AURKAIP1 lists AIP). `genes/gene_matching.py:GeneSymbolMatcher`
+memoises these for an import and records the alias followed on the `GeneListGeneSymbol`; an ambiguous alias is left
+unmatched and named in the gene list's `error_message`.
 
 A symbol does not name a gene; it names a gene *in a release*. The same symbol has pointed at different Ensembl and
 RefSeq ids over time (and TAZ became TAFAZZIN between builds), so `genes/gene_matching.py:ReleaseGeneMatcher` writes
@@ -238,8 +242,8 @@ lengths do not sum to the fetched sequence length and silently routes it to Clin
 `TranscriptVersion.hgvs_data_errors` is where to look when a transcript "works on the other server".
 
 `genes/models/models_gene.py:GeneSymbol.get_deterministic_queryset` exists because `symbol__startswith` raises
-`NotSupportedError` on the collated column. `GeneSymbolMatcher` and `ReleaseGeneMatcher` read whole tables into
-dicts on first use and `GeneSymbolMatcher.create_gene_list_gene_symbols` re-matches every release on each save, so
+`NotSupportedError` on the collated column. `ReleaseGeneMatcher` reads whole tables into dicts on first use,
+`GeneSymbolMatcher` remembers each name it resolved, and `GeneSymbolMatcher.create_gene_list_gene_symbols` re-matches every release on each save, so
 a loop creating lists should share one matcher. Inserting
 `GeneListGeneSymbol` rows any other way leaves symbols with no release rows and the list matches nothing in analyses
 until `genes/management/commands/rematch_unmatched_gene_list_symbols.py:Command` runs;

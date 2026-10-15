@@ -38,6 +38,8 @@ from library.constants import DAY_SECS, HOUR_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.preview_request import PreviewData, PreviewModelMixin
+from library.utils.collection_utils import batch_iterator
+from library.utils.text_utils import clean_string
 from snpdb.models import GenomicCoordinates, Wiki
 from snpdb.models.models_genome import Contig, GenomeBuild
 
@@ -144,6 +146,63 @@ class AmbiguousGeneSymbolAlias(ValueError):
                          f"change it to the explicit gene symbol")
 
 
+@dataclass(frozen=True)
+class GeneNameResolution:
+    """ What a gene name as written stands for - see GeneSymbol.resolve_names """
+    gene_symbol_id: Optional[str] = None
+    hgnc: Optional[HGNC] = None
+    gene_symbol_alias_id: Optional[int] = None  # The GeneSymbolAlias followed to reach gene_symbol_id
+    ambiguous_alias: Optional[AmbiguousGeneSymbolAlias] = None
+
+
+def resolve_gene_name(name: str, exact_symbol: Optional[str], alias_ids: dict[str, int],
+                      hgncs_by_uc_symbol: dict[str, list[HGNC]]) -> GeneNameResolution:
+    """ The rules of GeneSymbol.resolve_names, over what was fetched for 'name':
+        exact_symbol - the GeneSymbol 'name' is, alias_ids - {gene symbol: GeneSymbolAlias pk} for each gene 'name'
+        is an alias of, hgncs_by_uc_symbol - upper case symbol -> its HGNC records, covering both """
+    uc_name = name.upper()
+
+    def hgncs_for(symbols: Iterable[str]) -> list[HGNC]:
+        hgncs = [hgnc for symbol in symbols for hgnc in hgncs_by_uc_symbol.get(symbol.upper(), [])]
+        # gene_symbol isn't unique in HGNC (eg MMP21 has multiple entries) so prefer the approved one
+        return sorted(hgncs, key=lambda hgnc: (hgnc.status != HGNCStatus.APPROVED, hgnc.pk))
+
+    def lists_name(hgnc: HGNC, field: str) -> bool:
+        return uc_name in {symbol.strip().upper() for symbol in (getattr(hgnc, field) or "").split(",")}
+
+    def single_gene(hgncs: list[HGNC]) -> Optional[HGNC]:
+        if len({hgnc.gene_symbol_id for hgnc in hgncs}) == 1:
+            return hgncs[0]
+        return None
+
+    uc_alias_ids = {symbol.upper(): alias_id for symbol, alias_id in alias_ids.items()}
+
+    def via_alias(hgnc: HGNC) -> GeneNameResolution:
+        return GeneNameResolution(gene_symbol_id=hgnc.gene_symbol_id, hgnc=hgnc,
+                                  gene_symbol_alias_id=uc_alias_ids[hgnc.gene_symbol_id.upper()])
+
+    if exact_symbol:
+        if hgncs := hgncs_for([exact_symbol]):
+            return GeneNameResolution(gene_symbol_id=exact_symbol, hgnc=hgncs[0])
+
+    alias_hgncs = hgncs_for(alias_ids)
+    for hgnc in alias_hgncs:
+        if lists_name(hgnc, "previous_symbols"):
+            return via_alias(hgnc)
+    # an alias is a nickname rather than a rename, so it counts only when it names one gene
+    if hgnc := single_gene(alias_hgncs) or single_gene([h for h in alias_hgncs if lists_name(h, "alias_symbols")]):
+        return via_alias(hgnc)
+
+    if exact_symbol:
+        return GeneNameResolution(gene_symbol_id=exact_symbol)
+    if len(alias_ids) > 1:
+        return GeneNameResolution(ambiguous_alias=AmbiguousGeneSymbolAlias(name, alias_ids))
+    if alias_ids:
+        (gene_symbol_id, alias_id), = alias_ids.items()
+        return GeneNameResolution(gene_symbol_id=gene_symbol_id, gene_symbol_alias_id=alias_id)
+    return GeneNameResolution()
+
+
 class GeneSymbol(models.Model, PreviewModelMixin):
     """
         If you want to do a like on symbol and get an error:
@@ -158,6 +217,8 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     symbol = TextField(primary_key=True, db_collation='case_insensitive')  # See note above if 'like' breaks
 
     objects = ObjectManagerCachingRequest()
+
+    RESOLVE_NAMES_BATCH_SIZE = 2000
 
     class Meta:
         base_manager_name = 'objects'
@@ -181,51 +242,51 @@ class GeneSymbol(models.Model, PreviewModelMixin):
 
     @staticmethod
     def resolve_name(name: str) -> tuple[Optional[str], Optional[HGNC]]:
-        """ (gene symbol, HGNC) for a gene name as written - the symbol is the approved one where 'name' is an old name.
+        """ (gene symbol, HGNC) for a gene name as written - see GeneSymbol.resolve_names for the rules
+            :raises AmbiguousGeneSymbolAlias: when 'name' is no symbol itself, and an alias for several genes """
+        resolution = GeneSymbol.resolve_names([name])[name]
+        if resolution.ambiguous_alias:
+            raise resolution.ambiguous_alias
+        return resolution.gene_symbol_id, resolution.hgnc
+
+    @staticmethod
+    def resolve_names(names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResolution]:
+        """ What each gene name as written stands for, keyed by the name as passed - the symbol is the approved one
+            where a name is an old name.
 
             A name that is a current HGNC symbol in its own right is taken as written. Otherwise HGNC's rename is the
             strongest evidence two names are one gene, so it outranks an alias: SEPT2 is SEPTIN2's previous symbol and
-            also, on an unrelated gene, one of SEPTIN6's aliases. An alias resolves only when it names a single gene.
-            :raises AmbiguousGeneSymbolAlias: when 'name' is no symbol itself, and an alias for several genes
+            also, on an unrelated gene, one of SEPTIN6's aliases. An alias resolves only when it names a single gene,
+            otherwise the resolution carries an AmbiguousGeneSymbolAlias naming the candidates.
 
-            One name, a few indexed queries: the HGNC import stores every previous and alias symbol as a
+            Three indexed queries per batch of names: the HGNC import stores every previous and alias symbol as a
             GeneSymbolAlias, so the alias rows are what find the HGNC records to check """
-        name = name.strip()
-        uc_name = name.upper()
+        resolutions = {}
+        for batch in batch_iterator(set(names), batch_size=GeneSymbol.RESOLVE_NAMES_BATCH_SIZE):
+            cleaned_names = {name: clean_string(name) for name in batch}
+            query_names = {cleaned for cleaned in cleaned_names.values() if cleaned}
 
-        def approved_first(hgnc_qs) -> list[HGNC]:
-            # gene_symbol isn't unique in HGNC (eg MMP21 has multiple entries) so prefer the approved one
-            return sorted(hgnc_qs, key=lambda hgnc: (hgnc.status != HGNCStatus.APPROVED, hgnc.pk))
+            exact_symbols = {}
+            for symbol in GeneSymbol.objects.filter(symbol__in=query_names).values_list("symbol", flat=True):
+                exact_symbols[symbol.upper()] = symbol
 
-        def lists_name(hgnc: HGNC, field: str) -> bool:
-            return uc_name in {symbol.strip().upper() for symbol in (getattr(hgnc, field) or "").split(",")}
+            alias_ids_by_uc_name = defaultdict(dict)
+            alias_qs = GeneSymbolAlias.objects.filter(alias__in=query_names)
+            for alias, gene_symbol_id, alias_id in alias_qs.values_list("alias", "gene_symbol_id", "pk"):
+                alias_ids_by_uc_name[alias.upper()][gene_symbol_id] = alias_id
 
-        def single_gene(hgncs: list[HGNC]) -> Optional[HGNC]:
-            if len({hgnc.gene_symbol_id for hgnc in hgncs}) == 1:
-                return hgncs[0]
-            return None
+            symbols = set(exact_symbols.values())
+            for alias_ids in alias_ids_by_uc_name.values():
+                symbols.update(alias_ids)
+            hgncs_by_uc_symbol = defaultdict(list)
+            for hgnc in HGNC.objects.filter(gene_symbol_id__in=symbols):
+                hgncs_by_uc_symbol[hgnc.gene_symbol_id.upper()].append(hgnc)
 
-        exact = GeneSymbol.objects.filter(symbol=name).first()
-        if exact:
-            if hgncs := approved_first(HGNC.objects.filter(gene_symbol=exact)):
-                return exact.symbol, hgncs[0]
-
-        alias_symbol_ids = set(GeneSymbolAlias.objects.filter(alias=name).values_list("gene_symbol_id", flat=True))
-        alias_hgncs = approved_first(HGNC.objects.filter(gene_symbol_id__in=alias_symbol_ids))
-        for hgnc in alias_hgncs:
-            if lists_name(hgnc, "previous_symbols"):
-                return hgnc.gene_symbol_id, hgnc
-        # an alias is a nickname rather than a rename, so it counts only when it names one gene
-        if hgnc := single_gene(alias_hgncs) or single_gene([h for h in alias_hgncs if lists_name(h, "alias_symbols")]):
-            return hgnc.gene_symbol_id, hgnc
-
-        if exact:
-            return exact.symbol, None
-        if len(alias_symbol_ids) > 1:
-            raise AmbiguousGeneSymbolAlias(name, alias_symbol_ids)
-        if alias_symbol_ids:
-            return alias_symbol_ids.pop(), None
-        return None, None
+            for name, cleaned in cleaned_names.items():
+                uc_name = cleaned.upper()
+                resolutions[name] = resolve_gene_name(cleaned, exact_symbols.get(uc_name),
+                                                      alias_ids_by_uc_name.get(uc_name, {}), hgncs_by_uc_symbol)
+        return resolutions
 
     @property
     def metrics_logging_key(self) -> tuple[str, Any]:
@@ -334,10 +395,6 @@ class GeneSymbolAlias(TimeStampedModel):
     def get_absolute_url(self):
         """ So search sends it to the symbol """
         return reverse("view_gene_symbol", kwargs={"gene_symbol": self.gene_symbol_id})
-
-    @staticmethod
-    def get_upper_case_lookup():
-        return {a: (gs, alias_id) for a, gs, alias_id in GeneSymbolAlias.objects.values_list("alias", "gene_symbol", "id")}
 
 
 @dataclass

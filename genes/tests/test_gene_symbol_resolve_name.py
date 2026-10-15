@@ -1,9 +1,25 @@
-"""GeneSymbol.resolve_name: which current symbol a name as written stands for."""
+"""GeneSymbol.resolve_name and GeneSymbol.resolve_names: which current symbol a name as written stands for."""
 from django.test import TestCase
 
 from genes.models import HGNC, GeneSymbol, GeneSymbolAlias, HGNCImport
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
+
+AMBIGUOUS = "ambiguous"
+
+# name as written -> (gene symbol, HGNC pk), or AMBIGUOUS
+EXPECTED = {
+    "sept2": ("SEPTIN2", 7729),  # A rename outranks another gene's alias of the same name
+    "ACPP": ("ACP3", 125),  # Previous symbol resolves though a GeneSymbol row shadows it
+    "SEPTX": AMBIGUOUS,  # An alias of several genes
+    "AIP": ("AIP", 358),  # An approved symbol wins over another gene's informal alias
+    "POPDC1": ("POPDC1", 1152),  # An approved symbol wins over a leftover redirect to its old name
+    "bves": ("POPDC1", 1152),
+    " SEPTIN6 ": ("SEPTIN6", 15848),
+    "kal1": ("ANOS1", 3730),  # Alias stored in mixed case
+    "RETIRED_ONLY": ("GONE", None),  # Alias of a symbol HGNC no longer has
+    "NOT_A_GENE_SYMBOL": (None, None),
+}
 
 
 class TestGeneSymbolResolveName(TestCase):
@@ -12,32 +28,69 @@ class TestGeneSymbolResolveName(TestCase):
     def setUpTestData(cls):
         """ As the HGNC import stores them: each previous and alias symbol is also a GeneSymbolAlias """
         hgnc_import = HGNCImport.objects.create()
+
+        def _hgnc(pk, symbol, previous_symbols="", alias_symbols=""):
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import, status=HGNCStatus.APPROVED,
+                                approved_name=f"{symbol} approved name",
+                                previous_symbols=previous_symbols, alias_symbols=alias_symbols)
+
+        def _alias(alias, symbol, source=GeneSymbolAliasSource.HGNC):
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias=alias, gene_symbol_id=symbol, source=source)
+
         # SEPT2 is SEPTIN2's previous symbol and, on an unrelated gene, one of SEPTIN6's aliases
-        for pk, symbol, previous, alias in [(7729, "SEPTIN2", "SEPT2", ""),
-                                            (15848, "SEPTIN6", "SEPT6", "SEPT2")]:
-            GeneSymbol.objects.create(symbol=symbol)
-            HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
-                                status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name",
-                                previous_symbols=previous, alias_symbols=alias)
-            GeneSymbolAlias.objects.create(alias="SEPT2", gene_symbol_id=symbol, source=GeneSymbolAliasSource.HGNC)
+        _hgnc(7729, "SEPTIN2", previous_symbols="SEPT2")
+        _hgnc(15848, "SEPTIN6", previous_symbols="SEPT6", alias_symbols="SEPT2")
+        _alias("SEPT2", "SEPTIN2")
+        _alias("SEPT2", "SEPTIN6")
+        _alias("SEPTX", "SEPTIN2", GeneSymbolAliasSource.NCBI)
+        _alias("SEPTX", "SEPTIN6", GeneSymbolAliasSource.NCBI)
         # Ensembl still has a GeneSymbol for ACP3's previous symbol
-        GeneSymbol.objects.create(symbol="ACP3")
         GeneSymbol.objects.create(symbol="ACPP")
-        HGNC.objects.create(pk=125, gene_symbol_id="ACP3", hgnc_import=hgnc_import, status=HGNCStatus.APPROVED,
-                            approved_name="acid phosphatase 3", previous_symbols="ACPP")
-        GeneSymbolAlias.objects.create(alias="ACPP", gene_symbol_id="ACP3", source=GeneSymbolAliasSource.HGNC)
+        _hgnc(125, "ACP3", previous_symbols="ACPP")
+        _alias("ACPP", "ACP3")
+        # AURKAIP1 lists the approved symbol AIP as an informal synonym
+        _hgnc(358, "AIP")
+        _hgnc(24114, "AURKAIP1", alias_symbols="AIP")
+        _alias("AIP", "AURKAIP1")
+        # A leftover row from when BVES was approved still points POPDC1 -> BVES
+        _hgnc(1152, "POPDC1", previous_symbols="BVES")
+        _alias("BVES", "POPDC1")
+        _alias("POPDC1", "BVES")
+        _hgnc(3730, "ANOS1", previous_symbols="KAL1")
+        _alias("Kal1", "ANOS1")
+        _alias("RETIRED_ONLY", "GONE")
 
-    def test_a_rename_outranks_another_gene_alias_of_the_same_name(self):
-        symbol, hgnc = GeneSymbol.resolve_name("sept2")
-        self.assertEqual("SEPTIN2", symbol)
-        self.assertEqual(7729, hgnc.pk)
+    def _check(self, name, gene_symbol_id, hgnc):
+        expected = EXPECTED[name]
+        self.assertNotEqual(AMBIGUOUS, expected, name)
+        self.assertEqual(expected, (gene_symbol_id, hgnc.pk if hgnc else None), name)
 
-    def test_previous_symbol_resolves_when_a_gene_symbol_row_shadows_it(self):
-        self.assertEqual("ACP3", GeneSymbol.resolve_name("ACPP")[0])
+    def test_resolve_name(self):
+        for name, expected in EXPECTED.items():
+            if expected == AMBIGUOUS:
+                with self.assertRaises(AmbiguousGeneSymbolAlias) as cm:
+                    GeneSymbol.resolve_name(name)
+                self.assertEqual(["SEPTIN2", "SEPTIN6"], cm.exception.gene_symbol_ids)
+            else:
+                self._check(name, *GeneSymbol.resolve_name(name))
 
-    def test_an_alias_of_several_genes_raises_naming_them(self):
-        for symbol in ["SEPTIN2", "SEPTIN6"]:
-            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
-        with self.assertRaises(AmbiguousGeneSymbolAlias) as cm:
-            GeneSymbol.resolve_name("SEPTX")
-        self.assertEqual(["SEPTIN2", "SEPTIN6"], cm.exception.gene_symbol_ids)
+    def test_resolve_names_together(self):
+        with self.assertNumQueries(3):
+            resolutions = GeneSymbol.resolve_names(EXPECTED)
+        for name, resolution in resolutions.items():
+            if EXPECTED[name] == AMBIGUOUS:
+                self.assertEqual(["SEPTIN2", "SEPTIN6"], resolution.ambiguous_alias.gene_symbol_ids)
+                self.assertIsNone(resolution.gene_symbol_id)
+            else:
+                self.assertIsNone(resolution.ambiguous_alias)
+                self._check(name, resolution.gene_symbol_id, resolution.hgnc)
+
+    def test_resolve_names_records_alias_followed(self):
+        resolutions = GeneSymbol.resolve_names(["ACPP", "AIP", "RETIRED_ONLY"])
+        acpp_alias = GeneSymbolAlias.objects.get(alias="ACPP", gene_symbol_id="ACP3")
+        retired_alias = GeneSymbolAlias.objects.get(alias="RETIRED_ONLY")
+        self.assertEqual(acpp_alias.pk, resolutions["ACPP"].gene_symbol_alias_id)
+        self.assertIsNone(resolutions["AIP"].gene_symbol_alias_id)
+        self.assertEqual(retired_alias.pk, resolutions["RETIRED_ONLY"].gene_symbol_alias_id)
