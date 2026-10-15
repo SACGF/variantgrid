@@ -38,7 +38,6 @@ from genes.hgvs.hgvs_converter import (
     HgvsOriginallyNormalized,
 )
 from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
-from genes.models import TranscriptVersion
 from genes.transcripts_utils import get_refseq_type
 from snpdb.babelfish import babelfish_assembly_name
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
@@ -213,7 +212,10 @@ class BioCommonsHGVSConverter:
             self, hgvs_string: str, transcript_version=None
     ) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         try:
-            var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(hgvs_string, transcript_version)
+            var_x = self._parser_hgvs(hgvs_string)
+            if var_x.type in ('c', 'n'):
+                self._check_transcript_hgvs(var_x)
+            var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(var_x)
             # A del/dup/inv too big to normalize hasn't read any sequence, so a contig from another build gets this far
             if var_g.ac not in self.babelfish.ac_to_name_map:
                 raise Contig.ContigNotInBuildError(f"Contig '{var_g.ac}' not in genome build '{self.genome_build.name}'")
@@ -295,14 +297,26 @@ class BioCommonsHGVSConverter:
                     return our_ex
         return HGVSException  # General one...
 
-    def _fix_ref(self, var_x: SequenceVariant, transcript_version=None) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
+    def _alignment_mapper(self, tx_ac: str) -> AlignmentMapper:
+        """ The transcript's alignment to this build's contig, the one c_to_g / n_to_g will map through """
+        alt_ac = self.am._alt_ac_for_tx_ac(tx_ac)
+        return self.am._fetch_AlignmentMapper(tx_ac, alt_ac, self.am.alt_aln_method)
+
+    def _fix_ref(self, var_x: SequenceVariant) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
         if provided_ref := var_x.posedit.edit.ref_s:
-            # An intronic position has no transcript sequence to check against: biocommons reads the genome
-            # instead, but only when told which contig the transcript is aligned to. Without it the provided
-            # reference is returned untouched and a wrong base passes as a match.
-            alt_ac = transcript_version.contig.refseq_accession if transcript_version else None
+            strand = None
+            alt_ac = None
+            alt_aln_method = None
+            if var_x.type in ('c', 'n'):
+                # An intronic position has no transcript sequence to check against: biocommons reads the genome
+                # instead, but only when told which contig the transcript is aligned to. Without it the provided
+                # reference is returned untouched and a wrong base passes as a match.
+                alignment = self._alignment_mapper(var_x.ac)
+                strand = alignment.strand
+                alt_ac = alignment.alt_ac
+                alt_aln_method = alignment.alt_aln_method
             var_x_fixed_ref = self.no_validate_mapper._replace_reference(copy.deepcopy(var_x), alt_ac=alt_ac,
-                                                                         alt_aln_method='splign')
+                                                                         alt_aln_method=alt_aln_method)
             calculated_ref = var_x_fixed_ref.posedit.edit.ref_s
             pr_len = len(provided_ref)
             cr_len = len(calculated_ref)
@@ -311,14 +325,21 @@ class BioCommonsHGVSConverter:
                       + f"reference '{provided_ref}' length ({pr_len})"
                 raise HGVSInvalidVariantError(msg)
 
-            strand = transcript_version.strand if transcript_version else None
             matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, provided_ref, calculated_ref)
             return var_x_fixed_ref, matches_reference
 
         # didn't provide anything so won't say anything
         return var_x, HgvsMatchRefAllele(provided_ref='', calculated_ref='')
 
-    def _check_intronic_offsets_anchor_exon_boundaries(self, var_x: SequenceVariant, transcript_version):
+    def _check_transcript_hgvs(self, var_x: SequenceVariant):
+        """ Input checks for a c./n. HGVS that must run before biocommons maps it """
+        transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x)
+        # Check before anything asks the transcript for its CDS (which fails with "CDS is undefined")
+        if var_x.type == 'c' and get_refseq_type(transcript_accession) == 'RNA':
+            raise HGVSNonCodingTranscriptException(transcript_accession)
+        self._check_intronic_offsets_anchor_exon_boundaries(var_x)
+
+    def _check_intronic_offsets_anchor_exon_boundaries(self, var_x: SequenceVariant):
         """ A '+' offset counts from the last base of an exon and a '-' offset from the first base of the next
             one. biocommons adds the offset to whichever base is named, so an anchor inside an exon (c.5054+2 on
             a transcript whose exon ends at c.5045 - numbering that ignored an alignment gap) lands in the
@@ -331,9 +352,8 @@ class BioCommonsHGVSConverter:
         if not (_has_offset(pos.start) or _has_offset(pos.end)):
             return
 
-        alt_ac = transcript_version.contig.refseq_accession
-        mapper = AlignmentMapper(self.hdp, var_x.ac, alt_ac, 'splign')
-        tx_exons = self.hdp.get_tx_exons(var_x.ac, alt_ac, 'splign')
+        mapper = self._alignment_mapper(var_x.ac)
+        tx_exons = self.hdp.get_tx_exons(var_x.ac, mapper.alt_ac, mapper.alt_aln_method)
         exon_starts = {e["tx_start_i"] + 1 for e in tx_exons}
         exon_ends = {e["tx_end_i"] for e in tx_exons}
         pos_n = mapper.c_to_n(pos) if var_x.type == 'c' else pos
@@ -361,25 +381,14 @@ class BioCommonsHGVSConverter:
         length = Babelfish.symbolic_alt_length(var_x)
         return length is not None and length >= max_length
 
-    def _hgvs_to_g_hgvs(self, hgvs_string: str, transcript_version=None) -> tuple[SequenceVariant, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
+    def _hgvs_to_g_hgvs(self, var_x_original: SequenceVariant) -> tuple[SequenceVariant, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
             'n': self.am.n_to_g,
             'm': self._m_to_g,
         }
 
-        var_x_original = self._parser_hgvs(hgvs_string)
-        if var_x_original.type in ('c', 'n'):
-            transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x_original)
-            # Check before anything asks the transcript for its CDS (which fails with "CDS is undefined")
-            if var_x_original.type == 'c' and get_refseq_type(transcript_accession) == 'RNA':
-                raise HGVSNonCodingTranscriptException(transcript_accession)
-            if transcript_version is None:
-                transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession,
-                                                                              best_attempt=True)
-            self._check_intronic_offsets_anchor_exon_boundaries(var_x_original, transcript_version)
-
-        var_x, matches_reference = self._fix_ref(var_x_original, transcript_version)
+        var_x, matches_reference = self._fix_ref(var_x_original)
 
         # TODO: Maybe we can always just normalize? Need some test cases to make sure
         # If so, we can remove handling of 'Variant is outside CDS bounds' below
