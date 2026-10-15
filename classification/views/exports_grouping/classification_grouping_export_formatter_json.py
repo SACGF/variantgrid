@@ -1,11 +1,20 @@
+import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Iterator
+
 from django.conf import settings
+
 from classification.models import ClassificationJsonParams
-from classification.views.exports_grouping.classification_grouping_export_filter import \
-    ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, ClassificationGroupingExportFilter
-import json
+from classification.models.evidence_mixin import EvidenceMixin
+from classification.views.exports_grouping.classification_grouping_export_filter import (
+    ClassificationGroupingExportFilter,
+    ClassificationGroupingExportFormat,
+    ClassificationGroupingExportFormatProperties,
+)
+from library.utils import batch_iterator
+
+CITATION_PREFETCH_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -64,12 +73,15 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             "latest_classification_modification__classification__clinical_context"
         ).prefetch_related("overlapcontribution_set")
 
-        for cg in queryset.iterator(chunk_size=4000):
-            json_data = cg.latest_classification_modification.as_json(
-                self.json_params
-            )
-            json_data["grouping_id"] = cg.pk
-            yield json.dumps(json_data)
+        for batch in batch_iterator(queryset.iterator(chunk_size=4000), batch_size=CITATION_PREFETCH_BATCH_SIZE):
+            if self.json_params.populate_literature_with_citations:
+                EvidenceMixin.prefetch_citations(cg.latest_classification_modification.classification for cg in batch)
+            for cg in batch:
+                json_data = cg.latest_classification_modification.as_json(
+                    self.json_params
+                )
+                json_data["grouping_id"] = cg.pk
+                yield json.dumps(json_data)
 
     def footer(self) -> list[str]:
         return [']}']

@@ -11,6 +11,7 @@ from hgvs.parsers import Parser
 
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import (
+    create_col18a1_transcript_version,
     create_fake_transcript_version,
     create_gata2_as1_transcript_version,
     create_gata2_transcript_version,
@@ -245,6 +246,46 @@ class TestHGVS(TestCase):
             #print(f"{type(vcd.matches_reference)=}")
             self.assertEqual(vcd.variant_coordinate, expected_vc)
             self.assertEqual(vcd.matches_reference, expected_matches_ref)
+
+    def test_intronic_offset_must_anchor_exon_boundary(self):
+        """ NM_130444.2 has a 9 base alignment gap, so gap-unaware numbering (ClinVar's for this transcript,
+            eg VCV003384928 'c.5054+4G>A') anchors offsets 9 bases inside the next exon. biocommons would
+            just add the offset and return an exonic variant with the wrong reference """
+        genome_build = GenomeBuild.grch37()
+        create_col18a1_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+
+        CORRECT = [
+            # ClinVar VCV003384928 / VCV004455297 at their true boundaries (last base of exon 40, first of 41)
+            ("NM_130444.2(COL18A1):c.5045+4G>A", VariantCoordinate(chrom='21', position=46931144, ref='G', alt='A')),
+            ("NM_130444.2(COL18A1):c.5046-3C>A", VariantCoordinate(chrom='21', position=46932099, ref='C', alt='A')),
+        ]
+        for hgvs_string, expected_vc in CORRECT:
+            vcd = matcher.get_variant_coordinate_and_details(hgvs_string)
+            self.assertEqual(vcd.variant_coordinate, expected_vc, hgvs_string)
+            self.assertTrue(vcd.matches_reference, hgvs_string)
+
+        GAP_UNAWARE = {
+            "NM_130444.2(COL18A1):c.5054+4G>A": "c.5045",
+            "NM_130444.2(COL18A1):c.5055-3C>A": "c.5046",
+            "NM_130444.2(COL18A1):c.5054+1_5055-1del": "c.5045",
+        }
+        for hgvs_string, nearest_boundary in GAP_UNAWARE.items():
+            with self.assertRaises(HGVSNomenclatureException, msg=hgvs_string) as cm:
+                matcher.get_variant_coordinate_and_details(hgvs_string)
+            self.assertIn(nearest_boundary, str(cm.exception))
+
+    def test_intronic_reference_checked_against_genome(self):
+        """ An intronic position has no transcript sequence, so the reference has to be read from the genome
+            (VCV003384928 with its ref base swapped) """
+        genome_build = GenomeBuild.grch37()
+        create_col18a1_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+
+        vcd = matcher.get_variant_coordinate_and_details("NM_130444.2(COL18A1):c.5045+4C>A")
+        self.assertEqual(vcd.variant_coordinate, VariantCoordinate(chrom='21', position=46931144, ref='G', alt='A'))
+        self.assertFalse(vcd.matches_reference)
+        self.assertIn('"G"', vcd.matches_reference.get_message())
 
     def test_biocommons_c_hgvs_on_non_coding_transcript(self):
         """ c. on a non-coding transcript may be numbered from a coding model, so isn't resolved - except by search,

@@ -99,6 +99,10 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     def preview_icon(cls) -> str:
         return "fa-solid fa-a p-1 text-light border rounded bg-dark"
 
+    @classmethod
+    def preview_can_liftover(cls) -> bool:
+        return True
+
     @property
     def preview(self) -> 'PreviewData':
         return self.preview_with(
@@ -753,6 +757,10 @@ class Variant(PreviewModelMixin, models.Model):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-v p-1 text-light border rounded bg-dark"
+
+    @classmethod
+    def preview_can_liftover(cls) -> bool:
+        return True
 
     @staticmethod
     def get_chrom_q(chrom):
