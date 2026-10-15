@@ -56,6 +56,8 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         # Set once mapped to the genome - the transcript ref at the mapped span and the genome ref there
         self.mapped_transcript_ref: Optional[str] = None
         self.genome_ref: Optional[str] = None
+        # Without a stored transcript sequence the transcript ref is stitched from the genome, so always equal
+        self.transcript_sequence_stored = False
 
         provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
         super().__init__(provided_g_ref, calculated_g_ref)
@@ -66,12 +68,13 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         return sequence
 
     @property
-    def transcript_and_genome_ref_differ(self) -> bool:
+    def transcript_and_genome_ref_differ(self) -> Optional[bool]:
         """ The transcript sequence differs from the genome (eg F5 Leiden in GRCh37) so the genomic variant
-            isn't what the transcript HGVS describes - it can even come out ref-only (#1266) """
-        if self.mapped_transcript_ref and self.genome_ref:
+            isn't what the transcript HGVS describes - it can even come out ref-only (#1266).
+            None when it couldn't be checked: not mapped yet, or no stored sequence for the transcript """
+        if self.transcript_sequence_stored and self.mapped_transcript_ref and self.genome_ref:
             return self._transcript_strand(self.mapped_transcript_ref) != self.genome_ref
-        return False
+        return None
 
     def get_transcript_and_genome_ref_message(self) -> str:
         if not self.transcript_and_genome_ref_differ:
@@ -407,6 +410,8 @@ class BioCommonsHGVSConverter:
                 # Set from genomic coord in case it's diff than transcript
                 matches_reference.calculated_ref = var_g.posedit.edit.ref_s
             if isinstance(matches_reference, HgvsMatchTranscriptAndGenomeRefAllele):
+                transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x)
+                matches_reference.transcript_sequence_stored = self.hdp.db_transcript_seqfetcher.has_sequence(transcript_accession)
                 matches_reference.mapped_transcript_ref = var_x.posedit.edit.ref_s
                 matches_reference.genome_ref = var_g.posedit.edit.ref_s
         else:

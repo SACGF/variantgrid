@@ -464,6 +464,7 @@ class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
     @staticmethod
     def _mapped(strand: str, transcript_ref: str, genome_ref: str) -> HgvsMatchTranscriptAndGenomeRefAllele:
         matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, transcript_ref, transcript_ref)
+        matches_reference.transcript_sequence_stored = True
         matches_reference.mapped_transcript_ref = transcript_ref
         matches_reference.genome_ref = genome_ref
         return matches_reference
@@ -481,4 +482,11 @@ class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
         self.assertTrue(self._mapped("+", "T", "A").transcript_and_genome_ref_differ)
 
     def test_not_mapped(self):
-        self.assertFalse(HgvsMatchTranscriptAndGenomeRefAllele("+", "T", "T").transcript_and_genome_ref_differ)
+        self.assertIsNone(HgvsMatchTranscriptAndGenomeRefAllele("+", "T", "T").transcript_and_genome_ref_differ)
+
+    def test_no_stored_transcript_sequence(self):
+        # Stitched from the genome, so the refs match by construction - unchecked rather than same
+        matches_reference = self._mapped("+", "T", "T")
+        matches_reference.transcript_sequence_stored = False
+        self.assertIsNone(matches_reference.transcript_and_genome_ref_differ)
+        self.assertEqual("", matches_reference.get_transcript_and_genome_ref_message())

@@ -472,7 +472,8 @@ class CalculatedVariantCoordinate:
     hgvs_converter_version: Optional[HGVSConverterVersion]
     hgvs_converter_data_version: str = ''
     """ cdot data version or ClinGen date used during this resolution """
-    transcript_genome_ref_differ: bool = False
+    transcript_genome_ref_differ: Optional[bool] = None
+    """ None when it couldn't be checked - resolved via ClinGen, or no stored sequence for the transcript """
 
     @property
     def variant_coordinate_str(self) -> Optional[str]:
@@ -597,8 +598,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     message = TextField(null=True, blank=True)
     """ used to describe information about the matching process (or failure) """
 
-    transcript_genome_ref_differ = BooleanField(default=False)
-    """ The transcript sequence and the imported build's genome differ over the variant's reference """
+    transcript_genome_ref_differ = BooleanField(null=True, blank=True)
+    """ The transcript sequence and the imported build's genome differ over the variant's reference.
+        None means it couldn't be checked: resolved via ClinGen, no stored sequence for the transcript, or matched
+        before the check existed (one_off_backfill_transcript_genome_ref_differ fills those in) """
 
     status = CharField(max_length=1, choices=ImportedAlleleInfoStatus.choices, default=ImportedAlleleInfoStatus.PROCESSING)
     """ If true, indicates that this is not matchable, see the message for details """
@@ -953,7 +956,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         version = hgvs_matcher.hgvs_converter.get_version()
         used_converter_type = hgvs_converter_type
         data_version = ''
-        transcript_genome_ref_differ = False
+        transcript_genome_ref_differ = None
 
         try:
             vc_extra = hgvs_matcher.get_variant_coordinate_and_details(use_hgvs)
@@ -962,8 +965,8 @@ class ImportedAlleleInfo(TimeStampedModel):
             data_version = vc_extra.converter_info.hgvs_converter_data_version
             vc = vc_extra.variant_coordinate
             if isinstance(vc_extra.matches_reference, HgvsMatchTranscriptAndGenomeRefAllele):
+                transcript_genome_ref_differ = vc_extra.matches_reference.transcript_and_genome_ref_differ
                 if ref_message := vc_extra.matches_reference.get_transcript_and_genome_ref_message():
-                    transcript_genome_ref_differ = True
                     message += f"\n{ref_message}"
         except Exception as ex:
             message = str(ex)

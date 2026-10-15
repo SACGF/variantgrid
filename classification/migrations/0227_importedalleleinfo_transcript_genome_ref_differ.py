@@ -2,6 +2,8 @@
 
 from django.db import migrations, models
 
+from manual.operations.manual_operations import ManualOperation
+
 
 class Migration(migrations.Migration):
 
@@ -13,6 +15,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='importedalleleinfo',
             name='transcript_genome_ref_differ',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(blank=True, null=True),
         ),
+        ManualOperation.operation_manage(["one_off_backfill_transcript_genome_ref_differ"],
+                                         note="Check existing biocommons-resolved allele infos for a transcript / "
+                                              "genome reference mismatch, a transcript at a time (#1266)"),
     ]
