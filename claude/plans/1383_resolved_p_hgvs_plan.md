@@ -26,8 +26,9 @@ using cdot's protein accession and the transcript sequences we hold. On a dev da
 class ResolvedVariantInfo(TimeStampedModel):
     # ... existing fields ...
     p_hgvs = TextField(null=True, blank=True)
-    """ Canonical p.HGVS for resolved_hgvs: p-dot only (no protein accession), 3-letter, Ter, always in predicted
-        brackets - p.(Gly12Asp), p.(Met246IlefsTer14), p.?, p.(=). Null when the row has no transcript_version
+    """ Canonical p.HGVS for resolved_hgvs on the protein accession the source gave (a lab's evidence may have
+        none, or another NP version than cdot's): 3-letter, Ter, always in predicted brackets -
+        NP_000483.3:p.(Gly480Cys), p.(Met246IlefsTer14), p.?, p.(=). Null when the row has no transcript_version
         (gene-level, mito, g.HGVS-only) or no source could translate it (see p_hgvs_error) """
 
     p_hgvs_source = TextField(null=True, blank=True, choices=PHGVSSource.choices)
@@ -70,16 +71,20 @@ and `ClassificationGrouping.p_hgvses`).
 Entry points:
 
 - `canonical_p_hgvs(raw: str) -> Optional[str]` - returns the canonical string or None when the string is not a
-  p.HGVS biocommons can parse. Steps: strip whitespace; split off anything before `p.` (protein accession, with or
-  without a gene in brackets) and parse only the p-dot; map legacy `X` for stop to `Ter` before parsing (biocommons
+  p.HGVS biocommons can parse. Steps: strip whitespace; split off the protein accession before `p.` (kept, its
+  gene in brackets dropped) and parse only the p-dot; map legacy `X` for stop to `Ter` before parsing (biocommons
   reads `X` as `Xaa`, unknown residue, and `p.Trp26X` would come out as `p.(Trp26Xaa)`); url-decode `%3D` (VEP
   writes `p.%3D` for `p.=`); a bare p-dot has no accession so it goes through `Parser.parse_p_posedit`;
   `p.?` has `posedit is None` and is returned as `p.?` directly. Format with
   `format(conf={"p_3_letter": True, "p_term_asterisk": False})`, then force predicted brackets - `p.(…)` - on anything
-  that is not `p.?` or `p.=`/`p.(=)` (write `p.(=)`), matching `p_parts`' `override_is_confirmed_to=False`.
-- `short_p_hgvs(canonical: str) -> str` - the same parse formatted with `p_3_letter=False, p_term_asterisk=True`.
+  that is not `p.?` or `p.=`/`p.(=)` (write `p.(=)`), matching `p_parts`' `override_is_confirmed_to=False`; put the
+  accession back in front.
+- `short_p_hgvs(canonical: str) -> str` - the same parse formatted with `p_3_letter=False, p_term_asterisk=True`,
+  without the accession (display only).
 - `canonical_from_sequence_variant(variant: hgvs.sequencevariant.SequenceVariant) -> str` - what the computed path
-  calls; same formatting rules, no reparse.
+  calls; same formatting rules on `variant.ac` (cdot's protein), no reparse. `c_hgvs_to_p_sequence_variant` raises
+  `HGVSDataNotAvailableError` first when the cdot data has no `protein` (pre-cdot rows), as biocommons would
+  otherwise fall through to `get_acs_for_protein_seq`, which cdot leaves unimplemented.
 - `is_frameshift_in_disguise(variant) -> bool` - a computed `delins` whose range ends at the protein's last residue
   is a frameshift biocommons could not name (it writes `p.(Ser1321_Val2843delinsIleLeuTer)` where VEP writes
   `p.Ser1321IlefsTer3`); the resolver treats it as "no computed value".
@@ -132,7 +137,7 @@ because that is what the lab is asked to confirm), and is out of scope here.
 
 ## Backfill
 
-New command classification/management/commands/resolved_variant_info_p_hgvs.py (new file), `category = "maintenance"`:
+New command classification/management/commands/one_off_backfill_resolved_variant_info_p_hgvs.py (new file), `category = "maintenance"`:
 
 - Pages `ResolvedVariantInfo.objects.filter(transcript_version__isnull=False)` with
   `library/django_utils/__init__.py:chunked_queryset` (pk range, default chunk 1,000, `--chunk-size`), running
@@ -163,7 +168,7 @@ lines ~178 and ~487, `classification/templatetags/classification_tags.py` line ~
 neighbours; `snpdb/tests/utils/mock_clingen_api.py` has `proteinEffect` payloads. Fixtures per
 `claude/guides/testing.md`. Worth keeping:
 
-- `canonical_p_hgvs`: 1-letter → 3-letter, `*` → `Ter`, `X` → `Ter`, missing brackets added, accession stripped,
+- `canonical_p_hgvs`: 1-letter → 3-letter, `*` → `Ter`, `X` → `Ter`, missing brackets added, accession kept,
   `p.%3D` → `p.(=)`, `p.?` unchanged, a range/dup/delins (`p.(Lys550_Lys558del)`) round-trips, junk returns None.
 - `short_p_hgvs`: `p.(Met246IlefsTer14)` → `p.(M246Ifs*14)`.
 - `recalc_p_hgvs` source ordering: VEP value wins over a computed one; computed wins when VEP has no row for the

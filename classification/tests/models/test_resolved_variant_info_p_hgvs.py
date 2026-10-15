@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase
+from hgvs.exceptions import HGVSDataNotAvailableError
 from hgvs.parsers import Parser
 
 from annotation.fake_data import create_fake_variant_annotation, get_fake_annotation_version
@@ -20,13 +21,14 @@ from classification.models.classification_variant_info_models import (
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_gata2_transcript_version
+from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.models import TranscriptVersionSequenceInfo
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, GenomeBuildPatchVersion
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 C_HGVS = "NM_001145661.2(GATA2):c.4G>A"
-COMPUTED_P_HGVS = "p.(Glu2Lys)"  # GAG -> AAG
+COMPUTED_P_HGVS = "NP_001139133.1:p.(Glu2Lys)"  # GAG -> AAG, on the fixture's cdot protein
 
 
 class ResolvedVariantInfoPHGVSTest(TestCase):
@@ -78,7 +80,7 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
     def test_vep_wins_over_computed(self):
         self._vep("NP_001139133.1:p.Glu2Ter")
         resolution = self.rvi.recalc_p_hgvs()
-        self.assertEqual((resolution.p_hgvs, resolution.source), ("p.(Glu2Ter)", PHGVSSource.VEP))
+        self.assertEqual((resolution.p_hgvs, resolution.source), ("NP_001139133.1:p.(Glu2Ter)", PHGVSSource.VEP))
 
     def test_computed_without_vep_for_exact_transcript_version(self):
         resolution = self.rvi.recalc_p_hgvs()
@@ -88,7 +90,7 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
         self._clingen("NP_001139133.1:p.Glu2Lys")
         with self._computed_fails():
             resolution = self.rvi.recalc_p_hgvs()
-        self.assertEqual((resolution.p_hgvs, resolution.source), ("p.(Glu2Lys)", PHGVSSource.CLINGEN))
+        self.assertEqual((resolution.p_hgvs, resolution.source), ("NP_001139133.1:p.(Glu2Lys)", PHGVSSource.CLINGEN))
 
     def test_clingen_non_protein_rejected(self):
         """ ClinGen returns n. on the protein accession for intronic variants """
@@ -98,7 +100,20 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
         self.assertIsNone(resolution.p_hgvs)
         self.assertIn("not divisible by 3", resolution.error)
 
+    def test_computed_without_protein_accession_is_an_error(self):
+        """ Pre-cdot RefSeq rows have no "protein" - biocommons would otherwise fall through to an unimplemented
+            lookup. The other sources are still tried """
+        self._clingen("NP_001139133.1:p.Glu2Lys")
+        # biocommons wraps the provider's methods in its own lru_cache at init, which needs a real function
+        with patch.object(DjangoTranscriptDataProvider, "get_pro_ac_for_tx_ac", lambda _self, _tx_ac: None):
+            converter = BioCommonsHGVSConverter(self.genome_build)
+            with self.assertRaises(HGVSDataNotAvailableError):
+                converter.c_hgvs_to_p_sequence_variant(C_HGVS)
+            resolution = self.rvi.recalc_p_hgvs(converter=converter)
+        self.assertEqual((resolution.p_hgvs, resolution.source), ("NP_001139133.1:p.(Glu2Lys)", PHGVSSource.CLINGEN))
+
     def test_evidence_typo_skipped(self):
+        """ The lab's accession is stored as typed - here none """
         self._evidence("p.Glu2Lys")
         self._evidence("p.Glx2Lsy")  # latest, but doesn't parse
         with self._computed_fails():
@@ -138,6 +153,6 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
         self.assertEqual((None, None, None), (self.rvi.p_hgvs, self.rvi.p_hgvs_source, self.rvi.p_hgvs_error))
 
     def test_backfill_command(self):
-        call_command("resolved_variant_info_p_hgvs", "--genome-build", "GRCh37", stdout=StringIO())
+        call_command("one_off_backfill_resolved_variant_info_p_hgvs", "--genome-build", "GRCh37", stdout=StringIO())
         self.rvi.refresh_from_db()
         self.assertEqual((COMPUTED_P_HGVS, PHGVSSource.COMPUTED), (self.rvi.p_hgvs, self.rvi.p_hgvs_source))

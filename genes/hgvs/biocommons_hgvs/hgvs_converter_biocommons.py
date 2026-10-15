@@ -241,6 +241,9 @@ class BioCommonsHGVSConverter:
         """ Translate a c.HGVS (gene in brackets allowed) to a p. SequenceVariant on the cdot protein accession """
         var_c = self._parser_hgvs(c_hgvs_string)
         var_c.gene = None
+        if not self.hdp.get_pro_ac_for_tx_ac(var_c.ac):
+            # Without this, biocommons falls back to hdp.get_acs_for_protein_seq, which cdot leaves unimplemented
+            raise HGVSDataNotAvailableError(f"{var_c.ac} has no protein accession in its cdot data")
         return self.am.c_to_p(var_c)
 
     def get_protein_length(self, transcript_accession: str) -> int:

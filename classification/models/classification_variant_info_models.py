@@ -212,8 +212,9 @@ class ResolvedVariantInfo(TimeStampedModel):
     """ If there was an error generating the c.HGVS, put it here """
 
     p_hgvs = TextField(null=True, blank=True)
-    """ Canonical p.HGVS for resolved_hgvs: p-dot only (no protein accession), 3-letter, Ter, always in predicted
-        brackets - p.(Gly12Asp), p.(Met246IlefsTer14), p.?, p.(=). Null when the row has no transcript_version
+    """ Canonical p.HGVS for resolved_hgvs on the protein accession the source gave (a lab's evidence may have
+        none, or another NP version than cdot's): 3-letter, Ter, always in predicted brackets -
+        NP_000483.3:p.(Gly480Cys), p.(Met246IlefsTer14), p.?, p.(=). Null when the row has no transcript_version
         (gene-level, mito, g.HGVS-only) or no source could translate it (see p_hgvs_error) """
 
     p_hgvs_source = TextField(null=True, blank=True, choices=PHGVSSource.choices)
@@ -225,7 +226,7 @@ class ResolvedVariantInfo(TimeStampedModel):
 
     @property
     def p_hgvs_short(self) -> Optional[str]:
-        """ p.(G12D), p.(M246Ifs*14) - derived for display, nothing sorts or searches on it """
+        """ p.(G12D), p.(M246Ifs*14) - no accession, derived for display, nothing sorts or searches on it """
         return short_p_hgvs(self.p_hgvs)
 
     objects = ObjectManagerCachingRequest()

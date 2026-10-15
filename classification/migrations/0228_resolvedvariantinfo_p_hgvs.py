@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
             name='p_hgvs_source',
             field=models.TextField(blank=True, choices=[('V', 'VEP'), ('C', 'Computed'), ('G', 'ClinGen'), ('E', 'Evidence')], null=True),
         ),
-        ManualOperation(task_id=ManualOperation.task_id_manage(["resolved_variant_info_p_hgvs"]),
+        ManualOperation(task_id=ManualOperation.task_id_manage(["one_off_backfill_resolved_variant_info_p_hgvs"]),
                         note="Calculate canonical p.HGVS for existing ResolvedVariantInfo rows (#1383)",
                         test=_has_resolved_variant_info_needing_p_hgvs),
     ]

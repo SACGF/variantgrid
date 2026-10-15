@@ -44,16 +44,17 @@ class PhgvsTest(TestCase):
 
 
 class CanonicalPHGVSTest(SimpleTestCase):
-    """ ResolvedVariantInfo.p_hgvs form: no accession, 3-letter, Ter, predicted brackets (#1383) """
+    """ ResolvedVariantInfo.p_hgvs form: source's accession kept, 3-letter, Ter, predicted brackets (#1383) """
 
     def test_canonical(self):
         for raw, expected in [
             ("p.G12D", "p.(Gly12Asp)"),
-            ("NP_000483.3(CFTR):p.Gly480Cys", "p.(Gly480Cys)"),
+            ("NP_000483.3(CFTR):p.Gly480Cys", "NP_000483.3:p.(Gly480Cys)"),
+            ("NP_000483.3:p.?", "NP_000483.3:p.?"),
             ("p.Met246Ilefs*14", "p.(Met246IlefsTer14)"),
             ("p.Trp26X", "p.(Trp26Ter)"),  # biocommons alone reads X as Xaa
             ("p.Arg97fsX5", "p.(Arg97fsTer5)"),
-            ("ENSP00000371342.4:p.%3D", "p.(=)"),
+            ("ENSP00000371342.4:p.%3D", "ENSP00000371342.4:p.(=)"),
             ("p.=", "p.(=)"),
             ("p.?", "p.?"),
             ("p.(?)", "p.?"),
@@ -69,7 +70,7 @@ class CanonicalPHGVSTest(SimpleTestCase):
                 self.assertIsNone(canonical_p_hgvs(raw))
 
     def test_short(self):
-        self.assertEqual("p.(M246Ifs*14)", short_p_hgvs("p.(Met246IlefsTer14)"))
+        self.assertEqual("p.(M246Ifs*14)", short_p_hgvs("NP_000483.3:p.(Met246IlefsTer14)"))
 
     def test_frameshift_in_disguise(self):
         parser = Parser()

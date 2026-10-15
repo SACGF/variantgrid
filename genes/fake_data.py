@@ -107,6 +107,7 @@ def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
                       "hgnc": "4171",
                       "biotype": ["protein_coding"],
                       "gene_name": "GATA2",
+                      "protein": "NP_001139133.1",
                       "stop_codon": 1878,
                       "start_codon": 435,
                       "genome_builds": {
