@@ -346,6 +346,7 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "curation_context",
     "curation_date",
     "curation_verified_date",
+    "data_level",
     "gene_penetrance",
     "gene_symbol",
     "genome_build",
