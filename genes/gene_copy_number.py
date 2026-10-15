@@ -28,6 +28,7 @@ from genes.models import (
     GeneLevelId,
     gene_copy_number_canonical_str,
 )
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.gene_level_variants import (
     GENE_LEVEL_CONTIG_NAME,
@@ -104,7 +105,10 @@ def resolve_gene_copy_number_string(copy_number_string: str,
     gene_name, kind = parsed
     if resolver is None:
         resolver = GeneLevelNameResolver()
-    resolved_gene = resolver.resolve_gene(gene_name, allow_unknown=False)
+    try:
+        resolved_gene = resolver.resolve_gene(gene_name, allow_unknown=False)
+    except AmbiguousGeneSymbolAlias as ambiguous:
+        return GeneLevelResolution.refused(str(ambiguous))
     if resolved_gene is None:
         return GeneLevelResolution.refused(unknown_gene_reason(gene_name))
     return GeneLevelResolution.identity(

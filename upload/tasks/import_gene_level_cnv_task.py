@@ -25,6 +25,7 @@ Two steps:
   GeneLevelCNVInsertTask    - once the variants exist, create the GeneCopyNumberEvents against them
 """
 import logging
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -37,6 +38,7 @@ from genes.gene_copy_number import (
 )
 from genes.gene_level_resolver import GeneLevelNameResolver
 from genes.models import GeneCopyNumberEventKind
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_enums import VCFColumns, VCFSymbolicAllele
 from library.genomics.vcf_writer import VCFInfoHeader, VCFWriter, build_header_lines
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
@@ -59,6 +61,7 @@ VCF_MISSING_VALUE = "."
 
 NO_SEGMENT_MESSAGE = "Gene-level CNV records skipped - no gene named in the segment field"
 DUPLICATE_MESSAGE = "Gene-level CNV records skipped - the gene and direction were already called"
+AMBIGUOUS_MESSAGE_PREFIX = "Gene-level CNV records skipped - "
 
 # Header lines the rewrite replaces with its own
 _REPLACED_HEADER_PREFIXES = ("##fileformat", "##INFO", "##FORMAT", "##contig", "##ALT", "#CHROM")
@@ -104,6 +107,7 @@ class GeneLevelCNVRewrite:
     records_read: int = 0
     no_segment: int = 0
     duplicates: int = 0
+    ambiguous: Counter[str] = field(default_factory=Counter)  # AmbiguousGeneSymbolAlias message -> records
 
 
 def _segment_gene(record: cyvcf2.Variant, segment_field: str) -> Optional[str]:
@@ -126,7 +130,8 @@ def read_gene_level_cnv_records(reader: cyvcf2.VCF, segment_field: str,
         than guessed at, so a file this rule does not fit says so instead of half-importing.
 
         A name HGNC doesn't know is no reason to drop a call - it gets a custom GeneLevelId, as an
-        unknown fusion partner does. """
+        unknown fusion partner does. An ambiguous alias is dropped and counted under its message, which
+        names the genes it could be. """
 
     if resolver is None:
         resolver = GeneLevelNameResolver()
@@ -140,7 +145,11 @@ def read_gene_level_cnv_records(reader: cyvcf2.VCF, segment_field: str,
             continue  # A no-call, or an alt that isn't a whole-gene copy number call
 
         written_gene = _segment_gene(record, segment_field)
-        resolved_gene = resolver.resolve_gene(written_gene) if written_gene else None
+        try:
+            resolved_gene = resolver.resolve_gene(written_gene) if written_gene else None
+        except AmbiguousGeneSymbolAlias as ambiguous:
+            rewrite.ambiguous[str(ambiguous)] += 1
+            continue
         if resolved_gene is None:
             rewrite.no_segment += 1
             continue
@@ -225,6 +234,8 @@ class GeneLevelCNVCreateVCFTask(ImportVCFStepTask):
                                (rewrite.duplicates, DUPLICATE_MESSAGE)]:
             if count:
                 SimpleVCFImportInfo.add_message_count(count, message, upload_step)
+        for ambiguous_message, count in rewrite.ambiguous.items():
+            SimpleVCFImportInfo.add_message_count(count, AMBIGUOUS_MESSAGE_PREFIX + ambiguous_message, upload_step)
         return rewrite.records_read
 
 
