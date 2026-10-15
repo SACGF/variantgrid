@@ -81,7 +81,7 @@ every release. Resolving one exact string is
 `genes/models/models_gene.py:GeneSymbol.resolve_names` (`resolve_name` for one), three indexed queries per batch of
 names feeding one decision, `genes/models/models_gene.py:resolve_gene_name`: a symbol with an HGNC record of its own
 is taken as written, then an HGNC previous symbol outranks an alias (SEPT2 is SEPTIN2's rename and SEPTIN6's alias),
-and an alias counts only when it names one gene - otherwise the resolution carries an `AmbiguousGeneSymbolAlias`
+and an alias counts only when it names one gene - otherwise each name comes back paired with an `AmbiguousGeneSymbolAlias`
 naming the candidates. An approved symbol always outranks an alias redirect because HGNC's `alias_symbol` synonyms
 are frequently another gene's approved symbol (AURKAIP1 lists AIP). `genes/gene_matching.py:GeneSymbolMatcher`
 memoises these for an import and records the alias followed on the `GeneListGeneSymbol`; an ambiguous alias is left

@@ -49,7 +49,7 @@ class Command(BaseCommand):
         unmatched = list(GeneListGeneSymbol.objects.filter(gene_symbol__isnull=True))
         resolutions = gsm.resolve_names(glgs.original_name for glgs in unmatched)
         for glgs in unmatched:
-            resolution = resolutions[glgs.original_name]
+            resolution, _ambiguous = resolutions[glgs.original_name]
             if resolution.gene_symbol_id:
                 glgs.gene_symbol_id = resolution.gene_symbol_id
                 glgs.gene_symbol_alias_id = resolution.gene_symbol_alias_id

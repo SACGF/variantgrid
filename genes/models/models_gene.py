@@ -152,11 +152,14 @@ class GeneNameResolution:
     gene_symbol_id: Optional[str] = None
     hgnc: Optional[HGNC] = None
     gene_symbol_alias_id: Optional[int] = None  # The GeneSymbolAlias followed to reach gene_symbol_id
-    ambiguous_alias: Optional[AmbiguousGeneSymbolAlias] = None
+
+
+# A name's resolution, and the ambiguity that left it unresolved
+GeneNameResult = tuple[GeneNameResolution, Optional[AmbiguousGeneSymbolAlias]]
 
 
 def resolve_gene_name(name: str, exact_symbol: Optional[str], alias_ids: dict[str, int],
-                      hgncs_by_uc_symbol: dict[str, list[HGNC]]) -> GeneNameResolution:
+                      hgncs_by_uc_symbol: dict[str, list[HGNC]]) -> GeneNameResult:
     """ The rules of GeneSymbol.resolve_names, over what was fetched for 'name':
         exact_symbol - the GeneSymbol 'name' is, alias_ids - {gene symbol: GeneSymbolAlias pk} for each gene 'name'
         is an alias of, hgncs_by_uc_symbol - upper case symbol -> its HGNC records, covering both """
@@ -177,13 +180,13 @@ def resolve_gene_name(name: str, exact_symbol: Optional[str], alias_ids: dict[st
 
     uc_alias_ids = {symbol.upper(): alias_id for symbol, alias_id in alias_ids.items()}
 
-    def via_alias(hgnc: HGNC) -> GeneNameResolution:
+    def via_alias(hgnc: HGNC) -> GeneNameResult:
         return GeneNameResolution(gene_symbol_id=hgnc.gene_symbol_id, hgnc=hgnc,
-                                  gene_symbol_alias_id=uc_alias_ids[hgnc.gene_symbol_id.upper()])
+                                  gene_symbol_alias_id=uc_alias_ids[hgnc.gene_symbol_id.upper()]), None
 
     if exact_symbol:
         if hgncs := hgncs_for([exact_symbol]):
-            return GeneNameResolution(gene_symbol_id=exact_symbol, hgnc=hgncs[0])
+            return GeneNameResolution(gene_symbol_id=exact_symbol, hgnc=hgncs[0]), None
 
     alias_hgncs = hgncs_for(alias_ids)
     for hgnc in alias_hgncs:
@@ -194,13 +197,13 @@ def resolve_gene_name(name: str, exact_symbol: Optional[str], alias_ids: dict[st
         return via_alias(hgnc)
 
     if exact_symbol:
-        return GeneNameResolution(gene_symbol_id=exact_symbol)
+        return GeneNameResolution(gene_symbol_id=exact_symbol), None
     if len(alias_ids) > 1:
-        return GeneNameResolution(ambiguous_alias=AmbiguousGeneSymbolAlias(name, alias_ids))
+        return GeneNameResolution(), AmbiguousGeneSymbolAlias(name, alias_ids)
     if alias_ids:
         (gene_symbol_id, alias_id), = alias_ids.items()
-        return GeneNameResolution(gene_symbol_id=gene_symbol_id, gene_symbol_alias_id=alias_id)
-    return GeneNameResolution()
+        return GeneNameResolution(gene_symbol_id=gene_symbol_id, gene_symbol_alias_id=alias_id), None
+    return GeneNameResolution(), None
 
 
 class GeneSymbol(models.Model, PreviewModelMixin):
@@ -244,20 +247,20 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     def resolve_name(name: str) -> tuple[Optional[str], Optional[HGNC]]:
         """ (gene symbol, HGNC) for a gene name as written - see GeneSymbol.resolve_names for the rules
             :raises AmbiguousGeneSymbolAlias: when 'name' is no symbol itself, and an alias for several genes """
-        resolution = GeneSymbol.resolve_names([name])[name]
-        if resolution.ambiguous_alias:
-            raise resolution.ambiguous_alias
+        resolution, ambiguous = GeneSymbol.resolve_names([name])[name]
+        if ambiguous:
+            raise ambiguous
         return resolution.gene_symbol_id, resolution.hgnc
 
     @staticmethod
-    def resolve_names(names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResolution]:
-        """ What each gene name as written stands for, keyed by the name as passed - the symbol is the approved one
-            where a name is an old name.
+    def resolve_names(names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResult]:
+        """ (resolution, ambiguity) for each gene name as written, keyed by the name as passed - the symbol is the
+            approved one where a name is an old name. One bad name doesn't stop the rest resolving.
 
             A name that is a current HGNC symbol in its own right is taken as written. Otherwise HGNC's rename is the
             strongest evidence two names are one gene, so it outranks an alias: SEPT2 is SEPTIN2's previous symbol and
             also, on an unrelated gene, one of SEPTIN6's aliases. An alias resolves only when it names a single gene,
-            otherwise the resolution carries an AmbiguousGeneSymbolAlias naming the candidates.
+            otherwise the name is unresolved and paired with an AmbiguousGeneSymbolAlias naming the candidates.
 
             Three indexed queries per batch of names: the HGNC import stores every previous and alias symbol as a
             GeneSymbolAlias, so the alias rows are what find the HGNC records to check """

@@ -25,7 +25,7 @@ from genes.models import (
     ReleaseGeneSymbol,
     ReleaseGeneSymbolGene,
 )
-from genes.models.models_gene import GeneNameResolution
+from genes.models.models_gene import GeneNameResult
 from library.utils import clean_string
 
 TokenizeResult = namedtuple("TokenizeResult", ["valid", "oversized"])
@@ -36,16 +36,17 @@ class GeneSymbolMatcher:
         import. Resolve a file's names together up front: get_gene_symbol_id on a name not seen yet queries for it """
 
     def __init__(self):
-        self._resolutions: dict[Optional[str], GeneNameResolution] = {}
+        self._resolutions: dict[Optional[str], GeneNameResult] = {}
 
-    def resolve_names(self, names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResolution]:
+    def resolve_names(self, names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResult]:
         names = set(names)
         if unresolved := names - self._resolutions.keys():
             self._resolutions.update(GeneSymbol.resolve_names(unresolved))
         return {name: self._resolutions[name] for name in names}
 
     def get_gene_symbol_id(self, original_gene_symbol: str) -> Optional[str]:
-        return self.resolve_names([original_gene_symbol])[original_gene_symbol].gene_symbol_id
+        resolution, _ambiguous = self.resolve_names([original_gene_symbol])[original_gene_symbol]
+        return resolution.gene_symbol_id
 
     @cached_property
     def _release_gene_matchers(self):
@@ -76,9 +77,9 @@ class GeneSymbolMatcher:
         gene_list_gene_symbols = []
         ambiguous_aliases = []
         for original_name in valid_names:
-            resolution = resolutions[original_name]
-            if resolution.ambiguous_alias:
-                ambiguous_aliases.append(str(resolution.ambiguous_alias))
+            resolution, ambiguous = resolutions[original_name]
+            if ambiguous:
+                ambiguous_aliases.append(str(ambiguous))
             gene_list_gene_symbols.append(GeneListGeneSymbol(gene_list=gene_list,
                                                              original_name=original_name,
                                                              gene_symbol_id=resolution.gene_symbol_id,
