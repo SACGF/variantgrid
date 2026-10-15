@@ -210,22 +210,30 @@ class ReferenceCheckTest(SimpleTestCase):
 
 
 class ServedConfigurationCheckTest(SimpleTestCase):
+    """ Checked against a known-good baseline, not the settings of whichever host runs the suite """
+    BASELINE = {
+        "DEBUG": False, "UNIT_TEST": True,
+        "SECURE_PROXY_SSL_HEADER": None,
+        "REST_FRAMEWORK": {**settings.REST_FRAMEWORK, "DEFAULT_SCHEMA_CLASS": checks.SPECTACULAR_SCHEMA_CLASS},
+        "MIDDLEWARE": (*(m for m in settings.MIDDLEWARE if m != checks.AXES_MIDDLEWARE), checks.AXES_MIDDLEWARE),
+    }
 
     def test_defaults_pass(self):
-        self.assertEqual(ids(checks.check_served_configuration(None)), set())
+        with override_settings(**self.BASELINE):
+            self.assertEqual(ids(checks.check_served_configuration(None)), set())
 
     def test_misconfigurations(self):
+        rest_framework_without_schema = {k: v for k, v in self.BASELINE["REST_FRAMEWORK"].items()
+                                         if k != "DEFAULT_SCHEMA_CLASS"}
         cases = [
-            ("dev switch on a server", {"UNIT_TEST": False, "DEBUG": False, "CACHE_GENERATED_FILES": False},
-             "variantgrid.W005"),
+            ("dev switch on a server", {"UNIT_TEST": False, "CACHE_GENERATED_FILES": False}, "variantgrid.W005"),
             ("https without secure cookies", {"SECURE_PROXY_SSL_HEADER": ('HTTP_X_FORWARDED_PROTOCOL', 'https'),
                                               "SESSION_COOKIE_SECURE": False, "CSRF_COOKIE_SECURE": True},
              "variantgrid.W006"),
-            ("schema class dropped", {"REST_FRAMEWORK": {k: v for k, v in settings.REST_FRAMEWORK.items()
-                                                         if k != "DEFAULT_SCHEMA_CLASS"}}, "variantgrid.E026"),
-            ("axes not last", {"MIDDLEWARE": (*settings.MIDDLEWARE, 'eventlog.middleware.PageViewsMiddleware')},
+            ("schema class dropped", {"REST_FRAMEWORK": rest_framework_without_schema}, "variantgrid.E026"),
+            ("axes not last", {"MIDDLEWARE": (*self.BASELINE["MIDDLEWARE"], 'eventlog.middleware.PageViewsMiddleware')},
              "variantgrid.E027"),
         ]
         for name, overrides, expected in cases:
-            with self.subTest(name), override_settings(**overrides):
+            with self.subTest(name), override_settings(**{**self.BASELINE, **overrides}):
                 self.assertEqual(ids(checks.check_served_configuration(None)), {expected})
