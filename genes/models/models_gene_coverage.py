@@ -127,6 +127,7 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         genes_with_matched_canonical = set()
         unmatched_transcripts_by_gene = defaultdict(set)
 
+        gene_matcher.resolve_names(gene_coverage_df["original_gene_symbol"])
         for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["original_gene_symbol"]
             original_transcript = row["original_transcript"]

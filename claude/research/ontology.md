@@ -93,7 +93,7 @@ against MONDO while labs often pick OMIM. `ontology/ontology_traversal.py:get_on
 the same API over a `MemoryOntologyTraverser`, which loads one version's whole edge list into adjacency dicts once;
 `gene_annotation` uses it across every HGNC term, where a query per step would be the bottleneck. The HGNC bridge is
 `ontology/models/models_ontology.py:OntologyTerm.get_gene_symbol`: name match, then alias match, then
-`genes/gene_matching.py:HGNCMatcher` - and if HGNC knows the gene but no term exists it creates one on the spot under
+`genes/models/models_gene.py:GeneSymbol.resolve_name` - and if HGNC knows the gene but no term exists it creates one on the spot under
 an ad-hoc import. Its docstring is the rule: pass GeneSymbols around and only cross to the HGNC term at the edge of a
 traversal.
 

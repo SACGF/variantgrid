@@ -75,6 +75,7 @@ class ImportGeneWikiCollection(ImportTask):
 
         matched_records = []
         gs_matcher = GeneSymbolMatcher()
+        gs_matcher.resolve_names(iw.match_column_value for iw in records)
         user_matcher = UserMatcher(file_upload.user)
         for iw in records:
             if gene_symbol_id := gs_matcher.get_gene_symbol_id(iw.match_column_value):
