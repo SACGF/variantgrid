@@ -8,7 +8,7 @@ from manual.operations.manual_operations import ManualOperation
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('classification', '0226_remove_hgvsconverterversion_code_git_hash'),
+        ('classification', '0227_data_evidencekeys'),
     ]
 
     operations = [

@@ -57,8 +57,9 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         # Set once mapped to the genome - the transcript ref at the mapped span and the genome ref there
         self.mapped_transcript_ref: Optional[str] = None
         self.genome_ref: Optional[str] = None
-        # Without a stored transcript sequence the transcript ref is stitched from the genome, so always equal
-        self.transcript_sequence_stored = False
+        # Only a ref read from a stored transcript sequence can differ from the genome: an intronic position, or any
+        # position when no sequence is stored (cdot stitches one from the genome), is read from the genome itself
+        self.transcript_ref_from_sequence = False
 
         provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
         super().__init__(provided_g_ref, calculated_g_ref)
@@ -72,8 +73,8 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
     def transcript_and_genome_ref_differ(self) -> Optional[bool]:
         """ The transcript sequence differs from the genome (eg F5 Leiden in GRCh37) so the genomic variant
             isn't what the transcript HGVS describes - it can even come out ref-only (#1266).
-            None when it couldn't be checked: not mapped yet, or no stored sequence for the transcript """
-        if self.transcript_sequence_stored and self.mapped_transcript_ref and self.genome_ref:
+            None when it couldn't be checked: not mapped yet, or the transcript ref came from the genome """
+        if self.transcript_ref_from_sequence and self.mapped_transcript_ref and self.genome_ref:
             return self._transcript_strand(self.mapped_transcript_ref) != self.genome_ref
         return None
 
@@ -336,6 +337,18 @@ class BioCommonsHGVSConverter:
         alt_ac = self.am._alt_ac_for_tx_ac(tx_ac)
         return self.am._fetch_AlignmentMapper(tx_ac, alt_ac, self.am.alt_aln_method)
 
+    def _transcript_ref_from_sequence(self, var_x: SequenceVariant) -> bool:
+        """ Whether the ref biocommons filled in came from a stored transcript sequence, so can be compared with
+            the genome (#1266). An intronic position is read from the genome, and so is every position of a
+            transcript with no stored sequence, which cdot stitches out of the genome """
+        if not self._is_transcript_variant(var_x):
+            return False
+        pos = var_x.posedit.pos
+        if pos.start.is_intronic or pos.end.is_intronic:
+            return False
+        transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x)
+        return self.hdp.db_transcript_seqfetcher.has_sequence(transcript_accession)
+
     def _fix_ref(self, var_x: SequenceVariant) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
         if provided_ref := var_x.posedit.edit.ref_s:
             strand = None
@@ -346,7 +359,7 @@ class BioCommonsHGVSConverter:
                 # instead, but only when told which contig the transcript is aligned to. Without it the provided
                 # reference is returned untouched and a wrong base passes as a match.
                 alignment = self._alignment_mapper(var_x.ac)
-                strand = alignment.strand
+                strand = "-" if alignment.strand == -1 else "+"
                 alt_ac = alignment.alt_ac
                 alt_aln_method = alignment.alt_aln_method
             var_x_fixed_ref = self.no_validate_mapper._replace_reference(copy.deepcopy(var_x), alt_ac=alt_ac,
@@ -466,10 +479,9 @@ class BioCommonsHGVSConverter:
                 # Set from genomic coord in case it's diff than transcript
                 matches_reference.calculated_ref = var_g.posedit.edit.ref_s
             if isinstance(matches_reference, HgvsMatchTranscriptAndGenomeRefAllele):
-                transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x)
-                matches_reference.transcript_sequence_stored = self.hdp.db_transcript_seqfetcher.has_sequence(transcript_accession)
                 matches_reference.mapped_transcript_ref = var_x.posedit.edit.ref_s
                 matches_reference.genome_ref = var_g.posedit.edit.ref_s
+                matches_reference.transcript_ref_from_sequence = self._transcript_ref_from_sequence(var_x)
         else:
             var_g = var_x
 
