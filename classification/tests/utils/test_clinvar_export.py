@@ -22,6 +22,8 @@ from classification.models.clinvar_export_convertor import ClinVarExportConverte
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import ClinVarResponseOutcome, clinvar_export_sync
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models_enums import GeneSymbolAliasSource
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
 from snpdb.models import ClinVarKey, GenomeBuild, GenomeBuildPatchVersion
@@ -222,6 +224,22 @@ class TestClinVarExport(TestCase):
         clinvar_export = self._create_clinvar_export(resolved_hgvs="NM_000001.2:c.1913G>A", gene_symbol="OLDSYM")
         variant_json = ClinVarExportConverter(clinvar_export).variant_set.pure_json()["variant"][0]
         self.assertEqual(variant_json["gene"], [{"symbol": "OLDSYM"}])
+
+    def test_gene_symbol_evidence_key_alias_resolves_to_current_symbol(self):
+        GeneSymbol.objects.get_or_create(symbol="TECTA")
+        GeneSymbolAlias.objects.create(alias="OLDSYM", gene_symbol_id="TECTA", source=GeneSymbolAliasSource.HGNC)
+        clinvar_export = self._create_clinvar_export(resolved_hgvs="NM_000001.2:c.1913G>A", gene_symbol="OLDSYM")
+        variant_json = ClinVarExportConverter(clinvar_export).variant_set.pure_json()["variant"][0]
+        self.assertEqual(variant_json["gene"], [{"symbol": "TECTA"}])
+
+    def test_gene_symbol_ambiguous_alias_is_an_error(self):
+        for symbol in ["TECTA", "TECTB"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias="OLDSYM", gene_symbol_id=symbol, source=GeneSymbolAliasSource.HGNC)
+        clinvar_export = self._create_clinvar_export(resolved_hgvs="NM_000001.2:c.1913G>A", gene_symbol="OLDSYM")
+        variant_set = ClinVarExportConverter(clinvar_export).variant_set
+        self.assertEqual(variant_set.pure_json()["variant"][0]["gene"], [])
+        self.assertTrue(variant_set.has_errors)
 
     @mock.patch('classification.models.clinvar_export_sync.ClinVarExportSync._send_data', side_effect=mock_send_data)
     def test_clinvar_setup(self, mocked_send_data):

@@ -15,6 +15,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagType
 from genes.hgvs import HGVSComponents
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
 from snpdb.models import ClinVarCitationsModes, ClinVarKey, GenomeBuild
@@ -501,12 +502,22 @@ class ClinVarExportConverter:
                 else:
                     hgvs_errors += JsonMessages.error(f"ClinVar only accepts transcripts starting with one of {CLINVAR_ACCEPTED_TRANSCRIPTS}")
 
-                # the resolved c.HGVS carries the preferred symbol, which ClinVar expects over the lab's imported one
-                gene_symbols = []
-                if gene_symbol := c_hgvs_obj.gene_symbol or self.value(SpecialEKeys.GENE_SYMBOL):
-                    gene_symbols.append({"symbol": gene_symbol})
+                # ClinVar expects the current symbol, which the resolved c.HGVS carries over the lab's imported one
+                try:
+                    gene_error = "No gene symbol provided"
+                    if best_gene_symbol := self.classification_based_on.gene_symbol_best(genome_build):
+                        gene_symbol = best_gene_symbol.symbol
+                    else:
+                        # a name VariantGrid doesn't know is sent as written
+                        gene_symbol = c_hgvs_obj.gene_symbol or self.value(SpecialEKeys.GENE_SYMBOL)
+                except AmbiguousGeneSymbolAlias as ambiguous:
+                    gene_symbol = None
+                    gene_error = str(ambiguous)
+
+                if gene_symbol:
+                    gene_symbols = [{"symbol": gene_symbol}]
                 else:
-                    gene_symbols = ValidatedJson([], JsonMessages.error("No gene symbol provided"))
+                    gene_symbols = ValidatedJson([], JsonMessages.error(gene_error))
 
                 json_data = {
                     "variant": [
