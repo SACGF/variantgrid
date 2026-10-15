@@ -25,16 +25,16 @@
     {% if normalized_diff %}
         {% labelled label="Normalised Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
-    {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% p_hgvs c_hgvs_resolved_variant_info.1.4 %}{% endlabelled %}
-    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.1.0 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.1.1 | enrich}}{% endlabelled %}
-    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.1.2 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.1.3 | dash_if_empty }}{% endlabelled %}
+    {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% p_hgvs resolved_variant_info.1.4 %}{% endlabelled %}
+    {% labelled admin_only=True label=resolved_variant_info.1.0 value_css="text-monospace" row_css="debug-footnote" %}{{ resolved_variant_info.1.1 | enrich}}{% endlabelled %}
+    {% labelled admin_only=True label=resolved_variant_info.1.2 value_css="text-monospace" row_css="debug-footnote" %}{{ resolved_variant_info.1.3 | dash_if_empty }}{% endlabelled %}
 
     {% if liftover_diff %}
         {% labelled label="Liftover Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
-    {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% p_hgvs c_hgvs_resolved_variant_info.2.4 %}{% endlabelled %}
-    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.2.0 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.2.1 | enrich }}{% endlabelled %}
-    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.2.2 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.2.3 | dash_if_empty }}{% endlabelled %}
+    {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% p_hgvs resolved_variant_info.2.4 %}{% endlabelled %}
+    {% labelled admin_only=True label=resolved_variant_info.2.0 value_css="text-monospace" row_css="debug-footnote" %}{{ resolved_variant_info.2.1 | enrich }}{% endlabelled %}
+    {% labelled admin_only=True label=resolved_variant_info.2.2 value_css="text-monospace" row_css="debug-footnote" %}{{ resolved_variant_info.2.3 | dash_if_empty }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
     {% labelled label=variant_coordinate_normalized_label value_css="text-monospace" %}{{ allele_info.variant_coordinate_normalized }}{% endlabelled %}
 

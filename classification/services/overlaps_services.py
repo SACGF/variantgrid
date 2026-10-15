@@ -578,7 +578,7 @@ class OverlapServices:
 
                     lab_notification.add_field(label="Overlap", value=f"<{report_url}|OV_{notification.overlap_id}>")
                     # can't say when discordance detected on as overlap_status_change_timestamp would have been updated
-                    lab_notification.add_field(label="c.HGVS", value=str(overlap.c_hgvs(lab)))
+                    lab_notification.add_field(label="c.HGVS", value=str(overlap.hgvs(lab)))
 
                     # now each lab's contribution
                     for contribution in overlap.contributions_list:
@@ -629,7 +629,7 @@ class OverlapContributionPerspective:
 
     @cached_property
     def email_subject(self):
-        return f"{settings.SITE_NAME} overlap for {self.overlap.c_hgvs(lab=self.overlap_contribution.lab)}"
+        return f"{settings.SITE_NAME} overlap for {self.overlap.hgvs(lab=self.overlap_contribution.lab)}"
 
     @property
     def _sort_index(self):
@@ -681,7 +681,7 @@ class OverlapPageDetails:
             subject = None
             if lab := overlap_contribution.lab:
                 genome_build = UserSettings.get_for(lab=lab).default_genome_build
-                subject = f"{settings.SITE_NAME} record : {self.overlap.c_hgvs(lab=lab, genome_build=genome_build)}"
+                subject = f"{settings.SITE_NAME} record : {self.overlap.hgvs(lab=lab, genome_build=genome_build)}"
 
             labs.add(
                 LabContext(

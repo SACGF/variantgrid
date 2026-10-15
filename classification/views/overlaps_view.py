@@ -351,8 +351,8 @@ class OverlapDownloadRow(ExportRow):
         return get_url_from_view_path(self.overlap.get_absolute_url())
 
     @export_column("c.HGVS")
-    def c_hgvs(self):
-        return "\n".join([str(chgvs) for chgvs in self.overlap.c_hgvs_all(
+    def dna_hgvs(self):
+        return "\n".join([str(hgvs) for hgvs in self.overlap.all_hgvs(
             lab_picker=self.lab_picker,
             genome_build=GenomeBuildManager.get_current_genome_build()
         )])

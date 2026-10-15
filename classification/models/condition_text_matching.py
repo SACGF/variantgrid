@@ -357,7 +357,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         """
         candidates: list[str] = []
         try:
-            if resolved := cm.c_hgvs_best(cm.get_genome_build()).gene_symbol:
+            if resolved := cm.hgvs_best(cm.get_genome_build()).gene_symbol:
                 candidates.append(resolved)
         except ValueError:
             # no usable genome build on the record

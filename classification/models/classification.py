@@ -2296,24 +2296,24 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if variant := self.get_variant_for_build(variant_annotation_version.genome_build):
             return variant.variantannotation_set.filter(version=variant_annotation_version).first()
 
-    def c_hgvs_all(self) -> list[HGVSDisplay]:
-        all_chgvs: list[HGVSDisplay] = []
+    def all_hgvs(self) -> list[HGVSDisplay]:
+        all_hgvs: list[HGVSDisplay] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_resolved_hgvs(genome_build):
-                all_chgvs.append(HGVSDisplay.parse(text, genome_build=genome_build, is_normalised=True,
-                                                   p_hgvs=self.get_resolved_p_hgvs(genome_build)))
-        return all_chgvs
+                all_hgvs.append(HGVSDisplay.parse(dna_hgvs=text, genome_build=genome_build, is_normalised=True,
+                                                 p_hgvs=self.get_resolved_p_hgvs(genome_build)))
+        return all_hgvs
 
-    def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
+    def hgvs_best(self, preferred_genome_build: GenomeBuild) -> HGVSDisplay:
         if c_hgvs_str := self.get_resolved_hgvs(preferred_genome_build):
-            return HGVSDisplay.parse(c_hgvs_str, genome_build=preferred_genome_build,
+            return HGVSDisplay.parse(dna_hgvs=c_hgvs_str, genome_build=preferred_genome_build,
                                      is_normalised=True, is_desired_build=True,
                                      p_hgvs=self.get_resolved_p_hgvs(preferred_genome_build))
         for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
             if preferred_genome_build == alt_genome_build:
                 continue
             if c_hgvs_str := self.get_resolved_hgvs(alt_genome_build):
-                return HGVSDisplay.parse(c_hgvs_str, genome_build=alt_genome_build,
+                return HGVSDisplay.parse(dna_hgvs=c_hgvs_str, genome_build=alt_genome_build,
                                          is_normalised=True, is_desired_build=False,
                                          p_hgvs=self.get_resolved_p_hgvs(alt_genome_build))
         if (allele_info := self.allele_info) and \
@@ -2325,7 +2325,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             imported_genome_build = self.get_genome_build()
         except ValueError:
             pass
-        return HGVSDisplay.parse(self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "",
+        return HGVSDisplay.parse(dna_hgvs=self.get(SpecialEKeys.C_HGVS) or self.get(SpecialEKeys.G_HGVS) or "",
                                  genome_build=imported_genome_build, is_normalised=False,
                                  is_desired_build=preferred_genome_build == imported_genome_build)
 
@@ -2428,7 +2428,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
                 genome_build = self.get_genome_build()
             except ValueError:
                 pass
-            return HGVSDisplay.parse(c_hgvs, genome_build=genome_build)
+            return HGVSDisplay.parse(dna_hgvs=c_hgvs, genome_build=genome_build)
         return None
 
     @property
@@ -2731,8 +2731,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
         """ Driven by EvidenceKey.max_share_level """
         return EvidenceVisibility(user).visible_evidence(self.classification, self.evidence)
 
-    def c_hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
-        return self.classification.c_hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
+    def hgvs_best(self, genome_build: GenomeBuild) -> HGVSDisplay:
+        return self.classification.hgvs_best(preferred_genome_build=genome_build)  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """

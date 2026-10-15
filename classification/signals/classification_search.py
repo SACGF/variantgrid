@@ -110,7 +110,7 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
         if c_and_p := sorted(((c_hgvs, p_hgvs) for c_hgvs, p_hgvs in c_and_p_qs if c_hgvs),
                              key=lambda pair: (pair[0], pair[1] or "")):
             for c_hgvs, p_hgvs in c_and_p:
-                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", HGVSDisplay.parse(c_hgvs, p_hgvs=p_hgvs),
+                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", HGVSDisplay.parse(dna_hgvs=c_hgvs, p_hgvs=p_hgvs),
                                                    dedicated_row=True))
 
     if not hgvs_extras:

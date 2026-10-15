@@ -241,8 +241,8 @@ class DiscordanceReportTemplateData:
         return self._effectives_and_not_considered[1]
 
     @property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        return self.report.all_c_hgvs(self.genome_build)
+    def hgvses(self) -> list[HGVSDisplay]:
+        return self.report.all_hgvs(self.genome_build)
 
     @property
     def lab_clin_sigs(self) -> list[_LabClinSig]:

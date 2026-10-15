@@ -5,7 +5,7 @@
 {% if vcm and vcm.classification.id %}
     {% if show_imported_c_hgvs %}
         <div style="display:inline-block;min-width:400px">
-        {% c_hgvs vcm.imported_c_hgvs_obj show_genome_build=True %}
+        {% hgvs vcm.imported_c_hgvs_obj show_genome_build=True %}
         </div>
     {% endif %}
     {% if mode == "compact" %}

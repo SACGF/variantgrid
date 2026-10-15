@@ -36,10 +36,10 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
                 (c_hgvs := preferred_build.resolved_hgvs_display):
             resolved_dict.update(c_hgvs.to_json())
         elif c_hgvs_raw := classification.get(SpecialEKeys.C_HGVS):
-            resolved_dict.update(HGVSDisplay.parse(c_hgvs_raw).to_json())
+            resolved_dict.update(HGVSDisplay.parse(dna_hgvs=c_hgvs_raw).to_json())
         elif g_hgvs := allele_info.imported_g_hgvs_obj:
             # g.HGVS only submission where the variant ran off the transcript, show what was imported
-            resolved_dict.update(HGVSDisplay(g_hgvs).to_json())
+            resolved_dict.update(HGVSDisplay(dna_hgvs=g_hgvs).to_json())
 
         include = False
         if latest_validation := allele_info.latest_validation:

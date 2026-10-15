@@ -351,9 +351,9 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             if value_type := self.value_type:
                 summary_extra.append(PreviewKeyValue(value=ClassificationResultValue(value_type).label))
 
-        for c_hgvs in self.c_hgvses:
+        for hgvs in self.hgvses:
             summary_extra.append(
-                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
+                PreviewKeyValue(key=f"{hgvs.genome_build} c.HGVS", value=str(hgvs), dedicated_row=True)
             )
 
         return self.preview_with(
@@ -362,20 +362,20 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         )
 
     @cached_property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        c_hgvses = set()
+    def hgvses(self) -> list[HGVSDisplay]:
+        hgvses = set()
         for entry in self.contributions_list:
             if cg := entry.classification_grouping:
-                c_hgvses.add(cg.latest_allele_info.preferred_hgvs_obj())
-        return list(sorted(c_hgvses))
+                hgvses.add(cg.latest_allele_info.preferred_hgvs_obj())
+        return list(sorted(hgvses))
 
-    def c_hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
-        return first(self.c_hgvs_all(
+    def hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
+        return first(self.all_hgvs(
             lab_picker=LabPickerData(lab_selection=LabSelection.single_lab(lab)),
             genome_build=genome_build
         ))
 
-    def c_hgvs_all(self, lab_picker: Optional[LabPickerData], genome_build: GenomeBuild) -> list[HGVSDisplay]:
+    def all_hgvs(self, lab_picker: Optional[LabPickerData], genome_build: GenomeBuild) -> list[HGVSDisplay]:
         results = set()
         if lab_picker:
             for contribution in self.contributions_list:
@@ -384,13 +384,13 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
                         results.add(classification_grouping.latest_allele_info.preferred_hgvs_obj(genome_build))
 
         if not results and lab_picker:
-            return self.c_hgvs_all(genome_build=genome_build, lab_picker=None)
+            return self.all_hgvs(genome_build=genome_build, lab_picker=None)
         elif results:
             # only return one CHGVS Display per c.HGVS where they only differ in transcript versions
             return HGVSDisplay.select_distinct(results)
 
         else:
-            return [HGVSDisplay(HGVSComponents("-"), is_normalised=False)]
+            return [HGVSDisplay(dna_hgvs=HGVSComponents("-"), is_normalised=False)]
 
     @property
     def contributions(self) -> QuerySet[OverlapContribution]:

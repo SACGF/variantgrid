@@ -34,14 +34,14 @@ class HGVSCorpusTests(TestCase):
                 self.assertIsNotNone(components.without_transcript_version)
                 self.assertIsNotNone(components.with_transcript_version(9))
                 self.assertIsNotNone(components.with_gene_symbol("BRCA1"))
-                self.assertIn("full", HGVSDisplay(components).to_json())
+                self.assertIn("full", HGVSDisplay(dna_hgvs=components).to_json())
 
     def test_sorting_is_a_total_order(self):
         """ Order must depend on the values alone, never on the order they arrived in -
             a key where one entry is a prefix of another is easy to get wrong """
         corpus = all_hgvs()
-        forwards = [str(d) for d in sorted(HGVSDisplay.parse(hgvs) for hgvs in corpus)]
-        backwards = [str(d) for d in sorted(HGVSDisplay.parse(hgvs) for hgvs in reversed(corpus))]
+        forwards = [str(d) for d in sorted(HGVSDisplay.parse(dna_hgvs=hgvs) for hgvs in corpus)]
+        backwards = [str(d) for d in sorted(HGVSDisplay.parse(dna_hgvs=hgvs) for hgvs in reversed(corpus))]
         self.assertEqual(forwards, backwards)
 
     def test_diff_against_self_is_same(self):

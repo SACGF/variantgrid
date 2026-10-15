@@ -156,7 +156,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
     def batches(self, row: CellData) -> JsonDataType:
         return self.export_to_batches.get(row.get("id"))
 
-    def render_c_hgvs(self, row: CellData) -> JsonDataType:
+    def render_hgvs(self, row: CellData) -> JsonDataType:
         if row["classification_based_on__classification__allele_info__allele"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             build_prefix = "classification_based_on__classification__allele_info__" + ("grch37" if "h37" in genome_build else "grch38")
@@ -174,7 +174,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                     "always_show_genome_build": True
                     # below row makes this link to the variant, but probably not desired action
                     # "variantId": row["classification_based_on__classification__variant"]
-                } | HGVSDisplay(c_hgvs, p_hgvs=row[f"{build_prefix}__p_hgvs"]).p_hgvs_json()
+                } | HGVSDisplay(dna_hgvs=c_hgvs, p_hgvs=row[f"{build_prefix}__p_hgvs"]).p_hgvs_json()
             else:
                 data = {"full": c_hgvs_str}
 
@@ -218,7 +218,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                         "classification_based_on__classification__allele_info__grch37__p_hgvs",
                         "classification_based_on__classification__allele_info__grch38__p_hgvs",
                     ],
-                    renderer=self.render_c_hgvs, client_renderer='VCTable.hgvs',
+                    renderer=self.render_hgvs, client_renderer='VCTable.hgvs',
                     search=[
                         # "clinvar_allele__allele__clingen_allele__id",  # need a string
                         "classification_based_on__classification__allele_info__grch37__resolved_hgvs",

@@ -192,7 +192,7 @@ class TestHGVSComponentsInit(TestCase):
         high = HGVSComponents("NM_001.1:c.100A>G")
         self.assertLess(low, high)
         # the display wrapper is where being normalised gets to win
-        self.assertLess(HGVSDisplay(high, is_normalised=True), HGVSDisplay(low, is_normalised=False))
+        self.assertLess(HGVSDisplay(dna_hgvs=high, is_normalised=True), HGVSDisplay(dna_hgvs=low, is_normalised=False))
 
     def test_sort_str_no_transcript(self):
         # A bare nomen has no transcript to append
@@ -202,25 +202,25 @@ class TestHGVSComponentsInit(TestCase):
         """ The build must not be concatenated onto sort_str - a shorter key is a prefix of a longer
             one whenever a transcript is unversioned, and the suffix would flip that comparison """
         build = collections.namedtuple("FakeBuild", "pk")("GRCh38")
-        unversioned = HGVSDisplay.parse("NM_033213:c.3+46C>G", genome_build=build)
-        versioned = HGVSDisplay.parse("NM_033213.5:c.3+46C>G", genome_build=build)
+        unversioned = HGVSDisplay.parse(dna_hgvs="NM_033213:c.3+46C>G", genome_build=build)
+        versioned = HGVSDisplay.parse(dna_hgvs="NM_033213.5:c.3+46C>G", genome_build=build)
         self.assertLess(unversioned, versioned)
 
     def test_genome_build_breaks_an_actual_tie(self):
         grch37 = collections.namedtuple("FakeBuild", "pk")("GRCh37")
         grch38 = collections.namedtuple("FakeBuild", "pk")("GRCh38")
         # same transcript and nomen, so sort_str ties and only the build separates them
-        a = HGVSDisplay.parse("NM_001.2(BRCA1):c.123A>G", genome_build=grch37)
-        b = HGVSDisplay.parse("NM_001.2:c.123A>G", genome_build=grch38)
+        a = HGVSDisplay.parse(dna_hgvs="NM_001.2(BRCA1):c.123A>G", genome_build=grch37)
+        b = HGVSDisplay.parse(dna_hgvs="NM_001.2:c.123A>G", genome_build=grch38)
         self.assertEqual(a.sort_str, b.sort_str)
         self.assertLess(a, b)
 
     def test_display_eq_includes_view_state(self):
         components = HGVSComponents("NM_001.2:c.123A>G")
-        a = HGVSDisplay(components)
-        b = HGVSDisplay(components, is_normalised=True)
+        a = HGVSDisplay(dna_hgvs=components)
+        b = HGVSDisplay(dna_hgvs=components, is_normalised=True)
         self.assertNotEqual(a, b)
-        self.assertEqual(len({a, b, HGVSDisplay(components)}), 2)
+        self.assertEqual(len({a, b, HGVSDisplay(dna_hgvs=components)}), 2)
 
 
 # ---------------------------------------------------------------------------

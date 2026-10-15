@@ -83,8 +83,8 @@ class ClassificationGroupEntry:
         return self.modification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @cached_property
-    def c_hgvs(self):
-        return ClassificationGroup.c_hgvs_for(self.modification, self.genome_build)
+    def hgvs(self):
+        return ClassificationGroup.hgvs_for(self.modification, self.genome_build)
 
     @property
     def condition_sorter(self) -> Optional[str]:
@@ -104,7 +104,7 @@ class ClassificationGroupEntry:
             self.somatic_clin_sig or "",
             self.modification.classification.lab.organization.name or "",
             self.modification.classification.lab.name or "",
-            self.c_hgvs,
+            self.hgvs,
             self.condition_sorter or ""
         )
 
@@ -313,9 +313,9 @@ class ClassificationGroup:
                 return cc.is_discordant
 
     @staticmethod
-    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
+    def hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
         if c_str := cm.classification.get_resolved_hgvs(genome_build):
-            return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True,
+            return HGVSDisplay.parse(dna_hgvs=c_str, genome_build=genome_build, is_normalised=True,
                                      p_hgvs=cm.classification.get_resolved_p_hgvs(genome_build))
         if (allele_info := cm.classification.allele_info) and \
                 (matched := allele_info.matched_without_resolved_hgvs_display(genome_build)):
@@ -329,15 +329,15 @@ class ClassificationGroup:
         except ValueError:
             pass
         imported_hgvs = cm.classification.get(SpecialEKeys.C_HGVS) or cm.classification.get(SpecialEKeys.G_HGVS)
-        return HGVSDisplay.parse(imported_hgvs or "", genome_build=imported_genome_build,
+        return HGVSDisplay.parse(dna_hgvs=imported_hgvs or "", genome_build=imported_genome_build,
                                  is_normalised=False, is_desired_build=is_desired_build)
 
     @cached_property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        unique_c = set()
+    def hgvses(self) -> list[HGVSDisplay]:
+        unique_hgvs = set()
         for ge in self.group_entries:
-            unique_c.add(ge.c_hgvs)
-        return sorted(unique_c)
+            unique_hgvs.add(ge.hgvs)
+        return sorted(unique_hgvs)
 
     @cached_property
     def variant_sort(self) -> str:
@@ -348,11 +348,11 @@ class ClassificationGroup:
                     if genomic_sort := variant_info.genomic_sort:
                         return prefix + genomic_sort
 
-        return prefix + self.c_hgvs.sort_str
+        return prefix + self.hgvs.sort_str
 
     @property
-    def c_hgvs(self) -> HGVSDisplay:
-        return self.c_hgvses[0]
+    def hgvs(self) -> HGVSDisplay:
+        return self.hgvses[0]
 
     @property
     def has_matching_error(self) -> bool:

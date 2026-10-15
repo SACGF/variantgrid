@@ -141,15 +141,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         builds = GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
         return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds()]
 
-    def render_c_hgvs(self, row: CellData) -> JsonDataType:
-        def get_preferred_chgvs_json() -> dict:
+    def render_hgvs(self, row: CellData) -> JsonDataType:
+        def get_preferred_hgvs_json() -> dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
                     p_hgvs = row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "p_hgvs"))
-                    c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
-                                               is_desired_build=index == 0, p_hgvs=p_hgvs)
-                    return c_hgvs.to_json()
+                    hgvs = HGVSDisplay.parse(dna_hgvs=c_hgvs_string, genome_build=genome_build,
+                                             is_desired_build=index == 0, p_hgvs=p_hgvs)
+                    return hgvs.to_json()
 
             imported_hgvs = row["latest_allele_info__imported_c_hgvs"] or row["latest_allele_info__imported_g_hgvs"]
             imported_genome_build = None
@@ -161,20 +161,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             for genome_build in self.genome_build_prefs:
                 if row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "variant_id")):
                     display_genome_build = imported_genome_build or genome_build
-                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=display_genome_build,
-                                               is_normalised=True,
-                                               is_desired_build=display_genome_build == first(self.genome_build_prefs),
-                                               is_resolved_without_hgvs=True)
-                    return c_hgvs.to_json()
+                    hgvs = HGVSDisplay.parse(dna_hgvs=imported_hgvs, genome_build=display_genome_build,
+                                             is_normalised=True,
+                                             is_desired_build=display_genome_build == first(self.genome_build_prefs),
+                                             is_resolved_without_hgvs=True)
+                    return hgvs.to_json()
 
             # could be dirty and not have a latest_allele_info
             if imported_genome_build:
-                c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=imported_genome_build, is_normalised=False)
-                return c_hgvs.to_json()
+                hgvs = HGVSDisplay.parse(dna_hgvs=imported_hgvs, genome_build=imported_genome_build, is_normalised=False)
+                return hgvs.to_json()
             else:
                 return {}
 
-        response = get_preferred_chgvs_json()
+        response = get_preferred_hgvs_json()
         response['allele_id'] = row.get('latest_allele_info__allele_id')
         response['allele_info_id'] = row.get('latest_allele_info__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
@@ -461,7 +461,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                                                                     "genomic_sort")],
                 name='c_hgvs',
                 label=f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>',
-                renderer=self.render_c_hgvs,
+                renderer=self.render_hgvs,
                 client_renderer='VCTable.hgvs',
                 order_sequence=[SortOrder.ASC, SortOrder.DESC],
                 extra_columns=[
