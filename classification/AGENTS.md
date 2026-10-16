@@ -133,8 +133,8 @@ Gotchas:
 - Condition resolution flows from ConditionTextMatch to classifications via models/condition_text_matching.py:apply_condition_resolution
   (sends condition_set_signal); Classification.condition_resolution is a cache of that match, not the source.
 - models/condition_text_matching.py:search_suggestion swallows a Monarch search failure and falls back to local OMIM; the only
-  trace is `ConditionMatchingSuggestion.search_failed`, which `ConditionTextMatch.attempt_automatch` writes to
-  `ConditionText.search_failed` and the hourly `retry_failed_condition_text_automatch` task clears (#1744).
+  trace is `ConditionMatchingSuggestion.monarch_search_failed`, which `ConditionTextMatch.attempt_automatch` writes to
+  `ConditionText.monarch_search_failed` and the hourly `retry_failed_condition_text_automatch` task clears (#1744).
 - ClinVar export is one ClinVarExport per ClinVarKey + allele + condition (models/clinvar_export_models.py:ClinVarExport), built by
   models/clinvar_export_convertor.py:ClinVarExportConverter as ValidatedJson: embedded errors keep it out of a batch, no exception is raised.
 - Withdrawing is a soft delete (models/classification.py:Classification.set_withdrawn) that sends classification_withdraw_signal;

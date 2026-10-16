@@ -164,10 +164,10 @@
                 {% endlabelled %}
                 {% labelled label="Total Classification Records" %}<span class="mono">{{ condition_text.classifications_count }}</span>{% endlabelled %}
                 {% labelled label="Outstanding Classification Records" %}<span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>{% endlabelled %}
-                {% if condition_text.search_failed %}
+                {% if condition_text.monarch_search_failed %}
                 <div class="alert alert-warning mt-2">
                     Automatic matching did not complete: the MONDO text search failed
-                    {{ condition_text.search_failed|timesince }} ago, so nothing was auto-assigned. It is retried hourly;
+                    {{ condition_text.monarch_search_failed|timesince }} ago, so nothing was auto-assigned. It is retried hourly;
                     the quick suggestions below come from a fresh search and can be applied now.
                 </div>
                 {% endif %}

@@ -45,7 +45,7 @@ class Command(BaseCommand):
         if options["failed"]:
             print("Retrying automatch where the Monarch search failed")
             cleared = ConditionTextMatch.retry_failed_automatch()
-            print(f"Cleared {cleared}, {ConditionText.objects.filter(search_failed__isnull=False).count()} still failed")
+            print(f"Cleared {cleared}, {ConditionText.objects.filter(monarch_search_failed__isnull=False).count()} still failed")
             return
         if options["obsolete"]:
             print("Checking for obsoletes")

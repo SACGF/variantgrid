@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='conditiontext',
-            name='search_failed',
+            name='monarch_search_failed',
             field=models.DateTimeField(blank=True, null=True),
         ),
     ]

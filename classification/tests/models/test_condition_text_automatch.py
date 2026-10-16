@@ -10,7 +10,7 @@ from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.condition_text_matching import (
-    MANUAL_ENTRY_SEARCH_TIMEOUT,
+    MANUAL_ENTRY_MONARCH_TIMEOUT,
     ConditionMatchingSuggestion,
     ConditionText,
     ConditionTextMatch,
@@ -108,23 +108,23 @@ class ConditionTextAutomatchTest(TestCase):
 
         self.assertTrue(ct.pending_automatch)
 
-    @patch('classification.models.condition_text_matching.condition_text_search', return_value=[])
+    @patch('classification.models.condition_text_matching.monarch_condition_text_search', return_value=[])
     def test_form_publish_searches_free_text_immediately(self, mock_search):
         ct = self._sync_classification("hereditary breast cancer", source=SubmissionSource.FORM)
 
         self.assertFalse(ct.pending_automatch)
-        mock_search.assert_called_once_with("hereditary breast cancer", timeout=MANUAL_ENTRY_SEARCH_TIMEOUT)
+        mock_search.assert_called_once_with("hereditary breast cancer", timeout=MANUAL_ENTRY_MONARCH_TIMEOUT)
 
-    @patch('classification.models.condition_text_matching.condition_text_search', side_effect=TimeoutError("slow"))
+    @patch('classification.models.condition_text_matching.monarch_condition_text_search', side_effect=TimeoutError("slow"))
     def test_form_publish_search_failure_leaves_text_for_sweep(self, _mock_search):
         ct = self._sync_classification("hereditary breast cancer", source=SubmissionSource.FORM)
 
         self.assertTrue(ct.pending_automatch)
 
 
-@patch('classification.models.condition_text_matching.condition_text_search')
+@patch('classification.models.condition_text_matching.monarch_condition_text_search')
 class ConditionTextSearchFailedTest(TestCase):
-    """ #1744 - a Monarch failure during automatch is recorded on ConditionText.search_failed and retried """
+    """ #1744 - a Monarch failure during automatch is recorded on ConditionText.monarch_search_failed and retried """
 
     def setUp(self):
         set_thread_variable('request', None)
@@ -144,14 +144,14 @@ class ConditionTextSearchFailedTest(TestCase):
         mock_search.side_effect = HTTPError("Monarch down")
         ConditionTextMatch.attempt_automatch(condition_text=ct)
         ct.refresh_from_db()
-        self.assertIsNotNone(ct.search_failed)
+        self.assertIsNotNone(ct.monarch_search_failed)
         self.assertEqual(ct.root.condition_xrefs, [])
 
         mock_search.side_effect = None
         mock_search.return_value = []
         ConditionTextMatch.attempt_automatch(condition_text=ct)
         ct.refresh_from_db()
-        self.assertIsNone(ct.search_failed)
+        self.assertIsNone(ct.monarch_search_failed)
 
     def test_page_suggestions_do_not_record_failure(self, mock_search):
         ct = self._condition_text()
@@ -160,21 +160,21 @@ class ConditionTextSearchFailedTest(TestCase):
         condition_matching_suggestions(ct)
 
         ct.refresh_from_db()
-        self.assertIsNone(ct.search_failed)
+        self.assertIsNone(ct.monarch_search_failed)
 
     def test_retry_stops_at_first_failure(self, mock_search):
         older = self._condition_text("zzz no such syndrome")
         newer = self._condition_text("zzz no such disorder")
-        ConditionText.objects.filter(pk=older.pk).update(search_failed=timezone.now() - timedelta(hours=2))
-        ConditionText.objects.filter(pk=newer.pk).update(search_failed=timezone.now() - timedelta(hours=1))
+        ConditionText.objects.filter(pk=older.pk).update(monarch_search_failed=timezone.now() - timedelta(hours=2))
+        ConditionText.objects.filter(pk=newer.pk).update(monarch_search_failed=timezone.now() - timedelta(hours=1))
 
         mock_search.side_effect = HTTPError("Monarch down")
         self.assertEqual(ConditionTextMatch.retry_failed_automatch(), 0)
         mock_search.assert_called_once()
         self.assertEqual(mock_search.call_args.args[0], older.normalized_text)
-        self.assertEqual(ConditionText.objects.filter(search_failed__isnull=False).count(), 2)
+        self.assertEqual(ConditionText.objects.filter(monarch_search_failed__isnull=False).count(), 2)
 
         mock_search.side_effect = None
         mock_search.return_value = []
         self.assertEqual(ConditionTextMatch.retry_failed_automatch(), 2)
-        self.assertFalse(ConditionText.objects.filter(search_failed__isnull=False).exists())
+        self.assertFalse(ConditionText.objects.filter(monarch_search_failed__isnull=False).exists())
