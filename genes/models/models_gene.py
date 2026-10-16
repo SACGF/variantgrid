@@ -1483,7 +1483,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         """ Returns DB copy if we have it, or retrieves + stores from API """
 
         if is_cdot_fake_transcript(transcript_accession):
-            raise NoTranscript(f"'{transcript_accession}' is a cdot stand-in for a mitochondrial gene RefSeq gives "
+            raise NoTranscript(f"'{transcript_accession}' is a fake transcript for a mitochondrial gene RefSeq gives "
                                f"no RNA accession - there is no transcript sequence")
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
