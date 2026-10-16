@@ -235,11 +235,6 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
         else:
             raise ValueError(f"Don't know how to produce liftover VCF for {liftover.get_conversion_tool_display()}")
 
-    def _error(self, upload_step: UploadStep, error_message: str):
-        super()._error(upload_step, error_message)
-        liftover = upload_step.upload_pipeline.file_upload.uploadedliftover.liftover
-        liftover.error()
-
 
 class LiftoverProcessFailureVCFTask(ImportVCFStepTask):
 
