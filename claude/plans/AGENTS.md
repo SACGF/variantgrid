@@ -22,6 +22,14 @@ properties out of the plan; they belong in the implementation.
 whose knowledge has moved into docs is deleted. A backticked path is a claim the file exists, so write a file the plan
 will create as plain text (analysis/tasks/new_tasks.py (new file)).
 
+## Plans and their issues
+`claude/plans/` is the record of work still to do, so a plan is deleted once it is done - landed, superseded or
+abandoned - with any lasting knowledge moved into docs first. When a plan is written for a GitHub issue, comment on the
+issue with the plan's path (prefaced 🤖 Written by Claude, as for any GitHub comment) and add the `Has Plan` label:
+`gh issue comment N --body "🤖 Written by Claude: plan at claude/plans/<file>"` and
+`gh issue edit N --add-label "Has Plan"`. When the plan is deleted, remove the label
+(`gh issue edit N --remove-label "Has Plan"`).
+
 ## Implementation prompts
 When asked to draft a prompt for an agent to implement a plan in another conversation:
 - The plan file is the spec. Reference it; don't restate it.
