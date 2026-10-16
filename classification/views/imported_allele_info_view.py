@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
+from django.utils.safestring import mark_safe
 from requests import Response
 
 from classification.models import (
@@ -94,12 +95,12 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='imported_genome_build_patch_version',
-                label='Imported<br/>Genome Build',
+                label=mark_safe('Imported<br/>Genome Build'),
                 orderable=True
             ),
             RichColumn(
                 key='imported_c_hgvs',
-                label='Imported<br/>c.HGVS',
+                label=mark_safe('Imported<br/>c.HGVS'),
                 orderable=True,
                 renderer=ImportedAlleleInfoColumns.render_hgvs,
                 client_renderer='VCTable.hgvs',
@@ -107,7 +108,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='grch37__resolved_hgvs',
-                label='Resolved GRCh37<br/>c.HGVS',
+                label=mark_safe('Resolved GRCh37<br/>c.HGVS'),
                 orderable=True,
                 extra_columns=['grch37__variant', 'grch37__error', 'grch37__p_hgvs'],
                 renderer=ImportedAlleleInfoColumns.render_hgvs,
@@ -115,7 +116,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='grch38__resolved_hgvs',
-                label='Resolved GRCh38<br/>c.HGVS',
+                label=mark_safe('Resolved GRCh38<br/>c.HGVS'),
                 orderable=True,
                 extra_columns=['grch38__variant', 'grch38__error', 'grch38__p_hgvs'],
                 renderer=ImportedAlleleInfoColumns.render_hgvs,
@@ -131,7 +132,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='classification_count',
-                label="<span style=\"font-size:10px\">Classification<br/>Record Count</span>",
+                label=mark_safe("<span style=\"font-size:10px\">Classification<br/>Record Count</span>"),
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn('id', visible=False)  # just used for the expand

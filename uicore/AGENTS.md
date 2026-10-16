@@ -94,6 +94,10 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   `client_renderer` is a JS expression, usually `TableFormat.*`
   (variantgrid/static_files/default_static/js/datatable_definition.js:TableFormat) or a function in
   datatables_client_renderers.js; `visible=False` sends data without a column; `detail=True` moves it to the expand row.
+- Cells and labels go into the page as HTML, so they're escaped by default: a string cell with no `client_renderer` is
+  escaped in snpdb/views/datatable_view.py:escape_cell (the CSV stays raw), and labels in `rich_column_json`. A server
+  renderer or label that means HTML returns a `SafeString` (`format_html`, `render_to_string`, `mark_safe` on a constant).
+  A client renderer gets the raw value, so it builds markup with jQuery `text:` or `escapeHtml`, never by concatenation.
 - A renderer needing more than the row's values resolves it for the whole page in
   snpdb/views/datatable_view.py:DatatableConfig.pre_render (it gets the page's rows; the page's objects under
   `server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS`), never a `.get()` per row - per-row write

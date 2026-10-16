@@ -69,7 +69,7 @@ function renderSCV(data, type, row) {
     if (!data) {
         return $('<span>', {text: '-', class:'no-value'}).prop('outerHTML');
     } else {
-        return data;
+        return $('<span>', {text: data}).prop('outerHTML');
     }
 }
 /*

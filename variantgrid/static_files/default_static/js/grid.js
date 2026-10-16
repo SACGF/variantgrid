@@ -211,6 +211,12 @@ function createFilterChild(columnName, columnFilter) {
     });
 }
 
+// Read with attr() rather than data(), which would turn a "null" filter value into null
+$(document).on("click", ".create-filter-child", function() {
+    const link = $(this);
+    createFilterChild(link.attr("data-column-name"), link.attr("data-column-filter"));
+});
+
 function inAnalysis() {
     // Variant selection and filter child links are wired up by the analysis page - other pages showing
     // the same grids (sample variants tab, variantopedia) render them read only
@@ -324,14 +330,14 @@ function colorTagAutocompleteResults(tagSelect) {
 }
 
 
-/* options: tagLabel (HTML, defaults to the tag), extraClasses, title, variantTagId (the tagging the
+/* options: tagLabel (HTML - escape the tag in it - defaults to the tag), extraClasses, title, variantTagId (the tagging the
    pill is - what the X deletes) and marker (icon classes drawn after the label, saying whose tagging
    it is - @see VariantGridFormat.tags) */
 function getVariantTagHtml(variantId, tag, readOnly, options) {
     options = options || {};
-    const tagLabel = typeof(options.tagLabel) === 'undefined' ? tag : options.tagLabel;
+    const tagLabel = typeof(options.tagLabel) === 'undefined' ? escapeHtml(tag) : options.tagLabel;
     const title = typeof(options.title) === 'undefined' ? `Tagged as ${tag}` : options.title;
-    const outerClasses = ["grid-tag", "tagged-" + tag];
+    const outerClasses = ["grid-tag", "tagged-" + escapeHtml(tag)];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
@@ -339,9 +345,9 @@ function getVariantTagHtml(variantId, tag, readOnly, options) {
         outerClasses.push(...options.extraClasses);
     }
     // A tagging's own pk - the analysis grid's X removes that one tagging, not every tagging of the tag
-    const pkAttr = options.variantTagId ? ` variant_tag_id='${options.variantTagId}'` : "";
+    const pkAttr = options.variantTagId ? ` variant_tag_id='${escapeHtml(options.variantTagId)}'` : "";
     const marker = options.marker ? `<i class='grid-tag-sample-marker ${options.marker}'></i>` : "";
-    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${variantId}' tag_id='${tag}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
+    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${escapeHtml(variantId)}' tag_id='${escapeHtml(tag)}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
 }
 
 

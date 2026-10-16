@@ -187,7 +187,11 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         for ivt, variant_id in ivt_variants.items():
             tag = tag_cache.get(ivt.tag_string)
             if tag is None:
-                tag, _ = Tag.objects.get_or_create(pk=ivt.tag_string)
+                if (tag := Tag.objects.filter(pk=ivt.tag_string).first()) is None:
+                    # The same rule as snpdb.forms.CreateTagForm - tag ids go into the page as class names
+                    if not ivt.tag_string.isalnum():
+                        raise ValueError(f"Tag '{ivt.tag_string}' must be alphanumeric (no spaces or special characters)")
+                    tag = Tag.objects.create(pk=ivt.tag_string)
                 tag_cache[tag.pk] = tag
 
             # We're not going to link analysis/nodes - as probably don't match up across systems

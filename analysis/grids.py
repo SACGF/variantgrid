@@ -819,6 +819,13 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         return gene_list
 
 
+def _log_entry_classification_id(content_type_model, additional_data) -> Optional[int]:
+    """ The classification a variant tag was cleared by """
+    if content_type_model == "varianttag" and additional_data.get("operation") == VARIANT_TAG_CLASSIFIED:
+        return additional_data["classification_id"]
+    return None
+
+
 def get_analysis_log_entry_summary(action, content_type_model, changes, additional_data) -> Optional[str]:
     """ If it can come up with a summary, return something, otherwise nothing, and the
         caller can do it themselves """
@@ -842,11 +849,8 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
             raise ValueError("Don't know how to handle analysisedge UPDATE")
         return f"{op} Parent: {parent_desc} {desc} Child: {child_desc}"
 
-    if content_type_model == "varianttag":
-        if additional_data.get("operation") == VARIANT_TAG_CLASSIFIED:
-            classification_id = additional_data["classification_id"]
-            url = Classification.get_url_for_pk(classification_id)
-            return f"Cleared - classified as <a href='{url}'>{classification_id}</a>"
+    if classification_id := _log_entry_classification_id(content_type_model, additional_data):
+        return f"Cleared - classified as {classification_id}"
 
     if action == LogEntry.Action.CREATE:
         return "Created"
@@ -916,6 +920,8 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
         summary_json = {}
         if summary_text := get_analysis_log_entry_summary(action, content_type_model, changes, additional_data):
             summary_json["summary_text"] = summary_text
+            if classification_id := _log_entry_classification_id(content_type_model, additional_data):
+                summary_json["url"] = Classification.get_url_for_pk(classification_id)
         else:
             summary_json['changes'] = changes
             summary_json['additional_data'] = additional_data

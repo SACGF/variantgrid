@@ -16,20 +16,24 @@ function renderGeneSymbol(geneSymbol, type, row) {
 function renderAnalysisAuditLogSummary(summary, type, row) {
     const summaryText = summary['summary_text'];
     if (summaryText) {
-        return "<span>" + summaryText + "</span>";
+        if (summary['url']) {
+            return $('<a>', {href: summary['url'], text: summaryText});
+        }
+        return $('<span>', {text: summaryText});
     }
     const changes = summary['changes'];
     if (changes) {
         const hideValues = new Set(['valid', 'status', 'version', 'appearance_version']);
-        let changesSummary = "<table class='table'>";
-        changesSummary += "<tr><th>field</th><th>old</th><th>new</th></tr>";
+        const table = $('<table>', {class: 'table'});
+        table.append($('<tr>', {html: [$('<th>', {text: 'field'}), $('<th>', {text: 'old'}), $('<th>', {text: 'new'})]}));
         for (const [key, value] of Object.entries(changes)) {
             if (!hideValues.has(key)) {
-                changesSummary += `<tr><td>${key}</td><td>${value[0]}</td><td>${value[1]}</td>`;
+                table.append($('<tr>', {html: [
+                    $('<td>', {text: key}), $('<td>', {text: value[0]}), $('<td>', {text: value[1]})
+                ]}));
             }
         }
-        changesSummary += "</table>";
-        return changesSummary;
+        return table;
     }
 
 }
@@ -316,13 +320,15 @@ function renderCohortSampleCheckbox(data, type, row) {
 function renderColumnSummaryFilterChildLink(data, type, row, renderContext) {
     const extra = renderContext.extra;
     if (!extra.createFilterChildLinks) {
-        return data;
+        return $('<span>', {text: data}).prop('outerHTML');
     }
     // A missing value goes back as the string "null" - that's what the column filter matches on
-    const value = JSON.stringify(String(row.c0));
     return $('<a>', {
-        href: `javascript:createFilterChild(${JSON.stringify(extra.variantColumn)}, ${value});`,
-        html: data
+        class: 'create-filter-child',
+        href: 'javascript:void(0)',
+        'data-column-name': extra.variantColumn,
+        'data-column-filter': String(row.c0),
+        text: data
     }).prop('outerHTML');
 }
 

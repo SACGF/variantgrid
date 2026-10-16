@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from django.conf import settings
 from django.db.models import Count, F, Q, QuerySet
 from django.http import HttpRequest
+from django.utils.safestring import mark_safe
 from more_itertools import first
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -469,7 +470,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info",
                                                                     "genomic_sort")],
                 name='c_hgvs',
-                label=f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>',
+                label=mark_safe(f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>'),
                 renderer=self.render_hgvs,
                 client_renderer='VCTable.hgvs',
                 order_sequence=[SortOrder.ASC, SortOrder.DESC],
@@ -507,7 +508,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ),
             RichColumn(
                 name='somatic_clinical_significances',
-                label='Somatic Clinical<br/>Significance',
+                label=mark_safe('Somatic Clinical<br/>Significance'),
                 client_renderer="VCTable.somatic_clinical_significance",
                 sort_keys=["latest_somatic_sort", "latest_pathogenicity_sort"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
@@ -524,7 +525,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key="latest_classification_modification__classification__summary__criteria_labels",
                 name="latest_criteria",
-                label='<span class="text-secondary">Latest</span><br/>Criteria',
+                label=mark_safe('<span class="text-secondary">Latest</span><br/>Criteria'),
                 client_renderer='TableFormat.list_codes'
             ),
             RichColumn(
@@ -538,7 +539,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
-                label='<span class="text-secondary">Latest</span><br/>Curated',
+                label=mark_safe('<span class="text-secondary">Latest</span><br/>Curated'),
                 sort_keys=["latest_curated_date"],
                 client_renderer="VCTable.latest_curation_and_link",
                 renderer=self._render_date,
