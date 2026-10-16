@@ -1,6 +1,7 @@
 """upload/test_data/patient_upload.csv through file type detection and the import pipeline (#1745)"""
 import os
 from datetime import date
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -50,12 +51,14 @@ class TestPatientUploadImport(TestCase):
         file_upload = FileUpload.objects.create(user=cls.user, name="patient_upload.csv", path=PATIENT_UPLOAD_CSV,
                                                 file_type=UploadedFileTypes.PATIENT_RECORDS,
                                                 import_source=ImportSource.COMMAND_LINE)
-        cls.upload_pipeline, _ = process_uploaded_file(file_upload, run_async=False)
+        with patch("patients.import_records.reconcile_pending_extractions.delay") as reconcile:
+            cls.upload_pipeline, _ = process_uploaded_file(file_upload, run_async=False)
+        cls.reconcile_calls = reconcile.call_count
         cls.upload_pipeline = UploadPipeline.objects.get(pk=cls.upload_pipeline.pk)
 
     def test_pipeline_succeeds(self):
         self.assertEqual(ProcessingStatus.SUCCESS, self.upload_pipeline.status, self.upload_pipeline.progress_status)
-        self.assertEqual(7, self.upload_pipeline.items_processed)
+        self.assertEqual(8, self.upload_pipeline.items_processed)
 
     def test_every_record_valid(self):
         invalid = {r.record_id: r.validation_message for r in PatientRecord.objects.filter(valid=False)}
@@ -76,11 +79,19 @@ class TestPatientUploadImport(TestCase):
                 self.assertIsNotNone(sample.extraction)
 
     def test_one_specimen_two_arms(self):
-        specimen = Specimen.objects.get(reference_id="SPEC-042")
+        """ Named arms plus a sample-less re-extraction, told apart by their Extraction Reference id """
+        specimen = Specimen.objects.get(reference_id="2600000001")
         self.assertEqual(TissueStatus.AFFECTED, specimen.tissue_status)
-        arms = {e.nucleic_acid_source for e in Extraction.objects.filter(specimen=specimen)}
-        self.assertEqual({NucleicAcid.DNA, NucleicAcid.RNA}, arms)
-        self.assertEqual(Sample.objects.get(name="ONC042_DNA").specimen, Sample.objects.get(name="ONC042_RNA").specimen)
+        arms = {e.reference_id: (e.nucleic_acid_source, timezone.localdate(e.extraction_date))
+                for e in Extraction.objects.filter(specimen=specimen)}
+        self.assertEqual({"2600000001C": (NucleicAcid.DNA, date(2025, 5, 6)),
+                          "2600000001B": (NucleicAcid.RNA, date(2025, 5, 6)),
+                          "2600000001D": (NucleicAcid.DNA, date(2025, 6, 20))}, arms)
+        self.assertEqual("2600000001C", Sample.objects.get(name="ONC042_DNA").extraction.reference_id)
+        self.assertEqual("2600000001B", Sample.objects.get(name="ONC042_RNA").extraction.reference_id)
+
+    def test_new_extractions_reconcile_parked_samples(self):
+        self.assertEqual(1, self.reconcile_calls)
 
     def test_tissue_status_from_header_values(self):
         self.assertEqual(TissueStatus.REFERENCE, Specimen.objects.get(reference_id="SPEC-002").tissue_status)
