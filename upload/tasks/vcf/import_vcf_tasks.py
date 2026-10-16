@@ -222,7 +222,9 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
         liftover = upload_pipeline.file_upload.uploadedliftover.liftover
-        AlleleLiftover.objects.filter(liftover=liftover).update(status=ProcessingStatus.PROCESSING)
+        # Alleles that failed the pre-liftover checks are already ERROR and aren't in the VCF
+        AlleleLiftover.objects.filter(liftover=liftover,
+                                      status=ProcessingStatus.CREATED).update(status=ProcessingStatus.PROCESSING)
 
         if liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
             reject_vcf, num_rejected = bcftools_liftover(upload_step.input_filename, liftover.source_genome_build,
