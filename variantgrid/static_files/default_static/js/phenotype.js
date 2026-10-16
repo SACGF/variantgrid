@@ -48,10 +48,10 @@ function summariseTerms(terms, minPrefixLen = 15) {
 function getOntologyTermObj(term_type, term, url) {
     const termSpan = $("<span>", {class: `grid-term-link ${term_type}`, title: term, term: term, term_type: term_type});
     if (url) {
-        const termLink = $("<a>", {href: url, target: "_blank", html: term});
+        const termLink = $("<a>", {href: url, target: "_blank", text: term});
         termSpan.append(termLink);
     } else {
-        termSpan.html(term);
+        termSpan.text(term);
     }
     return termSpan;
 }

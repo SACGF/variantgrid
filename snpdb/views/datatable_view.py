@@ -26,7 +26,7 @@ from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Val
 from django.db.models.functions import Concat
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
-from django.utils.html import escape
+from django.utils.html import conditional_escape, escape
 from kombu.utils import json
 
 from library.django_utils.datatable_mixins import JSONResponseView
@@ -121,6 +121,14 @@ def sanitize_value(value: Any) -> Any:
         # JSON goes out strict - a NaN in a float annotation column renders blank rather than
         # breaking JSON.parse in the browser
         value = None
+    return value
+
+
+def escape_cell(value: Any) -> Any:
+    """ A string cell with no client renderer goes into the page as HTML - escaped, unless the server
+        renderer built it as HTML on purpose and returned a SafeString """
+    if isinstance(value, str):
+        return conditional_escape(value)
     return value
 
 
@@ -794,6 +802,13 @@ class DatatableConfig(Generic[DC]):
             self._page_writable_pks = set(writable_qs.values_list("pk", flat=True))
         return self._page_writable_pks
 
+    def _render_json_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
+        """ A cell for the grid, rather than the CSV - which keeps the raw value """
+        value = self.render_cell(row=row, column=column)
+        if not column.client_renderer:
+            value = escape_cell(value)
+        return value
+
     def prepare_results(self, qs: QuerySet[DC]) -> list[JsonDataType]:
         data = []
         if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
@@ -803,8 +818,7 @@ class DatatableConfig(Generic[DC]):
             for row in rows:
                 row_json = {}
                 for rc in self.enabled_columns:
-                    value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
-                    row_json[rc.name] = value
+                    row_json[rc.name] = self._render_json_cell(CellData(all_data=row, key=rc.key), rc)
                 if row_css := self.row_css(row):
                     row_json["row_css"] = row_css
                 data.append(row_json)
@@ -815,8 +829,7 @@ class DatatableConfig(Generic[DC]):
                 mapped_obj = self.map_object(row_obj)
                 row_json = {}
                 for rc in self.enabled_columns:
-                    value = self.render_cell(row=CellData(all_data=None, obj=mapped_obj, key=rc.key), column=rc)
-                    row_json[rc.name] = value
+                    row_json[rc.name] = self._render_json_cell(CellData(all_data=None, obj=mapped_obj, key=rc.key), rc)
                 data.append(row_json)
         else:
             raise ValueError(f"Unexpected QuerySet mode {self.server_calculate_mode}")
@@ -868,7 +881,7 @@ def rich_column_json(rc: RichColumn, default_column_width: Optional[int] = None)
         renderer) from. @see the annotation descriptions page, which draws example cells from these """
     column: JsonObjType = {
         "data": rc.name,
-        "label": rc.label,
+        "label": conditional_escape(rc.label),
         "render": rc.client_renderer,
         "createdCell": rc.client_renderer_td,
         "orderable": rc.orderable,

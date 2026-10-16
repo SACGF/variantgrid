@@ -56,7 +56,7 @@ if (typeof setVariantDetailsTabLabel === "function") {
 }
 
 function tagRenderer(data, type, row) {
-    let tagLabel = row.tag;
+    let tagLabel = escapeHtml(row.tag);
     let title = `Tagged as ${row.tag}`;
     let classes = `grid-tag tagged-${row.tag}`;
     if (VARIANT_TAG_STALE_DAYS && row.last_created) {
@@ -68,8 +68,8 @@ function tagRenderer(data, type, row) {
             title = `Tagged as ${row.tag} - no events within the last ${VARIANT_TAG_STALE_DAYS} days, most recent ${mostRecent}`;
         }
     }
-    let variantTagHtml = `<span class='${classes}' title='${title}' id="variant-tag-${row.id}" variant_tag_id='${row.id}' tag_id='${row.tag}'><span class='user-tag-colored'>${tagLabel}</span></span>`;
-    return $(variantTagHtml).prop('outerHTML');
+    return $('<span>', {class: classes, title: title, id: `variant-tag-${row.id}`, variant_tag_id: row.id, tag_id: row.tag,
+                        html: $('<span>', {class: 'user-tag-colored', html: tagLabel})}).prop('outerHTML');
 }
 
 function getAlignmentFiles() {

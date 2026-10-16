@@ -853,19 +853,19 @@ TableFormat.limit = (limit, data, type, row) => {
     if (typeof(data) === 'string' && data.length > limit) {
         return $('<span>', {class:'hover-detail', text:data.substring(0, limit) + '...', title:data}).prop('outerHTML');
     }
-    return data;
+    return data === null || data === undefined ? data : escapeHtml(data);
 };
 
 TableFormat.text = (data, type, row) => {
     if (data === '' || data === null) {
         return $('<span/>', {class:'no-value', text:'-'}).prop('outerHTML');
     } else {
-        return data;
+        return escapeHtml(data);
     }
 };
 
 TableFormat.plain = (data, type, row) => {
-    return data;
+    return data === null || data === undefined ? data : escapeHtml(data);
 };
 
 TableFormat.number = (data, type, row) => {
@@ -873,7 +873,7 @@ TableFormat.number = (data, type, row) => {
         return $('<span/>', {class:'no-value', text:'-'}).prop('outerHTML');
     } else {
         // TODO, put in format commas, monospace etc
-        return `<span class="text-number">${data.toLocaleString('en-US')}</span>`;
+        return $('<span>', {class: 'text-number', text: data.toLocaleString('en-US')}).prop('outerHTML');
     }
 };
 
@@ -930,7 +930,7 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     if (data === 0) {
         return '<span class="no-value mono font-weight-bold">0</span>';
     } else {
-        return `<span class="mono font-weight-bold text-${severity}">${data}</span>`;
+        return $('<span>', {class: `mono font-weight-bold text-${severity}`, text: data}).prop('outerHTML');
     }
 };
 
@@ -978,7 +978,7 @@ TableFormat.repeat = function(settings, data, type, columns) {
 
 TableFormat.json = function(data, type, columns) {
     // TODO format JSON
-    return JSON.stringify(data);
+    return data === undefined ? data : escapeHtml(JSON.stringify(data));
 };
 
 TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {

@@ -11,13 +11,14 @@ from typing import Any, Optional
 
 import pandas as pd
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
+from django.utils.html import conditional_escape
 
 from library.django_utils.datatable_mixins import JSONResponseView
 from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
 from library.pandas_utils import df_nan_to_none
 from library.utils import JsonObjType, nice_class_name
 from snpdb.models import UserGridConfig
-from snpdb.views.datatable_view import DATATABLE_CSV_PARAM, SortOrder
+from snpdb.views.datatable_view import DATATABLE_CSV_PARAM, SortOrder, escape_cell
 
 logger = logging.getLogger(__name__)
 
@@ -123,15 +124,21 @@ class DataFrameTableView(JSONResponseView):
             return df
         return df.sort_values(column_name, ascending=ascending)
 
-    def _rows(self, df: pd.DataFrame) -> list[JsonObjType]:
+    def _rows(self, df: pd.DataFrame, for_html: bool = True) -> list[JsonObjType]:
+        """ for_html: escape the cells that go into the page with no client renderer (the CSV stays raw) """
+        config = self.config
         columns = self._columns(df)
+        escape_index = for_html and not config.index_client_renderer
+        escape_columns = {column_name for _, column_name in columns[1:]
+                          if for_html and not config.get_column_client_renderer(column_name)}
         rows = []
         for index, row in df.iterrows():
             if isinstance(index, float) and math.isnan(index):
                 index = None
-            data = {INDEX_COLUMN_KEY: index}
+            data = {INDEX_COLUMN_KEY: escape_cell(index) if escape_index else index}
             for column_key, column_name in columns[1:]:
-                data[column_key] = row[column_name]
+                value = row[column_name]
+                data[column_key] = escape_cell(value) if column_name in escape_columns else value
             rows.append(data)
         return rows
 
@@ -162,7 +169,7 @@ class DataFrameTableView(JSONResponseView):
     def download_csv(self) -> StreamingHttpResponse:
         df = self._sort(self._dataframe())
         csv_columns = [{"name": key, "label": label} for key, label in self._column_labels(df)]
-        return csv_streaming_response(self._csv_name(), grid_export_csv(csv_columns, self._rows(df)))
+        return csv_streaming_response(self._csv_name(), grid_export_csv(csv_columns, self._rows(df, for_html=False)))
 
     def _column_labels(self, df: pd.DataFrame) -> list[tuple[str, str]]:
         config = self.config
@@ -197,7 +204,7 @@ class DataFrameTableView(JSONResponseView):
             is_index = i == 0
             columns.append({
                 "data": column_key,
-                "label": config.index_label if is_index else config.get_column_label(column_name),
+                "label": conditional_escape(config.index_label if is_index else config.get_column_label(column_name)),
                 "render": config.index_client_renderer if is_index else config.get_column_client_renderer(column_name),
                 "orderable": True,
                 "orderSequence": [SortOrder.ASC.value, SortOrder.DESC.value],

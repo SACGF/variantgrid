@@ -2418,7 +2418,10 @@ VCTable.format_hgvs = (parts) => {
     const error = parts.error;
 
     if (error) {
-        return $(`<span><i class="fa-solid fa-circle-exclamation text-danger"></i> ${error}</span>`);
+        return $('<span>', {html: [
+            $('<i>', {class: 'fa-solid fa-circle-exclamation text-danger'}),
+            document.createTextNode(` ${error}`)
+        ]});
     }
 
     if (variantId) {
@@ -2472,7 +2475,7 @@ VCTable.format_hgvs = (parts) => {
         // used to be display:inline-block; but that doesn't underline
         cDom.append($('<span>', {class:'c-hgvs-nomen', text: limitLength(cNomen, 100)}));
     } else {
-        cDom.append(limitLength(parts.full, 100));
+        cDom.append(document.createTextNode(limitLength(parts.full || '', 100)));
     }
     if (url) {
         cDom = $('<a>', {href: url, html: cDom, class: 'hover-link'});
@@ -2601,7 +2604,7 @@ VCTable.classification = (data, type, row) => {
         dom = $('<div>', {class: 'c-pill cs-none no-value', html: 'No Data'});
     } else {
         const pendingClass = pendingVal ? 'strike' : '';
-        dom = $('<div>', {class: `cs c-pill cs-${csVal.toLowerCase()} ${pendingClass}`, html: csKey.prettyValue(csVal).val});
+        dom = $('<div>', {class: `cs c-pill cs-${csVal.toLowerCase()} ${pendingClass}`, text: csKey.prettyValue(csVal).val});
     }
     domParts.push(dom);
     if (value["diff"]) {
