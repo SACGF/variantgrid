@@ -36,7 +36,12 @@
                     <a target="_blank" class="hover-link" href="{% url 'view_gene_symbol' transcript_data.gene_symbol %}">{{ transcript_data.gene_symbol }}</a>
                 {% endif %}
             <td>{%  if transcript_data.refseq_transcript_accession %}
+                    {% if transcript_data.cdot_fake %}
+                    <a target="_blank" class="hover-link" href="{% url 'view_transcript_accession' transcript_data.refseq_transcript_accession %}"
+                       data-toggle="tooltip" title="RefSeq gives mitochondrial genes no RNA accession: '{{ transcript_data.refseq_transcript_accession }}' is a fake transcript so annotation can link to the gene. HGVS uses NC_012920.1 (m.) instead."><span class="pill important">NO OFFICIAL TRANSCRIPT</span></a>
+                    {% else %}
                     <a target="_blank" class="hover-link" href="{% url 'view_transcript_accession' transcript_data.refseq_transcript_accession %}">{{ transcript_data.refseq_transcript_accession }}</a>
+                    {% endif %}
                 {%  endif %}
             <td>{%  if transcript_data.ensembl_transcript_accession %}
                     <a target="_blank" class="hover-link" href="{% url 'view_transcript_accession' transcript_data.ensembl_transcript_accession %}">{{ transcript_data.ensembl_transcript_accession }}</a>

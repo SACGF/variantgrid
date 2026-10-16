@@ -141,6 +141,26 @@ def create_gata2_transcript_version(genome_build) -> TranscriptVersion:
     return insert_transcript_data(genome_build, nm_001145661_2, gene_version)
 
 
+def create_fake_mitochondrial_transcript_version(genome_build) -> TranscriptVersion:
+    """ cdot's stand-in for ND4, a RefSeq mitochondrial gene with no RNA accession (TranscriptVersion.is_cdot_fake) """
+    gene_version = create_fake_gene_version(genome_build, "4538", "ND4", AnnotationConsortium.REFSEQ)
+    fake_rna_nd4 = {"id": "fake-rna-ND4.1",
+                    "hgnc": "7459",
+                    "biotype": ["mRNA"],
+                    "gene_name": "ND4",
+                    "protein": "YP_003024035.1",
+                    "stop_codon": 1378,
+                    "start_codon": 0,
+                    "translation": {"transl_table": 2},
+                    "genome_builds": {
+                        genome_build.name: {"contig": "NC_012920.1",
+                                            "strand": "+",
+                                            "exons": [[10759, 12137, 0, 1, 1378, None]],
+                                            "cds_start": 10759,
+                                            "cds_end": 12137}}}
+    return insert_transcript_data(genome_build, fake_rna_nd4, gene_version)
+
+
 def create_col18a1_transcript_version(genome_build) -> TranscriptVersion:
     """ Plus strand, with a 9 base alignment gap in exon 33 (the RefSeq mRNA lacks 9 genomic bases),
         so c. positions after it are 9 lower than gap-unaware numbering gives """

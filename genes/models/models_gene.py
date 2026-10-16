@@ -27,9 +27,9 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNC
 # Re-exported: callers have long imported these from genes.models
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
 from genes.transcript_parts import (
-    CDOT_FAKE_TRANSCRIPT_PREFIX,
     TranscriptParts,
     get_transcript_id_and_version,
+    is_cdot_fake_transcript,
 )
 from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
 from genes.transcripts_utils import get_lrg_and_t
@@ -749,6 +749,11 @@ class Transcript(models.Model, PreviewModelMixin):
         kwargs = {"transcript_id": self.identifier}
         return reverse("view_transcript", kwargs=kwargs)
 
+    @property
+    def is_cdot_fake(self) -> bool:
+        """ See TranscriptVersion.is_cdot_fake """
+        return is_cdot_fake_transcript(self.identifier)
+
     def get_external_url(self, genome_build: GenomeBuild):
         if self.annotation_consortium == AnnotationConsortium.REFSEQ:
             return f"https://www.ncbi.nlm.nih.gov/nuccore/{self.identifier}"
@@ -932,7 +937,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def is_cdot_fake(self) -> bool:
         """ A cdot stand-in for a RefSeq gene with no RNA accession (mitochondrial, eg 'fake-rna-ND4'), not
             something to write HGVS against """
-        return self.transcript_id.startswith(CDOT_FAKE_TRANSCRIPT_PREFIX)
+        return is_cdot_fake_transcript(self.transcript_id)
 
     @property
     def annotation_consortium(self):
@@ -955,6 +960,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def hgvs_ok(self) -> bool:
+        if self.is_cdot_fake:
+            return False
         if self.has_valid_data:
             if settings.HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH:
                 if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
@@ -1008,8 +1015,9 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def alignment_gap(self) -> bool:
-        if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-            # Sometimes RefSeq transcripts have gaps when aligning to the genome
+        if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ and not self.is_cdot_fake:
+            # Sometimes RefSeq transcripts have gaps when aligning to the genome (a cdot fake MT transcript is
+            # taken straight from the genome and has no sequence to compare)
             for ex in self.genome_build_data["exons"]:
                 if ex[-1] is not None:
                     return True
@@ -1473,6 +1481,10 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     @staticmethod
     def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
         """ Returns DB copy if we have it, or retrieves + stores from API """
+
+        if is_cdot_fake_transcript(transcript_accession):
+            raise NoTranscript(f"'{transcript_accession}' is a fake transcript for a mitochondrial gene RefSeq gives "
+                               f"no RNA accession - there is no transcript sequence")
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():

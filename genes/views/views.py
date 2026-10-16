@@ -260,14 +260,15 @@ def view_transcript_version(request, transcript_id, version):
         return render(request, "genes/view_transcript.html", {'transcript_id': transcript_id})
 
     accession = TranscriptVersion.get_accession(transcript_id, version)
+    tv_sequence_info = None
     no_transcript_message = ""
-    try:
-        # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
-        # if lengths are different
-        tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
-    except (NoTranscript, RequestException) as e:
-        tv_sequence_info = None
-        no_transcript_message = str(e)
+    if not transcript.is_cdot_fake:  # A cdot stand-in has no sequence to fetch (the template says why)
+        try:
+            # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
+            # if lengths are different
+            tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
+        except (NoTranscript, RequestException) as e:
+            no_transcript_message = str(e)
 
     tv_set = transcript.transcriptversion_set.filter(version=version)
     tv: TranscriptVersion = tv_set.first()
