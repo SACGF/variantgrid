@@ -17,8 +17,8 @@ run. Fields, URLs, commands, tasks and signals are in the generated maps ([model
 
 ### The pipeline posts a run
 
-The client (`seqauto/management/commands/seqauto_api_client2.py` is the reference, `seqauto_api_client.py` the
-hardcoded test-data version) posts in dependency order. `seqauto/serializers/sequencing_serializers.py:SequencingRunSerializer`
+The client ([variantgrid_api](https://github.com/SACGF/variantgrid_api), whose [example_haem_20_999.py](https://github.com/SACGF/variantgrid_api/blob/master/examples/example_haem_20_999.py)
+posts a whole fake run) posts in dependency order. `seqauto/serializers/sequencing_serializers.py:SequencingRunSerializer`
 `get_or_create`s by name - the run's name is its primary key, so a re-post is a no-op and never updates fields.
 `SampleSheetSerializer.create` `update_or_create`s the sheet by (run, hash), upserts its rows by `sample_id`, stores
 the extra sheet columns as `SequencingSampleData` key/values, carries extraction links forward from the previous
