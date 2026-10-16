@@ -115,11 +115,9 @@ class Command(BaseCommand):
 
         if apply:
             # VARIANT_GRID can change an API-immutable value; note / explain go in so the patch keeps them
-            response = classification.patch_value({key: {"value": normalised, "note": blob.get("note"),
-                                                         "explain": blob.get("explain")}},
-                                                  user=user, source=SubmissionSource.VARIANT_GRID, save=True)
-            if immutable := [w.message for w in response.warnings if w.code == "immutable"]:
-                raise ValueError("; ".join(immutable))
+            classification.patch_value({key: {"value": normalised, "note": blob.get("note"),
+                                              "explain": blob.get("explain")}},
+                                       user=user, source=SubmissionSource.VARIANT_GRID, save=True)
             if outcome == Outcome.PUBLISHED:
                 classification.publish_latest(user=user)
         return outcome
