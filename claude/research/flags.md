@@ -6,10 +6,11 @@ The flags app hangs typed, commentable, resolvable "flags" off any model that mi
 `flags/models/models.py:FlagsMixin` - today `snpdb/models/models_variant.py:Allele`,
 `classification/models/classification.py:Classification` and
 `classification/models/clinical_context_models.py:ClinicalContext`. It is small (one models module, one REST views
-module, no tasks, commands or tests of its own), but classification leans on it for workflow state: submitted, unshared,
-withdrawn, discordant, pending changes, significance change, condition resolution, internal review and suggestions are
-all flag types (`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the
-team's position: new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
+module, no tasks or commands, and one test module for the REST API's input validation), but classification leans on
+it for workflow state: submitted, unshared, withdrawn, discordant, pending changes, significance change, condition
+resolution, internal review and suggestions are all flag types
+(`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the team's position:
+new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
 ([models](../maps/models.md#flags), [urls](../maps/urls.md#flags)); receivers are in [signals](../maps/signals.md).
 
 ## Flows
@@ -109,10 +110,10 @@ compare against `flag_type.raise_permission_enum`.
 every flag, private ones too (only USERS is filtered). No caller passes a user at present. Compare with
 `== FlagPermissionLevel.NO_PERM` or `.level`.
 
-**A `watch` POST 500s (confirmed, dead path).** `FlagsView` POST with `watch` calls `fc.set_watcher`, which
-`FlagCollection` does not define; `watch_toggle()` in `flags.js` exists but nothing calls it. Delete both rather than
-revive them. `FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele
-flag types (`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
+**`watch_toggle()` in `flags.js` is dead.** Nothing calls it, and `FlagsView` POST answers 400 to its `watch` body
+(no `flag_type`), as it does to an unknown flag type or resolution and a bad `?history=` / `?since=`.
+`FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele flag types
+(`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
 
 **`classification_not_public` is disabled by accident of JavaScript.** Without `CLINVAR_EXPORT` mode,
 `FlagHelper.to_json` sets that type's `permission` / `raise_permission` to `FlagPermissionLevel.SYSTEM` (the string `"A"`)
