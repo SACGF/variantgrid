@@ -29,7 +29,7 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.utils import pretty_label
-from snpdb.grids import AbstractVariantGrid
+from snpdb.grids import AbstractVariantGrid, get_standard_overrides
 from snpdb.models import ImportStatus, Q, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import (
@@ -180,44 +180,56 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         return q
 
 
-def _get_gene_fields():
-    q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
-    columns_qs = VariantGridColumn.objects.filter(q_gene).order_by("pk")
-    first_fields = ["gene_version__gene_symbol__symbol", "gene_version__gene__identifier", "gene_version__version"]
-    fields = []
-    for variant_column in columns_qs.values_list("variant_column", flat=True):
-        gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
-        if gene_column.startswith("gene__"):
-            gene_column = "gene_version__" + gene_column
-        if gene_column not in first_fields:
-            fields.append(gene_column)
+def _gene_field_path(variant_column: str) -> str:
+    """ A VariantGridColumn path rooted at Variant -> the same column rooted at ReleaseGeneVersion """
+    gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
+    if gene_column.startswith("gene__"):
+        gene_column = "gene_version__" + gene_column
+    return gene_column
 
-    return first_fields + fields
+
+def _gene_catalogue_columns() -> list[tuple[str, Optional[VariantGridColumn]]]:
+    """ (ReleaseGeneVersion field path, the VariantGridColumn it is the gene level of) for every gene
+        column in the variant grid catalogue - symbol, identifier and version first, the rest in
+        catalogue order. The version has no catalogue column """
+    q_gene = Q(variant_column__contains='__gene__') | Q(variant_column__contains='__gene_version__')
+    catalogue = {_gene_field_path(c.variant_column): c for c in VariantGridColumn.objects.filter(q_gene).order_by("pk")}
+    first_fields = ["gene_version__gene_symbol__symbol", "gene_version__gene__identifier", "gene_version__version"]
+    fields = first_fields + [f for f in catalogue if f not in first_fields]
+    return [(f, catalogue.get(f)) for f in fields]
 
 
 class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
-    """ Shows genes / symbols in a gene annotation release """
+    """ Shows genes / symbols in a gene annotation release. Its columns are the gene level ones of the
+        variant grid catalogue, drawn the way the variant grids draw them: catalogue label, tooltip,
+        width and cell renderer, laid out table-layout: fixed with every cell clipped to one line, so
+        a gene with thousands of interactors takes the same row as any other (#2251) """
     grid_name = "Gene Release"
     server_csv_download = True
     search_box_enabled = True
     scroll_x = True
+    table_class = AbstractVariantGrid.table_class
+    default_column_width = AbstractVariantGrid.default_column_width
     # The unfiltered count is every gene in the release joined to its annotation, and only feeds the
     # "(filtered from N total)" text
     count_unfiltered = False
 
     GENE_SYMBOL_FIELD = "gene_version__gene_symbol__symbol"
+    CLIENT_OVERRIDE_KEYS = ("client_renderer", "client_renderer_kwargs")
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        column_labels = _gene_column_labels()
+        column_overrides = get_standard_overrides(af_show_in_percent=False)
         self.rich_columns = []
-        for field in _get_gene_fields():
-            is_symbol = field == self.GENE_SYMBOL_FIELD
-            self.rich_columns.append(
-                RichColumn(key=field, label=column_labels.get(field, pretty_label(field.split("__")[-1])),
-                           orderable=True, search=is_symbol,
-                           default_sort=SortOrder.ASC if is_symbol else None,
-                           client_renderer='renderGeneSymbol' if is_symbol else None))
+        for field, column in _gene_catalogue_columns():
+            kwargs = {"label": pretty_label(field.split("__")[-1])}
+            if column:
+                override = column_overrides.get(column.variant_column, {})
+                kwargs.update(label=column.label, header_title=column.description, width=column.width,
+                              **{k: override[k] for k in self.CLIENT_OVERRIDE_KEYS if k in override})
+            if field == self.GENE_SYMBOL_FIELD:
+                kwargs.update(search=True, default_sort=SortOrder.ASC, client_renderer='renderGeneSymbol')
+            self.rich_columns.append(RichColumn(key=field, orderable=True, **kwargs))
 
     def _get_gene_annotation_release_id(self) -> int:
         if release_id := self.get_query_param("gene_annotation_release_id"):
@@ -250,17 +262,6 @@ class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
             is_null = self.get_query_param("is_null") == "true"
             qs = qs.filter(**{f"{column}__isnull": is_null})
         return qs
-
-
-def _gene_column_labels() -> dict[str, str]:
-    """ Gene column path -> the label the variant grid gives it """
-    labels = {}
-    for variant_column, label in VariantGridColumn.objects.values_list("variant_column", "label"):
-        gene_column = variant_column.replace("variantannotation__", "").replace("transcript_version__", "")
-        if gene_column.startswith("gene__"):
-            gene_column = "gene_version__" + gene_column
-        labels[gene_column] = label
-    return labels
 
 
 class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCollection]):

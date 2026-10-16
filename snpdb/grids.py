@@ -560,6 +560,26 @@ AF_UNIT_COLUMNS = [
     'variantannotation__topmed_af',
 ]
 
+# DBNSFPGeneAnnotation text columns that hold a ';' joined list. @see get_standard_overrides
+DBNSFP_GENE_COLUMN_PREFIX = 'variantannotation__gene__geneannotation__dbnsfp_gene__'
+DBNSFP_GENE_LIST_FIELDS = [
+    'expression_egenetics',
+    'expression_gnf_atlas',
+    'go_biological_process',
+    'go_cellular_component',
+    'go_molecular_function',
+    'pathway_biocarta_full',
+    'pathway_consensus_pathdb',
+    'pathway_kegg_full',
+    'pathway_kegg_id',
+]
+# Each term carries a bracketed qualifier - "BARD1[0.9]", "KLK5[26186194;28514442]"
+DBNSFP_GENE_BRACKETED_LIST_FIELDS = [
+    'gwas_trait_association',
+    'interactions_biogrid',
+    'interactions_consensus_pathdb',
+]
+
 
 def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
     """ Per column RichColumn kwargs the variant grids apply on top of the catalogue - the client
@@ -599,6 +619,13 @@ def get_standard_overrides(af_show_in_percent: bool) -> dict[str, dict]:
         'variantannotation__gnomad_filtered': {'client_renderer': 'VariantGridFormat.gnomadFiltered'},
         'variantannotation__transcript_version__gene_version__hgnc__uniprot__accession': {
             'client_renderer': 'VariantGridFormat.uniprotLink'},
+        # dbNSFP gene lists are ';' joined - plain terms, or terms each qualified in brackets (an
+        # interactor's confidence or PubMed IDs, a GWAS trait's PubMed ID) that recur per qualifier
+        **{DBNSFP_GENE_COLUMN_PREFIX + field: {'client_renderer': 'VariantGridFormat.separated',
+                                              'client_renderer_kwargs': {'separator': ';'}}
+           for field in DBNSFP_GENE_LIST_FIELDS},
+        **{DBNSFP_GENE_COLUMN_PREFIX + field: {'client_renderer': 'VariantGridFormat.bracketedTerms'}
+           for field in DBNSFP_GENE_BRACKETED_LIST_FIELDS},
         # Composite cells, keyed by the composite column's own name - the members they draw
         # ride along hidden and their sort menus come from CompositeColumnMember
         'consequence_impact': {'client_renderer': 'VariantGridFormat.impactConsequence'},
