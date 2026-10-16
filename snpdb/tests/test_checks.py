@@ -54,9 +54,17 @@ class OidcCheckTest(SimpleTestCase):
 
 
 class FeatureDependencyCheckTest(SimpleTestCase):
+    """ Checked against a baseline with every feature off, not the settings of whichever host runs the suite """
+    BASELINE = {
+        "MME_ENABLED": False, "MME_CONTACT": None,
+        "BEACON_ENABLED": False, "BEACON_CONFIG": {**settings.BEACON_CONFIG, "beacon_id": checks.BEACON_PLACEHOLDER_ID},
+        "DISCORDANCE_ENABLED": False, "DISCORDANCE_EMAIL": None,
+        "CONTACT_US_ENABLED": False, "KEYCLOAK_SYNC_DETAILS": None, "REGISTRATION_OPEN": False,
+    }
 
     def test_defaults_pass(self):
-        self.assertEqual(ids(checks.check_feature_dependencies(None)), set())
+        with override_settings(**self.BASELINE):
+            self.assertEqual(ids(checks.check_feature_dependencies(None)), set())
 
     def test_feature_without_its_dependency(self):
         cases = {
@@ -70,16 +78,18 @@ class FeatureDependencyCheckTest(SimpleTestCase):
             "variantgrid.E011": {"REGISTRATION_OPEN": True, "RECAPTCHA_PUBLIC_KEY": "", "RECAPTCHA_PRIVATE_KEY": "x"},
         }
         for expected, overrides in cases.items():
-            with self.subTest(expected), override_settings(**overrides):
+            with self.subTest(expected), override_settings(**{**self.BASELINE, **overrides}):
                 self.assertEqual(ids(checks.check_feature_dependencies(None)), {expected})
 
-    @override_settings(MME_ENABLED=True, MME_FROM_EMAIL="mme@example.org", SEND_EMAILS=True)
     def test_mme_needs_a_contact(self):
-        self.assertEqual(ids(checks.check_feature_dependencies(None)), {"variantgrid.E007"})
+        with override_settings(**{**self.BASELINE, "MME_ENABLED": True, "MME_FROM_EMAIL": "mme@example.org",
+                                  "SEND_EMAILS": True}):
+            self.assertEqual(ids(checks.check_feature_dependencies(None)), {"variantgrid.E007"})
 
-    @override_settings(KEYCLOAK_SYNC_DETAILS={"host": "https://auth.example.org"}, ACCOUNTS_EMAIL=None)
     def test_keycloak_admin_needs_an_accounts_email(self):
-        self.assertEqual(ids(checks.check_feature_dependencies(None)), {"variantgrid.E010"})
+        with override_settings(**{**self.BASELINE, "KEYCLOAK_SYNC_DETAILS": {"host": "https://auth.example.org"},
+                                  "ACCOUNTS_EMAIL": None}):
+            self.assertEqual(ids(checks.check_feature_dependencies(None)), {"variantgrid.E010"})
 
 
 class AnnotationCheckTest(SimpleTestCase):
