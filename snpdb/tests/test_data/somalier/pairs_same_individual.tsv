@@ -1,0 +1,2 @@
+#sample_a	sample_b	relatedness	ibs0	ibs2	hom_concordance	hets_a	hets_b	hets_ab	shared_hets	hom_alts_a	hom_alts_b	shared_hom_alts	n	x_ibs0	x_ibs2	expected_relatedness
+mother_9000002	proband_9000001	0.98	10	20	0.9	50	50	60	4000	30	30	3000	1000	1	2	-1

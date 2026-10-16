@@ -1210,6 +1210,9 @@ SOMALIER = {
     # with 'somalier_existing_vcfs --clear' whenever it changes
     "compensate_allele_order": True,
     "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
+    # Max query samples per 'somalier ancestry' call when somalier_existing_vcfs backfills - one call fits the
+    # 1kg background once for all of them, and a bad .somalier file only fails its own batch
+    "ancestry_batch_samples": 1000,
     # A VCF whose best sample has fewer het+hom sites than this is extracted, but ancestry and relate
     # are recorded as SKIPPED rather than run on numbers that mean nothing
     "min_genotyped_sites": 100,
