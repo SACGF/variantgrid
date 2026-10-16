@@ -453,7 +453,7 @@ class ClassificationGrouping(TimeStampedModel):
             self.latest_allele_info = best_classification.classification.allele_info
 
             all_terms = Counter()
-            all_free_text_conditions = Counter()
+            all_free_text_conditions = defaultdict(list)
             all_zygosities: set[str] = set()
 
             all_buckets = set()
@@ -467,7 +467,9 @@ class ClassificationGrouping(TimeStampedModel):
                     for term in condition.terms:
                         all_terms[term] += 1
                 elif condition_text := modification.get(SpecialEKeys.CONDITION):
-                    all_free_text_conditions[condition_text] += 1
+                    # use a normalised version of the condition as the key
+                    # for now just lowercasing but we could do other normalisations
+                    all_free_text_conditions[condition_text.lower()].append(condition_text)
 
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
@@ -493,11 +495,12 @@ class ClassificationGrouping(TimeStampedModel):
 
             for term, count in all_terms.items():
                 condition_references.append(ConditionReference(term=term, count=count))
-            for text, count in all_free_text_conditions.items():
-                condition_references.append(ConditionReference(name=text, count=count))
+            for values in all_free_text_conditions.values():
+                display_text = min(values)  # grab the max text value
+                # as sometimes the condition is purely lower case, min will get us some capital letters
+                condition_references.append(ConditionReference(name=display_text, count=len(values)))
             condition_references.sort()
             self.conditions = strip_json(ConditionResolved(references=condition_references).to_json())
-
             self.classification_count = len(all_modifications)
 
             pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF

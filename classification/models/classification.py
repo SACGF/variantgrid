@@ -350,6 +350,7 @@ class ConditionReference:
             return False
         return True
 
+# TODO: these classes should be reworked as dataclass json
 
 @dataclass(frozen=True)
 class ConditionResolved:
