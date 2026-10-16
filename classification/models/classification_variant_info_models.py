@@ -155,6 +155,9 @@ class PHGVSResolution:
 
 NO_P_HGVS_SOURCE = "No p.HGVS source"
 
+VEPHGVSpLookup = dict[tuple[int, int], str]
+""" (variant_id, transcript_version_id) -> VariantTranscriptAnnotation.hgvs_p """
+
 
 @lru_cache
 def p_hgvs_converter(genome_build: GenomeBuild, retrieve_transcripts: Optional[bool] = None) -> BioCommonsHGVSConverter:
@@ -304,11 +307,12 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.save()
         return self
 
-    def set_p_hgvs(self, converter: Optional[BioCommonsHGVSConverter] = None):
+    def set_p_hgvs(self, converter: Optional[BioCommonsHGVSConverter] = None,
+                   vep_hgvs_p_lookup: Optional[VEPHGVSpLookup] = None):
         """ Sets p_hgvs, p_hgvs_source and p_hgvs_error (doesn't save). A p.HGVS problem is recorded,
             never raised - it must not stop the c.HGVS saving """
         try:
-            p_resolution = self.recalc_p_hgvs(converter=converter)
+            p_resolution = self.recalc_p_hgvs(converter=converter, vep_hgvs_p_lookup=vep_hgvs_p_lookup)
         except Exception as e:
             report_exc_info(extra_data={"resolved_variant_info": self.pk, "resolved_hgvs": self.resolved_hgvs})
             p_resolution = PHGVSResolution(p_hgvs=None, source=None, error=str(e))
@@ -316,13 +320,21 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.p_hgvs_source = p_resolution.source
         self.p_hgvs_error = p_resolution.error
 
-    def recalc_p_hgvs(self, converter: Optional[BioCommonsHGVSConverter] = None) -> PHGVSResolution:
+    def recalc_p_hgvs(self, converter: Optional[BioCommonsHGVSConverter] = None,
+                      vep_hgvs_p_lookup: Optional[VEPHGVSpLookup] = None) -> PHGVSResolution:
         """ First canonical p.HGVS of VEP, computed (c_to_p), cached ClinGen, then classification evidence.
-            VEP goes first as biocommons can't name some frameshifts - @see is_frameshift_in_disguise (#1383) """
+            VEP goes first as biocommons can't name some frameshifts - @see is_frameshift_in_disguise (#1383)
+            vep_hgvs_p_lookup: hgvs_p already fetched for a batch (@see vep_hgvs_p_lookup_for), else queried per row """
         if not (self.transcript_version and self.resolved_hgvs):
             return PHGVSResolution(p_hgvs=None, source=None, error=NO_P_HGVS_SOURCE)
 
-        if p_hgvs := self._vep_p_hgvs():
+        if vep_hgvs_p_lookup is None:
+            p_hgvs = self._vep_p_hgvs()
+        elif hgvs_p := vep_hgvs_p_lookup.get((self.variant_id, self.transcript_version_id)):
+            p_hgvs = canonical_p_hgvs(hgvs_p)
+        else:
+            p_hgvs = None
+        if p_hgvs:
             return PHGVSResolution(p_hgvs=p_hgvs, source=PHGVSSource.VEP, error=None)
 
         if converter is None:
@@ -356,6 +368,22 @@ class ResolvedVariantInfo(TimeStampedModel):
             if hgvs_p := vta_qs.values_list("hgvs_p", flat=True).first():
                 return canonical_p_hgvs(hgvs_p)
         return None
+
+    @staticmethod
+    def vep_hgvs_p_lookup_for(genome_build: GenomeBuild, rvis: list['ResolvedVariantInfo']) -> VEPHGVSpLookup:
+        """ _vep_p_hgvs for many rows of one build in a single query """
+        lookup: VEPHGVSpLookup = {}
+        if vav := VariantAnnotationVersion.latest(genome_build):
+            vta_qs = VariantTranscriptAnnotation.objects.filter(
+                version=vav,
+                variant_id__in={rvi.variant_id for rvi in rvis},
+                transcript_version_id__in={rvi.transcript_version_id for rvi in rvis},
+                hgvs_p__isnull=False,
+            )
+            for variant_id, transcript_version_id, hgvs_p in vta_qs.values_list("variant_id", "transcript_version_id",
+                                                                                "hgvs_p"):
+                lookup.setdefault((variant_id, transcript_version_id), hgvs_p)
+        return lookup
 
     def _clingen_p_hgvs(self, allow_unknown_stop: bool) -> Optional[str]:
         """ Cached JSON only, never calls the registry. ClinGen returns NP_x:n.123+1G>A for intronic variants

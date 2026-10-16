@@ -153,6 +153,7 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
         self.assertEqual((None, None, None), (self.rvi.p_hgvs, self.rvi.p_hgvs_source, self.rvi.p_hgvs_error))
 
     def test_backfill_command(self):
-        call_command("one_off_backfill_resolved_variant_info_p_hgvs", "--genome-build", "GRCh37", stdout=StringIO())
+        call_command("one_off_backfill_resolved_variant_info_p_hgvs", "--genome-build", "GRCh37", "--sync",
+                     stdout=StringIO())
         self.rvi.refresh_from_db()
         self.assertEqual((COMPUTED_P_HGVS, PHGVSSource.COMPUTED), (self.rvi.p_hgvs, self.rvi.p_hgvs_source))
