@@ -179,7 +179,10 @@ Gotchas:
 - With `VARIANT_GENE_LEVEL_ENABLED` off (Shariant), `genes/gene_level_strings.py:looks_gene_level` is always False, so
   'BCR::ABL1' takes the HGVS path and fails as an HGVS - `cant_resolve_to_variant_coordinate`, never `gene_level_unresolved`.
 - Shariant records arrive through the API (`models/classification_inserter.py:BulkClassificationInserter`), already curated
-  elsewhere. An unpublished edit there usually means an update the inserter saved but refused to share (`share_failure`:
+  elsewhere: every lab there is external, and the curating system is the source of truth. A data fix (a one-off command,
+  a normalisation) runs on the curating deployment and reaches Shariant when its next upload re-sends the republished
+  record, which keeps the two in sync. Changing records on Shariant itself is the exception - correcting an error made
+  there, or a case decided explicitly. An unpublished edit there usually means an update the inserter saved but refused to share (`share_failure`:
   the record has errors) or one sent without `publish`. A pending clinical significance only comes from discordance
   resolution. A change to editing UI needs testing on a curation deployment; a change to the API, cross-lab visibility,
   overlaps or the exports labs download (CSV column set included) needs testing on Shariant test.

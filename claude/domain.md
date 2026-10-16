@@ -203,7 +203,8 @@ tag settings page; `settings.TAG_REQUIRES_CLASSIFICATION` only names the one a f
 
 **Organization / Lab** - `snpdb/models/models.py:Organization`, `Lab`. A Lab belongs to an Organization; each has a
 `group_name` (`org/lab`) that names its Django Group, and lab membership *is* group membership. Classifications are owned by a
-Lab; sharing levels map to these groups.
+Lab; sharing levels map to these groups. `Lab.external` marks a lab whose records are curated on another system: on a
+curation deployment, the labs pulled down from Shariant; on Shariant, every lab, so `lab__external=False` selects nothing there.
 
 **Guardian permissions** - object-level read/write via `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsMixin`
 (`can_view`, `check_can_write`, `filter_for_user`). Standard groups `all_users` and `public`
