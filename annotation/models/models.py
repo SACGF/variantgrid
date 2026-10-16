@@ -755,6 +755,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # Lifecycle: NEW (being populated by scheduler) → ACTIVE (current working version)
     # → HISTORICAL (kept for old analyses). @see private issue #577
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.NEW)
+    # #1679: latched by annotate_variants when the installed VEP no longer matches this version's pins.
+    # Set once (first failure reports to Rollbar), cleared only by the recheck_vep_version task. While set
+    # the scheduler creates no range locks and the dispatcher launches no VEP runs against this version.
+    vep_version_mismatch_reason = models.TextField(null=True, blank=True)
+    vep_version_mismatch_date = models.DateTimeField(null=True, blank=True)
 
     vep = models.IntegerField()  # code version
     vep_cache = models.IntegerField(null=True)  # May need to have diff code/cache versions eg T2T
@@ -945,12 +950,36 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
 
     def get_annotation_run_blocker(self) -> Optional[str]:
         """ Reason annotation runs against this VAV will fail at pipeline time, or None if OK. Without a
-            GeneAnnotationRelease we can't get transcript/versions into the DB for FK linking, so every
-            AnnotationRun errors (see annotation.tasks.annotate_variants). Surfaced as a warning on the
-            annotation runs page so a misconfigured VAV is caught before pipelines are run. """
+            GeneAnnotationRelease we can't get transcript/versions into the DB for FK linking, and a
+            latched VEP mismatch (#1679) fails every run at the version check, so every AnnotationRun
+            errors (see annotation.tasks.annotate_variants). While set, the scheduler creates no range
+            locks and the dispatcher's VEP lane launches nothing against this version; it is also shown
+            as a warning on the annotation runs page. """
         if self.gene_annotation_release_id is None:
             return "missing GeneAnnotationRelease"
+        if self.vep_version_mismatch_date:
+            mismatch_date = timezone.localtime(self.vep_version_mismatch_date)
+            return f"VEP mismatch since {mismatch_date:%Y-%m-%d %H:%M}: {self.vep_version_mismatch_reason}"
         return None
+
+    def latch_vep_version_mismatch(self, reason: str) -> bool:
+        """ #1679: latch a VEP mismatch. Returns whether this call made the transition - runs leased
+            before the latch fail in the same wave on parallel workers, and the conditional update makes
+            exactly one of them the reporter. """
+        now = timezone.now()
+        updated = VariantAnnotationVersion.objects.filter(
+            pk=self.pk, vep_version_mismatch_date__isnull=True).update(vep_version_mismatch_reason=reason,
+                                                                       vep_version_mismatch_date=now)
+        if updated:
+            self.vep_version_mismatch_reason = reason
+            self.vep_version_mismatch_date = now
+        return bool(updated)
+
+    def clear_vep_version_mismatch(self):
+        VariantAnnotationVersion.objects.filter(pk=self.pk).update(vep_version_mismatch_reason=None,
+                                                                   vep_version_mismatch_date=None)
+        self.vep_version_mismatch_reason = None
+        self.vep_version_mismatch_date = None
 
     @transaction.atomic
     def promote_to_active(self):

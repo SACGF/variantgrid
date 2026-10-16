@@ -13,7 +13,7 @@ from annotation.models import (
 from annotation.models.models import AnnotationPipelineVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types
-from annotation.tasks.annotate_variants import annotation_run_retry
+from annotation.tasks.annotate_variants import annotation_run_retry, recheck_vep_version
 from annotation.tasks.annotation_scheduler_task import (
     annotation_scheduler,
     dispatch_annotation_runs,
@@ -149,6 +149,10 @@ def variant_annotation_runs(request):
                         annotation_run_retry(annotation_run)
                         num_retrying += 1
                     message = f"{genome_build} - retrying {num_retrying} annotation runs."
+                elif f"recheck-vep-version-{vav.pk}" in request.POST:
+                    recheck_vep_version.si(vav.pk).apply_async()
+                    message = (f"{genome_build} - queued VEP version re-check for {vav.short_string()} on an "
+                               f"annotation worker; reload this page for the result")
 
                 if message:
                     messages.add_message(request, messages.INFO, message)
