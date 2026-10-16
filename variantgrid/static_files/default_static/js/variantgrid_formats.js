@@ -63,6 +63,30 @@ VariantGridFormat.separated = (value, type, rowData, ctx) => {
     return escapeHtml(splitValues(value, _separator(ctx)).join(VALUE_JOIN));
 };
 
+// A ';' joined list of terms each qualified in brackets, the dbNSFP gene way: "BARD1[0.9];BARD1[NA]"
+// (ConsensusPathDB interactors and their confidence), "KLK5[26186194;28514442]" (BioGRID interactors
+// and PubMed IDs), "Urate levels[25811787]" (GWAS traits). The same term recurs under different
+// qualifiers, so the distinct terms in first-seen order are what the cell reads as
+function splitBracketedTerms(rawValue) {
+    const terms = [];
+    const seen = new Set();
+    for (const match of String(rawValue).matchAll(/([^;[]+)(?:\[[^\]]*\])?/g)) {
+        const term = match[1].trim();
+        if (term && !seen.has(term)) {
+            seen.add(term);
+            terms.push(term);
+        }
+    }
+    return terms;
+}
+
+VariantGridFormat.bracketedTerms = (value) => {
+    if (value == null || value === '') {
+        return '';
+    }
+    return escapeHtml(splitBracketedTerms(value).join(VALUE_JOIN));
+};
+
 // Keys are Classification.clinical_significance codes / somatic summary tiers - values give the box
 // contents and tooltip label
 const GERMLINE_CLASSIFICATION_BOXES = {
