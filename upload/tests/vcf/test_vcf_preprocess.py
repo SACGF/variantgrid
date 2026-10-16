@@ -1,12 +1,16 @@
 """
 Tests for the pieces of preprocess_vcf that make the unsorted-VCF sort-and-retry work (#127):
 how the pipe is built for each pass, and the reset that puts the pipeline back to a clean state
-in between. Running the pipe itself needs bcftools and a real reference fasta, so it isn't covered here.
+in between. The full pipe needs bcftools and a real reference fasta, so TestRunPipe runs run_pipe on toy
+stages instead, checking which stage a failure is blamed on (#1005).
 """
 import copy
 import os
+import shlex
+import shutil
 import tempfile
 from subprocess import CalledProcessError
+from unittest import skipUnless
 from unittest.mock import patch
 
 from django.conf import settings
@@ -30,11 +34,14 @@ from upload.vcf.vcf_preprocess import (
     SORT_VCF_SUB_STEP,
     UNSORTED_VCF_MESSAGE,
     VCF_CLEAN_AND_FILTER_SUB_STEP,
+    PipeStageError,
     PreprocessFiles,
     _build_pipe_commands,
     _get_preprocess_files,
     _reset_for_retry,
+    create_sub_step,
     preprocess_vcf,
+    run_pipe,
 )
 
 _TEST_DIR = tempfile.mkdtemp(prefix="test_vcf_preprocess_")
@@ -229,3 +236,81 @@ class TestPreprocessFiles(TestCase):
                                 skipped_records_stats="records.tsv", skipped_filters_stats="filters.tsv",
                                 skipped_alts_stats="alts.tsv", converted_alts_stats="converted.tsv")
         self.assertEqual(len(files.written_by_pipe), 6)
+
+
+@override_settings(IMPORT_PROCESSING_DIR=os.path.join(_TEST_DIR, "import_processing"))
+class TestRunPipe(TestCase):
+    """ The real run_pipe on toy stages - no bcftools or fasta needed except for the #1179 repro """
+    VCF_FILENAME = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf", "grch38_brca1.vcf")
+    NO_FORMAT_HEADER_VCF_FILENAME = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf",
+                                                 "no_format_header.grch38_brca1.vcf")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        user = User.objects.create_user(username="run_pipe_test_user", password="x")
+        file_upload = FileUpload.objects.create(user=user, name="test.vcf", path=cls.VCF_FILENAME,
+                                                file_type=UploadedFileTypes.VCF,
+                                                import_source=ImportSource.COMMAND_LINE)
+        cls.upload_pipeline = UploadPipeline.objects.create(file_upload=file_upload)
+        cls.upload_step = UploadStep.objects.create(upload_pipeline=cls.upload_pipeline, name="Preprocess VCF",
+                                                    sort_order=0, task_type=UploadStepTaskType.CELERY)
+
+    def _run_pipe(self, pipe_commands: dict) -> dict:
+        sub_steps = {name: create_sub_step(self.upload_step, name, command, tool_version=None)
+                     for name, command in pipe_commands.items()}
+        run_pipe(pipe_commands, sub_steps, dict(os.environ), self.upload_pipeline)
+        return sub_steps
+
+    def _failed_pipe(self, pipe_commands: dict) -> PipeStageError:
+        with self.assertRaises(PipeStageError) as cm:
+            self._run_pipe(pipe_commands)
+        return cm.exception
+
+    def test_failing_stage_is_named_with_its_own_stderr_and_code(self):
+        pipe_commands = {"a": ["cat", self.VCF_FILENAME],
+                         "b": ["sh", "-c", "cat > /dev/null; echo boom >&2; exit 3"],
+                         "c": ["cat"]}
+        e = self._failed_pipe(pipe_commands)
+        self.assertEqual(e.stage.name, "b")
+        self.assertEqual(e.returncode, 3)
+        self.assertEqual(e.stderr, "boom")
+        self.assertEqual(e.cmd, shlex.join(pipe_commands["b"]))
+        self.assertIn("'b' (2 of 3)", str(e))
+        self.assertIn("a=0 b=3 c=0", str(e))
+
+        sub_steps = {s.name: s for s in self.upload_step.substep_set.all()}
+        self.assertEqual(sub_steps["b"].error_message, "boom")
+        self.assertEqual(sub_steps["a"].output_text, "")
+        self.assertFalse(sub_steps["a"].error_message)
+
+    def test_upstream_sigpipe_and_broken_pipe_are_not_blamed(self):
+        e = self._failed_pipe({"yes": ["yes"], "fail": ["sh", "-c", "exit 3"], "c": ["cat"]})
+        self.assertEqual([s.returncode for s in e.stages], [141, 3, 0])
+        self.assertEqual(e.stage.name, "fail")
+
+        # Python ignores SIGPIPE, so a manage.py stage exits 1 with a traceback instead of 141
+        e = self._failed_pipe({"python": ["python3", "-c", "print('x\\n' * 10**7)"],
+                               "fail": ["sh", "-c", "exit 3"], "c": ["cat"]})
+        self.assertIn("BrokenPipeError", e.stages[0].stderr)
+        self.assertEqual(e.stage.name, "fail")
+
+    def test_success_writes_every_sub_steps_stderr(self):
+        sub_steps = self._run_pipe({"a": ["cat", self.VCF_FILENAME],
+                                    "b": ["sh", "-c", "echo note >&2; cat"],
+                                    "c": ["cat"]})
+        self.assertEqual(sub_steps["b"].output_text, "note")
+        self.assertEqual(sub_steps["a"].output_text, "")
+        self.assertFalse(sub_steps["b"].error_message)
+
+    @skipUnless(shutil.which(settings.BCFTOOLS_COMMAND), "bcftools not installed")
+    def test_bcftools_norm_dying_on_undeclared_format_is_blamed(self):
+        """ #1179: bcftools norm dies mid-pipe on FORMAT tags missing from the header """
+        e = self._failed_pipe({
+            "cat": ["cat", self.NO_FORMAT_HEADER_VCF_FILENAME],
+            UploadStep.NORMALIZE_SUB_STEP: [settings.BCFTOOLS_COMMAND, "norm", "--multiallelics=-", "-"],
+            "remove_header": [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"],
+            "c": ["cat"],
+        })
+        self.assertEqual(e.stage.name, UploadStep.NORMALIZE_SUB_STEP)
+        self.assertIn("[E::vcf_format]", e.stderr)

@@ -1,7 +1,7 @@
 # #1005 — VCF preprocess pipe: name the stage that failed and show its stderr
 
 Written by Claude Fable 5.1 (claude-fable-5-1), 2026-09-14
-Status: draft
+Status: in progress - implemented on branch 1005_preprocess_pipe_stage_errors, awaiting review
 
 [#1005](https://github.com/SACGF/variantgrid/issues/1005) (better error handling when a preprocess tool dies); the fix
 is `upload/vcf/vcf_preprocess.py:run_pipe`. The repro from #1179 (bcftools dying mid-pipe once the FORMAT header lines
