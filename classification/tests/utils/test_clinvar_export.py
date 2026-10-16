@@ -18,9 +18,12 @@ from classification.models.classification_variant_info_models import (
     ImportedAlleleInfoValidation,
     ResolvedVariantInfo,
 )
+from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import ClinVarResponseOutcome, clinvar_export_sync
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models_enums import GeneSymbolAliasSource
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
 from snpdb.models import ClinVarKey, GenomeBuild, GenomeBuildPatchVersion
@@ -137,12 +140,11 @@ def mock_send_data(
     )
 
 
+@override_settings(CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "mode": "prod", "api_key": "ABC123"})
 class TestClinVarExport(TestCase):
 
-    @mock.patch('classification.models.clinvar_export_sync.ClinVarExportSync._send_data', side_effect=mock_send_data)
-    @override_settings(CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "mode": "prod", "api_key": "ABC123"})
-    def test_clinvar_setup(self, mocked_send_data):
-
+    @staticmethod
+    def _create_clinvar_export(resolved_hgvs: str = "NM_000001.2(TECTA):c.1913G>A", gene_symbol: Optional[str] = None) -> ClinVarExport:
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         variant = slowly_create_test_variant("3", 128198980, 'A', 'T', grch37)
         allele = create_mock_allele(variant, grch37)
@@ -154,21 +156,25 @@ class TestClinVarExport(TestCase):
         lab.clinvar_key = clinvar_key
         lab.save()
 
+        data = {
+            SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(TECTA):c.1913G>A'},
+            SpecialEKeys.INTERPRETATION_SUMMARY: {'value': 'I have an interpretation summary'},
+            SpecialEKeys.ASSERTION_METHOD: {'value': ['acmg']},
+            SpecialEKeys.MODE_OF_INHERITANCE: {'value': ['autosomal_dominant']},
+            SpecialEKeys.AFFECTED_STATUS: {'value': 'yes'},
+            SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
+            SpecialEKeys.GENOME_BUILD: {'value': 'GRCh37'},
+            SpecialEKeys.CONDITION: {'value': 'MONDO:0008841'},
+            SpecialEKeys.ALLELE_ORIGIN: {'value': "germline"}
+        }
+        if gene_symbol:
+            data[SpecialEKeys.GENE_SYMBOL] = {'value': gene_symbol}
+
         c = Classification.create(
             user=user,
             lab=lab,
             lab_record_id="x42",
-            data={
-                SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(TECTA):c.1913G>A'},
-                SpecialEKeys.INTERPRETATION_SUMMARY: {'value': 'I have an interpretation summary'},
-                SpecialEKeys.ASSERTION_METHOD: {'value': ['acmg']},
-                SpecialEKeys.MODE_OF_INHERITANCE: {'value': ['autosomal_dominant']},
-                SpecialEKeys.AFFECTED_STATUS: {'value': 'yes'},
-                SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
-                SpecialEKeys.GENOME_BUILD: {'value': 'GRCh37'},
-                SpecialEKeys.CONDITION: {'value': 'MONDO:0008841'},
-                SpecialEKeys.ALLELE_ORIGIN: {'value': "germline"}
-            },
+            data=data,
             save=True,
             source=SubmissionSource.API,
             make_fields_immutable=False)
@@ -188,7 +194,7 @@ class TestClinVarExport(TestCase):
             genome_build=GenomeBuild.grch37(),
             variant=variant,
             allele_info=allele_info,
-            resolved_hgvs="NM_000001.2(TECTA):c.1913G>A"
+            resolved_hgvs=resolved_hgvs
         )
         allele_info.grch37 = variant_info
         allele_info.latest_validation = validation
@@ -206,8 +212,38 @@ class TestClinVarExport(TestCase):
         c.save()
 
         ClinvarExportPrepare.update_export_records()
+        return ClinVarExport.objects.first()
 
-        clinvar_export: ClinVarExport = ClinVarExport.objects.first()
+    def test_gene_symbol_from_resolved_hgvs(self):
+        clinvar_export = self._create_clinvar_export(gene_symbol="OLDSYM")
+        variant_json = ClinVarExportConverter(clinvar_export).variant_set.pure_json()["variant"][0]
+        self.assertEqual(variant_json["hgvs"], "NM_000001.2:c.1913G>A")
+        self.assertEqual(variant_json["gene"], [{"symbol": "TECTA"}])
+
+    def test_gene_symbol_falls_back_to_evidence_key(self):
+        clinvar_export = self._create_clinvar_export(resolved_hgvs="NM_000001.2:c.1913G>A", gene_symbol="OLDSYM")
+        variant_json = ClinVarExportConverter(clinvar_export).variant_set.pure_json()["variant"][0]
+        self.assertEqual(variant_json["gene"], [{"symbol": "OLDSYM"}])
+
+    def test_gene_symbol_evidence_key_alias_resolves_to_current_symbol(self):
+        GeneSymbol.objects.get_or_create(symbol="TECTA")
+        GeneSymbolAlias.objects.create(alias="OLDSYM", gene_symbol_id="TECTA", source=GeneSymbolAliasSource.HGNC)
+        clinvar_export = self._create_clinvar_export(resolved_hgvs="NM_000001.2:c.1913G>A", gene_symbol="OLDSYM")
+        variant_json = ClinVarExportConverter(clinvar_export).variant_set.pure_json()["variant"][0]
+        self.assertEqual(variant_json["gene"], [{"symbol": "TECTA"}])
+
+    def test_gene_symbol_ambiguous_alias_is_an_error(self):
+        for symbol in ["TECTA", "TECTB"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias="OLDSYM", gene_symbol_id=symbol, source=GeneSymbolAliasSource.HGNC)
+        clinvar_export = self._create_clinvar_export(resolved_hgvs="NM_000001.2:c.1913G>A", gene_symbol="OLDSYM")
+        variant_set = ClinVarExportConverter(clinvar_export).variant_set
+        self.assertEqual(variant_set.pure_json()["variant"][0]["gene"], [])
+        self.assertTrue(variant_set.has_errors)
+
+    @mock.patch('classification.models.clinvar_export_sync.ClinVarExportSync._send_data', side_effect=mock_send_data)
+    def test_clinvar_setup(self, mocked_send_data):
+        clinvar_export = self._create_clinvar_export()
         self.assertIsNotNone(clinvar_export)
         self.assertEqual(clinvar_export.status, ClinVarExportStatus.NEW_SUBMISSION)
 
