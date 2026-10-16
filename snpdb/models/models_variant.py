@@ -1276,8 +1276,9 @@ class LiftoverRun(TimeStampedModel):
         liftover_run_complete_signal.send_robust(sender=self.__class__, instance=self)
 
     def error(self):
-        self.alleleliftover_set.update(status=ProcessingStatus.ERROR,
-                                       error={"message": f"{self} failed"})
+        """ The run's pipeline failed - alleles it already finished keep their result """
+        self.alleleliftover_set.filter(status__in=ProcessingStatus.RUNNING_STATES).update(
+            status=ProcessingStatus.ERROR, error={AlleleLiftover.ERROR_JSON_MESSAGE_KEY: f"{self} failed"})
 
     def __str__(self):
         source = ""

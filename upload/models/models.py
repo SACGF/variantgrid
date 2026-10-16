@@ -317,6 +317,7 @@ class UploadPipeline(models.Model):
         self.save()
 
         self._set_related_data_import_status(ImportStatus.ERROR)
+        self.error_liftover()
 
         user = self.file_upload.user
         name = f"import_{self.file_type}_failed"
@@ -333,6 +334,15 @@ class UploadPipeline(models.Model):
                 mvec.save()
             except ObjectDoesNotExist:
                 pass
+
+    def error_liftover(self):
+        """ A failed or timed out liftover pipeline won't finish its alleles - #2246 """
+        try:
+            liftover = self.file_upload.uploadedliftover.liftover
+        except ObjectDoesNotExist:
+            return
+        if liftover:
+            liftover.error()
 
     @property
     def vcf(self):
@@ -508,6 +518,7 @@ class UploadStep(models.Model):
         qs = UploadPipeline.objects.filter(pk=self.upload_pipeline.pk)
         progress_status = f"Failure in import step id: {self.pk}, ({self.error_message})"
         qs.update(status=self.status, progress_status=progress_status)
+        self.upload_pipeline.error_liftover()
 
     def get_uploaded_vcf(self) -> 'UploadedVCF':
         return self.file_upload.uploadedvcf
