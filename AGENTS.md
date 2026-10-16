@@ -39,6 +39,7 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | VCF import | `upload/AGENTS.md` | `claude/maps/tasks.md` |
 | a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`) | `vg page <url> --queries` |
 | permissions, notifications, previews, `library/utils` | `library/AGENTS.md` | - |
+| the user-facing changelog (`system/changelog`) | `variantgrid/templates/default_templates/changelog.html` (rules in its header comment) | `git log` since its last update |
 | a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |

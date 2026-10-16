@@ -11,11 +11,14 @@
         {% tip_box %}
 
     <!-- Style hint: keep bullets short - entries from 2025 and earlier average 77 chars (median 67).
-         One line per feature: "#issue - what changed". -->
+         One line per feature: "#issue - what changed".
+         Only what a user would notice - no internal refactors, ops / deploy changes or minor fixes.
+         Everyone else: one card per deploy, newest first. A deployed card is never edited.
+         SA Path: the single VariantGrid 4.0 card below, updated in place with everything since its last audit. -->
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 9 October 2026 (includes features up to the 9 October 2026 deploy) -->
+        <!-- Last audited/updated: 16 October 2026 (includes features up to 16 October 2026) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0 - FAQ</div>
@@ -101,6 +104,7 @@
                     <li>Phenotype node can take its terms from a cohort as well as a patient</li>
                     <li>Node warnings - a badge on the node card, eg out of date PanelApp panels, or new variants / classifications since the analysis was saved</li>
                     <li>Copying nodes keeps their parent connections, so the copy keeps the original's counts</li>
+                    <li>Karyomapping moved onto the trio page - per-chromosome phase QC graph, per-gene graph and CSV</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -175,6 +179,8 @@
                     <li>Classifications for gene-level events and splice events (eg "AR-V7") can be imported</li>
                     <li>Classification report warns when it was generated from an older submitted version</li>
                     <li>Classification groupings grid shows the samples and users behind each grouping, with a sample filter</li>
+                    <li>Classify &amp; Report / create classification - previous classifications compared side by side by what applying one would copy</li>
+                    <li>p.HGVS shown after the c.HGVS wherever a classification's resolved c.HGVS is shown</li>
                 </ul>
 
                 <h4>Data</h4>
@@ -190,6 +196,7 @@
                     <li>TSO 500 pair page - CombinedVariantOutput and Library QC (from MetricsOutput) together, linked from the sequencing run</li>
                     <li>BAM or CRAM files (several per sample) for IGV, bulk added to a VCF's samples from a filename pattern</li>
                     <li>Upload page - sortable, searchable grid of files, with a short reason for failures you can fix</li>
+                    <li>Annotated sample / cohort exports include every annotated column, and regenerate on a new annotation version</li>
                 </ul>
 
                 <h4>Data Sharing</h4>
@@ -351,7 +358,7 @@
 
     {% else %}
        <div class="card mt-4">
-            <div class="card-header">9 October 2026</div>
+            <div class="card-header">16 October 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
                 <ul>
@@ -368,6 +375,7 @@
                     <li>Running node loads are cancelled before their caches are dropped</li>
                     <li>#1894 - Faster patient / specimen level SampleNode filters</li>
                     <li>#2120 - Intersection node with a BED file missing from disk shows an error naming the file</li>
+                    <li>#1754 - Karyomapping moved onto the trio page - per-chromosome phase QC graph, per-gene graph and CSV</li>
                 </ul>
                 <h4>Classification</h4>
                 <ul>
@@ -382,11 +390,12 @@
                     <li>Gene level targets read as "CCND1 amplification" / "EGFRvIVa splice"</li>
                     <li>"Compare with other classifications" counts somatic tiers alongside germline</li>
                     <li>A ClinGen Allele Registry outage no longer holds up classification create / autopopulate</li>
-                    <li>Flag popup title names the record its flags are for</li>
                     <li>#1992 - Public evidence keys page shows last updated and created/modified dates</li>
                     <li>Grouping export - grouping ID, clearer filenames, fix labs per allele</li>
-                    <li>Franklin export - fix Likely Benign being exported as Likely Pathogenic, somatic records not exported</li>
-                    <li>Alissa MVL export removed</li>
+                    <li>Classify &amp; Report / create classification - previous classifications compared side by side by what applying one would copy</li>
+                    <li>#19 #1383 - p.HGVS shown after the c.HGVS wherever a classification's resolved c.HGVS is shown</li>
+                    <li>#2230 - Old gene symbols and single gene aliases resolve to the current symbol (ClinVar export, export filters, condition matching)</li>
+                    <li>#2230 - An alias of several genes is an error naming them, rather than a gene picked arbitrarily</li>
                 </ul>
                 <h4>Somatic / TSO 500</h4>
                 <ul>
@@ -422,6 +431,7 @@
                     <li>#2114 - Upload page lists files in a sortable, searchable grid</li>
                     <li>#2030 - Upload grid shows a short reason for failures you can fix</li>
                     <li>#2126 - Variant page lists records bcftools normalised in place, not only ones it moved</li>
+                    <li>#2188 - Retry failed imports in bulk from the upload page or sequencing run, including imports whose worker was killed</li>
                 </ul>
                 <h4>Patients / Phenotype</h4>
                 <ul>
@@ -434,6 +444,7 @@
                     <li>#2125 - Phenotype matching doesn't fuzzy-match correctly spelled words (table -&gt; "Stable"), handles British spelling</li>
                     <li>#2131 - Phenotype matches redone when the matcher or ontology updates, keeping links and approvals</li>
                     <li>PED import validates every family and reports all the invalid ones</li>
+                    <li>#1870 - Patient CSV - extraction reference, nucleic acid source and date columns, one row per extraction (eg DNA and RNA from one specimen)</li>
                 </ul>
                 <h4>Search</h4>
                 <ul>
@@ -441,11 +452,17 @@
                     <li>#1876 - Gene level search - a single hyphen doesn't split fusion partners</li>
                     <li>#2126 - Coordinate search says when it found the variant via its pre-normalisation (VCF) form</li>
                 </ul>
+                <h4>Liftover</h4>
+                <ul>
+                    <li>#2214 - A record on a contig the destination build lacks (eg MT in T2T) fails alone rather than its whole batch</li>
+                    <li>#2246 - Failed or timed out liftover runs no longer leave alleles stuck as processing</li>
+                </ul>
                 <h4>Genes</h4>
                 <ul>
                     <li>Gene page variants grid - "Include ClinVar variants" toggle</li>
                     <li>#2029 - Faster cdot transcript import</li>
-                    <li>#2139 - RefSeq mitochondrial transcripts give m.HGVS</li>
+                    <li>#2139 - RefSeq mitochondrial transcripts give m.HGVS, and older RefSeq gene annotation releases gain the MT genes</li>
+                    <li>HGVS - intronic offsets must be anchored at an exon boundary, and intronic reference bases are checked against the genome</li>
                 </ul>
                 <h4>User Interface</h4>
                 <ul>
@@ -456,7 +473,6 @@
                     <li>Annotation run page explains its Retry / Subdivide / Make Local buttons</li>
                     <li>Nearby variants only count tags you can see</li>
                     <li>#2137 - Nearby variants tab no longer hangs on some variants</li>
-                    <li>Permission checks tightened across uploads, pedigrees, pathology tests, reviews and graphs</li>
                 </ul>
             </div>
        </div>
