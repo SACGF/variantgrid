@@ -1,0 +1,9 @@
+{% comment %}Context: transcript (a cdot stand-in for a RefSeq mitochondrial gene, see Transcript.is_cdot_fake){% endcomment %}
+{% load ui_utils %}
+<div class="alert alert-warning">
+    {{ 'W' | severity_icon }} <b>No official transcript.</b>
+    RefSeq gives the mitochondrial gene <b>{{ transcript.pk|cut:"fake-rna-" }}</b> no RNA accession, so <code>{{ transcript.pk }}</code>
+    is a placeholder from cdot (named after the gene) that exists only so annotation can link to the gene.
+    It has no transcript sequence, cannot be used for c.HGVS and will not be found at NCBI.
+    Variants in this gene are written as genomic HGVS on <code>NC_012920.1</code> (<code>m.</code>) instead.
+</div>
