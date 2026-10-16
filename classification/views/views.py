@@ -863,6 +863,9 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     sample_autocomplete_form = SampleChoiceForm(genome_build=genome_build)
     sample_autocomplete_form.fields['sample'].required = False
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
+    lab_form = None
+    if lab:
+        lab_form = UserLabChoiceForm(user=request.user, default_lab=lab)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
     matcher = HGVSMatcher.instance(genome_build)
@@ -891,7 +894,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
                "refseq_transcript_accession": refseq_transcript_accession,
                "ensembl_transcript_accession": ensembl_transcript_accession,
                'sample_autocomplete_form': sample_autocomplete_form,
-               "lab": lab,
+               "lab_form": lab_form,
                "lab_error": lab_error,
                "initially_require_sample": settings.CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE}
     return render(request, 'classification/create_classification_from_hgvs.html', context)

@@ -78,6 +78,10 @@ def classification_populate_from_variant(
                                         annotation_version=annotation_version,
                                         clingen_api=clingen_api)
 
+    # Classified from HGVS we couldn't resolve - deliberately not linked to a variant (#810)
+    if classification.variant is None:
+        return
+
     allele_info, allele_info_created = classification.ensure_allele_info_with_created()
     if allele_info and allele_info_created:
         vc_import = ClassificationImport.objects.create(user=classification.user, genome_build=genome_build)
