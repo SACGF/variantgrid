@@ -4,6 +4,7 @@ genotypes), what `relate` is run with (--unknown, and the sites VCF of brentp/so
 is batched across VCFs (#1850), and that a failing stage never takes the import down.
 """
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -12,12 +13,13 @@ import cyvcf2
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from patients.models import Patient
 from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
 from snpdb.management.commands.somalier_existing_vcfs import batch_by_sample_count
 from snpdb.models import (
-    AbstractSomalierModel,
+    VCF,
     CohortGenotype,
     GenomeBuild,
     ImportStatus,
@@ -409,8 +411,7 @@ class SomalierVCFTaskTest(TestCase):
         self.assertEqual(ProcessingStatus.PROCESSING, vcf_extract.status)
 
 
-ANCESTRY_TSV_HEADER = "#sample_id\tpredicted_ancestry\tgiven_ancestry\tEAS_prob\tAFR_prob\tAMR_prob\t" \
-                      "SAS_prob\tEUR_prob"
+ANCESTRY_TSV = Path(__file__).parent / "test_data" / "somalier" / "somalier-ancestry.tsv"
 
 
 class SomalierAncestryBatchTest(TestCase):
@@ -418,15 +419,20 @@ class SomalierAncestryBatchTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        """ Samples have fixed pks so their somalier names (name_pk) match ANCESTRY_TSV """
         cls.user = User.objects.get_or_create(username='somalier_ancestry_user')[0]
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         cls.vcf_extracts = []
-        for _ in range(3):
-            vcf = create_fake_cohort(cls.user, genome_build).vcf
+        sample_pk = 9_000_001
+        for i in range(3):
+            vcf = VCF.objects.create(name=f"somalier_ancestry_{i}", genotype_samples=3, genome_build=genome_build,
+                                     import_status=ImportStatus.SUCCESS, user=cls.user, date=timezone.now())
             vcf_extract = SomalierVCFExtract.objects.create(vcf=vcf, status=ProcessingStatus.SUCCESS)
-            for sample in vcf.sample_set.all():
+            for name in ["proband", "mother", "father"]:
+                sample = Sample.objects.create(pk=sample_pk, vcf=vcf, vcf_sample_name=name, name=name)
                 SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample,
                                                      het_count=5000, hom_count=5000)
+                sample_pk += 1
             cls.vcf_extracts.append(vcf_extract)
 
     def setUp(self):
@@ -436,29 +442,28 @@ class SomalierAncestryBatchTest(TestCase):
                                                       "min_genotyped_sites": 100}))
 
     @staticmethod
-    def _write_tsv(batch: SomalierAncestryBatch, sample_names: list[str]):
+    def _copy_tsv(batch: SomalierAncestryBatch):
         report_dir = Path(batch.get_report_dir())
         report_dir.mkdir(parents=True, exist_ok=True)
-        rows = [f"{name}\tEUR\t\t0.01\t0.02\t0.03\t0.04\t0.9" for name in sample_names]
-        (report_dir / ANCESTRY_TSV_FILENAME).write_text("\n".join([ANCESTRY_TSV_HEADER, *rows]) + "\n")
+        shutil.copy(ANCESTRY_TSV, report_dir / ANCESTRY_TSV_FILENAME)
 
-    def _fake_ancestry(self, batch: SomalierAncestryBatch, runs, _processing_dir):
-        self._write_tsv(batch, [AbstractSomalierModel.sample_name(s) for r in runs for s in r.get_samples()])
+    def _fake_ancestry(self, batch: SomalierAncestryBatch, _runs, _processing_dir):
+        self._copy_tsv(batch)
         batch.status = ProcessingStatus.SUCCESS
         batch.save()
 
     def test_load_ancestry_tsv_splits_samples_by_run(self):
+        """ ANCESTRY_TSV has a different ancestry per VCF, and a sample that isn't in any run """
         batch = SomalierAncestryBatch.objects.create()
         runs = [SomalierAncestryRun.objects.create(vcf_extract=ve, batch=batch) for ve in self.vcf_extracts]
-        sample_names = [AbstractSomalierModel.sample_name(s) for r in runs for s in r.get_samples()]
-        self._write_tsv(batch, [*sample_names, "not_ours_999999"])
+        self._copy_tsv(batch)
 
         _load_ancestry_tsv(batch, runs)
-        for run in runs:
+        for run, ancestry in zip(runs, [SuperPopulationCode.EUR, SuperPopulationCode.EAS, SuperPopulationCode.AFR]):
             self.assertEqual({s.pk for s in run.get_samples()},
                              set(run.somalierancestry_set.values_list("sample_extract__sample", flat=True)))
+            self.assertEqual({ancestry}, set(run.somalierancestry_set.values_list("predicted_ancestry", flat=True)))
         self.assertEqual(9, SomalierAncestry.objects.count())
-        self.assertEqual(SuperPopulationCode.EUR, SomalierAncestry.objects.first().predicted_ancestry)
 
     def test_too_few_sites_skipped_while_neighbour_runs(self):
         too_few, runs_ok = self.vcf_extracts[:2]
