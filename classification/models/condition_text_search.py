@@ -15,7 +15,7 @@ _session = Session()
 _session.mount("https://", HTTPAdapter(max_retries=_retry))
 
 
-def condition_text_search(search_text: str, row_limit: int = 10, timeout: float = MINUTE_SECS) -> list[OntologyTerm]:
+def monarch_condition_text_search(search_text: str, row_limit: int = 10, timeout: float = MINUTE_SECS) -> list[OntologyTerm]:
     if not search_text or search_text.lower() in {"not set", "not specified", "not provided", "n/a"}:
         # Searching for blank returns everything (29916 records, though you will only get row_limit)
         # This is probably not what you want, so return early without API call

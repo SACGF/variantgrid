@@ -4,7 +4,7 @@ from django.test import TestCase
 from requests import HTTPError
 from requests.exceptions import JSONDecodeError
 
-from classification.models.condition_text_search import condition_text_search
+from classification.models.condition_text_search import monarch_condition_text_search
 
 
 def _mock_response(*, json_data=None) -> MagicMock:
@@ -24,7 +24,7 @@ class ConditionTextSearchTestCase(TestCase):
             {"id": "MONDO:0000001"},
         ]})
 
-        terms = condition_text_search("anything")
+        terms = monarch_condition_text_search("anything")
 
         self.assertEqual(["MONDO:0000001"], [term.id for term in terms])
 
@@ -35,7 +35,7 @@ class ConditionTextSearchTestCase(TestCase):
             {"id": "Orphanet:12345"},
         ]})
 
-        terms = condition_text_search("anything")
+        terms = monarch_condition_text_search("anything")
 
         self.assertEqual(["ORPHA:12345"], [term.id for term in terms])
 
@@ -48,7 +48,7 @@ class ConditionTextSearchTestCase(TestCase):
             {"id": "MONDO:0000001"},
         ]})
 
-        terms = condition_text_search("anything")
+        terms = monarch_condition_text_search("anything")
 
         self.assertEqual(["MONDO:0000001"], [term.id for term in terms])
 
@@ -63,7 +63,7 @@ class ConditionTextSearchTestCase(TestCase):
         mock_get.return_value = response
 
         with self.assertRaises(ValueError) as cm:
-            condition_text_search("anything")
+            monarch_condition_text_search("anything")
 
         message = str(cm.exception)
         self.assertIn("Monarch", message)
@@ -79,4 +79,4 @@ class ConditionTextSearchTestCase(TestCase):
         mock_get.return_value = response
 
         with self.assertRaises(HTTPError):
-            condition_text_search("anything")
+            monarch_condition_text_search("anything")
