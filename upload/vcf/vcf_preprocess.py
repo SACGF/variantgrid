@@ -15,6 +15,7 @@ import glob
 import logging
 import os
 import shlex
+import signal
 from dataclasses import dataclass
 from subprocess import PIPE, CalledProcessError, Popen
 from typing import Optional
@@ -51,7 +52,7 @@ from upload.tasks.vcf.unknown_variants_task import (
 from upload.vcf.vcf_ref_check import check_vcf_ref_matches_build
 
 MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
-SIGPIPE_EXIT_CODE = 128 + 13
+SIGPIPE_EXIT_CODE = 128 + signal.SIGPIPE  # bash reports a stage killed by signal N as exit 128+N
 PIPE_STATUS_FILENAME = "pipestatus.txt"
 
 VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
@@ -165,8 +166,9 @@ def _get_preprocess_files(upload_pipeline, vcf_filename: str, cleaned_vcf_header
 def get_split_vcf_command(vcf_name: str, split_file_rows: int) -> list[str]:
     """ GNU split (--filter / --additional-suffix are not POSIX) writing bgzipped chunks named
         <vcf_name>NN.vcf.gz into $VG_SPLIT_VCF_DIR. Also run by deployment_check to prove the tools are there. """
-    return ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
-            "--lines", str(split_file_rows), SPLIT_VCF_FILTER]
+    # '--' so a vcf_name (from the uploaded filename) starting with '-' is the prefix, not an option
+    return ["split", "--additional-suffix=.vcf.gz", "--numeric-suffixes",
+            "--lines", str(split_file_rows), SPLIT_VCF_FILTER, "--", "-", vcf_name]
 
 
 def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False, sort_vcf=False) -> tuple[dict, dict]:
