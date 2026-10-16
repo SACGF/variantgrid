@@ -87,11 +87,13 @@ LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontol
 
 # OIDC SETTINGS
 USE_OIDC = True
+OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 LOGIN_URL = '/oidc_login/'
+OIDC_USE_PKCE = True
+OIDC_PKCE_CODE_CHALLENGE_METHOD = 'S256'
 OIDC_RP_SIGN_ALGO = 'RS256'
-# TODO, change this then move it to
 OIDC_RP_CLIENT_SECRET = get_secret('OIDC.client_secret')
-KEY_CLOAK_BASE = 'https://shariant.org.au/auth'
+KEY_CLOAK_BASE = 'https://auth.shariant.org.au'
 KEY_CLOAK_REALM = 'agha'
 KEY_CLOAK_PROTOCOL_BASE = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/protocol/openid-connect'
 OIDC_OP_JWKS_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/certs'
