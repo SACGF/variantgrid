@@ -174,7 +174,7 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in fake_version or f.name == "annotation_blocked_reason":
+        if f.name in fake_version or f.name == "vep_version_mismatch_reason":
             continue  # already set, or not a VEP pin (#1679 latch)
         if isinstance(f, IntegerField):
             value = -1

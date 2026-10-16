@@ -54,8 +54,8 @@ Gotchas:
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.
-- The first VEPVersionMismatchError latches annotation_blocked_reason/date on the VAV (#1679,
-  annotation/models/models.py:VariantAnnotationVersion.block_annotation_runs); get_annotation_run_blocker then makes the
+- The first VEPVersionMismatchError latches vep_version_mismatch_reason/date on the VAV (#1679,
+  annotation/models/models.py:VariantAnnotationVersion.latch_vep_version_mismatch); get_annotation_run_blocker then makes the
   scheduler and the dispatcher's VEP lane skip it, while the import lane keeps draining. Only
   annotation/tasks/annotate_variants.py:recheck_vep_version clears it, and get_vep_version is lru_cached per worker
   process, so the re-check clears only its own process's cache - restart annotation_workers to re-run the same VAV.

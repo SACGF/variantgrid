@@ -283,7 +283,7 @@ def annotate_variants(annotation_run_id):
         if isinstance(e, AnnotationRunBlockedError):
             raise
         if isinstance(e, VEPVersionMismatchError):
-            _block_variant_annotation_version(annotation_run.variant_annotation_version, e, tb)
+            _latch_vep_version_mismatch(annotation_run.variant_annotation_version, e, tb)
             raise AnnotationRunBlockedError(str(e)) from e
 
         error_message = f"{e}: {annotation_run.pipeline_stderr}"
@@ -315,10 +315,10 @@ def annotate_variants(annotation_run_id):
         _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
 
 
-def _block_variant_annotation_version(vav: VariantAnnotationVersion, e: VEPVersionMismatchError, tb: str):
+def _latch_vep_version_mismatch(vav: VariantAnnotationVersion, e: VEPVersionMismatchError, tb: str):
     """ #1679: a mismatch is a property of the deployment, so latch it on the VAV - the dispatcher stops
         launching VEP runs against it. Only the run that made the transition reports it. """
-    if vav.block_annotation_runs(str(e)):
+    if vav.latch_vep_version_mismatch(str(e)):
         report_message(message=f"Annotation blocked {vav}", level='error',
                        extra_data={'output': str(e), 'error': tb})
         create_event(None, "Annotation blocked", f"{vav}: {e}", severity=LogLevel.ERROR)
@@ -336,11 +336,11 @@ def recheck_vep_version(variant_annotation_version_id):
     try:
         vep_check_command_line_version_match(vav)
     except VEPVersionMismatchError as e:
-        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(annotation_blocked_reason=str(e))
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(vep_version_mismatch_reason=str(e))
         create_event(None, "Annotation still blocked", f"{vav}: {e}", severity=LogLevel.WARNING)
         return
 
-    vav.unblock_annotation_runs()
+    vav.clear_vep_version_mismatch()
     create_event(None, "Annotation unblocked", f"{vav}: VEP version check passed", severity=LogLevel.INFO)
     _trigger_dispatch(vav.pk)
 

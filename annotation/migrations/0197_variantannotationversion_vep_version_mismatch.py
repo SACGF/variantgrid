@@ -12,12 +12,12 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='variantannotationversion',
-            name='annotation_blocked_date',
+            name='vep_version_mismatch_date',
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
             model_name='variantannotationversion',
-            name='annotation_blocked_reason',
+            name='vep_version_mismatch_reason',
             field=models.TextField(blank=True, null=True),
         ),
     ]

@@ -952,7 +952,7 @@ class AnnotationDispatchTestCase(TestCase):
         """ A blocked version's CREATED runs are not leased while another version's are, and its
             already-annotated run still imports. """
         other_vav = self._make_new_vav()
-        self.vav.block_annotation_runs("mismatch")
+        self.vav.latch_vep_version_mismatch("mismatch")
         blocked_created = self._make_lock(0, 0, count=100).annotationrun_set.first()
         blocked_completed = self._make_past_vep_run(lo_idx=1)
         other_created = self._make_lock(2, 2, count=100, vav=other_vav).annotationrun_set.first()
@@ -964,7 +964,7 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(blocked_created.lease_expires)
 
     def test_scheduler_makes_no_range_locks_for_blocked_vav(self):
-        self.vav.block_annotation_runs("mismatch")
+        self.vav.latch_vep_version_mismatch("mismatch")
         with mock.patch.object(annotation_scheduler_task, "_handle_variant_annotation_version",
                                return_value=None) as handle, \
                 mock.patch.object(dispatch_annotation_runs, "si") as dispatch_kick:
@@ -989,7 +989,7 @@ class AnnotationDispatchTestCase(TestCase):
             self.assertIsInstance(result.result, RollbarIgnoreException)
         report_message.assert_called_once()
         self.vav.refresh_from_db()
-        self.assertIsNotNone(self.vav.annotation_blocked_date)
+        self.assertIsNotNone(self.vav.vep_version_mismatch_date)
 
         # Leased in the same sweep the latch was set - fails on the in-run blocker, silently
         result = self._annotate_with_vep_mismatch(runs[2], report_message)
@@ -1000,26 +1000,26 @@ class AnnotationDispatchTestCase(TestCase):
             self.assertEqual(annotation_run.status, AnnotationStatus.ERROR)
 
     def test_recheck_vep_version_clears_latch_when_check_passes(self):
-        self.vav.block_annotation_runs("mismatch")
+        self.vav.latch_vep_version_mismatch("mismatch")
         with mock.patch.object(annotate_variants_module, "vep_check_command_line_version_match"), \
                 mock.patch.object(annotate_variants_module, "_trigger_dispatch") as trigger_dispatch:
             recheck_vep_version(self.vav.pk)
         self.vav.refresh_from_db()
-        self.assertIsNone(self.vav.annotation_blocked_date)
-        self.assertIsNone(self.vav.annotation_blocked_reason)
+        self.assertIsNone(self.vav.vep_version_mismatch_date)
+        self.assertIsNone(self.vav.vep_version_mismatch_reason)
         trigger_dispatch.assert_called_once_with(self.vav.pk)
 
     def test_recheck_vep_version_keeps_latch_when_check_fails(self):
-        self.vav.block_annotation_runs("old reason")
-        blocked_date = self.vav.annotation_blocked_date
+        self.vav.latch_vep_version_mismatch("old reason")
+        mismatch_date = self.vav.vep_version_mismatch_date
         with mock.patch.object(annotate_variants_module, "vep_check_command_line_version_match",
                                side_effect=VEPVersionMismatchError("new reason")), \
                 mock.patch.object(annotate_variants_module, "report_message") as report_message, \
                 mock.patch.object(annotate_variants_module, "_trigger_dispatch") as trigger_dispatch:
             recheck_vep_version(self.vav.pk)
         self.vav.refresh_from_db()
-        self.assertEqual(self.vav.annotation_blocked_date, blocked_date)
-        self.assertEqual(self.vav.annotation_blocked_reason, "new reason")
+        self.assertEqual(self.vav.vep_version_mismatch_date, mismatch_date)
+        self.assertEqual(self.vav.vep_version_mismatch_reason, "new reason")
         report_message.assert_not_called()
         trigger_dispatch.assert_not_called()
 

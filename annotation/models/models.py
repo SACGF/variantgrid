@@ -758,8 +758,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # #1679: latched by annotate_variants when the installed VEP no longer matches this version's pins.
     # Set once (first failure reports to Rollbar), cleared only by the recheck_vep_version task. While set
     # the scheduler creates no range locks and the dispatcher launches no VEP runs against this version.
-    annotation_blocked_reason = models.TextField(null=True, blank=True)
-    annotation_blocked_date = models.DateTimeField(null=True, blank=True)
+    vep_version_mismatch_reason = models.TextField(null=True, blank=True)
+    vep_version_mismatch_date = models.DateTimeField(null=True, blank=True)
 
     vep = models.IntegerField()  # code version
     vep_cache = models.IntegerField(null=True)  # May need to have diff code/cache versions eg T2T
@@ -957,29 +957,29 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             as a warning on the annotation runs page. """
         if self.gene_annotation_release_id is None:
             return "missing GeneAnnotationRelease"
-        if self.annotation_blocked_date:
-            blocked_date = timezone.localtime(self.annotation_blocked_date)
-            return f"VEP mismatch since {blocked_date:%Y-%m-%d %H:%M}: {self.annotation_blocked_reason}"
+        if self.vep_version_mismatch_date:
+            mismatch_date = timezone.localtime(self.vep_version_mismatch_date)
+            return f"VEP mismatch since {mismatch_date:%Y-%m-%d %H:%M}: {self.vep_version_mismatch_reason}"
         return None
 
-    def block_annotation_runs(self, reason: str) -> bool:
+    def latch_vep_version_mismatch(self, reason: str) -> bool:
         """ #1679: latch a VEP mismatch. Returns whether this call made the transition - runs leased
             before the latch fail in the same wave on parallel workers, and the conditional update makes
             exactly one of them the reporter. """
         now = timezone.now()
         updated = VariantAnnotationVersion.objects.filter(
-            pk=self.pk, annotation_blocked_date__isnull=True).update(annotation_blocked_reason=reason,
-                                                                    annotation_blocked_date=now)
+            pk=self.pk, vep_version_mismatch_date__isnull=True).update(vep_version_mismatch_reason=reason,
+                                                                       vep_version_mismatch_date=now)
         if updated:
-            self.annotation_blocked_reason = reason
-            self.annotation_blocked_date = now
+            self.vep_version_mismatch_reason = reason
+            self.vep_version_mismatch_date = now
         return bool(updated)
 
-    def unblock_annotation_runs(self):
-        VariantAnnotationVersion.objects.filter(pk=self.pk).update(annotation_blocked_reason=None,
-                                                                   annotation_blocked_date=None)
-        self.annotation_blocked_reason = None
-        self.annotation_blocked_date = None
+    def clear_vep_version_mismatch(self):
+        VariantAnnotationVersion.objects.filter(pk=self.pk).update(vep_version_mismatch_reason=None,
+                                                                   vep_version_mismatch_date=None)
+        self.vep_version_mismatch_reason = None
+        self.vep_version_mismatch_date = None
 
     @transaction.atomic
     def promote_to_active(self):

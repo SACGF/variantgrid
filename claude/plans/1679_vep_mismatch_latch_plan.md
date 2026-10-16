@@ -53,11 +53,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # #1679: latched by annotate_variants when the installed VEP no longer matches this version's pins.
     # Set once (first failure reports to Rollbar), cleared only by the re-check task. While set the
     # scheduler creates no range locks and the dispatcher launches no VEP runs against this version.
-    annotation_blocked_reason = models.TextField(null=True, blank=True)
-    annotation_blocked_date = models.DateTimeField(null=True, blank=True)
+    vep_version_mismatch_reason = models.TextField(null=True, blank=True)
+    vep_version_mismatch_date = models.DateTimeField(null=True, blank=True)
 ```
 
-A new migration under annotation/migrations (0184_variantannotationversion_annotation_blocked): two `AddField`s,
+A new migration under annotation/migrations (0184_variantannotationversion_vep_version_mismatch): two `AddField`s,
 nothing to backfill. `SubVersionPartition.save` only bumps `AnnotationVersion` on insert, so writes to
 these fields are ordinary `update()` calls and never create a new `AnnotationVersion`.
 
@@ -65,14 +65,14 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 
 ### `annotation/models/models.py`
 
-- `VariantAnnotationVersion.block_annotation_runs(reason) -> bool`: a conditional update,
-  `objects.filter(pk=self.pk, annotation_blocked_date__isnull=True).update(annotation_blocked_reason=reason,
-  annotation_blocked_date=timezone.now())`, returning whether this call made the transition. Several
+- `VariantAnnotationVersion.latch_vep_version_mismatch(reason) -> bool`: a conditional update,
+  `objects.filter(pk=self.pk, vep_version_mismatch_date__isnull=True).update(vep_version_mismatch_reason=reason,
+  vep_version_mismatch_date=timezone.now())`, returning whether this call made the transition. Several
   already-leased runs fail in the same wave on parallel workers; the row count is what makes exactly one
   of them the reporter.
-- `VariantAnnotationVersion.unblock_annotation_runs()`: nulls both fields with `update()`.
+- `VariantAnnotationVersion.clear_vep_version_mismatch()`: nulls both fields with `update()`.
 - `get_annotation_run_blocker()`: after the existing missing-`GeneAnnotationRelease` reason, return
-  `f"VEP mismatch since {annotation_blocked_date:%Y-%m-%d %H:%M}: {annotation_blocked_reason}"` when
+  `f"VEP mismatch since {vep_version_mismatch_date:%Y-%m-%d %H:%M}: {vep_version_mismatch_reason}"` when
   latched. Its docstring gains the scheduling effect (below) - it gates dispatch as well as warning on the page.
 
 ### `annotation/tasks/annotate_variants.py`
@@ -83,7 +83,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
   set is the wave the issue accepts; there is nothing new to say about it.
 - In the `except Exception` handler of `annotate_variants`, after the `save_if_owner` ownership check and
   before the `report_message`: when `e` is a `VEPVersionMismatchError`, call
-  `annotation_run.variant_annotation_version.block_annotation_runs(str(e))`. If that returns True, send one
+  `annotation_run.variant_annotation_version.latch_vep_version_mismatch(str(e))`. If that returns True, send one
   `report_message(level='error')` named `Annotation blocked <vav>` with the traceback and the message in
   `extra_data` and a `create_event` at ERROR; otherwise `logging.warning` only. Then
   `raise AnnotationRunBlockedError(msg) from e`. When `e` is already an `AnnotationRunBlockedError` (the
@@ -93,8 +93,8 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
   `variantgrid/settings/components/celery_settings.py` next to `annotate_variants`): calls
   `get_vep_version.cache_clear()` so this process re-runs VEP on the fake VCF rather than returning the
   value memoised before the operator's fix, then `vep_check_command_line_version_match(vav)`. On success:
-  `unblock_annotation_runs()`, `create_event` at INFO, `_trigger_dispatch(vav.pk)`. On
-  `VEPVersionMismatchError`: rewrite `annotation_blocked_reason` with the current message (the date stays),
+  `clear_vep_version_mismatch()`, `create_event` at INFO, `_trigger_dispatch(vav.pk)`. On
+  `VEPVersionMismatchError`: rewrite `vep_version_mismatch_reason` with the current message (the date stays),
   `create_event` at WARNING, return - the operator reads the result on the runs page, nothing reaches
   Rollbar. Other worker processes keep their memoised value: after a real VEP upgrade the fix is a new VAV
   (`create_new_variant_annotation_version`), and a worker restart is documented (below) for the case where
@@ -118,7 +118,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 ### `annotation/views_annotation_runs.py` and `annotation/templates/annotation/variant_annotation_runs.html`
 
 - The blocker alert (template line 191) drops the hard-coded "Assign a GeneAnnotationRelease" sentence in
-  favour of the blocker text plus, when `vav.annotation_blocked_date` is set, a
+  favour of the blocker text plus, when `vav.vep_version_mismatch_date` is set, a
   `recheck-vep-version-{{ vav.pk }}` button and one line: the check runs on an annotation worker; after
   a VEP upgrade create a new version instead, and restart `annotation_workers` if this version is meant to
   run again. The alert also says failed runs stay in Error and are retried with the existing
@@ -130,7 +130,7 @@ these fields are ordinary `update()` calls and never create a new `AnnotationVer
 ### Docs
 
 - `annotation/AGENTS.md`, under the existing mismatch gotcha: the mismatch latches
-  `annotation_blocked_reason` on the VAV, the dispatcher's VEP lane and the scheduler skip a blocked VAV,
+  `vep_version_mismatch_reason` on the VAV, the dispatcher's VEP lane and the scheduler skip a blocked VAV,
   `get_vep_version` is memoised per worker process so the re-check clears only its own cache.
 - `claude/research/annotation.md` Traps paragraph: one sentence on the latch and the re-check button.
 - `scripts/vg map` after the model, task and route change.
@@ -162,9 +162,9 @@ Fixtures: `annotation/fake_data.py:get_fake_vep_version` via the `_make_vav` hel
 `annotation/tests/test_annotation_dispatch.py`; eager `annotate_variants` with the VEP stage patched as in
 `annotation/tests/test_annotation_run_lease_abort.py`.
 
-- `test_variant_annotation_version_status.py`: `block_annotation_runs` returns True on the first call and
+- `test_variant_annotation_version_status.py`: `latch_vep_version_mismatch` returns True on the first call and
   False on the second, and the reason and date from the first call survive; `get_annotation_run_blocker`
-  names the latched reason; `unblock_annotation_runs` clears it.
+  names the latched reason; `clear_vep_version_mismatch` clears it.
 - `test_annotation_dispatch.py`: a blocked VAV's CREATED runs are not leased while another VAV's are, and
   the blocked VAV's ANNOTATION_COMPLETED run still launches on the import lane; the scheduler creates no
   range lock for a blocked VAV (patch `_handle_variant_annotation_version`, assert it is not called for
@@ -182,7 +182,7 @@ On a box with VEP (vg-test2), scheduler and workers running, Rollbar or its log 
 
 1. `manage.py shell`: take the ACTIVE GRCh38 VAV, note `dbsnp`, set it to `dbsnp + 1` with
    `save(update_fields=["dbsnp"])`. Import a small VCF or run the scheduler from the runs page.
-2. Expect: the first run to reach VEP fails, one `Annotation blocked` event, `annotation_blocked_*` set,
+2. Expect: the first run to reach VEP fails, one `Annotation blocked` event, `vep_version_mismatch_*` set,
    the runs page warning with the re-check button, `annotation_workers` idle, the scheduler log naming the
    skipped version, no further Rollbar events. `vg status` shows the run in Error.
 3. Click re-check: the latch stays, the reason is refreshed, nothing reaches Rollbar.

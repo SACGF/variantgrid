@@ -182,7 +182,7 @@ and `annotation/vep_annotation.py:vep_check_annotated_file_version_match` both r
 changing a `settings.ANNOTATION` data path without creating a new VAV halts every run. `gencode_subset` and `distance`
 are settings snapshots, not VEP header facts, and are excluded from the comparison
 (`annotation/vep_annotation.py:_vep_check_version_match`). The first mismatch latches the VAV
-(`annotation/models/models.py:VariantAnnotationVersion.block_annotation_runs`, #1679), which stops the scheduler and the
+(`annotation/models/models.py:VariantAnnotationVersion.latch_vep_version_mismatch`, #1679), which stops the scheduler and the
 dispatcher's VEP lane for it; only the runs page's re-check button
 (`annotation/tasks/annotate_variants.py:recheck_vep_version`) clears it.
 

@@ -119,17 +119,17 @@ class VariantAnnotationVersionStatusTests(TestCase):
         """ #1679: only the first block reports (returns True), and its reason/date survive later blocks. """
         vav = _make_vav(self.grch37)
         link_fake_gene_annotation_release(vav)
-        self.assertTrue(vav.block_annotation_runs("first"))
-        first_date = vav.annotation_blocked_date
-        self.assertFalse(vav.block_annotation_runs("second"))
+        self.assertTrue(vav.latch_vep_version_mismatch("first"))
+        first_date = vav.vep_version_mismatch_date
+        self.assertFalse(vav.latch_vep_version_mismatch("second"))
 
         vav.refresh_from_db()
-        self.assertEqual(vav.annotation_blocked_reason, "first")
-        self.assertEqual(vav.annotation_blocked_date, first_date)
+        self.assertEqual(vav.vep_version_mismatch_reason, "first")
+        self.assertEqual(vav.vep_version_mismatch_date, first_date)
         self.assertIn("VEP mismatch", vav.get_annotation_run_blocker())
         self.assertIn("first", vav.get_annotation_run_blocker())
 
-        vav.unblock_annotation_runs()
+        vav.clear_vep_version_mismatch()
         vav.refresh_from_db()
         self.assertIsNone(vav.get_annotation_run_blocker())
 
