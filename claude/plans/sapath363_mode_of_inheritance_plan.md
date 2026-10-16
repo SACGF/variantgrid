@@ -1,7 +1,7 @@
 # Consistent, then mandatory, mode of inheritance at SA Path
 
 Written by Claude Opus 5 (claude-opus-5), 2026-09-16
-Status: draft
+Status: in progress - Parts A and B implemented (branches sapath363_normalise_option_values / sapath 363_normalise_mode_of_inheritance), awaiting review; Part C waits for Karin's sign-off
 
 The mode-of-inheritance half of [sapath#363](https://github.com/SACGF/variantgrid_sapath/issues/363)
 (Classifications - condition + MOI). The condition matching half went to
@@ -142,7 +142,7 @@ its size is bounded by the number of distinct stored values, not by rows.
 
 ## Part B - run it on SA Path deployments (sapath repo)
 
-A `ManualOperation` in a new sapath migration (*sapath/migrations/0014_normalise_mode_of_inheritance.py*),
+A `ManualOperation` in a new sapath migration (*sapath/migrations/0023_one_off_normalise_mode_of_inheritance.py*),
 after the pattern of `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`:
 
 ```python

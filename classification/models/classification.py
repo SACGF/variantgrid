@@ -1311,6 +1311,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     @staticmethod
+    def option_value_parts(e_key: EvidenceKey, value: Any) -> list[Any]:
+        """ The separate options in a select value as submitted: a string is split on commas (or '|_' for a
+            multi-select that uses it), a list is taken as is. Blanks are dropped """
+        parts: list[Any]
+        if isinstance(value, str):
+            if e_key.value_type == EvidenceKeyValueType.MULTISELECT and '|_' in value:
+                parts = value.split('|_')
+            else:
+                parts = value.split(',')
+            parts = [p.strip() for p in parts]
+        elif isinstance(value, list):
+            parts = value
+        else:
+            parts = [value]
+        return [part for part in parts if part is not None and part != ""]
+
+    @staticmethod
     def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[str]]:
         e_key = cell.e_key
         options = e_key.virtual_options or []
@@ -1459,21 +1476,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
                                       EvidenceKeyValueType.SELECT,
                                       EvidenceKeyValueType.CRITERIA):
-                parts: list[Any]
-                if isinstance(value, str):
-                    if e_key.value_type == EvidenceKeyValueType.MULTISELECT and '|_' in str(value):
-                        parts = value.split('|_')
-                    else:
-                        parts = value.split(',')
-                    parts = [p.strip() for p in parts if p.strip()]
-                elif isinstance(value, list):
-                    parts = value
-                else:
-                    parts = [value]
-                parts = [part for part in parts if part is not None and part != ""]  # filter out any blanks
-
                 # sets the value of cell to the valid options
-                value = Classification.process_option_values(cell, parts)
+                value = Classification.process_option_values(cell, Classification.option_value_parts(e_key, value))
                 if value is not None:
                     if e_key.value_type != EvidenceKeyValueType.MULTISELECT:
                         value_len = len(value)
