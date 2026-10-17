@@ -13,7 +13,8 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from analysis.models import Analysis, AnalysisEdge, AnalysisNode, NodeStatus, NodeTask
-from analysis.models.nodes.analysis_node import LEASE_SECONDS, NodeCache, NodeVersion
+from analysis.models.nodes.analysis_node import LEASE_SECONDS
+from analysis.models.nodes.node_support_models import NodeCache, NodeVersion
 from analysis.models.nodes.node_utils import get_hidden_error_node_statuses, get_nodes_by_id
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
 from library.log_utils import log_traceback, report_message

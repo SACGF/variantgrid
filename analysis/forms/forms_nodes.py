@@ -13,7 +13,6 @@ from django.utils.text import slugify
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
 from analysis.models.enums import NodeMatchInput
-from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
@@ -27,6 +26,7 @@ from analysis.models.nodes.filters.selected_in_parent_node import SelectedInPare
 from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
+from analysis.models.nodes.node_support_models import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.cohort_node import (
     CohortNode,

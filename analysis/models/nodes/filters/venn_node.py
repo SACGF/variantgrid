@@ -16,10 +16,10 @@ from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeStatus,
-    NodeVersion,
     node_query_planner_settings,
 )
 from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_support_models import NodeVersion
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
 

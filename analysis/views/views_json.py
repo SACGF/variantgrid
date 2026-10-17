@@ -30,13 +30,12 @@ from analysis.models.nodes.analysis_node import (
     AnalysisNode,
     NodeProband,
     NodeStatus,
-    NodeTask,
-    NodeVersion,
 )
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
+from analysis.models.nodes.node_support_models import NodeTask, NodeVersion
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
     get_child_position,

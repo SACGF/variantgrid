@@ -2,7 +2,8 @@
 Owns: Analysis (a DAG of AnalysisNode subclasses filtering Variants), AnalysisEdge, NodeVersion/NodeCache/NodeTask,
 the lease-based node scheduler, templates (AnalysisTemplate/Version/Run, AnalysisVariable), VariantTag, node editors, node grid + export.
 Start with:
-- models/nodes/analysis_node.py — AnalysisNode base (Q composition, versioning, load/counts, save cascade) + NodeVersion/Cache/Task
+- models/nodes/analysis_node.py — AnalysisNode base (Q composition, versioning, load/counts, save cascade) + AnalysisEdge/Dag;
+  models/nodes/node_support_models.py — NodeVersion/Cache/Task, VCF and allele frequency filters
 - models/nodes/sources/*.py, models/nodes/filters/*.py — one module per concrete node
 - models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run
 - tasks/analysis_update_tasks.py + tasks/node_update_tasks.py — dispatcher and the per-node celery tasks

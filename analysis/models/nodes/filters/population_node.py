@@ -9,8 +9,9 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import GroupOperation
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_support_models import NodeAuditLogMixin
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification

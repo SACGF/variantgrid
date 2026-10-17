@@ -7,13 +7,8 @@ from typing import Any
 
 from analysis.models.models_analysis import Analysis, AnalysisTemplateRun
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import (
-    AnalysisEdge,
-    AnalysisNode,
-    NodeCache,
-    NodeTask,
-    NodeVersion,
-)
+from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode
+from analysis.models.nodes.node_support_models import NodeCache, NodeTask, NodeVersion
 from analysis.models.nodes.node_utils import get_toposorted_nodes
 from library.vg.inspect import capped
 from library.vg.inspect.common import user_summary

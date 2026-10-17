@@ -20,10 +20,10 @@ from django.utils import timezone
 from analysis.models import AllVariantsNode, AnalysisNode, NodeTask
 from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
+from analysis.models.nodes.node_support_models import NodeCache, NodeVersion
 from analysis.models.nodes.node_utils import cancel_node_tasks, reload_analysis_nodes
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.tasks import analysis_update_tasks

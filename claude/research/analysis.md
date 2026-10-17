@@ -26,8 +26,8 @@ to `analysis/models/nodes/analysis_node.py:AnalysisNode._save`, which recomputes
 when `parents_changed` or `queryset_dirty` - calls `analysis/models/nodes/analysis_node.py:AnalysisNode.bump_version`
 (version+1, DIRTY, count/errors/cloned_from cleared) and then recursively saves every child with `queryset_dirty=True`,
 so a whole subtree bumps in one transaction. The save ends by `get_or_create`ing the
-`analysis/models/nodes/analysis_node.py:NodeVersion` for the new number; everything scoped to a version (the Redis Q
-cache key, `analysis/models/nodes/analysis_node.py:NodeCache`, `analysis/models/nodes/analysis_node.py:NodeTask`, column
+`analysis/models/nodes/node_support_models.py:NodeVersion` for the new number; everything scoped to a version (the Redis Q
+cache key, `analysis/models/nodes/node_support_models.py:NodeCache`, `analysis/models/nodes/node_support_models.py:NodeTask`, column
 summaries) hangs off that row and cascades away when
 `analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions` deletes every NodeVersion that is not its node's
 latest.
@@ -107,7 +107,7 @@ sibling Venn over the same parents reuses an in-flight build. `analysis/models/n
 raises: the node's Q always comes from `_get_node_cache_arg_q_dict` as `variantcollectionrecord__variant_collection__in`.
 
 `analysis/models/nodes/filters/intersection_node.py:IntersectionNode` is the only user of the generic
-`analysis/models/nodes/analysis_node.py:NodeCache`: `use_cache` is true for a selected BED collection or a long pasted
+`analysis/models/nodes/node_support_models.py:NodeCache`: `use_cache` is true for a selected BED collection or a long pasted
 variant list, `analysis/models/nodes/analysis_node.py:AnalysisNode.get_cache_task_args_set` creates the NodeCache (or
 finds the parent's, for a pass-through node) and the chained `analysis/tasks/node_update_tasks.py:node_cache_task` calls
 `analysis/models/nodes/filters/intersection_node.py:IntersectionNode.write_cache`, which streams the parent queryset as a

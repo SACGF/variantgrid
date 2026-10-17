@@ -7,7 +7,8 @@ from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_support_models import NodeVersion
 from classification.models import Classification
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models import Patient

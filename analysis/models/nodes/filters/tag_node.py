@@ -13,8 +13,9 @@ from django.utils.timezone import localtime
 
 from analysis.models.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_support_models import NodeAuditLogMixin, NodeVersion
 from snpdb.models import Tag
 
 

@@ -11,8 +11,8 @@ from django.utils.timezone import localtime
 from analysis.grids import get_analysis_log_entry_summary
 from analysis.models import Analysis, TagNode, TagNodeInput, VariantTag
 from analysis.models.enums import TagNodeMode
-from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.filters.merge_node import MergeNode
+from analysis.models.nodes.node_support_models import NodeVersion
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.variant_tag_operations import resolve_requires_classification_tags
