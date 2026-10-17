@@ -17,7 +17,7 @@ Patterns here:
 - hgvs/hgvs_matcher.py:HGVSMatcher.get_variant_coordinate_and_details tries local biocommons first, then the ClinGen Allele Registry, across neighbouring transcript versions (hgvs/hgvs_matcher.py:HGVSMatcher.filter_best_transcripts_and_converter_type_by_accession); version-distance ranking is delegated to the external cdot package, so change ranking there.
 - Symbol-only HGVS ("BRCA1:c.100A>G") is a search feature, not a matcher feature: snpdb/signals/variant_search.py ranks transcripts with hgvs/hgvs_matcher.py:HGVSMatcher.rank_gene_symbol_transcripts under the `SEARCH_HGVS_GENE_SYMBOL*` settings; the matcher itself raises on a transcript-less c.HGVS.
 - Parse or rewrite an HGVS string without touching the DB using hgvs/hgvs.py:HGVSComponents; use HGVSMatcher only when you need coordinates.
-- Turn any p.HGVS (VEP, ClinGen, a lab's typing) into the one stored form with hgvs/phgvs_canonical.py:canonical_p_hgvs; hgvs/phgvs.py:PHGVS is a regex for single residue changes that can't read ranges, dups or delins.
+- Turn any p.HGVS (VEP, ClinGen, a lab's typing) into the one stored form with hgvs/phgvs_canonical.py:canonical_p_hgvs (biocommons parsing, so ranges, dups and delins too).
 - Consortium is the single-letter `AnnotationConsortium` (R/E) on Gene, Transcript, GeneAnnotationRelease and CanonicalTranscriptCollection (models_enums.py:AnnotationConsortium); infer it from an accession with `AnnotationConsortium.get_from_transcript_accession()`.
 - Reference data (HGNC, MANE, LRG, Pfam, gnomAD constraint, PanelApp panel lists) loads through CachedWebResource tasks (tasks/cached_web_resource_tasks.py:HGNCWebResourceTask, cached_web_resource/hgnc.py:store_hgnc_from_web), not management commands.
 Gotchas:
