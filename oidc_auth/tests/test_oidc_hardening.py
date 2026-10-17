@@ -6,14 +6,18 @@ from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from mozilla_django_oidc.middleware import SessionRefresh
 from requests import HTTPError, Response
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.request import Request
 
-from oidc_auth.backend import VariantGridOIDCAuthenticationBackend, provider_logout
+from oidc_auth.backend import (
+    VariantGridOIDCAuthenticationBackend,
+    groups_from_claims,
+    provider_logout,
+)
 from oidc_auth.oidc_error_handler import HandleOIDC400Middleware
 from oidc_auth.session_refresh import VariantGridSessionRefresh
 
@@ -44,6 +48,24 @@ def _browser_login_backend():
     backend = VariantGridOIDCAuthenticationBackend()
     backend.request = request
     return backend, request
+
+
+class GroupsFromClaimsTest(SimpleTestCase):
+
+    def test_nested_association_adds_each_level_and_no_empty_group(self):
+        claim_groups = groups_from_claims(["/associations/org/lab", "/associations/org2/sub/lab",
+                                           "/associations", "/unrelated/thing"])
+        self.assertEqual(claim_groups.groups, {"org", "org/lab", "org2", "org2/sub", "org2/sub/lab"})
+        self.assertTrue(claim_groups.has_lab_or_role)
+
+    def test_variantgrid_roles(self):
+        claim_groups = groups_from_claims(["/variantgrid/admin", "/variantgrid/bot", "/variantgrid/tester",
+                                           "/variantgrid/shariant_production"])
+        self.assertEqual(claim_groups.groups, {"variantgrid/bot", "variantgrid/tester"})
+        self.assertTrue(claim_groups.is_superuser and claim_groups.is_bot and claim_groups.is_tester)
+
+        claim_groups = groups_from_claims(["/unrelated", "/variantgrid"])
+        self.assertFalse(claim_groups.has_lab_or_role or claim_groups.groups or claim_groups.is_superuser)
 
 
 class HandleOIDC400MiddlewareTest(TestCase):
