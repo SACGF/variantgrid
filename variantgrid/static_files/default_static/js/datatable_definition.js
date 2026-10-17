@@ -509,6 +509,8 @@ const DataTableDefinition = (function() {
             const dataTable = this.dataTable;
             const expandFn = eval(this.serverParams.expandClientRenderer);
             const expandData = this.expandData;
+            // DataTables' "No data available" / "Loading..." placeholder row is tr.odd too, but has no data
+            const isDataRow = (tr) => (tr.hasClass('odd') || tr.hasClass('even')) && dataTable.row(tr).data() !== undefined;
 
             dom.on('click', 'tr', function(event) {
                 // A click on a link or control belongs to it (the variant grids have a details link, a
@@ -517,8 +519,7 @@ const DataTableDefinition = (function() {
                     return;
                 }
                 const tr = $(this); //.closest('tr');
-                if (!tr.hasClass('odd') && !tr.hasClass('even')) {
-                    // not a regular row
+                if (!isDataRow(tr)) {
                     return;
                 }
                 const row = dataTable.row( tr );
@@ -560,8 +561,8 @@ const DataTableDefinition = (function() {
             // if hovering over a single row for 500ms, pre-fetch the client data ready to display
             dom.on('mouseenter', 'tr', function() {
                 const tr = $(this);
-                if (!tr.hasClass('odd') && !tr.hasClass('even') || tr.hasClass('loaded')) {
-                    return; // either not an odd or even row, or already
+                if (!isDataRow(tr) || tr.hasClass('loaded')) {
+                    return;
                 }
                 window.clearTimeout(expandData.hoverTimeout);
                 expandData.hoverTimeout = window.setTimeout(() => {
