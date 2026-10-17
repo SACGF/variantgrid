@@ -12,12 +12,13 @@ from classification.models.classification import (
     ClassificationModification,
     classification_post_publish_signal,
 )
+from classification.models.clinvar_export_exclude_models import ClinVarKeyExcludePattern
 from classification.models.evidence_mixin import EvidenceMixin
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagStatus
 from library.guardian_utils import admin_bot
 from library.utils import get_timer
-from snpdb.models import ClinVarKey, ClinVarKeyExcludePattern
+from snpdb.models.models import ClinVarKey
 
 """
 This file has the data responsible for applying the ClinVarExclude patterns to automatically stop

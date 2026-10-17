@@ -547,48 +547,6 @@ class ClinVarKey(TimeStampedModel):
                 raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
 
-class ClinVarKeyExcludePatternMode(TextChoices):
-    EXCLUDE_IF_MATCH = 'X'
-    EXCLUDE_IF_NO_MATCH = 'N'
-
-
-class ClinVarKeyExcludePattern(TimeStampedModel):
-    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=CASCADE)
-    evidence_key = models.TextField()  # Actually EvidenceKey but can't link to that from snpdb
-    pattern = models.TextField()
-    name = models.TextField(blank=True)
-    case_insensitive = models.BooleanField(default=True, blank=True)
-    mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
-
-    @cached_property
-    def regex(self):
-        flags = 0
-        if self.case_insensitive:
-            flags = RegexFlag.IGNORECASE
-        return re.compile(self.pattern, flags=flags)
-
-    def should_exclude(self, text: str) -> bool:
-        matches = bool(self.regex.search(text))
-        if self.mode == ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH:
-            return matches
-        else:
-            return not matches
-
-    def clean(self):
-        try:
-            re.compile(self.pattern)
-        except Exception as exc:
-            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')}) from exc
-
-        from classification.models import EvidenceKeyMap
-        if EvidenceKeyMap.cached_key(self.evidence_key).is_dummy:
-            raise ValidationError({'evidence_key': ValidationError(f'{self.evidence_key} is not a valid EvidenceKey')})
-
-    def __str__(self):
-        from classification.models import EvidenceKeyMap
-        return EvidenceKeyMap.cached_key(self.evidence_key).pretty_label + " : " + (self.name or self.pattern)
-
-
 class Country(models.Model):
     name = models.TextField(primary_key=True)
     short_name = models.TextField(unique=True, null=True)
