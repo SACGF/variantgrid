@@ -21,7 +21,7 @@ class AgeWidget {
 
         this.entryText.on('keyup', () => {this.fieldsUpdated();});
         this.unitSelect.on('change', () => {this.fieldsUpdated();});
-        this.unitSelect.chosen({width: '160px'});
+        this.unitSelect.select2({minimumResultsForSearch: Infinity});
 
         this.value(this.options.value);
     }
@@ -63,7 +63,7 @@ class AgeWidget {
     refreshView(parts) {
         this.entryText.val(parts.num);
         this.unitSelect.val( parts.unit );
-        this.unitSelect.trigger("chosen:updated");
+        this.unitSelect.trigger('change.select2');  // redraw without firing our change handler
     }
 }
 

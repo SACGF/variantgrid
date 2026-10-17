@@ -1103,7 +1103,7 @@ const VCForm = (function() {
 
                 let visualElement = elem;
                 if (elem.prop('tagName') === 'SELECT') {
-                    const container = elem.siblings('.chosen-container');
+                    const container = elem.siblings('.select2-container');
                     if (container.length) {
                         visualElement = container;
                     }
@@ -1202,7 +1202,7 @@ const VCForm = (function() {
                 }
             }
             select.val( val );
-            select.trigger("chosen:updated");
+            select.trigger('change.select2');  // redraw without firing our change handler
         },
 
         immutable(key) {
@@ -1866,7 +1866,9 @@ const VCForm = (function() {
                         }));
                     }
 
-                    if (!blankOption) {
+                    // only a single select needs a blank: populateSelect's val(null) would select it in a
+                    // multiple one, where select2 shows it as a chosen item
+                    if (!blankOption && type !== 'multiple') {
                         options.unshift($('<option>', {value: '', text: ''}));
                     }
 
@@ -1876,10 +1878,9 @@ const VCForm = (function() {
                     }
                     widgetDiv.append(select);
 
-                    select.chosen({
-                        allow_single_deselect: true,
-                        width: '288px',
-                        placeholder_text_single: ' '
+                    select.select2({
+                        allowClear: true,
+                        placeholder: ' '
                     }).change(function () {
 
                         let custom = false;

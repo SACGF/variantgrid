@@ -16,4 +16,7 @@
     width: 140px;
     width: 120px !important;
     min-width: 120px !important;
+}.custom-age span.select2-container {
+    width: 160px !important;
+    min-width: 160px !important;
 }

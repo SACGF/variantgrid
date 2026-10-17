@@ -450,6 +450,9 @@ tr.template-download .toggle {
 #vc-form h5 {
   font-size: 1.15rem;
 }
+#vc-form .select2-selection__arrow {
+  display: block;
+}
 
 #vc-extras {
   position: fixed;
