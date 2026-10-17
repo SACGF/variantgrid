@@ -97,6 +97,5 @@ urlpatterns = [
          name='tagged_variant_grid'),
 
     # Grid export
-    path('tags/export/<genome_build_name>/', views.variant_tags_export, name='variant_tags_export'),
 
 ]
