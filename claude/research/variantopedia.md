@@ -13,8 +13,8 @@ the two commands are in the generated maps ([urls](../maps/urls.md#variantopedia
 
 ### Variant page
 
-`variantopedia/views.py:view_variant` picks a build (URL, else the user's default build if the variant is in it, else
-`Variant.any_genome_build` - contigs such as MT sit in several builds), sets it on
+`variantopedia/views.py:view_variant` picks a build (URL, else `snpdb/models/models_variant.py:Variant.preferred_genome_build`:
+the user's default build if the variant is in it, else the first by name - contigs such as MT sit in several builds), sets it on
 `snpdb/genome_build_manager.py:GenomeBuildManager`, and hands off to
 `variantopedia/views.py:variant_details_annotation_version` with the build's latest AnnotationVersion. That view is also
 reachable directly with an explicit annotation version id, with the bare `variant_details.html` template - analysis

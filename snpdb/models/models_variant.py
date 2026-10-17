@@ -905,8 +905,20 @@ class Variant(PreviewModelMixin, models.Model):
         return self.genome_builds
 
     @property
+    def ordered_genome_builds(self) -> list['GenomeBuild']:
+        """ genome_builds by name - iterating the set itself gives a different order in each process """
+        return sorted(self.genome_builds, key=lambda gb: gb.name)
+
+    @property
     def any_genome_build(self) -> GenomeBuild:
-        return next(iter(self.genome_builds))
+        """ Variants on a contig builds share (MT) are in several builds - the same one every time """
+        return self.ordered_genome_builds[0]
+
+    def preferred_genome_build(self, genome_build: Optional[GenomeBuild]) -> GenomeBuild:
+        """ genome_build (e.g. the user's) if this variant is in it, otherwise any_genome_build """
+        if genome_build in self.genome_builds:
+            return genome_build
+        return self.any_genome_build
 
     @cached_property
     def coordinate(self) -> VariantCoordinate:

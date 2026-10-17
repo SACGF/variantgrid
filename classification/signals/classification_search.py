@@ -161,7 +161,7 @@ def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwar
 
 @receiver(preview_extra_signal, sender=Variant)
 def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
-    genome_build = next(iter(obj.genome_builds))
+    genome_build = obj.preferred_genome_build(GenomeBuildManager.get_current_genome_build(user))
     if allele := obj.allele:
         return _allele_preview_classifications_extra(user, allele, genome_build)
     else:

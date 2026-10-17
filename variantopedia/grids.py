@@ -64,7 +64,7 @@ def filter_unresolved_variant_tags(qs: QuerySet[VariantTag], request: HttpReques
 def variant_tags_for_user(variant: Variant, request: HttpRequest) -> QuerySet[VariantTag]:
     """ The taggings the variant page shows for a variant: any build of its allele, visible to this user,
         and not yet resolved unless they're being shown. """
-    genome_build = variant.any_genome_build
+    genome_build = variant.preferred_genome_build(UserSettings.get_for_user(request.user).default_genome_build)
     qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
     qs = VariantTag.filter_for_user(request.user, queryset=qs)
     return filter_unresolved_variant_tags(qs, request)
