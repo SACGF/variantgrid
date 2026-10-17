@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 
 from annotation.models import ManualVariantEntryType
-from annotation.models.models import ManualVariantEntry, ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntry, ManualVariantEntryCollection
 from annotation.tasks.process_manual_variants_task import (
     ManualVariantsPostInsertTask,
     get_manual_variant_coordinates,

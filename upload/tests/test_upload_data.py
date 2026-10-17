@@ -3,8 +3,8 @@ from django.test import TestCase
 from django.utils.timezone import localdate
 
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ManualVariantEntryCollection
 from annotation.models.models_clinvar import ClinVarVersion
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from classification.models.classification import ClassificationImport
 from snpdb.models import VCF, ImportedWikiCollection, ImportSource
 from snpdb.models.models_enums import AlleleConversionTool

@@ -7,7 +7,7 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.serializers import (
     ManualVariantEntryCollectionSerializer,

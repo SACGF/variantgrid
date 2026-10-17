@@ -7,6 +7,7 @@ module here to make it reachable.
 from .models_version import *
 from .models_clinvar import *
 from .models_gene_annotation import *
+from .models_manual_variant import *
 from .models import *
 from .models_gene_counts import *
 from .models_cohort_stats import *
