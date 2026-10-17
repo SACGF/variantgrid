@@ -26,7 +26,8 @@ Found or newly created, the user goes through `create_or_update`, which rewrites
 2. `OIDC_REQUIRED_GROUP` (eg `/variantgrid/shariant_production`) must be in `groups`, otherwise the user is saved
    inactive and shown which Shariant environments their groups *do* allow. One Keycloak realm (`agha`) serves prod,
    test, demo and security; this group is what keeps a test-only account out of production.
-3. Groups are `/associations/<org>/<lab>` and `/variantgrid/<role>`. No group under either prefix: inactive, "doesn't
+3. Groups are `/associations/<org>/<lab>` and `/variantgrid/<role>`, mapped by the pure function
+   `oidc_auth/backend.py:groups_from_claims`. No group under either prefix: inactive, "doesn't
    belong to any labs". Each association adds every prefix level as a Django `Group` (`org`, `org/lab`), matching
    `Lab.group_name` / `Organization.group_name` (`snpdb/models/models.py:Lab`), created on the fly if missing.
    `/variantgrid/admin` sets `is_superuser` and `is_staff`; `bot` and `tester` become the Django groups
