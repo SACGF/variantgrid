@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from functools import cached_property
+from functools import cached_property, partial
 from json import JSONDecodeError
 from collections.abc import Iterable
 from typing import Optional, Any, Self
@@ -27,7 +27,7 @@ from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 import json
 from library.django_utils import get_url_from_view_path
-from library.log_utils import NotificationBuilder
+from library.log_utils import NotificationBuilder, report_exc_info
 from library.utils.collection_utils import batch_iterator
 from review.models import Review
 from snpdb.lab_picker import LabPickerData
@@ -479,8 +479,12 @@ class OverlapServices:
         Sends discordance notifications to labs if .is_still_relevant and fills in their send date
         Deletes discordance notifications that are marked as not .is_still_relevant
         Also sends an overall notification to admins about the discordances
+
+        The notifications are marked sent and the messages built inside the transaction, but only sent once it commits,
+        each send on its own: a failing Slack/email send is reported, not retried, and never rolls back or repeats the
+        rest of the batch (#2279).
         :param outstanding_notifications: which notifications to send, if blank then inspect all unsent notifications
-        :return: True if all notifications were sent
+        :return: True if notifications were processed (False if there were none, or an import is ongoing)
         """
 
         if ClassificationImportRun.ongoing_imports():
@@ -501,95 +505,99 @@ class OverlapServices:
             current_date = now()
             relevant_notifications: list[OverlapDiscordanceNotification] = []
             notifications_by_lab: dict[Lab, list[OverlapDiscordanceNotification]] = defaultdict(list)
+            messages: list[NotificationBuilder] = []
 
-            # send relevant notifications to the admins
-            # and build up a dictionary of which notifications each lab should get
             for notification in outstanding_notifications:
                 if not notification.is_still_relevant:
                     # the old/new status of an Overlap can be updated multiple times
                     # possible that the end result is the Overlap after status changes to something and then back again
                     notification.delete()
-                else:
-                    # send one notification per discordance so we don't try to send a single message too big for slack
-                    overall_admin_notification = NotificationBuilder("Discordance notification").add_markdown(
-                        ":email: Sending Discordance Notification")
-                    notification.notification_sent_date = current_date
-                    relevant_notifications.append(notification)
+                    continue
 
-                    # we could also contact labs that were once part of the Overlap but are no longer
-                    # though currently not possible to tell if they were part of the allele from years back or from minutes ago and just withdrew
-                    # so for now only support notifying when new labs add to the Overlap
+                notification.notification_sent_date = current_date
+                relevant_notifications.append(notification)
 
-                    labs: set[Lab] = set()
-                    for contribution in notification.overlap.contributions.filter(
-                            contribution_status=OverlapContributionStatus.CONTRIBUTING):
-                        if lab := contribution.lab:
-                            labs.add(lab)
-                            notifications_by_lab[lab].append(notification)
+                # we could also contact labs that were once part of the Overlap but are no longer
+                # though currently not possible to tell if they were part of the allele from years back or from minutes ago and just withdrew
+                # so for now only support notifying when new labs add to the Overlap
+                labs: set[Lab] = set()
+                for contribution in notification.overlap.contributions.filter(
+                        contribution_status=OverlapContributionStatus.CONTRIBUTING):
+                    if lab := contribution.lab:
+                        labs.add(lab)
+                        notifications_by_lab[lab].append(notification)
 
-                    sorted_lab_str = "\n".join(str(lab) for lab in sorted(labs))
+                # one admin message per discordance so we don't try to send a single message too big for slack
+                messages.append(OverlapServices._admin_message(notification, labs))
 
-                    overlap = notification.overlap
-                    discordance_status_icon = ":no_good:" if notification.new_state_obj.is_active_discordance else ":handshake:"
-                    overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
-
-                    overlap_change = []
-                    if notification.old_state_obj.label != notification.new_state_obj.label:
-                        overlap_change.append(
-                            f"{notification.old_state_obj.label} -> {notification.new_state_obj.label} {discordance_status_icon}")
-                    else:
-                        overlap_change.append(f"{notification.new_state_obj.label}")
-
-                    if new_lab_groups := set(notification.new_state_obj.lab_groups).difference(
-                            notification.old_state_obj.lab_groups):
-                        new_labs = list(sorted(Lab.objects.filter(group_name__in=new_lab_groups).all()))
-                        for lab in new_labs:
-                            overlap_change.append(f"{lab} is now part of this overlap")
-
-                    overall_admin_notification.add_field("Overlap",
-                                                         f"<{get_url_from_view_path(notification.overlap.get_absolute_url())}|Overlap_{notification.overlap_id}> {overlap_description}")
-                    overall_admin_notification.add_field("Involved Labs", sorted_lab_str)
-                    overall_admin_notification.add_field("Change", "\n".join(overlap_change))
-                    overall_admin_notification.send()
-
-            # now notify the labs
             for lab, notifications in notifications_by_lab.items():
-                notifications_list = list(sorted(notifications))
-                notification_count = len(notifications)
-                if notification_count > 6:
-                    subject = f"Discordance Update for {notification_count} Discordances"
-                else:
-                    subject = "Discordance Update for (" + ", ".join(
-                        [f"OV_{notification.overlap_id}" for notification in notifications_list]) + ")"
-
-                lab_notification = LabNotificationBuilder(lab=lab, message=subject)
-
-                for index, notification in enumerate(notifications):
-                    if not index == 0:
-                        lab_notification.add_divider()
-
-                    overlap = notification.overlap
-
-                    report_url = get_url_from_view_path(notification.overlap.get_absolute_url())
-                    # report_summary = DiscordanceReportRowData(discordance_report=dr, perspective=user_perspective)
-                    lab_notification.add_markdown(
-                        f"The below overlap is now marked as *{notification.new_state_obj.label}*")
-                    # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
-
-                    lab_notification.add_field(label="Overlap", value=f"<{report_url}|OV_{notification.overlap_id}>")
-                    # can't say when discordance detected on as overlap_status_change_timestamp would have been updated
-                    lab_notification.add_field(label="c.HGVS", value=str(overlap.hgvs(lab)))
-
-                    # now each lab's contribution
-                    for contribution in overlap.contributions_list:
-                        lab_notification.add_field(label=str(contribution.lab_like), value=contribution.pretty_value)
-
-                lab_notification.send()
+                messages.append(OverlapServices._lab_message(lab, notifications))
 
             OverlapDiscordanceNotification.objects.bulk_update(relevant_notifications,
                                                                fields=['notification_sent_date'])
+            # on_commit rather than after the block, as we may be inside a caller's transaction (e.g. a recalc_overlap)
+            transaction.on_commit(partial(OverlapServices._send_messages, messages))
         return True
 
+    @staticmethod
+    def _send_messages(messages: list[NotificationBuilder]):
+        for message in messages:
+            try:
+                message.send()
+            except Exception:
+                report_exc_info(extra_data={"notification": message.message})
+
+    @staticmethod
+    def _admin_message(notification: OverlapDiscordanceNotification, labs: set[Lab]) -> NotificationBuilder:
+        overlap = notification.overlap
+        old_state = notification.old_state_obj
+        new_state = notification.new_state_obj
+
+        discordance_status_icon = ":no_good:" if new_state.is_active_discordance else ":handshake:"
+        overlap_description = f"{overlap.scope_description} {overlap.value_type_label}"
+
+        overlap_change = []
+        if old_state.label != new_state.label:
+            overlap_change.append(f"{old_state.label} -> {new_state.label} {discordance_status_icon}")
+        else:
+            overlap_change.append(f"{new_state.label}")
+
+        if new_lab_groups := set(new_state.lab_groups).difference(old_state.lab_groups):
+            for lab in sorted(Lab.objects.filter(group_name__in=new_lab_groups)):
+                overlap_change.append(f"{lab} is now part of this overlap")
+
+        overlap_url = get_url_from_view_path(overlap.get_absolute_url())
+        admin_message = NotificationBuilder("Discordance notification").add_markdown(
+            ":email: Sending Discordance Notification")
+        admin_message.add_field("Overlap", f"<{overlap_url}|Overlap_{notification.overlap_id}> {overlap_description}")
+        admin_message.add_field("Involved Labs", "\n".join(str(lab) for lab in sorted(labs)))
+        admin_message.add_field("Change", "\n".join(overlap_change))
+        return admin_message
+
+    @staticmethod
+    def _lab_message(lab: Lab, notifications: list[OverlapDiscordanceNotification]) -> LabNotificationBuilder:
+        notification_count = len(notifications)
+        if notification_count > 6:
+            subject = f"Discordance Update for {notification_count} Discordances"
+        else:
+            subject = "Discordance Update for (" + ", ".join(
+                [f"OV_{notification.overlap_id}" for notification in sorted(notifications)]) + ")"
+
+        lab_message = LabNotificationBuilder(lab=lab, message=subject)
+        for index, notification in enumerate(notifications):
+            if index:
+                lab_message.add_divider()
+
+            overlap = notification.overlap
+            report_url = get_url_from_view_path(overlap.get_absolute_url())
+            lab_message.add_markdown(f"The below overlap is now marked as *{notification.new_state_obj.label}*")
+            lab_message.add_field(label="Overlap", value=f"<{report_url}|OV_{notification.overlap_id}>")
+            # can't say when discordance detected on as overlap_status_change_timestamp would have been updated
+            lab_message.add_field(label="c.HGVS", value=str(overlap.hgvs(lab)))
+
+            for contribution in overlap.contributions_list:
+                lab_message.add_field(label=str(contribution.lab_like), value=contribution.pretty_value)
+        return lab_message
 
 @dataclass
 class FieldChange:
