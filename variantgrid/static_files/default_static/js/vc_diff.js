@@ -350,7 +350,7 @@ const Diff = (function() {
                 if (somatic_clin_sig_value && somatic_clin_sig_value.value) {
                     const somatic_clin_sig_key = this.eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
                     const somatic_clin_sig_pretty = somatic_clin_sig_key.prettyValue(somatic_clin_sig_value.value);
-                    clinSigText.push("<br/>")
+                    clinSigText.push("<br/>");
 
                     const somatic = triages.S;
                     if (somatic && somatic.status == "F") {
@@ -374,7 +374,7 @@ const Diff = (function() {
                 /*
                 let conditionRow = $('<div>', {class:'my-1'});
                 if (v.resolved_condition) {
-                    VCForm.format_condition(v.resolved_condition).appendTo(conditionRow);
+                    VCTable.format_condition(v.resolved_condition).appendTo(conditionRow);
                 } else {
                     conditionRow.text((v.condition || {}).value);
                 }
