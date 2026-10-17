@@ -21,7 +21,7 @@ function tweakAjax() {
             //if (settings.type == 'POST' || settings.type == 'PUT' || settings.type == 'DELETE' || settings.type == 'PATCH') {
                 if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
                     // Only send the token to relative URLs i.e. locally.
-                    xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                    xhr.setRequestHeader("X-CSRFToken", Cookies.get('csrftoken'));
                 } else {
                     // console.log("Didn't add CSRF! to external url '" + settings.url + "'");
                 }
@@ -319,7 +319,7 @@ function enhanceAndMonitor() {
                 const form = node.closest('form');
                 form.submit(function (e) {
                     // if a page load has changed the cookie, change it in the form
-                    const cookie = getCookie('csrftoken');
+                    const cookie = Cookies.get('csrftoken');
                     node.val(cookie);
                     return true;
                 });
@@ -739,14 +739,6 @@ function globalSetup() {
     $.fn.selector = { split: function() { return ""; }};
 })(jQuery);
 
-function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    if (match) {
-        return match[2];
-    }
-    return null;
-}
-
 /* The menus and the rest of the per-user page frame (uicore/page_frame.py), requested while the page is still loading
    and filled in once it is ready - the page body itself is the same for every user. */
 function loadPageFrame(frameUrl, urlName) {
@@ -782,7 +774,7 @@ function postUrl(url) {
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = 'csrfmiddlewaretoken';
-    input.value = getCookie('csrftoken');
+    input.value = Cookies.get('csrftoken');
     form.appendChild(input);
     document.body.appendChild(form);
     form.submit();

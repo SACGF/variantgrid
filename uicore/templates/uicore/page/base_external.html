@@ -55,6 +55,9 @@
     <!-- JQuery , had to move to the top for the sake of autocomplete -->
     <script src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
 
+    <!-- global.js reads the CSRF token and its own cookies with js.cookie -->
+    <script src="{% static 'js/lib/js.cookie-3.0.1/js.cookie-3.0.1.min.js' %}"></script>
+
     <!-- Needed by code that calls ajaxForm -->
     <script src="{% static 'js/lib/jquery.form-4.3.0/jquery.form-4.3.0.min.js' %}"></script>
 
