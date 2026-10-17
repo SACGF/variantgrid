@@ -994,13 +994,13 @@ class ImportedAlleleInfo(TimeStampedModel):
         if preferred := self[genome_build]:
             return HGVSDisplay(dna_hgvs=preferred.resolved_hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
         else:
-            for genome_build in GenomeBuild.builds_with_annotation_cached():
-                if alternative := self[genome_build]:
+            for alt_build in GenomeBuild.builds_with_annotation_cached():
+                if alternative := self[alt_build]:
                     if hgvs_obj := alternative.resolved_hgvs_obj:
                         return HGVSDisplay(
                             dna_hgvs=hgvs_obj,
                             is_desired_build=False,
-                            genome_build=genome_build,
+                            genome_build=alt_build,
                             p_hgvs=alternative.p_hgvs
                         )
 
