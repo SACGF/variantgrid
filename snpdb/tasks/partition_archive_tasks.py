@@ -4,7 +4,6 @@ Celery task that performs the long-running pg_dump+drop for a PartitionArchive r
 @see https://github.com/SACGF/variantgrid/issues/1537
 """
 
-import hashlib
 import logging
 import os
 import shlex
@@ -17,6 +16,7 @@ from django.utils import timezone
 
 from eventlog.models import create_event
 from library.django_utils.database_utils import run_sql
+from library.utils.hash_utils import file_sha256sum
 from snpdb.models.models_partition_archive import PartitionArchive
 
 
@@ -45,7 +45,7 @@ def perform_partition_archive(archive_pk: int, reason: str = ""):
     try:
         _run_pg_dump(archive.dump_path, child_tables)
         _verify_dump(archive.dump_path, child_tables)
-        archive.sha256 = _sha256_file(archive.dump_path)
+        archive.sha256 = file_sha256sum(archive.dump_path)
         archive.save(update_fields=["sha256"])
 
         with transaction.atomic():
@@ -105,14 +105,6 @@ def _verify_dump(dump_path: str, expected_tables: list[str]):
     missing = [t for t in expected_tables if t not in listing]
     if missing:
         raise RuntimeError(f"pg_restore --list missing tables: {missing}")
-
-
-def _sha256_file(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def _fail(archive: PartitionArchive, msg: str):
