@@ -5,7 +5,8 @@ from typing import Any, Optional
 
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import SpecialEKeys
+from snpdb.models.models_enums import AlleleOriginBucket
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
 from classification.views.exports.classification_export_filter import (

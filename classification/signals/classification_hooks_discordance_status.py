@@ -6,7 +6,8 @@ from django.db import transaction
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import SpecialEKeys, ShareLevel
+from classification.enums import SpecialEKeys
+from snpdb.models.models_enums import ShareLevel
 from classification.models import ImportedAlleleInfo
 from classification.models.classification import Classification, \
     classification_current_state_signal, \

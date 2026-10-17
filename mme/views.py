@@ -7,7 +7,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models.classification import Classification, ClassificationModification
 from mme.disclaimers import connected_nodes, effective_disclaimer, node_disclaimer
 from mme.metrics import get_metrics
@@ -19,6 +18,7 @@ from mme.serializers.patient_profile import (
     mme_eligible_classifications,
 )
 from mme.tasks import submit_mme_submission_task
+from snpdb.models.models_enums import ClinicalSignificance, ShareLevel
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 # Card states - which layer of the node/lab/record opt-in a classification fails.

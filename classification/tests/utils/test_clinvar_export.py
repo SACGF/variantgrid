@@ -3,7 +3,7 @@ from unittest import mock
 
 from django.test import TestCase, override_settings
 
-from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
     Classification,
     ClinVarExport,
@@ -27,6 +27,7 @@ from genes.models_enums import GeneSymbolAliasSource
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
 from snpdb.models import ClinVarKey, GenomeBuild, GenomeBuildPatchVersion
+from snpdb.models.models_enums import ShareLevel
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 

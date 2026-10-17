@@ -2,7 +2,6 @@ from django.contrib.auth.models import User
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from classification.enums import ShareLevel
 from classification.models import (
     Classification,
     ClassificationImportRun,
@@ -19,6 +18,7 @@ from classification.models.classification_grouping import (
 )
 from classification.models.classification_import_run import classification_imports_complete_signal
 from library.utils import get_timer
+from snpdb.models.models_enums import ShareLevel
 
 ###
 # Capture events that could require a ClassificationGrouping to update.

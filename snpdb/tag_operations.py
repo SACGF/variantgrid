@@ -29,8 +29,8 @@ from django.utils import timezone
 
 from analysis.models import VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
-from classification.enums import AlleleOriginBucket
 from snpdb.models import TAG_ALLELE_ORIGIN_CHOICES, Tag, TagConfig
+from snpdb.models.models_enums import AlleleOriginBucket
 
 MERGE_SUGGESTION_MAX_DISTANCE = 1
 

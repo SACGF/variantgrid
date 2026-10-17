@@ -7,14 +7,15 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.dispatch import receiver
 
+from annotation.canonical_annotation import get_canonical_c_hgvs
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
-from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
 from genes.hgvs import HGVSDisplay
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab, Organization, Variant
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 
@@ -140,7 +141,7 @@ def _variant_location_summary(va: VariantAnnotation) -> Optional[str]:
 def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> list[PreviewKeyValue]:
     """ c.HGVS where there's a canonical transcript, otherwise the g.HGVS and where it lies """
     hgvs_extras = []
-    if c_hgvs := variant.get_canonical_c_hgvs(genome_build):
+    if c_hgvs := get_canonical_c_hgvs(variant, genome_build):
         hgvs_extras.append(PreviewKeyValue(None, c_hgvs, dedicated_row=True))
     else:
         if hgvs_g := VariantAnnotation.get_hgvs_g(variant):

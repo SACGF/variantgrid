@@ -26,7 +26,6 @@ from classification.classification_import import (
 from classification.enums import WithdrawReason
 from classification.enums.classification_enums import (
     EvidenceCategory,
-    ShareLevel,
     SpecialEKeys,
     SubmissionSource,
 )
@@ -95,6 +94,7 @@ from ontology.models import AncestorCalculator, OntologyTerm
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
+from snpdb.models.models_enums import ShareLevel
 
 
 class VariantMatchedFilter(admin.SimpleListFilter):

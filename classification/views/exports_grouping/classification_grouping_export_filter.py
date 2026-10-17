@@ -8,13 +8,13 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools.more import peekable
-from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
     OverlapContribution, OverlapContributionNextStep
 from classification.models import EvidenceKeyMap
 from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
 from snpdb.models import Organization, Lab, GenomeBuild, Variant, VariantAllele
+from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
 import re
 import itertools
 

@@ -6,13 +6,12 @@ from django.urls import reverse
 from django.utils.timezone import localdate
 
 from classification.enums import (
-    AlleleOriginBucket,
-    ClinicalSignificance,
     LabExternalFilter,
     ReclassificationEventType,
     SpecialEKeys,
     SubmissionSource,
 )
+from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from classification.models import (
     Classification,
     ReclassificationEvent,

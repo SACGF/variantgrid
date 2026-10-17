@@ -12,8 +12,8 @@ from django.db.models.functions import Coalesce
 from annotation.models import ClinVarRecordCollection
 from annotation.models.data_enums import EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import TestingContextBucket, OverlapStatus, OverlapType, SpecialEKeys, \
-    OverlapEntrySourceTextChoices, ShareLevel, AlleleOriginBucket
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapType, SpecialEKeys, OverlapEntrySourceTextChoices
+from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
     DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \

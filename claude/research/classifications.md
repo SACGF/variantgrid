@@ -115,7 +115,7 @@ group read permission on the modification, rewrites `Classification.summary` thr
 grouping assignment, condition text sync, ClinVar exclusion patterns, the significance-change flag, common-variant
 partition moves in snpdb, and gene-count refresh in annotation.
 
-Share levels are `classification/enums/classification_enums.py:ShareLevel` - user, lab, organisation, logged-in users,
+Share levels are `snpdb/models/models_enums.py:ShareLevel` - user, lab, organisation, logged-in users,
 public - and only the last two are `is_discordant_level`, i.e. count as "shared" for discordance, grouping visibility
 and export. The web form republishes at the record's current level (`classification/views/views.py:create_classification_object`)
 and the inserter refuses to go lower, republishing at the current level with a `shared_higher` warning, but the model has
@@ -252,7 +252,7 @@ classification is what makes "you can see what was published, not what is being 
 of every view. The cost is that `Classification.evidence` is a denormalised copy that must be kept in step, which is why
 the app insists on `patch_value`.
 
-**Buckets come from key metadata, not the enum.** `classification/enums/classification_enums.py:ClinicalSignificance`
+**Buckets come from key metadata, not the enum.** `snpdb/models/models_enums.py:ClinicalSignificance`
 only knows B/LB/VUS/LP/P, but deployments add VUS-A/B/C, oncogenic tiers, risk alleles and "other" as options on the
 `clinical_significance` key, and which of those count as the same bucket is a policy each deployment sets in the option's
 `bucket` attribute. Reading the bucket from `EvidenceKeyMap` means a new option is a data change, not code, and the

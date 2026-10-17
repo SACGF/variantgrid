@@ -8,7 +8,8 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.contrib.auth.models import User
 
-from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys, ClassificationResultValue, TriageDecision
+from classification.enums import SpecialEKeys, ClassificationResultValue, TriageDecision
+from snpdb.models.models_enums import ClinicalSignificance, ShareLevel
 from classification.models import (
     Classification,
     ClassificationFlagTypes,

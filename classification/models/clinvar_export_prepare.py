@@ -7,7 +7,6 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.timezone import now
 
-from classification.enums import AlleleOriginBucket, ShareLevel
 from classification.models import (
     ClassificationModification,
     ClinVarAllele,
@@ -19,6 +18,7 @@ from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import pretty_collection
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, ClinVarKey, Lab
+from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
 
 """
 This code creates or updates ClinVarExports with the latest data.

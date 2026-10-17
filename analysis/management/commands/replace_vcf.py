@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
+from analysis.vcf_replace_data import vcf_replace_data
 from snpdb.models.models_vcf import VCF
-from snpdb.models.vcf_replace_data import vcf_replace_data
 
 
 class Command(BaseCommand):

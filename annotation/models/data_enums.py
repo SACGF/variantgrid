@@ -83,8 +83,7 @@ class ClassificationDate:
 
     @property
     def date_str(self) -> str:
-        from classification.models import Classification
-        return Classification.to_date_str(self.value)
+        return self.value.strftime('%Y-%m-%d')
 
     def __lt__(self, other: 'ClassificationDate'):
         if self.datetime and other.datetime:

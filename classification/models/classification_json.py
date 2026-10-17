@@ -2,7 +2,8 @@ from collections import defaultdict
 
 from django.conf import settings
 
-from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
+from classification.enums import EvidenceKeyValueType, SpecialEKeys
+from snpdb.models.models_enums import ShareLevel
 from classification.models import (
     Classification,
     ClassificationJsonParams,

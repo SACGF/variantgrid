@@ -11,8 +11,8 @@ from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
 from classification.models.classification import Classification, ClassificationModification
 from genes.models import Gene
 from library.utils import rgb_invert
-from snpdb.models import Cohort, GenomeBuild, Sample, ShareLevel, Variant
-from snpdb.models.models_enums import ProcessingStatus
+from snpdb.models import Cohort, GenomeBuild, Sample, Variant
+from snpdb.models.models_enums import ProcessingStatus, ShareLevel
 from variantgrid.celery import app
 
 

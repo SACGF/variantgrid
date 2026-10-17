@@ -29,9 +29,7 @@ from frozendict import frozendict
 from more_itertools import last
 
 from classification.enums import (
-    AlleleOriginBucket,
     ClassificationResultValue,
-    ShareLevel,
     SpecialEKeys,
     TestingContextBucket,
     TestingContextFull,
@@ -48,6 +46,7 @@ from classification.models.evidence_mixin_summary_cache import ClassificationSum
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
 from snpdb.models import Allele, Lab
+from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
 from django.contrib.auth.models import User
 
 if TYPE_CHECKING:

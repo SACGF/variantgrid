@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.template import Library
 
+from annotation.models.models import VariantAnnotationVersion
 from genes.forms import (
     GeneAnnotationReleaseForm,
     GeneListCategoryAutocompleteForm,
@@ -9,7 +10,7 @@ from genes.forms import (
     NamedCustomGeneListForm,
     panel_app_server_autocomplete_form_factory,
 )
-from genes.models import GeneAnnotationRelease, GeneListCategory, PanelAppServer
+from genes.models import GeneListCategory, PanelAppServer
 from library.log_utils import log_traceback
 from ontology.forms import HPOForm, OMIMForm
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
@@ -45,7 +46,7 @@ def gene_grid(context, columns_from_url=None,
         initial_columns.extend(columns_from_url.split("/"))
 
     if show_gene_annotation_release:
-        gene_annotation_releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
+        gene_annotation_releases = VariantAnnotationVersion.latest_gene_annotation_releases()
         initial_columns.extend([f"gene-annotation-release-{release.pk}" for release in gene_annotation_releases])
 
     data_columns = []

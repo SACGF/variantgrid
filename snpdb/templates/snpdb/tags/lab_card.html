@@ -34,24 +34,24 @@
             {% endfor %}
         </ul>
 
-        {% if lab.total_classifications %}
+        {% if stats.total_classifications %}
             <label>Classification Records</label>
             <hr/>
             {% if shared_classifications %}
                 {% labelled hint="tiny" id_prefix=lab.group_name id="shared" label="Total Shared" %}
-                    {{ lab.total_shared_classifications }}
-                    {% if user.is_superuser and lab.total_unshared_classifications %}
-                        <span class="admin-only">({{ lab.total_unshared_classifications }} unshared)</span>
+                    {{ stats.total_shared_classifications }}
+                    {% if user.is_superuser and stats.total_unshared_classifications %}
+                        <span class="admin-only">({{ stats.total_unshared_classifications }} unshared)</span>
                     {% endif %}
                 {% endlabelled %}
             {% else %}
                 {% labelled hint="tiny" id_prefix=lab.group_name id="shared" label="Classifications" %}
-                {{ lab.total_classifications}} ({{ lab.total_shared_classifications }} shared)
+                {{ stats.total_classifications}} ({{ stats.total_shared_classifications }} shared)
                 {% endlabelled %}
             {% endif %}
-            {% labelled hint="tiny" label="First Submission" %}{% timestamp lab.first_classification_ever_shared_date time_ago=True %}{% endlabelled %}
-            {% labelled hint="tiny" label="Last New" %}{% timestamp lab.classifications_by_created.last.created time_ago=True %}{% endlabelled %}
-            {% labelled hint="tiny" label="Avg/Week" %}{{ lab.classifications_per_week | floatformat:1 }}{% endlabelled %}
+            {% labelled hint="tiny" label="First Submission" %}{% timestamp stats.first_classification_ever_shared_date time_ago=True %}{% endlabelled %}
+            {% labelled hint="tiny" label="Last New" %}{% timestamp stats.last_created time_ago=True %}{% endlabelled %}
+            {% labelled hint="tiny" label="Avg/Week" %}{{ stats.classifications_per_week | floatformat:1 }}{% endlabelled %}
         {% else %}
             {% labelled hint="tiny" id_prefix=lab.group_name id="shared" label="Classification Records" %}None{% endlabelled %}
         {% endif%}

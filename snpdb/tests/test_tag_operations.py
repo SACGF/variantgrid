@@ -8,10 +8,10 @@ from analysis.forms.forms_nodes import TagNodeForm
 from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
 from annotation.fake_data import create_fake_variants
-from classification.enums import AlleleOriginBucket
 from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.forms import CreateTagForm
 from snpdb.models import GenomeBuild, Tag, TagConfig, TagConfigCollection, Variant
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.tag_operations import (
     TagOperation,
     get_case_collision_groups,

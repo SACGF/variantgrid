@@ -83,7 +83,6 @@ from annotation.pathogenicity_predictions import (
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
-from classification.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from genes.models import (
     Gene,
     GeneAnnotationRelease,
@@ -114,7 +113,7 @@ from snpdb.models import (
     Q,
     Variant,
 )
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_enums import AlleleOriginBucket, ImportStatus, SomaticClinicalSignificance
 
 
 class SubVersionPartition(RelatedModelsPartitionModel):
@@ -913,6 +912,16 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         if vav := VariantAnnotationVersion.latest(genome_build):
             return vav.structural_variant_min_size
         return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+
+    @staticmethod
+    def latest_gene_annotation_releases(status: 'VariantAnnotationVersion.Status' = None) -> list[GeneAnnotationRelease]:
+        """ The GeneAnnotationRelease of each annotated build's latest VAV (by build name), for builds that have one """
+        gene_annotation_releases = []
+        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
+            if vav := VariantAnnotationVersion.latest(genome_build, status=status):
+                if vav.gene_annotation_release:
+                    gene_annotation_releases.append(vav.gene_annotation_release)
+        return gene_annotation_releases
 
     @staticmethod
     def latest_for_all_builds(status: 'VariantAnnotationVersion.Status' = None) -> QuerySet:

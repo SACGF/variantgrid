@@ -14,13 +14,13 @@ from django.views.generic import TemplateView
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
-from classification.enums import ShareLevel
 from classification.models import Classification, ClassificationModification
 from genes.interpro import store_domains_for_transcripts
 from genes.models import Gene, Transcript, TranscriptVersion
 from library.constants import MINUTE_SECS
 from library.utils import segment
 from snpdb.models import Cohort, CohortGenotypeCollection, VariantZygosityCountCollection
+from snpdb.models.models_enums import ShareLevel
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 

@@ -20,7 +20,7 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import localdate
 
-from classification.enums import (ClinicalSignificance, CriteriaEvaluation, LabExternalFilter,
+from classification.enums import (CriteriaEvaluation, LabExternalFilter,
                                  ReclassificationEventType, SpecialEKeys)
 from classification.models import (
     Classification,
@@ -35,6 +35,7 @@ from classification.models import (
 from classification.tasks.classification_reclassification_tasks import reclassification_events_update
 from flags.models import Flag
 from snpdb.models import Lab, Organization
+from snpdb.models.models_enums import ClinicalSignificance
 
 # top to bottom / left to right on every chart and table
 SIGNIFICANCE_ORDER = [

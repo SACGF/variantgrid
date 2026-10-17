@@ -12,7 +12,7 @@ from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun
@@ -24,6 +24,7 @@ from library.django_utils.database_utils import IntegerFieldChoices, TextFieldCh
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property
 from snpdb.models import Lab
+from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
 from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
