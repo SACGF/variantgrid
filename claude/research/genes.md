@@ -98,7 +98,7 @@ bridge them (an MT-TS2 gene list matching PDCD2 via "RP8", #1669), and HGNC list
 so renames never need more than one. Readers never touch the
 matcher: `genes/models/models_gene_annotation_release.py:GeneAnnotationRelease.genes_for_symbols` and
 `genes/models/models_gene_list.py:GeneList.get_genes` read the cached rows, and the release always comes from the
-VAV (`GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds`). Matching is triggered whenever symbols
+VAV (`annotation/models/models.py:VariantAnnotationVersion.latest_gene_annotation_releases`). Matching is triggered whenever symbols
 appear: `genes/gene_matching.py:GeneSymbolMatcher.create_gene_list_gene_symbols` runs
 `ReleaseGeneMatcher.match_unmatched_in_hgnc_and_gene_lists` for every release after a bulk create, and the HGNC
 download and release creation do the same, so every symbol in a gene list or HGNC has rows in every release.
@@ -169,8 +169,8 @@ rather than dropped. Typed text goes through `genes/custom_text_gene_list.py:cre
 hashes the text so an unchanged edit is a no-op and otherwise replaces the list, tokenising with
 `genes/gene_matching.py:tokenize_gene_symbols`; tokens over `genes/gene_matching.py:MAX_GENE_SYMBOL_LENGTH` are
 skipped with a recorded warning because they cannot fit the unique index on `(gene_list, original_name)`. Analyses
-read a list per release: `genes/models/models_gene_list.py:GeneList.get_q` resolves symbols to that release's genes
-and delegates to `annotation/models/models.py:VariantTranscriptAnnotation.get_overlapping_genes_q`, and the gene
+read a list per release: `genes/models/models_gene_list.py:GeneList.get_genes` resolves symbols to that release's genes
+for `annotation/models/models.py:VariantTranscriptAnnotation.get_overlapping_genes_q`, and the gene
 list node merges several lists with `GeneList.get_gene_ids_for_gene_lists`, routing symbols through a subquery so
 Postgres uses the `(release, gene_symbol)` unique index instead of hash-joining every ReleaseGeneSymbol. Categories
 (`genes/models/models_gene_list.py:GeneListCategory`) are a table rather than choices so forms can chain on them,
@@ -255,9 +255,7 @@ it. Run it `--dry-run` first.
 Genes prefixed `unknown_` are legacy placeholders from pre-GFF imports; `genes/management/commands/fix_fake_genes.py:Command`
 re-points their transcripts where another version names the gene and `Gene.delete_orphaned_fake_genes` removes the
 rest. `LRGRefSeqGene.get_transcript_version` requires the `t` part (`LRG_199t1`); a bare `LRG_199` raises.
-`genes/models/models_gene_list.py:GeneList.get_q` and
-`genes/models/models_gene_annotation_release.py:GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds`
-import from annotation inside the method: the genes/annotation cycle is real, and new cross-imports belong at the
-call site, not module level. `PanelAppPanel.cache_valid` is time-based, so a test that touches a stale panel makes a
+genes models don't import annotation (annotation.models imports genes.models at module level): code needing both
+lives in annotation or at the call site. `PanelAppPanel.cache_valid` is time-based, so a test that touches a stale panel makes a
 network call; `MANE` is GRCh38-only and `MANE.get_mane_and_aliases_list_from_symbol` raises when the table is empty,
 so gene-symbol HGVS search errors on a deployment that has not loaded MANE.

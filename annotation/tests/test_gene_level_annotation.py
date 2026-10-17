@@ -3,6 +3,10 @@ from django.test import TestCase
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.annotation_version_querysets import get_queryset_for_annotation_version
+from annotation.canonical_annotation import (
+    get_canonical_c_hgvs,
+    get_canonical_transcript_annotation,
+)
 from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
@@ -137,8 +141,8 @@ class GeneLevelAnnotationTest(TestCase):
             from the representative annotation rather than a transcript row """
         self._run_annotation()
         variant = self.gene_fusion.variant
-        self.assertIsNone(variant.get_canonical_transcript_annotation(self.genome_build))
-        self.assertEqual("CD74::ROS1", variant.get_canonical_c_hgvs(self.genome_build))
+        self.assertIsNone(get_canonical_transcript_annotation(variant, self.genome_build))
+        self.assertEqual("CD74::ROS1", get_canonical_c_hgvs(variant, self.genome_build))
 
     def test_hgvs_g_is_not_regenerated(self):
         """ The matcher fallback has no coordinate to work from, so it must not be reached """
