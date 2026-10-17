@@ -3,13 +3,13 @@ from django.test import TestCase
 from django.utils.timezone import localdate
 
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
+from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_clinvar import ClinVarVersion
 from classification.models.classification import ClassificationImport
 from snpdb.models import VCF, ImportedWikiCollection, ImportSource
 from snpdb.models.models_enums import AlleleConversionTool
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
-from upload.uploaded_file_type import get_upload_data_for_uploaded_file, reloads_vcf_in_place
 from upload.models import (
     FileUpload,
     UploadedClassificationImport,
@@ -22,6 +22,7 @@ from upload.models import (
     UploadedWikiCollection,
     UploadPipeline,
 )
+from upload.uploaded_file_type import get_upload_data_for_uploaded_file, reloads_vcf_in_place
 
 
 class UploadDataTestCase(TestCase):

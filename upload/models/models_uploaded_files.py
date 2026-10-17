@@ -10,7 +10,8 @@ from django.dispatch import receiver
 
 from analysis.models.models_analysis import Analysis
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
+from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_clinvar import ClinVarVersion
 from classification.models import ClassificationImport
 from genes.models import GeneCoverageCollection, GeneList
 from library.utils.file_utils import name_from_filename

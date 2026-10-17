@@ -20,15 +20,17 @@ from annotation.models.models import (
     AnnotationRangeLock,
     AnnotationRun,
     AnnotationVersion,
-    ClinVar,
-    ClinVarCitation,
-    ClinVarCitationsCollection,
-    ClinVarVersion,
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
     VariantAnnotation,
 )
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from annotation.models.models_clinvar import (
+    ClinVar,
+    ClinVarCitation,
+    ClinVarCitationsCollection,
+    ClinVarVersion,
+)
 from annotation.models.models_enums import AnnotationStatus
 from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig

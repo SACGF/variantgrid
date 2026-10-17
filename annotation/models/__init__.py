@@ -5,6 +5,7 @@ write `from annotation.models import VariantAnnotationVersion, AnnotationRun`. A
 module here to make it reachable.
 """
 from .models_version import *
+from .models_clinvar import *
 from .models import *
 from .models_gene_counts import *
 from .models_cohort_stats import *
