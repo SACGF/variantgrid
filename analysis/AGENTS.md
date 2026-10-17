@@ -2,8 +2,10 @@
 Owns: Analysis (a DAG of AnalysisNode subclasses filtering Variants), AnalysisEdge, NodeVersion/NodeCache/NodeTask,
 the lease-based node scheduler, templates (AnalysisTemplate/Version/Run, AnalysisVariable), VariantTag, node editors, node grid + export.
 Start with:
-- models/nodes/analysis_node.py — AnalysisNode base (Q composition, versioning, load/counts, save cascade) + AnalysisEdge/Dag;
-  models/nodes/node_support_models.py — NodeVersion/Cache/Task, VCF and allele frequency filters
+- models/nodes/analysis_node.py — AnalysisNode base (fields, versioning, load/counts, save cascade) + AnalysisEdge/Dag;
+  node_samples_mixin / node_query_mixin (Q composition) / node_display_mixin / node_errors_mixin hold the rest,
+  each docstring listing the hooks a node overrides
+- models/nodes/node_support_models.py — NodeVersion/Cache/Task, VCF and allele frequency filters
 - models/nodes/sources/*.py, models/nodes/filters/*.py — one module per concrete node
 - models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run
 - tasks/analysis_update_tasks.py + tasks/node_update_tasks.py — dispatcher and the per-node celery tasks
@@ -11,9 +13,9 @@ Start with:
 - views/nodes/node_view.py + forms/forms_nodes.py — node editors; grids.py + grid_export.py — node grid/export
 Patterns here:
 - A node is a filter, not a result set. Override `_get_node_q` (or `_get_node_arg_q_dict` when the Q needs an annotation
-  alias such as a cohort genotype join); leave `get_queryset` alone. `analysis/models/nodes/analysis_node.py:AnalysisNode.get_arg_q_dict`
+  alias such as a cohort genotype join); leave `get_queryset` alone. `analysis/models/nodes/node_query_mixin.py:NodeQueryMixin.get_arg_q_dict`
   merges parent dicts with the node's own via `AnalysisNode.merge_arg_q_dicts`, and
-  `analysis/models/nodes/analysis_node.py:annotate_and_filter_queryset` annotates once per alias then filters — a chain
+  `analysis/models/nodes/node_query_mixin.py:annotate_and_filter_queryset` annotates once per alias then filters — a chain
   of nodes is one SQL query.
 - Declare `min_inputs`/`max_inputs` on the subclass (0/0 = source, `AnalysisNode.PARENT_CAP_NOT_SET` = unbounded,
   `analysis/models/nodes/filters/merge_node.py:MergeNode`). Set `uses_parent_queryset = False` and override
@@ -68,7 +70,7 @@ Patterns here:
   `patients/sample_grouping.py:get_sample_group` resolves, so a TSO 500 case's DNA and RNA arms are one case reported
   from the specimen its measures hang off (`analysis/classify_report.py:ClassifyReportCase._for_source`).
   A tagging is in a case's queue when `Tag.requires_classification` and it belongs to one of the case's samples: its own `VariantTag.sample` (the study's proband, from
-  `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else its `VariantTag.patient`
+  `analysis/models/nodes/node_samples_mixin.py:NodeSamplesMixin.get_proband_sample` at tag time), else its `VariantTag.patient`
   (`AnalysisNode.get_proband_patient` - a node above sample level names the person while leaving which of their VCFs
   open, so the tagging is on the patient's tab and on each of that patient's sample tabs), else the analysis it was made
   in contains the sample. Carrying the variant is only a display filter for a tagging with no sample - a relative who is
@@ -165,7 +167,7 @@ Gotchas:
   not recursive `parents()` calls. `parents()` returns base `AnalysisNode` rows, which never `==` a subclass instance -
   compare by pk (#2060). `AnalysisEdge.save()` rejects an edge that would make a cycle.
 - Several subqueries combine as `pk = ANY(ARRAY(<a> UNION <b>))`
-  (`analysis/models/nodes/analysis_node.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
+  (`analysis/models/nodes/node_query_mixin.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
   can't index an OR of IN-subqueries and walks all of snpdb_variant (#1894). Plain `pk IN (<union>)` fixes count() but
   the planner misestimates the union and sorted grid pages get slower.
 - Never call `node.save()` inside a celery task — use `analysis/models/nodes/analysis_node.py:AnalysisNode.update`, a
@@ -190,7 +192,7 @@ Gotchas:
   filter the load ran. A node with no stored pks falls back to its filter chain - a count mismatch
   between the two paths is a real bug.
 - Anything that evaluates a node's Variant queryset runs under
-  `analysis/models/nodes/analysis_node.py:node_query_planner_settings` (grid handler, export task, `update_node_task`,
+  `analysis/models/nodes/node_query_mixin.py:node_query_planner_settings` (grid handler, export task, `update_node_task`,
   tag recounts, Venn cache). With the grid's columns selected the query joins 50+ relations, past Postgres's
   `join_collapse_limit` of 8, and the planner keeps the SQL's join order - whole variant table first, the node's
   selective filter last. It is per operation rather than server-wide because the extra planning time slows
@@ -233,7 +235,7 @@ Gotchas:
 - Templates run by cloning the snapshot then setting AnalysisVariable-bound fields in toposort order
   (`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments`); a source node's editor gets the variable
   widget only when `analysis.template_type == TEMPLATE` (`analysis/views/nodes/node_view.py:NodeView.get_form`).
-- Cache keys are pks (`analysis/models/nodes/analysis_node.py` keys node Q dicts on `node_version.pk`), so cached
+- Cache keys are pks (`analysis/models/nodes/node_query_mixin.py` keys node Q dicts on `node_version.pk`), so cached
   entries survive a deploy. One whose pickled class was since renamed, moved or removed is a miss
   (`library/django_utils/redis_cache.py:UnpickleTolerantRedisCache`); a change that leaves old entries unpickling but
   wrong needs a `CACHE_VERSION` bump in `variantgrid/settings/components/default_settings.py`.

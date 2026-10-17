@@ -9,7 +9,7 @@ from django.db.models import Q, QuerySet
 
 from analysis.models.enums import GroupOperation
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.analysis_node import (
+from analysis.models.nodes.node_query_mixin import (
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
     querysets_to_pk_any_array_q,
@@ -74,7 +74,7 @@ def get_sample_pk_in_q(node, sample: Sample, arg_q_dict: dict[Optional[str], dic
 
 def get_samples_pk_q(node, sample_arg_q_dicts: list[tuple[Sample, dict[Optional[str], dict[str, Q]]]]) -> Q:
     """ The variants of any of the samples - each (sample, arg_q_dict) is filtered in its own subquery
-        and the subqueries are UNIONed (@see analysis_node.querysets_to_pk_any_array_q) """
+        and the subqueries are UNIONed (@see node_query_mixin.querysets_to_pk_any_array_q) """
     if len(sample_arg_q_dicts) == 1:
         return get_sample_pk_in_q(node, *sample_arg_q_dicts[0])
     return querysets_to_pk_any_array_q([get_sample_queryset(node, sample, arg_q_dict)
@@ -552,7 +552,7 @@ class AncestorSampleMixin(SampleMixin):
 
             Sample mode returns it as is. Patient mode wraps each sample's filters in a subquery
             annotated with only that sample's genotype join - a Q keyed on an alias runs as soon as
-            that alias is annotated (@see analysis_node.annotate_and_filter_queryset), so an OR across
+            that alias is annotated (@see node_query_mixin.annotate_and_filter_queryset), so an OR across
             two aliases has nowhere to hang until both are """
         samples = self.get_filter_samples()
         if not samples:

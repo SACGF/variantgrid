@@ -22,19 +22,14 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import TagLocation, TagNodeMode
+from analysis.models.enums import NodeStatus, TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import (
-    AnalysisDag,
-    AnalysisEdge,
-    AnalysisNode,
-    NodeProband,
-    NodeStatus,
-)
+from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
+from analysis.models.nodes.node_samples_mixin import NodeProband
 from analysis.models.nodes.node_support_models import NodeTask, NodeVersion
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
