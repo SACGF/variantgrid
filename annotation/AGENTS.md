@@ -96,6 +96,8 @@ Gotchas:
 - A sub cohort's stats are written to its parent's CGC (calculate_sample_stats.py:calculate_cohort_stats, #2311): only
   the base cohort writes per-sample rows and clears the CGC, a sub cohort writes just its aggregate/trio rows under keys
   carrying its samples (snpdb/models/models_cohort.py:Cohort.get_stats_filter_key). Freshness needs a row per key.
+  Every trio on the cohort gets buckets, keyed by its members (snpdb/models/models_family.py:Trio.get_stats_filter_key,
+  #2327), so a new trio misses and its node's read recomputes.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
 - transcripts_annotation_selections.py:VariantTranscriptSelections converts the coordinate to explicit once before

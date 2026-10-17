@@ -250,11 +250,22 @@ def _trio_predicates(mum_zyg, dad_zyg, proband_zyg, is_x: bool, mother_affected,
 
 def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
     """ The filter_key buckets calculate_cohort_stats populates: the raw aggregate row (None, or a sub
-        cohort's own key on its parent's CGC), plus the inheritance modes when the cohort has a Trio. """
+        cohort's own key on its parent's CGC), plus the inheritance modes of each of the cohort's trios.
+        A trio added since the last compute has no rows yet, so the freshness check recomputes on its
+        node's first read (#2327) """
     keys = [cohort.get_stats_filter_key()]
-    if trio := cohort.trio_set.first():
+    for trio in _get_trios(cohort):
         keys.extend(trio.get_stats_filter_keys())
     return keys
+
+
+def _get_trios(cohort) -> list[Trio]:
+    """ The cohort's trios, one per distinct set of stats keys - trios with the same members and affected
+        flags share their buckets, which are counted and written once """
+    trio_by_keys = {}
+    for trio in cohort.trio_set.order_by("pk"):
+        trio_by_keys.setdefault(tuple(trio.get_stats_filter_keys()), trio)
+    return list(trio_by_keys.values())
 
 
 def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion):
@@ -478,21 +489,21 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
 
         Postgres counts: the cohort rows are grouped by (samples_zygosity, _VariantFlags) into a temp
         table - many rows share a zygosity string - then grouped three ways: per packed sample index,
-        by the aggregate's priority zygosity, and by the trio's three zygosities. Python folds the
+        by the aggregate's priority zygosity, and by each trio's three zygosities. Python folds the
         small results onto the counter arrays, and keeps the trio predicates (shared with
         trio_node.py) and the compound het gene pairing (#2283).
         A sub cohort's rows are its parent's: it has no per-sample counts (those are the parent's), and
         its aggregate only reads its own samples' characters (#2311).
         Must run inside a transaction - the temp table is ON COMMIT DROP """
     cohort_samples = list(cohort.get_cohort_samples())
-    trio, trio_indexes = _get_trio_and_packed_indexes(cohort, cohort_samples)
+    trio_indexes = _get_trios_and_packed_indexes(cohort, cohort_samples)
     sample_counters: dict[tuple[int, bool], list[int]] = defaultdict(_new_counter)
     aggregate_counters: dict[tuple[Optional[str], bool], list[int]] = defaultdict(_new_counter)
 
     def passing_filter_buckets(flags: _VariantFlags):
         return (False, True) if has_filters and flags.passing_filter else (False,)
 
-    with_gene = trio_indexes is not None
+    with_gene = bool(trio_indexes)
     rows_sql, rows_params = _get_cohort_rows_queryset(cgc, annotation_version, with_gene).query.sql_with_params()
     table = f"pg_temp.cohort_stats_cgc_{cgc.pk}"
     gene_column = ", v.gene" if with_gene else ""
@@ -537,9 +548,9 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
             for pf_pass in passing_filter_buckets(flags):
                 _add_count(aggregate_counters[(aggregate_key, pf_pass)], flags, zygosity, n)
 
-        if with_gene:
+        for trio, indexes in trio_indexes:
             # Only a proband HET can be compound het (_compound_het_source), so only those rows keep their gene
-            mum, dad, proband = (f"substr(g.samples_zygosity, {i + 1}, 1)" for i in trio_indexes)  # 1-based
+            mum, dad, proband = (f"substr(g.samples_zygosity, {i + 1}, 1)" for i in indexes)  # 1-based
             cursor.execute(f"SELECT {mum}, {dad}, {proband}, CASE WHEN {proband} = %s THEN g.gene END, "
                            f"g.symbolic_alt, g.flag_bits, sum(g.n)::bigint "
                            f"FROM {table} g GROUP BY 1, 2, 3, 4, 5, 6",
@@ -616,19 +627,16 @@ def _compound_het_source(mum_zyg, dad_zyg, proband_zyg) -> Optional[str]:
     return None
 
 
-def _get_trio_and_packed_indexes(cohort: Cohort, cohort_samples) -> tuple[Optional[Trio], Optional[tuple[int, int, int]]]:
-    """ The cohort's trio and its (mother, father, proband) packed indexes, or None indexes when the
-        trio isn't coherent with this cohort, which skips inheritance bucketing """
-    trio = cohort.trio_set.first()
-    if trio is None:
-        return None, None
+def _get_trios_and_packed_indexes(cohort: Cohort, cohort_samples) -> list[tuple[Trio, tuple[int, int, int]]]:
+    """ Each of the cohort's trios with its (mother, father, proband) packed indexes. A trio that isn't
+        coherent with this cohort is left out, which skips its inheritance bucketing """
     packed_index_by_cohort_sample_id = {cs.pk: cs.cohort_genotype_packed_field_index for cs in cohort_samples}
-    try:
-        return trio, (packed_index_by_cohort_sample_id[trio.mother_id],
-                      packed_index_by_cohort_sample_id[trio.father_id],
-                      packed_index_by_cohort_sample_id[trio.proband_id])
-    except KeyError:
-        return trio, None
+    trio_indexes = []
+    for trio in _get_trios(cohort):
+        member_ids = (trio.mother_id, trio.father_id, trio.proband_id)
+        if all(cs_id in packed_index_by_cohort_sample_id for cs_id in member_ids):
+            trio_indexes.append((trio, tuple(packed_index_by_cohort_sample_id[cs_id] for cs_id in member_ids)))
+    return trio_indexes
 
 
 def _cohort_has_filters(cohort: Cohort) -> bool:

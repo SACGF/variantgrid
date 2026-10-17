@@ -3,7 +3,8 @@ Cohort stats are counted in SQL and folded onto the counter fields in Python (#2
 counts for a trio whose rows exercise every rule the fold has to reproduce: variant class (SNP,
 insertion, deletion, symbolic, fusion, MNV), the "truthy" annotation flags, the chrX fields, the
 passing-filter buckets, the aggregate's priority zygosity, each inheritance mode and the compound het
-gene pairing. A sub cohort's stats live on its parent's CGC, under keys of its own (#2311).
+gene pairing. A sub cohort's stats live on its parent's CGC, under keys of its own (#2311), as does each
+trio on a cohort (#2327).
 """
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -224,3 +225,21 @@ class CohortStatsCountsTest(TestCase):
         # Parent trio has mother affected, the sub cohort's doesn't - each reads its own bucket
         self.assertEqual(3, stats_qs.get(filter_key=self.trio.get_stats_filter_key("autosomal_dominant")).variant_count)
         self.assertEqual(2, stats_qs.get(filter_key=sub_trio.get_stats_filter_key("autosomal_dominant")).variant_count)
+
+    def test_each_trio_on_a_cohort_reads_its_own_buckets(self):
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+        # Added after the cohort's stats were computed, as a user making a new trio would
+        cohort_samples = {cs.sample.name: cs for cs in self.cohort.get_cohort_samples()}
+        other_trio = Trio.objects.create(user=self.trio.user, cohort=self.cohort, mother=cohort_samples["proband"],
+                                         father=cohort_samples["father"], proband=cohort_samples["mother"])
+        # Same members and flags as self.trio, so the same buckets - which mustn't be counted twice
+        Trio.objects.create(user=self.trio.user, cohort=self.cohort, mother=self.trio.mother, mother_affected=True,
+                            father=self.trio.father, proband=self.trio.proband)
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+
+        stats_qs = CohortGenotypeStats.objects.filter(cohort_genotype_collection=self.cohort.cohort_genotype_collection,
+                                                      passing_filter=False, sample__isnull=True)
+        for mode, trio_count, other_trio_count in [("denovo", 2, 0), ("autosomal_recessive", 1, 0)]:
+            self.assertEqual(trio_count, stats_qs.get(filter_key=self.trio.get_stats_filter_key(mode)).variant_count)
+            self.assertEqual(other_trio_count,
+                             stats_qs.get(filter_key=other_trio.get_stats_filter_key(mode)).variant_count)
