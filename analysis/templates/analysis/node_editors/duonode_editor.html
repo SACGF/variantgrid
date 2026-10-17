@@ -5,7 +5,7 @@
     var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
     // Until a Duo loads, preview the modes as they'd read with the mother
     var relativeAffected = false, relationship = 'M';
-    var duoLoadable = {{ duo_loadable|yesno:"true,false" }};
+    var duoLoadable = {{ source_loadable|yesno:"true,false" }};
 
     function getDuoId() {
        return $("#id_duo", duoForm).find(":selected").val();

@@ -200,7 +200,9 @@ the field when exactly one proband sample is upstream, and the proband patient w
 `analysis/models/nodes/sources/cohort_node.py:CohortNode` filters by het/hom counts, a simple zygosity, or per-sample
 zygosities (`CohortNodeZygosityFiltersCollection`), and adds the ref/het/hom count columns. Trio, duo and quad share
 `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin` (inheritance-versus-family checks, waivable as
-warnings) and one `AbstractFamilyInheritance` strategy object per mode, built by the node's `_inheritance_factory`;
+warnings, plus every node method that only needs to know which field holds the family) and one
+`AbstractFamilyInheritance` strategy object per mode, built by the node's `_inheritance_factory`. The modes are written
+once against the node's `analysis/models/nodes/family_inheritance.py:FamilyShape` (#2269);
 `analysis/models/nodes/sources/trio_node.py:TrioNode`, `analysis/models/nodes/sources/duo_node.py:DuoNode` (#1829, a
 proband and one relative - a parent, or a sibling (#1861) - with Denovo becoming "absent in parent", which along with
 the mosaic mode errors when there is no parent to read) and `analysis/models/nodes/sources/quad_node.py:QuadNode`
