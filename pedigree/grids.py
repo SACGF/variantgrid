@@ -16,7 +16,7 @@ class PedFilesColumns(DatatableConfig[PedFile]):
                        client_renderer='TableFormat.linkUrl'),
             self.user_column(label='Uploaded by'),
             RichColumn(key='import_status', label='Status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(ImportStatus.choices)),
+                       **RichColumn.choices_client_renderer(ImportStatus.choices)),
             RichColumn(key='id', name='delete', label='', orderable=False,
                        renderer=self.render_delete,
                        client_renderer='TableFormat.deleteRow'),

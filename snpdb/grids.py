@@ -111,7 +111,7 @@ class VCFListColumns(DatatableConfig[VCF]):
             RichColumn(key="source", label="VCF source", orderable=True),
             RichColumn(key="uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
                        search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
+                       **RichColumn.choices_client_renderer(ImportSource.choices)),
             RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True, search=False),
             RichColumn(key="project__name", label="Project", orderable=True),
             RichColumn(key="uploadedvcf__vcf_importer__name", label="VCF Importer", orderable=True,
@@ -174,7 +174,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(VariantOrigin.choices)),
+                       **RichColumn.choices_client_renderer(VariantOrigin.choices)),
             self.user_column("vcf__user", label="Uploaded by"),
             RichColumn(key="vcf__source", label="VCF source", orderable=True),
             RichColumn(key="vcf__name", label="VCF Name", orderable=True, extra_columns=["vcf__id"],
@@ -182,7 +182,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
             RichColumn(key="vcf__project__name", label="Project", orderable=True),
             RichColumn(key="vcf__uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
                        search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
+                       **RichColumn.choices_client_renderer(ImportSource.choices)),
             RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True, search=False,
                        extra_columns=["activesamplegenelist__id"], enabled=has_sample_gene_lists,
                        renderer=self._render_sample_gene_list_count,
@@ -194,12 +194,12 @@ class SamplesListColumns(DatatableConfig[Sample]):
             RichColumn(key="somaliersampleextract__somalierancestry__predicted_ancestry",
                        label="Predicted Ancestry", orderable=True, search=False,
                        enabled=has_somalier_ancestry,
-                       client_renderer=RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
+                       **RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
             RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
             RichColumn(key="patient__first_name", label="First Name", orderable=True),
             RichColumn(key="patient__last_name", label="Last Name", orderable=True),
             RichColumn(key="patient__sex", label="Sex", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
+                       **RichColumn.choices_client_renderer(Sex.choices)),
             RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True, search=False,
                        renderer=dob_renderer, client_renderer=dob_client_renderer),
             RichColumn(key="extraction__specimen__reference_id", label="Specimen", orderable=True,
@@ -354,7 +354,7 @@ class CohortSampleListColumns(DatatableConfig[Sample]):
             RichColumn(key="patient__first_name", label="First Name", orderable=True),
             RichColumn(key="patient__last_name", label="Last Name", orderable=True),
             RichColumn(key="patient__sex", label="Sex", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
+                       **RichColumn.choices_client_renderer(Sex.choices)),
             RichColumn(key="patient__date_of_birth", label="D.O.B.", orderable=True,
                        client_renderer='TableFormat.timestamp'),
         ]
@@ -462,7 +462,7 @@ class DuosListColumns(FamilyGroupListColumns[Duo]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         relationship_column = RichColumn(key='relationship', label='Relationship', orderable=True,
-                                         client_renderer=RichColumn.choices_client_renderer(DuoRelationship.choices))
+                                         **RichColumn.choices_client_renderer(DuoRelationship.choices))
         relative_affected = next(i for i, rc in enumerate(self.rich_columns) if rc.key == 'relative_affected')
         self.rich_columns.insert(relative_affected + 1, relationship_column)
 
@@ -726,8 +726,8 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
         self.rich_columns = self._get_rich_columns()
         # Row expansion (@see DataTableDefinition.setupClientExpend) - variantGridRowDetail in grid.js
         # fetches variant_grid_row_detail for the annotation version this grid is showing
-        self.expand_client_renderer = \
-            f"variantGridRowDetail.bind(null, {self._get_annotation_version().pk})"
+        self.expand_client_renderer = "variantGridRowDetail"
+        self.expand_client_renderer_kwargs = {"annotationVersionId": self._get_annotation_version().pk}
 
     def _get_rich_columns(self) -> list[RichColumn]:
         rich_columns, _sample_columns_position = self._build_variant_grid_columns()
@@ -982,7 +982,7 @@ class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryColl
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('manual_variant_entry_collection_detail', expected_height=120)
+        self.set_expand_ajax('manual_variant_entry_collection_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('id', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),

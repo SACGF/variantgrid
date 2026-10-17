@@ -196,7 +196,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key='published_evidence__gene_symbol__value',
                 name='gene_symbol',
                 label='Gene Symbol',
-                client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.GENE_SYMBOL }")',
+                client_renderer='VCTable.evidence_key',
+                client_renderer_kwargs={"key": SpecialEKeys.GENE_SYMBOL},
                 orderable=True
             ),
             RichColumn(

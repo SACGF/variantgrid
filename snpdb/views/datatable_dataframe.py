@@ -18,7 +18,12 @@ from library.django_utils.grid_export import csv_streaming_response, grid_export
 from library.pandas_utils import df_nan_to_none
 from library.utils import JsonObjType, nice_class_name
 from snpdb.models import UserGridConfig
-from snpdb.views.datatable_view import DATATABLE_CSV_PARAM, SortOrder, escape_cell
+from snpdb.views.datatable_view import (
+    DATATABLE_CSV_PARAM,
+    SortOrder,
+    check_client_renderer_name,
+    escape_cell,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +210,8 @@ class DataFrameTableView(JSONResponseView):
             columns.append({
                 "data": column_key,
                 "label": conditional_escape(config.index_label if is_index else config.get_column_label(column_name)),
-                "render": config.index_client_renderer if is_index else config.get_column_client_renderer(column_name),
+                "render": check_client_renderer_name(config.index_client_renderer if is_index
+                                                     else config.get_column_client_renderer(column_name)),
                 "orderable": True,
                 "orderSequence": [SortOrder.ASC.value, SortOrder.DESC.value],
                 "className": f"dt-{column_key}",

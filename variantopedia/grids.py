@@ -85,7 +85,7 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
         super().__init__(request)
         self.download_csv_button_enabled = True
 
-        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        # self.set_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('variant', renderer=self.render_variant, client_renderer="renderVariantId"),
             RichColumn(name="genome_build", renderer=self.render_genome_build, visible=False),
@@ -550,7 +550,7 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     """ This is for showing on the variant page """
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('viewTagDetail', id_field="tag")
+        self.set_expand_ajax('viewTagDetail', id_field="tag")
         self.tag_stale_date = UserSettings.get_for_user(self.user).variant_tag_stale_date
         # Custom tag ordering from the tag colors page - tags without an entry sort as 0
         self.sort_order_by_tag = get_tag_sort_order_by_tag(self.user)
