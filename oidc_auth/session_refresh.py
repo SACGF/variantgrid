@@ -1,4 +1,9 @@
+import re
+
 from mozilla_django_oidc.middleware import SessionRefresh
+
+# DRF lives under /api/ or /<app>/api/
+_API_PATH_RE = re.compile(r'^/([^/]+/)?api/')
 
 
 class VariantGridSessionRefresh(SessionRefresh):
@@ -10,7 +15,7 @@ class VariantGridSessionRefresh(SessionRefresh):
         return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
 
     def is_refreshable_url(self, request):
-        if '/api/' in request.path or VariantGridSessionRefresh.is_ajax(request):
+        if _API_PATH_RE.match(request.path) or VariantGridSessionRefresh.is_ajax(request):
             # API requests use token-based auth (OIDCAuthentication in DRF) and do not need
             # browser-based session refresh. AJAX requests are excluded to avoid interrupting
             # in-flight XHR calls with an OIDC redirect.
