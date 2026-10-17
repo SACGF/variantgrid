@@ -6,8 +6,9 @@ from types import SimpleNamespace
 
 from django.test import TestCase
 
-from annotation.models.models import ClinVar, VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import ClinVar, VariantAnnotation
 from annotation.models.models_enums import ClinVarReviewStatus
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from library.genomics import Range, overlap_fraction
 

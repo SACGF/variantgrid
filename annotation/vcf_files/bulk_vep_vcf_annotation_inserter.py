@@ -23,11 +23,11 @@ from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PRE
 from annotation.models.models import (
     AnnotationRun,
     VariantAnnotation,
-    VariantAnnotationVersion,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
 from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.sv_conservation import (

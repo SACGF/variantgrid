@@ -36,8 +36,8 @@ from annotation.fake_data import (
     get_fake_annotation_version,
 )
 from annotation.models import AnnotationRangeLock, AnnotationRun
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.tasks.annotate_variants import annotate_variants
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant

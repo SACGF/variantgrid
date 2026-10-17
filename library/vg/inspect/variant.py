@@ -6,7 +6,8 @@ tags, samples carrying it (capped) and ClinGen / liftover state through the Alle
 from typing import Any
 
 from analysis.models.models_variant_tag import VariantTag
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from classification.models.classification import Classification
 from library.vg.inspect import capped, ref
 from library.vg.inspect.common import (

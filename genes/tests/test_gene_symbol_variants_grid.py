@@ -3,14 +3,9 @@ from django.test import TestCase
 
 from analysis.models import VariantTag
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
-from annotation.models.models import (
-    AnnotationRun,
-    AnnotationVersion,
-    ClinVar,
-    VariantAnnotationVersion,
-    VariantGeneOverlap,
-)
+from annotation.models.models import AnnotationRun, AnnotationVersion, ClinVar, VariantGeneOverlap
 from annotation.models.models_enums import ClinVarReviewStatus
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.fake_data import create_fake_transcript_version
 from genes.grids import GeneSymbolVariantsGrid
 from library.django_utils import FakeRequest

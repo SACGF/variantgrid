@@ -16,12 +16,8 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
-from annotation.models.models import (
-    AnnotationPipelineVersion,
-    AnnotationRangeLock,
-    AnnotationRun,
-    VariantAnnotationVersion,
-)
+from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines.annotsv import AnnotSVRunner
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import (
     _extract_pathogenic_overlaps,

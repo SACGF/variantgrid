@@ -35,7 +35,8 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (

@@ -17,7 +17,7 @@ from annotation.backfill_columns import (
     import_backfill_vcf,
     resolve_backfill_columns,
 )
-from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from snpdb.models.models_genome import GenomeBuild
 
 

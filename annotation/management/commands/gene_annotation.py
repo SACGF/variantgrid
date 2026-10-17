@@ -18,7 +18,7 @@ from annotation.models import (
     OntologyTerm,
     VariantAnnotationVersion,
 )
-from annotation.models.models import SubVersionPartition
+from annotation.models.models_version import SubVersionPartition
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import (

@@ -36,7 +36,8 @@ from analysis.models.nodes.node_types import (
     get_node_types_hash_by_class_name,
     get_nodes_by_classification,
 )
-from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
+from annotation.models.models import AnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models.models_gene import GeneSymbol
 from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2, Select2Multiple

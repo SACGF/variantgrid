@@ -10,8 +10,9 @@ from annotation.annotation_pipeline_routing import (
 )
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.fake_data import get_fake_annotation_version
-from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
+from annotation.models.models import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import (

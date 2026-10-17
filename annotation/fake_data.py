@@ -26,12 +26,11 @@ from annotation.models.models import (
     ClinVarVersion,
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
-    SubVersionPartition,
     VariantAnnotation,
-    VariantAnnotationVersion,
 )
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from annotation.models.models_enums import AnnotationStatus
+from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion

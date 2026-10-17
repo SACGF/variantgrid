@@ -12,11 +12,11 @@ from annotation.models import AnnotationStatus, VEPSkippedReason
 from annotation.models.models import (
     AnnotationRun,
     AnnotationVersion,
-    InvalidAnnotationVersionError,
     VariantAnnotation,
     VariantTranscriptAnnotation,
 )
 from annotation.models.models_enums import NMDEscapeStatus
+from annotation.models.models_version import InvalidAnnotationVersionError
 from genes.hgvs import HGVSException, HGVSMatcher
 from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
