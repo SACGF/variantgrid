@@ -93,6 +93,9 @@ Gotchas:
   calculate_cohort_stats' locked transaction. Python folds the grouped rows onto the counter fields and keeps the trio
   predicates (_trio_predicates, mirroring analysis/models/nodes/sources/trio_node.py) and the compound het pairing.
   A new per-row input is a bit in _BOOLEAN_FLAGS_SQL; a new counting rule goes in _flag_field_indexes / _add_count.
+- A sub cohort's stats are written to its parent's CGC (calculate_sample_stats.py:calculate_cohort_stats, #2311): only
+  the base cohort writes per-sample rows and clears the CGC, a sub cohort writes just its aggregate/trio rows under keys
+  carrying its samples (snpdb/models/models_cohort.py:Cohort.get_stats_filter_key). Freshness needs a row per key.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
 - transcripts_annotation_selections.py:VariantTranscriptSelections converts the coordinate to explicit once before

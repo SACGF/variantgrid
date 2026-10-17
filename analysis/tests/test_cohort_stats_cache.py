@@ -30,6 +30,7 @@ from annotation.tasks.calculate_sample_stats import (
 from library.utils.json_utils import canonical_filter_key
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
+    Cohort,
     CohortGenotypeStats,
     GenomeBuild,
     ImportStatus,
@@ -66,7 +67,7 @@ class TestStatsFilterKeyRoundTrip(TestCase):
 
     @staticmethod
     def _trio_node(inheritance, mother_affected=False, father_affected=True, require_zygosity=True):
-        trio = Trio(mother_affected=mother_affected, father_affected=father_affected)
+        trio = Trio(cohort=Cohort(), mother_affected=mother_affected, father_affected=father_affected)
         return TrioNode(inheritance=inheritance, require_zygosity=require_zygosity, trio=trio)
 
     def test_trio_node_round_trip(self):
@@ -84,8 +85,8 @@ class TestStatsFilterKeyRoundTrip(TestCase):
 
     def test_modes_without_affected_flags_keep_one_key(self):
         """ Only dominant depends on affected status - a flag edit leaves the other buckets valid """
-        unaffected_parents = set(Trio(mother_affected=False, father_affected=False).get_stats_filter_keys())
-        affected_mother = set(Trio(mother_affected=True, father_affected=False).get_stats_filter_keys())
+        unaffected_parents = set(Trio(cohort=Cohort(), mother_affected=False, father_affected=False).get_stats_filter_keys())
+        affected_mother = set(Trio(cohort=Cohort(), mother_affected=True, father_affected=False).get_stats_filter_keys())
         self.assertEqual(len(unaffected_parents & affected_mother), len(Trio.STATS_INHERITANCE_MODES) - 1)
 
     def test_trio_node_uncacheable_without_require_zygosity(self):
@@ -201,10 +202,10 @@ class TestCohortStatsRecomputeLock(TestCase):
 
     def test_cohort_stats_are_fresh_true_when_all_present(self):
         self.assertFalse(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None]))
         self._create_fresh_stats(self.cgc, self.code_version)
         self.assertTrue(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None]))
 
     def test_cohort_stats_are_fresh_false_on_code_version_mismatch(self):
         # Rows present but at a different code_version → a bump must force recompute.
@@ -212,7 +213,7 @@ class TestCohortStatsRecomputeLock(TestCase):
             name="test_other", version=98)
         self._create_fresh_stats(self.cgc, other_code_version)
         self.assertFalse(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None]))
 
     def test_cohort_stats_are_fresh_false_when_partial(self):
         # Only the genotype-level row present; annotation-version rows missing.
@@ -221,7 +222,14 @@ class TestCohortStatsRecomputeLock(TestCase):
             passing_filter=False, code_version=self.code_version,
             import_status=ImportStatus.SUCCESS)
         self.assertFalse(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None]))
+
+    def test_cohort_stats_are_fresh_false_when_a_key_is_missing(self):
+        # Eg a trio's affected flags changed its autosomal dominant key since the last compute
+        self._create_fresh_stats(self.cgc, self.code_version)
+        keys = [None, canonical_filter_key({"inheritance": "denovo"})]
+        self.assertFalse(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, keys))
 
     def test_early_exit_when_fresh_skips_recompute(self):
         self._create_fresh_stats(self.cgc, self.code_version)

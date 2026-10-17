@@ -142,8 +142,9 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
         """ The key a mode's cohort stats bucket is stored under - the writer and the readers both
             come through here so they can't drift apart. autosomal_dominant's predicate branches on
             which parents are affected, so those flags belong in its key: editing them misses the
-            old bucket and recomputes, rather than reading one built for the previous flags. """
-        key = {"inheritance": mode}
+            old bucket and recomputes, rather than reading one built for the previous flags.
+            A trio on a sub cohort shares its parent's CGC, so its keys carry the sub cohort's scope. """
+        key = {**self.cohort.stats_filter_scope, "inheritance": mode}
         if mode == "autosomal_dominant":
             key["mother_affected"] = bool(self.mother_affected)
             key["father_affected"] = bool(self.father_affected)

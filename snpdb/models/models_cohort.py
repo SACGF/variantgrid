@@ -38,6 +38,7 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.unit_percent import convert_from_percent_to_unit
 from library.utils import invert_dict
+from library.utils.json_utils import canonical_filter_key
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
@@ -310,6 +311,18 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     @property
     def is_sub_cohort(self):
         return self.parent_cohort is not None
+
+    @cached_property
+    def stats_filter_scope(self) -> dict:
+        """ A sub cohort's CohortGenotype*Stats aggregate rows live on its parent's CGC, so their filter keys
+            carry its samples - which also makes a changed sample set miss and recompute (#2311) """
+        if self.is_sub_cohort:
+            return {"sub_cohort_samples": list(self.get_sample_ids())}
+        return {}
+
+    def get_stats_filter_key(self) -> Optional[str]:
+        """ The key of this cohort's raw aggregate stats row - None for a base cohort """
+        return canonical_filter_key(self.stats_filter_scope)
 
     def get_base_cohort(self):
         """ Underlying cohort (ie deals with sub cohorts) """

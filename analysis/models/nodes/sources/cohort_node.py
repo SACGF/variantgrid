@@ -50,8 +50,8 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         return [True, True, True, True]
 
     def get_stats_filter_key(self) -> Optional[str]:
-        """ The precomputed cohort stats bucket counts are read from - None is the raw aggregate row """
-        return None
+        """ The precomputed cohort stats bucket counts are read from - the cohort's raw aggregate row """
+        return self._get_cohort().get_stats_filter_key()
 
     def _get_cached_label_count(self, label):
         cohort = self._get_cohort()
