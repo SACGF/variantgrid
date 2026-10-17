@@ -1,11 +1,10 @@
 """
-The annotation version models and the annotation itself. SubVersionPartition is the base for every
-per-version partitioned table (ClinVarVersion, GeneAnnotationVersion, HumanProteinAtlasAnnotationVersion,
-VariantAnnotationVersion); AnnotationVersion bundles one of each per build and is what analyses pin;
-AnnotationRangeLock / AnnotationRun are one batch of variants through VEP; VariantAnnotation (the
-representative transcript row) and VariantTranscriptAnnotation (every transcript) hold the columns
-VEPColumnDef writes. Query a version's rows through annotation/annotation_version_querysets.py,
-never VariantAnnotation.objects directly. Enums are in models_enums.py and damage_enums.py.
+The variant annotation rows VEP writes: VariantAnnotation (the representative transcript, one row per variant) and
+VariantTranscriptAnnotation (every transcript) share AbstractVariantAnnotation's per-transcript columns, and
+VariantGeneOverlap has a row per gene a variant overlaps, for gene list queries. All three are partitioned per
+VariantAnnotationVersion, so query them through annotation/annotation_version_querysets.py, never
+VariantAnnotation.objects directly. Plugin display parsing is in annotation/open_targets.py and
+annotation/vep_plugin_display.py. Also CachedWebResource and the gene citation / PubMed count tables it loads.
 """
 import logging
 import re
@@ -47,9 +46,7 @@ from annotation.models.models_enums import (
     VariantAnnotationPipelineType,
     VEPSkippedReason,
 )
-from annotation.models.models_version import (
-    VariantAnnotationVersion,
-)
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.repeat_masker import RepeatMaskerSummary
 from genes.models import (
     Gene,
@@ -62,10 +59,7 @@ from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict
 from patients.models_enums import GnomADPopulation
-from snpdb.models import (
-    Q,
-    Variant,
-)
+from snpdb.models import Variant
 from snpdb.models.models_enums import ImportStatus
 
 
