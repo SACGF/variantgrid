@@ -10,11 +10,11 @@ from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from classification.enums.condition_enums import MultiCondition
 from classification.models import (
     ConditionMatchingSuggestion,
     ConditionText,
     ConditionTextMatch,
-    MultiCondition,
     condition_matching_suggestions,
     update_condition_text_match_counts,
 )

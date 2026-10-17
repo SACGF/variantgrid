@@ -71,6 +71,7 @@ from classification.enums import (
     ValidationCode,
     WithdrawReason,
 )
+from classification.enums.condition_enums import MultiCondition
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
@@ -137,7 +138,7 @@ from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
 
 if TYPE_CHECKING:
-    from classification.models import ClinicalContext, ConditionText, MultiCondition
+    from classification.models import ClinicalContext, ConditionText
 
 ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
@@ -381,7 +382,7 @@ class ConditionResolved:
     def from_uncounted_terms(
             terms: list[OntologyTerm] = None,
             plain_text_terms: list[str] = None,
-            join: Optional['MultiCondition'] = None,
+            join: Optional[MultiCondition] = None,
             plain_text: Optional[str] = None
     ) -> 'ConditionResolved':
         references: list[ConditionReference] = []
@@ -404,7 +405,6 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
-        from classification.models import MultiCondition
         if not condition_dict:
             return ConditionResolved(references=[])
 
@@ -523,8 +523,6 @@ class ConditionResolved:
     def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
         if self.terms:
-            from classification.models import MultiCondition
-
             def format_term(term: OntologyTerm) -> str:
                 if name := term.name:
                     return f"{term.id} {name}"
@@ -564,7 +562,6 @@ class ConditionResolved:
     def join_text(self) -> Optional[str]:
         if join := self.join:
             try:
-                from classification.models import MultiCondition
                 return MultiCondition(join).label
             except Exception:
                 pass
