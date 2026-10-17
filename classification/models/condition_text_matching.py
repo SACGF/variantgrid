@@ -26,10 +26,12 @@ from classification.models import flag_types
 from classification.models.classification import (
     Classification,
     ClassificationModification,
+    classification_post_publish_signal,
+)
+from classification.models.condition_resolved import (
     ConditionReference,
     ConditionResolved,
     ConditionResolvedDict,
-    classification_post_publish_signal,
 )
 from classification.models.condition_text_search import monarch_condition_text_search
 from classification.models.evidence_key import EvidenceKeyMap
