@@ -15,7 +15,7 @@ from classification.models.evidence_key import (
     VCPatch,
     VCStore,
 )
-from genes.hgvs import PHGVS, HGVSComponents
+from genes.hgvs import HGVSComponents
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
@@ -246,10 +246,6 @@ class EvidenceMixin:
     @cached_property
     def c_parts(self) -> HGVSComponents:
         return HGVSComponents(self.get(SpecialEKeys.C_HGVS) or "")
-
-    @cached_property
-    def p_parts(self) -> PHGVS:
-        return PHGVS.parse(self.get(SpecialEKeys.P_HGVS), override_is_confirmed_to=False)
 
     @property
     def transcript(self) -> Optional[str]:

@@ -83,7 +83,9 @@ Liftover is per Allele, not per Variant: the goal is a Variant in every annotate
 cursor is held open for the hours a big run takes and alleles lifted over by earlier batches drop out), holds one batch
 of `settings.LIFTOVER_BATCH_SIZE` in memory and writes one VCF per (batch, tool, destination build). The celery entry
 `snpdb/tasks/liftover_tasks.py:liftover_alleles` fans out `snpdb/tasks/liftover_tasks.py:liftover_allele_batch` per pk
-range, and each batch re-queries `Allele.missing_variants_for_build` so a failure only loses its own batch.
+range, and each batch re-queries `Allele.missing_variants_for_build` so a failure only loses its own batch. The Allele
+admin action queues `snpdb/tasks/liftover_tasks.py:liftover_selected_allele_batch` per `LIFTOVER_BATCH_SIZE` of the
+selected ids instead (ids, as a selection isn't a pk range); each links ClinGen alleles and retries every tool.
 
 `snpdb/liftover.py:_get_build_liftover_dicts` chooses the method per allele, stopping at the first that works:
 `snpdb/liftover.py:_liftover_using_existing_contig` when the contig is shared between builds (MT), which just creates the
