@@ -22,8 +22,8 @@ from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType
 from analysis.models.enums import NodeStatus, SNPMatrix
-from analysis.models.nodes.analysis_node import NodeTask, NodeVCFFilter
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
+from analysis.models.nodes.node_support_models import NodeTask, NodeVCFFilter
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,

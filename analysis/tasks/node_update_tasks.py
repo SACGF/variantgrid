@@ -17,14 +17,10 @@ from analysis.exceptions import (
     NodeOutOfMemoryException,
     NodeParentErrorsException,
 )
-from analysis.models.nodes.analysis_node import (
-    AnalysisNode,
-    NodeCache,
-    NodeStatus,
-    NodeTask,
-    NodeVersion,
-    node_query_planner_settings,
-)
+from analysis.models.enums import NodeStatus
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
+from analysis.models.nodes.node_support_models import NodeCache, NodeTask, NodeVersion
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS

@@ -25,17 +25,13 @@ from django.utils import timezone
 from analysis.exceptions import NonFatalNodeError
 from analysis.models import Analysis, NodeStatus
 from analysis.models.enums import NodeErrorSource
-from analysis.models.nodes.analysis_node import (
-    AnalysisEdge,
-    AnalysisNode,
-    NodeTask,
-    NodeVersion,
-    node_query_planner_settings,
-)
+from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode
 from analysis.models.nodes.node_counts import (
     get_tag_node_counts_dict,
     get_tagged_variant_ids_by_label,
 )
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
+from analysis.models.nodes.node_support_models import NodeTask, NodeVersion
 from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
 from library.utils.collection_utils import toposort_groups

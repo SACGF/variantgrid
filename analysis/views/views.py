@@ -46,8 +46,8 @@ from analysis.models import (
 from analysis.models.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
+from analysis.models.nodes.node_support_models import AnalysisClassification
 from analysis.models.nodes.node_types import (
     get_node_display_data_by_class_name,
     get_node_types_hash,
