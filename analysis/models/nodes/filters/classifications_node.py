@@ -80,7 +80,7 @@ class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
         vc_qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
         if lab_list := list(self.get_labs()):
             vc_qs = vc_qs.filter(lab__in=lab_list)
-        return Classification.get_variant_q_from_classification_qs(vc_qs, self.analysis.genome_build)
+        return vc_qs.variant_q(self.analysis.genome_build)
 
     def has_classification_filters(self) -> bool:
         """ Whether any classification significance is selected for the node's allele origin """

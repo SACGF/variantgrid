@@ -204,9 +204,57 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
     def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
-        # i.e., we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+        # i.e., we don't use ClassificationQuerySet.variant_q() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
+
+
+class ClassificationQuerySet(QuerySet):
+    """ Classification.objects - the query builders analysis nodes, gene counts and searches filter variants with """
+
+    def for_gene(self, gene: Gene) -> ClassificationQuerySet:
+        match_gene = Q(**{"variant__" + VariantAnnotation.GENE_COLUMN: gene})
+        match_evidence = Q(evidence__ensembl_gene_id__value=gene.pk)
+        return self.filter(match_gene | match_evidence)
+
+    def published_for_user(self, user: User, clinical_significance_list: Iterable[str] = None,
+                           lab_list: Iterable[Lab] = None,
+                           somatic_clinical_significance_list: Iterable[str] = None,
+                           allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> ClassificationQuerySet:
+        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
+            record matches if either its germline or somatic clinical significance is in its list """
+        cm_qs = ClassificationModification.latest_for_user(user, published=True,
+                                                           allele_origin_buckets=allele_origin_buckets)
+        cs_q = Q()
+        if clinical_significance_list:
+            cs_q |= Q(clinical_significance__in=clinical_significance_list)
+        if somatic_clinical_significance_list:
+            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
+        if cs_q:
+            cm_qs = cm_qs.filter(cs_q)
+        qs = self.filter(pk__in=cm_qs.values('classification'))
+        if lab_list:
+            qs = qs.filter(lab__in=lab_list)
+        return qs
+
+    def published_variant_q(self, user: User, genome_build: GenomeBuild,
+                            clinical_significance_list: Iterable[str] = None,
+                            lab_list: Iterable[Lab] = None,
+                            somatic_clinical_significance_list: Iterable[str] = None,
+                            allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
+        """ returns a Q object filtering variants to those with a PUBLISHED classification
+            (optionally classification in clinical_significance_list """
+        vc_qs = self.published_for_user(user, clinical_significance_list, lab_list,
+                                        somatic_clinical_significance_list=somatic_clinical_significance_list,
+                                        allele_origin_buckets=allele_origin_buckets)
+        return vc_qs.variant_q(genome_build)
+
+    def variant_q(self, genome_build: GenomeBuild) -> Q:
+        """ Q against Variant for the variants of these classifications' alleles in genome_build """
+        va_qs = VariantAllele.objects.filter(genome_build=genome_build,
+                                             allele__in=self.values_list("allele"))
+        variant_ids = va_qs.values_list("variant_id", flat=True)
+        return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 
 
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewModelMixin):
@@ -227,6 +275,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
     """ Deprecated -  """
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
+
+    objects = ClassificationQuerySet.as_manager()
 
     allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
     """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between 
@@ -1753,53 +1803,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def get_edit_url(self) -> str:
         return self.get_absolute_url() + "?edit=true"
-
-    @staticmethod
-    def get_q_for_gene(gene: Gene) -> Q:
-        match_gene = Q(**{"variant__" + VariantAnnotation.GENE_COLUMN: gene})
-        match_evidence = Q(evidence__ensembl_gene_id__value=gene.pk)
-        return match_gene | match_evidence
-
-    @staticmethod
-    def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
-                               lab_list: Iterable[Lab] = None,
-                               somatic_clinical_significance_list: Iterable[str] = None,
-                               allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet:
-        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
-            record matches if either its germline or somatic clinical significance is in its list """
-        cm_qs = ClassificationModification.latest_for_user(user, published=True,
-                                                           allele_origin_buckets=allele_origin_buckets)
-        cs_q = Q()
-        if clinical_significance_list:
-            cs_q |= Q(clinical_significance__in=clinical_significance_list)
-        if somatic_clinical_significance_list:
-            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
-        if cs_q:
-            cm_qs = cm_qs.filter(cs_q)
-        qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
-        if lab_list:
-            qs = qs.filter(lab__in=lab_list)
-        return qs
-
-    @staticmethod
-    def get_variant_q(user: User, genome_build: GenomeBuild,
-                      clinical_significance_list: Iterable[str] = None,
-                      lab_list: Iterable[Lab] = None,
-                      somatic_clinical_significance_list: Iterable[str] = None,
-                      allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
-        """ returns a Q object filtering variants to those with a PUBLISHED classification
-            (optionally classification in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list,
-                                                      somatic_clinical_significance_list=somatic_clinical_significance_list,
-                                                      allele_origin_buckets=allele_origin_buckets)
-        return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
-
-    @staticmethod
-    def get_variant_q_from_classification_qs(vc_qs, genome_build: GenomeBuild) -> Q:
-        va_qs = VariantAllele.objects.filter(genome_build=genome_build,
-                                             allele__in=vc_qs.values_list("allele"))
-        variant_ids = va_qs.values_list("variant_id", flat=True)
-        return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 
     @staticmethod
     def annotate_with_variant_sort(classifications_qs: QuerySet, genome_build: GenomeBuild, name="variant_sort"):

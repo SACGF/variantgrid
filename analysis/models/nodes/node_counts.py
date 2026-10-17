@@ -63,8 +63,8 @@ def get_extra_filters_q(analysis, extra_filters) -> Q:
             clinical_significance_list = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
         elif extra_filters == BuiltInFilters.CLASSIFIED_TIER_1_2:
             somatic_clinical_significance_list = SomaticClinicalSignificance.TIER_1_AND_2_VALUES
-        q = Classification.get_variant_q(user, annotation_version.genome_build, clinical_significance_list,
-                                         somatic_clinical_significance_list=somatic_clinical_significance_list)
+        q = Classification.objects.published_variant_q(user, annotation_version.genome_build, clinical_significance_list,
+                                                         somatic_clinical_significance_list=somatic_clinical_significance_list)
     elif extra_filters == BuiltInFilters.IMPACT_HIGH_OR_MODERATE:
         q = Q(variantannotation__impact__in=(PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE))
     elif extra_filters == BuiltInFilters.COSMIC:

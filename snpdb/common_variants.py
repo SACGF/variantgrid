@@ -60,7 +60,7 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
     if alleles is not None:
         classification_kwargs["allele__in"] = alleles
     vc_qs = Classification.objects.filter(**classification_kwargs)
-    q_classification = Classification.get_variant_q_from_classification_qs(vc_qs, cgcfv.genome_build)
+    q_classification = vc_qs.variant_q(cgcfv.genome_build)
     if vav is None:
         # Without AF for this gnomAD version we can't tell which classified variants sit in the common partition.
         # Moving a variant to uncommon is always safe (common is only a skip optimisation), so treat every
