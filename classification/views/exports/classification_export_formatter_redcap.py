@@ -16,6 +16,7 @@ from classification.models import (
     EvidenceKey,
     EvidenceKeyMap,
 )
+from classification.models.classification_evidence_normalise import export_value
 from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
@@ -331,7 +332,7 @@ class RedcapKeyValueFormatter(KeyValueFormatter):
     def value_for(self, ekey: EvidenceKey, value, pretty=False):
         if ekey.value_type in {EvidenceKeyValueType.SELECT, EvidenceKeyValueType.CRITERIA}:
             if value:
-                return Classification._export_value(value, key_data=ekey, export_key='index')
+                return export_value(value, key_data=ekey, export_key='index')
 
         elif ekey.value_type == EvidenceKeyValueType.MULTISELECT:
             return ekey.pretty_value(value)

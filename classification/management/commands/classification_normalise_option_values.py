@@ -1,6 +1,6 @@
 """Convert the legacy values of a select / multi-select evidence key to its option keys.
 
-Every write normalises a select value (Classification.process_entry), but records imported before that
+Every write normalises a select value (classification_evidence_normalise.process_entry), but records imported before that
 can still hold an option's label ("Autosomal recessive") or a comma separated string of labels. This
 rewrites the current evidence of internal-lab records as the sorted list of option keys - note, explain
 and immutability kept - and republishes a record whose latest version was already published. History is
@@ -20,6 +20,7 @@ from django.db import transaction
 
 from classification.enums import EvidenceKeyValueType, SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
+from classification.models.classification_evidence_normalise import match_option, option_value_parts
 from classification.models.condition_text_matching import ConditionTextMatch
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.django_utils.model_utils import ArrayLength
@@ -43,8 +44,8 @@ def normalise_option_value(e_key: EvidenceKey, value: Any) -> tuple[Any, list[st
     normalised: set[str] = set()
     unmatched: list[str] = []
     options = e_key.virtual_options or []
-    for part in Classification.option_value_parts(e_key, value):
-        if option := Classification.match_option(options, str(part)):
+    for part in option_value_parts(e_key, value):
+        if option := match_option(options, str(part)):
             normalised.add(option["key"])
         elif e_key.allow_custom_values:
             normalised.add(str(part))
