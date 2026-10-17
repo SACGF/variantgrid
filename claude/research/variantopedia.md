@@ -120,7 +120,7 @@ page goes further and drops builds entirely, because counting per build double-c
 ## Traps
 
 Viewing a page writes: `view_allele` calls `snpdb/clingen_allele.py:link_allele_to_existing_variants` (may create
-VariantAlleles) and both pages call `annotation/models/models.py:ClinVarRecordCollection.set_allele_for_variants`, which
+VariantAlleles) and both pages call `annotation/models/models_clinvar.py:ClinVarRecordCollection.set_allele_for_variants`, which
 backfills `allele` on ClinVar record collections so the ClinVar AJAX finds them. A read-only replica would break these
 pages.
 
