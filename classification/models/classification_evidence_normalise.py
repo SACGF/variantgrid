@@ -299,6 +299,7 @@ def process_entry(classification: Classification, cell: VCDataCell, source: str)
             value = value.replace('\u00a0', ' ')
     if note and '\u00a0' in note:
         note = note.replace('\u00a0', ' ')
+        cell.note = note
 
     if classification.lab.external:
         cell.validate = False
