@@ -19,7 +19,8 @@ from annotation.models.damage_enums import (
     Polyphen2Prediction,
     SIFTPrediction,
 )
-from annotation.models.models import AnnotationVersion, GenePubMedCount, VariantAnnotation
+from annotation.models.models import GenePubMedCount, VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_enums import ClinVarReviewStatus, VEPCustom
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR

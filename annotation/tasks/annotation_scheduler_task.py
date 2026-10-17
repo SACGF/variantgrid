@@ -22,9 +22,10 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationVersion
-from annotation.signals.manual_signals import annotation_run_discarded_signal
+from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
+from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.log_utils import log_traceback, report_message

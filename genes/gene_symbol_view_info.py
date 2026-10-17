@@ -12,7 +12,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models import VariantTag
 from annotation.models import Citation
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_gene_annotation import (
     DBNSFPGeneAnnotation,
     DBNSFPGeneAnnotationVersion,
