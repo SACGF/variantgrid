@@ -4,16 +4,23 @@ from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
+from django.db.models import (
+    Count,
+    IntegerField,
+    OuterRef,
+    QuerySet,
+    StringAgg,
+    Subquery,
+    TextField,
+    Value,
+)
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from analysis.models import VariantTag
-from annotation.models.models import (
-    AnnotationVersion,
-    GeneAnnotationVersion,
-    InvalidAnnotationVersionError,
-)
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_gene_annotation import GeneAnnotationVersion
+from annotation.models.models_version import InvalidAnnotationVersionError
 from genes.models import (
     CanonicalTranscript,
     CanonicalTranscriptCollection,

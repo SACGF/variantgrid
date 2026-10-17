@@ -21,13 +21,13 @@ from annotation import annotsv_columns as annotsv_columns_registry
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.models.models import (
-    AnnotationRun,
     VariantAnnotation,
-    VariantAnnotationVersion,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
+from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.sv_conservation import (
@@ -39,6 +39,10 @@ from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
+from annotation.vep_plugin_display import (
+    GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS,
+    vep_multi_fields_to_list_of_dicts,
+)
 from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneVersion, TranscriptVersion
@@ -624,7 +628,7 @@ class BulkVEPVCFAnnotationInserter:
             return
 
         empty_scores = EMPTY_VALUES | {"NA"}
-        records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, cls.PROMOTER_AI_COLUMNS)
+        records = vep_multi_fields_to_list_of_dicts(raw_db_data, cls.PROMOTER_AI_COLUMNS)
         scored = [r for r in records if r.get(cls.PROMOTER_AI_SCORE_COLUMN) not in empty_scores]
         if scored:
             best = max(scored, key=lambda r: abs(float(r[cls.PROMOTER_AI_SCORE_COLUMN])))
@@ -1058,7 +1062,7 @@ class SVOverlapProcessor:
 
         # The StructuralVariantOverlap fields are joined via '&'
         # Get it into a nice structure then process it
-        sv_records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, self.sv_fields)
+        sv_records = vep_multi_fields_to_list_of_dicts(raw_db_data, self.sv_fields)
         if required_substrings := self._get_required_substrings(raw_db_data["variant_class"]):
             filtered_sv_records = []
             for r in sv_records:
@@ -1075,11 +1079,11 @@ class SVOverlapProcessor:
             # Update if not special multi-field
             update_fields = {}
             for k, v in chosen_record.items():
-                if k not in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
+                if k not in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
                     update_fields[k] = v
 
             # Need to re-build the multi-files from what is filtered
-            for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
+            for f in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
                 update_fields[f] = VEP_SEPARATOR.join([r[f] for r in filtered_sv_records])
         else:
             # Nothing left after filtering - need to blank out all our values

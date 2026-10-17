@@ -31,7 +31,7 @@ from annotation.models import (
     CohortGenotypeVariantAnnotationStats,
     VCFAnnotationStats,
 )
-from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from annotation.tasks.calculate_sample_stats import (
     SAMPLE_STATS_CODE_VERSION,

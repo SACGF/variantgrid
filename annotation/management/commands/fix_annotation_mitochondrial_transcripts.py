@@ -12,11 +12,8 @@ Needs the fake transcripts imported first (import_cdot_latest).
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 
-from annotation.models.models import (
-    VariantAnnotation,
-    VariantAnnotationVersion,
-    VariantTranscriptAnnotation,
-)
+from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_PREFIX, CDOT_FAKE_TRANSCRIPT_VERSION

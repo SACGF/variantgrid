@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import (
     get_evidence_fields_for_sample_and_patient,
 )

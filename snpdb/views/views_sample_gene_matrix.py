@@ -12,12 +12,12 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from guardian.shortcuts import get_objects_for_group
 
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_gene_counts import (
     GeneCountType,
     GeneValueCountCollection,
     SampleAnnotationVersionVariantSource,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import GeneList
 from library.constants import HOUR_SECS
 from library.guardian_utils import DjangoPermission

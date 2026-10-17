@@ -5,8 +5,8 @@ from django.core.management.base import BaseCommand
 from django.db.models import Max
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.data_archive_mixin import DataArchivedError
 from snpdb.models import CohortGenotypeCollection, Variant

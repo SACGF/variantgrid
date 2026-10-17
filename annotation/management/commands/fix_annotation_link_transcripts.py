@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 
 import logging
+from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 from django.db.models import F, Func, Q, Value
 
 from annotation.models import (
-    TranscriptVersion,
     VariantAnnotation,
     VariantAnnotationVersion,
     VariantTranscriptAnnotation,
-    defaultdict,
 )
+from genes.models.models_gene import TranscriptVersion
 from snpdb.models.models_genome import GenomeBuild
 
 

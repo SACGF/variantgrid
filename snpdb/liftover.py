@@ -13,7 +13,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Prefetch, QuerySet
 
-from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.hgvs import HGVSMatcher
 from genes.hgvs.hgvs_matcher import get_hgvs_variant_coordinate
 from library.django_utils.django_file_utils import get_import_processing_dir

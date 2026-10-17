@@ -244,5 +244,5 @@ searches from `snpdb/signals/`.
 - Search must never mint a fusion identity; `snpdb/signals/variant_search.py:search_variant_gene_fusion` is lookup only.
 - Client-side grid renderers add links; they never convert data (`snpdb/grids.py:get_standard_overrides`).
 - `snpdb/forms.py:VCFForm` hides unused sample-field columns, so not every model field is on the form.
-- `ManualVariantEntry` lives in annotation (`annotation/models/models.py:ManualVariantEntryCollection`); snpdb only
+- `ManualVariantEntry` lives in annotation (`annotation/models/models_manual_variant.py:ManualVariantEntryCollection`); snpdb only
   supplies its form, view and grid.

@@ -1,6 +1,6 @@
 import logging
 
-from annotation.models.models import ClinVarVersion
+from annotation.models.models_clinvar import ClinVarVersion
 from annotation.vcf_files.import_clinvar_vcf import check_can_import_clinvar, import_clinvar_vcf
 from upload.models import UploadedClinVarVersion
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask

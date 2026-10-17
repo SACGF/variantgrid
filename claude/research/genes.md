@@ -60,7 +60,7 @@ The command is driven from the VariantAnnotationVersion, not from a filename.
 the VAV's `refseq` / `vep_cache` / `genebuild` pins (`RS_2025_08`, `110`, `2022_06`),
 `genes/cdot_data_release.py:find_latest_release_asset` finds the per-GFF asset with that token, and
 `genes/management/commands/import_cdot_gene_annotation_release.py:Command._ensure_release` downloads, creates and
-links it. Before downloading anything it tries `annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release`,
+links it. Before downloading anything it tries `annotation/models/models_version.py:VariantAnnotationVersion.link_gene_annotation_release`,
 which matches existing releases by the GFF URL in their import
 (`annotation/gene_annotation_release_matching.py:match_gene_annotation_release`) - a build's gene set usually does
 not change between VEP versions, so the previous VAV's release is normally the right one. An already-linked release
