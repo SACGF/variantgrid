@@ -30,27 +30,24 @@ so the sample node's minimum-reads threshold and allele frequency work on fusion
 import json
 import logging
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from typing import Optional
 
 from django.conf import settings
 
-from genes.gene_fusions import GeneFusionResolver, create_gene_fusions_for_variants
+from genes.gene_fusions import GeneFusionResolver, ResolvedFusion, create_gene_fusions_for_variants
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_writer import (
     VCFInfoHeader,
-    VCFWriter,
-    build_header_lines,
     percent_decode_info_value,
     percent_encode_info_value,
 )
 from library.utils.json_utils import json_dumps_nan_as_null
-from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,
     ModifiedImportedVariants,
-    SimpleVCFImportInfo,
     UploadStep,
 )
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -64,6 +61,12 @@ from upload.tso500.dragen_all_fusions_parser import (
     read_all_fusions,
     reference_reads,
     supporting_reads,
+)
+from upload.vcf.gene_level_rewrite import (
+    GeneLevelRecord,
+    gene_level_header_lines,
+    report_skip_counts,
+    write_gene_level_vcf,
 )
 from upload.vcf.vcf_import import resolve_genome_build_from_source
 from variantgrid.celery import app
@@ -164,17 +167,32 @@ def _vcf_filter(observations: list[dict]) -> str:
     return VCF_FILTER_NOT_KEPT
 
 
-def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, source: str):
-    """ Written already-clean and sorted, which is what lets preprocess skip straight to the split.
-        END = POS gives svlen 0 through vcf_get_ref_alt_svlen_and_modification, which needs one of
-        SVLEN/END for any symbolic alt (and reads SVLEN=0 as absent). """
+@dataclass(kw_only=True)
+class _FusionRecord(GeneLevelRecord):
+    """ One gene pair, from every caller row that named it """
+    event: ResolvedFusion
+    observations: list[dict]
 
+    @property
+    def sort_key(self) -> tuple:
+        return self.event.anchor.pk, self.event.alt
+
+
+def _fusion_record(resolved_fusion: ResolvedFusion, observations: list[dict]) -> _FusionRecord:
+    return _FusionRecord(event=resolved_fusion, observations=observations,
+                         vcf_filter=_vcf_filter(observations),
+                         fmt=f"{ALT_READS_FORMAT}:{REF_READS_FORMAT}",
+                         sample_calls=[_sample_call(observations)])
+
+
+def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, source: str):
+    records = [_fusion_record(resolved_fusion, fusion_observations)
+               for resolved_fusion, fusion_observations in observations.items()]
     meta_lines = [f"##source={source}"] if source else []
     meta_lines.extend(FILTER_HEADER_LINES)
-    header_lines = build_header_lines(
+    header_lines = gene_level_header_lines(
         meta_lines=meta_lines,
         info=[
-            VCFInfoHeader(id="END", type="Integer", description="Stop position of the interval"),
             VCFInfoHeader(id=FUSION_INFO, type="String",
                           description="Gene fusion in VICC gene-level nomenclature"),
             VCFInfoHeader(id=FUSION_OBSERVATIONS_INFO, type="String",
@@ -186,25 +204,17 @@ def _write_gene_level_vcf(filename: str, observations: dict, sample_name: str, s
             f'##FORMAT=<ID={REF_READS_FORMAT},Number=1,Type=Integer,'
             f'Description="Reads across the junctions that do not support the fusion">',
         ],
-        contig_lines=[f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},length={GENE_LEVEL_CONTIG_LENGTH}>"],
         samples=[sample_name],
+        records=records,
     )
 
-    with open(filename, "w") as f:
-        writer = VCFWriter(f, header_lines, encode_info=percent_encode_info_value)
-        for resolved_fusion in sorted(observations, key=lambda r: (r.anchor.pk, r.alt)):
-            variant_coordinate = resolved_fusion.variant_coordinate
-            fusion_observations = observations[resolved_fusion]
-            info = {
-                "END": variant_coordinate.position,
-                FUSION_INFO: resolved_fusion.canonical_str,
-                FUSION_OBSERVATIONS_INFO: json_dumps_nan_as_null(fusion_observations),
-            }
-            writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
-                                variant_coordinate.ref, variant_coordinate.alt,
-                                vcf_filter=_vcf_filter(fusion_observations),
-                                info=info, fmt=f"{ALT_READS_FORMAT}:{REF_READS_FORMAT}",
-                                sample_calls=[_sample_call(fusion_observations)])
+    def info_func(record: _FusionRecord) -> dict:
+        return {
+            FUSION_INFO: record.event.canonical_str,
+            FUSION_OBSERVATIONS_INFO: json_dumps_nan_as_null(record.observations),
+        }
+
+    write_gene_level_vcf(filename, header_lines, records, info_func, encode_info=percent_encode_info_value)
 
 
 class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
@@ -220,8 +230,7 @@ class DragenTSO500AllFusionsCreateVCFTask(ImportVCFStepTask):
         observations, ambiguous = _observations_by_variant_coordinate(rows, genome_build)
         _write_gene_level_vcf(upload_step.output_filename, observations,
                               sample_name=arm_sample_name(file_upload.name), source=source)
-        for ambiguous_message, count in ambiguous.items():
-            SimpleVCFImportInfo.add_message_count(count, AMBIGUOUS_MESSAGE_PREFIX + ambiguous_message, upload_step)
+        report_skip_counts(upload_step, ambiguous=ambiguous, ambiguous_prefix=AMBIGUOUS_MESSAGE_PREFIX)
         return len(rows)
 
 
