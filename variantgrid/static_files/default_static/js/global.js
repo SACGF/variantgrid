@@ -1058,29 +1058,40 @@ const JS_DATE_FORMAT_MILLISECONDS = 'YYYY-MM-DD HH:mm:ss.SSS';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
 const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD';
+
+/* "time ago" text is moment's fromNow, in words short enough for a grid cell */
 function configureTimestamps() {
-    if ($.timeago) {
-        $.timeago.settings.allowFuture = true;
-        $.timeago.settings.strings = {
-            prefixAgo: null,
-            prefixFromNow: null,
-            suffixAgo: "ago",
-            suffixFromNow: "from now",
-            seconds: "<1 min",
-            minute: "1 min",
-            minutes: "%d mins",
-            hour: "1 hour",
-            hours: "%d hours",
-            day: "1 day",
-            days: "%d days",
-            month: "1 month",
-            months: "%d months",
-            year: "1 year",
-            years: "%d years",
-            wordSeparator: " ",
-            numbers: []
-        };
+    if (typeof moment === 'undefined') {  // the login pages run globalSetup without moment
+        return;
     }
+    moment.updateLocale('en', {
+        relativeTime: {
+            future: "%s from now",
+            past: "%s ago",
+            s: "<1 min",
+            ss: "<1 min",
+            m: "1 min",
+            mm: "%d mins",
+            h: "1 hour",
+            hh: "%d hours",
+            d: "1 day",
+            dd: "%d days",
+            M: "1 month",
+            MM: "%d months",
+            y: "1 year",
+            yy: "%d years",
+        }
+    });
+    // count hours up to a whole day and days up to a month (moment rounds 22 hours up to "1 day")
+    moment.relativeTimeThreshold('h', 24);
+    moment.relativeTimeThreshold('d', 30);
+    setInterval(refreshTimeAgo, 60000);
+}
+
+function refreshTimeAgo() {
+    $('time.ago[datetime]').each(function() {
+        this.textContent = moment(this.getAttribute('datetime')).fromNow();
+    });
 }
 
 function convertTimestampDom(elem) {
@@ -1099,7 +1110,7 @@ function convertTimestampDom(elem) {
         let finalText = null;
         const daysDiff = m.diff(today, 'days');
         switch (daysDiff) {
-            // put a special case in for 2 as the hours component can sometimes trick timeAgo
+            // put a special case in for 2 as the hours component can sometimes trick fromNow
             case -2: finalText = "2 days ago"; break;
             case -1: finalText = "Yesterday"; break;
             case 0: finalText = "Today"; break;
@@ -1137,12 +1148,11 @@ function convertTimestampDom(elem) {
         if (title) {
             text += "<br/>" + title;
         }
-        newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: text});
+        newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.fromNow(), title: text});
         if (isFuture) {
             newElement.addClass('future');
         }
         elem.replaceWith(newElement);
-        newElement.timeago();
         newElement.tooltip({html: true});
     } else if (elem.hasClass('micro')) {
         newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_MILLISECONDS)});
@@ -1161,8 +1171,7 @@ function createTimestampDom(unix, timeAgo) {
     const jsTime = unix * 1000;
     const m = moment(jsTime);
     if (timeAgo) {
-        const timeAgoText = jQuery.timeago(jsTime);
-        return $('<time>', {class: 'ago', datetime: m.toISOString(), text: timeAgoText, title: m.format(JS_DATE_FORMAT_DETAILED)});
+        return $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.fromNow(), title: m.format(JS_DATE_FORMAT_DETAILED)});
     } else {
         return $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
     }
