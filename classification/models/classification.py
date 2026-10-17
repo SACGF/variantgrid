@@ -39,7 +39,6 @@ from django.db.models.expressions import OuterRef, RawSQL, Subquery, Value
 from django.db.models.functions import Cast, Concat, LPad
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
-from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
@@ -65,7 +64,6 @@ from classification.enums import (
     ValidationCode,
     WithdrawReason,
 )
-from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import (
@@ -97,13 +95,10 @@ from classification.models.evidence_mixin_summary_cache import (
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
-from flags.models import Flag, FlagPermissionLevel, FlagStatus
+from flags.models import FlagPermissionLevel
 from flags.models.models import (
-    FlagCollection,
-    FlagInfos,
     FlagsMixin,
     FlagTypeContext,
-    flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
 from genes.models import Gene, GeneSymbol, NoTranscript
@@ -212,78 +207,6 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         # i.e., we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
-
-
-@receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
-    """
-    Allows us to provide extra info for FlagCollections attached to Classification.
-    e.g. linking to the appropriate allele page, discordance report etc.
-    :param flag_infos: Information on the flag collections being displayed to the user.
-    Populates this with the extra info
-    :param user: The current user
-    :param kwargs: Required by @receiver
-    """
-    from classification.models.discordance_models import DiscordanceReportClassification
-
-    vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
-    drcs = DiscordanceReportClassification.objects.filter(classification_original__classification__in=vcs,
-                                                          report__resolution=DiscordanceReportResolution.ONGOING)
-    drcs_dict = {}
-    for drc in drcs.values_list('classification_original__classification', 'report'):
-        drcs_dict[drc[0]] = drc[1]
-
-    for vc in vcs:
-        """
-            # If we are to use sub-flags in their current incarnation, here's how we'd include
-            # one if zygosity or condition are missing
-            flags_for_vc = flag_infos.flags_for_collection[vc.flag_collection_id]
-            unsubmitted_flag = find_unsubmitted(flags_for_vc)
-
-            if unsubmitted_flag:
-                if vc.get(SpecialEKeys.ZYGOSITY) is None:
-                    flag_infos.record_sub_flag(unsubmitted_flag, 'Missing Zygosity', 'Z')
-                if vc.get(SpecialEKeys.CONDITION) is None:
-                    flag_infos.record_sub_flag(unsubmitted_flag, 'Missing Condition', 'C')
-        """
-
-        context = {
-            'label': vc.friendly_label,
-            'vc_id': vc.id
-        }
-        if vc.variant_id:
-            context['variant'] = vc.variant_id
-        if vc.clinical_context_id:
-            context['clinical_context'] = vc.clinical_context_id
-        if user and vc.can_write(user):
-            context['can_write'] = True
-
-        dc_report_id = drcs_dict.get(vc.id)
-        if dc_report_id:
-            context['discordance_report'] = dc_report_id
-
-        flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
-
-
-class ClassificationOutstandingIssues:
-
-    def __init__(self, classification: 'Classification'):
-        self.classification = classification
-        self.flags = []
-        self.issues = []
-
-    @property
-    def pk(self):
-        return self.classification.pk
-
-    def add_flag(self, flag: str):
-        self.flags.append(flag)
-
-    def add_issue(self, issue: str):
-        self.issues.append(issue)
-
-    def __str__(self):
-        return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
 
 
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewModelMixin):
@@ -515,10 +438,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return can_create and (user.is_superuser or settings.CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
 
     @staticmethod
-    def dashboard_report_new_classifications(since) -> int:
-        return Classification.objects.filter(created__gte=since).count()
-
-    @staticmethod
     def dashboard_total_shared_classifications() -> int:
         return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
                                              withdrawn=False).exclude(lab__name__icontains='legacy').count()
@@ -527,42 +446,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def dashboard_total_unshared_classifications() -> int:
         qs = Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy')
         return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
-
-    @staticmethod
-    def dashboard_report_classifications_of_interest(since) -> list[ClassificationOutstandingIssues]:
-        min_age = django_timezone.now() - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
-
-        time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
-
-        # want to find new tags that are still open
-        flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
-        flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
-        flag_q = Q(flag_collection_id__in=flag_collections.distinct())
-        missing_chgvs_q = (Q(allele_info__grch37__resolved_hgvs__isnull=True) | Q(allele_info__grch38__resolved_hgvs__isnull=True))
-        coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
-        coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
-
-        summaries: list[ClassificationOutstandingIssues] = []
-        c: Classification
-        for c in coi_qs:
-            coi = ClassificationOutstandingIssues(c)
-            this_flags = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN,
-                                             collection=c.flag_collection)
-
-            variant_matching = False
-            for flag_type in this_flags.order_by('flag_type').values_list('flag_type', flat=True):
-                if flag_type == 'classification_matching_variant':
-                    variant_matching = True
-                coi.add_flag(flag_type)
-            if not variant_matching:
-                if not c.resolved_hgvs_grch37:
-                    coi.add_issue("No cached 37 representation")
-                if not c.resolved_hgvs_grch38:
-                    coi.add_issue("No cached 38 representation")
-
-            summaries.append(coi)
-
-        return summaries
 
     @classmethod
     def order_by_evidence(cls, key_id: str):
