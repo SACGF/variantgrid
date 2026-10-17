@@ -924,13 +924,6 @@ class Variant(PreviewModelMixin, models.Model):
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
 
-    @cached_property
-    def vcf_alt(self) -> str:
-        """ Return the base as a string (not as our special REFERENCE_ALT) """
-        if self.is_reference:
-            return self.locus.ref.seq
-        return self.alt.seq
-
     @property
     def is_standard_variant(self) -> bool:
         """ Variant alt sequence is standard [GATCN] (ie not special or reference) """

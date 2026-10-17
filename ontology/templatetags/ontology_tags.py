@@ -14,14 +14,8 @@ from ontology.models import (
     OntologyTermRelation,
     PanelAppClassification,
 )
-from ontology.ontology_matching import OntologyMatch
 
 register = Library()
-
-
-@register.inclusion_tag("ontology/tags/ontology_match.html")
-def ontology_meta(data: OntologyMatch):
-    return {"ontology": data}
 
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")

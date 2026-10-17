@@ -319,10 +319,6 @@ class CitationIdNormalized:
         return CitationIdNormalized(use_source, index)
 
     @staticmethod
-    def from_citation(citation: Citation):
-        return CitationIdNormalized.from_parts(source=citation.source, index=citation.index)
-
-    @staticmethod
     def normalize_id(citation_id: Union[str, 'CitationIdNormalized']) -> 'CitationIdNormalized':
         if isinstance(citation_id, CitationIdNormalized):
             return citation_id

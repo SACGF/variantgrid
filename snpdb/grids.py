@@ -336,45 +336,6 @@ class VCFSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
         return vcf, vcf.genome_build
 
 
-class CohortSampleListColumns(DatatableConfig[Sample]):
-    """ Sample picker on the cohort page - either the cohort's samples, or the ones it could add """
-    grid_name = "Cohort Samples"
-    SHOW_COHORT = "show_cohort"
-    EXCLUDE_COHORT = "exclude_cohort"
-
-    def __init__(self, request: HttpRequest):
-        super().__init__(request)
-        self.rich_columns = [
-            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
-                       renderer=self.view_primary_key, client_renderer='renderCohortSampleCheckbox'),
-            RichColumn(key="name", label="Name", orderable=True),
-            RichColumn(key="vcf__name", label="VCF", orderable=True),
-            RichColumn(key="patient__family_code", label="Family Code", orderable=True),
-            RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
-            RichColumn(key="patient__first_name", label="First Name", orderable=True),
-            RichColumn(key="patient__last_name", label="Last Name", orderable=True),
-            RichColumn(key="patient__sex", label="Sex", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
-            RichColumn(key="patient__date_of_birth", label="D.O.B.", orderable=True,
-                       client_renderer='TableFormat.timestamp'),
-        ]
-
-    def get_initial_queryset(self) -> QuerySet[Sample]:
-        cohort = Cohort.get_for_user(self.user, self.get_query_param("cohort_id"))
-        qs = Sample.filter_for_user(self.user)
-        qs = qs.filter(vcf__genome_build=cohort.genome_build, import_status=ImportStatus.SUCCESS)
-
-        cohort_op = self.get_query_param("cohort_op") or self.EXCLUDE_COHORT
-        cohort_q = Q(cohortsample__cohort=cohort)
-        if cohort_op == self.SHOW_COHORT:
-            pass
-        elif cohort_op == self.EXCLUDE_COHORT:
-            cohort_q = ~cohort_q
-        else:
-            raise ValueError(f"Unknown cohort_op: '{cohort_op}'")
-        return qs.filter(cohort_q)
-
-
 class CohortListColumns(DatatableConfig[Cohort]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)

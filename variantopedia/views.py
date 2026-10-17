@@ -246,8 +246,7 @@ def view_variant(request, variant_id, genome_build_name=None):
     igv_data = get_igv_data(request.user, genome_build=genome_build)
     extra_context = {"igv_data": igv_data,
                      "in_multiple_genome_builds": in_multiple_genome_builds,
-                     "view_variant": True,
-                     "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'}
+                     "view_variant": True}
 
     annotation_version = AnnotationVersion.latest(genome_build)
     return variant_details_annotation_version(request, variant_id, annotation_version.pk,
@@ -626,5 +625,3 @@ def variant_tags_export(request, genome_build_name):
     response = StreamingHttpResponse(iter_rows(), content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
     return response
-
-

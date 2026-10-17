@@ -1095,11 +1095,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return self.vep_gene_set_versions.release_token
 
     @property
-    def gene_annotation_release_gff_url(self) -> Optional[str]:
-        """ The GFF/GTF cdot read to build this gene set """
-        return self.vep_gene_set_versions.gff_url
-
-    @property
     def suggested_gene_annotation_release_name(self) -> str:
         if release_token := self.cdot_gene_release_token:
             return f"{self.get_annotation_consortium_display()}_{release_token}"
