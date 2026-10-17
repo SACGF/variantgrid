@@ -2,9 +2,10 @@ from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 
-from classification.enums import ShareLevel, SubmissionSource
+from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
+from snpdb.models.models_enums import ShareLevel
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.variant_grid_upload import VariantGridUploadSyncer

@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource, ValidationCode
+from classification.enums import SpecialEKeys, SubmissionSource, ValidationCode
 from classification.models.classification import Classification, classification_validation_signal
 from classification.models.classification_utils import PatchMeta, ValidationMerger
 from classification.models.evidence_key import EvidenceKeyMap
@@ -14,6 +14,7 @@ from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
 from library.utils import first
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
+from snpdb.models.models_enums import AlleleOriginBucket
 
 __AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}
 __CHECK_IF_CHANGED = __AT_LEAST_ONE_SET | {SpecialEKeys.ALLELE_ORIGIN} | set(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys())

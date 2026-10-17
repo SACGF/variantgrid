@@ -9,13 +9,13 @@ from django.dispatch import receiver
 
 from annotation.canonical_annotation import get_canonical_c_hgvs
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
-from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
 from genes.hgvs import HGVSDisplay
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab, Organization, Variant
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 

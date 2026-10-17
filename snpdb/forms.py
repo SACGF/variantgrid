@@ -23,7 +23,6 @@ from guardian.shortcuts import assign_perm, remove_perm
 
 from annotation.models import ManualVariantEntry
 from annotation.models.models_enums import ManualVariantEntryType
-from classification.enums import AlleleOriginBucket
 from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
@@ -52,7 +51,7 @@ from snpdb.models import (
     VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import SampleFileType
+from snpdb.models.models_enums import AlleleOriginBucket, SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision

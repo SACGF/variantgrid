@@ -9,8 +9,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import Classification, ClassificationModification
+from snpdb.models.models_enums import ShareLevel
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.sync_runner import ClassificationUploadSyncRunner, sync_runner_for_destination

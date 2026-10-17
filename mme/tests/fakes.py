@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from classification.enums import SubmissionSource
-from classification.enums.classification_enums import ClinicalSignificance, ShareLevel, SpecialEKeys
+from classification.enums.classification_enums import SpecialEKeys
 from classification.models.classification import (
     Classification,
     ClassificationModification,
@@ -14,6 +14,7 @@ from classification.models.classification import (
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
 from ontology.models import OntologyService, OntologyTerm
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import ClinicalSignificance, ShareLevel
 
 
 def make_classification(lab, user, gene_symbol: str = "BRCA1",

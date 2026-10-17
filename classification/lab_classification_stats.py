@@ -11,9 +11,9 @@ from django.conf import settings
 from django.db.models import Exists, OuterRef, QuerySet
 from django.utils.timezone import now
 
-from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import Classification
 from snpdb.models.models import Lab
+from snpdb.models.models_enums import ShareLevel
 
 
 def _shared_classifications_qs() -> QuerySet[Classification]:

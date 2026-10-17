@@ -83,7 +83,6 @@ from annotation.pathogenicity_predictions import (
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
-from classification.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from genes.models import (
     Gene,
     GeneAnnotationRelease,
@@ -114,7 +113,7 @@ from snpdb.models import (
     Q,
     Variant,
 )
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_enums import AlleleOriginBucket, ImportStatus, SomaticClinicalSignificance
 
 
 class SubVersionPartition(RelatedModelsPartitionModel):

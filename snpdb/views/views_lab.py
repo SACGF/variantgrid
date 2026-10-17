@@ -9,7 +9,6 @@ from django.urls.base import reverse
 from django.views.decorators.http import require_POST
 
 from classification.classification_stats import get_grouped_classification_counts
-from classification.enums import AlleleOriginBucket
 from classification.lab_classification_stats import labs_with_classifications_qs
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import (
@@ -40,6 +39,7 @@ from snpdb.models import (
     State,
     UserSettings,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.utils import LabNotificationBuilder
 
 

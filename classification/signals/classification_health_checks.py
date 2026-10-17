@@ -1,6 +1,5 @@
 from django.dispatch import receiver
 
-from classification.enums import ShareLevel
 from classification.models import (
     Classification,
     ImportedAlleleInfo,
@@ -18,6 +17,7 @@ from library.health_check import (
     health_check_signal,
 )
 from library.utils import limit_str
+from snpdb.models.models_enums import ShareLevel
 
 """
 Reports information about classifications to the Slack health report

@@ -13,10 +13,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classification.enums import (
-    AlleleOriginBucket,
     EvidenceCategory,
     LabExternalFilter,
-    ShareLevel,
     TriageDecision, TriageStatus, TestingContextBucket, ClassificationResultValue,
 )
 from classification.models import (
@@ -37,6 +35,7 @@ from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
+from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 
 

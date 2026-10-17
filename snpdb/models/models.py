@@ -36,7 +36,6 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from more_itertools import first
 
-from classification.enums.classification_enums import AlleleOriginBucket
 from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.avatar import SpaceThemedAvatarProvider
@@ -46,7 +45,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import JsonObjType, import_class, string_deterministic_hash
-from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
+from snpdb.models.models_enums import AlleleOriginBucket, UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
 

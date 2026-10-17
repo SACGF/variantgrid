@@ -9,11 +9,11 @@ from django.db.models import Q, QuerySet
 from analysis.models import Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from annotation.models import AnnotationVersion, ClinVar, ClinVarReviewStatus, VariantAnnotation
-from classification.enums import AlleleOriginBucket, ClinicalSignificance
 from classification.models import Classification, ClassificationModification, EvidenceKey
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.classification_datatables import ClassificationColumns
 from snpdb.models import GenomeBuild, Sample
+from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from variantgrid.celery import app
 

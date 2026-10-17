@@ -10,7 +10,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from termsandconditions.decorators import terms_required
 
-from classification.enums import ShareLevel, TriageStatus
+from classification.enums import TriageStatus
 from classification.models import (
     ClinVarExport,
     ConditionText,
@@ -36,6 +36,7 @@ from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey
+from snpdb.models.models_enums import ShareLevel
 from snpdb.models.models_genome import GenomeBuild
 
 

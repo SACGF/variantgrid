@@ -8,7 +8,7 @@ from django.conf import settings
 
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
-from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
+from classification.enums import CriteriaEvaluation, SpecialEKeys
 from classification.models.evidence_key import (
     EvidenceKeyMap,
     VCDbRefDict,
@@ -19,6 +19,7 @@ from genes.hgvs import PHGVS, HGVSComponents
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)
