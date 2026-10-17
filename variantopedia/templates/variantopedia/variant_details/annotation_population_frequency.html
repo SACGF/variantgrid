@@ -1,0 +1,89 @@
+{% load js_tags %}
+{% load ui_utils %}
+<div class="col-md-6 mt-4">
+    <div class="card">
+        <div class="card-header">Population Frequency</div>
+        <div class="card-body">
+        {% if variant_annotation.has_non_gnomad_population_frequency %}
+            {% labelled id='af_1kg' label='1000 genomes' help=annotation_description.af_1kg hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_1kg|format_unit_as_percent }}{% endlabelled %}
+            {% labelled id='af_uk10k' label='UK10K' help=annotation_description.af_uk10k hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
+            {% labelled id='topmed_af' label='TopMed' help=annotation_description.topmed_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
+        {% endif %}
+            {% labelled label='gnomAD version' hint='tiny' %}{{ variant_annotation.version.gnomad }}{% endlabelled %}
+            {% if variant_annotation.has_gnomad %}
+                {% labelled id='gnomad_af' visible_fields=visible_fields label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
+                {% labelled id='gnomad_fafmax_faf95_max' visible_fields=visible_fields label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}
+
+                {% if variant_annotation.gnomad2_liftover_af %}
+                    {% labelled id='gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' help=annotation_description.gnomad2_liftover_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
+                {% endif %}
+                {% labelled id='gnomad_popmax_af' visible_fields=visible_fields label='gnomAD Pop Max' help=annotation_description.gnomad_popmax hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }}{% if 'gnomad_popmax' in visible_fields %} ({{ variant_annotation.get_gnomad_popmax_display }}){% endif %}{% endlabelled %}
+
+                {% if variant_annotation.gnomad_filtered %}
+                    {% labelled label="gnomAD Is Filtered" label_css="gnomad-filtered" help=annotation_description.gnomad_filtered hint="tiny" %}{{ variant_annotation.gnomad_filtered }}{% endlabelled %}
+                {% else %}
+                    {% labelled label="gnomAD Is Filtered" help=annotation_description.gnomad_filtered hint="tiny" %}{% endlabelled %}
+                {% endif %}
+
+                {% labelled id='gnomad_hom_alt' visible_fields=visible_fields label='gnomAD Total Homozygotes' help=annotation_description.gnomad_hom_alt hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
+                {% labelled id='gnomad_ac' visible_fields=visible_fields label='gnomAD Alt Allele Count' help=annotation_description.gnomad_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
+                {% labelled id='gnomad_an' visible_fields=visible_fields label='gnomAD Total number of alleles' help=annotation_description.gnomad_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+
+                {% if variant_annotation.has_hemi %}
+                    {% labelled id='gnomad_hemi_count' label='gnomAD Hemizygotes' help=annotation_description.gnomad_hemi_count hint="tiny" value_css="text-monospace" %}
+                        {% if variant_annotation.gnomad_non_par %}
+                            {{ variant_annotation.gnomad_hemi_count }}
+                        {% else %}
+                            PAR region
+                        {% endif %}
+                    {% endlabelled %}
+                {% endif %}
+
+                {% if variant_annotation.gnomad_url and not variant_annotation.is_structural_variant_annotation %}
+                    {% labelled label="View in gnomAD" hint="tiny" %}
+                        <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
+                    {% endlabelled %}
+                {% endif %}
+
+                {% labelled label="gnomAD Populations" hint="tiny" %}
+                    <a class='toggle-link' data-toggle="collapse" href='#gnomad-pops'>Show gnomAD Pops</a>
+                {% endlabelled %}
+
+                <div id="gnomad-pops" class="collapse">
+                    {% labelled id='gnomad_popmax_ac' visible_fields=visible_fields label='PopMax Alt Allele Count' help=annotation_description.gnomad_popmax_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_ac }}{% endlabelled %}
+                    {% labelled id='gnomad_popmax_an' visible_fields=visible_fields label='PopMax number of alleles' help=annotation_description.gnomad_popmax_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_an }}{% endlabelled %}
+
+                    {% labelled id='gnomad_afr_af' visible_fields=visible_fields label='African' help=annotation_description.gnomad_afr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_afr_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_asj_af' visible_fields=visible_fields label='Ashkenazi Jewish' help=annotation_description.gnomad_asj_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_asj_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_eas_af' visible_fields=visible_fields label='East Asian' help=annotation_description.gnomad_eas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_eas_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_fin_af' visible_fields=visible_fields label='European (Finnish)' help=annotation_description.gnomad_fin_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_nfe_af' visible_fields=visible_fields label='European (Non-Finnish)' help=annotation_description.gnomad_nfe_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_amr_af' visible_fields=visible_fields label='Latino' help=annotation_description.gnomad_amr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_mid_af' visible_fields=visible_fields label='Middle Eastern' help=annotation_description.gnomad_mid_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_mid_af|format_unit_as_percent }}{% endlabelled %}
+                    {% labelled id='gnomad_sas_af' visible_fields=visible_fields label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
+                </div>
+            {% else %}
+                {% labelled id='gnomad_none' label='gnomAD' hint="tiny" help=annotation_description.gnomad %}No gnomAD entry{% endlabelled %}
+            {% endif %}
+
+            {% if variant_annotation.is_structural_variant_annotation %}
+                {% labelled label="Structural Variants" hint="tiny" %}
+                    <a class='toggle-link' data-toggle="collapse" href='#gnomad-sv-list'>Show Structural Variant Overlaps</a>
+                {% endlabelled %}
+                <div id="gnomad-sv-list" class="collapse">
+                    {% for sv_overlap in variant_annotation.gnomad_sv_overlap %}
+                        {% labelled id='gnomad_sv_overlap_name' label='SV Overlap Name' help=annotation_description.gnomad_sv_overlap_name hint="tiny" value_css="text-monospace" %}
+                            <a target='_blank' class="hover-link" href='{{ sv_overlap.gnomad_sv_overlap_url }}'>{{ sv_overlap.gnomad_sv_overlap_name }}</a>
+                        {% endlabelled %}
+                        {% if sv_overlap.gnomad_sv_overlap_coords %}
+                            {% comment %}This might not have been annotated in all environments, so check before displaying {% endcomment %}
+                            {% labelled id='gnomad_sv_overlap_coords' label='SV Coords' help=annotation_description.gnomad_sv_overlap_coords hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_coords }} ({{ sv_overlap.gnomad_sv_overlap_length }}bp){% endlabelled %}
+                        {% endif %}
+                        {% labelled id='gnomad_sv_overlap_af' label='SV Overlap AF' help=annotation_description.gnomad_sv_overlap_af hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_af|format_unit_as_percent }}{% endlabelled %}
+                        {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
