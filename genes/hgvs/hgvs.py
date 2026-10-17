@@ -267,7 +267,7 @@ class HGVSDisplay:
         return short_p_hgvs(self.p_hgvs)
 
     def to_json(self):
-        """ The shape VCTable.format_hgvs in vc_form.js consumes """
+        """ The shape VCTable.format_hgvs in classification/vc_table.js consumes """
         return {
             "transcript": self.transcript,
             "gene_symbol": self.gene_symbol,
