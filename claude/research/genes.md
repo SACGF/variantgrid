@@ -203,7 +203,7 @@ canonical match than do - the symptom of the wrong collection on a kit. Collecti
 partitions.
 
 HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt, RefSeq gene summaries and the PanelApp listings all load through
-`annotation.CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
+`snpdb/models/models_cached_web_resource.py:CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
 `genes/signals/manual_signals.py:hgnc_post_save_handler` and siblings): saving the named resource row runs the
 download on a worker and the row's description records what arrived. Pfam domains are the exception:
 `genes/interpro.py:store_domains_for_transcripts` fetches them per gene from InterPro the first time a gene page

@@ -5,7 +5,6 @@ from typing import NamedTuple, Optional, Union
 import requests
 from rest_framework.exceptions import NotFound
 
-from annotation.models import CachedWebResource
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import (
     HGNC,
@@ -19,6 +18,7 @@ from genes.models import (
 )
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import MINUTE_SECS
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 PANEL_APP_PREFIX = "panel-app"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"

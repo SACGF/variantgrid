@@ -7,12 +7,12 @@ from dateutil import parser
 from django.conf import settings
 from pandas import DataFrame, isna, read_csv
 
-from annotation.models import CachedWebResource
 from library.constants import MINUTE_SECS
 from library.pandas_utils import df_nan_to_none
 from library.utils import md5sum_str
 from ontology.models import GeneDiseaseClassification, OntologyRelation
 from ontology.ontology_builder import OntologyBuilder
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_gencc_from_web(cached_web_resource: CachedWebResource):

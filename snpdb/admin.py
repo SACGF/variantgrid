@@ -395,6 +395,7 @@ class SiteMessagesAdmin(ModelAdminBasics):
 
 
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
+admin.site.register(models.CachedWebResource)
 admin.site.register(models.Cohort, ModelAdminBasics)
 
 
