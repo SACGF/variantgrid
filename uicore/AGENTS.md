@@ -91,9 +91,16 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   from it. `data-datatable-data` names a JS function whose return object is merged into every request.
 - RichColumn: `key` is a `.values()` path and the sort/search key; `name` is the JSON field (no dots); `renderer`
   is a server callable taking snpdb/views/datatable_view.py:CellData (list `extra_columns` it reads);
-  `client_renderer` is a JS expression, usually `TableFormat.*`
+  `client_renderer` is the dotted name of a JS function, usually `TableFormat.*`
   (variantgrid/static_files/default_static/js/datatable_definition.js:TableFormat) or a function in
-  datatables_client_renderers.js; `visible=False` sends data without a column; `detail=True` moves it to the expand row.
+  datatables_client_renderers.js, called as `(data, type, row, ctx)`; `visible=False` sends data without a column;
+  `detail=True` moves it to the expand row.
+- Client renderers are looked up by name on `window` (`resolveFunctionName` in datatable_definition.js), never
+  eval'd, and RichColumn raises on anything but a dotted name: a renderer's settings go in `client_renderer_kwargs`
+  and arrive as `ctx.kwargs` (`RichColumn.choices_client_renderer` returns both, spread with `**`). A namespace
+  declared with top-level `const` isn't on `window` by itself, so its file assigns it (`window.TableFormat = TableFormat`).
+  Row expansion is the same: `expand_client_renderer` + `expand_client_renderer_kwargs`, called as `(rowData, ctx)`;
+  `set_expand_ajax(view, ...)` (snpdb/views/datatable_view.py:DatatableConfig.set_expand_ajax) loads a view per row.
 - Cells and labels go into the page as HTML, so they're escaped by default: a string cell with no `client_renderer` is
   escaped in snpdb/views/datatable_view.py:escape_cell (the CSV stays raw), and labels in `rich_column_json`. A server
   renderer or label that means HTML returns a `SafeString` (`format_html`, `render_to_string`, `mark_safe` on a constant).

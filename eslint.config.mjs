@@ -115,6 +115,7 @@ export default [
                 dynamicSort: "readonly", // global.js
                 createMessage: "readonly", // global.js
                 DataTableDefinition: "readonly", // datatable_definition.js
+                resolveFunctionName: "readonly", // datatable_definition.js
                 VCTable: "readonly", // vc_form.js
                 Flags: "readonly", // flags.js
                 VCLinks: "readonly", // vc_links.js
