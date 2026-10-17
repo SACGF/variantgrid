@@ -58,7 +58,7 @@ class ClassificationPublicSummaryData:
         return Classification.objects.filter(allele__isnull=False, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('allele').distinct('allele').count()
 
     @cached_property
-    def classification_count(self) -> int:
+    def shared_classification_count(self) -> int:
         return Classification.objects.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).count()
 
     @cached_property
