@@ -153,10 +153,9 @@ $(document).ready(() => {
         $('.custom-key').each((index, ck) => {
             const select = $(ck);
             select.html(ekeys.keySelectOptions());
-            select.chosen({
-                allow_single_deselect: true,
-                width: '250px',
-                placeholder_text_single: `Key`
+            select.select2({
+                allowClear: true,
+                placeholder: 'Key'
             }).change(() => {
                 generateRequest();
             });
@@ -166,23 +165,4 @@ $(document).ready(() => {
         waitingForKeys = false;
         generateRequest();
     });
-
-    /*
-    EKeys.load().then(ekeys => {
-        $('.custom-key').each((index, ck) => {
-            let humanIndex = index+1;
-            let containerDiv  = $('<label>').appendTo(ck);
-            let keySelect = $('<select>', {id: `custom-key-${humanIndex}`, html: ekeys.keySelectOptions()}).appendTo(containerDiv);
-            keySelect.chosen({
-                allow_single_deselect: true,
-                width: '300px',
-                placeholder_text_single: `Key ${humanIndex}`,
-            }).change(() => {
-                generateRequest();
-            });
-            $('<input>', {id: `custom-value-${humanIndex}`, type:'text', placeholder:`value ${humanIndex}`, class:'custom-value', 'data-index':humanIndex}).keyup(() => {generateRequest()}).appendTo(ck);
-
-        });
-    });
-     */
 });

@@ -505,6 +505,10 @@ tr.template-download {
     h5 {
         font-size: 1.15rem;
     }
+    // its selects are fixed lists rather than autocompletes, so they keep select2's arrow
+    .select2-selection__arrow {
+        display: block;
+    }
 }
 
 #vc-extras {

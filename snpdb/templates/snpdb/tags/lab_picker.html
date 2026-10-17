@@ -1,8 +1,8 @@
 {% load ui_utils %}
 {% if data.has_multi_labs %}
     {% labelled label="For Lab" %}
-        <div class="form">
-            <select id="lab-picker" class="chosen-select">
+        <div class="form" style="max-width: 400px">
+            <select id="lab-picker">
                 {% if data.multi_select %}<option value="0">All {% if data.has_external %}Internal{% endif %} Assigned Labs</option>{% endif %}
                 {% for org_group in data.org_lab_groups %}
                     <optgroup label="{% if org_group.external %}EXTERNAL {% endif %}{{ org_group.org }}">
@@ -21,7 +21,7 @@
             </select>
         </div>
         <script>
-            $('#lab-picker').chosen({width:'400px'}).change((change) => {
+            $('#lab-picker').select2().change((change) => {
                 let val = $(change.target).val();
                 let url = Urls.{{ data.view_name | safe }}(val);
                 window.open(url, '_self');

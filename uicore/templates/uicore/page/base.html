@@ -27,7 +27,6 @@
     <!-- standard values -->
         <link href="{% static 'css/global.css' %}" rel="stylesheet">
         <link href="{% static 'css/branding.css' %}" rel="stylesheet">
-        <link href="{% static 'css/chosen.min.css' %}" rel="stylesheet">
         <link href="{% static 'css/vc_form.css' %}" rel="stylesheet">
         <link href="{% static 'css/flags.css' %}" rel="stylesheet">
         <link href="{% static 'css/age_widget.css' %}" rel="stylesheet">
@@ -111,13 +110,8 @@
     </script>
 
     <!-- Other 3rd Party -->
-    <!-- Chosen: used for multiselect drop downs that look good. Can probably be done by bootstrap -->
-
-    <script src="{% static 'js/lib/chosen-1.8.7/chosen-1.8.7.jquery.js' %}"></script>
-
-    <!-- Used to show time as time ago, handy to use JavaScript for dates as we get timezone sorted -->
+    <!-- Formats timestamps in the browser's timezone, and "time ago" text (fromNow) -->
     <script src="{% static 'js/lib/moment-2.30.1/moment-2.30.1.min.js' %}"></script>
-    <script src="{% static 'js/lib/jquery.timeago-1.6.7/jquery.timeago-1.6.7.js' %}"></script>
 
     <!-- Used by flag dialogs to show loading -->
     <script src="{% static 'js/lib/loadingoverlay-2.1.6/loadingoverlay-2.1.6.min.js' %}"></script>

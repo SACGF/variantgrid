@@ -990,7 +990,7 @@ const Flags = (function () {
             },
             
             ageText() {
-                return jQuery.timeago(this.created * 1000);
+                return moment(this.created * 1000).fromNow();
             },
             comments() {
                 return Object.values(this.db.comments.all()).filter(c => c.flag == this.id).sort((c1, c2) => c1.created - c2.created);
