@@ -18,7 +18,8 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from analysis.models import VariantTag
-from annotation.models.models import AnnotationVersion, GeneAnnotationVersion
+from annotation.models.models import AnnotationVersion
+from annotation.models.models_gene_annotation import GeneAnnotationVersion
 from annotation.models.models_version import InvalidAnnotationVersionError
 from genes.models import (
     CanonicalTranscript,

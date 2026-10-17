@@ -20,8 +20,6 @@ from annotation.models.models import (
     AnnotationRangeLock,
     AnnotationRun,
     AnnotationVersion,
-    GeneAnnotationVersion,
-    HumanProteinAtlasAnnotationVersion,
     VariantAnnotation,
 )
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
@@ -32,6 +30,10 @@ from annotation.models.models_clinvar import (
     ClinVarVersion,
 )
 from annotation.models.models_enums import AnnotationStatus
+from annotation.models.models_gene_annotation import (
+    GeneAnnotationVersion,
+    HumanProteinAtlasAnnotationVersion,
+)
 from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig
 from genes.hgvs import HGVSMatcher
