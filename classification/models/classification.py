@@ -1016,7 +1016,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         patch_response = ClassificationPatchResponse()
 
-        is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
@@ -1037,6 +1036,68 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patch_response.append_warning("unrecognised_key",
                                               f"The following keys are not valid ({sorted_bad_keys})")
 
+        self._normalise_patch_hgvs_and_gene(patch, initial_data=initial_data)
+
+        self._apply_patch_source_rules(patch, use_evidence, source=source, clear_all_fields=clear_all_fields,
+                                       remove_api_immutable=remove_api_immutable,
+                                       make_patch_fields_immutable=make_patch_fields_immutable,
+                                       revalidate_all=revalidate_all)
+
+        # creating the record, if no owner was provided set the value to match current
+        if not self.id:
+            owner_cell = patch[SpecialEKeys.OWNER]
+            if not owner_cell.provided and user:
+                owner_cell.value = user.username
+
+        debug_timer = get_timer()
+        debug_timer.tick("Patch data normalisation")
+
+        patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
+
+        validations_received = classification_validation_signal.send(sender=Classification, classification=self,
+                                                                     patch_meta=patch_meta, key_map=key_dict)
+        multi_errors = ValidationMerger.union_send_responses(validations_received)
+        multi_errors.apply(patch.data, use_evidence.data)
+
+        diffs_only_patch = self._diff_patch(patch, use_evidence, patch_response=patch_response, source=source,
+                                            leave_existing_values=leave_existing_values)
+
+        apply_patch = bool(diffs_only_patch)
+        if apply_patch and ignore_if_only_patching and ignore_if_only_patching.issuperset(diffs_only_patch.keys()):
+            apply_patch = False
+
+        if not apply_patch:
+            # if this is the first submission, create a version regardless of if there's data or not
+            apply_patch = self.id is None
+
+        debug_timer.tick("Patch validation")
+
+        # only make a modification if there's data to actually patch
+        if apply_patch:
+            self._apply_patch_diff(diffs_only_patch, use_evidence, patch_response=patch_response,
+                                   user=user, source=source, save=save)
+            debug_timer.tick("Saved")
+        else:
+            if diffs_only_patch:
+                message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
+                patch_response.append_warning(code="no_patch", message=message)
+            else:
+                patch_response.append_warning(code="no_patch", message="No changes detected to patch")
+                # don't save if we haven't changed any values
+
+        if self.requires_auto_population:
+            self.requires_auto_population = False
+            from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+                classification_auto_populate_fields,
+            )
+            genome_build = self.get_genome_build()
+            patch_response += classification_auto_populate_fields(self, genome_build, save=save)
+
+        return patch_response
+
+    def _normalise_patch_hgvs_and_gene(self, patch: VCDataDict, initial_data: bool):
+        """ patch_value phase 1: upper case the gene symbol and tidy c.HGVS; for initial_data, fill the transcript
+            and gene symbol from the c.HGVS (or inject the gene symbol into it) """
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
         gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
@@ -1084,6 +1145,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         # if gene symbol provided (but not in c.HGVS) inject it into it
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_hgvs
+
+    def _apply_patch_source_rules(self, patch: VCDataDict, use_evidence: VCDataDict, source: SubmissionSource,
+                                  clear_all_fields: bool, remove_api_immutable: bool,
+                                  make_patch_fields_immutable: bool, revalidate_all: bool):
+        """ patch_value phase 2: what each source may submit and make immutable, then normalise and validate
+            each cell that changed (process_entry) """
+        key_dict: EvidenceKeyMap = self.evidence_keys
+        is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
 
         # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys,
         # so we clear out any previous values but still retain immutability
@@ -1147,22 +1216,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
             process_entry(self, cell, source=source)
 
-        # creating the record, if no owner was provided set the value to match current
-        if not self.id:
-            owner_cell = patch[SpecialEKeys.OWNER]
-            if not owner_cell.provided and user:
-                owner_cell.value = user.username
-
-        debug_timer = get_timer()
-        debug_timer.tick("Patch data normalisation")
-
-        patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
-
-        validations_received = classification_validation_signal.send(sender=Classification, classification=self,
-                                                                     patch_meta=patch_meta, key_map=key_dict)
-        multi_errors = ValidationMerger.union_send_responses(validations_received)
-        multi_errors.apply(patch.data, use_evidence.data)
-
+    def _diff_patch(self, patch: VCDataDict, use_evidence: VCDataDict, patch_response: ClassificationPatchResponse,
+                    source: SubmissionSource, leave_existing_values: bool) -> dict:
+        """ patch_value phase 3: the patch reduced to what differs from the current evidence, rejecting changes
+            to values the source can't edit """
         # merge the patch with a lot of nulls if it's a POST
         # i.e. a "complete" patch
 
@@ -1209,101 +1266,74 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     # could be two floats that are close enough to each other
                     if not patched.has_data:
                         patched.wipe(WipeMode.POP)
+        return diffs_only_patch
 
-        apply_patch = bool(diffs_only_patch)
-        if apply_patch and ignore_if_only_patching and ignore_if_only_patching.issuperset(diffs_only_patch.keys()):
-            apply_patch = False
-
-        if not apply_patch:
-            # if this is the first submission, create a version regardless of if there's data or not
-            apply_patch = self.id is None
-
+    def _apply_patch_diff(self, diffs_only_patch: dict, use_evidence: VCDataDict,
+                          patch_response: ClassificationPatchResponse, user: Optional[User],
+                          source: SubmissionSource, save: bool):
+        """ patch_value phase 4: append to the last modification or create a new one, apply the diff to the
+            evidence and its cached columns, and save if asked """
         pending_modification: Optional[ClassificationModification]
+        patch_response.modified_keys = set(diffs_only_patch.keys())
+        last_edited = self.last_edited_version
 
-        debug_timer.tick("Patch validation")
+        # in some cases we can append the last version
+        # we do this so editing on the web form over the period of 1 minute
+        # makes 2 versions instead of one every 2 seconds
+        if last_edited and last_edited.is_edit_appendable(user=user, source=source):
+            pending_modification = last_edited
+            # update last modification as it was recent enough
+            delta = pending_modification.delta
+            delta.update(diffs_only_patch)
+            pending_modification.delta = delta
+            pending_modification.code_version = CodeVersion.current()
 
-        # only make a modification if there's data to actually patch
-        if apply_patch:
-            patch_response.modified_keys = set(diffs_only_patch.keys())
-            last_edited = self.last_edited_version
-
-            # in some cases we can append the last version
-            # we do this so editing on the web form over the period of 1 minute
-            # makes 2 versions instead of one every 2 seconds
-            if last_edited and last_edited.is_edit_appendable(user=user, source=source):
-                pending_modification = last_edited
-                # update last modification as it was recent enough
-                delta = pending_modification.delta
-                delta.update(diffs_only_patch)
-                pending_modification.delta = delta
-                pending_modification.code_version = CodeVersion.current()
-
-            else:
-                if save and last_edited:
-                    last_edited.is_last_edited = False
-                    last_edited.save()
-
-                # create a new modification
-                pending_modification = ClassificationModification(
-                    user=user,
-                    share_level=ShareLevel.LAB.key,
-                    source=source.value,
-                    delta=diffs_only_patch,
-                    is_last_edited=True
-                )
-            ###
-            # ACTUALLY APPLY THE PATCH
-            # update the actual evidence with normalised patch values
-            ###
-            Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
-
-            self.evidence = use_evidence.data
-            # classification is stored on the classification record and on the classification modification
-            # (not sure if we actually use it for anything on the modification)
-
-            # TODO this is in the wrong spot, it should be on publish
-            clinical_significance_choice = self.calc_clinical_significance_choice()
-            self.clinical_significance = clinical_significance_choice
-            pending_modification.clinical_significance = clinical_significance_choice
-
-            self.allele_origin_bucket = self.calc_allele_origin_bucket()
-
-            message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
-            patch_response.append_warning(code="patched", message=message)
-
-            # update the evidence keys in case that's changed
-            # FIXME do some optimisation so we can see if it changed easily
-            self._clear_evidence_key_cache()
-
-            if save:
-                self.save()
-                patch_response.saved = True
-                # have to save the modification after saving the record in case this
-                # is the first record
-                if pending_modification:
-                    pending_modification.classification = self
-                    pending_modification.save()
-                    assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
-            debug_timer.tick("Saved")
-
-        # end apply patch diff
         else:
-            if diffs_only_patch:
-                message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
-                patch_response.append_warning(code="no_patch", message=message)
-            else:
-                patch_response.append_warning(code="no_patch", message="No changes detected to patch")
-                # don't save if we haven't changed any values
+            if save and last_edited:
+                last_edited.is_last_edited = False
+                last_edited.save()
 
-        if self.requires_auto_population:
-            self.requires_auto_population = False
-            from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
-                classification_auto_populate_fields,
+            # create a new modification
+            pending_modification = ClassificationModification(
+                user=user,
+                share_level=ShareLevel.LAB.key,
+                source=source.value,
+                delta=diffs_only_patch,
+                is_last_edited=True
             )
-            genome_build = self.get_genome_build()
-            patch_response += classification_auto_populate_fields(self, genome_build, save=save)
+        ###
+        # ACTUALLY APPLY THE PATCH
+        # update the actual evidence with normalised patch values
+        ###
+        Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
 
-        return patch_response
+        self.evidence = use_evidence.data
+        # classification is stored on the classification record and on the classification modification
+        # (not sure if we actually use it for anything on the modification)
+
+        # TODO this is in the wrong spot, it should be on publish
+        clinical_significance_choice = self.calc_clinical_significance_choice()
+        self.clinical_significance = clinical_significance_choice
+        pending_modification.clinical_significance = clinical_significance_choice
+
+        self.allele_origin_bucket = self.calc_allele_origin_bucket()
+
+        message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
+        patch_response.append_warning(code="patched", message=message)
+
+        # update the evidence keys in case that's changed
+        # FIXME do some optimisation so we can see if it changed easily
+        self._clear_evidence_key_cache()
+
+        if save:
+            self.save()
+            patch_response.saved = True
+            # have to save the modification after saving the record in case this
+            # is the first record
+            if pending_modification:
+                pending_modification.classification = self
+                pending_modification.save()
+                assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
 
     def publish_latest(self, user: User, share_level=None) -> bool:
         if not share_level:
