@@ -1,4 +1,5 @@
-"""Ensembl API failures (an HTML error page, a connection error) are reported, not raised as a 500 (#869)."""
+"""Ensembl API failures (an HTML error page, a connection error) are reported, not raised as a 500 (#869),
+and an unversioned Ensembl accession resolves to the latest version."""
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -40,6 +41,16 @@ class EnsemblFetchErrorTest(SimpleTestCase):
                         return_value=_response(200, ENSEMBL_ERROR_PAGE)):
             with self.assertRaises(NoTranscript):
                 TranscriptSequenceFetcher().fetch_ensembl("ENST00000000001.1", genome_build=GRCH38)
+
+
+class EnsemblFetchUnversionedTest(SimpleTestCase):
+    def test_unversioned_accession_resolves_to_latest_version(self):
+        ensembl_json = '{"id": "ENST00000000001", "version": 9, "seq": "ACGT", "molecule": "dna"}'
+        with mock.patch("genes.transcript_sequence_retrieval.requests.get",
+                        return_value=_response(200, ensembl_json)):
+            fetched = TranscriptSequenceFetcher().fetch_ensembl("ENST00000000001", genome_build=GRCH38)
+        self.assertEqual(fetched.version, 9)
+        self.assertEqual(fetched.versions, [9])
 
 
 class ViewTranscriptVersionApiDownTest(URLTestCase):
