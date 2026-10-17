@@ -124,6 +124,14 @@ def sanitize_value(value: Any) -> Any:
     return value
 
 
+def export_value(value: Any) -> Any:
+    """ A raw value for the CSV/VCF export. Unlike sanitize_value a datetime stays one, so the file gets
+        a date rather than the epoch seconds TableFormat.timestamp takes """
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
+
+
 def escape_cell(value: Any) -> Any:
     """ A string cell with no client renderer goes into the page as HTML - escaped, unless the server
         renderer built it as HTML on purpose and returned a SafeString """
@@ -623,7 +631,7 @@ class DatatableConfig(Generic[DC]):
         if columns is None:
             columns = self.export_columns()
         for row in rows:
-            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered else sanitize_value(row.get(rc.key))
+            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered else export_value(row.get(rc.key))
                    for rc in columns}
 
     def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:

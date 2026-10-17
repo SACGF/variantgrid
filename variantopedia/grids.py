@@ -325,23 +325,28 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
     # The initial queryset is every tag in the build - a DISTINCT over a dozen joins - and recordsTotal
     # only feeds the "(filtered from N total)" text, so it isn't worth a second count of it
     count_unfiltered = False
+    # The DataTable pages at 100 rows, so the CSV streams from the server
+    server_csv_download = True
+    csv_label_overrides = {"user": "Username"}
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
         self.annotation_version = AnnotationVersion.latest_or_none(self.genome_build, context=self.GRID_NAME)
 
+        # The hidden columns are only there for the CSV
         self.rich_columns = [
-            RichColumn("id", visible=False),
             RichColumn("variant_string", label="Variant", orderable=True,
                        extra_columns=["id", "variant__id", "tag__id", "tag__requires_classification",
                                       "tag__retired", "analysis__id"],
                        renderer=self.render_variant, client_renderer="renderVariantTagVariant"),
-            RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build),
+            RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build,
+                       include_in_csv=True, csv_rendered=True),
             RichColumn("gene_symbol", label="Gene", orderable=True,
                        client_renderer="renderGeneSymbolNewWindow"),
             RichColumn("tag__id", name="tag", label="Tag", orderable=True, extra_columns=["variant__id"],
                        renderer=self.render_tag, client_renderer="renderVariantTagPill"),
+            RichColumn("analysis__id", label="Analysis ID", visible=False),
             RichColumn("analysis__name", name="analysis", label="Analysis", orderable=True,
                        extra_columns=["analysis__id"],
                        renderer=self.render_analysis, client_renderer="renderVariantTagAnalysis"),
@@ -349,9 +354,18 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
             self.user_column(name="user", label="User"),
             RichColumn("created", label="Created", orderable=True, default_sort=SortOrder.DESC,
                        client_renderer="TableFormat.timestamp"),
+            RichColumn("variant__id", label="Variant ID", visible=False),
+            RichColumn("id", label="Tag ID", visible=False),
             RichColumn("id", name="delete", label="", extra_columns=["analysis__id"],
-                       renderer=self.render_delete, client_renderer="TableFormat.deleteRow"),
+                       renderer=self.render_delete, client_renderer="TableFormat.deleteRow",
+                       include_in_csv=False),
         ]
+
+    def get_csv_name(self) -> str:
+        name = "variant_tags_export"
+        if tag_id := self.get_query_param("tag"):
+            name += f"_tag_{tag_id}"
+        return name
 
     def render_genome_build(self, _cell: CellData) -> JsonDataType:
         return self.genome_build.name
