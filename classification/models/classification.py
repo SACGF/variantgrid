@@ -1431,6 +1431,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 # use that 1 value
                 value = value[0]
 
+        # types below without a normaliser (age, date, an unmatched user) keep the cleanup above
+        if value != cell.value:
+            cell.value = value
+
         if value is not None:
             # remove support for existing_variant_id
             # variant matching is best done through allele_info stuff now
@@ -1446,11 +1450,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # convert users (username or email) to username if possible
             if e_key.value_type == EvidenceKeyValueType.USER:
                 value = str(value)
-                user = User.objects.filter(Q(username=value) | Q(email=value)).first()
-                if user:
-                    cell.value = user.username
-                else:
-                    pass
+                if user := User.objects.filter(Q(username=value) | Q(email=value)).first():
+                    value = user.username
+                cell.value = value
 
             # normalise booleans if it's unambiguous what the value is meant to be,
             # otherwise leave the value as is to be caught by validation
