@@ -58,15 +58,12 @@ from classification.models import (
     AlleleOriginGrouping,
     Classification,
     ClassificationAttachment,
-    ClassificationConsensus,
     ClassificationGrouping,
     ClassificationImportRun,
     ClassificationJsonParams,
     ClassificationRef,
     ClassificationReportTemplate,
     ConditionResolvedDict,
-    ConsensusComparison,
-    ConsensusGroup,
     DiscordanceReport,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
@@ -75,10 +72,13 @@ from classification.models import (
     OverlapContributionNextStep,
     ReportNames,
 )
-from classification.models.classification import (
+from classification.models.classification import ClassificationModification
+from classification.models.classification_consensus import (
     COPY_SCOPES_ALL,
     COPY_SCOPES_GENE,
-    ClassificationModification,
+    ClassificationConsensus,
+    ConsensusComparison,
+    ConsensusGroup,
 )
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext

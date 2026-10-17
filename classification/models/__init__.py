@@ -8,6 +8,7 @@ silently unregister behaviour. Add new models modules to this list.
 from classification.models.discordance_models import *
 from classification.models.classification import *
 from classification.models.condition_resolved import *
+from classification.models.classification_consensus import *
 from classification.models.classification_ref import *
 from classification.models.classification_variant_fields_validation import *  # so we load the receivers
 from classification.models.classification_variant_info_models import *
