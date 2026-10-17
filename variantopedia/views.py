@@ -19,14 +19,13 @@ from django.utils.timezone import localtime
 from analysis.models import VariantTag
 from annotation.models import (
     AnnotationVersion,
-    Classification,
-    ClassificationModification,
     ClinVar,
     ClinVarRecordCollection,
     VariantAnnotation,
     VariantTranscriptAnnotation,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.models.classification import Classification, ClassificationModification
 from eventlog.models import create_event
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.models import (

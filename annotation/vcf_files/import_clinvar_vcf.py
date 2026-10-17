@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 
-from annotation.models import ClinVarReviewStatus, Variant
+from annotation.models import ClinVarReviewStatus
 from annotation.models.models_clinvar import ClinVar, ClinVarVersion
 from annotation.vcf_files.clinvar_significance import (
     highest_oncogenicity,
@@ -15,6 +15,7 @@ from annotation.vcf_files.clinvar_significance import (
 )
 from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
+from snpdb.models.models_variant import Variant
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv

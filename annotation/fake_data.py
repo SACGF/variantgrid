@@ -14,7 +14,7 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
+from annotation.models import ClinVarReviewStatus
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
@@ -35,6 +35,7 @@ from annotation.models.models_version import SubVersionPartition, VariantAnnotat
 from annotation.vep_config import VEPConfig
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion
+from genes.models.models_gene_annotation_release import GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_partition import temporary_db_table
 from library.fake_data import FakeData, FakeDataContext, register
