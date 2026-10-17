@@ -1,8 +1,6 @@
 from django.http.response import JsonResponse
 from django.shortcuts import render
-from django.template.loader import render_to_string
 
-from annotation.models import Citation
 from annotation.models.models_citations import CitationFetchRequest
 from library.utils import first
 
@@ -26,10 +24,6 @@ def view_citation_detail(request, citation_id: str):
     :return: A stand alone page with the loaded citation details
     """
     return render(request, "annotation/citation_detail.html", {"citation": CitationFetchRequest.fetch_all_now([citation_id]).first_citation})
-
-
-def simple_citation_html(cd: Citation) -> str:
-    return render_to_string('annotation/citation_simple.html', {"citation": cd}).replace('\n', '').strip()
 
 
 def citations_json(request, citations_ids_list):

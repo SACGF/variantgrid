@@ -5,15 +5,13 @@ from typing import Any, Optional
 
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket
 from classification.models import ClassificationModification
-from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
 from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
 )
 from genes.hgvs import HGVSComponents
-from library.log_utils import report_message
 
 
 class CitationCounter:

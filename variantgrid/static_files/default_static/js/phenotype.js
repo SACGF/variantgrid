@@ -27,24 +27,6 @@ function groupTerms(terms, minPrefixLen = 15) {
 }
 
 
-function summariseTerms(terms, minPrefixLen = 15) {
-  const groups = groupTerms(terms, minPrefixLen);
-  console.log("groups:");
-  console.log(groups);
-
-  const out = [];
-  for (const g of groups) {
-    if (g.items.length > 1 && g.prefix.length >= minPrefixLen) {
-      const prefix = g.prefix.replace(/[ ,]+$/, '');
-      out.push(`${prefix} [${g.items.length} matches]`);
-    } else {
-      out.push(...g.items);
-    }
-  }
-  return out;
-}
-
-
 function getOntologyTermObj(term_type, term, url) {
     const termSpan = $("<span>", {class: `grid-term-link ${term_type}`, title: term, term: term, term_type: term_type});
     if (url) {

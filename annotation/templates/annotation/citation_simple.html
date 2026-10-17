@@ -1,2 +1,0 @@
-{% if citation.get_external_url %}<a href='{{ citation.get_external_url | safe }}'>{{ citation.pk }}</a> {{ citation.first_author|default_if_none:'' }} {% if not citation.single_author %}et al {% endif %} {{ citation.year|default_if_none:'' }}{% else %}{{ citation.pk }}{% endif %}<br/>
-{{ citation.title_safe }}

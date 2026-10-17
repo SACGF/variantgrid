@@ -25,7 +25,7 @@ from classification.enums import (
     TestingContextFull,
     TriageStatus,
 )
-from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
+from classification.enums.classification_enums import ClinicalSignificance
 from classification.models import (
     IN_REVIEW_VALUE,
     ClassificationGrouping,
@@ -365,16 +365,6 @@ def lab(lab: LabLike, is_your_lab: Optional[bool] = None, lab_css: Optional[str]
     }
 
 
-@register.inclusion_tag("classification/tags/clinical_significance_select.html")
-def clinical_significance_select(name, value):
-    key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-    return {
-        "name": name,
-        "options": key.virtual_options,
-        "value": value
-    }
-
-
 @register.inclusion_tag("classification/tags/clinical_context.html")
 def clinical_context(cc: ClinicalContext, orientation: str = 'horizontal'):
     return {"cc": cc, "orientation": orientation}
@@ -456,104 +446,6 @@ def classification_quick(context,
     }
 
 
-class ClinicalGrouping:
-
-    def __init__(self, cc: Optional[ClinicalContext]):
-        self.cc = cc
-        self.latest_report = DiscordanceReport.latest_report(cc) if cc else None
-        self.vcms = []
-
-    @property
-    def has_multiple(self):
-        return len(self.vcms) > 1
-
-
-@register.inclusion_tag("classification/tags/classification_table.html", takes_context=True)
-def classification_table(
-        context,
-        records,
-        genome_build=None,
-        user=None,
-        show_variant_link=False,
-        show_clinical_context=False,
-        variant: Variant = None,
-        allele: Allele = None,
-        edit_clinical_groupings=False):
-    if user is None:
-        user = context.request.user
-    if not genome_build:
-        if not user:
-            raise ValueError('Must provide genome build or user')
-        else:
-            genome_build = UserSettings.get_for_user(user).default_genome_build
-
-    if isinstance(records, QuerySet):
-        records = list(records.all())
-    mods = []
-    for r in records:
-        if isinstance(r, Classification):
-            r = r.last_published_version
-        if r:
-            mods.append(r)
-
-    # group by cc if we're doing clinical context
-    if show_clinical_context:
-        groupings = {}
-        no_cc_grouping = ClinicalGrouping(cc=None)
-        for vcm in mods:
-            cc = vcm.classification.clinical_context
-            if cc and vcm.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
-                grouping = groupings.get(cc.id)
-                if not grouping:
-                    grouping = ClinicalGrouping(cc=cc)
-                    groupings[cc.id] = grouping
-                grouping.vcms.append(vcm)
-            else:
-                no_cc_grouping.vcms.append(vcm)
-
-        records = list(groupings.values())
-        if no_cc_grouping.vcms:
-            records.append(no_cc_grouping)
-    else:
-        not_grouped = ClinicalGrouping(cc=None)
-        not_grouped.vcms = mods
-        records = [not_grouped]
-
-    # now to sort groups, and then sort vcms inside groups
-    def clinical_group_sort_score(cg: ClinicalGrouping):
-        cc = cg.cc
-        if not cc:
-            return 'zzzz'
-        else:
-            return cc.name
-
-    cs_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-    def classification_modification_sort_score(vcm: ClassificationModification):
-        cs = vcm.evidence.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        options = cs_key.matched_options(cs)
-        if options:
-            return options[0].get('index', 0), vcm.id_str
-        else:
-            return None, vcm.id_str
-
-    records.sort(key=clinical_group_sort_score)
-    for record in records:
-        record.vcms.sort(key=classification_modification_sort_score)
-
-    return {
-        "records": records,
-        "variant": variant,
-        "allele": allele,
-        "genome_build": genome_build,
-        "show_variant_link": show_variant_link,
-        "show_clinical_context": show_clinical_context,
-        "edit_clinical_groupings": edit_clinical_groupings,
-        "user": user,
-        "discordance_enabled": settings.DISCORDANCE_ENABLED
-    }
-
-
 def _to_hgvs(hgvs: Any) -> HGVSDisplay:
     if isinstance(hgvs, ClassificationModification):
         genome_build = GenomeBuildManager.get_current_genome_build()
@@ -615,55 +507,6 @@ def allele_origin_toggle(context, style: str = "", show_label: bool = True, pref
 @register.inclusion_tag("classification/tags/gene_symbol.html")
 def gene_symbol(gene_symbol: GeneSymbol):
     return {"gene_symbol": gene_symbol}
-
-
-@register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)
-def classification_row(
-        context,
-        record: Union[Classification, ClassificationModification],
-        genome_build: GenomeBuild,
-        user: User = None,
-        show_variant_link=False,
-        show_clinical_context=False,
-        edit_clinical_context=False):
-    if user is None:
-        user = context.request.user
-
-    vc = record
-    vcm = None
-    if isinstance(record, ClassificationModification):
-        vc = record.classification
-        vcm = record
-    else:
-        vcm = record.last_published_version
-    icon = 'icons/share_level/' + vc.share_level_enum.key + '.png'
-
-    try:
-        curated = Classification.to_date(record.get(SpecialEKeys.CURATION_DATE, None))
-    except ValueError:
-        curated = None
-
-    can_write = False
-    if user:
-        can_write = vc.can_write(user_or_group=user)
-
-    hgvs = vc.hgvs_best(preferred_genome_build=genome_build)
-
-    return {
-        "evidence": record.evidence,
-        "condition_obj": vc.condition_resolution_obj,
-        "curated": curated,
-        "hgvs": hgvs,
-        "gene_symbol": vcm.get(SpecialEKeys.GENE_SYMBOL),
-        "vc": vc,
-        "vcm": vcm,
-        "icon": icon,
-        "can_write": can_write,
-        "show_variant_link": show_variant_link,
-        "show_clinical_context": show_clinical_context,
-        "edit_clinical_context": edit_clinical_context,
-        "show_specimen_id": settings.CLASSIFICATION_SHOW_SPECIMEN_ID
-    }
 
 
 @register.inclusion_tag("classification/tags/classification.html")
@@ -771,11 +614,6 @@ def discordance_triage_embed(lab_summary: ClassificationLabSummary) -> Optional[
     if triage := lab_summary.triage:
         return DiscordanceReportTriageView.lazy_render(triage)
     return None
-
-
-@register.inclusion_tag("classification/tags/criteria_strength.html")
-def criteria_strength(strength: CriteriaStrength):
-    return {"strength": strength}
 
 
 @register.inclusion_tag("classification/tags/criteria_strength_td.html")
