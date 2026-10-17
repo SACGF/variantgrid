@@ -3,6 +3,8 @@ Owns: Classification / ClassificationModification, EvidenceKey + EvidenceKeyMap,
 DiscordanceReport, ConditionText matching, ClassificationGrouping, ClinVarExport, the classification API and import pipeline.
 Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
+- models/classification_evidence_normalise.py — process_entry: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
+- models/condition_resolved.py (ConditionResolved), models/classification_consensus.py (copying content between records).
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
 - enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
