@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 
 from django.contrib.auth.models import User
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.timezone import localdate
 
@@ -18,16 +18,19 @@ from classification.models import (
     ReclassificationEvent,
     ReclassificationEventBuilder,
     ReclassificationEventBuildState,
+    classification_flag_types,
 )
-from classification.models import classification_flag_types
-from classification.tests.models.test_utils import ClassificationTestUtils
-from flags.models import Flag
-from classification.views.classification_reclassification_view import (
+from classification.services.reclassification_analytics.analytics import ReclassificationAnalytics
+from classification.services.reclassification_analytics.charts import significance_flow
+from classification.services.reclassification_analytics.evidence_movement import (
     OTHER_EVIDENCE_GROUP,
     TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT,
-    EvidenceMovement,
-    ReclassificationAnalytics,
+    collapse_evidence,
 )
+from classification.services.reclassification_analytics.results import EvidenceMovement
+from classification.services.reclassification_analytics.survival import life_table
+from classification.tests.models.test_utils import ClassificationTestUtils
+from flags.models import Flag
 
 
 class ReclassificationEventTestCase(TestCase):
@@ -302,10 +305,9 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         cls.classification = classification
         ReclassificationEventBuilder.bring_up_to_date()
 
-    def _analytics(self, **params) -> ReclassificationAnalytics:
-        request = RequestFactory().get(reverse('classification_reclassification_analytics'), params)
-        request.user = self.admin
-        return ReclassificationAnalytics.from_request(request)
+    @staticmethod
+    def _analytics(**params) -> ReclassificationAnalytics:
+        return ReclassificationAnalytics.from_params(params)
 
     def test_defaults_to_all_labs(self):
         analytics = self._analytics()
@@ -332,7 +334,7 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
             self.assertEqual(200, self.client.get(url).status_code)
 
     def test_significance_flow_moves_towards_benign(self):
-        flow = self._analytics().significance_flow
+        flow = significance_flow(self._analytics())
         # sources are the first five node indexes, targets the next five - VUS -> LB then LB -> B
         self.assertEqual({(2, 8, 1), (3, 9, 1)},
                          set(zip(flow["sources"], flow["targets"], flow["values"])))
@@ -376,20 +378,20 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
 
     def test_evidence_movement_splits_criteria_on_off_from_plain_changes(self):
         analytics = self._analytics()
-        movements = {movement.key: movement for movement in analytics.evidence_towards_benign}
+        movements = {movement.key: movement for movement in analytics.evidence.towards_benign}
         self.assertEqual((0, 1, 0, 0, 0), self._counts(movements["pm2"]))
         self.assertEqual((1, 0, 0, 0, 0), self._counts(movements["bp4"]))
         self.assertEqual((0, 0, 0, 0, 1), self._counts(movements[SpecialEKeys.LITERATURE]))
         self.assertNotIn(SpecialEKeys.CLINICAL_SIGNIFICANCE, movements)
         # criteria lead, in ACMG strength order
         self.assertEqual(["pm2", "bp4"],
-                         [movement.key for movement in analytics.evidence_towards_benign
+                         [movement.key for movement in analytics.evidence.towards_benign
                           if movement.key in {"pm2", "bp4"}])
-        self.assertEqual([], analytics.evidence_towards_pathogenic)
+        self.assertEqual([], analytics.evidence.towards_pathogenic)
 
     def test_evidence_movement_keeps_namespaced_keys_for_a_single_lab(self):
         analytics = self._analytics(lab=self.classification.lab_id)
-        self.assertIn("acmg:pm2", {movement.key for movement in analytics.evidence_towards_benign})
+        self.assertIn("acmg:pm2", {movement.key for movement in analytics.evidence.towards_benign})
 
     def test_evidence_collapse_keeps_criteria_and_folds_the_quiet_keys(self):
         def movement(key: str, changed: int, is_criteria: bool = False) -> EvidenceMovement:
@@ -399,7 +401,7 @@ class ReclassificationAnalyticsViewTestCase(TestCase):
         movements = [movement("pm2", 1, is_criteria=True)] + \
                     [movement(f"key_{index}", 100 - index) for index in range(TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT)] + \
                     [movement("quiet_a", 2), movement("quiet_b", 3)]
-        rows, folded_count = ReclassificationAnalytics._collapse_evidence(movements)
+        rows, folded_count = collapse_evidence(movements)
 
         self.assertEqual(2, folded_count)
         self.assertEqual(TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT + 2, len(rows))
@@ -447,9 +449,7 @@ class ReclassificationSurvivalViewTestCase(TestCase):
     def _analytics(self, **params) -> ReclassificationAnalytics:
         params.setdefault('origin', self.ORIGIN.isoformat())
         params.setdefault('date_to', self.WINDOW_END.isoformat())
-        request = RequestFactory().get(reverse('classification_reclassification_analytics'), params)
-        request.user = self.admin
-        return ReclassificationAnalytics.from_request(request)
+        return ReclassificationAnalytics.from_params(params)
 
     def test_the_cohort_is_everything_sitting_at_the_significance_on_the_origin_date(self):
         survival = self._analytics().survival
@@ -491,17 +491,17 @@ class SurvivalMathsTestCase(TestCase):
 
     def test_a_cohort_with_no_events_never_drops(self):
         members = [(None, 730)] * 10
-        self.assertEqual([1.0, 1.0, 1.0], ReclassificationAnalytics._life_table(members, self.GRID))
+        self.assertEqual([1.0, 1.0, 1.0], life_table(members, self.GRID))
 
     def test_events_in_the_first_year_drop_the_curve_and_it_stays_there(self):
         members = [(100, 730)] * 5 + [(None, 730)] * 5
-        self.assertEqual([1.0, 0.5, 0.5], ReclassificationAnalytics._life_table(members, self.GRID))
+        self.assertEqual([1.0, 0.5, 0.5], life_table(members, self.GRID))
 
     def test_a_record_leaving_observation_counts_as_half_exposed_in_its_interval(self):
         members = [(100, 730)] * 4 + [(None, 200)] * 2 + [(None, 730)] * 4
-        survival = ReclassificationAnalytics._life_table(members, self.GRID)
+        survival = life_table(members, self.GRID)
         self.assertEqual(round(1 - 4 / 9, 4), survival[1])
 
     def test_an_event_after_the_record_left_observation_is_censored_instead(self):
         members = [(700, 100)] * 10
-        self.assertEqual([1.0, 1.0, 1.0], ReclassificationAnalytics._life_table(members, self.GRID))
+        self.assertEqual([1.0, 1.0, 1.0], life_table(members, self.GRID))
