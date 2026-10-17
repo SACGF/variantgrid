@@ -9,7 +9,8 @@ from django.utils.html import format_html
 from django.utils.timesince import timesince
 
 from annotation.models import AnnotationStatus, VEPSkippedReason
-from annotation.models.models import AnnotationRun, VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_enums import NMDEscapeStatus
 from annotation.models.models_version import InvalidAnnotationVersionError

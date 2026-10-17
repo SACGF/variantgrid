@@ -3,7 +3,8 @@ from django.test import TestCase
 
 from analysis.models import VariantTag
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
-from annotation.models.models import AnnotationRun, VariantGeneOverlap
+from annotation.models.models import VariantGeneOverlap
+from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_clinvar import ClinVar
 from annotation.models.models_enums import ClinVarReviewStatus

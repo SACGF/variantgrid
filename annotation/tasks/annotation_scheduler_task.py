@@ -22,7 +22,7 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock
+from annotation.models.models_annotation_run import AnnotationPipelineVersion, AnnotationRangeLock
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
 from annotation.signals.manual_signals import annotation_run_discarded_signal

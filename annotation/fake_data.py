@@ -16,7 +16,8 @@ from django.utils import timezone
 
 from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotation
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from annotation.models.models_clinvar import (

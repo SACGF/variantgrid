@@ -21,11 +21,11 @@ from annotation import annotsv_columns as annotsv_columns_registry
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
 from annotation.models.models import (
-    AnnotationRun,
     VariantAnnotation,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
+from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
