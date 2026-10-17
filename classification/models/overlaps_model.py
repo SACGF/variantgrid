@@ -365,8 +365,8 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     def hgvses(self) -> list[HGVSDisplay]:
         hgvses = set()
         for entry in self.contributions_list:
-            if cg := entry.classification_grouping:
-                hgvses.add(cg.latest_allele_info.preferred_hgvs_obj())
+            if (cg := entry.classification_grouping) and (hgvs := cg.latest_allele_info.preferred_hgvs_obj()):
+                hgvses.add(hgvs)
         return list(sorted(hgvses))
 
     def hgvs(self, lab: Lab, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
@@ -380,8 +380,9 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         if lab_picker:
             for contribution in self.contributions_list:
                 if classification_grouping := contribution.classification_grouping:
-                    if classification_grouping.lab_id in lab_picker.lab_ids:
-                        results.add(classification_grouping.latest_allele_info.preferred_hgvs_obj(genome_build))
+                    if classification_grouping.lab_id in lab_picker.lab_ids and \
+                            (hgvs := classification_grouping.latest_allele_info.preferred_hgvs_obj(genome_build)):
+                        results.add(hgvs)
 
         if not results and lab_picker:
             return self.all_hgvs(genome_build=genome_build, lab_picker=None)
