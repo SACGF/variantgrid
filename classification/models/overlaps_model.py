@@ -375,23 +375,28 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             genome_build=genome_build
         ))
 
+    def _preferred_hgvses(self, genome_build: GenomeBuild, lab_ids: Optional[set[int]] = None) -> set[HGVSDisplay]:
+        """ Preferred HGVS of each contributing classification grouping, limited to lab_ids if provided """
+        results = set()
+        for contribution in self.contributions_list:
+            if classification_grouping := contribution.classification_grouping:
+                if (lab_ids is None or classification_grouping.lab_id in lab_ids) and \
+                        (hgvs := classification_grouping.latest_allele_info.preferred_hgvs_obj(genome_build)):
+                    results.add(hgvs)
+        return results
+
     def all_hgvs(self, lab_picker: Optional[LabPickerData], genome_build: GenomeBuild) -> list[HGVSDisplay]:
+        """ The picked labs' HGVS, or every contributing lab's if none of the picked labs contribute """
         results = set()
         if lab_picker:
-            for contribution in self.contributions_list:
-                if classification_grouping := contribution.classification_grouping:
-                    if classification_grouping.lab_id in lab_picker.lab_ids and \
-                            (hgvs := classification_grouping.latest_allele_info.preferred_hgvs_obj(genome_build)):
-                        results.add(hgvs)
+            results = self._preferred_hgvses(genome_build, lab_picker.lab_ids)
+        if not results:
+            results = self._preferred_hgvses(genome_build)
 
-        if not results and lab_picker:
-            return self.all_hgvs(genome_build=genome_build, lab_picker=None)
-        elif results:
+        if results:
             # only return one CHGVS Display per c.HGVS where they only differ in transcript versions
             return HGVSDisplay.select_distinct(results)
-
-        else:
-            return [HGVSDisplay(dna_hgvs=HGVSComponents("-"), is_normalised=False)]
+        return [HGVSDisplay(dna_hgvs=HGVSComponents("-"), is_normalised=False)]
 
     @property
     def contributions(self) -> QuerySet[OverlapContribution]:
