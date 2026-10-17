@@ -18,7 +18,9 @@ the two commands are in the generated maps ([urls](../maps/urls.md#variantopedia
 `snpdb/genome_build_manager.py:GenomeBuildManager`, and hands off to
 `variantopedia/views.py:variant_details_annotation_version` with the build's latest AnnotationVersion. That view is also
 reachable directly with an explicit annotation version id, with the bare `variant_details.html` template - analysis
-grids load it that way from `grid.js`. It builds
+grids load it that way from `grid.js`. That template is the layout and the inline JS, which fills panels in by element
+`id`; each card is an include under `variantopedia/templates/variantopedia/variant_details/` (`annotation_*.html` for
+the VEP panels, whose `{% if %}` guards stay in the layout). The view builds
 `annotation/transcripts_annotation_selections.py:VariantTranscriptSelections` for the transcript picker, the canonical
 transcripts per enrichment kit (`variantopedia/views.py:get_genes_canonical_transcripts`), the VariantAllele/ClinGen data
 (left out when `needs_clingen_call()` so the page fetches it asynchronously), tag presence across the allele's builds,

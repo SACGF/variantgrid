@@ -1,0 +1,9 @@
+{% load nearby_variants_tags %}
+<div class="container">
+    <div class="card mt-4">
+        <div class="card-header">Nearby variants</div>
+        <div class="card-body">
+            {% nearby_variants variant annotation_version %}
+        </div>
+    </div>
+</div>
