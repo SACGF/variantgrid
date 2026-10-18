@@ -7,12 +7,12 @@ from math import ceil, log10
 from typing import Any
 
 from classification.enums.classification_enums import ClinicalSignificance
-from classification.services.reclassification_analytics.analytics import ReclassificationAnalytics
-from classification.services.reclassification_analytics.evidence_movement import (
+from classification.reclassification_analytics.analytics import ReclassificationAnalytics
+from classification.reclassification_analytics.evidence_movement import (
     OTHER_EVIDENCE_GROUP,
     collapse_evidence,
 )
-from classification.services.reclassification_analytics.palette import (
+from classification.reclassification_analytics.palette import (
     BENIGN_DIRECTION_COLOUR,
     CHANGE_COLOUR,
     EVIDENCE_APPLIED_COLOUR,
@@ -25,7 +25,7 @@ from classification.services.reclassification_analytics.palette import (
     REVIEW_COLOUR,
     translucent,
 )
-from classification.services.reclassification_analytics.results import (
+from classification.reclassification_analytics.results import (
     SIGNIFICANCE_ORDER,
     EvidenceMovement,
     significance_label,

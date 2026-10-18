@@ -23,14 +23,14 @@ from classification.enums.classification_enums import (
     ReclassificationEventType,
 )
 from classification.models.classification_reclassification_models import ReclassificationEvent
-from classification.services.reclassification_analytics.evidence_movement import EvidenceMovements
-from classification.services.reclassification_analytics.palette import (
+from classification.reclassification_analytics.evidence_movement import EvidenceMovements
+from classification.reclassification_analytics.palette import (
     CHANGE_COLOUR,
     MATRIX_HEAT_COLOUR,
     REVIEW_COLOUR,
     translucent,
 )
-from classification.services.reclassification_analytics.results import (
+from classification.reclassification_analytics.results import (
     SIGNIFICANCE_ORDER,
     Distribution,
     GeneBurden,
@@ -45,7 +45,7 @@ from classification.services.reclassification_analytics.results import (
     YearlyActivity,
     significance_label,
 )
-from classification.services.reclassification_analytics.survival import (
+from classification.reclassification_analytics.survival import (
     DAYS_PER_YEAR,
     SURVIVAL_INTERVAL_YEARS,
     life_table,

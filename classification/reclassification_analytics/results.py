@@ -9,11 +9,11 @@ from datetime import date
 from typing import Optional
 
 from classification.enums.classification_enums import ClinicalSignificance
-from classification.services.reclassification_analytics.palette import (
+from classification.reclassification_analytics.palette import (
     BENIGN_DIRECTION_COLOUR,
     PATHOGENIC_DIRECTION_COLOUR,
 )
-from classification.services.reclassification_analytics.survival import SURVIVAL_INTERVAL_YEARS
+from classification.reclassification_analytics.survival import SURVIVAL_INTERVAL_YEARS
 
 # top to bottom / left to right on every chart and table
 SIGNIFICANCE_ORDER = [

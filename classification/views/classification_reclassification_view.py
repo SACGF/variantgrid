@@ -1,6 +1,6 @@
 """
 /classification/reclassification_analytics: the permission check, bringing the timelines up to date and
-rendering. The numbers come from classification/services/reclassification_analytics.
+rendering. The numbers come from classification/reclassification_analytics.
 """
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
@@ -13,9 +13,9 @@ from classification.models.classification_reclassification_models import (
     ReclassificationBuildResult,
     ReclassificationEventBuilder,
 )
-from classification.services.reclassification_analytics.analytics import ReclassificationAnalytics
-from classification.services.reclassification_analytics.charts import chart_data
-from classification.services.reclassification_analytics.results import (
+from classification.reclassification_analytics.analytics import ReclassificationAnalytics
+from classification.reclassification_analytics.charts import chart_data
+from classification.reclassification_analytics.results import (
     SIGNIFICANCE_ORDER,
     significance_label,
 )

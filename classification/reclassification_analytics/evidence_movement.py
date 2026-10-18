@@ -16,7 +16,7 @@ from classification.enums.classification_enums import CriteriaEvaluation, Specia
 from classification.models.classification import ClassificationModification
 from classification.models.classification_reclassification_models import ReclassificationEvent
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from classification.services.reclassification_analytics.results import EvidenceMovement
+from classification.reclassification_analytics.results import EvidenceMovement
 
 EVIDENCE_MOVEMENT_CACHE_SECONDS = 60 * 60
 # the significance itself changes by definition, the dates get stamped alongside it, and the report and

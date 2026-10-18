@@ -20,15 +20,15 @@ from classification.models import (
     ReclassificationEventBuildState,
     classification_flag_types,
 )
-from classification.services.reclassification_analytics.analytics import ReclassificationAnalytics
-from classification.services.reclassification_analytics.charts import significance_flow
-from classification.services.reclassification_analytics.evidence_movement import (
+from classification.reclassification_analytics.analytics import ReclassificationAnalytics
+from classification.reclassification_analytics.charts import significance_flow
+from classification.reclassification_analytics.evidence_movement import (
     OTHER_EVIDENCE_GROUP,
     TOP_NON_CRITERIA_EVIDENCE_KEY_COUNT,
     collapse_evidence,
 )
-from classification.services.reclassification_analytics.results import EvidenceMovement
-from classification.services.reclassification_analytics.survival import life_table
+from classification.reclassification_analytics.results import EvidenceMovement
+from classification.reclassification_analytics.survival import life_table
 from classification.tests.models.test_utils import ClassificationTestUtils
 from flags.models import Flag
 
