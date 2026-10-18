@@ -13,6 +13,7 @@ from dataclasses import replace
 from datetime import date, datetime
 from typing import Optional, Union
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.http.request import HttpRequest
@@ -68,6 +69,8 @@ def newer_than(groups: list[ConsensusGroup], applied_at: datetime) -> list[Conse
 def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpResponseBase:
     """ The gene content box: the card on the classification form, the rows its dialog shows (?rows=1), and
         the POST that copies a chosen record's gene content into this one """
+    if not settings.CLASSIFICATION_GENE_CONSENSUS:
+        raise Http404("Gene content reuse is disabled (settings.CLASSIFICATION_GENE_CONSENSUS)")
     classification = get_object_or_404(Classification, pk=classification_id)
     if not classification.can_write(request.user):
         raise PermissionDenied(f"You do not have WRITE permission on classification {classification_id}")
