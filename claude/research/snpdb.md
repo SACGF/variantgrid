@@ -208,8 +208,8 @@ admits only Variant searches) and `SearchReceiver.search` returns a `SearchRespo
 `settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
 `SearchInput.get_visible_variants` restricts to a build's contigs and, on Shariant, to classified variants.
 `SearchResultMatchStrength` decides whether the UI jumps straight to a single result. The variant receivers live in
-`snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, HGVS via `snpdb/signals/variant_search.py:_search_hgvs`, ids,
-fusions as lookup only); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
+`snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, ids, fusions as lookup only) and
+`snpdb/signals/hgvs_search.py` (HGVS, via `snpdb/signals/hgvs_search.py:_search_hgvs`); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
 searches from `snpdb/signals/`.
 
 ## Why it is shaped this way
