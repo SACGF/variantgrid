@@ -37,7 +37,7 @@ from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.genomics.vcf_writer import VCFInfoHeader, percent_encode_info_value
 from library.utils.json_utils import json_dumps_nan_as_null
 from snpdb.models import GenomeBuild
-from upload.models import UploadStep
+from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (
     BREAKPOINT_1,
@@ -48,12 +48,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     SPLICE_OBSERVATION_INFO,
     SPLICE_SUPPORTING_READS,
 )
-from upload.vcf.gene_level_rewrite import (
-    GeneLevelRecord,
-    gene_level_header_lines,
-    report_skip_counts,
-    write_gene_level_vcf,
-)
+from upload.vcf.gene_level_rewrite import GeneLevelRecord, write_gene_level_vcf
 from upload.vcf.vcf_import import resolve_genome_build
 from variantgrid.celery import app
 
@@ -76,16 +71,10 @@ def can_process_file(filename: str) -> bool:
                for line in reader.raw_header.splitlines())
 
 
-@dataclass(kw_only=True)
-class _SpliceRecord(GeneLevelRecord):
-    event: ResolvedSpliceEvent
-    observation: dict
-
-
 @dataclass
 class SpliceGirlRewrite:
     """ What the rewrite made of the caller's file """
-    records: list[_SpliceRecord] = field(default_factory=list)
+    records: list[GeneLevelRecord] = field(default_factory=list)
     records_read: int = 0
     not_a_junction: int = 0
     unresolved: int = 0
@@ -138,32 +127,18 @@ def read_splicegirl_records(reader: cyvcf2.VCF, genome_build: GenomeBuild,
             continue
         seen.add(event)
 
-        rewrite.records.append(_SpliceRecord(event=event, observation=_observation(record, event, end),
-                                             **GeneLevelRecord.caller_columns(record)))
+        info = {SPLICE_INFO: event.canonical_str,
+                SPLICE_OBSERVATION_INFO: json_dumps_nan_as_null(_observation(record, event, end))}
+        rewrite.records.append(GeneLevelRecord.from_caller(record, event, info))
     return rewrite
 
 
 def write_splicegirl_vcf(filename: str, rewrite: SpliceGirlRewrite, reader: cyvcf2.VCF):
-    header_lines = gene_level_header_lines(
-        raw_header=reader.raw_header,
-        info=[
-            VCFInfoHeader(id=SPLICE_INFO, type="String",
-                          description="Splice event as gene and label, eg 'AR-V7'"),
-            VCFInfoHeader(id=SPLICE_OBSERVATION_INFO, type="String",
-                          description="JSON of the caller record this splice event was called from"),
-        ],
-        samples=reader.samples,
-        records=rewrite.records,
-    )
-
-    def info_func(record: _SpliceRecord) -> dict:
-        return {
-            SPLICE_INFO: record.event.canonical_str,
-            SPLICE_OBSERVATION_INFO: json_dumps_nan_as_null(record.observation),
-        }
-
-    write_gene_level_vcf(filename, header_lines, rewrite.records, info_func,
-                         encode_info=percent_encode_info_value)
+    write_gene_level_vcf(filename, rewrite.records, info=[
+        VCFInfoHeader(id=SPLICE_INFO, type="String", description="Splice event as gene and label, eg 'AR-V7'"),
+        VCFInfoHeader(id=SPLICE_OBSERVATION_INFO, type="String",
+                      description="JSON of the caller record this splice event was called from"),
+    ], samples=reader.samples, raw_header=reader.raw_header, encode_info=percent_encode_info_value)
 
 
 class SpliceGirlCreateVCFTask(ImportVCFStepTask):
@@ -181,9 +156,11 @@ class SpliceGirlCreateVCFTask(ImportVCFStepTask):
         rewrite = read_splicegirl_records(reader, genome_build)
         write_splicegirl_vcf(upload_step.output_filename, rewrite, cyvcf2.VCF(filename))
 
-        report_skip_counts(upload_step, [(rewrite.not_a_junction, NOT_A_JUNCTION_MESSAGE),
-                                         (rewrite.unresolved, UNRESOLVED_MESSAGE),
-                                         (rewrite.duplicates, DUPLICATE_MESSAGE)])
+        for count, message in [(rewrite.not_a_junction, NOT_A_JUNCTION_MESSAGE),
+                               (rewrite.unresolved, UNRESOLVED_MESSAGE),
+                               (rewrite.duplicates, DUPLICATE_MESSAGE)]:
+            if count:
+                SimpleVCFImportInfo.add_message_count(count, message, upload_step)
         return rewrite.records_read
 
 

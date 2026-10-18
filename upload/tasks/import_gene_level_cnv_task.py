@@ -41,14 +41,9 @@ from genes.models import GeneCopyNumberEventKind
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.genomics.vcf_writer import VCFInfoHeader
-from upload.models import UploadStep
+from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
-from upload.vcf.gene_level_rewrite import (
-    GeneLevelRecord,
-    gene_level_header_lines,
-    report_skip_counts,
-    write_gene_level_vcf,
-)
+from upload.vcf.gene_level_rewrite import GeneLevelRecord, write_gene_level_vcf
 from variantgrid.celery import app
 
 # The canonical string of the event a record became, so the file says what it is - the peer of the
@@ -86,16 +81,10 @@ def get_segment_field(filename: str) -> Optional[str]:
     return None
 
 
-@dataclass(kw_only=True)
-class _GeneLevelRecord(GeneLevelRecord):
-    event: ResolvedGeneCopyNumberEvent
-    written_gene: str
-
-
 @dataclass
 class GeneLevelCNVRewrite:
     """ What the rewrite made of the caller's file """
-    records: list[_GeneLevelRecord] = field(default_factory=list)
+    records: list[GeneLevelRecord] = field(default_factory=list)
     records_read: int = 0
     no_segment: int = 0
     duplicates: int = 0
@@ -150,32 +139,17 @@ def read_gene_level_cnv_records(reader: cyvcf2.VCF, segment_field: str,
             continue
         seen.add(event)
 
-        rewrite.records.append(_GeneLevelRecord(event=event, written_gene=written_gene,
-                                                **GeneLevelRecord.caller_columns(record)))
+        info = {segment_field: written_gene, GENE_COPY_NUMBER_INFO: event.canonical_str}
+        rewrite.records.append(GeneLevelRecord.from_caller(record, event, info))
     return rewrite
 
 
 def write_gene_level_cnv_vcf(filename: str, rewrite: GeneLevelCNVRewrite, reader: cyvcf2.VCF,
                              segment_field: str):
-    header_lines = gene_level_header_lines(
-        raw_header=reader.raw_header,
-        info=[
-            VCFInfoHeader(id=segment_field, type="String",
-                          description="Gene the caller's segment named, as written"),
-            VCFInfoHeader(id=GENE_COPY_NUMBER_INFO, type="String",
-                          description="Whole-gene copy number event"),
-        ],
-        samples=reader.samples,
-        records=rewrite.records,
-    )
-
-    def info_func(record: _GeneLevelRecord) -> dict:
-        return {
-            segment_field: record.written_gene,
-            GENE_COPY_NUMBER_INFO: record.event.canonical_str,
-        }
-
-    write_gene_level_vcf(filename, header_lines, rewrite.records, info_func)
+    write_gene_level_vcf(filename, rewrite.records, info=[
+        VCFInfoHeader(id=segment_field, type="String", description="Gene the caller's segment named, as written"),
+        VCFInfoHeader(id=GENE_COPY_NUMBER_INFO, type="String", description="Whole-gene copy number event"),
+    ], samples=reader.samples, raw_header=reader.raw_header)
 
 
 class GeneLevelCNVCreateVCFTask(ImportVCFStepTask):
@@ -192,9 +166,12 @@ class GeneLevelCNVCreateVCFTask(ImportVCFStepTask):
         rewrite = read_gene_level_cnv_records(reader, segment_field)
         write_gene_level_cnv_vcf(upload_step.output_filename, rewrite, reader, segment_field)
 
-        report_skip_counts(upload_step, [(rewrite.no_segment, NO_SEGMENT_MESSAGE),
-                                         (rewrite.duplicates, DUPLICATE_MESSAGE)],
-                           ambiguous=rewrite.ambiguous, ambiguous_prefix=AMBIGUOUS_MESSAGE_PREFIX)
+        for count, message in [(rewrite.no_segment, NO_SEGMENT_MESSAGE),
+                               (rewrite.duplicates, DUPLICATE_MESSAGE)]:
+            if count:
+                SimpleVCFImportInfo.add_message_count(count, message, upload_step)
+        for ambiguous_message, count in rewrite.ambiguous.items():
+            SimpleVCFImportInfo.add_message_count(count, AMBIGUOUS_MESSAGE_PREFIX + ambiguous_message, upload_step)
         return rewrite.records_read
 
 
