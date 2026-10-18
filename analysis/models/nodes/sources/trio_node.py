@@ -30,15 +30,9 @@ from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.models_enums import Zygosity
 from snpdb.models import Trio
 
-TRIO_SHAPE = FamilyShape(source_field="trio", members=(
-    FamilyMember(MOTHER, "Mother", affected_field="mother_affected", require_zygosity_field="require_zygosity"),
-    FamilyMember(FATHER, "Father", affected_field="father_affected", require_zygosity_field="require_zygosity"),
-    FamilyMember(PROBAND, "Proband"),
-))
-
 
 class AbstractTrioInheritance(AbstractFamilyInheritance):
-    FAMILY_SHAPE = TRIO_SHAPE
+    pass
 
 
 class Recessive(SimpleFamilyInheritance, AbstractTrioInheritance):
@@ -88,7 +82,11 @@ class TrioAnyAffected(AnyAffectedInheritance, AbstractTrioInheritance):
 
 
 class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
-    FAMILY_SHAPE = TRIO_SHAPE
+    FAMILY_SHAPE = FamilyShape(source_field="trio", members=(
+        FamilyMember(MOTHER, "Mother", affected_field="mother_affected", require_zygosity_field="require_zygosity"),
+        FamilyMember(FATHER, "Father", affected_field="father_affected", require_zygosity_field="require_zygosity"),
+        FamilyMember(PROBAND, "Proband"),
+    ))
     INHERITANCE = TrioInheritance
     INHERITANCE_CLASSES = {
         TrioInheritance.COMPOUND_HET: CompHet,

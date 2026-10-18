@@ -190,14 +190,16 @@ class AbstractFamilyInheritance(ABC):
     # hit without being homozygous for it
     NOT_HOM_ALT = {Zygosity.HET, Zygosity.MISSING, Zygosity.HOM_REF}
 
-    FAMILY_SHAPE: FamilyShape  # set by each family's base class
-
     def __init__(self, node):
         self.node = node
 
     @property
+    def family_shape(self) -> FamilyShape:
+        return self.node.FAMILY_SHAPE
+
+    @property
     def family(self):
-        return getattr(self.node, self.FAMILY_SHAPE.source_field)
+        return getattr(self.node, self.family_shape.source_field)
 
     def _get_cohort_genotype_collection(self):
         return self.family.cohort.cohort_genotype_collection
@@ -210,13 +212,13 @@ class AbstractFamilyInheritance(ABC):
         family = self.family
         return _build_family_zyg_q(cohort_genotype_collection, [
             (member.get_sample(family), zyg, member.requires_zygosity(self.node))
-            for member, zyg in zip(self.FAMILY_SHAPE.members, member_zygosities)
+            for member, zyg in zip(self.family_shape.members, member_zygosities)
         ])
 
     def get_zygosities_method(self, *member_zygosities) -> str:
         """ Proband first, then the relatives in family order - a member with no filter is left out """
         filters = {}
-        members = zip(self.FAMILY_SHAPE.members, member_zygosities)
+        members = zip(self.family_shape.members, member_zygosities)
         for member, zyg in sorted(members, key=lambda member_zyg: not member_zyg[0].is_proband):
             filters[self._member_label(member)] = self._zygosity_options(zyg, not member.requires_zygosity(self.node))
         return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
@@ -343,7 +345,7 @@ class DominantInheritance(SimpleFamilyInheritance):
         family = self.family
         return tuple(self.HAS_VARIANT if member.is_proband
                      else self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(member.is_affected(family))]
-                     for member in self.FAMILY_SHAPE.members)
+                     for member in self.family_shape.members)
 
 
 class DenovoInheritance(SimpleFamilyInheritance):
@@ -351,7 +353,7 @@ class DenovoInheritance(SimpleFamilyInheritance):
 
     def _get_member_zygosities(self) -> tuple[set, ...]:
         return tuple(self.HAS_VARIANT if member.is_proband else self.NO_VARIANT
-                     for member in self.FAMILY_SHAPE.members)
+                     for member in self.family_shape.members)
 
 
 class XLinkedRecessiveInheritance(SimpleFamilyInheritance):
@@ -400,7 +402,7 @@ class AllRecessiveInheritance(AbstractFamilyInheritance):
 
     def _branch_method(self, member_zygosities) -> str:
         return " ".join(f"{self._member_label(member)}:{zyg or '-'}"
-                        for member, zyg in zip(self.FAMILY_SHAPE.members, member_zygosities))
+                        for member, zyg in zip(self.family_shape.members, member_zygosities))
 
     def get_method(self) -> str:
         method = f"AR ({self._branch_method(self._recessive_zyg())})"
@@ -423,7 +425,7 @@ class AnyAffectedInheritance(AbstractFamilyInheritance):
 
     def _get_affected_samples(self) -> list:
         family = self.family
-        return [member.get_sample(family) for member in self.FAMILY_SHAPE.members if member.is_affected(family)]
+        return [member.get_sample(family) for member in self.family_shape.members if member.is_affected(family)]
 
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cgc = self._get_cohort_genotype_collection()
@@ -468,7 +470,7 @@ class MosaicEitherParentInheritance(AbstractMosaicParentInheritance):
 
     def _side_zygosities(self, mosaic_role: str) -> tuple[set, ...]:
         zygosities = []
-        for member in self.FAMILY_SHAPE.members:
+        for member in self.family_shape.members:
             if member.role == mosaic_role:
                 zyg = self.MOSAIC_ZYGOSITIES
             elif member.role in self.MOSAIC_ROLES:
@@ -482,8 +484,8 @@ class MosaicEitherParentInheritance(AbstractMosaicParentInheritance):
         node = self.node
         family = self.family
         q = self._get_zyg_q(cgc, self._side_zygosities(mosaic_role))
-        mosaic_sample = self.FAMILY_SHAPE.get_member(mosaic_role).get_sample(family)
-        other_sample = self.FAMILY_SHAPE.get_member(other_role).get_sample(family)
+        mosaic_sample = self.family_shape.get_member(mosaic_role).get_sample(family)
+        other_sample = self.family_shape.get_member(other_role).get_sample(family)
         q &= mosaic_evidence_q(cgc, mosaic_sample, node.mosaic_max_af, node.mosaic_min_alt_reads)
         q &= mosaic_absent_q(cgc, other_sample, node.mosaic_min_alt_reads)
         return q
@@ -494,13 +496,13 @@ class MosaicEitherParentInheritance(AbstractMosaicParentInheritance):
         return {cgc.cohortgenotype_alias: {str(combined): combined}}
 
     def get_method(self) -> str:
-        allow_unknown = not self.FAMILY_SHAPE.get_member(MOTHER).requires_zygosity(self.node)
+        allow_unknown = not self.family_shape.get_member(MOTHER).requires_zygosity(self.node)
         proband = self._zygosity_options(self.HAS_VARIANT)
         mosaic = self._zygosity_options(self.MOSAIC_ZYGOSITIES, allow_unknown)
         other = self._zygosity_options(self.NO_VARIANT, allow_unknown)
         method = (f"Proband: {proband}, and either parent ({mosaic}) with {self._evidence_description()} "
                   f"while the other ({other}) has <{self.node.mosaic_min_alt_reads} alt reads")
-        for member in self.FAMILY_SHAPE.members:
+        for member in self.family_shape.members:
             if not (member.is_proband or member.role in self.MOSAIC_ROLES):
                 zyg = self._zygosity_options(self._constitutional_zygosity(member),
                                              not member.requires_zygosity(self.node))
@@ -512,8 +514,8 @@ def _zygosity_table_row(handler: AbstractFamilyInheritance) -> dict:
     """ One mode's table row for one stub family - the zygosity each member needs, plus the other
         filters that go beside it """
     fmt = AbstractFamilyInheritance._zygosity_options
-    members = handler.FAMILY_SHAPE.members
-    roles = handler.FAMILY_SHAPE.roles
+    members = handler.family_shape.members
+    roles = handler.family_shape.roles
     if isinstance(handler, SimpleFamilyInheritance):
         row = {role: fmt(z) for role, z in zip(roles, handler._get_member_zygosities())}
     elif isinstance(handler, AllRecessiveInheritance):
@@ -700,7 +702,7 @@ class FamilyInheritanceNodeMixin:
         stub_nodes = {}
         for affected in (False, True):
             family = SimpleNamespace(**{m.affected_field: affected for m in shape.members if m.affected_field})
-            stub_nodes[(None, affected)] = SimpleNamespace(**{shape.source_field: family})
+            stub_nodes[(None, affected)] = SimpleNamespace(FAMILY_SHAPE=shape, **{shape.source_field: family})
         return stub_nodes
 
     @classmethod

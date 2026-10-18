@@ -28,17 +28,9 @@ from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.models_enums import Zygosity
 from snpdb.models import Quad
 
-QUAD_SHAPE = FamilyShape(source_field="quad", members=(
-    FamilyMember(MOTHER, "Mother", affected_field="mother_affected", require_zygosity_field="require_parent_zygosity"),
-    FamilyMember(FATHER, "Father", affected_field="father_affected", require_zygosity_field="require_parent_zygosity"),
-    FamilyMember(PROBAND, "Proband"),
-    FamilyMember("sibling", "Sibling", affected_field="sibling_affected",
-                 require_zygosity_field="require_sibling_zygosity"),
-))
-
 
 class AbstractQuadInheritance(AbstractFamilyInheritance):
-    FAMILY_SHAPE = QUAD_SHAPE
+    pass
 
 
 class SimpleQuadInheritance(SimpleFamilyInheritance, AbstractQuadInheritance):
@@ -110,7 +102,15 @@ class QuadAnyAffected(AnyAffectedInheritance, AbstractQuadInheritance):
 
 
 class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
-    FAMILY_SHAPE = QUAD_SHAPE
+    FAMILY_SHAPE = FamilyShape(source_field="quad", members=(
+        FamilyMember(MOTHER, "Mother", affected_field="mother_affected",
+                     require_zygosity_field="require_parent_zygosity"),
+        FamilyMember(FATHER, "Father", affected_field="father_affected",
+                     require_zygosity_field="require_parent_zygosity"),
+        FamilyMember(PROBAND, "Proband"),
+        FamilyMember("sibling", "Sibling", affected_field="sibling_affected",
+                     require_zygosity_field="require_sibling_zygosity"),
+    ))
     INHERITANCE = QuadInheritance
     INHERITANCE_CLASSES = {
         QuadInheritance.COMPOUND_HET:      QuadCompHet,

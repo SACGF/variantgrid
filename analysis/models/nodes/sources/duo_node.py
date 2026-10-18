@@ -32,10 +32,6 @@ from patients.models_enums import Zygosity
 from snpdb.models import Duo, DuoRelationship
 
 RELATIVE = "relative"
-DUO_SHAPE = FamilyShape(source_field="duo", members=(
-    FamilyMember(RELATIVE, "Relative", affected_field="relative_affected", require_zygosity_field="require_zygosity"),
-    FamilyMember(PROBAND, "Proband"),
-))
 
 XLINKED_RECESSIVE_NEEDS_MOTHER = "X-linked recessive needs the mother - the father's chrX is not passed to a son"
 COMP_HET_SIBLING_UNPHASED = (
@@ -57,8 +53,6 @@ def _recessive_zygosities(duo: Duo) -> tuple[set, set]:
 
 
 class AbstractDuoInheritance(AbstractFamilyInheritance):
-    FAMILY_SHAPE = DUO_SHAPE
-
     @property
     def relative_label(self) -> str:
         """ "Mother"/"Father"/"Sibling" - the modes read better naming the relative we actually have """
@@ -165,7 +159,7 @@ class DuoAnyAffected(AnyAffectedInheritance, AbstractDuoInheritance):
     pass
 
 
-def _duo_stub_node(relationship: DuoRelationship, relative_affected: bool) -> SimpleNamespace:
+def _duo_stub_node(shape: FamilyShape, relationship: DuoRelationship, relative_affected: bool) -> SimpleNamespace:
     """ Stands in for a DuoNode whose duo reads a given way - the editor's zygosity table is built
         once per mode, before any duo is loaded """
     duo = SimpleNamespace(relationship=relationship,
@@ -173,11 +167,15 @@ def _duo_stub_node(relationship: DuoRelationship, relative_affected: bool) -> Si
                           relative_is_sibling=relationship == DuoRelationship.SIBLING,
                           parent_is_mother=relationship == DuoRelationship.MOTHER,
                           relative_affected=relative_affected)
-    return SimpleNamespace(duo=duo)
+    return SimpleNamespace(FAMILY_SHAPE=shape, duo=duo)
 
 
 class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
-    FAMILY_SHAPE = DUO_SHAPE
+    FAMILY_SHAPE = FamilyShape(source_field="duo", members=(
+        FamilyMember(RELATIVE, "Relative", affected_field="relative_affected",
+                     require_zygosity_field="require_zygosity"),
+        FamilyMember(PROBAND, "Proband"),
+    ))
     INHERITANCE = DuoInheritance
     INHERITANCE_CLASSES = {
         DuoInheritance.COMPOUND_HET: DuoCompHet,
@@ -258,7 +256,7 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     @classmethod
     def _get_zygosity_table_stub_nodes(cls) -> dict:
         """ The duo's relationship changes how the modes read as much as its affected tick does """
-        return {(relationship.value, affected): _duo_stub_node(relationship, affected)
+        return {(relationship.value, affected): _duo_stub_node(cls.FAMILY_SHAPE, relationship, affected)
                 for relationship in DuoRelationship for affected in (False, True)}
 
     def get_rendering_args(self):
