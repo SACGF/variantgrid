@@ -10,7 +10,6 @@ from analysis.models.nodes.family_inheritance import (
     MOTHER,
     PROBAND,
     AbstractCompHetInheritance,
-    AbstractFamilyInheritance,
     AllRecessiveInheritance,
     AnyAffectedInheritance,
     DenovoInheritance,
@@ -31,38 +30,34 @@ from patients.models_enums import Zygosity
 from snpdb.models import Trio
 
 
-class AbstractTrioInheritance(AbstractFamilyInheritance):
-    pass
-
-
-class Recessive(SimpleFamilyInheritance, AbstractTrioInheritance):
+class Recessive(SimpleFamilyInheritance):
     def _get_member_zygosities(self) -> tuple[set, set, set]:
         return {Zygosity.HET}, {Zygosity.HET}, {Zygosity.HOM_ALT}
 
 
-class Dominant(DominantInheritance, AbstractTrioInheritance):
+class Dominant(DominantInheritance):
     pass
 
 
-class MosaicParent(MosaicEitherParentInheritance, AbstractTrioInheritance):
+class MosaicParent(MosaicEitherParentInheritance):
     pass
 
 
-class Denovo(DenovoInheritance, AbstractTrioInheritance):
+class Denovo(DenovoInheritance):
     pass
 
 
-class XLinkedRecessive(XLinkedRecessiveInheritance, AbstractTrioInheritance):
+class XLinkedRecessive(XLinkedRecessiveInheritance):
     def _get_member_zygosities(self) -> tuple[set, set, set]:
         return {Zygosity.HET}, set(), {Zygosity.HOM_ALT}
 
 
-class TrioAllRecessive(AllRecessiveInheritance, AbstractTrioInheritance):
+class TrioAllRecessive(AllRecessiveInheritance):
     RECESSIVE = Recessive
     XLINKED_RECESSIVE = XLinkedRecessive
 
 
-class CompHet(AbstractCompHetInheritance, AbstractTrioInheritance):
+class CompHet(AbstractCompHetInheritance):
     def _mum_but_not_dad(self):
         return {Zygosity.HET}, self.NO_VARIANT, {Zygosity.HET}
 
@@ -77,7 +72,7 @@ class CompHet(AbstractCompHetInheritance, AbstractTrioInheritance):
         return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
 
 
-class TrioAnyAffected(AnyAffectedInheritance, AbstractTrioInheritance):
+class TrioAnyAffected(AnyAffectedInheritance):
     pass
 
 

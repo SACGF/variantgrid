@@ -8,7 +8,6 @@ from analysis.models.nodes.family_inheritance import (
     MOTHER,
     PROBAND,
     AbstractCompHetInheritance,
-    AbstractFamilyInheritance,
     AllRecessiveInheritance,
     AnyAffectedInheritance,
     DenovoInheritance,
@@ -29,11 +28,7 @@ from patients.models_enums import Zygosity
 from snpdb.models import Quad
 
 
-class AbstractQuadInheritance(AbstractFamilyInheritance):
-    pass
-
-
-class SimpleQuadInheritance(SimpleFamilyInheritance, AbstractQuadInheritance):
+class SimpleQuadInheritance(SimpleFamilyInheritance):
     def get_method(self) -> str:
         mum_z, dad_z, prob_z, sib_z = self._get_member_zygosities()
         return f"Mother:{mum_z} Father:{dad_z} Proband:{prob_z} Sibling:{sib_z}"
@@ -53,7 +48,7 @@ class QuadDominant(DominantInheritance, SimpleQuadInheritance):
     pass
 
 
-class QuadMosaicParent(MosaicEitherParentInheritance, AbstractQuadInheritance):
+class QuadMosaicParent(MosaicEitherParentInheritance):
     pass
 
 
@@ -73,12 +68,12 @@ class QuadXLinkedRecessive(XLinkedRecessiveInheritance, SimpleQuadInheritance):
         return {Zygosity.HET}, set(), {Zygosity.HOM_ALT}, sibling_zyg
 
 
-class QuadAllRecessive(AllRecessiveInheritance, AbstractQuadInheritance):
+class QuadAllRecessive(AllRecessiveInheritance):
     RECESSIVE = QuadRecessive
     XLINKED_RECESSIVE = QuadXLinkedRecessive
 
 
-class QuadCompHet(AbstractCompHetInheritance, AbstractQuadInheritance):
+class QuadCompHet(AbstractCompHetInheritance):
     """Compound Het for Quad. Same two-pass gene logic as the Trio's CompHet.
 
     TODO: An unaffected sibling having BOTH comp-het hits (one from mum AND one from dad)
@@ -97,7 +92,7 @@ class QuadCompHet(AbstractCompHetInheritance, AbstractQuadInheritance):
         return "Proband: HET, >=2 hits in gene from (mum OR dad), sibling HET for each hit"
 
 
-class QuadAnyAffected(AnyAffectedInheritance, AbstractQuadInheritance):
+class QuadAnyAffected(AnyAffectedInheritance):
     pass
 
 
