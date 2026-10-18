@@ -23,10 +23,6 @@ class CachedWebResource(TimeStampedModel):
     description = models.TextField(blank=True)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
-    class Meta(TimeStampedModel.Meta):
-        # Moved from annotation (#2278) as a state-only migration, keeping its table
-        db_table = "annotation_cachedwebresource"
-
     @staticmethod
     def named_handler_factory(name, celery_task_class):
         def handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
