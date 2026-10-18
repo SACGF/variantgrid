@@ -70,8 +70,9 @@ coordinate is picked with a `FilteredRelation` on the allele's VariantAllele, co
 (`_annotation_version_queryset`). Resolved taggings (a classify-queue tag whose classification exists) are hidden unless
 the tag config says show them or the page flips `show_resolved` for one view
 (`variantopedia/grids.py:show_resolved_variant_tags`, #1901). Without `show_group_data` a user sees only their own
-taggings; an explicit user filter overrides that but stays permission checked. The CSV export
-(`variantopedia/views.py:variant_tags_export`) streams straight off the grid's queryset rather than paging it.
+taggings; an explicit user filter overrides that but stays permission checked. The CSV is the grid's own
+server CSV (`server_csv_download`), streamed off the filtered queryset rather than paged; Analysis ID, Variant ID and Tag
+ID are hidden columns that exist for it.
 
 `variantopedia/views_tag_stats.py` (#1751) is a skeleton page whose cards each fetch a JSON endpoint cached in Redis per
 user and parameters for a day (`_cached_json`). It counts on allele, so there is no build switch; tags with no allele yet
