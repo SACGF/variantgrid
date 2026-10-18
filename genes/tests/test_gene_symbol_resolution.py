@@ -14,7 +14,7 @@ from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvide
 from genes.models import MANE, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, MANEStatus
 from snpdb.models import GenomeBuild
-from snpdb.signals.variant_search import _get_search_hgvs_gene_symbol_transcripts
+from snpdb.signals.hgvs_search import _get_search_hgvs_gene_symbol_transcripts
 
 
 def _make_transcript_version(genome_build, accession, gene_symbol, annotation_consortium,

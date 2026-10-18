@@ -141,10 +141,10 @@ without biocommons (`HGVSMatcher._fast_variant_coordinate_to_g_hgvs`). Symbolic 
 `AssemblyMapper` with reference replacement and normalisation off, so a 2 Mb deletion never reads 2 Mb of reference
 (#1571). Parsing without the database is `genes/hgvs/hgvs.py:HGVSComponents` (with `HGVSComponents.diff` for comparing
 two) and `genes/hgvs/hgvs.py:HGVSDisplay` for the view layer; the matcher is only for coordinates. A c.HGVS with a gene symbol and no transcript raises in the matcher - the search app owns that
-feature: `snpdb/signals/variant_search.py:_search_hgvs` catches the error and hands it to
-`snpdb/signals/variant_search.py:_search_hgvs_without_transcript`, which ranks the symbol's transcripts through
+feature: `snpdb/signals/hgvs_search.py:_search_hgvs` catches the error and hands it to
+`snpdb/signals/hgvs_search.py:_search_hgvs_without_transcript`, which ranks the symbol's transcripts through
 `HGVSMatcher.rank_gene_symbol_transcripts` (cdot, MANE first) and searches each under the `SEARCH_HGVS_GENE_SYMBOL*`
-settings (`snpdb/signals/variant_search.py:_search_hgvs_using_gene_symbol`).
+settings (`snpdb/signals/hgvs_search.py:_search_hgvs_using_gene_symbol`).
 
 ### Canonical transcripts and MANE
 
