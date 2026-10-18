@@ -1,6 +1,3 @@
-import operator
-from abc import abstractmethod
-from functools import reduce
 from types import SimpleNamespace
 from typing import Optional
 
@@ -11,22 +8,30 @@ from django.db.models.query_utils import Q
 
 from analysis.models.enums import DuoInheritance
 from analysis.models.nodes.family_inheritance import (
-    MOSAIC_EVIDENCE_TEMPLATE,
+    PROBAND,
     AbstractCompHetInheritance,
     AbstractFamilyInheritance,
+    AbstractMosaicParentInheritance,
+    AllRecessiveInheritance,
+    AnyAffectedInheritance,
+    DenovoInheritance,
+    DominantInheritance,
     FamilyInheritanceNodeMixin,
-    _build_family_zyg_q,
+    FamilyMember,
+    FamilyShape,
+    SimpleFamilyInheritance,
+    XLinkedRecessiveInheritance,
     _dominant_requires_affected_parent_error,
     _pedigree_sex,
     _xlinked_recessive_errors,
-    mosaic_evidence_description,
     mosaic_evidence_q,
-    mosaic_parent_warnings,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.models_enums import Zygosity
-from snpdb.models import Contig, Duo, DuoRelationship, Sample
+from snpdb.models import Duo, DuoRelationship
+
+RELATIVE = "relative"
 
 XLINKED_RECESSIVE_NEEDS_MOTHER = "X-linked recessive needs the mother - the father's chrX is not passed to a son"
 COMP_HET_SIBLING_UNPHASED = (
@@ -48,142 +53,63 @@ def _recessive_zygosities(duo: Duo) -> tuple[set, set]:
 
 
 class AbstractDuoInheritance(AbstractFamilyInheritance):
-    def _get_zyg_q(self, cohort_genotype_collection, duo_zyg_data) -> Q:
-        """ duo_zyg_data = tuple of relative_zyg_set, proband_zyg_set """
-        duo = self.node.duo
-        return _build_family_zyg_q(cohort_genotype_collection, [
-            (duo.relative.sample, duo_zyg_data[0], self.node.require_zygosity),
-            (duo.proband.sample, duo_zyg_data[1], True),  # 947 - Always require zygosity for Proband
-        ])
-
     @property
     def relative_label(self) -> str:
         """ "Mother"/"Father"/"Sibling" - the modes read better naming the relative we actually have """
         return self.node.duo.relationship_label
 
-    def get_zygosities_method(self, relative_z: set, proband_z: set):
-        proband = self._zygosity_options(proband_z)
-        relative = self._zygosity_options(relative_z, not self.node.require_zygosity)
-        filters = {"Proband": proband, self.relative_label: relative}
-        return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
+    def _member_label(self, member: FamilyMember) -> str:
+        if member.role == RELATIVE:
+            return self.relative_label
+        return super()._member_label(member)
 
 
-class SimpleDuoInheritance(AbstractDuoInheritance):
-    @abstractmethod
-    def _get_relative_proband_zygosities(self) -> tuple[set, set]:
-        pass
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cgc = self.node.duo.cohort.cohort_genotype_collection
-        alias = cgc.cohortgenotype_alias
-        q = self._get_zyg_q(cgc, self._get_relative_proband_zygosities())
-        return {alias: {str(q): q}}
-
-    def get_method(self) -> str:
-        return self.get_zygosities_method(*self._get_relative_proband_zygosities())
-
-
-class DuoRecessive(SimpleDuoInheritance):
-    def _get_relative_proband_zygosities(self) -> tuple[set, set]:
+class DuoRecessive(SimpleFamilyInheritance, AbstractDuoInheritance):
+    def _get_member_zygosities(self) -> tuple[set, set]:
         return _recessive_zygosities(self.node.duo)
 
 
-class DuoDominant(SimpleDuoInheritance):
-    def _get_relative_proband_zygosities(self) -> tuple[set, set]:
-        """ Whoever the relative is, they carry the variant when affected and lack it when not - for a
-            sibling that makes this the discordant-pair filter """
-        relative_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.duo.relative_affected)]
-        return relative_zyg, self.HAS_VARIANT
+class DuoDominant(DominantInheritance, AbstractDuoInheritance):
+    """ Whoever the relative is, they carry the variant when affected and lack it when not - for a
+        sibling that makes this the discordant-pair filter """
 
 
-class DuoMosaicParent(AbstractDuoInheritance):
-    """ Dominant where the parent is mosaic - the proband is a constitutional HET and the parent
-        carries the variant in a fraction of cells, called either HOM_REF with a handful of alt
-        reads or HET at a low VAF. With one parent there's no other parent to require clean, so
-        this is the single side of the Trio mode. @see issue #1830 """
+class DuoMosaicParent(AbstractMosaicParentInheritance, AbstractDuoInheritance):
+    """ With one parent there's no other parent to require clean, so this is the single side of the
+        Trio mode """
+    MOSAIC_ROLES = (RELATIVE,)
 
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         duo = self.node.duo
-        cgc = duo.cohort.cohort_genotype_collection
+        cgc = self._get_cohort_genotype_collection()
         q = self._get_zyg_q(cgc, (self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT))
         q &= mosaic_evidence_q(cgc, duo.relative.sample, self.node.mosaic_max_af,
                                self.node.mosaic_min_alt_reads)
         return {cgc.cohortgenotype_alias: {str(q): q}}
 
-    def _evidence_description(self) -> str:
-        return mosaic_evidence_description(self.node.mosaic_max_af, self.node.mosaic_min_alt_reads)
-
     def get_method(self) -> str:
         zygosities = self.get_zygosities_method(self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT)
         return f"{zygosities}, with the {self.relative_label.lower()} having {self._evidence_description()}"
 
-    def get_other_filters_description(self) -> str:
-        return MOSAIC_EVIDENCE_TEMPLATE
 
-
-class DuoAbsentInParent(SimpleDuoInheritance):
+class DuoAbsentInParent(DenovoInheritance, AbstractDuoInheritance):
     """ The one-parent version of Denovo - a candidate de novo, or inherited from the missing parent """
 
-    def _get_relative_proband_zygosities(self) -> tuple[set, set]:
-        return self.NO_VARIANT, self.HAS_VARIANT
 
-
-class DuoXLinkedRecessive(SimpleDuoInheritance):
-    def _get_relative_proband_zygosities(self) -> tuple[set, set]:
+class DuoXLinkedRecessive(XLinkedRecessiveInheritance, AbstractDuoInheritance):
+    def _get_member_zygosities(self) -> tuple[set, set]:
         return _recessive_zygosities(self.node.duo)
 
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        arg_q_dict = super().get_arg_q_dict()
-        q = Q(locus__contig__name='X')  # will work for hg19 and GRCh38
-        arg_q_dict[None] = {str(q): q}
-        return arg_q_dict
 
-    def get_method(self) -> str:
-        return super().get_method() + " and contig name = 'X'"
-
-    def get_contigs(self) -> Optional[set[Contig]]:
-        return set(self.node.duo.genome_build.contigs.filter(name='X'))
-
-    def get_other_filters_description(self) -> str:
-        return "Chr X only"
-
-
-class DuoAllRecessive(AbstractDuoInheritance):
-    """OR of autosomal recessive and X-linked recessive.
-
-    The XLR branch only means anything through the mother, so a duo with the father collapses to
-    the AR branch alone. A sibling keeps both branches - they inherited the same chrX we're asking
-    the proband about.
-    """
-
-    def _recessive_zyg(self) -> tuple[set, set]:
-        return DuoRecessive(self.node)._get_relative_proband_zygosities()
-
-    def _xlinked_zyg(self) -> tuple[set, set]:
-        return DuoXLinkedRecessive(self.node)._get_relative_proband_zygosities()
+class DuoAllRecessive(AllRecessiveInheritance, AbstractDuoInheritance):
+    """ The XLR branch only means anything through the mother, so a duo with the father collapses to
+        the AR branch alone. A sibling keeps both branches - they inherited the same chrX we're asking
+        the proband about. """
+    RECESSIVE = DuoRecessive
+    XLINKED_RECESSIVE = DuoXLinkedRecessive
 
     def _has_xlinked_branch(self) -> bool:
         return self.node.duo.relationship != DuoRelationship.FATHER
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cgc = self.node.duo.cohort.cohort_genotype_collection
-        combined = self._get_zyg_q(cgc, self._recessive_zyg())
-        if self._has_xlinked_branch():
-            combined |= self._get_zyg_q(cgc, self._xlinked_zyg()) & Q(locus__contig__name='X')
-        return {cgc.cohortgenotype_alias: {str(combined): combined}}
-
-    def get_method(self) -> str:
-        ar_relative, ar_prob = self._recessive_zyg()
-        method = f"AR ({self.relative_label}:{ar_relative} Proband:{ar_prob})"
-        if self._has_xlinked_branch():
-            x_relative, x_prob = self._xlinked_zyg()
-            method += f" OR XLR ({self.relative_label}:{x_relative} Proband:{x_prob} chrX only)"
-        return method
-
-    def get_other_filters_description(self) -> str:
-        if self._has_xlinked_branch():
-            return "XLR branch: Chr X only"
-        return "AR only - the XLR branch needs the mother"
 
 
 class DuoCompHet(AbstractCompHetInheritance, AbstractDuoInheritance):
@@ -229,39 +155,11 @@ class DuoCompHet(AbstractCompHetInheritance, AbstractDuoInheritance):
         return f"≥2 hits in same gene, one from the {self.relative_label.lower()}, one not"
 
 
-class DuoAnyAffected(AbstractDuoInheritance):
-    """Variant present in any affected family member.
-
-    Permissive upstream pre-filter. An unaffected relative is unconstrained - they may have or not
-    have the variant. Proband is always treated as affected.
-    """
-
-    def _get_affected_samples(self) -> list:
-        duo = self.node.duo
-        members = [
-            (duo.relative.sample, duo.relative_affected),
-            (duo.proband.sample, True),
-        ]
-        return [s for s, affected in members if affected]
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cgc = self.node.duo.cohort.cohort_genotype_collection
-        per_member_qs = [
-            cgc.get_zygosity_q({s: self.HAS_VARIANT}, {s: True})
-            for s in self._get_affected_samples()
-        ]
-        combined = reduce(operator.or_, per_member_qs)
-        return {cgc.cohortgenotype_alias: {str(combined): combined}}
-
-    def get_method(self) -> str:
-        names = [s.name for s in self._get_affected_samples()]
-        return f"Variant present in at least one affected family member ({', '.join(names)})"
+class DuoAnyAffected(AnyAffectedInheritance, AbstractDuoInheritance):
+    pass
 
 
-ZYGOSITY_TABLE_MEMBERS = ['relative', 'proband']
-
-
-def _duo_stub_node(relationship: DuoRelationship, relative_affected: bool) -> SimpleNamespace:
+def _duo_stub_node(shape: FamilyShape, relationship: DuoRelationship, relative_affected: bool) -> SimpleNamespace:
     """ Stands in for a DuoNode whose duo reads a given way - the editor's zygosity table is built
         once per mode, before any duo is loaded """
     duo = SimpleNamespace(relationship=relationship,
@@ -269,76 +167,16 @@ def _duo_stub_node(relationship: DuoRelationship, relative_affected: bool) -> Si
                           relative_is_sibling=relationship == DuoRelationship.SIBLING,
                           parent_is_mother=relationship == DuoRelationship.MOTHER,
                           relative_affected=relative_affected)
-    return SimpleNamespace(duo=duo)
-
-
-def _zygosity_table_row(klass, relationship: DuoRelationship, relative_affected: bool) -> dict:
-    """ One mode's table row for one kind of duo - the zygosity each member needs, plus the other
-        filters that go beside it """
-    fmt = AbstractFamilyInheritance._zygosity_options
-    handler = klass(_duo_stub_node(relationship, relative_affected))
-    if issubclass(klass, SimpleDuoInheritance):
-        zyg = handler._get_relative_proband_zygosities()
-        row = {member: fmt(z) for member, z in zip(ZYGOSITY_TABLE_MEMBERS, zyg)}
-    elif klass is DuoAllRecessive:
-        row = {}
-        for member, ar_z, xlr_z in zip(ZYGOSITY_TABLE_MEMBERS, handler._recessive_zyg(), handler._xlinked_zyg()):
-            row[member] = f"AR: {fmt(ar_z)}"
-            if handler._has_xlinked_branch():
-                row[member] += f"\nXLR: {fmt(xlr_z)}"
-    elif klass is DuoMosaicParent:
-        row = {'relative': fmt(klass.MOSAIC_ZYGOSITIES), 'proband': fmt(klass.HAS_VARIANT)}
-    elif klass is DuoAnyAffected:
-        has_variant = fmt(klass.HAS_VARIANT)
-        row = {'relative': has_variant if relative_affected else '—', 'proband': has_variant}
-    else:
-        # CompHet - the proband side is the same on both halves, and so is the relative's when the
-        # two halves collapse into one (a sibling phases nothing)
-        relative_zyg, proband_zyg = handler._mum_but_not_dad()
-        other_half, _ = handler._dad_but_not_mum()
-        row = {'relative': fmt(relative_zyg) if relative_zyg == other_half else '',
-               'proband': fmt(proband_zyg)}
-
-    if description := handler.get_other_filters_description():
-        # Mosaic reads the relative's alt reads, so the proband row says nothing about them
-        members = ['relative'] if klass is DuoMosaicParent else ZYGOSITY_TABLE_MEMBERS
-        for member in members:
-            row['other_filters_' + member] = description
-    return row
-
-
-def _store_zygosity_field(entry: dict, key: str, unaffected, affected):
-    """ One key where the affected tick makes no difference, an '_affected'/'_unaffected' pair where
-        it does - the editor's lookup() tries the suffixed name first """
-    if unaffected == affected:
-        if unaffected is not None:
-            entry[key] = unaffected
-    else:
-        entry[f"{key}_unaffected"] = unaffected
-        entry[f"{key}_affected"] = affected
-
-
-def _collapse_zygosity_rows(rows: dict) -> dict:
-    """Store every field under the plainest key that still tells the editor's rows apart.
-
-    rows is keyed on (relationship, relative_affected). A field that reads the same for every duo is
-    stored under its own name; one that differs between relationships is stored per relationship,
-    each of those split again by affected status only where that matters too.
-    """
-    entry = {}
-    for member in ZYGOSITY_TABLE_MEMBERS:
-        for field in (member, 'other_filters_' + member):
-            by_relationship = {r: (rows[(r, False)].get(field), rows[(r, True)].get(field))
-                               for r in DuoRelationship}
-            if len(set(by_relationship.values())) == 1:
-                _store_zygosity_field(entry, field, *next(iter(by_relationship.values())))
-            else:
-                for relationship, (unaffected, affected) in by_relationship.items():
-                    _store_zygosity_field(entry, f"{field}_{relationship.value}", unaffected, affected)
-    return entry
+    return SimpleNamespace(FAMILY_SHAPE=shape, duo=duo)
 
 
 class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
+    FAMILY_SHAPE = FamilyShape(source_field="duo", members=(
+        FamilyMember(RELATIVE, "Relative", affected_field="relative_affected",
+                     require_zygosity_field="require_zygosity"),
+        FamilyMember(PROBAND, "Proband"),
+    ))
+    INHERITANCE = DuoInheritance
     INHERITANCE_CLASSES = {
         DuoInheritance.COMPOUND_HET: DuoCompHet,
         DuoInheritance.RECESSIVE: DuoRecessive,
@@ -356,16 +194,6 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     # Mosaic parent mode only - the low VAF band the parent's alt reads have to fall in (#1830)
     mosaic_max_af = models.FloatField(default=0.35)
     mosaic_min_alt_reads = models.IntegerField(default=2)
-
-    @property
-    def min_inputs(self):
-        return self.max_inputs
-
-    @property
-    def max_inputs(self):
-        if self.inheritance == DuoInheritance.COMPOUND_HET:
-            return 1
-        return 0
 
     @staticmethod
     def get_duo_inheritance_errors(duo: Duo, inheritance) -> list[str]:
@@ -404,52 +232,13 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
                     missing = self.duo.missing_parent_label.lower()
                     warnings.append(f"One parent only - de novo cannot be confirmed; variant may be inherited "
                                     f"from the missing {missing}")
-            elif self.inheritance == DuoInheritance.MOSAIC_PARENT:
-                warnings.extend(mosaic_parent_warnings(self.duo.cohort))
         return warnings
-
-    def _get_cohort(self):
-        return self.duo.cohort if self.duo else None
 
     def _get_cached_label_count(self, label):
         """ Nothing is precomputed for duos - the buckets are built off a cohort's Trio, so every
             DuoNode counts live rather than reading the raw cohort row, which knows nothing about its
             inheritance mode """
         return None
-
-    def modifies_parents(self):
-        return self.duo is not None
-
-    def _inheritance_factory(self):
-        klass = self.INHERITANCE_CLASSES[DuoInheritance(self.inheritance)]
-        return klass(self)
-
-    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
-        if cohort:
-            inheritance = self._inheritance_factory()
-            self.merge_arg_q_dicts(arg_q_dict, inheritance.get_arg_q_dict())
-            self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
-        return arg_q_dict
-
-    def _get_node_contigs(self) -> Optional[set[Contig]]:
-        if self.duo:
-            return self._inheritance_factory().get_contigs()
-        return None
-
-    def _get_method_summary(self):
-        if self._get_cohort():
-            return self._inheritance_factory().get_method()
-        return "No cohort selected"
-
-    def get_node_name(self):
-        label = DuoInheritance(self.inheritance).label
-        if not self.require_zygosity:
-            label += "?"
-        name_parts = [label]
-        if desc := self.get_filter_description():
-            name_parts.append(f"({desc})")
-        return "\n".join(name_parts)
 
     @staticmethod
     def get_help_text() -> str:
@@ -464,21 +253,11 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             "('Absent in parent', 'Dominant (mosaic parent)') have nothing to read."
         )
 
-    @staticmethod
-    def get_zygosity_table_data() -> dict:
-        """Build zygosity display data for all inheritance modes, for the node editor UI.
-
-        Instantiates each inheritance class against a stubbed duo and calls its zygosity methods
-        directly, so the table always matches the actual filtering logic. Rows are keyed on the
-        member, with a '_<relationship>' and/or '_affected'/'_unaffected' suffix wherever the mode
-        reads differently for different duos - the editor picks the row from the duo it loaded.
-        """
-        data = {}
-        for mode, klass in DuoNode.INHERITANCE_CLASSES.items():
-            rows = {(relationship, affected): _zygosity_table_row(klass, relationship, affected)
-                    for relationship in DuoRelationship for affected in (False, True)}
-            data[mode] = _collapse_zygosity_rows(rows)
-        return data
+    @classmethod
+    def _get_zygosity_table_stub_nodes(cls) -> dict:
+        """ The duo's relationship changes how the modes read as much as its affected tick does """
+        return {(relationship.value, affected): _duo_stub_node(cls.FAMILY_SHAPE, relationship, affected)
+                for relationship in DuoRelationship for affected in (False, True)}
 
     def get_rendering_args(self):
         if not self.duo:
@@ -489,12 +268,6 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             "proband_sex": _pedigree_sex(self.duo.effective_proband_sex),
         }
 
-    def get_css_classes(self):
-        css_classes = super().get_css_classes()
-        if self.duo:
-            css_classes.extend(self.duo.get_preview_icon_css_class().split())
-        return css_classes
-
     @staticmethod
     def get_node_class_label():
         return 'Duo'
@@ -502,28 +275,6 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(symbol="node-icon-duo")
-
-    def _get_configuration_errors(self) -> list:
-        errors = super()._get_configuration_errors()
-        if not self.duo:
-            errors.append("No duo selected")
-        else:
-            errors.extend(self._get_genome_build_errors("duo", self.duo.genome_build))
-        return errors
-
-    def _get_cohorts_and_sample_visibility_for_node(self):
-        cohorts, visibility = [], {}
-        if self.duo:
-            cohort = self.duo.cohort
-            cohorts = [cohort]
-            visibility = dict.fromkeys(self.duo.get_samples(), cohort.has_sample_columns)
-        return cohorts, visibility
-
-    def _get_proband_sample_for_node(self) -> Optional[Sample]:
-        return self.duo.proband.sample if self.duo else None
-
-    def __str__(self):
-        return f"DuoNode: {self.pk}"
 
 
 auditlog.register(DuoNode)
