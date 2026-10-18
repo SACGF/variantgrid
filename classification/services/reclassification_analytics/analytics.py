@@ -61,7 +61,8 @@ SERIAL_YEAR_CAP = 4
 class ReclassificationAnalytics:
     """
     Every chart on /classification/reclassification_analytics reads from here, so they all share the
-    organisation / lab / date filters the user picked. @see ReclassificationEvent
+    organisation / lab / date filters the user picked. timeline_qs and the querysets derived from it are
+    the base every chart builds on. @see ReclassificationEvent
     """
 
     def __init__(self, organization: Optional[Organization], lab: Optional[Lab],
@@ -115,8 +116,6 @@ class ReclassificationAnalytics:
             lab_external=lab_external,
             origin=get_date('origin'),
             origin_significance=origin_significance)
-
-    # -- querysets every chart builds on --------------------------------------------------------
 
     @cached_property
     def timeline_qs(self) -> QuerySet[ReclassificationEvent]:
@@ -195,8 +194,6 @@ class ReclassificationAnalytics:
             qs = qs.filter(lab__external=False).distinct()
         return qs.order_by('name')
 
-    # -- 1. Significance transitions --------------------------------------------------------------
-
     @cached_property
     def significance_transitions(self) -> list[SignificanceTransition]:
         counts = self.reclassifications_qs \
@@ -268,8 +265,6 @@ class ReclassificationAnalytics:
     def significance_matrix_total(self) -> int:
         return sum(self.significance_matrix_totals)
 
-    # -- 3. Re-evaluation against reclassification, year by year ---------------------------------
-
     @cached_property
     def yearly_activity(self) -> list[YearlyActivity]:
         first_event_date = self.events_qs.order_by('reclassified_date') \
@@ -317,8 +312,6 @@ class ReclassificationAnalytics:
                 .annotate(years=Count(ExtractYear('reclassified_date'), distinct=True)).order_by():
             touched[min(row['years'], SERIAL_YEAR_CAP)] += 1
         return touched
-
-    # -- 4. Survival curves ----------------------------------------------------------------------
 
     @cached_property
     def survival_cohort_qs(self) -> QuerySet[ReclassificationEvent]:
@@ -395,8 +388,6 @@ class ReclassificationAnalytics:
             return [survival.reviewed, survival.reclassified]
         return []
 
-    # -- 5. Lab league table ---------------------------------------------------------------------
-
     @cached_property
     def lab_activity(self) -> list[LabActivity]:
         held = self._records_by_lab(
@@ -432,8 +423,6 @@ class ReclassificationAnalytics:
     def labs_with_no_reclassification(self) -> int:
         return len([row for row in self.lab_activity if not row.reclassified])
 
-    # -- 4. Time to reclassification ------------------------------------------------------------
-
     @cached_property
     def time_to_reclassification(self) -> list[Distribution]:
         initial_date = ReclassificationEvent.objects \
@@ -453,8 +442,6 @@ class ReclassificationAnalytics:
             for cs in SIGNIFICANCE_ORDER if days_by_significance[cs]
         ]
 
-    # -- 5. VUS burden by gene ------------------------------------------------------------------
-
     @cached_property
     def gene_burden(self) -> list[GeneBurden]:
         latest_qs = ReclassificationEvent.latest_state_qs(as_of=self.date_to, base_qs=self.timeline_qs) \
@@ -471,14 +458,10 @@ class ReclassificationAnalytics:
             for row in vus_counts
         ]
 
-    # -- 6. Evidence driving reclassification ---------------------------------------------------
-
     @cached_property
     def evidence(self) -> EvidenceMovements:
         return EvidenceMovements(self.reclassifications_qs, fold_lab_namespaces=not self.lab,
                                  cache_scope=self.query_string)
-
-    # -- 7. Points to cross a boundary -----------------------------------------------------------
 
     @cached_property
     def points_transitions(self) -> list[PointsTransition]:
@@ -494,8 +477,6 @@ class ReclassificationAnalytics:
                                         deltas=points)
                        for (from_cs, to_cs), points in deltas.items()]
         return sorted(transitions, key=lambda transition: -transition.count)
-
-    # -- page furniture -------------------------------------------------------------------------
 
     @property
     def significance_legend(self) -> list[dict[str, str]]:
