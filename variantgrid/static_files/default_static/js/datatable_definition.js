@@ -509,8 +509,9 @@ const DataTableDefinition = (function() {
             const dataTable = this.dataTable;
             const expandFn = eval(this.serverParams.expandClientRenderer);
             const expandData = this.expandData;
-            // DataTables' "No data available" / "Loading..." placeholder row is tr.odd too, but has no data
-            const isDataRow = (tr) => (tr.hasClass('odd') || tr.hasClass('even')) && dataTable.row(tr).data() !== undefined;
+            // Only DataTables' own data rows - not the "No data available" / "Loading..." placeholder, headers or
+            // expanded child rows. Stripe classes (odd/even) can't tell them apart: the placeholder row is tr.odd
+            const isDataRow = (tr) => dataTable.row(tr).data() !== undefined;
 
             dom.on('click', 'tr', function(event) {
                 // A click on a link or control belongs to it (the variant grids have a details link, a
