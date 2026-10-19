@@ -219,19 +219,12 @@ def view_variant(request, variant_id, genome_build_name=None):
 
     variant = get_object_or_404(Variant, pk=variant_id)
     in_multiple_genome_builds = len(variant.genome_builds) > 1
-    genome_build = None
     if genome_build_name:
         genome_build = get_genome_build_or_404(genome_build_name)
         if genome_build not in variant.genome_builds:
             return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
-        if in_multiple_genome_builds:
-            user_settings = UserSettings.get_for_user(request.user)
-            if user_settings.default_genome_build in variant.genome_builds:
-                genome_build = user_settings.default_genome_build
-
-    if genome_build is None:
-        genome_build = variant.any_genome_build
+        genome_build = variant.preferred_genome_build(UserSettings.get_for_user(request.user).default_genome_build)
 
     GenomeBuildManager.set_current_genome_build(genome_build)
 
