@@ -11,7 +11,7 @@ from classification.models import (
     EvidenceKeyMap,
     ImportedAlleleInfo,
 )
-from classification.models.classification_evidence_normalise import validate_evidence
+from classification.models.classification_evidence_normalise import evidence_validation_messages
 from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
     ClassificationJsonAlleleRevolvedDict,
@@ -159,7 +159,7 @@ def populate_classification_json(classification: Classification, params: Classif
         content['has_changes'] = last_published_version.id != latest_modification.id
 
     if include_messages:
-        content['messages'] = validate_evidence(classification.evidence)
+        content['messages'] = evidence_validation_messages(classification.evidence)
 
     if can_write and latest_modification:
         content['last_edited'] = latest_modification.created.timestamp()
@@ -174,7 +174,7 @@ def populate_classification_json(classification: Classification, params: Classif
         content['version'] = version_timestamp
         content['data'] = classification.get_visible_evidence(versioned_data, lowest_share_level)
         if include_messages:
-            content['messages'] = validate_evidence(versioned_data)
+            content['messages'] = evidence_validation_messages(versioned_data)
         content['can_write'] = False
 
     if include_lab_config:

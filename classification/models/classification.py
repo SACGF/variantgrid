@@ -60,7 +60,10 @@ from classification.enums import (
     TestingContextBucket,
     WithdrawReason,
 )
-from classification.models.classification_evidence_normalise import process_entry, validate_evidence
+from classification.models.classification_evidence_normalise import (
+    evidence_validation_messages,
+    normalise_evidence_cell,
+)
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_utils import (
     ClassificationJsonParams,
@@ -1096,7 +1099,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                   clear_all_fields: bool, remove_api_immutable: bool,
                                   make_patch_fields_immutable: bool, revalidate_all: bool):
         """ patch_value phase 2: what each source may submit and make immutable, then normalise and validate
-            each cell that changed (process_entry) """
+            each cell that changed (normalise_evidence_cell) """
         key_dict: EvidenceKeyMap = self.evidence_keys
         is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
 
@@ -1150,7 +1153,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     cell.pop_immutability()
 
                 # copy attributes from the existing into the patch (they'll later be removed by diff)
-                # required for process_entry
+                # required for normalise_evidence_cell
                 existing = use_evidence[cell.e_key]
 
                 if not cell.has_change(existing) and not revalidate_all:
@@ -1160,7 +1163,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if existing.raw is not None:
                     cell.merge_from(existing)
 
-            process_entry(self, cell, source=source)
+            normalise_evidence_cell(self, cell, source=source)
 
     def _diff_patch(self, patch: VCDataDict, use_evidence: VCDataDict, patch_response: ClassificationPatchResponse,
                     source: SubmissionSource, leave_existing_values: bool) -> dict:
@@ -1334,7 +1337,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return False
 
     def validate(self) -> list[dict]:
-        return validate_evidence(self.evidence)
+        return evidence_validation_messages(self.evidence)
 
     @staticmethod
     def flatten(record: Mapping, prefix: str = '', ignore_none_values=False, depth=0) -> dict:

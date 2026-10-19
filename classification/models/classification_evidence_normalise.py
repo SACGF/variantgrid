@@ -1,9 +1,9 @@
 """
 Evidence normalisation: turns a submitted evidence cell into the value we store and attaches validation to it.
-process_entry is what Classification.patch_value runs over every patched cell - the shared tidying (non-breaking
-spaces, escaped HTML, db_ref extraction, mandatory checks, single item lists), then the per value type
+normalise_evidence_cell is what Classification.patch_value runs over every patched cell - the shared tidying
+(non-breaking spaces, escaped HTML, db_ref extraction, mandatory checks, single item lists), then the per value type
 normaliser from VALUE_TYPE_NORMALISERS, then the key specific checks. Select values are matched to their options
-through option_value_parts / match_option / process_option_values, and validate_evidence collects the
+through evidence_option_value_parts / match_evidence_option, and evidence_validation_messages collects the
 validation messages stored in evidence.
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ _key_to_regex = {
     'gtr_id': DbRegexes.GTR
 }
 
-def export_value(normal_value_obj: Any, key_data: EvidenceKey, export_key: str = 'key') -> Any:
+def evidence_option_export_value(normal_value_obj: Any, key_data: EvidenceKey, export_key: str = 'key') -> Any:
     if options := key_data.virtual_options:
         if normal_value_obj and isinstance(normal_value_obj, Mapping):
             value = normal_value_obj.get('value')
@@ -54,7 +54,7 @@ def export_value(normal_value_obj: Any, key_data: EvidenceKey, export_key: str =
                     return export_value
     return None
 
-def match_option(options, check_value) -> Optional[dict[str, str]]:
+def match_evidence_option(options, check_value) -> Optional[dict[str, str]]:
     for option in options:
         option_value = option.get('key')
 
@@ -88,7 +88,7 @@ def match_option(options, check_value) -> Optional[dict[str, str]]:
             return option
     return None
 
-def option_value_parts(e_key: EvidenceKey, value: Any) -> list[Any]:
+def evidence_option_value_parts(e_key: EvidenceKey, value: Any) -> list[Any]:
     """ The separate options in a select value as submitted: a string is split on commas (or '|_' for a
         multi-select that uses it), a list is taken as is. Blanks are dropped """
     parts: list[Any]
@@ -104,7 +104,7 @@ def option_value_parts(e_key: EvidenceKey, value: Any) -> list[Any]:
         parts = [value]
     return [part for part in parts if part is not None and part != ""]
 
-def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[str]]:
+def _normalise_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[str]]:
     e_key = cell.e_key
     options = e_key.virtual_options or []
     # Do a case-insensitive check for each value against the key and any aliases
@@ -124,7 +124,7 @@ def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[
             continue
 
         check_value = str(check_value)
-        matched_option = match_option(options, check_value)
+        matched_option = match_evidence_option(options, check_value)
         if matched_option:
             results.append(matched_option.get('key'))
             if settings.CLASSIFICATION_REQUIRE_OVERWRITE_NOTE and \
@@ -152,7 +152,7 @@ def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[
 
 
 # Each normaliser takes the cell and its tidied value, sets cell.value (and any validation) and returns the value
-# for the key specific checks in process_entry to work on
+# for the key specific checks in normalise_evidence_cell to work on
 
 def _normalise_user(cell: VCDataCell, value: Any) -> Any:
     # convert users (username or email) to username if possible
@@ -190,7 +190,7 @@ def _normalise_options(cell: VCDataCell, value: Any) -> Any:
     # handle selects with multiple values (comma sep string, array etc.)
     # sets the value of cell to the valid options
     e_key = cell.e_key
-    value = process_option_values(cell, option_value_parts(e_key, value))
+    value = _normalise_option_values(cell, evidence_option_value_parts(e_key, value))
     if value is not None:
         if e_key.value_type != EvidenceKeyValueType.MULTISELECT:
             value_len = len(value)
@@ -282,10 +282,10 @@ VALUE_TYPE_NORMALISERS: dict[str, Callable[[VCDataCell, Any], Any]] = {
     EvidenceKeyValueType.INTEGER: _normalise_integer,
     EvidenceKeyValueType.DATE: _validate_date,
 }
-""" Per EvidenceKey.value_type, the normaliser process_entry runs on a non-None value. AGE has none """
+""" Per EvidenceKey.value_type, the normaliser normalise_evidence_cell runs on a non-None value. AGE has none """
 
 
-def process_entry(classification: Classification, cell: VCDataCell, source: str):
+def normalise_evidence_cell(classification: Classification, cell: VCDataCell, source: str):
     """
     Normalises the value and adds any validation
     """
@@ -373,7 +373,7 @@ def process_entry(classification: Classification, cell: VCDataCell, source: str)
         cell.wipe(WipeMode.SET_NONE)
 
 
-def validate_evidence(evidence: dict) -> list[dict]:
+def evidence_validation_messages(evidence: dict) -> list[dict]:
     messages = []
 
     for key, blob in evidence.items():

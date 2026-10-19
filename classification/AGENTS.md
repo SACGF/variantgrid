@@ -3,7 +3,7 @@ Owns: Classification / ClassificationModification, EvidenceKey + EvidenceKeyMap,
 DiscordanceReport, ConditionText matching, ClassificationGrouping, ClinVarExport, the classification API and import pipeline.
 Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
-- models/classification_evidence_normalise.py — process_entry: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
+- models/classification_evidence_normalise.py — normalise_evidence_cell: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
 - models/condition_resolved.py (ConditionResolved), models/classification_consensus.py (copying content between records).
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
 - enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/models/models_enums.py (re-exported by classification.enums; import them from snpdb).
@@ -90,7 +90,7 @@ Gotchas:
   the attribute and models/evidence_mixin.py:EvidenceMixin.__getitem__ answers any evidence key. Resolve model fields in
   the view or tag (templatetags/classification_tags.py:classification_quick passes `sample` / `username`).
 - Legacy (VG3-era) records can hold a select key's option label or a comma separated string of labels ("Autosomal
-  recessive") instead of the list of option keys every write now stores (models/classification_evidence_normalise.py:option_value_parts).
+  recessive") instead of the list of option keys every write now stores (models/classification_evidence_normalise.py:evidence_option_value_parts).
   management/commands/classification_normalise_option_values.py converts them; compare on normalised values until it has run.
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
