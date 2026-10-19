@@ -600,6 +600,8 @@ class OverlapDiscordanceNotification(TimeStampedModel):
     overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
     old_state = models.JSONField(default=OverlapSnapshot.default_json)
     new_state = models.JSONField(default=OverlapSnapshot.default_json)
+    # Set on a retry of a lab message whose send failed: only this lab is sent it again, and admins aren't
+    lab = models.ForeignKey(Lab, null=True, blank=True, on_delete=CASCADE)
 
     notification_sent_date = models.DateTimeField(null=True, blank=True)
 
