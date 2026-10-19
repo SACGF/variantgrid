@@ -167,8 +167,8 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
     def test_definition_declares_row_expansion(self):
         definition = datatable_definition(self.grid)
         annotation_version_id = self.node.analysis.annotation_version_id
-        self.assertEqual(definition["expandClientRenderer"],
-                         f"variantGridRowDetail.bind(null, {annotation_version_id})")
+        self.assertEqual(definition["expandClientRenderer"], "variantGridRowDetail")
+        self.assertEqual(definition["expandClientRendererKwargs"], {"annotationVersionId": annotation_version_id})
         self.assertFalse(definition["expandPrefetch"])
 
     def test_system_default_collection(self):

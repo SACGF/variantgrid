@@ -436,8 +436,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classificationGroupingDetailUrl',
-                                                                       expected_height=108)
+        self.set_expand_ajax('classificationGroupingDetailUrl', expected_height=108)
         self.rich_columns = [
             RichColumn(
                 key='lab',

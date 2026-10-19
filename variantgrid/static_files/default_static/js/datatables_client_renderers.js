@@ -153,12 +153,12 @@ $(window).on('resize', closeRowActionsMenus);
 document.addEventListener('scroll', closeRowActionsMenus, true);
 
 
-// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse
-function renderIconFlag(settings, data, type, row) {
+// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse. kwargs: {cssClass, title}
+function renderIconFlag(data, type, row, ctx) {
     if (!data) {
         return '';
     }
-    return $('<div>', {class: settings.cssClass, title: settings.title}).prop('outerHTML');
+    return $('<div>', {class: ctx.kwargs.cssClass, title: ctx.kwargs.title}).prop('outerHTML');
 }
 
 
