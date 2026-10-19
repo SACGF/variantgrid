@@ -2326,3 +2326,57 @@ const VCForm = (function() {
 
     return VCForm;
 })();
+
+const globalPreviewCache = {};
+const globalPreviewableDbs = new Set(["OMIM", "MONDO", "HPO", "PMID", "PMC", "PUBMED", "NCBIBOOKSHELF"]);
+
+// a reference (VCForm.renderReference) shows the title and summary of the record it links to
+registerDomProcessor('[data-preview-db]', (node) => {
+    const $node = $(node);
+    const db = node.attr('data-preview-db').toUpperCase();
+    const idx = node.attr('data-preview-id');
+    const combinedId = `${db}:${idx}`;
+
+    function previewPromise(request_db, request_idx) {
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                type: "GET",
+                url: Urls.preview_data(db, idx),
+                // url: `/snpdb/preview/${request_db}/${request_idx}`,
+                async: true,
+                success: (results, textStatus, jqXHR) => {
+                    resolve(results);
+                },
+                error: (call, status, text) => {
+                    reject([call, status, text]);
+                }
+            });
+        });
+    }
+
+    let existingPromise = globalPreviewCache[combinedId];
+    if (!existingPromise) {
+        if (globalPreviewableDbs.has(db)) {
+            existingPromise = previewPromise(db, idx);
+        } else {
+            //   console.log(`Unsupported DB for fetching: ${db}`);
+            existingPromise = Promise.resolve({"found": false});
+        }
+        globalPreviewCache[combinedId] = existingPromise;
+    }
+
+    existingPromise.then((data) => {
+        const refSummary = $node.children('.ref-summary');
+        if (data.found === false) {
+            refSummary.text('');
+        } else {
+            refSummary.text(data.title);
+            refSummary.addClass('hover-detail');
+            refSummary.addClass('text-secondary');
+        }
+        if (data.summary) {
+            $node.tooltip({html:true, trigger : 'hover', title: data.summary});
+            $node.click(function(e) {$(this).tooltip('hide');});
+        }
+    });
+});
