@@ -10,7 +10,6 @@ from django.utils.timezone import now
 from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 
-from classification.enums import AlleleOriginBucket
 from classification.enums.clinvar_export_enums import ClinVarExportStatus
 from classification.models.classification import ClassificationModification, ConditionResolved
 from classification.models.clinvar_export_convertor import (
@@ -20,6 +19,7 @@ from classification.models.clinvar_export_convertor import (
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import JsonObjType, first, invalidate_cached_property
 from snpdb.models import Allele, ClinVarKey
+from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JsonMessages, ValidatedJson
 
 

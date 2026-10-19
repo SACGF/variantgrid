@@ -25,7 +25,6 @@ from annotation.models.models_enums import (
 )
 from annotation.models.models_version import SubVersionPartition
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.utils import first
 from snpdb.models import (
@@ -33,6 +32,8 @@ from snpdb.models import (
     GenomeBuild,
     Variant,
 )
+from snpdb.models.models_cached_web_resource import CachedWebResource
+from snpdb.models.models_enums import AlleleOriginBucket, SomaticClinicalSignificance
 
 
 class ClinVarVersion(DataArchiveMixin, SubVersionPartition):
@@ -439,7 +440,7 @@ class ClinVarRecord(TimeStampedModel):
 
 
 class ClinVarCitationsCollection(models.Model):
-    cached_web_resource = models.ForeignKey('CachedWebResource', null=True, on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)
 
 
 class ClinVarCitation(models.Model):

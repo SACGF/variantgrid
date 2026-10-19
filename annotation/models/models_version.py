@@ -276,6 +276,16 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     @staticmethod
+    def latest_gene_annotation_releases(status: 'VariantAnnotationVersion.Status' = None) -> list[GeneAnnotationRelease]:
+        """ The GeneAnnotationRelease of each annotated build's latest VAV (by build name), for builds that have one """
+        gene_annotation_releases = []
+        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
+            if vav := VariantAnnotationVersion.latest(genome_build, status=status):
+                if vav.gene_annotation_release:
+                    gene_annotation_releases.append(vav.gene_annotation_release)
+        return gene_annotation_releases
+
+    @staticmethod
     def latest_for_all_builds(status: 'VariantAnnotationVersion.Status' = None) -> QuerySet:
         if status is None:
             status = VariantAnnotationVersion.Status.ACTIVE
@@ -454,11 +464,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     def cdot_gene_release_token(self) -> Optional[str]:
         """ The release identifier cdot uses in its per-GFF asset names, eg 'RS_2025_08' """
         return self.vep_gene_set_versions.release_token
-
-    @property
-    def gene_annotation_release_gff_url(self) -> Optional[str]:
-        """ The GFF/GTF cdot read to build this gene set """
-        return self.vep_gene_set_versions.gff_url
 
     @property
     def suggested_gene_annotation_release_name(self) -> str:

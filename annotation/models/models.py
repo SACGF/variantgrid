@@ -4,7 +4,7 @@ VariantTranscriptAnnotation (every transcript) share AbstractVariantAnnotation's
 VariantGeneOverlap has a row per gene a variant overlaps, for gene list queries. All three are partitioned per
 VariantAnnotationVersion, so query them through annotation/annotation_version_querysets.py, never
 VariantAnnotation.objects directly. Plugin display parsing is in annotation/open_targets.py and
-annotation/vep_plugin_display.py. Also CachedWebResource and the gene citation / PubMed count tables it loads.
+annotation/vep_plugin_display.py. Also the gene citation / PubMed count tables a CachedWebResource loads.
 """
 import logging
 import re
@@ -19,7 +19,6 @@ from django.db import models
 from django.db.models import F, Max, Min, Q
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.functions import Coalesce, Greatest
-from django_extensions.db.models import TimeStampedModel
 
 from annotation import open_targets, vep_plugin_display
 from annotation.external_search_terms import (
@@ -60,7 +59,7 @@ from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict
 from patients.models_enums import GnomADPopulation
 from snpdb.models import Variant
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 class AbstractVariantAnnotation(models.Model):
@@ -842,29 +841,6 @@ class VariantGeneOverlap(models.Model):
 
     class Meta:
         unique_together = ('version', 'variant', 'gene')
-
-
-class CachedWebResource(TimeStampedModel):
-    """ These are annotations that can populate themselves via the web
-
-        * Can be manually updated via button kicking off annotation.views.load_cached_web_resource
-        * List of names each system uses is in settings
-        * Creation of one with name triggers signals which apps can configure to listen to / run populators
-    """
-    name = models.TextField(primary_key=True)
-    description = models.TextField(blank=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-
-    @staticmethod
-    def named_handler_factory(name, celery_task_class):
-        def handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-            created = kwargs.get("created")
-
-            if created and instance.name == name:
-                task_signature = celery_task_class.si(instance.pk)
-                task_signature.apply_async()
-
-        return handler
 
 
 class GeneSymbolCitation(models.Model):

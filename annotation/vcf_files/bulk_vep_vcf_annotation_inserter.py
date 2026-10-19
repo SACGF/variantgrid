@@ -1002,10 +1002,6 @@ class BulkVEPVCFAnnotationInserter:
             data_values = [data.get(v) for v in header]
             yield data_values
 
-    @staticmethod
-    def _gene_overlap_to_row_data(_header, annotations_list: list):
-        pass
-
     def remove_processing_files(self):
         remove_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
 

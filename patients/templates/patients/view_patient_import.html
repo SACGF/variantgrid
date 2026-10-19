@@ -32,10 +32,14 @@
                             {% endif %}
                         {% endlabelled %}
                         {% labelled label="Download" %}
-                            <a href="{% url 'download_uploaded_file' file_upload.pk %}">
-                                <div class="icon24 left margin-r-5 csv-icon">
-                                </div> Uploaded CSV
-                            </a> ({{ file_upload.size|filesizeformat }})
+                            {% if file_upload.exists %}
+                                <a href="{% url 'download_uploaded_file' file_upload.pk %}">
+                                    <div class="icon24 left margin-r-5 csv-icon">
+                                    </div> Uploaded CSV
+                                </a> ({{ file_upload.size|filesizeformat }})
+                            {% else %}
+                                {{ "W"|severity_icon }} The uploaded file is no longer available
+                            {% endif %}
                         {% endlabelled %}
                     </div>
                 {% else %}

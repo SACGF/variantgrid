@@ -1,4 +1,3 @@
-import datetime
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
@@ -569,17 +568,6 @@ class FlagsMixin(models.Model):
             return FlagPermissionLevel.USERS if self.can_view(user) else FlagPermissionLevel.NO_PERM
         return FlagPermissionLevel.USERS
 
-    def flags_of_type(self, flag_type: FlagType) -> QuerySet[Flag]:
-        if not self.flag_collection:
-            return Flag.objects.none()
-        return Flag.objects.filter(collection=self.flag_collection, flag_type=flag_type)
-
-    @property
-    def has_open_flags(self) -> bool:
-        if not self.flag_collection:
-            return False
-        return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).exists()
-
     def has_open_flag_with_attribute(self, attribute, value) -> bool:
         if not self.flag_collection:
             return False
@@ -596,13 +584,6 @@ class FlagsMixin(models.Model):
             return False
         fc = self.flag_collection_safe
         fc.close_open_flags_of_type(flag_type, comment=comment, user=None, resolution=resolution, data=data)
-
-    def has_flag_activity(self, since=None) -> bool:
-        if since is None:
-            since = datetime.datetime.now() - datetime.timedelta(days=1)
-        if self.flag_collection:
-            return FlagComment.objects.filter(flag__collection=self.flag_collection, created__gte=since).exists()
-        return False
 
     @property
     def flag_collection_safe(self) -> FlagCollection:

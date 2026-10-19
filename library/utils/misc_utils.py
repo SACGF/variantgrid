@@ -123,13 +123,6 @@ def invalidate_cached_property(obj, property_name: str):
         delattr(obj, property_name)
 
 
-def update_dict_of_dict_values(dict_to_update: dict[Any, dict], new_values: dict[Any, dict]):
-    for k, v in new_values.items():
-        old_values = dict_to_update.get(k, {})
-        old_values.update(v)
-        dict_to_update[k] = old_values
-
-
 _retry = Retry(total=5, read=5, backoff_factor=0, allowed_methods=["GET"])
 _ses = Session()
 _ses.mount("http://", HTTPAdapter(max_retries=_retry))

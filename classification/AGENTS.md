@@ -4,7 +4,7 @@ DiscordanceReport, ConditionText matching, ClassificationGrouping, ClinVarExport
 Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
-- enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
+- enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/models/models_enums.py (re-exported by classification.enums; import them from snpdb).
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
   Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
   not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.

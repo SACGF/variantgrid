@@ -36,13 +36,13 @@ from analysis.models import (
     NodeStatus,
     VariantTag,
 )
-from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
     get_node_extra_filters_q,
     is_extra_filter,
 )
 from analysis.models.nodes.node_types import get_node_class_choices, get_node_class_name_expression
+from analysis.models.nodes.node_version import NodeColumnSummaryCacheCollection
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
@@ -59,7 +59,10 @@ from library.utils import (
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_all_variant_grid_columns, get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import (
+    get_all_variant_grid_columns,
+    get_variantgrid_extra_annotate,
+)
 from snpdb.grid_columns.grid_sample_columns import (
     COPY_NUMBER_COLUMN,
     SAMPLE_COMPOSITE_COLUMNS,
@@ -519,7 +522,7 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True,
                        enabled=len(self.genome_builds) > 1),
             RichColumn(key="analysis_type", label="Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(AnalysisType.choices)),
+                       **RichColumn.choices_client_renderer(AnalysisType.choices)),
             RichColumn(key="description", label="Description", orderable=True),
             self.user_column(label="Created by"),
             RichColumn(key="tags", label="Tags", search=False, client_renderer='renderAnalysisTags'),
@@ -732,9 +735,9 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
                        renderer=self.render_node_link,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='node_class', label='Node Class', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(get_node_class_choices())),
+                       **RichColumn.choices_client_renderer(get_node_class_choices())),
             RichColumn(key='status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(NodeStatus.choices)),
+                       **RichColumn.choices_client_renderer(NodeStatus.choices)),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
             RichColumn(key='errors', orderable=False),

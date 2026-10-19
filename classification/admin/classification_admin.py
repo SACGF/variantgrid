@@ -23,10 +23,9 @@ from classification.classification_import import (
     reattempt_variant_matching,
     variant_matching_dry_run,
 )
-from classification.enums import WithdrawReason
+from classification.enums import ShareLevel, WithdrawReason
 from classification.enums.classification_enums import (
     EvidenceCategory,
-    ShareLevel,
     SpecialEKeys,
     SubmissionSource,
 )

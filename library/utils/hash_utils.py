@@ -1,6 +1,5 @@
 import hashlib
 import json
-from hashlib import md5
 
 from typing_extensions import deprecated
 
@@ -31,10 +30,8 @@ def sha256sum_str(s: str) -> str:
 
 
 def file_sha256sum(filename: str) -> str:
-    hasher = hashlib.sha256()
     with open(filename, "rb") as f:
-        hasher.update(f.read())
-    return hasher.hexdigest()
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 def stable_dict_hash(d: dict) -> str:
@@ -43,10 +40,3 @@ def stable_dict_hash(d: dict) -> str:
     s = json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(s.encode()).hexdigest()
 
-
-@deprecated("Use file_sha256sum instead")
-def file_md5sum(filename: str):
-    m = md5()
-    with open(filename, "rb") as f:
-        m.update(f.read())
-    return m.hexdigest()
