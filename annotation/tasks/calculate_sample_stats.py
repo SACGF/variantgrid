@@ -9,6 +9,7 @@ import numpy as np
 from django.conf import settings
 from django.db import connection, transaction
 from django.db.models import F
+from django.db.models.functions import Length
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import (
@@ -108,24 +109,15 @@ def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion)
     qs = qs.filter(Variant.get_no_reference_q())
     qs = qs.exclude(Variant.get_gene_level_q())  # no coordinate, so no length
     qs = vcf.get_variant_qs(qs)
-    columns = [
-        "locus__ref__seq",
-        "alt__seq",
-        "svlen",
-        "variantannotation__vep_skipped_reason",
-        "variantannotation__hgvs_g",
-    ]
-    vep_skipped_count = 0
-    variant_class_lengths = defaultdict(list)
+    vep_skipped_count = qs.filter(variantannotation__vep_skipped_reason__isnull=False) \
+        .exclude(variantannotation__vep_skipped_reason="").count()
 
-    for row in qs.values_list(*columns).iterator(chunk_size=10_000):
-        ref, alt, svlen, vep_skipped, hgvs_g = row
-        if vep_skipped:
-            vep_skipped_count += 1
-        ref_len = len(ref)
-        alt_len = len(alt)
-        if ref_len == 1 and alt_len == 1:
-            continue  # SNP — no length histogram
+    # SNVs have no length histogram and are most of the rows, so leave them in the database
+    non_snv_qs = qs.annotate(ref_len=Length("locus__ref__seq"), alt_len=Length("alt__seq")) \
+        .exclude(ref_len=1, alt_len=1)
+    columns = ["alt__seq", "svlen", "variantannotation__hgvs_g", "ref_len", "alt_len"]
+    variant_class_lengths = defaultdict(list)
+    for alt, svlen, hgvs_g, ref_len, alt_len in non_snv_qs.values_list(*columns).iterator(chunk_size=10_000):
         variant_class = _get_variant_class(alt, hgvs_g)
         variant_length = abs(svlen) if svlen else max(alt_len, ref_len)
         variant_class_lengths[variant_class].append(variant_length)
