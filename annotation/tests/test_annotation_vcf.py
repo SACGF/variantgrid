@@ -15,12 +15,10 @@ from annotation.models.damage_enums import (
     AlphaMissensePrediction,
     PathogenicityImpact,
 )
-from annotation.models.models import (
-    AnnotationRun,
-    VariantAnnotationVersion,
-    VariantTranscriptAnnotation,
-)
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import (

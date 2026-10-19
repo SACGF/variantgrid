@@ -15,7 +15,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from requests import RequestException
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV

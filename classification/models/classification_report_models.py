@@ -23,7 +23,6 @@ from django.db import models
 from django.db.models import CASCADE, PROTECT, SET_NULL, Prefetch, Q, QuerySet
 from model_utils.models import TimeStampedModel
 
-from classification.enums import AlleleOriginBucket
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
@@ -35,6 +34,7 @@ from patients.models_enums import (
 from seqauto.models import LibraryQC
 from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from snpdb.models import Lab, Sample
+from snpdb.models.models_enums import AlleleOriginBucket
 
 # A report has gone out with the case, so a deployment that files it somewhere else can now do so.
 # Only the DRAFT -> FINAL step sends it - re-finalising is how a LIS id entered later reaches the records

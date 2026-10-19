@@ -32,11 +32,8 @@ from django.db import connection, transaction
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models.models import (
-    VariantAnnotation,
-    VariantAnnotationVersion,
-    VariantTranscriptAnnotation,
-)
+from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
 from library.django_utils import get_model_fields
 from snpdb.variants_to_vcf import VARIANT_ID

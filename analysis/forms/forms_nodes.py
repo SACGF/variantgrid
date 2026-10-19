@@ -13,7 +13,6 @@ from django.utils.text import slugify
 from analysis import models
 from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
 from analysis.models.enums import NodeMatchInput
-from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
@@ -27,6 +26,8 @@ from analysis.models.nodes.filters.selected_in_parent_node import SelectedInPare
 from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.cohort_node import (
     CohortNode,
@@ -1236,16 +1237,16 @@ class TissueNodeForm(BaseNodeForm):
                    'accordion_panel': HiddenInput()}
 
 
-class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
-    genome_build_fields = ["trio"]
-    exclude_archived = True
+def _family_node_form(node_class) -> type[VCFSourceNodeForm]:
+    """ The Duo/Trio/Quad editor forms differ only in the family they pick """
+    source_field = node_class.FAMILY_SHAPE.source_field
 
     class Meta:
-        model = TrioNode
+        model = node_class
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
-            "trio": ModelSelect2(url='trio_autocomplete',
-                                 attrs={'data-placeholder': 'Trio...'}),
+            source_field: ModelSelect2(url=f'{source_field}_autocomplete',
+                                       attrs={'data-placeholder': f'{source_field.title()}...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -1254,43 +1255,18 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
 
-
-class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
-    genome_build_fields = ["quad"]
-    exclude_archived = True
-
-    class Meta:
-        model = QuadNode
-        exclude = ANALYSIS_NODE_FIELDS
-        widgets = {
-            "quad": ModelSelect2(url='quad_autocomplete',
-                                 attrs={'data-placeholder': 'Quad...'}),
-            "min_ad": WIDGET_INTEGER_MIN_0,
-            "min_dp": WIDGET_INTEGER_MIN_0,
-            "min_gq": WIDGET_INTEGER_MIN_0,
-            "max_pl": WIDGET_INTEGER_MIN_0,
-            "mosaic_max_af": WIDGET_UNIT_INTERVAL_SLIDER,
-            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
-        }
+    attrs = {
+        "__module__": __name__,
+        "genome_build_fields": [source_field],
+        "exclude_archived": True,
+        "Meta": Meta,
+    }
+    return type(f"{node_class.__name__}Form", (GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm), attrs)
 
 
-class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
-    genome_build_fields = ["duo"]
-    exclude_archived = True
-
-    class Meta:
-        model = DuoNode
-        exclude = ANALYSIS_NODE_FIELDS
-        widgets = {
-            "duo": ModelSelect2(url='duo_autocomplete',
-                                attrs={'data-placeholder': 'Duo...'}),
-            "min_ad": WIDGET_INTEGER_MIN_0,
-            "min_dp": WIDGET_INTEGER_MIN_0,
-            "min_gq": WIDGET_INTEGER_MIN_0,
-            "max_pl": WIDGET_INTEGER_MIN_0,
-            "mosaic_max_af": WIDGET_UNIT_INTERVAL_SLIDER,
-            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
-        }
+TrioNodeForm = _family_node_form(TrioNode)
+QuadNodeForm = _family_node_form(QuadNode)
+DuoNodeForm = _family_node_form(DuoNode)
 
 
 class ZygosityNodeForm(AncestorSampleSourceMixin, BaseNodeForm):

@@ -7,11 +7,13 @@ from django.db.models.deletion import CASCADE
 from model_utils.managers import InheritanceManager
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
+from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import Classification, ClassificationModification
 from genes.models import Gene
 from library.utils import rgb_invert
-from snpdb.models import Cohort, GenomeBuild, Sample, ShareLevel, Variant
+from snpdb.models import Cohort, GenomeBuild, Sample, Variant
 from snpdb.models.models_enums import ProcessingStatus
 from variantgrid.celery import app
 
@@ -66,7 +68,7 @@ class GeneCountType(models.Model):
     def _get_variant_q(self, genome_build: GenomeBuild) -> Optional[Q]:
         if self.uses_classifications:
             vc_qs = self.get_classification_qs()
-            return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
+            return vc_qs.variant_q(genome_build)
 
     def get_variant_queryset(self, variant_annotation_version: VariantAnnotationVersion):
         annotation_version = variant_annotation_version.get_any_annotation_version()

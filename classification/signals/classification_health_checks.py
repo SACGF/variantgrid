@@ -1,13 +1,17 @@
-from django.dispatch import receiver
+from datetime import timedelta
 
-from classification.enums import ShareLevel
+from django.db.models.query_utils import Q
+from django.dispatch import receiver
+from django.utils import timezone as django_timezone
+
+from classification.enums.classification_enums import ShareLevel
 from classification.models import (
     Classification,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
     classification_flag_types,
 )
-from flags.models import FlagType
+from flags.models import Flag, FlagStatus, FlagType
 from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import (
     HealthCheckRecentActivity,
@@ -22,6 +26,67 @@ from library.utils import limit_str
 """
 Reports information about classifications to the Slack health report
 """
+
+
+class ClassificationOutstandingIssues:
+
+    def __init__(self, classification: 'Classification'):
+        self.classification = classification
+        self.flags = []
+        self.issues = []
+
+    @property
+    def pk(self):
+        return self.classification.pk
+
+    def add_flag(self, flag: str):
+        self.flags.append(flag)
+
+    def add_issue(self, issue: str):
+        self.issues.append(issue)
+
+    def __str__(self):
+        return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
+
+
+def dashboard_report_new_classifications(since) -> int:
+    return Classification.objects.filter(created__gte=since).count()
+
+
+def dashboard_report_classifications_of_interest(since) -> list[ClassificationOutstandingIssues]:
+    min_age = django_timezone.now() - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
+
+    time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
+
+    # want to find new tags that are still open
+    flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
+    flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
+    flag_q = Q(flag_collection_id__in=flag_collections.distinct())
+    missing_chgvs_q = (Q(allele_info__grch37__resolved_hgvs__isnull=True) | Q(allele_info__grch38__resolved_hgvs__isnull=True))
+    coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
+    coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
+
+    summaries: list[ClassificationOutstandingIssues] = []
+    c: Classification
+    for c in coi_qs:
+        coi = ClassificationOutstandingIssues(c)
+        this_flags = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN,
+                                         collection=c.flag_collection)
+
+        variant_matching = False
+        for flag_type in this_flags.order_by('flag_type').values_list('flag_type', flat=True):
+            if flag_type == 'classification_matching_variant':
+                variant_matching = True
+            coi.add_flag(flag_type)
+        if not variant_matching:
+            if not c.resolved_hgvs_grch37:
+                coi.add_issue("No cached 37 representation")
+            if not c.resolved_hgvs_grch38:
+                coi.add_issue("No cached 38 representation")
+
+        summaries.append(coi)
+
+    return summaries
 
 
 @receiver(signal=health_check_signal)
@@ -87,8 +152,8 @@ def classifications_health_check_count(sender, health_request: HealthCheckReques
 @receiver(signal=health_check_signal)
 def classification_health_check_activity(sender, health_request: HealthCheckRequest, **kwargs):
     # TODO, also want to restrict this data based on now (not too much of an issue if now() is pretty much now)
-    classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=health_request.since)
-    new_classification_count = Classification.dashboard_report_new_classifications(since=health_request.since)
+    classifications_of_interest = dashboard_report_classifications_of_interest(since=health_request.since)
+    new_classification_count = dashboard_report_new_classifications(since=health_request.since)
 
     classification_new = Classification.objects.filter(created__gte=health_request.since)
 

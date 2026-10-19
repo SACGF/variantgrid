@@ -10,12 +10,14 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
-from annotation.models import OntologyTerm, VariantTranscriptAnnotation
+from annotation.models import VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from library.constants import DAY_SECS
+from ontology.models.models_ontology import OntologyTerm
 from patients.models import Patient
 from snpdb.models import Cohort, Contig
 

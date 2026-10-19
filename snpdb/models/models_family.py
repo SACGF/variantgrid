@@ -197,10 +197,6 @@ class Quad(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
     def get_listing_url(self):
         return reverse('quads')
 
-    @property
-    def sibling_details(self):
-        return _member_details(self.sibling, self.sibling_affected)
-
 
 class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
           SortByPKMixin, TimeStampedModel):
@@ -265,7 +261,3 @@ class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPr
         if affected := super().get_preview_icon_css_class():
             css_classes.append(affected)
         return " ".join(css_classes)
-
-    @property
-    def relative_details(self):
-        return _member_details(self.relative, self.relative_affected)

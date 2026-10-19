@@ -1,6 +1,5 @@
 // @ts-check
 // patients/templates/patients/view_patient.html
-/* global getCookie */ // global.js
 /* global FilePond, FilePondPluginFilePoster */ // lib/filepond
 function setupPatientFileUpload(patientId) {
     const inputElement = document.querySelector('#patient-file-upload');
@@ -10,7 +9,7 @@ function setupPatientFileUpload(patientId) {
     if (typeof FilePondPluginFilePoster !== 'undefined') {
         FilePond.registerPlugin(FilePondPluginFilePoster);
     }
-    const csrftoken = getCookie('csrftoken');
+    const csrftoken = Cookies.get('csrftoken');
     const pond = FilePond.create(inputElement, {
         allowMultiple: true,
         credits: false,

@@ -1,0 +1,46 @@
+{% load ui_utils %}
+<div class="col-md-6 mt-4">
+    <div class="card">
+        <div class="card-header">External IDs</div>
+        <div class="card-body">
+            {% labelled id="clingen-allele-id" label="ClinGen" help=annotation_description.clingen_allele hint="tiny" %}
+                <i class="fa fa-spinner"></i>
+            {% endlabelled %}
+        {% if variant_annotation.has_cosmic %}
+            {% labelled id='cosmic_id' label='COSMIC Genomic Mutation ID' help=annotation_description.cosmic_id hint="tiny" %}{{ variant_annotation.cosmic_id }}{% endlabelled %}
+            {% labelled id='cosmic_legacy_id' label='COSMIC Legacy ID' help=annotation_description.cosmic_legacy_id hint="tiny" %}{{ variant_annotation.cosmic_legacy_id }}{% endlabelled %}
+            {% labelled id='cosmic_count' label='COSMIC Sample Count' help=annotation_description.cosmic_count hint="tiny" %}{% endlabelled %}
+        {% endif %}
+
+            {% labelled id='dbsnp_rs_id' label='dbSNP' help=annotation_description.dbsnp_rs_id hint="tiny" %}{{ variant_annotation.dbsnp_rs_id }}{% endlabelled %}
+            {% labelled id='ensembl_protein' label='Ensembl Protein' help=annotation_description.ensembl_protein hint="tiny" %}{% endlabelled %}
+        {% if variant_annotation.has_mavedb %}
+            {% labelled id='mave_db_url' label='MaveDB' help=annotation_description.mave_db hint='tiny' %}
+                {% with mave_urls=variant_annotation.get_mave_urls %}
+                    {% for label, url in mave_urls.items %}
+                        <a target="_blank" class='hover-link' href="{{ url }}">{{ label }}</a>
+                    {% endfor %}
+                {% endwith %}
+            {% endlabelled %}
+        {% endif %}
+            {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
+                {% with search_term=variant_annotation.get_search_terms %}
+                    {% if search_term %}
+                        <a target="_blank" class='hover-link' href="http://google.com/search?q={{search_term}}"><span class="search-terms-short">{{ search_term|truncatechars:30 }}</span><span class="search-terms-full" style="display: none">{{ search_term }}</span></a>
+                        {% if search_term|length > 30 %}<a href="javascript:void(0)" class="search-terms-toggle small text-secondary">show all</a>{% endif %}
+                    {% endif %}
+                {% endwith %}
+            {% endlabelled %}
+            {% if annotation_pubmed_search_terms_enabled %}
+                {% labelled id='pubmed_search_terms' label='PubMed Search' hint="tiny" %}
+                    {% with pubmed_search_term=variant_annotation.get_pubmed_search_terms %}
+                        {% if pubmed_search_term %}
+                            <a target="_blank" class='hover-link' href="https://pubmed.ncbi.nlm.nih.gov/?term={{pubmed_search_term}}"><span class="search-terms-short">{{ pubmed_search_term|truncatechars:30 }}</span><span class="search-terms-full" style="display: none">{{ pubmed_search_term }}</span></a>
+                            {% if pubmed_search_term|length > 30 %}<a href="javascript:void(0)" class="search-terms-toggle small text-secondary">show all</a>{% endif %}
+                        {% endif %}
+                    {% endwith %}
+                {% endlabelled %}
+            {% endif %}
+        </div>
+    </div>
+</div>

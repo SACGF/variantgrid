@@ -17,7 +17,8 @@ from classification.models import (
     ConditionTextMatch,
     DiscordanceReport,
     DiscordanceReportClassification,
-    classification_flag_types, OverlapContribution,
+    OverlapContribution,
+    classification_flag_types,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync

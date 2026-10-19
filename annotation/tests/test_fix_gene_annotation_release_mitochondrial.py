@@ -17,7 +17,7 @@ from annotation.models import (
     GeneAnnotation,
     GeneAnnotationVersion,
 )
-from annotation.models.models import SubVersionPartition
+from annotation.models.models_version import SubVersionPartition
 from genes.fake_data import create_fake_gene_version
 from genes.models import (
     GeneAnnotationImport,

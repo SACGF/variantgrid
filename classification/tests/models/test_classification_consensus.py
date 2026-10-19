@@ -3,14 +3,14 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource
-from classification.models import (
-    Classification,
+from classification.enums import SpecialEKeys, SubmissionSource
+from classification.models import Classification, ClassificationModification
+from classification.models.classification_consensus import (
+    COPY_SCOPES_ALL,
+    COPY_SCOPES_GENE,
     ClassificationConsensus,
-    ClassificationModification,
     ConsensusComparison,
 )
-from classification.models.classification import COPY_SCOPES_ALL, COPY_SCOPES_GENE
 from classification.models.classification_variant_fields_validation import (
     apply_somatic_tier_from_amp_level,
 )
@@ -19,6 +19,7 @@ from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_fake_gene_version
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ClassificationConsensusPatchTestCase(TestCase):

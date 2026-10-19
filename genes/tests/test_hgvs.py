@@ -31,7 +31,7 @@ from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
 from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
-from snpdb.signals.variant_search import _get_non_coding_c_hgvs_as_n_details
+from snpdb.signals.hgvs_search import _get_non_coding_c_hgvs_as_n_details
 
 
 @override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)

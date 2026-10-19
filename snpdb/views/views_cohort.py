@@ -14,11 +14,11 @@ from annotation.forms import GeneCountTypeChoiceForm
 from annotation.models import (
     AnnotationVersion,
 )
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_gene_counts import (
     CohortGeneCounts,
     GeneCountType,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, GeneAndTranscriptForm, UserGeneListForm
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory

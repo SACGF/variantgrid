@@ -9,14 +9,15 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import GroupOperation
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantAnnotation
-from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
 from library.constants import MINUTE_SECS
 from patients.models_enums import GnomADPopulation, SimpleZygosity
 from snpdb.models import VariantZygosityCountCollection
+from snpdb.models.models_enums import ClinicalSignificance
 
 
 class PopulationNode(AnalysisNode):
@@ -213,8 +214,8 @@ class PopulationNode(AnalysisNode):
         """ Uses parent pk/version so can be shared with siblings. Doesn't use exclude as that ended up being slow """
         qs = parent.get_queryset()
         path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        q_classified = Classification.get_variant_q(parent.analysis.user, parent.analysis.genome_build,
-                                                    clinical_significance_list=path_and_likely_path)
+        q_classified = Classification.objects.published_variant_q(parent.analysis.user, parent.analysis.genome_build,
+                                                                    clinical_significance_list=path_and_likely_path)
         qs = qs.filter(q_classified)
         return list(qs.values_list("pk", flat=True))
 

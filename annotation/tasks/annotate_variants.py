@@ -12,7 +12,8 @@ from django.db.models import F
 from django.utils import timezone
 
 from annotation.models import AnnotationStatus
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import get_runner
 from annotation.signals.manual_signals import (
     annotation_run_complete_signal,
