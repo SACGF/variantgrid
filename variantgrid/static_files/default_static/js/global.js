@@ -1,6 +1,5 @@
 /*jshint esversion: 6 */
 /*globals $:false, jQuery:false, console:false, moment:false, Rollbar:false */
-/*globals toMarkdown:false */
 
 // Required until we can up our minimum browser suppert to this https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replaceAll
 if (!String.prototype.replaceAll) {
@@ -644,11 +643,6 @@ $(document).on("ajaxStop", () => {
         200); // timeout was 350, but now we have timeout on spinners and modals, so can put a small buffer on this
 });
 
-function setGlobalDebugMessage(message) {
-    const messageBox = $('<div>', {class: 'site-message border rounded m-2 p-2 bg-light severity-warning', html: message});
-    $('#global-debug-message').html(messageBox);
-}
-
 function loadAjaxBlock(dom, url) {
     if (!url) {
         url = dom.attr('href');
@@ -912,13 +906,6 @@ function getValue(val, defaultValue) {
     return (typeof val !== 'undefined') ?  val : defaultValue;
 }
 
-function markdownize(content) {
-    const html = content.split("\n").map($.trim).filter(function(line) {
-        return line !== "";
-    }).join("\n");
-    return toMarkdown(html);
-}
-
 function format(str, col) {
     col = typeof col === 'object' ? col : Array.prototype.slice.call(arguments, 1);
 
@@ -967,12 +954,6 @@ function dynamicSort(property, caseSensitive) {
         const result = (valA < valB) ? -1 : (valA > valB) ? 1 : 0;
         return result * sortOrder;
     };
-}
-
-function zero_pad(num, size) {
-    let s = num + "";
-    while (s.length < size) s = "0" + s;
-    return s;
 }
 
 function clearAutocompleteChoice(selector) {
@@ -1174,15 +1155,6 @@ function createTimestampDom(unix, timeAgo) {
         return $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.fromNow(), title: m.format(JS_DATE_FORMAT_DETAILED)});
     } else {
         return $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
-    }
-}
-
-function convertTimestampToMoment(timestamp) {
-    let m;
-    if (/[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(timestamp)) {
-        return moment(timestamp);
-    } else {
-        return moment(Number(timestamp) * 1000);
     }
 }
 

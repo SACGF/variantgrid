@@ -39,7 +39,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import TextField
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
-from django.db.models.expressions import OuterRef, RawSQL, Subquery, Value
+from django.db.models.expressions import OuterRef, Subquery, Value
 from django.db.models.functions import Cast, Concat, LPad
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
@@ -760,10 +760,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         return summary_obj.somatic.tumor_type_category
 
-    @staticmethod
-    def is_supported_transcript(transcript_or_hgvs: str):
-        return ImportedAlleleInfo.is_supported_transcript(transcript_or_hgvs)
-
     @property
     def include_based_on_allele_info(self) -> bool:
         if allele_info := self.allele_info:
@@ -841,16 +837,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return Classification.objects.filter(created__gte=since).count()
 
     @staticmethod
-    def dashboard_total_shared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
-                                             withdrawn=False).exclude(lab__name__icontains='legacy').count()
-
-    @staticmethod
-    def dashboard_total_unshared_classifications() -> int:
-        qs = Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy')
-        return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
-
-    @staticmethod
     def dashboard_report_classifications_of_interest(since) -> list[ClassificationOutstandingIssues]:
         min_age = django_timezone.now() - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
 
@@ -885,10 +871,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             summaries.append(coi)
 
         return summaries
-
-    @classmethod
-    def order_by_evidence(cls, key_id: str):
-        return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     @property
     def variant_coordinate(self):
@@ -1616,47 +1598,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             save=True,
             revalidate_all=True
         )
-        # migration fixes are so retrieve_established at this point, no need to re-run them
-        # self.fix_migration_stuff(user)
 
         classification_revalidate_signal.send(sender=Classification, classification=self)
 
         if submitted:
             # have to re-retrieve last_edited_version as it's now the latest
             self.last_edited_version.publish(share_level=self.share_level_enum, user=user, vc=self)
-
-    def fix_migration_stuff(self, user: User) -> None:
-        """
-        Ensure there's a published version, and that it's marked as such, that the variant matching flags are correct
-        """
-        modifications_for_self_qs = ClassificationModification.objects.filter(classification=self)
-        if not modifications_for_self_qs.filter(is_last_published=True).count() == 1:
-            # in case we have multiple last published records, this will  ensure we only have 1
-            modifications_for_self_qs.filter(is_last_published=True).update(is_last_published=False)
-            last_published = modifications_for_self_qs.filter(published=True).order_by('-created').first()
-            if last_published:
-                last_published.is_last_published = True
-                last_published.save()
-            else:
-                first_modification = modifications_for_self_qs.order_by('created').first()
-                if first_modification:
-                    first_modification.publish(share_level=ShareLevel.LAB, user=user, vc=self)
-
-        if not modifications_for_self_qs.filter(is_last_edited=True).count() == 1:
-            modifications_for_self_qs.filter(is_last_edited=True).update(is_last_edited=False)
-            last_edited = modifications_for_self_qs.order_by('-created').first()
-            if last_edited:
-                last_edited.is_last_edited = True
-                last_edited.save()
-
-        if settings.UNSHARED_FLAG_ENABLED and self.share_level_enum.key not in ShareLevel.DISCORDANT_LEVEL_KEYS:
-            self.flag_collection_safe.get_or_create_open_flag_of_type(
-                flag_type=classification_flag_types.unshared_flag
-            )
-
-        self.apply_allele_info_to_classification()
-        self.fix_permissions()
-        self.save()
 
     def patch_history(self, patcher: Callable[[PatchMeta], None]):
         """
@@ -2491,10 +2438,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
     code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
-
-    @classmethod
-    def order_by_evidence(cls, key_id: str) -> RawSQL:
-        return RawSQL('cast(published_evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     def __str__(self) -> str:
         return self.id_str
