@@ -3,8 +3,9 @@ The classification vocabulary: SpecialEKeys (the evidence keys code refers to by
 never string literals), ShareLevel (lab -> institution -> logged-in users -> public, with which levels
 count toward discordance), CopyScope / CopyAlleleOrigin (how far a value travels when copied from a
 previous classification), EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema),
-CriteriaEvaluation (ACMG strengths), SubmissionSource, ValidationCode and WithdrawReason. Buckets and
-option metadata come from EvidenceKey rows, not from these enums.
+CriteriaEvaluation (ACMG strengths), SubmissionSource, ValidationCode, WithdrawReason and MultiCondition
+(how a classification's multiple condition terms combine). Buckets and option metadata come from
+EvidenceKey rows, not from these enums.
 AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification,
 so are defined in snpdb/models/models_enums.py and re-exported here.
 """
@@ -649,3 +650,17 @@ class WithdrawReason(TextChoices):
     DUPLICATE = 'DUPLICATE', 'This record has an exact duplicate'
     SENSITIVE_DATA = 'SENSITIVE_DATA', 'This record contains sensitive data'
     OTHER = 'OTHER', 'Other'
+
+
+class MultiCondition(TextChoices):
+    """
+    For when multiple terms exist, are we uncertain which one it is, or are we curating for multiple.
+    NOT_DECIDED means a choice is still required
+    """
+    NOT_DECIDED = 'N', 'Not decided'
+    UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
+    CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
+
+    @property
+    def clinvar_label(self):
+        return self.label

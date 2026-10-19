@@ -206,7 +206,7 @@ result into `Classification.condition_resolution`, raises the condition-resoluti
 only what `classification/models/condition_text_matching.py:ConditionMatchingSuggestion.is_auto_assignable` is certain
 of - an embedded id such as `MONDO:0005021` at the root, or a single leaf term with a known gene relationship at gene
 level; everything else waits for a curator on the condition matching page. Multiple terms carry a
-`classification/enums/condition_enums.py:MultiCondition` of uncertain or co-occurring.
+`classification/enums/classification_enums.py:MultiCondition` of uncertain or co-occurring.
 
 ### ClinVar export
 

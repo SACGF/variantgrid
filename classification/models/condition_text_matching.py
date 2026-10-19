@@ -21,7 +21,7 @@ from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
-from classification.enums.condition_enums import MultiCondition
+from classification.enums.classification_enums import MultiCondition
 from classification.models import flag_types
 from classification.models.classification import (
     Classification,

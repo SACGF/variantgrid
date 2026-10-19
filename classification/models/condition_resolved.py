@@ -14,7 +14,7 @@ from typing import Optional, TypedDict
 import pydantic
 from typing_extensions import deprecated
 
-from classification.enums.condition_enums import MultiCondition
+from classification.enums.classification_enums import MultiCondition
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 
 

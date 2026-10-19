@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import TestCase
 
-from classification.enums.condition_enums import MultiCondition
+from classification.enums.classification_enums import MultiCondition
 from classification.models import ConditionResolved
 from classification.tests.utils.data_utils import ConditionMock
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
