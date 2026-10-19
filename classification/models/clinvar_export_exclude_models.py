@@ -3,8 +3,6 @@ ClinVarKeyExcludePattern: a per-ClinVarKey regex over one evidence key that keep
 classifications out of that key's ClinVar submissions. Applied by
 classification/models/clinvar_export_exclude_utils.py:ClinVarExcludePatternUtil, edited as an inline on the
 ClinVarKey admin (classification/admin/clinvar_export_admin.py).
-
-The table is still snpdb_clinvarkeyexcludepattern, from when the model lived in snpdb (#2276).
 """
 import re
 from functools import cached_property
@@ -32,9 +30,6 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
     name = models.TextField(blank=True)
     case_insensitive = models.BooleanField(default=True, blank=True)
     mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
-
-    class Meta:
-        db_table = "snpdb_clinvarkeyexcludepattern"
 
     @cached_property
     def regex(self):

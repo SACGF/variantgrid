@@ -1,4 +1,4 @@
-# State-only: takes over ClinVarKeyExcludePattern and its existing table from snpdb (#2276)
+# State-only: takes over ClinVarKeyExcludePattern and its existing table from snpdb, renamed in 0234 (#2276)
 
 import django.db.models.deletion
 import django_extensions.db.fields
