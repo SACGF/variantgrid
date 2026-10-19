@@ -17,10 +17,8 @@ from library.django_utils.admin_utils import (
 )
 from snpdb import models
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
-from snpdb.liftover import liftover_alleles
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
     ClinVarKey,
     ClinVarKeyExcludePattern,
@@ -41,6 +39,7 @@ from snpdb.partition_archive import (
     clear_partition_archive_dump,
     mark_partition_archive_restored,
 )
+from snpdb.tasks.liftover_tasks import queue_liftover_selected_alleles
 
 
 @admin.register(AlleleLiftover)
@@ -94,10 +93,8 @@ class AlleleAdmin(ModelAdminBasics):
 
     @admin_action("Liftover")
     def liftover(self, request, queryset):
-        # Explicitly selected alleles, so retry tools that have already failed on them
-        liftover_alleles(allele_qs=queryset, user=request.user,
-                         retry_conversion_tools=list(AlleleConversionTool))
-        self.message_user(request, message='Liftover queued', level=messages.INFO)
+        num_batches = queue_liftover_selected_alleles(request.user, queryset)
+        self.message_user(request, message=f'Liftover queued ({num_batches} tasks)', level=messages.INFO)
 
     @admin_action("Re-calc Overlaps")
     def recalc_overlaps(self, request, queryset: QuerySet[Allele]):
