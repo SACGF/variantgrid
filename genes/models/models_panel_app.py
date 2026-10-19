@@ -157,5 +157,5 @@ class PanelAppPanelLocalCacheGeneSymbol(models.Model):
 
 
 class CachedThirdPartyGeneList(models.Model):
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     company = models.ForeignKey(Company, on_delete=CASCADE)

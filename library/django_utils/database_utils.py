@@ -28,7 +28,6 @@ from django.db.models import QuerySet
 from django.db.models.lookups import In
 from django.db.models.sql.where import NothingNode
 from django.db.models.enums import TextChoices, IntegerChoices
-from django_json_widget.widgets import JSONEditorWidget
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
@@ -430,28 +429,8 @@ class TextFieldChoices(ChoicesMixin[T2], models.TextField):
     pass
 
 
-T3 = TypeVar('T3', bound=TextChoices)
-
-
-class CharFieldChoices(ChoicesMixin[T3], models.CharField):
-    pass
-
-
 T4 = TypeVar('T4', bound=IntegerChoices)
 
 
 class IntegerFieldChoices(ChoicesMixin[T4], models.IntegerField):
     pass
-
-
-class JSONDataClassAdminWidget(JSONEditorWidget):
-
-    def format_value(self, value):
-        if not isinstance(value, (dict, list)):
-            value = json.loads(value)
-            if isinstance(value, str):
-                # TODO, why would these values be double escaped anyway?
-                value = json.loads(value)
-            return value
-        else:
-            return value

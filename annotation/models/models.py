@@ -83,7 +83,6 @@ from annotation.pathogenicity_predictions import (
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
-from classification.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from genes.models import (
     Gene,
     GeneAnnotationRelease,
@@ -114,7 +113,8 @@ from snpdb.models import (
     Q,
     Variant,
 )
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_cached_web_resource import CachedWebResource
+from snpdb.models.models_enums import AlleleOriginBucket, ImportStatus, SomaticClinicalSignificance
 
 
 class SubVersionPartition(RelatedModelsPartitionModel):
@@ -552,7 +552,7 @@ class ClinVarRecord(TimeStampedModel):
 
 
 class ClinVarCitationsCollection(models.Model):
-    cached_web_resource = models.ForeignKey('CachedWebResource', null=True, on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)
 
 
 class ClinVarCitation(models.Model):
@@ -915,6 +915,16 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     @staticmethod
+    def latest_gene_annotation_releases(status: 'VariantAnnotationVersion.Status' = None) -> list[GeneAnnotationRelease]:
+        """ The GeneAnnotationRelease of each annotated build's latest VAV (by build name), for builds that have one """
+        gene_annotation_releases = []
+        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
+            if vav := VariantAnnotationVersion.latest(genome_build, status=status):
+                if vav.gene_annotation_release:
+                    gene_annotation_releases.append(vav.gene_annotation_release)
+        return gene_annotation_releases
+
+    @staticmethod
     def latest_for_all_builds(status: 'VariantAnnotationVersion.Status' = None) -> QuerySet:
         if status is None:
             status = VariantAnnotationVersion.Status.ACTIVE
@@ -1093,11 +1103,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     def cdot_gene_release_token(self) -> Optional[str]:
         """ The release identifier cdot uses in its per-GFF asset names, eg 'RS_2025_08' """
         return self.vep_gene_set_versions.release_token
-
-    @property
-    def gene_annotation_release_gff_url(self) -> Optional[str]:
-        """ The GFF/GTF cdot read to build this gene set """
-        return self.vep_gene_set_versions.gff_url
 
     @property
     def suggested_gene_annotation_release_name(self) -> str:
@@ -3067,29 +3072,6 @@ class AnnotationVersion(models.Model):
                         f"Ontology: {self.ontology_version}"]
         sub_versions_str = ", ".join(sub_versions)
         return f"{self.short_description}. {sub_versions_str}"
-
-
-class CachedWebResource(TimeStampedModel):
-    """ These are annotations that can populate themselves via the web
-
-        * Can be manually updated via button kicking off annotation.views.load_cached_web_resource
-        * List of names each system uses is in settings
-        * Creation of one with name triggers signals which apps can configure to listen to / run populators
-    """
-    name = models.TextField(primary_key=True)
-    description = models.TextField(blank=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-
-    @staticmethod
-    def named_handler_factory(name, celery_task_class):
-        def handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-            created = kwargs.get("created")
-
-            if created and instance.name == name:
-                task_signature = celery_task_class.si(instance.pk)
-                task_signature.apply_async()
-
-        return handler
 
 
 class GeneSymbolCitation(models.Model):

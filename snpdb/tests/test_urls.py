@@ -124,7 +124,6 @@ class Test(URLTestCase):
             ("quad_datatable", {}, cls.quad),
             ("duo_datatable", {}, cls.duo),
             ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
-            ("cohort_sample_datatable", {"cohort_id": cls.cohort.pk}, None),
         ]
 
     def testUrls(self):

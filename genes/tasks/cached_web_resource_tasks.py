@@ -1,4 +1,3 @@
-from annotation.tasks.cached_web_resource_tasks import CachedWebResourceTask
 from genes.cached_web_resource.gnomad_gene_constraint import store_gnomad_gene_constraint_from_web
 from genes.cached_web_resource.hgnc import store_hgnc_from_web
 from genes.cached_web_resource.lrg_ref_seq_gene import store_lrg_ref_seq_gene_from_web
@@ -13,6 +12,7 @@ from genes.cached_web_resource.refseq import (
 from genes.cached_web_resource.uniprot import store_uniprot_from_web
 from genes.models import PanelAppServer
 from genes.panel_app import store_panel_app_panels_from_web
+from snpdb.tasks.cached_web_resource_tasks import CachedWebResourceTask
 from variantgrid.celery import app
 
 

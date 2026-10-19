@@ -522,8 +522,7 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
     # data on disk - fixed when the partition is built/migrated - not config, so it can't be derived from settings.
     additional_gnomad_versions = ArrayField(models.TextField(), default=list, blank=True)
     gnomad_af_min = models.FloatField()
-    # This value is from classification.enums.classification_enums.ClinicalSignificance
-    # but don't want to bring dependency in from classification
+    # A models_enums.ClinicalSignificance value
     clinical_significance_max = models.CharField(max_length=1, null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 

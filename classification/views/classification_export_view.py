@@ -16,7 +16,7 @@ from drf_spectacular.utils import extend_schema
 from requests.models import Response
 from rest_framework.views import APIView
 
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef

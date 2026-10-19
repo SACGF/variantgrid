@@ -7,6 +7,7 @@ const VCTable = (function() {
     VCTable.prototype = {};
     return VCTable;
 })();
+window.VCTable = VCTable;  // @see resolveFunctionName in datatable_definition.js
 
 VCTable.format_condition = function(condition_json) {
     if (!condition_json) {
@@ -301,7 +302,9 @@ VCTable.classification = (data, type, row) => {
     return $('<div>', {html: domParts});
 };
 
-VCTable.evidence_key = (key_name, data, type, row) => {
+// kwargs: {key: the evidence key data is a value of}
+VCTable.evidence_key = (data, type, row, ctx) => {
+    const key_name = ctx.kwargs.key;
     const csKey = EKeys.cachedKeys.key(key_name);
     let span;
     if (data == null) {

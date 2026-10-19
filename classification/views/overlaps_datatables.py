@@ -313,7 +313,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         self.csv_name = "overlaps"
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlap', expected_height=108)
+        self.set_expand_ajax('overlap', expected_height=108)
         self.rich_columns = [
 
             RichColumn(
@@ -321,7 +321,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 label="c.HGVS",
                 # sort_keys=["latest_allele_info__grch38__genomic_sort"],
                 renderer=self.render_hgvs,
-                client_renderer=RichColumn.client_renderer_repeat({'formatter': 'VCTable.hgvs', 'groupCSS': 'd-inline'})
+                **RichColumn.client_renderer_repeat('VCTable.hgvs', group_css='d-inline')
             ),
 
             RichColumn(

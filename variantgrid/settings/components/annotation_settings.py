@@ -10,6 +10,10 @@ from variantgrid.settings.components.settings_paths import (
 # GeneAnnotation is only in analyses, as an optimisation to stpre e.g. per-gene ontology records.
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
 
+# work_mem (SET LOCAL) for calculate_sample_stats grouping a cohort's rows by zygosity string. The worker's
+# backend and each of its parallel workers can use hash_mem_multiplier (default 2) times this
+ANNOTATION_COHORT_STATS_WORK_MEM = "128MB"
+
 ANNOTATION_VEP_FAKE_VERSION = False  # Overridden in unit tests to not call VEP to get version
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 

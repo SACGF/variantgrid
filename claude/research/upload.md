@@ -240,7 +240,8 @@ Normalisation history is kept as `ModifiedImportedVariant` because users search 
 file, not the left-aligned one: `ModifiedImportedVariant.get_variant_for_unnormalized_variant` and
 `get_other_loci_variants_by_multiallelic` answer "where did my variant go", and `ModifiedImportedVariants.get_for_pipeline`
 hangs the collection off the normalize sub-step so the tool version is recorded with it. Legacy rows
-hold vt-format `OLD_VARIANT` strings, which `_vt_split_old_variant` parses, so the model reads both.
+hold vt-format `OLD_VARIANT` strings; lookups go through `old_variant_formatted`, which has the same
+`chrom:pos:ref/alt` shape for both tools, so those rows are still found.
 
 ## Traps
 

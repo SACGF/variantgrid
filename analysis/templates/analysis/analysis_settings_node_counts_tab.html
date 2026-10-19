@@ -70,6 +70,10 @@
         user-select: none;
     }
 
+    .node-counts-read-only .list-group {
+        opacity: 0.6;
+    }
+
     #available_tags_sortable {
         /* There can be a lot of tags - keep the columns beside each other a sane length */
         max-height: 400px;
@@ -141,14 +145,16 @@
                 nodeCountInput.appendTo(nodeCountsForm);
             }
 		});
-		nodeCountsForm.ajaxForm(options); 
+		nodeCountsForm.ajaxForm(options);
+		{% if has_write_permission %}
 		setupNodeCountsWidget();
+		{% endif %}
 	});
 </script>
 <form id="analysis-node-counts-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
 
-    <div class="container no-gutters">
+    <div class="container no-gutters{% if not has_write_permission %} node-counts-read-only{% endif %}">
     {% if is_analysis %}
         <div class="row">
             <div class="col">

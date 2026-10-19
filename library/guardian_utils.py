@@ -60,41 +60,6 @@ def add_public_group_read_permission(obj):
     assign_perm(read_perm, public_group(), obj)
 
 
-def _group_general_score(group_name):
-    if group_name == settings.PUBLIC_GROUP_NAME:
-        return 4
-    if group_name == settings.LOGGED_IN_USERS_GROUP_NAME:
-        return 3
-    if '/' not in group_name:
-        return 2
-    return 1
-
-
-def highest_group(group_names):
-    highest_score = 0
-    highest_group_name = None
-
-    for name in group_names:
-        score = _group_general_score(name)
-        if score > highest_score:
-            highest_score = score
-            highest_group_name = name
-    return highest_group_name
-
-
-def groups_map(klass, ids, id_field='id'):
-    id_to_group = {}
-    if ids:
-        if hasattr(ids[0], id_field):
-            ids = [obj.id for obj in ids]
-
-        objs = klass.objects.filter(pk__in=ids).only(id_field)
-        for obj in objs:
-            id_to_group[obj.id] = set(get_groups_with_perms(obj).values_list('name', flat=True))
-
-    return id_to_group
-
-
 class DjangoPermission:
     READ = 'view'
     WRITE = 'change'
