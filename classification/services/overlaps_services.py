@@ -751,7 +751,11 @@ class OverlapPageDetails:
             ))
 
         if allele_id := self.overlap.allele_id:
-            if cross_context := Overlap.objects.filter(allele_id=allele_id, overlap_type=OverlapType.CROSS_CONTEXT, valid=True).first():
+            if cross_context := Overlap.objects.filter(
+                    allele_id=allele_id,
+                    value_type=self.overlap.value_type,
+                    overlap_type=OverlapType.CROSS_CONTEXT,
+                    valid=True).first():
                 cross_context_contributions = set(cross_context.contributions) - set(self.overlap.contributions_list)
                 for overlap_contribution in list(sorted(cross_context_contributions)):
                     perspectives.append(OverlapContributionPerspective(
