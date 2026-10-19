@@ -1,8 +1,9 @@
-"""Ensembl API failures (an HTML error page, a connection error) are reported, not raised as a 500 (#869)."""
+"""Ensembl API failures (an HTML error page, a connection error) are reported, not raised as a 500 (#869),
+and an unversioned Ensembl accession resolves to the latest version."""
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError, Response
@@ -18,6 +19,8 @@ from snpdb.models.models_genome import GenomeBuild
 ENSEMBL_ERROR_PAGE = "<!doctype html><html><title>Error: 500 | EMBL-EBI</title></html>"
 GRCH38 = mock.Mock(spec=GenomeBuild, name="GRCh38")
 GRCH38.name = "GRCh38"
+UNVERSIONED_ACCESSION = "ENST00000000001"
+ENSEMBL_LATEST_VERSION_JSON = '{"id": "ENST00000000001", "version": 9, "seq": "ACGT", "molecule": "dna"}'
 
 
 def _response(status_code: int, text: str) -> Response:
@@ -40,6 +43,24 @@ class EnsemblFetchErrorTest(SimpleTestCase):
                         return_value=_response(200, ENSEMBL_ERROR_PAGE)):
             with self.assertRaises(NoTranscript):
                 TranscriptSequenceFetcher().fetch_ensembl("ENST00000000001.1", genome_build=GRCH38)
+
+
+@override_settings(TRANSCRIPT_SEQUENCE_FETCHER_CLASS="genes.transcript_sequence_retrieval.TranscriptSequenceFetcher")
+class EnsemblUnversionedSequenceInfoTest(TestCase):
+    def setUp(self):
+        patcher = mock.patch("genes.transcript_sequence_retrieval.requests.get",
+                             return_value=_response(200, ENSEMBL_LATEST_VERSION_JSON))
+        self.requests_get = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_stores_latest_version(self):
+        tvi = TranscriptVersionSequenceInfo.get(UNVERSIONED_ACCESSION)
+        self.assertEqual(tvi.version, 9)
+
+    def test_second_lookup_uses_stored_version(self):
+        TranscriptVersionSequenceInfo.get(UNVERSIONED_ACCESSION)
+        TranscriptVersionSequenceInfo.get(UNVERSIONED_ACCESSION)
+        self.requests_get.assert_called_once()
 
 
 class ViewTranscriptVersionApiDownTest(URLTestCase):
