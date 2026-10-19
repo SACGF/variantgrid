@@ -533,6 +533,9 @@ const DataTableDefinition = (function() {
                                    kwargs: this.serverParams.expandClientRendererKwargs || null};
             const expandFn = (rowData) => expandRenderer(rowData, expandContext);
             const expandData = this.expandData;
+            // Only DataTables' own data rows - not the "No data available" / "Loading..." placeholder, headers or
+            // expanded child rows. Stripe classes (odd/even) can't tell them apart: the placeholder row is tr.odd
+            const isDataRow = (tr) => dataTable.row(tr).data() !== undefined;
 
             dom.on('click', 'tr', function(event) {
                 // A click on a link or control belongs to it (the variant grids have a details link, a
@@ -541,8 +544,7 @@ const DataTableDefinition = (function() {
                     return;
                 }
                 const tr = $(this); //.closest('tr');
-                if (!tr.hasClass('odd') && !tr.hasClass('even')) {
-                    // not a regular row
+                if (!isDataRow(tr)) {
                     return;
                 }
                 const row = dataTable.row( tr );
@@ -584,8 +586,8 @@ const DataTableDefinition = (function() {
             // if hovering over a single row for 500ms, pre-fetch the client data ready to display
             dom.on('mouseenter', 'tr', function() {
                 const tr = $(this);
-                if (!tr.hasClass('odd') && !tr.hasClass('even') || tr.hasClass('loaded')) {
-                    return; // either not an odd or even row, or already
+                if (!isDataRow(tr) || tr.hasClass('loaded')) {
+                    return;
                 }
                 window.clearTimeout(expandData.hoverTimeout);
                 expandData.hoverTimeout = window.setTimeout(() => {
