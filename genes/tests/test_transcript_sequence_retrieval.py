@@ -48,11 +48,14 @@ class EnsemblUnversionedSequenceInfoTest(TestCase):
     def test_unversioned_accession_stores_latest_version(self):
         ensembl_json = '{"id": "ENST00000000001", "version": 9, "seq": "ACGT", "molecule": "dna"}'
         with mock.patch("genes.transcript_sequence_retrieval.requests.get",
-                        return_value=_response(200, ensembl_json)):
+                        return_value=_response(200, ensembl_json)) as requests_get:
             tvi = TranscriptVersionSequenceInfo.get("ENST00000000001")
+            cached_tvi = TranscriptVersionSequenceInfo.get("ENST00000000001")
         self.assertEqual(tvi.version, 9)
         stored_versions = TranscriptVersionSequenceInfo.objects.filter(transcript_id="ENST00000000001")
         self.assertEqual(list(stored_versions.values_list("version", flat=True)), [9])
+        self.assertEqual(cached_tvi, tvi)
+        requests_get.assert_called_once()
 
 
 class ViewTranscriptVersionApiDownTest(URLTestCase):
