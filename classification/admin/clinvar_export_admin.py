@@ -20,13 +20,13 @@ from classification.models.clinvar_export_exclude_models import ClinVarKeyExclud
 from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import ClinVarRequestException, clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from library.django_utils.admin_utils import (
     AllValuesChoicesFieldListFilter,
     ModelAdminBasics,
     admin_action,
     admin_list_column,
 )
-from snpdb.models.models import ClinVarKey
 
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):

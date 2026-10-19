@@ -216,11 +216,11 @@ class CreateWithDefaultsTestCase(TestCase):
         self.user.first_name = "Dave"
         self.user.last_name = "Lawrence"
         self.user.save()
-        self.lab.classification_config = {
+        self.lab.classification_settings.classification_config = {
             SpecialEKeys.CURATED_BY: {"mandatory": True, "default_value": "$user"},
             SpecialEKeys.CURATION_DATE: {"mandatory": True, "default_value": "$today"}
         }
-        self.lab.save()
+        self.lab.classification_settings.save()
 
     def _create(self, **kwargs) -> Classification:
         return Classification.create(

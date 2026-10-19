@@ -127,7 +127,6 @@ urlpatterns = [
     path('lab/members_tab/<int:pk>', views_lab.lab_members_tab, name='lab_members_tab'),
     path('lab/members/add/<int:pk>', views_lab.lab_add_member, name='lab_add_member'),
     path('lab/members/remove/<int:pk>', views_lab.lab_remove_member, name='lab_remove_member'),
-    path('clinvar_key/<str:pk>', views_lab.view_clinvar_key, name='clinvar_key'),
     path('organization/<int:organization_id>', views_lab.view_organization, name='view_organization'),
     path('help_static_page/<path:page_name>', views.help_static_page, name='help_static_page'),
     path('genomic_intervals_graph/<int:genomic_intervals_collection_id>', views_graphs.genomic_intervals_graph, name='genomic_intervals_graph'),

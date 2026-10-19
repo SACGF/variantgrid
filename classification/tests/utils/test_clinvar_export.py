@@ -21,12 +21,13 @@ from classification.models.classification_variant_info_models import (
 from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import ClinVarResponseOutcome, clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.models_enums import GeneSymbolAliasSource
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
-from snpdb.models import ClinVarKey, GenomeBuild, GenomeBuildPatchVersion
+from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 
@@ -153,8 +154,8 @@ class TestClinVarExport(TestCase):
         lab, user = ClassificationTestUtils.lab_and_user()
 
         clinvar_key = ClinVarKey.objects.create(id="test_c_key")
-        lab.clinvar_key = clinvar_key
-        lab.save()
+        lab.classification_settings.clinvar_key = clinvar_key
+        lab.classification_settings.save()
 
         data = {
             SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(TECTA):c.1913G>A'},

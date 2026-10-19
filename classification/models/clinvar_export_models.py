@@ -16,10 +16,11 @@ from classification.models.clinvar_export_convertor import (
     CLINVAR_EXPORT_CONVERSION_VERSION,
     ClinVarExportConverter,
 )
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.condition_resolved import ConditionResolved
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import JsonObjType, first, invalidate_cached_property
-from snpdb.models import Allele, ClinVarKey
+from snpdb.models import Allele
 from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JsonMessages, ValidatedJson
 

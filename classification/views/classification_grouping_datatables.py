@@ -89,7 +89,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "classification_count": row.get('classification_count'),
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
-            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__research')),
+            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__classification_settings__research')),
             "research_icon": settings.RESEARCH_ICON,
             "share_level": row.get('share_level'),
             "allele_origin_bucket": row.get('allele_origin_grouping__allele_origin_bucket'),
@@ -462,7 +462,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
-                    'lab__research',
+                    'lab__classification_settings__research',
 					'allele_origin_grouping__allele_origin_bucket',
                     'share_level',
                     'dirty'

@@ -184,9 +184,8 @@ def make_code_friendly(text: str) -> str:
 @admin.register(Lab)
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'state', 'country',
-                    'external', 'research', 'clinvar_key', 'upload_location', 'classification_config')
-    list_filter = ('external', 'research')
+    list_display = ('name', 'group_name', 'organization', 'state', 'country', 'external')
+    list_filter = ('external', )
     search_fields = ('organization__name', 'name')
 
     fieldsets = (
@@ -194,12 +193,11 @@ class LabAdmin(ModelAdminBasics):
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Contact', {'fields': ('url', 'contact_name', 'contact_email', 'contact_phone')}),
         ('Notifications', {'fields': ('email', 'slack_webhook')}),
-        ('Uploads', {'fields': ('upload_location', 'upload_automatic', 'upload_instructions')}),
-        ('Submissions', {'fields': ('classification_config', 'external', 'research', 'clinvar_key', 'consolidates_variant_classifications')})
+        ('Submissions', {'fields': ('external', )})
     )
 
     def is_readonly_field(self, f) -> bool:
-        if f.name in ('clinvar_key', 'organization', 'state', 'country'):
+        if f.name in ('organization', 'state', 'country'):
             return False
         return super().is_readonly_field(f)
 
@@ -216,7 +214,6 @@ class LabAdmin(ModelAdminBasics):
             'contact_name': admin.widgets.AdminTextInputWidget(),
             'contact_email': admin.widgets.AdminEmailInputWidget(),
             'contact_phone': admin.widgets.AdminTextInputWidget(),
-            'upload_location': admin.widgets.AdminTextInputWidget(),
             'email': admin.widgets.AdminEmailInputWidget(),
             'slack_webhook': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
@@ -244,11 +241,10 @@ class LabAdmin(ModelAdminBasics):
 @admin.register(Organization)
 class OrganizationAdmin(ModelAdminBasics):
 
-    list_display = ('name', 'group_name', 'classification_config')
+    list_display = ('name', 'group_name')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'short_name', 'group_name', 'active')}),
-        ('Submissions', {'fields': ('classification_config', )})
     )
 
     def fix_group_name(self, request, queryset):

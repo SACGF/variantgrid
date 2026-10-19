@@ -29,6 +29,7 @@ from classification.models import (
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.utils.clinvar_matcher import (
     ClinVarLegacyExportMatchType,
     ClinVarLegacyMatches,
@@ -53,7 +54,7 @@ from library.utils import (
 )
 from ontology.models import AncestorCalculator, OntologyTerm, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Allele, ClinVarKey, GenomeBuild, Lab
+from snpdb.models import Allele, GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -561,7 +562,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
     clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
 
-    labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
+    labs = clinvar_key.labs
     dashboard = ClassificationDashboard(LabPickerData.for_labs(labs, user=request.user))
 
     export_columns = ClinVarExportColumns(request)
@@ -701,3 +702,20 @@ def clinvar_match_detail(request, clinvar_key_id: str):
         'matches': matches,
         'action_required': action_required
     })
+
+
+def view_clinvar_key(request, pk: str):
+    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key.check_user_can_access(request.user)
+
+    return render(request, 'classification/clinvar_key.html', {
+        'clinvar_key': clinvar_key,
+        'labs': clinvar_key.labs,
+    })
+
+
+def lab_clinvar_key_tab(request, pk: int):
+    lab = get_object_or_404(Lab, pk=pk)
+    if clinvar_key := lab.classification_settings.clinvar_key:
+        return view_clinvar_key(request, clinvar_key.pk)
+    return HttpResponse("ClinVar is not configured for this lab. Contact a site administrator if you'd like to change that.")

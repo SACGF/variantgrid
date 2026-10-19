@@ -66,7 +66,7 @@ ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
 # Only applies when DISCORDANCE_ENABLED is True. When False, classifications from
-# labs flagged as research (Lab.research) do not participate in discordance detection.
+# labs flagged as research (LabClassificationSettings.research) do not participate in discordance detection.
 DISCORDANCE_RESEARCH_ENABLED = True
 
 ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
@@ -673,7 +673,7 @@ CLASSIFICATION_GRID_FADE_NON_SHARED = False  # Fade grid rows and record summari
 CLASSIFICATION_GRID_SUMMARY_COUNTS = True  # Clinical significance counts above the gene / allele / variant classification grids
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_GENE_CONSENSUS = True  # Offer gene content curated on other records in the gene (create page, Classify & Report, Gene Content card)
-CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
+CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where LabClassificationSettings.research=True
 RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
 # Require people to click "my sample's not here" (ie encourage them to find it)

@@ -13,12 +13,12 @@ from classification.models.classification import (
     classification_post_publish_signal,
 )
 from classification.models.clinvar_export_exclude_models import ClinVarKeyExcludePattern
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.evidence_mixin import EvidenceMixin
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagStatus
 from library.guardian_utils import admin_bot
 from library.utils import get_timer
-from snpdb.models.models import ClinVarKey
 
 """
 This file has the data responsible for applying the ClinVarExclude patterns to automatically stop
@@ -40,7 +40,7 @@ def published(sender,
     (will have no effect if ClinVarKey is not configured)
     """
 
-    if clinvar_key := classification.lab.clinvar_key:
+    if clinvar_key := classification.lab.classification_settings.clinvar_key:
         ClinVarExcludePatternUtil(clinvar_key).ignore_pattern_for(newly_published).apply()
 
     get_timer().tick("Reviewed ClinVar exclusion")
@@ -163,7 +163,7 @@ class ClinVarExcludePatternUtil:
         return matching_patterns
 
     def _all_classifications_for_key(self) -> QuerySet[ClassificationModification]:
-        labs = self.clinvar_key.lab_set.all()
+        labs = self.clinvar_key.labs
         return ClassificationModification.objects.filter(
             classification__lab__in=labs,
             is_last_published=True

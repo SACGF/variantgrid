@@ -53,7 +53,8 @@ Patterns here:
   classification_revalidate_signal, variants_classification_changed_signal). Receivers live in signals/ and are imported by
   apps.py:ClassificationConfig.ready; annotation/apps.py and snpdb/signals/common_variants_classification_changed.py subscribe
   from outside the app.
-- A lab's `classification_config` can give an evidence key a `default_value`, which a record created from the web
+- A lab's `classification_config` (`models/classification_settings_models.py:LabClassificationSettings`, applied over
+  its organization's) can give an evidence key a `default_value`, which a record created from the web
   form starts that key with (`models/classification.py:Classification.create_with_response` with
   `populate_with_defaults=True` - the API, file imports and sync never see one). `$user` and `$today` resolve at create
   time through `models/evidence_key.py:resolve_default_value`, so a lab that makes `curated_by` / `curation_date`

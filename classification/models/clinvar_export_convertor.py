@@ -8,9 +8,10 @@ from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
 from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
-from classification.enums.clinvar_export_enums import ClinVarExportStatus
 from classification.enums.classification_enums import MultiCondition
+from classification.enums.clinvar_export_enums import ClinVarExportStatus
 from classification.models.classification import Classification, ClassificationModification
+from classification.models.clinvar_key_models import ClinVarCitationsModes, ClinVarKey
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagType
@@ -18,7 +19,7 @@ from genes.hgvs import HGVSComponents
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
-from snpdb.models import ClinVarCitationsModes, ClinVarKey, GenomeBuild
+from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 
@@ -473,7 +474,7 @@ class ClinVarExportConverter:
                     withdrawn=False,
                     variant__in=allele.variants,
                     share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
-                    lab__clinvar_key=self.clinvar_key
+                    lab__classification_settings__clinvar_key=self.clinvar_key
             ).exclude(id=self.classification_based_on.id):
                 for c in other_classifications_for_key:
                     has_condition = (resolved_condition := c.condition_resolution_obj) and len(resolved_condition.terms) >= 1

@@ -192,7 +192,7 @@ class UploadedClassificationsUnmappedView(View):
 
         context = {"lab_picker": lab_picker}
         selected_lab = lab_picker.selected_lab
-        if upload_location := empty_to_none(selected_lab.upload_location):
+        if upload_location := empty_to_none(selected_lab.classification_settings.upload_location):
             if server_address := resolve_uploaded_url_to_handle(upload_location):
                 existing: set[FileMeta] = set()
                 for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
@@ -251,7 +251,7 @@ class UploadedClassificationsUnmappedView(View):
             raise ValueError("Single Lab Required")
 
         try:
-            if server_address := resolve_uploaded_url_to_handle(lab.upload_location):
+            if server_address := resolve_uploaded_url_to_handle(lab.classification_settings.upload_location):
                 sub_file: FileHandle
 
                 if existing_file := request.POST.get('import-existing'):
@@ -271,7 +271,7 @@ class UploadedClassificationsUnmappedView(View):
                     self.check_zip(file_obj)
                     sub_file = server_address.save(file_obj)
 
-                status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
+                status = UploadedClassificationsUnmappedStatus.Pending if lab.classification_settings.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
                 user: User = request.user
                 file_type_override = ""
 
@@ -307,7 +307,7 @@ class UploadedClassificationsUnmappedView(View):
                     file_size=sub_file.size
                 )
 
-                if lab.upload_automatic:
+                if lab.classification_settings.upload_automatic:
                     task = ClassificationImportMapInsertTask.si(uploaded_file.pk)
                     task.apply_async()
                     return HttpResponseRedirect(reverse("classification_upload_unmapped_status", kwargs={

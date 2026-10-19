@@ -14,8 +14,8 @@ from django.db.models import TextChoices
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
 
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.evidence_key import EvidenceKeyMap
-from snpdb.models.models import ClinVarKey
 
 
 class ClinVarKeyExcludePatternMode(TextChoices):
@@ -30,6 +30,9 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
     name = models.TextField(blank=True)
     case_insensitive = models.BooleanField(default=True, blank=True)
     mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
+
+    class Meta:
+        db_table = "snpdb_clinvarkeyexcludepattern"
 
     @cached_property
     def regex(self):
