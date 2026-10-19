@@ -4,7 +4,8 @@ counts for a trio whose rows exercise every rule the fold has to reproduce: vari
 insertion, deletion, symbolic, fusion, MNV), the "truthy" annotation flags, the chrX fields, the
 passing-filter buckets, the aggregate's priority zygosity, each inheritance mode and the compound het
 gene pairing. A sub cohort's stats live on its parent's CGC, under keys of its own (#2311), as do each
-trio's, which are computed apart from the cohort's (#2327).
+trio's, which are computed apart from the cohort's (#2327). The VCF stats are counted on the cohort stats pass,
+or on their own when it's skipped as fresh (#2331).
 """
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -14,6 +15,7 @@ from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_clinvar import ClinVar
+from annotation.models.models_enums import VEPSkippedReason
 from annotation.models.models_gene_annotation import GeneAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.tasks import calculate_sample_stats, calculate_trio_stats
@@ -21,12 +23,14 @@ from genes.models.models_gene import Gene, Transcript
 from genes.models_enums import AnnotationConsortium
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils.django_partition import temporary_db_table
+from library.genomics.vcf_enums import VariantClass
 from snpdb.fake_data import create_fake_trio, make_cohort_genotype
 from snpdb.models.models_cohort import CohortGenotype
 from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
+from snpdb.models.models_vcf import VCFLengthStats
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
@@ -58,13 +62,14 @@ class CohortStatsCountsTest(TestCase):
         rows = [
             (variant("1", 1000, "A", "T"), "E..", None,
              {"gene": gene_a, "transcript": transcript, "dbsnp_rs_id": "rs1", "impact": PathogenicityImpact.HIGH}, 5),
-            (variant("1", 2000, "A", "AT"), "EE.", None, {"gene": gene_a, "dbsnp_rs_id": ""}, 0),
+            (variant("1", 2000, "A", "AT"), "EE.", None, {"gene": gene_a, "dbsnp_rs_id": "", "hgvs_g": "g.2000_2001insT"}, 0),
             (variant("1", 3000, "AT", "A"), "E.E", None,
-             {"gene": gene_a, "dbsnp_rs_id": "rs3", "impact": PathogenicityImpact.MODERATE}, 2),
+             {"gene": gene_a, "dbsnp_rs_id": "rs3", "impact": PathogenicityImpact.MODERATE, "hgvs_g": "g.3001del"}, 2),
             (variant("1", 4000, "C", "G"), "EE.", None, {"gene": gene_b}, None),
             (variant("X", 5000, "G", "C"), "OE.", None, {"gene": gene_b, "impact": PathogenicityImpact.LOW}, 4),
             (variant("2", 6000, "T", "C"), "OEE", "1", {"dbsnp_rs_id": "rs6"}, None),
-            (variant("2", 7000, "AT", "GC"), "UUO", None, {"dbsnp_rs_id": "rs7"}, None),
+            (variant("2", 7000, "AT", "GC"), "UUO", None, {"dbsnp_rs_id": "rs7", "hgvs_g": "g.7000_7001delinsGC",
+                                                  "vep_skipped_reason": VEPSkippedReason.UNKNOWN}, None),
             (variant("X", 8000, "G", "A"), "RRE", None, {}, None),
             (symbolic_del, "RUO", None, {}, None),
             (fusion, "E..", "1", None, None),
@@ -101,7 +106,7 @@ class CohortStatsCountsTest(TestCase):
         """ {(sample name or filter key, passing_filter): {field: count}} with the zero fields left out """
         cgc = self.cohort.cohort_genotype_collection
         has_filters = calculate_sample_stats.cohort_has_filters(self.cohort)
-        sample_counters, aggregate_counters = calculate_sample_stats._count_cohort_stats(
+        sample_counters, aggregate_counters, _ = calculate_sample_stats._count_cohort_stats(
             self.cohort, cgc, self.annotation_version, has_filters)
         aggregate_counters.update(calculate_trio_stats._count_trio_stats(
             self.trio, cgc, self.annotation_version, has_filters))
@@ -253,3 +258,22 @@ class CohortStatsCountsTest(TestCase):
             self.assertEqual(trio_count, stats_qs.get(filter_key=self.trio.get_stats_filter_key(mode)).variant_count)
             self.assertEqual(other_trio_count,
                              stats_qs.get(filter_key=other_trio.get_stats_filter_key(mode)).variant_count)
+
+    def test_vcf_stats(self):
+        cohort_pass_counts = calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version,
+                                                                           with_vcf_stats=True)
+        self.assertIsNone(calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version,
+                                                                        with_vcf_stats=True))  # fresh
+        own_pass_counts = calculate_sample_stats._count_vcf_stats(self.cohort.vcf, self.annotation_version)
+        # SNVs and the fusion have no length. "delins" also holds "del" and "ins", the unannotated <DEL> is
+        # classed by its alt, and its svlen, not its ref/alt, is its length
+        expected_lengths = {VariantClass.INSERTION: {2: 1}, VariantClass.DELETION: {2: 1, 2000: 1},
+                            VariantClass.INDEL: {2: 1}}
+        for counts in (cohort_pass_counts, own_pass_counts):
+            self.assertEqual(1, counts.vep_skipped_count)
+            self.assertEqual(expected_lengths, counts.variant_class_lengths)
+
+        calculate_sample_stats._compute_vcf_specific_stats(self.cohort.vcf, self.annotation_version, cohort_pass_counts)
+        deletions = VCFLengthStats.objects.get(collection__vcf=self.cohort.vcf, variant_class=VariantClass.DELETION)
+        self.assertEqual((False, 2), (deletions.is_log, sum(deletions.histogram_counts)))
+        self.assertEqual((2, 2000), (deletions.histogram_bin_edges[0], deletions.histogram_bin_edges[-1]))
