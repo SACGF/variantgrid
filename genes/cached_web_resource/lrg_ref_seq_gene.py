@@ -2,10 +2,10 @@ import logging
 
 import pandas as pd
 
-from annotation.models import CachedWebResource
 from genes.models import LRGRefSeqGene
 from genes.models_enums import LRGRefSeqGeneCategory
 from library.pandas_utils import df_nan_to_none
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_lrg_ref_seq_gene_from_web(cached_web_resource: CachedWebResource):

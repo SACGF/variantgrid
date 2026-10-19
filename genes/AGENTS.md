@@ -15,9 +15,9 @@ Patterns here:
 - Transcript geometry and tags come from cdot JSON in `TranscriptVersion.data["genome_builds"][build]`; read tags via models/models_gene.py:TranscriptVersion.tags and canonical-ness via models/models_gene.py:TranscriptVersion.CANONICAL_SCORES (MANE Select 2, RefSeq Select 1; "basic" is stripped, not scored).
 - Get an HGVSMatcher with hgvs/hgvs_matcher.py:HGVSMatcher.instance (lru-cached per build; construction opens the genome fasta). Pass `clingen_resolution=False` in batch/offline code.
 - hgvs/hgvs_matcher.py:HGVSMatcher.get_variant_coordinate_and_details tries local biocommons first, then the ClinGen Allele Registry, across neighbouring transcript versions (hgvs/hgvs_matcher.py:HGVSMatcher.filter_best_transcripts_and_converter_type_by_accession); version-distance ranking is delegated to the external cdot package, so change ranking there.
-- Symbol-only HGVS ("BRCA1:c.100A>G") is a search feature, not a matcher feature: snpdb/signals/variant_search.py ranks transcripts with hgvs/hgvs_matcher.py:HGVSMatcher.rank_gene_symbol_transcripts under the `SEARCH_HGVS_GENE_SYMBOL*` settings; the matcher itself raises on a transcript-less c.HGVS.
+- Symbol-only HGVS ("BRCA1:c.100A>G") is a search feature, not a matcher feature: snpdb/signals/hgvs_search.py ranks transcripts with hgvs/hgvs_matcher.py:HGVSMatcher.rank_gene_symbol_transcripts under the `SEARCH_HGVS_GENE_SYMBOL*` settings; the matcher itself raises on a transcript-less c.HGVS.
 - Parse or rewrite an HGVS string without touching the DB using hgvs/hgvs.py:HGVSComponents; use HGVSMatcher only when you need coordinates.
-- Turn any p.HGVS (VEP, ClinGen, a lab's typing) into the one stored form with hgvs/phgvs_canonical.py:canonical_p_hgvs; hgvs/phgvs.py:PHGVS is a regex for single residue changes that can't read ranges, dups or delins.
+- Turn any p.HGVS (VEP, ClinGen, a lab's typing) into the one stored form with hgvs/phgvs_canonical.py:canonical_p_hgvs (biocommons parsing, so ranges, dups and delins too).
 - Consortium is the single-letter `AnnotationConsortium` (R/E) on Gene, Transcript, GeneAnnotationRelease and CanonicalTranscriptCollection (models_enums.py:AnnotationConsortium); infer it from an accession with `AnnotationConsortium.get_from_transcript_accession()`.
 - Reference data (HGNC, MANE, LRG, Pfam, gnomAD constraint, PanelApp panel lists) loads through CachedWebResource tasks (tasks/cached_web_resource_tasks.py:HGNCWebResourceTask, cached_web_resource/hgnc.py:store_hgnc_from_web), not management commands.
 Gotchas:
@@ -60,7 +60,7 @@ Gotchas:
   that recognised the string refused it (a typo'd fusion partner), which is what the record's message and its
   `gene_level_unresolved` validation tag say. A resolution is falsy until it resolved, so test `.recognised` /
   `.reason` rather than `or`-ing one.
-- models/models_gene_list.py:GeneList.get_q imports from annotation inside the method — the genes/annotation import cycle is real; keep new cross-imports out of module level.
+- genes models never import annotation: annotation.models imports genes.models at module level. Logic that needs both lives in annotation (annotation/models/models_version.py:VariantAnnotationVersion.latest_gene_annotation_releases, annotation/signals/gene_symbol_wiki_citations.py) or at the call site.
 - Creating a second SampleGeneList for a sample deletes the ActiveSampleGeneList instead of switching it (models/models_gene_list.py:sample_gene_list_created); set the active one explicitly.
 - `PanelAppPanel.cache_valid` expires after `settings.PANEL_APP_CACHE_DAYS` (models/models_panel_app.py:PanelAppPanel.cache_valid); panel_app.py:get_panel_app_local_cache re-fetches from the live API when stale, so tests must not depend on it.
 - GeneCoverageCollection is a partitioned model (models/models_gene_coverage.py:GeneCoverageCollection); delete via the model so partitions are dropped.

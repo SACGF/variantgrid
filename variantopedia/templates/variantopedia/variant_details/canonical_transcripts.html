@@ -1,0 +1,19 @@
+{% if genes_canonical_transcripts %}
+    <div class="container mt-4">
+        <h4>Canonical Transcripts</h4>
+
+        <table class="table">
+            <thead>
+                <tr><th>Gene</th><th>Enrichment Kit</th><th>Transcript</th>
+            </thead>
+            <tbody>
+            {% for gene, ct_data in genes_canonical_transcripts.items %}
+                {% for description, transcript_id in ct_data %}
+                    <tr><td>{{ gene }}</td><td>{{ description }}</td><td>{{ transcript_id }}</td>
+                {% endfor %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% endif %}

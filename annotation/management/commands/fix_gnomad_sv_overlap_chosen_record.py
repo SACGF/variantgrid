@@ -26,6 +26,7 @@ from annotation import vep_columns
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.vep_config import VEPConfig
+from annotation.vep_plugin_display import GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.genomics import parse_gnomad_coord
 from snpdb.models import GenomeBuild
@@ -43,7 +44,7 @@ def _sv_column_targets(genome_build: GenomeBuild) -> dict[str, list[str]]:
         if not column_def.source_field:
             continue  # VEP's own overlap output (coords/percent), not a source VCF INFO field
         columns = [vgc for vgc in column_def.variant_grid_columns
-                   if vgc not in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS]
+                   if vgc not in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS]
         if columns:
             targets[column_def.source_field] = columns
     return targets
@@ -113,7 +114,7 @@ def fix_variant_annotation_version(vav: VariantAnnotationVersion, dry_run: bool 
     partition_qs = _partition_qs(vav)
     # The symbolic alt narrows this to the SV rows through an index, rather than scanning the partition
     qs = partition_qs.filter(gnomad_sv_overlap_af__contains="&", variant__alt__seq__startswith="<")
-    fields = ["variant_id", "gnomad_af", *VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS]
+    fields = ["variant_id", "gnomad_af", *GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS]
     for va in qs.values(*fields).iterator():
         results["checked"] += 1
 

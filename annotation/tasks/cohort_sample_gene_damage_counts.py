@@ -3,7 +3,7 @@ from collections import Counter, defaultdict
 
 from celery.app.task import Task
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
 from annotation.models.models_gene_counts import (
     CohortGeneCounts,
     GeneCountType,
@@ -12,8 +12,8 @@ from annotation.models.models_gene_counts import (
     GeneValueCountCollection,
     SampleAnnotationVersionVariantSource,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
-from classification.models import Classification
 from eventlog.models import create_event
 from genes.models import Gene, GeneVersion
 from library.django_utils import thread_safe_unique_together_get_or_create
@@ -182,7 +182,7 @@ class CohortSampleClassificationGeneDamageCountTask(CohortSampleGeneDamageCountT
         vc_qs = cohort_gene_counts.gene_count_type.get_classification_qs()
         if update_gene_id:
             gene = Gene.objects.get(pk=update_gene_id)
-            vc_qs = vc_qs.filter(Classification.get_q_for_gene(gene))
+            vc_qs = vc_qs.for_gene(gene)
 
         sample_gene_value_counts = defaultdict(lambda: defaultdict(Counter))
 

@@ -27,12 +27,6 @@ class SyncRunInstance:
         self.full_sync = full_sync
         self.max_rows = max_rows
 
-    def get_config(self, param: str, mandatory: bool = True):
-        value = self.sync_destination.config.get(param)
-        if value is None and mandatory:
-            raise ValueError(f"Expected SyncDestination config property of {param}")
-        return value
-
     def server_auth(self) -> ServerAuth:
         return ServerAuth.for_sync_details(self.sync_destination.sync_details)
 

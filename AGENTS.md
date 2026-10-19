@@ -157,6 +157,8 @@ top: renaming or editing one that a deployment has applied leaves `django_migrat
 exists (`InconsistentMigrationHistory`), repaired by hand on every database. A migration that only exists locally
 (unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
 pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
+Changing a library call inside a pushed migration (a renamed helper, an inlined one) is fine when the migration's behaviour
+stays identical: migrations never freeze the names of the code they import.
 
 ### Manual migrations (management commands on deploy)
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`

@@ -1,11 +1,12 @@
 from functools import cached_property
+
 from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel, OverlapStatus, OverlapType
-from classification.models import DiscordanceReport, Classification, ClinVarExport, Overlap
-from snpdb.models import Lab, Allele, Organization
+from classification.enums import OverlapStatus, OverlapType, ShareLevel
+from classification.models import Classification, ClinVarExport, DiscordanceReport, Overlap
+from snpdb.models import Allele, Lab, Organization
 
 
 class ClassificationPublicSummaryData:

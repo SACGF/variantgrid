@@ -1,8 +1,8 @@
 """Convert the legacy values of a select / multi-select evidence key to its option keys.
 
-Every write normalises a select value (Classification.process_entry), but records imported before that
-can still hold an option's label ("Autosomal recessive") or a comma separated string of labels. This
-rewrites the current evidence of internal-lab records as the sorted list of option keys - note, explain
+Every write normalises a select value (classification_evidence_normalise.normalise_evidence_cell), but records
+imported before that can still hold an option's label ("Autosomal recessive") or a comma separated string of
+labels. This rewrites the current evidence of internal-lab records as the sorted list of option keys - note, explain
 and immutability kept - and republishes a record whose latest version was already published. History is
 left as it was submitted; the new modification by admin_bot is the audit trail.
 
@@ -20,6 +20,10 @@ from django.db import transaction
 
 from classification.enums import EvidenceKeyValueType, SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
+from classification.models.classification_evidence_normalise import (
+    evidence_option_value_parts,
+    match_evidence_option,
+)
 from classification.models.condition_text_matching import ConditionTextMatch
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.django_utils.model_utils import ArrayLength
@@ -38,13 +42,13 @@ class Outcome(StrEnum):
 
 
 def normalise_option_value(e_key: EvidenceKey, value: Any) -> tuple[Any, list[str]]:
-    """ (the value process_entry would store, the parts that stop it being stored) - the second is empty
+    """ (the value normalise_evidence_cell would store, the parts that stop it being stored) - the second is empty
         when every part matches an option, or the key allows custom values """
     normalised: set[str] = set()
     unmatched: list[str] = []
     options = e_key.virtual_options or []
-    for part in Classification.option_value_parts(e_key, value):
-        if option := Classification.match_option(options, str(part)):
+    for part in evidence_option_value_parts(e_key, value):
+        if option := match_evidence_option(options, str(part)):
             normalised.add(option["key"])
         elif e_key.allow_custom_values:
             normalised.add(str(part))

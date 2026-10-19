@@ -1,6 +1,5 @@
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from enum import Enum
 from functools import cached_property
 from typing import Any, Optional
 
@@ -11,7 +10,6 @@ from django.db.models.query import QuerySet
 from classification.enums import CriteriaEvaluation
 from classification.models.classification import ClassificationModification, EvidenceVisibility
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from genes.hgvs import HGVSComponents
 from library.cache import clear_cached_property
 
 
@@ -231,58 +229,3 @@ class UsedKeyTracker:
                     cols.append(value_obj.get('explain'))
 
         return cols
-
-
-class ConflictStrategy(str, Enum):
-    MOST_BENIGN = 'most_benign'
-    MOST_PATHOGENIC = 'most_pathogenic'
-
-
-class VariantWithChgvs:
-
-    def __init__(self, vcm: ClassificationModification, chgvs: HGVSComponents):
-        self.vcm = vcm
-        self.chgvs = chgvs
-
-    @cached_property
-    def transcript_version(self) -> int:
-        if tp := self.chgvs.transcript_parts:
-            return tp.version or 0
-        else:
-            return 0
-
-    @property
-    def c_hgvs_without_transcript_version(self) -> HGVSComponents:
-        return self.chgvs.without_transcript_version
-
-
-class TranscriptGroup:
-
-    def __init__(self):
-        self.highest_transcript_version: Optional[int] = None
-        self.highest_transcript_chgvs: Optional[HGVSComponents] = None
-        self.vcmcs: list[VariantWithChgvs] = []
-
-    def add(self, vcmc: VariantWithChgvs):
-        self.vcmcs.append(vcmc)
-
-        transcript_version = vcmc.transcript_version
-        if self.highest_transcript_version is None or transcript_version > self.highest_transcript_version:
-            self.highest_transcript_version = transcript_version
-            self.highest_transcript_chgvs = vcmc.chgvs
-
-    @property
-    def different_c_hgvs(self):
-        first_c = self.vcmcs[0].chgvs.without_transcript_version
-        for vc in self.vcmcs[1:]:
-            if first_c != vc.chgvs.without_transcript_version:
-                return True
-        return False
-
-    @property
-    def cms(self) -> list[ClassificationModification]:
-        return [vcmcs.vcm for vcmcs in self.vcmcs]
-
-    @property
-    def chgvs(self):
-        return self.highest_transcript_chgvs

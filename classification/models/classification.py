@@ -4,33 +4,29 @@ evidence is JSON validated against EvidenceKey, with every edit kept as a modifi
 evidence through Classification.patch_value, publish through ClassificationModification.publish,
 and read what a user may see through ClassificationModification.latest_for_user; allele resolution
 is delegated to ImportedAlleleInfo (classification_variant_info_models.py). Also here:
-ClassificationImport and the allele sources that drive matching and liftover, ConditionResolved,
-ClassificationConsensus and CuratedDate.
+ClassificationImport and the allele sources that drive matching and liftover, EvidenceVisibility and
+CuratedDate. ConditionResolved lives in condition_resolved.py, copying between records in
+classification_consensus.py.
 """
 from __future__ import annotations
 
 import copy
-import json
 import logging
-import operator
 import re
 import uuid
-from collections import Counter, defaultdict, namedtuple
+from collections import Counter, namedtuple
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from enum import Enum
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
-    TypedDict,
     Union,
 )
 
 import django.dispatch
-import pydantic
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
@@ -39,16 +35,14 @@ from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import TextField
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
-from django.db.models.expressions import OuterRef, RawSQL, Subquery, Value
+from django.db.models.expressions import OuterRef, Subquery, Value
 from django.db.models.functions import Cast, Concat, LPad
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
-from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
-from typing_extensions import deprecated
 
 from annotation.models.data_enums import (
     ClassificationDate,
@@ -56,42 +50,39 @@ from annotation.models.data_enums import (
     EffectiveDate,
     EffectiveDateType,
 )
-from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
-from annotation.regexes import DbRegexes, db_ref_regexes
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from classification.enums import (
     CRITERIA_NOT_MET,
-    AlleleOriginBucket,
-    ClinicalSignificance,
-    CopyScope,
     CriteriaEvaluation,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
     TestingContextBucket,
-    ValidationCode,
     WithdrawReason,
 )
-from classification.enums.discordance_enums import DiscordanceReportResolution
+from classification.models.classification_evidence_normalise import (
+    evidence_validation_messages,
+    normalise_evidence_cell,
+)
 from classification.models.classification_import_run import ClassificationImportRun
-from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import (
     ClassificationJsonParams,
     ClassificationPatchResponse,
     PatchMeta,
     ValidationMerger,
-    classification_gene_symbol_filter,
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
     tidy_hgvs_whitespace,
 )
+from classification.models.condition_resolved import ConditionResolved, ConditionResolvedDict
 from classification.models.evidence_key import (
-    EvidenceKey,
     EvidenceKeyMap,
     EvidenceKeyOverrides,
     EvidenceKeyValueType,
-    VCDataCell,
     VCDataDict,
     VCPatch,
     WipeMode,
@@ -103,13 +94,10 @@ from classification.models.evidence_mixin_summary_cache import (
     ClassificationSummaryCalculator,
 )
 from classification.models.flag_types import classification_flag_types
-from flags.models import Flag, FlagPermissionLevel, FlagStatus
+from flags.models import FlagPermissionLevel
 from flags.models.models import (
-    FlagCollection,
-    FlagInfos,
     FlagsMixin,
     FlagTypeContext,
-    flag_collection_extra_info_signal,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
 from genes.models import Gene, GeneSymbol, NoTranscript
@@ -120,24 +108,20 @@ from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import (
-    cautious_attempt_html_to_text,
-    empty_to_none,
     get_timer,
     invalidate_cached_property,
     md5sum_str,
-    nest_dict,
     utc_from_timestamp,
 )
-from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
 from snpdb.models.models import CodeVersion, CodeVersionMixin
+from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
-from snpdb.user_settings_manager import UserSettingsManager
 
 if TYPE_CHECKING:
-    from classification.models import ClinicalContext, ConditionText, MultiCondition
+    from classification.models import ClinicalContext, ConditionText
 
 ChgvsKey = namedtuple('HGVSDisplay', ['short', 'column', 'build'])
 
@@ -149,14 +133,6 @@ classification_variant_set_signal = django.dispatch.Signal()  # args: "classific
 classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
 # This signal is called if a classification is assigned to a variant (or liftover), or the classification changes
 variants_classification_changed_signal = django.dispatch.Signal()  # args: "classification", "variant"
-
-_key_to_regex = {
-    'db_rs_id': DbRegexes.SNP,
-    'uniprot_id': DbRegexes.UNIPROTKB,
-    'clinvar_variation_id': DbRegexes.CLINVAR,
-    'cosmic_id': DbRegexes.COSMIC,
-    'gtr_id': DbRegexes.GTR
-}
 
 
 class VCBlobKeys(Enum):
@@ -218,395 +194,57 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
     def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
-        # i.e., we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+        # i.e., we don't use ClassificationQuerySet.variant_q() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
 
 
-@receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
-    """
-    Allows us to provide extra info for FlagCollections attached to Classification.
-    e.g. linking to the appropriate allele page, discordance report etc.
-    :param flag_infos: Information on the flag collections being displayed to the user.
-    Populates this with the extra info
-    :param user: The current user
-    :param kwargs: Required by @receiver
-    """
-    from classification.models.discordance_models import DiscordanceReportClassification
+class ClassificationQuerySet(QuerySet):
+    """ Classification.objects - the query builders analysis nodes, gene counts and searches filter variants with """
 
-    vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
-    drcs = DiscordanceReportClassification.objects.filter(classification_original__classification__in=vcs,
-                                                          report__resolution=DiscordanceReportResolution.ONGOING)
-    drcs_dict = {}
-    for drc in drcs.values_list('classification_original__classification', 'report'):
-        drcs_dict[drc[0]] = drc[1]
+    def for_gene(self, gene: Gene) -> ClassificationQuerySet:
+        match_gene = Q(**{"variant__" + VariantAnnotation.GENE_COLUMN: gene})
+        match_evidence = Q(evidence__ensembl_gene_id__value=gene.pk)
+        return self.filter(match_gene | match_evidence)
 
-    for vc in vcs:
-        """
-            # If we are to use sub-flags in their current incarnation, here's how we'd include
-            # one if zygosity or condition are missing
-            flags_for_vc = flag_infos.flags_for_collection[vc.flag_collection_id]
-            unsubmitted_flag = find_unsubmitted(flags_for_vc)
+    def published_for_user(self, user: User, clinical_significance_list: Iterable[str] = None,
+                           lab_list: Iterable[Lab] = None,
+                           somatic_clinical_significance_list: Iterable[str] = None,
+                           allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> ClassificationQuerySet:
+        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
+            record matches if either its germline or somatic clinical significance is in its list """
+        cm_qs = ClassificationModification.latest_for_user(user, published=True,
+                                                           allele_origin_buckets=allele_origin_buckets)
+        cs_q = Q()
+        if clinical_significance_list:
+            cs_q |= Q(clinical_significance__in=clinical_significance_list)
+        if somatic_clinical_significance_list:
+            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
+        if cs_q:
+            cm_qs = cm_qs.filter(cs_q)
+        qs = self.filter(pk__in=cm_qs.values('classification'))
+        if lab_list:
+            qs = qs.filter(lab__in=lab_list)
+        return qs
 
-            if unsubmitted_flag:
-                if vc.get(SpecialEKeys.ZYGOSITY) is None:
-                    flag_infos.record_sub_flag(unsubmitted_flag, 'Missing Zygosity', 'Z')
-                if vc.get(SpecialEKeys.CONDITION) is None:
-                    flag_infos.record_sub_flag(unsubmitted_flag, 'Missing Condition', 'C')
-        """
+    def published_variant_q(self, user: User, genome_build: GenomeBuild,
+                            clinical_significance_list: Iterable[str] = None,
+                            lab_list: Iterable[Lab] = None,
+                            somatic_clinical_significance_list: Iterable[str] = None,
+                            allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
+        """ returns a Q object filtering variants to those with a PUBLISHED classification
+            (optionally classification in clinical_significance_list """
+        vc_qs = self.published_for_user(user, clinical_significance_list, lab_list,
+                                        somatic_clinical_significance_list=somatic_clinical_significance_list,
+                                        allele_origin_buckets=allele_origin_buckets)
+        return vc_qs.variant_q(genome_build)
 
-        context = {
-            'label': vc.friendly_label,
-            'vc_id': vc.id
-        }
-        if vc.variant_id:
-            context['variant'] = vc.variant_id
-        if vc.clinical_context_id:
-            context['clinical_context'] = vc.clinical_context_id
-        if user and vc.can_write(user):
-            context['can_write'] = True
-
-        dc_report_id = drcs_dict.get(vc.id)
-        if dc_report_id:
-            context['discordance_report'] = dc_report_id
-
-        flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
-
-
-class ConditionResolvedReferenceDict(TypedDict, total=False):
-    term_id: Optional[str]
-    name: str  # name of the term if term_id is provided, otherwise from a plain text condition
-    count: Optional[int]  # assumed to be 1 if not provided
-
-
-@deprecated("Use ConditionResolvedReferenceDict")
-class ConditionResolvedTermDict(TypedDict, total=False):
-    term_id: str
-    name: str
-
-
-class ConditionResolvedDict(TypedDict, total=False):
-    """
-    Structure of data used to cached resolved condition text again a classification.
-    Used to use "resolved_terms" and "plain_text_terms" to store matched OntologyIDs and plain text conditions
-    respectively, but now both those are bundled into references.
-    Fields are still defined for reading pre-existing JSON.
-    """
-    display_text: str  # plain text to show to users if not in a position to render links
-    sort_text: str  # lower case representation of description
-    resolved_terms: list[ConditionResolvedTermDict]
-    """
-    DEPRECATED, please use references instead
-    """
-
-    plain_text_terms: list[str]  # A full list of unresolved plain text conditions
-    """
-    DEPRECATED, please use references instead
-    """
-
-    resolved_join: str
-
-    references: list[ConditionResolvedReferenceDict]  # new method of saving counts
-
-
-@pydantic.dataclasses.dataclass(frozen=True, config=pydantic.ConfigDict(arbitrary_types_allowed=True))
-class ConditionReference:
-    """
-    Represents an OntologyTerm (just provide the OntologyTerm) or
-    Free condition text (just provide name)
-    as well as a count of how many times they've appeared.
-    Count will be more meaningful when looking at a group of records rather than individual.
-    """
-
-    term: Optional[OntologyTerm] = None
-    name: Optional[str] = None
-    count: int = 1
-
-    @property
-    def full_text(self) -> str:
-        if term := self.term:
-            return f"{term.pk} {self.name}"
-        else:
-            return self.name
-
-    def to_json(self) -> ConditionResolvedReferenceDict:
-        result: ConditionResolvedReferenceDict = {}
-        if term := self.term:
-            result["term_id"] = term.id
-            result["name"] = term.name
-        else:
-            result["name"] = self.name
-        if count := self.count:
-            result["count"] = count
-        return result
-
-    def __lt__(self, other) -> bool:
-        if self.term and other.term:
-            return self.term < other.term
-        if not self.term and not other.term:
-            return self.name < other.name
-        if self.term:
-            return False
-        return True
-
-# TODO: these classes should be reworked as dataclass json
-
-@dataclass(frozen=True)
-class ConditionResolved:
-    # terms: list[OntologyTerm]
-    # plain_text_terms: list[str] = None
-    references: list[ConditionReference]
-    join: Optional[MultiCondition] = None
-    plain_text: Optional[str] = None  # fallback, not populated in all contexts
-
-    def __hash__(self) -> int:
-        hash_value = 34543
-        if join := self.join:
-            hash_value += hash(join)
-        if references := self.references:
-            hash_value += reduce(operator.add, map(hash, references))
-        return hash_value
-
-    @property
-    def terms(self) -> list[OntologyTerm]:
-        return [t.term for t in self.references if t.term is not None]
-
-    @property
-    def plain_text_terms(self) -> list[str]:
-        # [] rather than None: callers put this straight into JSON
-        return [t.name for t in self.references if t.term is None]
-
-    @staticmethod
-    def from_uncounted_terms(
-            terms: list[OntologyTerm] = None,
-            plain_text_terms: list[str] = None,
-            join: Optional['MultiCondition'] = None,
-            plain_text: Optional[str] = None
-    ) -> 'ConditionResolved':
-        references: list[ConditionReference] = []
-        if terms:
-            references += [ConditionReference(term=term) for term in terms]
-        if plain_text_terms:
-            references += [ConditionReference(name=plain_text_term) for plain_text_term in plain_text_terms]
-        return ConditionResolved(references=references, join=join, plain_text=plain_text)
-
-    @property
-    def summary(self) -> str:
-        text = ", ".join([term.id for term in self.terms])
-        if join := self.join:
-            try:
-                join = join.value
-            except Exception:
-                pass
-            text = f"{text} {join}"
-        return text
-
-    @staticmethod
-    def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
-        from classification.models import MultiCondition
-        if not condition_dict:
-            return ConditionResolved(references=[])
-
-        join: Optional[MultiCondition] = None
-        plain_text = condition_dict.get("display_text")
-
-        if resolved_join_text := condition_dict.get("resolved_join"):
-            join = MultiCondition(resolved_join_text)
-
-        if references_list := condition_dict.get("references"):
-            references: list[ConditionReference] = []
-            reference_dict: ConditionResolvedReferenceDict
-            for reference_dict in references_list:
-                term: Optional[OntologyTerm] = None
-                if term_id := reference_dict.get("term_id"):
-                    term = OntologyTerm.get_or_stub_cached(term_id)
-
-                references.append(ConditionReference(
-                    term=term,
-                    name=reference_dict.get("name"),
-                    count=reference_dict.get("count")
-                ))
-            references.sort()
-            return ConditionResolved(references=references, join=join, plain_text=plain_text)
-        else:
-            # old format with resolved terms and plain_text_terms
-            if resolved_terms := condition_dict.get("resolved_terms"):
-                terms = list(sorted(OntologyTerm.get_or_stub_cached(term_dict.get("term_id")) for term_dict in resolved_terms))
-            else:
-                terms = []
-            plain_text_terms = condition_dict.get("plain_text_terms")
-            return ConditionResolved.from_uncounted_terms(terms=terms, plain_text_terms=plain_text_terms, join=join, plain_text=plain_text)
-
-    @property
-    def is_multi_condition(self) -> bool:
-        return len(self.references) > 1
-
-    @property
-    def single_term(self) -> Optional[OntologyTerm]:
-        """
-        Only call if not is_multi_condition
-        """
-        return self.terms[0] if len(self.terms) == 1 else None
-
-    @cached_property
-    def mondo_term(self) -> Optional[OntologyTerm]:
-        if term := self.single_term:
-            return OntologyTermRelation.as_mondo(term)
-        else:
-            return None
-
-    def as_mondo_if_possible(self) -> ConditionResolved:
-        if mondo_term := self.mondo_term:
-            return ConditionResolved.from_uncounted_terms(terms=[mondo_term])
-        else:
-            return self
-
-    def is_same_or_more_specific(self, other: ConditionResolved) -> bool:
-        """
-        Returns the number of steps to go from this condition to the specific other condition
-        Returns None if self doesn't appear to be a descendant of other
-        :param other:
-        :return:
-        """
-        if self.is_multi_condition or other.is_multi_condition:
-            # when looking at multiple conditions, do not attempt merging unless we're the exact same
-            return self.terms == other.terms and self.join == other.join
-        elif self.single_term == other.single_term:
-            return True
-        else:
-            if other_mondo := other.mondo_term:
-                if self_mondo := self.mondo_term:
-                    if other_mondo.index == 1:
-                        return 99  # MOND:000001 is always going to be an ancestor
-                    descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo,
-                                                                               ancestor=other_mondo)
-                    return bool(descendant_relationships)
-
-            # terms cant be converted to MONDO and not exact match, just return False
-            return False
-
-    @staticmethod
-    def more_general_term_if_related(resolved_1: 'ConditionResolved', resolved_2: 'ConditionResolved') -> Optional[
-        'ConditionResolved']:
-        more_general: Optional[ConditionResolved] = None
-        if resolved_1.is_same_or_more_specific(resolved_2):
-            more_general = resolved_2
-        elif resolved_2.is_same_or_more_specific(resolved_1):
-            more_general = resolved_1
-
-        if more_general:
-            # if presented with different types, and we can switch over to MONDO, do so
-            if not more_general.is_multi_condition and \
-                    resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
-                if mondo_term := more_general.mondo_term:
-                    more_general = ConditionResolved.from_uncounted_terms(terms=[mondo_term])
-            return more_general
-
-        return None
-
-    @staticmethod
-    def term_to_dict(term: OntologyTerm) -> ConditionResolvedTermDict:
-        term_dict: ConditionResolvedTermDict = {
-            "term_id": term.id,
-            "name": term.name
-        }
-        return term_dict
-
-    @property
-    def as_plain_text(self) -> str:
-        if text := self.plain_text:
-            return text
-        else:
-            return self.to_json()['display_text']
-
-    def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
-        jsoned: ConditionResolvedDict
-        if self.terms:
-            from classification.models import MultiCondition
-
-            def format_term(term: OntologyTerm) -> str:
-                if name := term.name:
-                    return f"{term.id} {name}"
-                return term.id
-
-            terms = self.terms
-            text = ", ".join([format_term(term) for term in terms])
-            if self.plain_text_terms:
-                text += ",".join(self.plain_text_terms)
-
-            sort_text = ", ".join([term.name for term in terms]).lower()
-            join: Optional[MultiCondition] = None
-            if len(terms) > 1 and include_join:
-                join = self.join or MultiCondition.NOT_DECIDED
-                text = f"{text}; {join.label}"
-
-            resolved_term_dicts: list[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
-                                                                    self.terms]
-            jsoned: ConditionResolvedDict = {
-                "resolved_terms": resolved_term_dicts,
-                "resolved_join": join,
-                "plain_text_terms": self.plain_text_terms,
-                "display_text": text,
-                "sort_text": sort_text
-            }
-            return jsoned
-        else:
-            jsoned: ConditionResolvedDict = {
-                "plain_text_terms": self.plain_text_terms,
-                "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
-                "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
-            }
-        return jsoned
-
-
-    @cached_property
-    def join_text(self) -> Optional[str]:
-        if join := self.join:
-            try:
-                from classification.models import MultiCondition
-                return MultiCondition(join).label
-            except Exception:
-                pass
-        return None
-
-    def __eq__(self, other: ConditionResolved) -> bool:
-        if (s_terms := self.terms) and (o_terms := other.terms):
-            return s_terms == o_terms and self.join == other.join
-        elif self.terms or other.terms:
-            return False
-        else:
-            return self.plain_text == other.plain_text
-
-    def __lt__(self, other: ConditionResolved) -> bool:
-        self_terms = self.terms or []
-        other_terms = other.terms or []
-        if len(self_terms) != len(other_terms):
-            return len(self_terms) < len(other_terms)
-        if len(self_terms) >= 1:
-            return self_terms[0] < other_terms[0]
-        return (self.plain_text or '') < (other.plain_text or '')
-
-
-class ClassificationOutstandingIssues:
-
-    def __init__(self, classification: 'Classification'):
-        self.classification = classification
-        self.flags = []
-        self.issues = []
-
-    @property
-    def pk(self):
-        return self.classification.pk
-
-    def add_flag(self, flag: str):
-        self.flags.append(flag)
-
-    def add_issue(self, issue: str):
-        self.issues.append(issue)
-
-    def __str__(self):
-        return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
+    def variant_q(self, genome_build: GenomeBuild) -> Q:
+        """ Q against Variant for the variants of these classifications' alleles in genome_build """
+        va_qs = VariantAllele.objects.filter(genome_build=genome_build,
+                                             allele__in=self.values_list("allele"))
+        variant_ids = va_qs.values_list("variant_id", flat=True)
+        return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 
 
 class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewModelMixin):
@@ -627,6 +265,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
     """ Deprecated -  """
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
+
+    objects = ClassificationQuerySet.as_manager()
 
     allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
     """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between 
@@ -761,10 +401,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         summary_obj: ClassificationSummaryCacheObj = self.summary_obj
         return summary_obj.somatic.tumor_type_category
 
-    @staticmethod
-    def is_supported_transcript(transcript_or_hgvs: str):
-        return ImportedAlleleInfo.is_supported_transcript(transcript_or_hgvs)
-
     @property
     def include_based_on_allele_info(self) -> bool:
         if allele_info := self.allele_info:
@@ -836,60 +472,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def can_create_via_web_form(user: User):
         can_create = settings.CLASSIFICATION_WEB_FORM_CREATE
         return can_create and (user.is_superuser or settings.CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
-
-    @staticmethod
-    def dashboard_report_new_classifications(since) -> int:
-        return Classification.objects.filter(created__gte=since).count()
-
-    @staticmethod
-    def dashboard_total_shared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
-                                             withdrawn=False).exclude(lab__name__icontains='legacy').count()
-
-    @staticmethod
-    def dashboard_total_unshared_classifications() -> int:
-        qs = Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy')
-        return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
-
-    @staticmethod
-    def dashboard_report_classifications_of_interest(since) -> list[ClassificationOutstandingIssues]:
-        min_age = django_timezone.now() - timedelta(minutes=2)  # give records 2 minutes to matching properly before reporting
-
-        time_range_q = Q(created__gte=since) & Q(created__lte=min_age)
-
-        # want to find new tags that are still open
-        flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
-        flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
-        flag_q = Q(flag_collection_id__in=flag_collections.distinct())
-        missing_chgvs_q = (Q(allele_info__grch37__resolved_hgvs__isnull=True) | Q(allele_info__grch38__resolved_hgvs__isnull=True))
-        coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
-        coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
-
-        summaries: list[ClassificationOutstandingIssues] = []
-        c: Classification
-        for c in coi_qs:
-            coi = ClassificationOutstandingIssues(c)
-            this_flags = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN,
-                                             collection=c.flag_collection)
-
-            variant_matching = False
-            for flag_type in this_flags.order_by('flag_type').values_list('flag_type', flat=True):
-                if flag_type == 'classification_matching_variant':
-                    variant_matching = True
-                coi.add_flag(flag_type)
-            if not variant_matching:
-                if not c.resolved_hgvs_grch37:
-                    coi.add_issue("No cached 37 representation")
-                if not c.resolved_hgvs_grch38:
-                    coi.add_issue("No cached 38 representation")
-
-            summaries.append(coi)
-
-        return summaries
-
-    @classmethod
-    def order_by_evidence(cls, key_id: str):
-        return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     @property
     def variant_coordinate(self):
@@ -1261,311 +843,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     break
         return key_errors
 
-    @staticmethod
-    def _export_value(normal_value_obj: Any, key_data: EvidenceKey, export_key: str = 'key') -> Any:
-        if options := key_data.virtual_options:
-            if normal_value_obj and isinstance(normal_value_obj, Mapping):
-                value = normal_value_obj.get('value')
-            else:
-                value = normal_value_obj
-
-            for option in options:
-                if export_key in option:
-                    export_value = option.get(export_key)
-                    if option.get('key') == value:
-                        return export_value
-        return None
-
-    @staticmethod
-    def match_option(options, check_value) -> Optional[dict[str, str]]:
-        for option in options:
-            option_value = option.get('key')
-
-            if check_value is True:
-                if option.get('default'):
-                    return option
-                continue
-            if not isinstance(check_value, str):
-                check_value = str(check_value)
-
-            aliases = []
-            if option_value:
-                aliases.append(option_value)
-            if option.get('label'):
-                aliases.append(option.get('label'))
-            # Originally had index as a value you could submit, but this starts to get dangerous for fields
-            # that allow custom values, can't distinguish between index 3 and custom value 3
-            # if option.get('index') is not None:
-            #    aliases.append(str(option.get('index')))
-            elif option_value:
-                aliases.append(EvidenceKey.pretty_label_from_string(option_value))
-
-            aliases.extend(option.get('aliases', []))
-
-            match = next((alias for alias in aliases if alias.lower() == check_value.lower()), None)
-            if match is not None:
-                return option
-            check_value = check_value.replace('-', '_').replace(' ', '_')
-            match = next((alias for alias in aliases if alias.lower() == check_value.lower()), None)
-            if match is not None:
-                return option
-        return None
-
-    @staticmethod
-    def option_value_parts(e_key: EvidenceKey, value: Any) -> list[Any]:
-        """ The separate options in a select value as submitted: a string is split on commas (or '|_' for a
-            multi-select that uses it), a list is taken as is. Blanks are dropped """
-        parts: list[Any]
-        if isinstance(value, str):
-            if e_key.value_type == EvidenceKeyValueType.MULTISELECT and '|_' in value:
-                parts = value.split('|_')
-            else:
-                parts = value.split(',')
-            parts = [p.strip() for p in parts]
-        elif isinstance(value, list):
-            parts = value
-        else:
-            parts = [value]
-        return [part for part in parts if part is not None and part != ""]
-
-    @staticmethod
-    def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[str]]:
-        e_key = cell.e_key
-        options = e_key.virtual_options or []
-        # Do a case-insensitive check for each value against the key and any aliases
-        # if there's a match to any of those, normalise back to the key (with the case of the key)
-        results: list[str] = []
-        # remove duplicates
-        values = list(set(values))
-        for check_value in values:
-            check_value = empty_to_none(check_value)
-            if check_value is None:
-                continue
-            if check_value is True and e_key.default_crit_evaluation:
-                results.append(e_key.default_crit_evaluation)
-                continue
-            if check_value is False and e_key.value_type == EvidenceKeyValueType.CRITERIA:
-                results.append(CriteriaEvaluation.NOT_MET)
-                continue
-
-            check_value = str(check_value)
-            matched_option = Classification.match_option(options, check_value)
-            if matched_option:
-                results.append(matched_option.get('key'))
-                if settings.CLASSIFICATION_REQUIRE_OVERWRITE_NOTE and \
-                        matched_option.get('override') and cell.note is None and cell.explain is None:
-                    cell.add_validation(
-                        code=ValidationCode.REQUIRES_NOTE,
-                        severity='warning',
-                        message='Override value has been selected, but no note provided'
-                    )
-            else:
-                # add the value we couldn't match
-                results.append(str(check_value))
-
-                if not e_key.allow_custom_values:
-                    cell.add_validation(
-                        code=ValidationCode.INVALID_VALUE,
-                        severity='error',
-                        message='Illegal value (' + str(check_value) + ')'
-                    )
-
-        if results:
-            results.sort()  # TODO, sort by presentation index
-            return results
-        return None
-
     @cached_property
     def evidence_keys(self) -> EvidenceKeyMap:
         # note that this should be invalidated if the config changes (which would happen if
         # assertion method is updated for the example)
         return EvidenceKeyMap.instance().with_overrides(self.evidence_key_overrides)
-
-    def process_entry(self, cell: VCDataCell, source: str):
-        """
-        Normalises the value and adds any validation
-        """
-        # parse all notes looking for references
-        value = cell.value
-        e_key = cell.e_key
-        note = cell.note
-
-        if isinstance(value, str):
-            if '\u00a0' in value:
-                value = value.replace('\u00a0', ' ')
-        if note and '\u00a0' in note:
-            note = note.replace('\u00a0', ' ')
-
-        if self.lab.external:
-            cell.validate = False
-
-        if value and e_key.value_type in (EvidenceKeyValueType.FREE_ENTRY, EvidenceKeyValueType.TEXT_AREA):
-            scan_value = str(value)
-            if results := db_ref_regexes.search(scan_value, default_regex=_key_to_regex.get(e_key.key)):
-                cell.db_refs = [r.to_json() for r in results]
-
-        if note:
-            if results := db_ref_regexes.search(note):
-                cell.db_refs = (cell.db_refs or []) + [r.to_json() for r in results]
-
-        if source == SubmissionSource.API and isinstance(value, str):
-            # we often get escaped > sent to us as part of
-            value = value.replace('&gt;', '>').replace('&lt;', '<')
-
-        if value is None and e_key.mandatory and not e_key.exclude_namespace:
-            if e_key.key == SpecialEKeys.CONDITION and self.condition_resolution_obj:
-                # Gene condition is not mandatory if we have a condition resolution
-                pass
-            else:
-                # only provide mandatory validation for internal labs
-                # don't want to dirty up imported read only classifications with errors
-                cell.add_validation(code=ValidationCode.MANDATORY, severity='error', message='Missing mandatory value')
-
-        # if we got an array of values
-        if isinstance(value, list):
-            if not value:
-                # if the array is empty, treat that as a null value
-                value = None
-            elif e_key.value_type != EvidenceKeyValueType.MULTISELECT and len(value) == 1:
-                # if we're not a multi-select key, and we have an array with 1 value in it.
-                # use that 1 value
-                value = value[0]
-
-        if value is not None:
-            # remove support for existing_variant_id
-            # variant matching is best done through allele_info stuff now
-            if e_key.key == 'existing_sample_id':
-                try:
-                    self.sample = Sample.objects.get(pk=int(value))
-                    # self.requires_auto_population = True
-                    return None  # clear out the value
-                except Exception:
-                    cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
-                                        message="Couldn't resolve Sample " + str(value) + ")")
-
-            # convert users (username or email) to username if possible
-            if e_key.value_type == EvidenceKeyValueType.USER:
-                value = str(value)
-                user = User.objects.filter(Q(username=value) | Q(email=value)).first()
-                if user:
-                    cell.value = user.username
-                else:
-                    pass
-
-            # normalise booleans if it's unambiguous what the value is meant to be,
-            # otherwise leave the value as is to be caught by validation
-            elif e_key.value_type == EvidenceKeyValueType.BOOLEAN:
-                if isinstance(value, list) and len(value) == 1:
-                    value = value[0]
-                if not isinstance(value, bool):
-                    if value == 1:
-                        value = True
-                    elif value == 0:
-                        value = False
-                    elif isinstance(value, str):
-                        value = value.upper()
-                        if value in ('TRUE', 'Y', 'YES', 'T', '1'):
-                            value = True
-                        elif value in ('FALSE', 'N', 'NO', 'F', '0'):
-                            value = False
-                        else:
-                            cell.add_validation(code=ValidationCode.INVALID_VALUE, severity='error',
-                                                message="Invalid value for yes/no field (" + str(value) + ")")
-                cell.value = value
-
-            # handle selects with multiple values (comma sep string, array etc.)
-            elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
-                                      EvidenceKeyValueType.SELECT,
-                                      EvidenceKeyValueType.CRITERIA):
-                # sets the value of cell to the valid options
-                value = Classification.process_option_values(cell, Classification.option_value_parts(e_key, value))
-                if value is not None:
-                    if e_key.value_type != EvidenceKeyValueType.MULTISELECT:
-                        value_len = len(value)
-                        if value_len > 1:
-                            cell.add_validation(code=ValidationCode.TOO_MANY_VALUES, severity='error',
-                                                message="Can only have a single value for a select field")
-                        elif value_len == 1:
-                            value = value[0]
-                            cell.value = value
-                cell.value = value
-
-            # base text tidy
-            elif e_key.value_type in (EvidenceKeyValueType.FREE_ENTRY, EvidenceKeyValueType.TEXT_AREA):
-                value = str(value)
-                if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
-                    # strip out HTML from single row files to keep our data simple
-                    # allow HTML in text areas
-                    if not value.startswith("http"):  # makes beautiful soap angry thinking we want to go to the URL
-                        value = cautious_attempt_html_to_text(value)
-
-                cell.value = value
-
-            # -- BASIC NUMBER NORMALISING, VALIDATING --
-            elif e_key.value_type == EvidenceKeyValueType.UNIT:
-                valid = False
-                try:
-                    value = float(value)
-                    cell.value = value
-                    valid = 0 <= value <= 1
-                except Exception:
-                    pass
-                if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_UNIT, severity='warning',
-                                        message='Value should be a number between 0 and 1')
-
-            elif e_key.value_type == EvidenceKeyValueType.FLOAT:
-                valid = False
-                try:
-                    value = float(value)
-                    cell.value = value
-                    valid = True
-                except Exception:
-                    pass
-                if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_FLOAT, severity='warning',
-                                        message='Value should be a number')
-
-            elif e_key.value_type == EvidenceKeyValueType.INTEGER:
-                valid = False
-                try:
-                    value = int(value)
-                    cell.value = value
-                    valid = True
-                except Exception:
-                    pass
-                if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_INTEGER, severity='warning',
-                                        message='Value should be a whole number')
-
-            elif e_key.value_type == EvidenceKeyValueType.DATE:
-                try:
-                    Classification.to_date(value)
-                except ValueError:
-                    message = "Invalid date (expected yyyy-mm-dd)"
-                    cell.add_validation(code=ValidationCode.INVALID_DATE, severity='warning',
-                                        message=message)
-
-            # only complain about unknown keys if we have a value
-            if e_key.is_dummy:
-                cell.add_validation(code=ValidationCode.UNKNOWN_KEY, severity='warning',
-                                    message='This key ' + str(e_key.key) + ' has not been registered')
-
-        # SPECIAL HANDLING OF REFSEQ, basically looking for transcript version
-        if e_key.key == SpecialEKeys.REFSEQ_TRANSCRIPT_ID:
-            if isinstance(value, str):
-                version_regex = re.compile('.*?[.][0-9]+')
-                if not version_regex.match(value):
-                    cell.add_validation(code=ValidationCode.UNKNOWN_TRANSCRIPT, severity='warning',
-                                        message='Transcript should include version e.g. NM_001256799.1')
-
-        elif e_key.key == SpecialEKeys.AGE:
-            if settings.CLASSIFICATION_AUTOFUZZ_AGE:
-                cell.value = patch_fuzzy_age(value)
-
-        # ensure we have one non None value before returning the structure
-        if not cell.has_data:
-            cell.wipe(WipeMode.SET_NONE)
 
     def modification_at_timestamp(self, version_timestamp) -> 'ClassificationModification':
         dt = utc_from_timestamp(version_timestamp)
@@ -1617,47 +899,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             save=True,
             revalidate_all=True
         )
-        # migration fixes are so retrieve_established at this point, no need to re-run them
-        # self.fix_migration_stuff(user)
 
         classification_revalidate_signal.send(sender=Classification, classification=self)
 
         if submitted:
             # have to re-retrieve last_edited_version as it's now the latest
             self.last_edited_version.publish(share_level=self.share_level_enum, user=user, vc=self)
-
-    def fix_migration_stuff(self, user: User) -> None:
-        """
-        Ensure there's a published version, and that it's marked as such, that the variant matching flags are correct
-        """
-        modifications_for_self_qs = ClassificationModification.objects.filter(classification=self)
-        if not modifications_for_self_qs.filter(is_last_published=True).count() == 1:
-            # in case we have multiple last published records, this will  ensure we only have 1
-            modifications_for_self_qs.filter(is_last_published=True).update(is_last_published=False)
-            last_published = modifications_for_self_qs.filter(published=True).order_by('-created').first()
-            if last_published:
-                last_published.is_last_published = True
-                last_published.save()
-            else:
-                first_modification = modifications_for_self_qs.order_by('created').first()
-                if first_modification:
-                    first_modification.publish(share_level=ShareLevel.LAB, user=user, vc=self)
-
-        if not modifications_for_self_qs.filter(is_last_edited=True).count() == 1:
-            modifications_for_self_qs.filter(is_last_edited=True).update(is_last_edited=False)
-            last_edited = modifications_for_self_qs.order_by('-created').first()
-            if last_edited:
-                last_edited.is_last_edited = True
-                last_edited.save()
-
-        if settings.UNSHARED_FLAG_ENABLED and self.share_level_enum.key not in ShareLevel.DISCORDANT_LEVEL_KEYS:
-            self.flag_collection_safe.get_or_create_open_flag_of_type(
-                flag_type=classification_flag_types.unshared_flag
-            )
-
-        self.apply_allele_info_to_classification()
-        self.fix_permissions()
-        self.save()
 
     def patch_history(self, patcher: Callable[[PatchMeta], None]):
         """
@@ -1720,7 +967,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         patch_response = ClassificationPatchResponse()
 
-        is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
@@ -1741,6 +987,68 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patch_response.append_warning("unrecognised_key",
                                               f"The following keys are not valid ({sorted_bad_keys})")
 
+        self._normalise_patch_hgvs_and_gene(patch, initial_data=initial_data)
+
+        self._apply_patch_source_rules(patch, use_evidence, source=source, clear_all_fields=clear_all_fields,
+                                       remove_api_immutable=remove_api_immutable,
+                                       make_patch_fields_immutable=make_patch_fields_immutable,
+                                       revalidate_all=revalidate_all)
+
+        # creating the record, if no owner was provided set the value to match current
+        if not self.id:
+            owner_cell = patch[SpecialEKeys.OWNER]
+            if not owner_cell.provided and user:
+                owner_cell.value = user.username
+
+        debug_timer = get_timer()
+        debug_timer.tick("Patch data normalisation")
+
+        patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
+
+        validations_received = classification_validation_signal.send(sender=Classification, classification=self,
+                                                                     patch_meta=patch_meta, key_map=key_dict)
+        multi_errors = ValidationMerger.union_send_responses(validations_received)
+        multi_errors.apply(patch.data, use_evidence.data)
+
+        diffs_only_patch = self._diff_patch(patch, use_evidence, patch_response=patch_response, source=source,
+                                            leave_existing_values=leave_existing_values)
+
+        apply_patch = bool(diffs_only_patch)
+        if apply_patch and ignore_if_only_patching and ignore_if_only_patching.issuperset(diffs_only_patch.keys()):
+            apply_patch = False
+
+        if not apply_patch:
+            # if this is the first submission, create a version regardless of if there's data or not
+            apply_patch = self.id is None
+
+        debug_timer.tick("Patch validation")
+
+        # only make a modification if there's data to actually patch
+        if apply_patch:
+            self._apply_patch_diff(diffs_only_patch, use_evidence, patch_response=patch_response,
+                                   user=user, source=source, save=save)
+            debug_timer.tick("Saved")
+        else:
+            if diffs_only_patch:
+                message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
+                patch_response.append_warning(code="no_patch", message=message)
+            else:
+                patch_response.append_warning(code="no_patch", message="No changes detected to patch")
+                # don't save if we haven't changed any values
+
+        if self.requires_auto_population:
+            self.requires_auto_population = False
+            from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
+                classification_auto_populate_fields,
+            )
+            genome_build = self.get_genome_build()
+            patch_response += classification_auto_populate_fields(self, genome_build, save=save)
+
+        return patch_response
+
+    def _normalise_patch_hgvs_and_gene(self, patch: VCDataDict, initial_data: bool):
+        """ patch_value phase 1: upper case the gene symbol and tidy c.HGVS; for initial_data, fill the transcript
+            and gene symbol from the c.HGVS (or inject the gene symbol into it) """
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
         gene_symbol_cell = patch[SpecialEKeys.GENE_SYMBOL]
@@ -1788,6 +1096,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         # if gene symbol provided (but not in c.HGVS) inject it into it
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_hgvs
+
+    def _apply_patch_source_rules(self, patch: VCDataDict, use_evidence: VCDataDict, source: SubmissionSource,
+                                  clear_all_fields: bool, remove_api_immutable: bool,
+                                  make_patch_fields_immutable: bool, revalidate_all: bool):
+        """ patch_value phase 2: what each source may submit and make immutable, then normalise and validate
+            each cell that changed (normalise_evidence_cell) """
+        key_dict: EvidenceKeyMap = self.evidence_keys
+        is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
 
         # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys,
         # so we clear out any previous values but still retain immutability
@@ -1839,7 +1155,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     cell.pop_immutability()
 
                 # copy attributes from the existing into the patch (they'll later be removed by diff)
-                # required for process_entry
+                # required for normalise_evidence_cell
                 existing = use_evidence[cell.e_key]
 
                 if not cell.has_change(existing) and not revalidate_all:
@@ -1849,24 +1165,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if existing.raw is not None:
                     cell.merge_from(existing)
 
-            self.process_entry(cell, source=source)
+            normalise_evidence_cell(self, cell, source=source)
 
-        # creating the record, if no owner was provided set the value to match current
-        if not self.id:
-            owner_cell = patch[SpecialEKeys.OWNER]
-            if not owner_cell.provided and user:
-                owner_cell.value = user.username
-
-        debug_timer = get_timer()
-        debug_timer.tick("Patch data normalisation")
-
-        patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
-
-        validations_received = classification_validation_signal.send(sender=Classification, classification=self,
-                                                                     patch_meta=patch_meta, key_map=key_dict)
-        multi_errors = ValidationMerger.union_send_responses(validations_received)
-        multi_errors.apply(patch.data, use_evidence.data)
-
+    def _diff_patch(self, patch: VCDataDict, use_evidence: VCDataDict, patch_response: ClassificationPatchResponse,
+                    source: SubmissionSource, leave_existing_values: bool) -> dict:
+        """ patch_value phase 3: the patch reduced to what differs from the current evidence, rejecting changes
+            to values the source can't edit """
         # merge the patch with a lot of nulls if it's a POST
         # i.e. a "complete" patch
 
@@ -1913,101 +1217,74 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     # could be two floats that are close enough to each other
                     if not patched.has_data:
                         patched.wipe(WipeMode.POP)
+        return diffs_only_patch
 
-        apply_patch = bool(diffs_only_patch)
-        if apply_patch and ignore_if_only_patching and ignore_if_only_patching.issuperset(diffs_only_patch.keys()):
-            apply_patch = False
-
-        if not apply_patch:
-            # if this is the first submission, create a version regardless of if there's data or not
-            apply_patch = self.id is None
-
+    def _apply_patch_diff(self, diffs_only_patch: dict, use_evidence: VCDataDict,
+                          patch_response: ClassificationPatchResponse, user: Optional[User],
+                          source: SubmissionSource, save: bool):
+        """ patch_value phase 4: append to the last modification or create a new one, apply the diff to the
+            evidence and its cached columns, and save if asked """
         pending_modification: Optional[ClassificationModification]
+        patch_response.modified_keys = set(diffs_only_patch.keys())
+        last_edited = self.last_edited_version
 
-        debug_timer.tick("Patch validation")
+        # in some cases we can append the last version
+        # we do this so editing on the web form over the period of 1 minute
+        # makes 2 versions instead of one every 2 seconds
+        if last_edited and last_edited.is_edit_appendable(user=user, source=source):
+            pending_modification = last_edited
+            # update last modification as it was recent enough
+            delta = pending_modification.delta
+            delta.update(diffs_only_patch)
+            pending_modification.delta = delta
+            pending_modification.code_version = CodeVersion.current()
 
-        # only make a modification if there's data to actually patch
-        if apply_patch:
-            patch_response.modified_keys = set(diffs_only_patch.keys())
-            last_edited = self.last_edited_version
-
-            # in some cases we can append the last version
-            # we do this so editing on the web form over the period of 1 minute
-            # makes 2 versions instead of one every 2 seconds
-            if last_edited and last_edited.is_edit_appendable(user=user, source=source):
-                pending_modification = last_edited
-                # update last modification as it was recent enough
-                delta = pending_modification.delta
-                delta.update(diffs_only_patch)
-                pending_modification.delta = delta
-                pending_modification.code_version = CodeVersion.current()
-
-            else:
-                if save and last_edited:
-                    last_edited.is_last_edited = False
-                    last_edited.save()
-
-                # create a new modification
-                pending_modification = ClassificationModification(
-                    user=user,
-                    share_level=ShareLevel.LAB.key,
-                    source=source.value,
-                    delta=diffs_only_patch,
-                    is_last_edited=True
-                )
-            ###
-            # ACTUALLY APPLY THE PATCH
-            # update the actual evidence with normalised patch values
-            ###
-            Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
-
-            self.evidence = use_evidence.data
-            # classification is stored on the classification record and on the classification modification
-            # (not sure if we actually use it for anything on the modification)
-
-            # TODO this is in the wrong spot, it should be on publish
-            clinical_significance_choice = self.calc_clinical_significance_choice()
-            self.clinical_significance = clinical_significance_choice
-            pending_modification.clinical_significance = clinical_significance_choice
-
-            self.allele_origin_bucket = self.calc_allele_origin_bucket()
-
-            message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
-            patch_response.append_warning(code="patched", message=message)
-
-            # update the evidence keys in case that's changed
-            # FIXME do some optimisation so we can see if it changed easily
-            self._clear_evidence_key_cache()
-
-            if save:
-                self.save()
-                patch_response.saved = True
-                # have to save the modification after saving the record in case this
-                # is the first record
-                if pending_modification:
-                    pending_modification.classification = self
-                    pending_modification.save()
-                    assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
-            debug_timer.tick("Saved")
-
-        # end apply patch diff
         else:
-            if diffs_only_patch:
-                message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
-                patch_response.append_warning(code="no_patch", message=message)
-            else:
-                patch_response.append_warning(code="no_patch", message="No changes detected to patch")
-                # don't save if we haven't changed any values
+            if save and last_edited:
+                last_edited.is_last_edited = False
+                last_edited.save()
 
-        if self.requires_auto_population:
-            self.requires_auto_population = False
-            from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import (
-                classification_auto_populate_fields,
+            # create a new modification
+            pending_modification = ClassificationModification(
+                user=user,
+                share_level=ShareLevel.LAB.key,
+                source=source.value,
+                delta=diffs_only_patch,
+                is_last_edited=True
             )
-            genome_build = self.get_genome_build()
-            patch_response += classification_auto_populate_fields(self, genome_build, save=save)
+        ###
+        # ACTUALLY APPLY THE PATCH
+        # update the actual evidence with normalised patch values
+        ###
+        Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
 
-        return patch_response
+        self.evidence = use_evidence.data
+        # classification is stored on the classification record and on the classification modification
+        # (not sure if we actually use it for anything on the modification)
+
+        # TODO this is in the wrong spot, it should be on publish
+        clinical_significance_choice = self.calc_clinical_significance_choice()
+        self.clinical_significance = clinical_significance_choice
+        pending_modification.clinical_significance = clinical_significance_choice
+
+        self.allele_origin_bucket = self.calc_allele_origin_bucket()
+
+        message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
+        patch_response.append_warning(code="patched", message=message)
+
+        # update the evidence keys in case that's changed
+        # FIXME do some optimisation so we can see if it changed easily
+        self._clear_evidence_key_cache()
+
+        if save:
+            self.save()
+            patch_response.saved = True
+            # have to save the modification after saving the record in case this
+            # is the first record
+            if pending_modification:
+                pending_modification.classification = self
+                pending_modification.save()
+                assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
 
     def publish_latest(self, user: User, share_level=None) -> bool:
         if not share_level:
@@ -2040,27 +1317,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             records = lpv.classificationmodificationsyncrecord_set.filter(success=True)
         return records
 
-    @staticmethod
-    def validate_evidence(evidence: dict) -> list[dict]:
-        messages = []
-
-        for key, blob in evidence.items():
-            if blob is not None:  # just required to not blow up on legacy, shouldn't have Nones in here
-                validations = blob.get('validation')
-                if validations is not None:
-                    if not isinstance(validations, list):
-                        validations = [validations]  # just required to not blow up on legacy
-                    for validation in validations:
-                        try:
-                            valid_copy = validation.copy()
-                            valid_copy['key'] = key
-                            messages.append(valid_copy)
-                        except Exception:
-                            pass
-        # make order of messages predictable
-        messages.sort(key=lambda m: m.get('key') + ':' + m.get('code'))
-        return messages
-
     def current_state_validation(self, user: User) -> ValidationMerger:
         if self.id:
             self.refresh_from_db()
@@ -2083,7 +1339,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return False
 
     def validate(self) -> list[dict]:
-        return Classification.validate_evidence(self.evidence)
+        return evidence_validation_messages(self.evidence)
 
     @staticmethod
     def flatten(record: Mapping, prefix: str = '', ignore_none_values=False, depth=0) -> dict:
@@ -2193,53 +1449,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def get_edit_url(self) -> str:
         return self.get_absolute_url() + "?edit=true"
-
-    @staticmethod
-    def get_q_for_gene(gene: Gene) -> Q:
-        match_gene = Q(**{"variant__" + VariantAnnotation.GENE_COLUMN: gene})
-        match_evidence = Q(evidence__ensembl_gene_id__value=gene.pk)
-        return match_gene | match_evidence
-
-    @staticmethod
-    def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
-                               lab_list: Iterable[Lab] = None,
-                               somatic_clinical_significance_list: Iterable[str] = None,
-                               allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet:
-        """ clinical_significance_list / somatic_clinical_significance_list are ORed together - a
-            record matches if either its germline or somatic clinical significance is in its list """
-        cm_qs = ClassificationModification.latest_for_user(user, published=True,
-                                                           allele_origin_buckets=allele_origin_buckets)
-        cs_q = Q()
-        if clinical_significance_list:
-            cs_q |= Q(clinical_significance__in=clinical_significance_list)
-        if somatic_clinical_significance_list:
-            cs_q |= Q(classification__summary__somatic__clinical_significance__in=list(somatic_clinical_significance_list))
-        if cs_q:
-            cm_qs = cm_qs.filter(cs_q)
-        qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
-        if lab_list:
-            qs = qs.filter(lab__in=lab_list)
-        return qs
-
-    @staticmethod
-    def get_variant_q(user: User, genome_build: GenomeBuild,
-                      clinical_significance_list: Iterable[str] = None,
-                      lab_list: Iterable[Lab] = None,
-                      somatic_clinical_significance_list: Iterable[str] = None,
-                      allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> Q:
-        """ returns a Q object filtering variants to those with a PUBLISHED classification
-            (optionally classification in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list,
-                                                      somatic_clinical_significance_list=somatic_clinical_significance_list,
-                                                      allele_origin_buckets=allele_origin_buckets)
-        return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
-
-    @staticmethod
-    def get_variant_q_from_classification_qs(vc_qs, genome_build: GenomeBuild) -> Q:
-        va_qs = VariantAllele.objects.filter(genome_build=genome_build,
-                                             allele__in=vc_qs.values_list("allele"))
-        variant_ids = va_qs.values_list("variant_id", flat=True)
-        return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 
     @staticmethod
     def annotate_with_variant_sort(classifications_qs: QuerySet, genome_build: GenomeBuild, name="variant_sort"):
@@ -2492,10 +1701,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
     code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
-
-    @classmethod
-    def order_by_evidence(cls, key_id: str) -> RawSQL:
-        return RawSQL('cast(published_evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     def __str__(self) -> str:
         return self.id_str
@@ -2839,17 +2044,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
         return True
 
 
-COPY_SCOPES_ALL = frozenset({CopyScope.ALLELE, CopyScope.GENE})
-COPY_SCOPES_GENE = frozenset({CopyScope.GENE})
-CONSENSUS_GROUP_LIMIT = 10
-EXTERNAL_CANDIDATE_LIMIT = 10
-
-BUCKET_ALLELE_ORIGIN = {  # what the allele_origin evidence key is seeded with per bucket
-    AlleleOriginBucket.GERMLINE: "germline",
-    AlleleOriginBucket.SOMATIC: "somatic",
-}
-
-
 class EvidenceVisibility:
     """
     Hides evidence above a user's share level (EvidenceKey.max_share_level). Keep one per user across many
@@ -2896,292 +2090,6 @@ class EvidenceVisibility:
             visible_keys = {ek.key for ek in e_keys.share_level_and_higher(share_level)}
             self._visible_keys[cache_key] = visible_keys
         return Classification.hide_evidence(evidence, visible_keys)
-
-
-@dataclass(frozen=True)
-class ContentValue:
-    """ One copied key's content on a candidate - the thing a row is chosen for. `current` is what the record
-        being filled already holds, set only where there is one (the form's Gene Content dialog) """
-    key: str
-    label: str
-    value: Any
-    note: Optional[str] = None
-    current: Any = None
-
-
-@dataclass(frozen=True)
-class ConsensusGroup:
-    """
-    Classifications whose copied content is identical - they were copied from each other, so they are one
-    choice rather than many. The others are kept so the curator can see the spread of conditions the content
-    has been used for, which is usually what decides whether it applies here.
-    """
-    representative: ClassificationModification
-    others: list[ClassificationModification]
-    content: list[ContentValue]
-    differs_in: list[str] = field(default_factory=list)  # labels of the fields that differ from the first group
-
-    @property
-    def other_count(self) -> int:
-        return len(self.others)
-
-    @property
-    def record_count(self) -> int:
-        return len(self.others) + 1
-
-    @property
-    def records(self) -> list[ClassificationModification]:
-        return [self.representative, *self.others]
-
-    @property
-    def content_by_key(self) -> dict[str, ContentValue]:
-        return {value.key: value for value in self.content}
-
-    @cached_property
-    def conditions(self) -> list[ConditionResolved]:
-        """ The distinct conditions this content has been used for, most used first - the tumour type
-            spread is usually what decides whether a row applies to the case in hand """
-        counts: Counter[ConditionResolved] = Counter()
-        for modification in self.records:
-            if condition := modification.condition_resolution_obj_fallback:
-                counts[condition] += 1
-        return [condition for condition, _ in counts.most_common()]
-
-
-@dataclass(frozen=True)
-class ComparisonRow:
-    """ One copied key across the groups being compared - a cell per group, None where that group has nothing """
-    key: str
-    label: str
-    cells: list[Optional[ContentValue]]
-
-
-@dataclass(frozen=True)
-class ConsensusComparison:
-    """
-    The groups side by side, the way the Classify & Report dialog and the create page offer the allele's
-    previous classifications: what applying one would write, with the fields the candidates disagree on
-    separated from the ones they all carry the same. Nothing about the records themselves (lab id, who
-    curated it) is what is being chosen - that is provenance, and the row keeps it to a line.
-    """
-    groups: list[ConsensusGroup]
-    differing: list[ComparisonRow]
-    shared: list[ComparisonRow]
-
-    @property
-    def copied_count(self) -> int:
-        return len(self.differing) + len(self.shared)
-
-    @staticmethod
-    def of(groups: list[ConsensusGroup]) -> 'ConsensusComparison':
-        by_key = [group.content_by_key for group in groups]
-        keys_in_order: list[str] = []
-        labels: dict[str, str] = {}
-        for group in groups:
-            for value in group.content:
-                if value.key not in labels:
-                    keys_in_order.append(value.key)
-                    labels[value.key] = value.label
-        differing = []
-        shared = []
-        for key in keys_in_order:
-            cells = [content.get(key) for content in by_key]
-            row = ComparisonRow(key=key, label=labels[key], cells=cells)
-            distinct = {(cell.value, cell.note) if cell else None for cell in cells}
-            (differing if len(distinct) > 1 else shared).append(row)
-        return ConsensusComparison(groups=groups, differing=differing, shared=shared)
-
-
-@dataclass
-class ClassificationConsensus:
-    modification: ClassificationModification
-    copy_scopes: frozenset[CopyScope] = COPY_SCOPES_ALL
-
-    @staticmethod
-    def default_allele_origin_bucket(user: User) -> Optional[AlleleOriginBucket]:
-        """ The bucket a new record starts in, from the user's allele origin focus """
-        allele_origin_filter = UserSettingsManager.get_user_settings(user).allele_origin_focus
-        if allele_origin_filter.value in (AlleleOriginBucket.GERMLINE.value, AlleleOriginBucket.SOMATIC.value):
-            return AlleleOriginBucket(allele_origin_filter.value)
-        return None
-
-    @staticmethod
-    def copy_keys(copy_scopes: frozenset[CopyScope], allele_origin_bucket: Optional[AlleleOriginBucket]) -> list[str]:
-        """ The keys that travel when copying content of these scopes into a record of this bucket """
-        return [ekey.key for ekey in EvidenceKeyMap.cached().all_keys
-                if ekey.copy_scope_enum in copy_scopes
-                and ekey.copy_allele_origin_enum.can_copy_to(allele_origin_bucket)]
-
-    @staticmethod
-    def gene_scope_keys(allele_origin_bucket: Optional[AlleleOriginBucket]) -> list[str]:
-        """ The keys that travel when copying gene level content into a record of this bucket """
-        return ClassificationConsensus.copy_keys(COPY_SCOPES_GENE, allele_origin_bucket)
-
-    @staticmethod
-    def allele_consensus_groups(allele: Allele, user: User,
-                                allele_origin_bucket: Optional[AlleleOriginBucket],
-                                limit: int = CONSENSUS_GROUP_LIMIT) -> list[ConsensusGroup]:
-        """ The allele's previous classifications that may be copied from, one row per distinct set of copied
-            values - the content a pick would write, not the records (@see consensus_groups) """
-        qs = ClassificationModification.latest_for_user(user=user, allele=allele, published=True,
-                                                       exclude_external_labs=True,
-                                                       allele_origin_bucket=allele_origin_bucket) \
-            .select_related("classification", "classification__lab", "classification__lab__organization")
-        keys = ClassificationConsensus.copy_keys(COPY_SCOPES_ALL, allele_origin_bucket)
-        return ClassificationConsensus.consensus_groups(qs, keys, limit=limit)
-
-    @staticmethod
-    def external_lab_candidates(allele: Allele, user: User,
-                                allele_origin_bucket: Optional[AlleleOriginBucket] = None,
-                                limit: int = EXTERNAL_CANDIDATE_LIMIT) -> list[ClassificationModification]:
-        """ What other labs have curated on this allele - worth seeing while deciding how to curate, but never
-            a copy source: their evidence was assembled under a config and assertion method reviewed elsewhere """
-        qs = ClassificationModification.latest_for_user(user=user, allele=allele, published=True,
-                                                       allele_origin_bucket=allele_origin_bucket) \
-            .filter(classification__lab__external=True) \
-            .select_related("classification", "classification__lab", "classification__lab__organization")
-        return sorted(qs, key=lambda vcm: vcm.curated_date_check, reverse=True)[:limit]
-
-    @staticmethod
-    def has_copyable_content(modification: ClassificationModification, keys: list[str]) -> bool:
-        """ Whether copying this record would write anything - a record with none of the keys filled is not a choice """
-        return bool(ClassificationConsensus._content(modification, keys))
-
-    @staticmethod
-    def _content(modification: ClassificationModification, keys: list[str]) -> tuple:
-        """ The copied content of a record, as something two records can be compared on """
-        evidence = modification.published_evidence or {}
-        content = []
-        for key in keys:
-            blob = evidence.get(key)
-            if blob is None:
-                continue
-            for part in ('value', 'note'):
-                part_value = blob.get(part)
-                if part_value is None or (isinstance(part_value, list) and not part_value):
-                    continue
-                content.append((key, part, json.dumps(part_value, sort_keys=True, default=str)))
-        return tuple(content)
-
-    @staticmethod
-    def gene_consensus_groups(gene_symbol: Union[str, GeneSymbol], user: User,
-                              allele_origin_bucket: Optional[AlleleOriginBucket] = None,
-                              exclude_modifications: Optional[Iterable[ClassificationModification]] = None,
-                              exclude_classification: Optional[Classification] = None,
-                              limit: int = CONSENSUS_GROUP_LIMIT) -> list[ConsensusGroup]:
-        """
-        The gene level content available to copy in a gene, one row per distinct set of values - most records
-        in a gene carry the same content because they were copied from each other.
-
-        AMP tiering and therapy content are gene *and* tumour type, so this only ever lists: which row applies
-        to the case in hand is the curator's call.
-        """
-        gene_q = classification_gene_symbol_filter(gene_symbol)
-        if gene_q is None:
-            return []
-
-        qs = ClassificationModification.latest_for_user(user=user, published=True, exclude_external_labs=True,
-                                                       allele_origin_bucket=allele_origin_bucket) \
-            .filter(gene_q).distinct() \
-            .select_related("classification", "classification__lab", "classification__lab__organization")
-        if exclude_modifications:
-            qs = qs.exclude(pk__in=[cm.pk for cm in exclude_modifications])
-        if exclude_classification:
-            qs = qs.exclude(classification=exclude_classification)
-
-        return ClassificationConsensus.consensus_groups(
-            qs, ClassificationConsensus.gene_scope_keys(allele_origin_bucket), limit=limit)
-
-    @staticmethod
-    def consensus_groups(modifications: Iterable[ClassificationModification], keys: list[str],
-                         limit: int = CONSENSUS_GROUP_LIMIT) -> list[ConsensusGroup]:
-        """
-        The records grouped by what copying them would write (`keys`, value and note), one row per distinct
-        content. The most used content first, then newest; each later row names the fields in which it
-        differs from the first (`differs_in`). A record with none of the keys filled is not a choice.
-        """
-        by_content: dict[tuple, list[ClassificationModification]] = defaultdict(list)
-        for cm in modifications:
-            if content := ClassificationConsensus._content(cm, keys):
-                by_content[content].append(cm)
-
-        e_keys = EvidenceKeyMap.cached()
-        groups = []
-        for members in by_content.values():
-            members.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
-            groups.append(ConsensusGroup(
-                representative=members[0], others=members[1:],
-                content=ClassificationConsensus._content_values(members[0], keys, e_keys)))
-        # The widest used content first - a summary gets re-worded over time, and the many near copies
-        # of it are told apart by what differs from the first row, not by reading each one
-        groups.sort(key=lambda group: (group.record_count, group.representative.curated_date_check), reverse=True)
-        groups = groups[:limit]
-        if len(groups) > 1:
-            first = {value.key: (value.value, value.note) for value in groups[0].content}
-            labels = {value.key: value.label for group in groups for value in group.content}
-            for index, group in enumerate(groups[1:], start=1):
-                this = {value.key: (value.value, value.note) for value in group.content}
-                differing = [key for key in keys if first.get(key) != this.get(key)]
-                groups[index] = replace(group, differs_in=[labels[key] for key in differing])
-        return groups
-
-    @staticmethod
-    def _content_values(modification: ClassificationModification, keys: list[str],
-                        e_keys: EvidenceKeyMap) -> list[ContentValue]:
-        """ The copied content of a record as a row shows it - labelled, options resolved to their labels """
-        evidence = modification.published_evidence or {}
-        values = []
-        for key in keys:
-            blob = evidence.get(key)
-            if blob is None:
-                continue
-            e_key = e_keys.get(key)
-            value = e_key.pretty_value(blob)
-            note = blob.get('note') or None
-            if value in (None, '', []) and not note:
-                continue
-            values.append(ContentValue(key=key, label=e_key.pretty_label, value=value, note=note))
-        return values
-
-    @property
-    def allele_origin_bucket(self) -> Optional[AlleleOriginBucket]:
-        """ The bucket the copy is going into - a candidate is only ever offered for its own bucket """
-        return self.modification.classification.allele_origin_bucket
-
-    def apply_to(self, classification: 'Classification', user: User):
-        """ Copy this record's values into another one, filling the fields it has left empty """
-        classification.patch_value(
-            patch=self.consensus_patch,
-            clear_all_fields=False,
-            user=user,
-            source=SubmissionSource.CONSENSUS,
-            leave_existing_values=True,
-            save=True,
-            make_patch_fields_immutable=False)
-        classification.publish_latest(user)
-
-    @cached_property
-    def consensus_patch(self) -> VCPatch:
-        evidence = self.modification.published_evidence
-        consensus: dict[str, Any] = {}
-
-        # default allele origin - don't use copy consensus because that would copy "likely somatic" etc
-        allele_origin_bucket = self.allele_origin_bucket
-        if allele_origin := BUCKET_ALLELE_ORIGIN.get(allele_origin_bucket):
-            consensus["allele_origin.value"] = allele_origin
-
-        for key in ClassificationConsensus.copy_keys(self.copy_scopes, allele_origin_bucket):
-            for part in ['value', 'note']:
-                blob = evidence.get(key)
-                if blob is None:
-                    continue
-                part_value = blob.get(part)
-                if part_value is None or (isinstance(part_value, list) and not part_value):
-                    continue
-                consensus[key + '.' + part] = part_value
-
-        patch: dict[str, dict[str, Any]] = nest_dict(consensus)
-        return patch
 
 
 CLASSIFICATION_DATE_REGEX = re.compile(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})")

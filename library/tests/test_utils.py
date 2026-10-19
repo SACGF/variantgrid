@@ -31,6 +31,7 @@ from library.utils.collection_utils import (
 from library.utils.color_utils import rgb_contrasting_text, rgb_relative_luminance
 from library.utils.date_utils import calculate_age, parse_yymm, utc_from_timestamp
 from library.utils.file_utils import IteratorFile, file_to_array
+from library.utils.hash_utils import file_sha256sum
 from library.utils.json_utils import (
     JsonDiffs,
     json_dumps_nan_as_null,
@@ -539,3 +540,14 @@ class TestBedFileReader(TestCase):
         self.assertEqual((feature.iv.chrom, feature.iv.start, feature.iv.end), ("chr1", 10, 20))
         self.assertEqual(feature.attr["block_starts"], "0,")
         self.assertEqual((feature.attr["ID"], feature.attr["description"]), ("ID1", "desc one"))
+
+
+class TestFileSha256sum(TestCase):
+    def test_known_digest(self):
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(b"abc")
+        try:
+            self.assertEqual(file_sha256sum(f.name),
+                             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        finally:
+            os.unlink(f.name)

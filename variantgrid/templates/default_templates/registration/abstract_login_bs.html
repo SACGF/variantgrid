@@ -8,6 +8,8 @@
 
         <link rel="stylesheet" href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}">
         <script src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
+        <!-- global.js reads the CSRF token (postUrl, ajax) with js.cookie -->
+        <script src="{% static 'js/lib/js.cookie-3.0.1/js.cookie-3.0.1.min.js' %}"></script>
         <!-- Font Awesome -->
         <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
 

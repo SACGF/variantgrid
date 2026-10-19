@@ -43,7 +43,7 @@ Patterns here:
   (`batch_iterator`, `group_by_key`, `first`, `get_single_element`, `sorted_nicely`, `invert_dict`, `LazyAttribute`) ·
   `text_utils.py` (`pretty_label`, `limit_str`, `format_percent`) · `html_utils.py` (`html_id_safe`, `sanitize_html`,
   `html_to_text`) · `json_utils.py` (`force_json`, `strip_json`, `JsonDiffs`) · `hash_utils.py` (`md5sum_str`,
-  `sha256sum_str`, `stable_dict_hash`) · `file_utils.py` (`open_handle_gzip`, `mk_path_for_file`, `name_from_filename`) ·
+  `sha256sum_str`, `file_sha256sum`, `stable_dict_hash`) · `file_utils.py` (`open_handle_gzip`, `mk_path_for_file`, `name_from_filename`) ·
   `date_utils.py` (`calculate_age`, `parse_yymm`) · `diff_utils.py` (`diff_text`, `MultiDiff`) · `export_utils.py`
   (`ExportRow`, `export_column`) · `class_utils.py` (`import_class`, `get_all_subclasses`) · `os_utils.py`
   (`execute_cmd`) · `timer_utils.py` (`get_timer`) · `misc_utils.py` (`empty_to_none`, `ChoicesEnum`, `iter_http_lines`)

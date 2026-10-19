@@ -3,7 +3,7 @@ The gene content box on the classification form - for records the create-from-va
 made from the Classify & Report tab with nothing to copy, imported, or created before the gene was curated.
 
 It offers the same deduplicated gene candidates as the create page
-(classification/models/classification.py:ClassificationConsensus.gene_consensus_groups), and applying one
+(classification/models/classification_consensus.py:ClassificationConsensus.gene_consensus_groups), and applying one
 patches the empty fields as SubmissionSource.CONSENSUS.
 
 Entry points: gene_consensus_panel (the card, its dialog rows, and the apply POST), reached at
@@ -13,22 +13,23 @@ from dataclasses import replace
 from datetime import date, datetime
 from typing import Optional, Union
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
 
-from classification.enums import AlleleOriginBucket, SubmissionSource
-from classification.models import (
-    Classification,
+from classification.enums import SubmissionSource
+from classification.models import Classification, ClassificationModification
+from classification.models.classification_consensus import (
+    COPY_SCOPES_GENE,
     ClassificationConsensus,
-    ClassificationModification,
     ConsensusGroup,
 )
-from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 def _as_date(value: Union[date, datetime]) -> date:
@@ -68,6 +69,8 @@ def newer_than(groups: list[ConsensusGroup], applied_at: datetime) -> list[Conse
 def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpResponseBase:
     """ The gene content box: the card on the classification form, the rows its dialog shows (?rows=1), and
         the POST that copies a chosen record's gene content into this one """
+    if not settings.CLASSIFICATION_GENE_CONSENSUS:
+        raise Http404("Gene content reuse is disabled (settings.CLASSIFICATION_GENE_CONSENSUS)")
     classification = get_object_or_404(Classification, pk=classification_id)
     if not classification.can_write(request.user):
         raise PermissionDenied(f"You do not have WRITE permission on classification {classification_id}")

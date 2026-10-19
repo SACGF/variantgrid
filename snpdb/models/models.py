@@ -11,7 +11,7 @@ import os
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag
@@ -32,12 +32,10 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import SafeString
-from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from more_itertools import first
 
-from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
 from eventlog.models import create_event
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.avatar import SpaceThemedAvatarProvider
@@ -47,7 +45,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import JsonObjType, import_class, string_deterministic_hash
-from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
+from snpdb.models.models_enums import AlleleOriginBucket, UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
 
@@ -380,14 +378,6 @@ class Organization(models.Model, PreviewModelMixin):
     @property
     def shortest_name(self) -> str:
         return self.short_name or self.name
-
-    @cached_property
-    def classifying_labs(self) -> list['Lab']:
-        return [lab for lab in self.lab_set.all().order_by('name') if lab.total_classifications > 0]
-
-    @cached_property
-    def sharing_labs(self) -> list['Lab']:
-        return [lab for lab in self.lab_set.all().order_by('name') if lab.total_shared_classifications > 0]
 
     @property
     def group(self) -> Optional[Group]:
@@ -768,61 +758,6 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
         lab_users.sort()
         return lab_users
 
-    @cached_property
-    def shared_classifications(self) -> QuerySet['Classification']:
-        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).exclude(withdrawn=True)
-
-    @cached_property
-    def classifications(self) -> QuerySet['Classification']:
-        """ Shared or all classifications based on settings.CLASSIFICATION_STATS_USE_SHARED """
-        if settings.CLASSIFICATION_STATS_USE_SHARED:
-            qs = self.shared_classifications
-        else:
-            qs = self.classification_set.all()
-        return qs
-
-    @cached_property
-    def total_classifications(self) -> int:
-        """ Total 'classifications' as per above method """
-        return self.classifications.count()
-
-    @cached_property
-    def total_shared_classifications(self) -> int:
-        return self.shared_classifications.count()
-
-    @cached_property
-    def total_unshared_classifications(self) -> int:
-        all_classifications = self.classification_set.exclude(withdrawn=True).count()
-        return all_classifications - self.total_shared_classifications
-
-    @cached_property
-    def classifications_by_created(self) -> QuerySet['Classification']:
-        return self.classifications.order_by("created")
-
-    @cached_property
-    def classifications_by_modified(self) -> QuerySet['Classification']:
-        return self.classifications.order_by("-modified")
-
-    @property
-    def first_classification_ever_shared_date(self) -> Optional[datetime]:
-        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('created', flat=True).order_by('created').first()
-
-    @cached_property
-    def classifications_per_day(self) -> float:
-        try:
-            latest = now()
-            days = (latest - self.first_classification_ever_shared_date).days
-            if days == 0:
-                days = 1
-            cpd = self.total_classifications / days
-        except Exception:
-            cpd = 0
-        return cpd
-
-    @cached_property
-    def classifications_per_week(self) -> float:
-        return self.classifications_per_day * 7
-
     @staticmethod
     def valid_labs_qs(user: User, admin_check=False) -> QuerySet['Lab']:
         # as organization is used for sorting, it's generally always a good idea to select related it
@@ -839,6 +774,13 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
 
     def is_member(self, user: User, admin_check=False) -> bool:
         return self.valid_labs_qs(user=user, admin_check=admin_check).filter(pk=self.pk).exists()
+
+    @staticmethod
+    def get_only_head_for_member(user: User) -> Optional[User]:
+        """ The one active head (other than user) across user's labs - None when there's none or a choice to make """
+        heads = list(User.objects.filter(is_active=True, labhead__lab__in=Lab.valid_labs_qs(user))
+                     .exclude(pk=user.pk).distinct()[:2])
+        return heads[0] if len(heads) == 1 else None
 
     def is_head(self, user: User) -> bool:
         return self.labhead_set.filter(user=user).exists()

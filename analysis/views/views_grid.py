@@ -13,7 +13,7 @@ from django.views.decorators.vary import vary_on_cookie
 from analysis import grids
 from analysis.exceptions import NonFatalNodeError
 from analysis.models import AnalysisNode
-from analysis.models.nodes.analysis_node import node_query_planner_settings
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_cohort_to_downloadable_file,

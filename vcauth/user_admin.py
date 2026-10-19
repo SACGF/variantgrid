@@ -3,7 +3,10 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin
 
+from analysis.models.models_analysis import Analysis
+from analysis.models.nodes.node_utils import reload_analysis_nodes
 from classification.views.classification_email_view import send_summary_email_to_user
+from snpdb.models.models import Lab
 
 logger = logging.getLogger(__name__)
 
@@ -31,4 +34,31 @@ class CustomUserAdmin(UserAdmin):
 
     email_discordance.allowed_permissions = ['change']
     email_discordance.short_description = "Email weekly summary"
-    actions = [email_discordance]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change and "is_active" in form.changed_data and not obj.is_active:
+            if num_analyses := Analysis.objects.filter(user=obj).count():
+                lab_head = Lab.get_only_head_for_member(obj)
+                if lab_head:
+                    reassign = f"'{self.reassign_analyses_to_lab_head.short_description}' ({lab_head})"
+                else:
+                    reassign = "'Take Ownership' in each analysis' settings"
+                self.message_user(request, f"{obj.username} owns {num_analyses} analyses, which check permissions "
+                                           f"as their owner - reassign them with {reassign}", messages.WARNING)
+
+    def reassign_analyses_to_lab_head(self, request, queryset):
+        for user in queryset:
+            if lab_head := Lab.get_only_head_for_member(user):
+                analyses_qs = Analysis.objects.filter(user=user)
+                for analysis in analyses_qs:
+                    analysis.change_owner(lab_head)
+                    reload_analysis_nodes(analysis.pk)
+                self.message_user(request, f"Reassigned {len(analyses_qs)} analyses from {user.username} to {lab_head}")
+            else:
+                self.message_user(request, f"{user.username}: no single active lab head to reassign analyses to",
+                                  messages.WARNING)
+
+    reassign_analyses_to_lab_head.allowed_permissions = ['change']
+    reassign_analyses_to_lab_head.short_description = "Reassign analyses to lab head"
+    actions = [email_discordance, reassign_analyses_to_lab_head]
