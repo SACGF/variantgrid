@@ -128,7 +128,7 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
     MEMBER_FIELDS = ("mother", "father", "proband")
-    # Inheritance modes calculate_cohort_stats precomputes counts for
+    # Inheritance modes calculate_trio_stats precomputes counts for
     STATS_INHERITANCE_MODES = ("denovo", "autosomal_recessive", "autosomal_dominant", "x_linked_recessive", "compound_het")
 
     @classmethod

@@ -95,14 +95,15 @@ Gotchas:
   4.600000102072954e-05), so take the value off the raw INFO text (str(record)) to store what VEP's own pass-through would.
 - Cohort stats are counted in SQL (annotation/tasks/calculate_sample_stats.py:_count_cohort_stats, #2283): rows are
   grouped by (samples_zygosity, flag bits) into an ON COMMIT DROP temp table, so it only works inside
-  calculate_cohort_stats' locked transaction. Python folds the grouped rows onto the counter fields and keeps the trio
-  predicates (_trio_predicates, mirroring analysis/models/nodes/sources/trio_node.py) and the compound het pairing.
-  A new per-row input is a bit in _BOOLEAN_FLAGS_SQL; a new counting rule goes in _flag_field_indexes / _add_count.
+  calculate_cohort_stats' locked transaction. Python folds the grouped rows onto the counter fields.
+  A new per-row input is a bit in _BOOLEAN_FLAGS_SQL; a new counting rule goes in _flag_field_indexes / add_count.
+- Trio inheritance buckets are computed apart from the cohort's (annotation/tasks/calculate_trio_stats.py, #2327) on the
+  same rows and lock, keyed by the trio's members (snpdb/models/models_family.py:Trio.get_stats_filter_key). The cohort
+  pass knows nothing of trios: a TrioNode miss enqueues its trio, and a base cohort recompute clears the trio rows.
+  The predicates (_trio_predicates) mirror analysis/models/nodes/sources/trio_node.py.
 - A sub cohort's stats are written to its parent's CGC (calculate_sample_stats.py:calculate_cohort_stats, #2311): only
-  the base cohort writes per-sample rows and clears the CGC, a sub cohort writes just its aggregate/trio rows under keys
+  the base cohort writes per-sample rows and clears the CGC, a sub cohort writes just its aggregate rows under keys
   carrying its samples (snpdb/models/models_cohort.py:Cohort.get_stats_filter_key). Freshness needs a row per key.
-  Every trio on the cohort gets buckets, keyed by its members (snpdb/models/models_family.py:Trio.get_stats_filter_key,
-  #2327), so a new trio misses and its node's read recomputes.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models_annotation_version.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
 - transcripts_annotation_selections.py:VariantTranscriptSelections converts the coordinate to explicit once before

@@ -53,6 +53,11 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         """ The precomputed cohort stats bucket counts are read from - the cohort's raw aggregate row """
         return self._get_cohort().get_stats_filter_key()
 
+    def _get_stats_enqueue_recompute(self):
+        """ What brings get_stats_filter_key's bucket up to date after a cache miss, None for the cohort's
+            own stats """
+        return None
+
     def _get_cached_label_count(self, label):
         cohort = self._get_cohort()
         if cohort is None:
@@ -70,6 +75,7 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             passing_filter=bool(filter_code),
             zygosities=self._cached_label_count_zygosities(),
             label=label,
+            enqueue_recompute=self._get_stats_enqueue_recompute(),
         )
 
     def _get_q_and_list(self) -> list[Q]:

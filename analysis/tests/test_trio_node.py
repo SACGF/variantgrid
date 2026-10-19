@@ -257,6 +257,16 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
             self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
             m.assert_not_called()
 
+    def test_cache_miss_recomputes_the_trio_not_the_cohort(self):
+        """ Trio buckets are written by calculate_trio_stats, so a miss has to enqueue that - a cohort
+            recompute is fresh without them and would never write them """
+        node = self._make_node(TrioInheritance.DENOVO)
+        with (mock.patch("analysis.models.nodes.sources.trio_node.enqueue_trio_stats_recompute") as trio_enqueue,
+              mock.patch("analysis.models.nodes.stats_cache.enqueue_cohort_stats_recompute") as cohort_enqueue):
+            self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
+        trio_enqueue.assert_called_once_with(self.trio, self.analysis.annotation_version)
+        cohort_enqueue.assert_not_called()
+
     # ── Zygosity table ────────────────────────────────────────────────────────
 
     def test_zygosity_table_mosaic_thresholds_are_on_the_parent_rows_only(self):
