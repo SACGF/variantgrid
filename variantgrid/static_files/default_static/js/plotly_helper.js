@@ -90,20 +90,6 @@ function getBoxDataFromLabelsMatrix(labels, matrix) {
     return data;
 }
 
-function plotBoxLabelsMatrix(selector, title, labels, matrix, width, height) {
-    const data = getBoxDataFromLabelsMatrix(labels, matrix);
-    const layout = defaultLayout(title, width, height);
-    Plotly.newPlot(selector, data, layout);
-}
-
-function plotBarDict(selector, title, dict, width, height) {
-    const data = dictToData(dict, 'bar');
-
-    const layout = defaultLayout(title, width, height);
-    Plotly.newPlot(selector, [data], layout);
-}
-
-
 function plotBarArrays(selector, title, x, y, width, height, color) {
     const data = {
         x: x,
@@ -141,19 +127,6 @@ function plotHBarArrays(selector, title, x, y, width, height, color, margin) {
 }
 
 
-function plotLineArrays(selector, x, y, layout) {
-    const data = [
-      {
-        x: x,
-        y: y,
-        type: 'line',
-      }
-    ];
-
-    Plotly.newPlot(selector, data, layout);
-}
-
-
 // series_colors (optional) maps a series name to its colour; unnamed series keep Plotly's defaults
 function showStackedBar(elementId, title, width, height, named_data, x_labels, series_colors) {
     const x = [];
@@ -186,74 +159,3 @@ function showStackedBar(elementId, title, width, height, named_data, x_labels, s
     $("#" + elementId).empty();
     Plotly.newPlot(elementId, data, layout);
 }
-
-
-function showHeatMap(elementId, title, x, y, z, labels) {
-    const data = [{
-      x: x,
-      y: y,
-      z: z,
-      type: 'heatmap',
-    }];
-    
-    const layout = {
-      title: {
-        text: title,
-        font: {size: 32},
-      },
-      annotations: [],
-      xaxis: {
-        title: {text: 'Old Category'},
-        ticks: '',
-        side: 'top'
-      },
-      yaxis: {
-        title: {text: 'New Category'},
-        ticks: '',
-        ticksuffix: ' ',
-        width: 700,
-        height: 700,
-        autosize: false
-      }
-    };
-
-    let textColor;
-    for ( let i = 0; i < y.length; i++ ) {
-      for ( let j = 0; j < x.length; j++ ) {
-        const currentValue = labels[i][j];
-        if (currentValue != 0.0) {
-          textColor = 'white';
-        } else {
-          textColor = 'black';
-        }
-        const result = {
-          xref: 'x1',
-          yref: 'y1',
-          x: x[j],
-          y: y[i],
-          text: currentValue + " (" + (z[i][j]).toFixed(2) + "%)",
-          font: {
-            family: 'Arial',
-            size: 12,
-            // color: 'rgb(50, 171, 96)'
-          },
-          showarrow: false,
-          font: {
-            color: textColor
-          }
-        };
-        layout.annotations.push(result);
-      }
-    }
-    
-    Plotly.newPlot(elementId, data, layout);
-    
-    // Shift title up a bit
-    const TITLE_Y = -20;
-    const textTitle = $("text.gtitle", "#" + elementId);
-    y = parseInt(textTitle.attr("y"));
-    textTitle.attr("y", y + TITLE_Y);
-}
-
-
-

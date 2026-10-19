@@ -9,10 +9,8 @@ class GenesConfig(AppConfig):
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
 
-        from annotation.models.models import CachedWebResource
-        from genes.models import CachedThirdPartyGeneList
-
         from genes import user_awards  # noqa: F401  # registers award definitions on import
+        from genes.models import CachedThirdPartyGeneList
         from genes.signals.gene_search import gene_search, gene_version_search
         from genes.signals.gene_symbol_search import gene_symbol_alias_search
         from genes.signals.manual_signals import (
@@ -31,6 +29,7 @@ class GenesConfig(AppConfig):
             uniprot_post_save_handler,
         )
         from genes.signals.transcript_search import search_transcript
+        from snpdb.models.models_cached_web_resource import CachedWebResource
         from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
 

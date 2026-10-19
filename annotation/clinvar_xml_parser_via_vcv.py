@@ -11,8 +11,8 @@ from annotation.clinvar_xml_parser import (
     ClinVarXmlParserOutput,
 )
 from annotation.models import ClinVarRecord
-from classification.enums import AlleleOriginBucket
 from library.utils.xml_utils import PP, parser_path
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ConditionList:

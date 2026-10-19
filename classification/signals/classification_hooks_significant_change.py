@@ -6,25 +6,28 @@ from auditlog.context import set_extra_data
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.urls import reverse
-from django.contrib.auth.models import User
 
-from classification.enums import ClinicalSignificance, ShareLevel, SpecialEKeys, ClassificationResultValue, TriageDecision
+from classification.enums import ClassificationResultValue, ShareLevel, SpecialEKeys, TriageDecision
+from classification.enums.overlaps_enums import TriageStatus
 from classification.models import (
     Classification,
     ClassificationFlagTypes,
+    ClassificationGrouping,
     ClassificationModification,
+    ClassificationSummaryCacheObj,
     EvidenceKey,
     EvidenceKeyMap,
+    OverlapContribution,
     classification_flag_types,
-    classification_post_publish_signal, classification_grouping_summary_signal, ClassificationGrouping,
-    ClassificationSummaryCacheObj, OverlapContribution
+    classification_grouping_summary_signal,
+    classification_post_publish_signal,
 )
-from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlaps_services import OverlapServices
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
 from library.log_utils import NotificationBuilder
 from library.utils import get_timer
+from snpdb.models.models_enums import ClinicalSignificance
 
 
 @receiver(classification_post_publish_signal, sender=Classification)

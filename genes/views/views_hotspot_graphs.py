@@ -5,7 +5,6 @@ from typing import Optional
 from django.conf import settings
 from django.contrib.auth.decorators import login_not_required
 from django.db.models.aggregates import Count
-from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -14,10 +13,10 @@ from django.views.generic import TemplateView
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification, ClassificationModification
 from genes.interpro import store_domains_for_transcripts
-from genes.models import Gene, Transcript, TranscriptVersion
+from genes.models import Transcript, TranscriptVersion
 from library.constants import MINUTE_SECS
 from library.utils import segment
 from snpdb.models import Cohort, CohortGenotypeCollection, VariantZygosityCountCollection
@@ -78,7 +77,6 @@ class HotspotGraphView(TemplateView):
         """
 
         transcript_id = self.kwargs.get("transcript_id")
-        gene_id = self.kwargs.get("gene_id")
         gene_symbol_id = self.kwargs.get("gene_symbol")
         transcript_accession = self.kwargs.get("transcript_accession")
 
@@ -94,16 +92,11 @@ class HotspotGraphView(TemplateView):
                 lookup = f"Transcript: {transcript_id}"
                 transcript = Transcript.objects.get(pk=transcript_id)
                 tv_qs = gar.transcript_versions_for_transcript(transcript)
-            elif gene_id or gene_symbol_id:
-                if gene_id:
-                    lookup = f"Gene: {gene_id}"
-                    gene = get_object_or_404(Gene, identifier=gene_id)
-                    tv_qs = gar.transcript_versions_for_gene(gene)
-                else:
-                    lookup = f"GeneSymbol: {gene_symbol_id}"
-                    tv_qs = gar.transcript_versions_for_symbol(gene_symbol_id)
+            elif gene_symbol_id:
+                lookup = f"GeneSymbol: {gene_symbol_id}"
+                tv_qs = gar.transcript_versions_for_symbol(gene_symbol_id)
             else:
-                raise ValueError("At least one of 'gene_symbol', 'gene_id' or 'transcript_id' must be in url kwargs")
+                raise ValueError("At least one of 'gene_symbol' or 'transcript_id' must be in url kwargs")
 
             # Sort by canonical then choose higher version if any ties
             tv_list = sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True)

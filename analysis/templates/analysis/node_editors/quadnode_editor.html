@@ -4,7 +4,7 @@
     var quadForm = $("#quad-form");
     var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
     var motherAffected = false, fatherAffected = false, siblingAffected = false;
-    var quadLoadable = {{ quad_loadable|yesno:"true,false" }};
+    var quadLoadable = {{ source_loadable|yesno:"true,false" }};
 
     function getQuadId() {
        return $("#id_quad", quadForm).find(":selected").val();

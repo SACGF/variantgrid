@@ -1,13 +1,9 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from typing import Optional
 
 from dateutil import tz
 from django.utils import timezone as django_timezone
 from django.utils.timezone import localtime
-
-
-def time_since(start: datetime) -> timedelta:
-    return datetime.now() - start
 
 
 def local_date_string() -> str:

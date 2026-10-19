@@ -1,7 +1,6 @@
 {% load js_tags %}
 {% load settings_tags %}
 {% load static %}
-<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/highlight/styles/default.css' %}" />
 <style>
     code {
         white-space: pre-wrap;
@@ -23,7 +22,6 @@
 </div>
 
 {% if node.valid %}
-    <script src="{% static 'js/lib/highlight/highlight.pack.js' %}"></script>
     <script src="{% static 'js/analysis/grid_editor_debug_tab.js' %}"></script>
     <script>
         $(document).ready(function() {
@@ -36,18 +34,10 @@
     </div>
 
     <div id="min-sql">
-        <pre>
-        <code class='sql'>
-{{ node_sql }}
-        </code>
-        </pre>
+        <pre><code>{{ node_sql }}</code></pre>
     </div>
     <div id="grid-sql" style='display: none'>
-        <pre>
-        <code class='sql'>
-{{ grid_sql }}
-        </code>
-        </pre>
+        <pre><code>{{ grid_sql }}</code></pre>
     </div>
     {%  else %}
         <div class="editor-help">Could not generate SQL</div>

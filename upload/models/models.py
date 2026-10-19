@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 import shutil
 import traceback
 from collections import namedtuple
@@ -77,8 +76,10 @@ class FileUpload(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     @property
-    def exists(self):
-        if self.file_field:
+    def exists(self) -> bool:
+        """ Whether the file is still on disk - uploads can be cleaned up, or a database restored without them """
+        has_file = self.file_field if self.import_source == ImportSource.WEB_UPLOAD else self.path
+        if has_file:
             return os.path.exists(self.get_filename())
         return False
 
@@ -442,14 +443,6 @@ class UploadStep(models.Model):
     @property
     def file_upload(self) -> FileUpload:
         return self.upload_pipeline.file_upload
-
-    @property
-    def processing_seconds(self):
-        if self.start_date and self.end_date:
-            seconds = (self.end_date - self.start_date).total_seconds()
-        else:
-            seconds = None
-        return seconds
 
     @property
     def genome_build(self):
@@ -855,9 +848,6 @@ class ModifiedImportedVariant(models.Model):
     """ Keep track of variants that were modified during import pre-processing by bcftools,
         so people can find out why a variant they expected didn't turn up.  """
     BCFTOOLS_OLD_VARIANT_TAG = "BCFTOOLS_OLD_VARIANT"
-    VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([^/]+)/([^/]+)$")
-    NORM_TOOL_VT = "vt"
-    NORM_TOOL_BCFTOOLS = "bcftools"
 
     import_info = models.ForeignKey(ModifiedImportedVariants, on_delete=CASCADE, null=True)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
@@ -899,16 +889,6 @@ class ModifiedImportedVariant(models.Model):
         return self.import_info.upload_step.genome_build
 
     @staticmethod
-    def _to_variant_coordinate(old_variant) -> VariantCoordinate:
-        if full_match := ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN.fullmatch(old_variant):
-            chrom = full_match.group(1)
-            position = int(full_match.group(2))
-            ref = full_match.group(3)
-            alt = full_match.group(4)
-            return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
-        raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
-
-    @staticmethod
     def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
@@ -929,24 +909,6 @@ class ModifiedImportedVariant(models.Model):
         contig = genome_build.chrom_contig_mappings[chrom]
         variant_coordinate = VariantCoordinate(chrom=contig.name, position=position, ref=ref, alt=alt, svlen=svlen)
         return [ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate)]
-
-    @staticmethod
-    def _vt_split_old_variant(old_variant) -> list[str]:
-        """ VT decompose writes OLD_VARIANT as comma separated, but if not decomposed (eg someone uploads already
-            normalized) could be multi-alt that looks like 5:132240059:CT/CTT/T """
-        old_variants = []
-        for ov in old_variant.split(","):
-            locus, *alts = ov.split("/")
-            num_alts = len(alts)
-            if num_alts == 1:
-                # Quick most common path - no need to pull apart and re-assemble
-                old_variants.append(ov)
-            elif num_alts >= 2:
-                for alt in alts:
-                    old_variants.append(f"{locus}/{alt}")
-            else:
-                raise ValueError(f"Badly formatted INFO - 'OLD_VARIANT': '{ov}'")
-        return old_variants
 
     @staticmethod
     def get_old_variant_from_variant_coordinate(vc: VariantCoordinate) -> str:

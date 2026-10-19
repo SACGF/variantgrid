@@ -50,6 +50,11 @@ Patterns here:
   `analysis/templates/analysis/family_wizard.html`, driven by the subclass's `family_*`/`role_*` attributes. A sample's
   role says which family member it is (Mother/Father/Proband/Sibling), and the sample's sex narrows the roles on offer
   (`analysis/forms/forms.py:FamilyWizardForm`) - a Duo stores its relative's role as the Duo's relationship.
+- Duo/Trio/Quad differ only in their family: each node's `FAMILY_SHAPE`
+  (`analysis/models/nodes/family_inheritance.py:FamilyShape` - the FK to the family and its members in order, each with
+  its affected and require-zygosity fields). The modes, the node methods, the editor's zygosity table and the editor
+  form/view (`analysis/views/nodes/node_views.py:FamilyNodeView`) are written once against it; a family's own module
+  holds only its zygosity tuples where they differ (a recessive sibling, a Duo's relationship) and its inheritance errors.
 - A Duo's second member is a *relative*, not necessarily a parent: `relationship` is Mother, Father or Sibling (#1861).
   A sibling pair carries no transmission, so the parent-only modes ('Absent in parent', 'Dominant (mosaic parent)') raise
   an inheritance error; the recessive modes ask the sibling for the proband's own genotype when they're affected and
@@ -217,7 +222,7 @@ Gotchas:
   is what `_raise_or_warn_count_mismatch` raises on. Anything reading a threshold - query, cache check, method summary -
   goes through there.
 - The Duo/Trio/Quad editors' zygosity table is built once per page from a stub node
-  (`analysis/models/nodes/sources/trio_node.py:TrioNode.get_zygosity_table_data`), so it cannot see a field's live
+  (`analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin.get_zygosity_table_data`), so it cannot see a field's live
   value - anything that depends on one ships as a `{placeholder}` the editor's `updateZygosityTable()` substitutes
   (the mosaic thresholds, #1830). A member with no `other_filters_<member>` key renders a blank cell.
 - Tag colours, sort order, 1-click tags and staleness in an analysis come from its own
@@ -241,7 +246,7 @@ Gotchas:
   wrong needs a `CACHE_VERSION` bump in `variantgrid/settings/components/default_settings.py`.
 - A node mixin is listed before `AnalysisNode`, so a `def` on the mixin wins the MRO ahead of the node's
   implementation. State what the mixin only reads from the node as a class-level annotation
-  (`get_warnings: Callable[[], list[str]]` on `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin`),
+  (`get_filter_description: Callable[[], str]` on `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin`),
   and keep a `raise NotImplementedError()` body for what each subclass provides
   (`analysis/models/nodes/cohort_mixin.py:CohortMixin._get_cohort`) - a subclass is ahead of the mixin either way.
 Tests:

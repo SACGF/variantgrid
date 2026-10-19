@@ -1,6 +1,5 @@
 // @ts-check
 // upload/templates/upload/upload.html
-/* global getCookie */ // global.js
 /* global FilePond */ // lib/filepond
 /* global reloadUploadsGrid */ // upload/upload.js
 (function() {
@@ -8,7 +7,7 @@
     if (!inputElement) {
         return;
     }
-    const csrftoken = getCookie('csrftoken');
+    const csrftoken = Cookies.get('csrftoken');
 
     const pond = FilePond.create(inputElement, {
         allowMultiple: true,

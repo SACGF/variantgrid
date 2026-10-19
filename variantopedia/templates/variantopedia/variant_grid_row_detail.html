@@ -14,7 +14,7 @@
     {% if splice_event_variant %}<tr><th>Splice</th><td>{% splice_event splice_event_variant genome_build %}</td></tr>{% endif %}
     {% if overlapping_symbols %}<tr><th>Genes</th><td>{{ overlapping_symbols }}</td></tr>{% endif %}
     {% for build_variant in build_variants %}
-      <tr><th>{{ build_variant.any_genome_build }}</th><td class="mono">{{ build_variant.full_string }}</td></tr>
+      <tr><th>{{ build_variant.ordered_genome_builds|join:" / " }}</th><td class="mono">{{ build_variant.full_string }}</td></tr>
     {% endfor %}
     {% if clingen_allele %}<tr><th>ClinGen</th><td class="mono">{{ clingen_allele }}</td></tr>{% endif %}
     <tr><th>VariantGrid</th><td class="mono">v {{ variant.pk }}</td></tr>
