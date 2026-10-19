@@ -509,8 +509,9 @@ class OverlapServices:
 
             for notification in outstanding_notifications:
                 if not notification.is_still_relevant:
-                    # the old/new status of an Overlap can be updated multiple times
-                    # possible that the end result is the Overlap after status changes to something and then back again
+                    # The overlap's status can change several times before we get here, e.g. it became discordant
+                    # then resolved again, so from old_state to new_state nothing worth telling anyone has happened.
+                    # Delete it rather than mark it sent: no admin or lab message goes out for it.
                     notification.delete()
                     continue
 
