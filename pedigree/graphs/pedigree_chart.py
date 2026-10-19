@@ -52,19 +52,21 @@ class PedigreeChart:
         if madeline2 is None:
             raise ValueError("settings.PEDIGREE_MADELINE2_COMMAND not set!")
         ped_file = PedFile.objects.get(pk=self.ped_file_id)
-        ped_filename = ped_file.uploadedpedfile.file_upload.get_filename()
         temp_file = NamedTemporaryFile(delete=False)
         madeline_filename = temp_file.name
 
-        # Need to convert to Madeline input file
-        convert_command = [
-            *get_ped_parser_command(),
-            ped_filename,
-            "--to_madeline",
-            "-o",
-            madeline_filename,
-        ]
-        subprocess.check_call(convert_command)
+        with NamedTemporaryFile(suffix=".ped") as ped_temp_file:
+            ped_file.write_ped(ped_temp_file.name)
+
+            # Need to convert to Madeline input file
+            convert_command = [
+                *get_ped_parser_command(),
+                ped_temp_file.name,
+                "--to_madeline",
+                "-o",
+                madeline_filename,
+            ]
+            subprocess.check_call(convert_command)
         logging.info("Converted .ped to madeline: %s", madeline_filename)
 
         command = [
