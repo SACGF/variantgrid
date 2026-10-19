@@ -157,9 +157,9 @@ def _normalise_option_values(cell: VCDataCell, values: list[Any]) -> Optional[li
 def _normalise_user(cell: VCDataCell, value: Any) -> Any:
     # convert users (username or email) to username if possible
     value = str(value)
-    user = User.objects.filter(Q(username=value) | Q(email=value)).first()
-    if user:
-        cell.value = user.username
+    if user := User.objects.filter(Q(username=value) | Q(email=value)).first():
+        value = user.username
+    cell.value = value
     return value
 
 
@@ -335,6 +335,10 @@ def normalise_evidence_cell(classification: Classification, cell: VCDataCell, so
             # if we're not a multi-select key, and we have an array with 1 value in it.
             # use that 1 value
             value = value[0]
+
+    # types below without a normaliser (age, date, an unmatched user) keep the cleanup above
+    if value != cell.value:
+        cell.value = value
 
     if value is not None:
         # remove support for existing_variant_id
