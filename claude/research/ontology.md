@@ -20,7 +20,8 @@ the generated maps ([models](../maps/models.md#ontology), [urls](../maps/urls.md
 
 Every source goes through `ontology/ontology_builder.py:OntologyBuilder`, which is the whole import contract: one
 builder per (`import_source`, `context`, `processor_version`); `OntologyBuilder.ensure_hash_changed` raises
-`OntologyBuilderDataUpToDateException` when the file's md5 matches the last completed import of that context;
+`OntologyBuilderDataUpToDateException` when the data hash matches the last completed import of that context (file
+loaders call `OntologyBuilder.ensure_file_hash_changed`, the file's sha256, which also accepts an md5 stored before #2273);
 `OntologyBuilder.cache_everything` pulls every existing term into memory; `add_term` / `add_ontology_relation` mutate
 cached objects that `OntologyBuilder.complete` writes back with one bulk create and one bulk update per model. A previous import made with a different `processor_version` is ignored, so bumping the number
 in a loader is how a parsing change forces a reload of an unchanged file. `add_term` distinguishes the

@@ -20,7 +20,7 @@ def store_gencc_from_web(cached_web_resource: CachedWebResource):
     r = requests.get(GENCC_CSV_URL, timeout=MINUTE_SECS)
     file_hash = md5sum_str(r.text)
     fileobj = StringIO(r.text)
-    num_gene_disease_relationships = load_gencc(fileobj, file_hash, force=True, url=GENCC_CSV_URL)
+    num_gene_disease_relationships = load_gencc(fileobj, force=True, url=GENCC_CSV_URL, file_hash=file_hash)
     cached_web_resource.description = f"{num_gene_disease_relationships} gene/disease relationships"
     cached_web_resource.save()
 
@@ -38,12 +38,14 @@ def _none_if_na(value):
     return value
 
 
-def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -> int:
-    if isinstance(file_or_filename, str):
+def load_gencc(file_or_filename, force: bool, url: str | None = None, file_hash: str | None = None) -> int:
+    """ A filename is hashed here; a file object needs the 'url' and 'file_hash' it came from """
+    is_filename = isinstance(file_or_filename, str)
+    if is_filename:
         url_or_filename = file_or_filename
     else:
-        if url is None:
-            raise ValueError("If not loading from filename, you must pass in the 'url' parameter")
+        if url is None or file_hash is None:
+            raise ValueError("If not loading from filename, you must pass in the 'url' and 'file_hash' parameters")
         url_or_filename = url
 
     ontology_builder = OntologyBuilder(filename=url_or_filename,
@@ -51,7 +53,10 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
                                        import_source="gencc",
                                        processor_version=7,
                                        force_update=force)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    if is_filename:
+        ontology_builder.ensure_file_hash_changed(file_or_filename)
+    else:
+        ontology_builder.ensure_hash_changed(data_hash=file_hash)
     ontology_builder.cache_everything()
 
     logging.info("About to load gencc")
