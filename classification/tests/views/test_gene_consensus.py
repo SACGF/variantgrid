@@ -1,6 +1,6 @@
 from typing import Optional
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from classification.enums import SpecialEKeys, SubmissionSource
@@ -68,6 +68,18 @@ class GeneConsensusPanelTestCase(TestCase):
         self.record.refresh_from_db()
         self.assertEqual(self.record.get("h_summary"), GENE_SUMMARY)
         self.assertIsNone(self.record.get(SpecialEKeys.INTERPRETATION_SUMMARY))
+
+    @override_settings(CLASSIFICATION_GENE_CONSENSUS=False)
+    def test_disabled_deployment_neither_offers_nor_applies_gene_content(self):
+        candidate = self._classify("curated_before", curation_date="2024-02-01", h_summary=GENE_SUMMARY)
+
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        response = self.client.post(self.url,
+                                    {"copy_gene_from_vcm_id": candidate.last_published_version.pk})
+
+        self.assertEqual(response.status_code, 404)
+        self.record.refresh_from_db()
+        self.assertIsNone(self.record.get("h_summary"))
 
     def test_the_box_goes_away_once_gene_content_has_been_applied(self):
         candidate = self._classify("curated_before", curation_date="2024-02-01", h_summary=GENE_SUMMARY)

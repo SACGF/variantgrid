@@ -24,7 +24,7 @@ from rest_framework.exceptions import ParseError
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
-from classification.enums import AlleleOriginBucket, ClinicalContextStatus, ShareLevel
+from classification.enums import ClinicalContextStatus, ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import (
     Classification,
@@ -53,6 +53,7 @@ from snpdb.models import (
     Variant,
     VariantCoordinate,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 

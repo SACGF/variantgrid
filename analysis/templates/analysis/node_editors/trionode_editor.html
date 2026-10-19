@@ -4,7 +4,7 @@
     var trioForm = $("#trio-form");
     var ZYGOSITY_MAP = JSON.parse(document.getElementById('zygosity-data').textContent);
     var motherAffected = false, fatherAffected = false;
-    var trioLoadable = {{ trio_loadable|yesno:"true,false" }};
+    var trioLoadable = {{ source_loadable|yesno:"true,false" }};
 
     function getTrioId() {
        return $("#id_trio", trioForm).find(":selected").val();

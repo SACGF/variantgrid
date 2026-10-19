@@ -660,12 +660,6 @@ function setCell(tr, geneListClass, value) {
     col.replaceWith(value);
 }
 
-function setCellText(tr, geneListClass, value) {
-    let col = $("." + geneListClass, tr);
-    col.text(value);
-}
-
-
 function addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer) {
     let htmlByGene = geneListDataById[geneListId]["gene_html"];
     if (htmlByGene) {

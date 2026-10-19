@@ -20,3 +20,4 @@ from .models_vcf import *
 from .models_cohort_stats import *
 from .models_partition_archive import *
 from .models_zygosity_counts import *
+from .models_cached_web_resource import *

@@ -1,6 +1,5 @@
 /*jshint esversion: 6 */
 /*globals $:false, jQuery:false, console:false, moment:false, Rollbar:false */
-/*globals toMarkdown:false */
 
 // Required until we can up our minimum browser suppert to this https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replaceAll
 if (!String.prototype.replaceAll) {
@@ -21,7 +20,7 @@ function tweakAjax() {
             //if (settings.type == 'POST' || settings.type == 'PUT' || settings.type == 'DELETE' || settings.type == 'PATCH') {
                 if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
                     // Only send the token to relative URLs i.e. locally.
-                    xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                    xhr.setRequestHeader("X-CSRFToken", Cookies.get('csrftoken'));
                 } else {
                     // console.log("Didn't add CSRF! to external url '" + settings.url + "'");
                 }
@@ -319,7 +318,7 @@ function enhanceAndMonitor() {
                 const form = node.closest('form');
                 form.submit(function (e) {
                     // if a page load has changed the cookie, change it in the form
-                    const cookie = getCookie('csrftoken');
+                    const cookie = Cookies.get('csrftoken');
                     node.val(cookie);
                     return true;
                 });
@@ -644,11 +643,6 @@ $(document).on("ajaxStop", () => {
         200); // timeout was 350, but now we have timeout on spinners and modals, so can put a small buffer on this
 });
 
-function setGlobalDebugMessage(message) {
-    const messageBox = $('<div>', {class: 'site-message border rounded m-2 p-2 bg-light severity-warning', html: message});
-    $('#global-debug-message').html(messageBox);
-}
-
 function loadAjaxBlock(dom, url) {
     if (!url) {
         url = dom.attr('href');
@@ -739,14 +733,6 @@ function globalSetup() {
     $.fn.selector = { split: function() { return ""; }};
 })(jQuery);
 
-function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    if (match) {
-        return match[2];
-    }
-    return null;
-}
-
 /* The menus and the rest of the per-user page frame (uicore/page_frame.py), requested while the page is still loading
    and filled in once it is ready - the page body itself is the same for every user. */
 function loadPageFrame(frameUrl, urlName) {
@@ -782,7 +768,7 @@ function postUrl(url) {
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = 'csrfmiddlewaretoken';
-    input.value = getCookie('csrftoken');
+    input.value = Cookies.get('csrftoken');
     form.appendChild(input);
     document.body.appendChild(form);
     form.submit();
@@ -920,13 +906,6 @@ function getValue(val, defaultValue) {
     return (typeof val !== 'undefined') ?  val : defaultValue;
 }
 
-function markdownize(content) {
-    const html = content.split("\n").map($.trim).filter(function(line) {
-        return line !== "";
-    }).join("\n");
-    return toMarkdown(html);
-}
-
 function format(str, col) {
     col = typeof col === 'object' ? col : Array.prototype.slice.call(arguments, 1);
 
@@ -975,12 +954,6 @@ function dynamicSort(property, caseSensitive) {
         const result = (valA < valB) ? -1 : (valA > valB) ? 1 : 0;
         return result * sortOrder;
     };
-}
-
-function zero_pad(num, size) {
-    let s = num + "";
-    while (s.length < size) s = "0" + s;
-    return s;
 }
 
 function clearAutocompleteChoice(selector) {
@@ -1066,29 +1039,40 @@ const JS_DATE_FORMAT_MILLISECONDS = 'YYYY-MM-DD HH:mm:ss.SSS';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
 const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD';
+
+/* "time ago" text is moment's fromNow, in words short enough for a grid cell */
 function configureTimestamps() {
-    if ($.timeago) {
-        $.timeago.settings.allowFuture = true;
-        $.timeago.settings.strings = {
-            prefixAgo: null,
-            prefixFromNow: null,
-            suffixAgo: "ago",
-            suffixFromNow: "from now",
-            seconds: "<1 min",
-            minute: "1 min",
-            minutes: "%d mins",
-            hour: "1 hour",
-            hours: "%d hours",
-            day: "1 day",
-            days: "%d days",
-            month: "1 month",
-            months: "%d months",
-            year: "1 year",
-            years: "%d years",
-            wordSeparator: " ",
-            numbers: []
-        };
+    if (typeof moment === 'undefined') {  // the login pages run globalSetup without moment
+        return;
     }
+    moment.updateLocale('en', {
+        relativeTime: {
+            future: "%s from now",
+            past: "%s ago",
+            s: "<1 min",
+            ss: "<1 min",
+            m: "1 min",
+            mm: "%d mins",
+            h: "1 hour",
+            hh: "%d hours",
+            d: "1 day",
+            dd: "%d days",
+            M: "1 month",
+            MM: "%d months",
+            y: "1 year",
+            yy: "%d years",
+        }
+    });
+    // count hours up to a whole day and days up to a month (moment rounds 22 hours up to "1 day")
+    moment.relativeTimeThreshold('h', 24);
+    moment.relativeTimeThreshold('d', 30);
+    setInterval(refreshTimeAgo, 60000);
+}
+
+function refreshTimeAgo() {
+    $('time.ago[datetime]').each(function() {
+        this.textContent = moment(this.getAttribute('datetime')).fromNow();
+    });
 }
 
 function convertTimestampDom(elem) {
@@ -1107,7 +1091,7 @@ function convertTimestampDom(elem) {
         let finalText = null;
         const daysDiff = m.diff(today, 'days');
         switch (daysDiff) {
-            // put a special case in for 2 as the hours component can sometimes trick timeAgo
+            // put a special case in for 2 as the hours component can sometimes trick fromNow
             case -2: finalText = "2 days ago"; break;
             case -1: finalText = "Yesterday"; break;
             case 0: finalText = "Today"; break;
@@ -1145,12 +1129,11 @@ function convertTimestampDom(elem) {
         if (title) {
             text += "<br/>" + title;
         }
-        newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: text});
+        newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.fromNow(), title: text});
         if (isFuture) {
             newElement.addClass('future');
         }
         elem.replaceWith(newElement);
-        newElement.timeago();
         newElement.tooltip({html: true});
     } else if (elem.hasClass('micro')) {
         newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_MILLISECONDS)});
@@ -1169,19 +1152,9 @@ function createTimestampDom(unix, timeAgo) {
     const jsTime = unix * 1000;
     const m = moment(jsTime);
     if (timeAgo) {
-        const timeAgoText = jQuery.timeago(jsTime);
-        return $('<time>', {class: 'ago', datetime: m.toISOString(), text: timeAgoText, title: m.format(JS_DATE_FORMAT_DETAILED)});
+        return $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.fromNow(), title: m.format(JS_DATE_FORMAT_DETAILED)});
     } else {
         return $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
-    }
-}
-
-function convertTimestampToMoment(timestamp) {
-    let m;
-    if (/[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(timestamp)) {
-        return moment(timestamp);
-    } else {
-        return moment(Number(timestamp) * 1000);
     }
 }
 

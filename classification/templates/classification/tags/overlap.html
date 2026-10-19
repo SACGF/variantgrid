@@ -4,7 +4,7 @@
 <span style="{% if overlap.overlap_status.is_dull %}opacity:0.6{% endif %}">
     {% if overlap.overlap_type == "clinvar" %}<span class="overlap-source overlap-source-clinvar">ClinVar</span>{% endif %}
 
-    {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.name | pretty_label:"lower" }}</span>{% endfor %}
+    {% for testing_context in overlap.testing_contexts_objs %}{% if not forloop.first %}/{% endif %}<span class="testing-context-box testing-context-{{ testing_context.value }}">{{ testing_context.label }}</span>{% endfor %}
     {% if show_value_type %}{{ overlap.value_type_label }}: {% endif %}
 
     {% for value in overlap.relevant_values %}

@@ -175,7 +175,7 @@ class Command(BaseCommand):
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
 
             status = VariantAnnotationVersion.Status.NEW if new_releases else VariantAnnotationVersion.Status.ACTIVE
-            releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds(status=status)
+            releases = VariantAnnotationVersion.latest_gene_annotation_releases(status=status)
             if not releases:
                 print(f"No GeneAnnotationReleases linked to the latest {status.label} "
                       f"VariantAnnotationVersions - nothing to do")

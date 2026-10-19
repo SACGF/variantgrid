@@ -154,7 +154,7 @@ class VariantResolvingError(ValueError):
 class HGVSMatcher:
     # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
 
-    # Lenient pattern used by variant_search.py to extract the c./g. allele from an
+    # Lenient pattern used by hgvs_search.py to extract the c./g. allele from an
     # unparseable HGVS string for error reporting. The transcript is optional.
     HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT = re.compile(
         r"^((?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",

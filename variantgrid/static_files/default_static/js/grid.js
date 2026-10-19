@@ -110,10 +110,11 @@ function load_variant_details(variant_id) {
 
 const GENE_LEVEL_CONTIG_NAME = "GENE_LEVEL";  // @see snpdb/gene_level_variants.py
 
-// Expand renderer for the variant grids (@see AbstractVariantGrid.get_expand_client_renderer). The
+// Expand renderer for the variant grids (@see AbstractVariantGrid), kwargs: {annotationVersionId}. The
 // identifiers come from the server for the grid's annotation version; the actions are built here so
 // IGV follows ANALYSIS_SETTINGS.show_igv_links like the rest of the page
-function variantGridRowDetail(annotationVersionId, rowData) {
+function variantGridRowDetail(rowData, ctx) {
+    const annotationVersionId = ctx.kwargs.annotationVersionId;
     const variantId = rowData["id"];
     const detail = $('<div>', {class: 'variant-row-detail'});
     const fragment = $('<div>', {class: 'variant-row-detail-fragment', text: 'Loading...'});

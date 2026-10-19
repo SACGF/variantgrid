@@ -3,7 +3,7 @@ from datetime import date
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource
+from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
     Classification,
     ClassificationConsensus,
@@ -19,6 +19,7 @@ from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_fake_gene_version
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ClassificationConsensusPatchTestCase(TestCase):
