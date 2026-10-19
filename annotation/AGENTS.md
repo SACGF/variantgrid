@@ -29,7 +29,10 @@ Patterns here:
   base table.
 - Get "the current version" with annotation/models/models_annotation_version.py:AnnotationVersion.latest (validates, raises when none)
   or latest_or_none for degrade-gracefully paths; both filter on VAV status ACTIVE. VAVs go NEW → ACTIVE → HISTORICAL
-  via annotation/models/models_version.py:VariantAnnotationVersion.promote_to_active (demotes the prior ACTIVE one).
+  via annotation/models/models_version.py:VariantAnnotationVersion.promote_to_active (demotes the prior ACTIVE one and
+  ERRORs its unleased incomplete runs: the dispatcher only leases runs on NEW / ACTIVE versions). Runs nothing will
+  dispatch - no range lock, or a HISTORICAL version - are cleared by `clean_up_abandoned_annotation_runs`
+  (annotation/abandoned_annotation_runs.py:clean_up_abandoned_annotation_runs).
 - Saving a sub-version creates its partition tables (library/django_utils/django_partition.py:RelatedModelsPartitionModel.save)
   and bumps AnnotationVersion (annotation/models/models_version.py:SubVersionPartition.save → AnnotationVersion.new_sub_version,
   which overwrites the last one if unreferenced); batch creation goes inside SubVersionPartition.defer_new_sub_version.

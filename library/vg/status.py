@@ -18,7 +18,11 @@ from django.db import connection
 from django.db.models import Count
 from django.utils import timezone
 
-from annotation.models import AnnotationRun, VariantAnnotationVersion
+from annotation.abandoned_annotation_runs import (
+    abandoned_annotation_runs_by_reason,
+    incomplete_annotation_runs_qs,
+)
+from annotation.models import VariantAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus
 from eventlog.models import Event
 from library.django_utils.database_utils import get_table_row_estimates
@@ -135,13 +139,9 @@ def broker_queue_depths(queue_names) -> dict[str, dict]:
     return queues
 
 
-def _incomplete_runs():
-    return AnnotationRun.objects.exclude(status__in=AnnotationStatus.get_completed_states())
-
-
 def _annotation_runs() -> dict[str, int]:
     historical = VariantAnnotationVersion.Status.HISTORICAL
-    in_flight = _incomplete_runs().filter(annotation_range_lock__isnull=False).exclude(
+    in_flight = incomplete_annotation_runs_qs().filter(annotation_range_lock__isnull=False).exclude(
         annotation_range_lock__version__status=historical)
     by_status = {}
     for run_status, count in in_flight.values_list("status").annotate(n=Count("pk")).order_by("status"):
@@ -150,15 +150,10 @@ def _annotation_runs() -> dict[str, int]:
 
 
 def _annotation_runs_abandoned() -> dict[str, int]:
-    """ Incomplete runs nothing will ever pick up: no range lock (#1654), or on a HISTORICAL
-        version. They need deleting, not waiting for. """
-    incomplete = _incomplete_runs()
-    abandoned = {
-        "no range lock": incomplete.filter(annotation_range_lock__isnull=True).count(),
-        "historical version": incomplete.filter(
-            annotation_range_lock__version__status=VariantAnnotationVersion.Status.HISTORICAL).count(),
-    }
-    return {k: v for k, v in abandoned.items() if v}
+    """ Incomplete runs nothing will ever pick up: `manage.py clean_up_abandoned_annotation_runs` removes them. """
+    abandoned = abandoned_annotation_runs_by_reason(incomplete_annotation_runs_qs())
+    counts = {reason: qs.count() for reason, qs in abandoned.items()}
+    return {k: v for k, v in counts.items() if v}
 
 
 def _manual_outstanding() -> list[str]:
