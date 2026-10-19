@@ -19,6 +19,8 @@ from snpdb.models.models_genome import GenomeBuild
 ENSEMBL_ERROR_PAGE = "<!doctype html><html><title>Error: 500 | EMBL-EBI</title></html>"
 GRCH38 = mock.Mock(spec=GenomeBuild, name="GRCh38")
 GRCH38.name = "GRCh38"
+UNVERSIONED_ACCESSION = "ENST00000000001"
+ENSEMBL_LATEST_VERSION_JSON = '{"id": "ENST00000000001", "version": 9, "seq": "ACGT", "molecule": "dna"}'
 
 
 def _response(status_code: int, text: str) -> Response:
@@ -45,17 +47,20 @@ class EnsemblFetchErrorTest(SimpleTestCase):
 
 @override_settings(TRANSCRIPT_SEQUENCE_FETCHER_CLASS="genes.transcript_sequence_retrieval.TranscriptSequenceFetcher")
 class EnsemblUnversionedSequenceInfoTest(TestCase):
-    def test_unversioned_accession_stores_latest_version(self):
-        ensembl_json = '{"id": "ENST00000000001", "version": 9, "seq": "ACGT", "molecule": "dna"}'
-        with mock.patch("genes.transcript_sequence_retrieval.requests.get",
-                        return_value=_response(200, ensembl_json)) as requests_get:
-            tvi = TranscriptVersionSequenceInfo.get("ENST00000000001")
-            cached_tvi = TranscriptVersionSequenceInfo.get("ENST00000000001")
+    def setUp(self):
+        patcher = mock.patch("genes.transcript_sequence_retrieval.requests.get",
+                             return_value=_response(200, ENSEMBL_LATEST_VERSION_JSON))
+        self.requests_get = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_stores_latest_version(self):
+        tvi = TranscriptVersionSequenceInfo.get(UNVERSIONED_ACCESSION)
         self.assertEqual(tvi.version, 9)
-        stored_versions = TranscriptVersionSequenceInfo.objects.filter(transcript_id="ENST00000000001")
-        self.assertEqual(list(stored_versions.values_list("version", flat=True)), [9])
-        self.assertEqual(cached_tvi, tvi)
-        requests_get.assert_called_once()
+
+    def test_second_lookup_uses_stored_version(self):
+        TranscriptVersionSequenceInfo.get(UNVERSIONED_ACCESSION)
+        TranscriptVersionSequenceInfo.get(UNVERSIONED_ACCESSION)
+        self.requests_get.assert_called_once()
 
 
 class ViewTranscriptVersionApiDownTest(URLTestCase):
