@@ -200,14 +200,22 @@ class CohortNodeCompositeColumnsTest(GridExportTestCase):
 
     def test_counts_cell_carries_its_partners(self):
         columns = self._columns_by_name()
-        het = columns[self.node.het_count_column]
-        self.assertEqual(het.client_renderer, "VariantGridFormat.dbZygosityCounts")
-        self.assertEqual(het.client_renderer_kwargs, {"countPrefix": self.node.count_column_prefix})
-        self.assertEqual([entry["column"] for entry in het.sort_menu],
-                         [self.node.het_count_column, self.node.hom_count_column,
-                          self.node.ref_count_column])
-        for partner in [self.node.hom_count_column, self.node.ref_count_column]:
-            self.assertFalse(columns[partner].visible, partner)
+        count_columns = [self.node.het_count_column, self.node.hom_count_column, self.node.ref_count_column]
+        cell = columns[self.node.count_column_prefix + "counts"]
+        self.assertEqual(cell.client_renderer, "VariantGridFormat.dbZygosityCounts")
+        self.assertEqual(cell.client_renderer_kwargs, {"countPrefix": self.node.count_column_prefix})
+        self.assertEqual([entry["column"] for entry in cell.sort_menu], count_columns)
+        self.assertFalse(cell.include_in_csv)
+        for c in count_columns:
+            self.assertFalse(columns[c].visible, c)
+
+    def test_counts_export_under_cohort_labels(self):
+        """ A fixed header per count, not 'Cohort Counts' over the het count or the cohort's alias #2209 """
+        csv_labels = {rc.name: rc.label for rc in self.grid.export_columns()}
+        self.assertNotIn(self.node.count_column_prefix + "counts", csv_labels)
+        self.assertEqual([csv_labels[c] for c in [self.node.het_count_column, self.node.hom_count_column,
+                                                  self.node.ref_count_column]],
+                         ["Cohort Het Count", "Cohort Hom Count", "Cohort Ref Count"])
 
     def test_rows_carry_every_count_the_cell_draws(self):
         self.grid.request.GET = {"length": "1"}

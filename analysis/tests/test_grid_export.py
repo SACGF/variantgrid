@@ -10,6 +10,7 @@ import json
 import os
 import tempfile
 import zipfile
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from unittest import mock
 from urllib.parse import urlencode
@@ -701,3 +702,28 @@ class TestAnnotatedSampleExport(GridExportTestCase):
                 newer.save()  # annotation_date is auto_now, so this is now the build's latest
                 self.assertIsNone(get_annotated_download_files_cgf(self.GENERATOR, self.sample)["csv"],
                                   "offered for generating against the new version, not served from the old")
+
+
+@dataclass(frozen=True)
+class _LabelledSample:
+    name: str
+    vcf: str
+
+
+class SampleColumnLabelsTest(SimpleTestCase):
+    """ One specimen in a small variant and a CNV VCF is two samples with one name #2209 """
+
+    def test_shared_name_adds_the_vcf(self):
+        dna = _LabelledSample("specimen_1", "specimen_1.hard-filtered.vcf")
+        cnv = _LabelledSample("specimen_1", "specimen_1.cnv.vcf")
+        other = _LabelledSample("specimen_2", "specimen_2.hard-filtered.vcf")
+        self.assertEqual(VariantGrid._get_sample_labels([dna, cnv, other]),
+                         {dna: "specimen_1 (specimen_1.hard-filtered.vcf)",
+                          cnv: "specimen_1 (specimen_1.cnv.vcf)",
+                          other: "specimen_2"})
+
+    def test_formatter_labels_are_compared_not_names(self):
+        a = _LabelledSample("a", "a.vcf")
+        b = _LabelledSample("b", "b.vcf")
+        self.assertEqual(VariantGrid._get_sample_labels([a, b], lambda _sample: "proband"),
+                         {a: "proband (a.vcf)", b: "proband (b.vcf)"})
