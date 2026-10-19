@@ -464,7 +464,10 @@ const DataTableDefinition = (function() {
                                        html: '<i class="fas fa-download"></i> CSV'}).appendTo(toolbar);
                 const joiner = downloadUrl.indexOf('?') === -1 ? '?' : '&';
                 dataTable.on('draw', function() {
-                    link.attr('href', downloadUrl + joiner + $.param(dataTable.ajax.params() || {}));
+                    // The server never reads columns[i][...], and on a wide grid they push the URL past
+                    // nginx's header limit (414)
+                    const {columns, ...params} = dataTable.ajax.params() || {};
+                    link.attr('href', downloadUrl + joiner + $.param(params));
                 });
             }
         },
