@@ -92,7 +92,7 @@
             const button = $(this);
             button.prop('disabled', true).text('Applying\u2026');
             $.post(geneConsensusUrl,
-                   {copy_gene_from_vcm_id: button.data('vcmId'), csrfmiddlewaretoken: getCookie('csrftoken')},
+                   {copy_gene_from_vcm_id: button.data('vcmId'), csrfmiddlewaretoken: Cookies.get('csrftoken')},
                    function() {
                        window.location.reload();
                    }).fail(function() {
@@ -111,7 +111,7 @@
         if (typeof FilePondPluginFilePoster !== 'undefined') {
             FilePond.registerPlugin(FilePondPluginFilePoster);
         }
-        const csrftoken = getCookie('csrftoken');
+        const csrftoken = Cookies.get('csrftoken');
         const pond = FilePond.create(inputElement, {
             allowMultiple: true,
             credits: false,
