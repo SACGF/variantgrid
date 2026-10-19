@@ -228,7 +228,9 @@ class OverlapContribution(TimeStampedModel):
     @property
     def value_sort_index(self):
         if self.value_type == ClassificationResultValue.ONC_PATH:
-            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).classification_sorter_value(self.value)
+            sort_index = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).prop(self.value, "sort_order")
+            print(f"{self.value} sort index = {sort_index}")
+            return EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH).prop(self.value, "sort_order") or 0
         elif self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             return EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).classification_sorter_value(self.value)
         else:
