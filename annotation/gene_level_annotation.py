@@ -37,13 +37,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import (
     VariantAnnotation,
-    VariantAnnotationVersion,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.damage_enums import PathogenicityImpact
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants

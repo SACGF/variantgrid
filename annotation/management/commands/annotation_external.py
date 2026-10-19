@@ -18,8 +18,8 @@ from annotation.external_annotation import (
     dump_external_annotation_runs,
     import_external_annotation_runs,
 )
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from snpdb.models.models_genome import GenomeBuild
 
 

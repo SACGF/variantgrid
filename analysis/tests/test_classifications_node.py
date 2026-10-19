@@ -8,17 +8,17 @@ from analysis.models.nodes.filters.classifications_node import ClassificationsNo
 from analysis.models.nodes.node_counts import get_extra_filters_q
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_data import get_fake_annotation_version
-from classification.enums import (
-    ClinicalSignificance,
-    SomaticClinicalSignificance,
-    SpecialEKeys,
-    SubmissionSource,
-)
+from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification, ClassificationModification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import GenomeBuild, Variant
-from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters
+from snpdb.models.models_enums import (
+    AlleleOriginFilterDefault,
+    BuiltInFilters,
+    ClinicalSignificance,
+    SomaticClinicalSignificance,
+)
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 
@@ -101,9 +101,9 @@ class ClassificationsNodeFilterTest(ClassificationTestDataMixin, TestCase):
                                    tier_1=False, tier_2=False, tier_4=False)
         self.assertEqual(self._matching_classification_ids(node), {self.somatic_tier_3.pk})
 
-    def test_get_classifications_qs_ors_germline_and_somatic(self):
+    def test_published_for_user_ors_germline_and_somatic(self):
         # A record matches if either its germline or somatic clinical significance is in its list
-        qs = Classification.get_classifications_qs(
+        qs = Classification.objects.published_for_user(
             self.user,
             clinical_significance_list=[ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC],
             somatic_clinical_significance_list=SomaticClinicalSignificance.TIER_1_AND_2_VALUES)

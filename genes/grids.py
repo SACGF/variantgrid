@@ -4,16 +4,23 @@ from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
+from django.db.models import (
+    Count,
+    IntegerField,
+    OuterRef,
+    QuerySet,
+    StringAgg,
+    Subquery,
+    TextField,
+    Value,
+)
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from analysis.models import VariantTag
-from annotation.models.models import (
-    AnnotationVersion,
-    GeneAnnotationVersion,
-    InvalidAnnotationVersionError,
-)
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_gene_annotation import GeneAnnotationVersion
+from annotation.models.models_version import InvalidAnnotationVersionError, VariantAnnotationVersion
 from genes.models import (
     CanonicalTranscript,
     CanonicalTranscriptCollection,
@@ -94,7 +101,7 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
             self.rich_columns.append(RichColumn(field_name, label=str(release), orderable=True))
 
     def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
-        return GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
+        return VariantAnnotationVersion.latest_gene_annotation_releases()
 
     def _get_gene_list(self):
         """ Default is to get list, doing security check against request.user """

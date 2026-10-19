@@ -4,9 +4,10 @@ import operator
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import TYPE_CHECKING, Optional, Self, Iterable
+from typing import TYPE_CHECKING, Iterable, Optional, Self
 
 import django
+from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -29,26 +30,21 @@ from frozendict import frozendict
 from more_itertools import last
 
 from classification.enums import (
-    AlleleOriginBucket,
     ClassificationResultValue,
     ShareLevel,
     SpecialEKeys,
     TestingContextBucket,
     TestingContextFull,
 )
-from classification.models.classification import (
-    Classification,
-    ClassificationModification,
-    ConditionReference,
-    ConditionResolved,
-)
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.condition_resolved import ConditionReference, ConditionResolved
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObj
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
 from snpdb.models import Allele, Lab
-from django.contrib.auth.models import User
+from snpdb.models.models_enums import AlleleOriginBucket
 
 if TYPE_CHECKING:
     from classification.models.overlaps_model import OverlapContribution

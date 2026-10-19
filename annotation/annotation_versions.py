@@ -19,13 +19,13 @@ from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,
     AnnotationStatus,
-    Variant,
     VariantAnnotation,
     VariantAnnotationVersion,
 )
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from library.django_utils import highest_pk
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_variant import Variant
 
 
 def get_or_create_variant_annotation_version_from_current_vep(genome_build: GenomeBuild) -> tuple[VariantAnnotationVersion, bool]:

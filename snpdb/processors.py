@@ -15,7 +15,6 @@ def settings_context_processor(request):
         'discordance_enabled': settings.DISCORDANCE_ENABLED,
         'classification_distinguish_research': settings.CLASSIFICATION_DISTINGUISH_RESEARCH,
         'research_icon': settings.RESEARCH_ICON,
-        'classifications_new_grouping': settings.CLASSIFICATION_NEW_GROUPING,
         'help_url': settings.HELP_URL,
         'inbox_enabled': settings.INBOX_ENABLED,
         'pathology_tests_enabled': settings.PATHOLOGY_TESTS_ENABLED,

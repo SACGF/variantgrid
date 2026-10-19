@@ -88,7 +88,7 @@ class VCFRow(ExportVCF):
         description="Contributing Labs",
         categories={"system": VCFTargetSystem.GENERIC}
     )
-    def link(self):
+    def labs(self):
         return sorted(set([cg.lab for cg in self.entry.classification_groupings]))
 
     @export_vcf_info_cell(

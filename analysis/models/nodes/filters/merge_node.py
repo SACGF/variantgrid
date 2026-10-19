@@ -6,8 +6,9 @@ from typing import Optional
 from auditlog.registry import auditlog
 from django.db.models import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode, queryset_to_pk_in_q
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_query_mixin import queryset_to_pk_in_q
 
 
 class MergeNode(AnalysisNode):

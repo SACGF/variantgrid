@@ -5,11 +5,12 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL
 
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import (
     AncestorSampleMixin,
     get_sample_any_zygosity_arg_q_dict,
 )
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.models.nodes.node_display import NodeIcon
 from patients.models import Patient
 from snpdb.models import Sample

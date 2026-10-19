@@ -6,7 +6,7 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import SpecialEKeys
 from classification.models import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 from classification.views.classification_export_view import InvalidExportParameter
@@ -18,6 +18,7 @@ from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
 from ontology.models import OntologyTerm
 from snpdb.models import GenomeBuild, AlleleOriginFilterDefault
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class TestingContextMode(StrEnum):

@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Any, Optional, TypedDict
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
-from classification.enums import AlleleOriginBucket, EvidenceKeyValueType, ShareLevel, SpecialEKeys
+from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
 from classification.enums.clinvar_export_enums import ClinVarExportStatus
+from classification.enums.classification_enums import MultiCondition
 from classification.models.classification import Classification, ClassificationModification
-from classification.models.condition_text_matching import MultiCondition
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagType
@@ -19,6 +19,7 @@ from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
 from snpdb.models import ClinVarCitationsModes, ClinVarKey, GenomeBuild
+from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 
 """

@@ -5,8 +5,6 @@
 
 {% block head %}
 {{ block.super }}
-<link href="{% static 'css/colorPicker.css' %}" rel="stylesheet"></link>
-<script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker-1.0.0/jquery.colorPicker-1.0.0.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/html5sortable/html5sortable.min.js' %}"></script>
 <style>
 	.sort_placeholder {height: 15px; border: red 3px solid;}
@@ -33,7 +31,7 @@
 	$(document).ready(function() {
 		$("#clone-button").click(cloneTagConfigCollection);
 
-        const picker = $('.tag-colorpicker').colorPicker();
+        const picker = $('.tag-colorpicker');
 
 	{% if has_write_permission %}
         picker.change(function() {
@@ -227,7 +225,7 @@
             {% for tag_id, rgb in user_tag_colors.items %}
                 <tr class="tag-color-row" tag_id="{{ tag_id }}">
                     <td><span class='grid-tag tagged-{{ tag_id }}'><span class='user-tag-colored'> {{ tag_id }}</span></span></td>
-                    <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="text" value="{{ rgb }}"/></td>
+                    <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="color" value="{{ rgb|default:'#ffffff' }}"/></td>
                     <td><input class="tag-quick-tag" tag_id='{{ tag_id }}' type="checkbox" {% if tag_id in quick_tags %}checked{% endif %} {% if not has_write_permission %}disabled="disabled"{% endif %} /></td>
                 </tr>
             {% endfor %}

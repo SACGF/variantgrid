@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from annotation.fake_data import get_fake_vep_version, retire_seeded_annotation_version
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
-from annotation.models.models import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_enums import (
     AnnotationStatus,
     VariantAnnotationPipelineType,

@@ -11,7 +11,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from library.django_utils.django_file_utils import (
     get_import_processing_dir,
     import_processing_dir_path,

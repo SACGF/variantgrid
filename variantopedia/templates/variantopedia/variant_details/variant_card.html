@@ -1,0 +1,79 @@
+{% load classification_tags %}
+{% load gene_copy_number_tags %}
+{% load gene_fusion_tags %}
+{% load gene_splice_tags %}
+{% load ui_utils %}
+<div class="container">
+    <h3>Variant</h3>
+
+    <div id='top-links'>
+        {% if not variant.can_have_annotation %}
+        <p>There is no annotation for reference / non-standard variants. </p>
+        {% endif %}
+
+        {% if show_annotation and variant_annotation %}
+            {% if annotation_version == latest_annotation_version %}
+                Using Latest annotation version: {{ annotation_version.short_description }}
+            {% else %}
+                Using annotation version: {{ annotation_version.short_description }} <span class="text-warning">(not latest)</span>
+            {% endif %}
+            <a class="hover-link" data-toggle="collapse" href="#annotation-version-detail" role="button" aria-expanded="false">(expand)</a>
+            <div class="collapse" id="annotation-version-detail">
+                <a class="hover-link" href="{% url 'annotation_versions' %}">{{ annotation_version }}</a>
+                {% if annotation_version != latest_annotation_version %}
+                    - latest is {{ latest_annotation_version.short_description }}
+                {% endif %}
+                {% if num_variant_annotation_versions > 1 %}
+                    - <a href="{% url 'view_variant_annotation_history' variant.pk %}">Compare {{ num_variant_annotation_versions }} historical versions</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if modified_normalised_variants %}
+            <div class='alert alert-warning'>
+            <p>The following VCF variant records were <a target='_blank' href="https://samtools.github.io/bcftools/bcftools.html#norm">normalised by Bcftools</a>  during import and converted to this variant ({{ variant }}).
+            <ul>
+            {% for mnv in modified_normalised_variants %}
+                <li>{{ mnv }}
+            {% endfor %}
+            </ul>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card" id="clingen-allele">
+        <div class="card-header">Variant{% admin_link variant %}</div>
+        <div class="card-body">
+            {% if variant_annotation %}{% labelled label="Variant Annotation" admin_only=True %}{{ variant_annotation.version }} {% admin_link variant_annotation %}{% endlabelled %}{% endif %}
+            {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% hgvs hgvs_g %}{% endlabelled %}
+            {% if gene_fusion %}
+                {% labelled label="Fusion" %}{% gene_fusion gene_fusion %}{% endlabelled %}
+            {% elif gene_copy_number_event %}
+                {% labelled label="Copy number" %}{% gene_copy_number gene_copy_number_event %}{% endlabelled %}
+            {% elif splice_event_variant %}
+                {% labelled label="Splice" %}{% splice_event splice_event_variant %}{% endlabelled %}
+            {% else %}
+                {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+            {% endif %}
+            {% if variant.svlen %}
+                <!-- You can't see ref base in variant coordinate for symbolics - so explicitly show to help admins debug stuff -->
+                {% labelled label="Reference" admin_only=True %}{{ variant.locus.ref }}{% endlabelled %}
+                {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }}{% endlabelled %}
+            {% endif %}
+            {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
+            {% if variant.can_have_c_hgvs and variant_show_canonical_hgvs %}
+                {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
+            {% endif %}
+            {% labelled id="allele" label="Allele" help=annotation_description.allele %}Loading...{% endlabelled %}
+            {% labelled id="quick-links" label="Quick Links" %}Loading...{% endlabelled %}
+        </div>
+
+        {% if variant.can_have_annotation and can_create_classification %}
+            <div class="card-footer">
+                <a class="btn btn-primary" href="{% url 'create_classification_for_variant' variant.pk genome_build.pk %}">
+                    <i class="fas fa-plus-circle"></i> New Classification
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>

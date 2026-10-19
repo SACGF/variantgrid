@@ -125,11 +125,6 @@ class ResolvedPair:
     specimen: Specimen
     extractions: dict[str, Extraction]  # by sample id, so a Sample is reached by name alone
 
-    def arm_extraction(self, arm: Optional[ArmIdentifiers]) -> Optional[Extraction]:
-        if arm:
-            return self.extractions.get(arm.sample_id)
-        return None
-
 
 def parse_patient_code(pair_id: str) -> str:
     """ The patient's code out of the pair's sample name, as the lab's naming writes it (@see the

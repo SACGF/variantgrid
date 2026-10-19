@@ -11,7 +11,7 @@ from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
 from library.preview_request import PreviewKeyValue, preview_extra_signal
-from library.utils import first
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Variant, VariantZygosityCountCollection
 from variantopedia.interesting_nearby import interesting_summary
 
@@ -58,8 +58,7 @@ def allele_preview_zygosity_extra(sender, user: User, obj: Allele, **kwargs):
 
 @receiver(preview_extra_signal, sender=Variant)
 def variant_preview_zygosity_extra(sender, user: User, obj: Variant, **kwargs):
-    # choice of GenomeBuild with a single variant is
-    genome_build = first(obj.genome_builds)
+    genome_build = obj.preferred_genome_build(GenomeBuildManager.get_current_genome_build(user))
     if html := _variant_zygosity_summary_html(user, obj, genome_build):
         return [PreviewKeyValue(value=SafeString(html))]
     return None

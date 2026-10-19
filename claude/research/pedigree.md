@@ -64,7 +64,7 @@ uv venv under systemd (#1572). `variantgrid/deployment_validation/tool_version_c
 ## Why it is shaped this way
 
 - **PedFile is kept separate from Pedigree** so one uploaded family can be laid over several cohorts (the same family
-  sequenced twice, or re-called after a VCF replace - `snpdb/models/vcf_replace_data.py` repoints pedigrees and their
+  sequenced twice, or re-called after a VCF replace - `analysis/vcf_replace_data.py` repoints pedigrees and their
   mappings at the new cohort).
 - **Affection is a nullable boolean**, collapsing PED's several encodings (and Phenotips' `-9`) to affected /
   unaffected / unknown.
