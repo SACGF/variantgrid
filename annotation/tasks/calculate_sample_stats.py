@@ -9,7 +9,6 @@ import numpy as np
 from django.conf import settings
 from django.db import connection, transaction
 from django.db.models import F, Q
-from django.db.models.functions import Length
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import (
@@ -40,6 +39,7 @@ from snpdb.models import (
     Zygosity,
 )
 from snpdb.models.models import CodeVersion
+from snpdb.models.models_enums import SequenceRole
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
@@ -53,8 +53,8 @@ def calculate_vcf_stats(vcf_id, annotation_version_id):
         annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
         msg = f"Build for annotation: {annotation_version.genome_build} and VCF: {vcf.genome_build} match"
         assert annotation_version.genome_build == vcf.genome_build, msg
-        calculate_cohort_stats(vcf.cohort, annotation_version)
-        _compute_vcf_specific_stats(vcf, annotation_version)
+        vcf_stats_counts = calculate_cohort_stats(vcf.cohort, annotation_version, with_vcf_stats=True)
+        _compute_vcf_specific_stats(vcf, annotation_version, vcf_stats_counts)
     except:
         tb = get_traceback()
         create_event(None, 'calculate_vcf_stats', details=tb, severity=LogLevel.ERROR)
@@ -112,26 +112,20 @@ def cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: l
     return True
 
 
-def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion):
-    """ VCF-keyed stats — VEP-skipped count and variant-class length histograms.
+class VCFStatsCounts(NamedTuple):
+    vep_skipped_count: int
+    variant_class_lengths: dict[Optional[VariantClass], dict[int, int]]  # variant class → length → variant count
+
+
+def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion,
+                                vcf_stats_counts: Optional[VCFStatsCounts] = None):
+    """ VCF-keyed stats — VEP-skipped count and variant-class length histograms. The counts come from
+        the cohort stats pass when it ran (@see _count_cohort_stats), else from a pass of their own.
         Per-sample / cohort-aggregate stats are written by calculate_cohort_stats. """
     start = time.time()
-    qs = get_variant_queryset_for_annotation_version(annotation_version)
-    qs = qs.filter(Variant.get_no_reference_q())
-    qs = qs.exclude(Variant.get_gene_level_q())  # no coordinate, so no length
-    qs = vcf.get_variant_qs(qs)
-    vep_skipped_count = qs.filter(variantannotation__vep_skipped_reason__isnull=False) \
-        .exclude(variantannotation__vep_skipped_reason="").count()
-
-    # SNVs have no length histogram and are most of the rows, so leave them in the database
-    non_snv_qs = qs.annotate(ref_len=Length("locus__ref__seq"), alt_len=Length("alt__seq")) \
-        .exclude(ref_len=1, alt_len=1)
-    columns = ["alt__seq", "svlen", "variantannotation__hgvs_g", "ref_len", "alt_len"]
-    variant_class_lengths = defaultdict(list)
-    for alt, svlen, hgvs_g, ref_len, alt_len in non_snv_qs.values_list(*columns).iterator(chunk_size=10_000):
-        variant_class = _get_variant_class(alt, hgvs_g)
-        variant_length = abs(svlen) if svlen else max(alt_len, ref_len)
-        variant_class_lengths[variant_class].append(variant_length)
+    if vcf_stats_counts is None:
+        vcf_stats_counts = _count_vcf_stats(vcf, annotation_version)
+    vep_skipped_count, variant_class_lengths = vcf_stats_counts
 
     if vep_skipped_count:
         stats, created = VCFAnnotationStats.objects.get_or_create(
@@ -149,8 +143,9 @@ def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion)
             collection.vcflengthstats_set.all().delete()
 
         vcf_length_stats = []
-        for variant_class, lengths in variant_class_lengths.items():
-            lengths = np.array(lengths)
+        for variant_class, length_counts in variant_class_lengths.items():
+            lengths = np.array(list(length_counts.keys()))
+            counts = np.array(list(length_counts.values()))
             is_log = False
             abs_lengths = np.abs(lengths)
             max_min_ratio = abs_lengths.max() / (abs_lengths.min() + 1)
@@ -159,10 +154,12 @@ def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion)
                 is_log = True
                 lengths = np.log10(lengths)
 
-            histogram_counts, histogram_bin_edges = np.histogram(lengths, bins=50)
+            # Bin edges come from the min and max alone, so binning each distinct length once, weighted by
+            # its count, is the histogram of every variant
+            histogram_counts, histogram_bin_edges = np.histogram(lengths, bins=50, weights=counts)
             vcf_length_stats.append(VCFLengthStats(
                 collection=collection, variant_class=variant_class, is_log=is_log,
-                histogram_counts=histogram_counts.tolist(),
+                histogram_counts=histogram_counts.astype(int).tolist(),
                 histogram_bin_edges=histogram_bin_edges.tolist()))
         if vcf_length_stats:
             VCFLengthStats.objects.bulk_create(vcf_length_stats)
@@ -220,7 +217,8 @@ def new_counter():
     return [0] * _NUM_FIELDS
 
 
-def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion):
+def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion,
+                           with_vcf_stats: bool = False) -> Optional[VCFStatsCounts]:
     """ Count the cohort's rows once (@see _count_cohort_stats) and populate the four
         CohortGenotype*Stats classes for:
           - per-sample rows (sample IS NOT NULL, filter_key NULL) — every cohort member
@@ -239,8 +237,12 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
         the same CGC can't race the delete/bulk_create (issue #1576). A task that
         acquires the lock after another has just finished early-exits via
         cohort_stats_are_fresh instead of redoing the work. Unrelated cohorts
-        lock different rows and still run concurrently. """
+        lock different rows and still run concurrently.
+
+        with_vcf_stats also counts the VCF stats on the base cohort's pass and returns them - None when
+        that pass was skipped as fresh. """
     code_version = get_sample_stats_code_version()
+    vcf_stats_counts = None
     with transaction.atomic():
         cgc = CohortGenotypeCollection.objects.select_for_update().get(
             pk=cohort.cohort_genotype_collection.pk)
@@ -254,21 +256,28 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
             if cohort_stats_are_fresh(cgc, annotation_version, code_version, [filter_key], sample_ids):
                 logging.info("Cohort stats already fresh for %s on %s; skipping recompute", stats_cohort, cgc)
                 continue
-            _compute_and_persist_cohort_stats(stats_cohort, cgc, annotation_version, code_version, filter_key)
+            counts = _compute_and_persist_cohort_stats(stats_cohort, cgc, annotation_version, code_version, filter_key,
+                                                       with_vcf_stats=with_vcf_stats and not stats_cohort.is_sub_cohort)
+            if counts is not None:
+                vcf_stats_counts = counts
+    return vcf_stats_counts
 
 
 def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection,
                                       annotation_version: AnnotationVersion,
-                                      code_version: SampleStatsCodeVersion, filter_key: Optional[str]):
+                                      code_version: SampleStatsCodeVersion, filter_key: Optional[str],
+                                      with_vcf_stats: bool = False) -> Optional[VCFStatsCounts]:
     """ Count the four CohortGenotype*Stats families for the cohort and persist
         them via persist_cohort_stats. Must run inside the per-CGC locked
         transaction opened by calculate_cohort_stats, using the locked cgc. """
     has_filters = cohort_has_filters(cohort)
-    sample_counters, aggregate_counters = _count_cohort_stats(cohort, cgc, annotation_version, has_filters)
+    sample_counters, aggregate_counters, vcf_stats_counts = _count_cohort_stats(cohort, cgc, annotation_version,
+                                                                                has_filters, with_vcf_stats)
     samples = [] if cohort.is_sub_cohort else [cs.sample for cs in cohort.get_cohort_samples()]
     persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
                          sample_counters, aggregate_counters, [filter_key], samples,
                          replace_all=not cohort.is_sub_cohort)
+    return vcf_stats_counts
 
 
 class VariantFlags(NamedTuple):
@@ -407,8 +416,9 @@ def add_count(counter: list[int], flags: VariantFlags, zygosity: str, n: int,
 
 
 def get_cohort_rows_queryset(cgc: CohortGenotypeCollection, annotation_version: AnnotationVersion,
-                             with_gene: bool = False):
-    """ One row per cohort variant with the columns _BOOLEAN_FLAGS_SQL reads (and its gene, with_gene),
+                             with_gene: bool = False, with_vcf_stats: bool = False):
+    """ One row per cohort variant with the columns _BOOLEAN_FLAGS_SQL reads (and its gene, with_gene,
+        and the columns VCF_STATS_SQL reads, with_vcf_stats),
         through the annotation version's partitions and every collection the CGC reads (a sub-cohort
         reads its parent's) """
     qs = get_variant_queryset_for_annotation_version(annotation_version)
@@ -429,12 +439,19 @@ def get_cohort_rows_queryset(cgc: CohortGenotypeCollection, annotation_version: 
     }
     if with_gene:
         columns["gene"] = "variantannotation__gene_id"
+    if with_vcf_stats:
+        columns.update({
+            "contig_role": "locus__contig__role",
+            "svlen_value": "svlen",
+            "hgvs_g": "variantannotation__hgvs_g",
+            "vep_skipped_reason": "variantannotation__vep_skipped_reason",
+        })
     return qs.values(**{alias: F(path) for alias, path in columns.items()})
 
 
 def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotation_version: AnnotationVersion,
-                        has_filters: bool):
-    """ Returns (sample_counters, aggregate_counters) for persist_cohort_stats:
+                        has_filters: bool, with_vcf_stats: bool = False):
+    """ Returns (sample_counters, aggregate_counters, vcf_stats_counts) - the counters for persist_cohort_stats:
             sample_counters: (sample_pk, passing_filter) → counter array
             aggregate_counters: (filter_key, passing_filter) → counter array
 
@@ -444,6 +461,8 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
         arrays (#2283).
         A sub cohort's rows are its parent's: it has no per-sample counts (those are the parent's), and
         its aggregate only reads its own samples' characters (#2311).
+        with_vcf_stats also groups by the VCF stats columns, which adds few rows, and counts them from the
+        same temp table rather than scanning the VCF's rows again (#2331), else vcf_stats_counts is None.
         Must run inside a transaction - the temp table is ON COMMIT DROP """
     cohort_samples = list(cohort.get_cohort_samples())
     sample_counters: dict[tuple[int, bool], list[int]] = defaultdict(new_counter)
@@ -452,8 +471,11 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
     def passing_filter_buckets(flags: VariantFlags):
         return (False, True) if has_filters and flags.passing_filter else (False,)
 
-    rows_sql, rows_params = get_cohort_rows_queryset(cgc, annotation_version).query.sql_with_params()
+    rows_sql, rows_params = get_cohort_rows_queryset(cgc, annotation_version,
+                                                     with_vcf_stats=with_vcf_stats).query.sql_with_params()
     table = f"pg_temp.cohort_stats_cgc_{cgc.pk}"
+    vcf_stats_columns = f", {VCF_STATS_SQL}" if with_vcf_stats else ""
+    vcf_stats_group_by = ", 5, 6, 7" if with_vcf_stats else ""
 
     # The temp table's GROUP BY spills to disk at the default work_mem on wide cohorts, where almost every
     # zygosity string is distinct
@@ -461,8 +483,8 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
           connection.cursor() as cursor):
         cursor.execute(f"CREATE TEMPORARY TABLE {table} ON COMMIT DROP AS "
                        f"SELECT v.samples_zygosity, {SYMBOLIC_ALT_SQL} AS symbolic_alt, "
-                       f"{FLAG_BITS_SQL} AS flag_bits, count(*) AS n "
-                       f"FROM ({rows_sql}) v GROUP BY 1, 2, 3",
+                       f"{FLAG_BITS_SQL} AS flag_bits, count(*) AS n{vcf_stats_columns} "
+                       f"FROM ({rows_sql}) v GROUP BY 1, 2, 3{vcf_stats_group_by}",
                        [*BOOLEAN_FLAGS_PARAMS, *rows_params])
 
         if not cohort.is_sub_cohort:
@@ -494,8 +516,14 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
             for pf_pass in passing_filter_buckets(flags):
                 add_count(aggregate_counters[(aggregate_key, pf_pass)], flags, zygosity, n)
 
+        vcf_stats_counts = None
+        if with_vcf_stats:
+            cursor.execute(f"SELECT g.vep_skipped, g.symbolic_alt, g.hgvs_tokens, g.length, sum(g.n)::bigint "
+                           f"FROM {table} g GROUP BY 1, 2, 3, 4")
+            vcf_stats_counts = _fold_vcf_stats(cursor.fetchall())
+
         cursor.execute(f"DROP TABLE {table}")
-    return sample_counters, aggregate_counters
+    return sample_counters, aggregate_counters, vcf_stats_counts
 
 
 def _count_per_sample(cursor, table: str, cohort_samples, sample_counters, passing_filter_buckets):
@@ -720,6 +748,47 @@ def _get_variant_class(alt: str, hgvs_g: str) -> Optional[VariantClass]:
         elif "dup" in hgvs_g:
             variant_type = VariantClass.DUPLICATION
     return variant_type
+
+
+# _get_variant_class reads hgvs_g only for which of these substrings it holds
+_HGVS_CLASS_TOKENS = ("delins", "inv", "ins", "del", "dup")
+_HGVS_TOKEN_BITS_SQL = " | ".join(f"CASE WHEN strpos(v.hgvs_g, '{token}') > 0 THEN {1 << i} ELSE 0 END"
+                                  for i, token in enumerate(_HGVS_CLASS_TOKENS))
+# Gene-level variants have no coordinate and SNVs no length histogram
+_NOT_GENE_LEVEL_SQL = f"v.contig_role <> '{SequenceRole.VG_GENE_LEVEL_FAKE_CONTIG}'"
+_HAS_LENGTH_SQL = f"{_NOT_GENE_LEVEL_SQL} AND NOT ({_BOOLEAN_FLAGS_SQL['is_snp']})"
+# Columns 5-7 of the cohort stats temp table, over the with_vcf_stats columns of get_cohort_rows_queryset
+VCF_STATS_SQL = (f"{_NOT_GENE_LEVEL_SQL} AND coalesce(v.vep_skipped_reason, '') <> '' AS vep_skipped, "
+                 f"CASE WHEN {_HAS_LENGTH_SQL} THEN ({_HGVS_TOKEN_BITS_SQL}) END AS hgvs_tokens, "
+                 f"CASE WHEN {_HAS_LENGTH_SQL} THEN coalesce(nullif(abs(v.svlen_value), 0), "
+                 "greatest(length(v.ref_seq), length(v.alt_seq))) END AS length")
+
+
+def _count_vcf_stats(vcf: VCF, annotation_version: AnnotationVersion) -> VCFStatsCounts:
+    """ VCF stats counted on their own, when the cohort stats pass didn't run """
+    cgc = vcf.cohort.cohort_genotype_collection
+    rows_sql, rows_params = get_cohort_rows_queryset(cgc, annotation_version,
+                                                     with_vcf_stats=True).query.sql_with_params()
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT s.vep_skipped, s.symbolic_alt, s.hgvs_tokens, s.length, count(*) "
+                       f"FROM (SELECT {SYMBOLIC_ALT_SQL} AS symbolic_alt, {VCF_STATS_SQL} FROM ({rows_sql}) v) s "
+                       "GROUP BY 1, 2, 3, 4", rows_params)
+        return _fold_vcf_stats(cursor.fetchall())
+
+
+def _fold_vcf_stats(groups) -> VCFStatsCounts:
+    """ groups: (vep_skipped, symbolic_alt, hgvs_tokens, length, n). Postgres groups the rows by the inputs of
+        _get_variant_class and the length, so only a few thousand come back, and Python keeps the class rule,
+        reading a stand-in hgvs_g of the tokens present """
+    vep_skipped_count = 0
+    variant_class_lengths = defaultdict(lambda: defaultdict(int))
+    for vep_skipped, symbolic_alt, hgvs_tokens, length, n in groups:
+        if vep_skipped:
+            vep_skipped_count += n
+        if length is not None:
+            hgvs_g = " ".join(token for i, token in enumerate(_HGVS_CLASS_TOKENS) if hgvs_tokens & (1 << i))
+            variant_class_lengths[_get_variant_class(symbolic_alt or "", hgvs_g)][length] += n
+    return VCFStatsCounts(vep_skipped_count, variant_class_lengths)
 
 
 def enqueue_cohort_stats_recompute(cohort: Cohort, annotation_version: AnnotationVersion) -> None:
