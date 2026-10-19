@@ -3,7 +3,7 @@ and an unversioned Ensembl accession resolves to the latest version."""
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError, Response
@@ -43,14 +43,16 @@ class EnsemblFetchErrorTest(SimpleTestCase):
                 TranscriptSequenceFetcher().fetch_ensembl("ENST00000000001.1", genome_build=GRCH38)
 
 
-class EnsemblFetchUnversionedTest(SimpleTestCase):
-    def test_unversioned_accession_resolves_to_latest_version(self):
+@override_settings(TRANSCRIPT_SEQUENCE_FETCHER_CLASS="genes.transcript_sequence_retrieval.TranscriptSequenceFetcher")
+class EnsemblUnversionedSequenceInfoTest(TestCase):
+    def test_unversioned_accession_stores_latest_version(self):
         ensembl_json = '{"id": "ENST00000000001", "version": 9, "seq": "ACGT", "molecule": "dna"}'
         with mock.patch("genes.transcript_sequence_retrieval.requests.get",
                         return_value=_response(200, ensembl_json)):
-            fetched = TranscriptSequenceFetcher().fetch_ensembl("ENST00000000001", genome_build=GRCH38)
-        self.assertEqual(fetched.version, 9)
-        self.assertEqual(fetched.versions, [9])
+            tvi = TranscriptVersionSequenceInfo.get("ENST00000000001")
+        self.assertEqual(tvi.version, 9)
+        stored_versions = TranscriptVersionSequenceInfo.objects.filter(transcript_id="ENST00000000001")
+        self.assertEqual(list(stored_versions.values_list("version", flat=True)), [9])
 
 
 class ViewTranscriptVersionApiDownTest(URLTestCase):
