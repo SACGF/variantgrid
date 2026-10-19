@@ -104,6 +104,7 @@ def view_pedigree(request, pedigree_id):
     context = {'pedigree': pedigree,
                "cohort": pedigree.cohort,
                "ped_file_family": pedigree.ped_file_family,
+               "can_view_ped_file": pedigree.ped_file_family.ped_file.can_view(request.user),
                'pedigree_form': pedigree_form,
                "formset": formset,
                "has_write_permission": pedigree.can_write(request.user)}
