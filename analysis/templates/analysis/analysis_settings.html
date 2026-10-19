@@ -60,6 +60,13 @@
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-nodes-button' type='button'>Force Reload All Nodes</button>
 		    <button class="btn btn-outline-danger fas fa-redo" id='force-reload-error-nodes-button' type='button'>Force Reload Error Nodes</button>
 		    <button class="btn btn-outline-danger fas fa-lock" id='lock-analysis-button' type='button'>Lock Analysis</button>
+            {% if can_take_ownership %}
+                <form class="d-inline" method="post" action="{% url 'analysis_take_ownership' analysis.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-outline-primary fas fa-user" id='take-ownership-button' type='submit'
+                            title="The owner ({{ analysis.user }}) is deactivated - permissions inside this analysis will be checked as you">Take Ownership</button>
+                </form>
+            {% endif %}
         {% elif analysis.is_locked %}
             <div>
                 <span id="lock-details">

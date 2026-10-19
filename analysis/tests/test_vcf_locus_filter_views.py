@@ -7,6 +7,7 @@ from guardian.shortcuts import assign_perm
 from analysis.models import Analysis, TrioNode
 from analysis.models.enums import TrioInheritance
 from annotation.fake_data import get_fake_annotation_version
+from library.django_utils.unittest_utils import prevent_request_warnings
 from library.guardian_utils import DjangoPermission
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild
@@ -54,9 +55,11 @@ class TestVCFLocusFilterViews(TestCase):
                                                                  "cohort_id": self.trio.cohort.pk})
         self.assertEqual(self.client.get(cohort_url).status_code, 200)
 
-    def test_any_other_vcf_needs_the_users_own_permission(self):
+    @prevent_request_warnings
+    def test_any_other_vcf_is_checked_as_the_analysis_owner(self):
         other_vcf = self.other_trio.cohort.vcf
+        assign_perm(DjangoPermission.perm(other_vcf, DjangoPermission.READ), self.viewer, other_vcf)
         self.assertEqual(self.client.get(self._vcf_url(other_vcf)).status_code, 403)
 
-        assign_perm(DjangoPermission.perm(other_vcf, DjangoPermission.READ), self.viewer, other_vcf)
+        User.objects.filter(pk=self.analysis.user_id).update(is_active=True)
         self.assertEqual(self.client.get(self._vcf_url(other_vcf)).status_code, 200)

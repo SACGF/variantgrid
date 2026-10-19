@@ -470,18 +470,18 @@ def _render_vcf_locus_filters(request, node, vcf):
 
 def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    vcf = _get_node_or_user_vcf(request.user, node, vcf_id) if vcf_id else None
+    vcf = _get_node_or_analysis_vcf(node, vcf_id) if vcf_id else None
     return _render_vcf_locus_filters(request, node, vcf)
 
 
-def _get_node_or_user_vcf(user, node, vcf_id: int) -> VCF:
-    """ The node's own input VCF is visible to anyone who can see the analysis (#916) - checking the
-        analysis owner instead fails once they lose access or are deactivated (#2325). Any other VCF
-        (eg picked in the editor, not yet saved) needs the user's own permission """
+def _get_node_or_analysis_vcf(node, vcf_id: int) -> VCF:
+    """ The node's own input VCF comes with the node, which was permission-checked for the request user.
+        Any other VCF (eg picked in the editor, not yet saved) is checked as the analysis owner, like
+        everything else inside an analysis (#916) """
     for vcf in node.get_vcf_locus_filter_vcfs():
         if vcf.pk == vcf_id:
             return vcf
-    return VCF.get_for_user(user, vcf_id)
+    return VCF.get_for_user(node.analysis.user, vcf_id)
 
 
 def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):
