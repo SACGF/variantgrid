@@ -451,6 +451,21 @@ class TestImportPatientRecordsFailedRows(TestCase):
         self.assertEqual({"a bug of ours"}, messages)
 
 
+class TestFakePatientRecordsFile(TestCase):
+    """ test_data/fake_patient_records.csv is also the example to upload by hand, so it must stay importable """
+
+    @mock.patch("patients.import_records.reconcile_pending_extractions")
+    @mock.patch("patients.import_records.bulk_patient_phenotype_matching")
+    def test_every_row_imports(self, _phenotype_matching, _reconcile):
+        user = User.objects.create_user("fake_csv_user", password="x")
+        patient_records = _make_patient_records(user)
+        self.assertEqual(3, import_patient_records(patient_records))
+        invalid = PatientRecord.objects.filter(patient_records=patient_records, valid=False)
+        self.assertEqual([], list(invalid.values_list("validation_message", flat=True)))
+        specimen = Specimen.objects.get(reference_id="FAKESPEC001")
+        self.assertEqual(2, specimen.extraction_set.count())
+
+
 # ---------------------------------------------------------------------------
 # process_record specimen/patient mismatch must raise
 # ---------------------------------------------------------------------------
