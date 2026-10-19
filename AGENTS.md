@@ -224,6 +224,8 @@ confirm with the user before proceeding - do not include them in the commit.
 ### GitHub comments
 Preface any comment on a GitHub issue or pull request with 🤖 Written by Claude. Do NOT close GitHub issues
 unless I tell you to.
+Updating an issue or PR means its title as well as its body: rewrite the title whenever the body's
+description of the problem or the fix has changed.
 
 ### Which repo an issue goes in
 `SACGF/variantgrid_private` is the repo from before the code went public: its code and history stop in 2021 and
