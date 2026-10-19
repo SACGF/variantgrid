@@ -11,7 +11,9 @@ from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification, ClassificationModification

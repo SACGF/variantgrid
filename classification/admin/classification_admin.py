@@ -15,7 +15,7 @@ from django.forms import Widget
 from django.utils import timezone
 from django.utils.safestring import SafeString
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import (
     get_evidence_fields_for_variant,
 )

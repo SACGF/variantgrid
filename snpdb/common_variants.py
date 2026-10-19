@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import Q, QuerySet
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from classification.models import Classification
 from snpdb.models import Allele, CohortGenotypeCommonFilterVersion, CommonVariantClassified, Variant
 from snpdb.models.models_enums import ClinicalSignificance

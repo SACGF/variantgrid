@@ -13,7 +13,8 @@ import re
 from typing import Any, Optional
 
 from annotation.annotsv_columns import FULL_COLUMN_MAP
-from annotation.models.models import AnnotationRun, VariantAnnotation
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_enums import Pathogenicity
 
 # AnnotSV preserves the input VCF INFO column when run with -SVinputInfo 1.

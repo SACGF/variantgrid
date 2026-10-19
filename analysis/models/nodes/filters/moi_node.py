@@ -13,9 +13,10 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
-from annotation.models import OntologyTerm, VariantTranscriptAnnotation
+from annotation.models import VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
+from ontology.models.models_ontology import OntologyTerm
 from patients.models import Patient
 from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample

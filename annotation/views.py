@@ -13,14 +13,14 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models import (
+from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.models.models_gene_annotation import (
     DBNSFPGeneAnnotationVersion,
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasAnnotationVersion,
 )
-from annotation.models.models_enums import VariantAnnotationPipelineType
-from annotation.pipelines import vep_pipeline_types
 from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
+from annotation.pipelines import vep_pipeline_types
 from annotation.vep_annotation import (
     get_vep_command,
     get_vep_variant_annotation_version_kwargs,

@@ -19,7 +19,7 @@ from annotation.models import (
     CohortGenotypeVariantAnnotationStats,
 )
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import VCFAnnotationStats
+from annotation.models.models_annotation_run import VCFAnnotationStats
 from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.database_utils import pg_settings

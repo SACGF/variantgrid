@@ -50,7 +50,9 @@ from annotation.models.data_enums import (
     EffectiveDate,
     EffectiveDateType,
 )
-from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from classification.enums import (
     CRITERIA_NOT_MET,
     CriteriaEvaluation,

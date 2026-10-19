@@ -70,7 +70,7 @@ crawl is fresh.
 phenotype_to_genes.txt, and optionally OMIM), unique together, and it is created lazily: `OntologyVersion.latest`
 picks the newest completed import per slot, `get_or_create`s the version, and on creation calls
 `AnnotationVersion.new_sub_version` so every build's AnnotationVersion now points at it. That is the link that makes
-an ontology import a deploy event: `annotation/models/models.py:AnnotationVersion.validate` refuses a version whose
+an ontology import a deploy event: `annotation/models/models_annotation_version.py:AnnotationVersion.validate` refuses a version whose
 GeneAnnotationVersion was built for a different OntologyVersion, so `manage.py gene_annotation` must follow every
 import (the command prints the `--ontology-version` to pass). Readers pick their graph through
 `OntologyVersion.get_ontology_term_relations` (relations whose `from_import` is one of the version's five) or, for

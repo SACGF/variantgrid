@@ -10,7 +10,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import QuerySet
 from guardian.models import GroupObjectPermission
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_grouping import (
     AlleleOriginGrouping,

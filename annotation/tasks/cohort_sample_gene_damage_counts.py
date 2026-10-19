@@ -3,7 +3,7 @@ from collections import Counter, defaultdict
 
 from celery.app.task import Task
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
 from annotation.models.models_gene_counts import (
     CohortGeneCounts,
     GeneCountType,
@@ -12,6 +12,7 @@ from annotation.models.models_gene_counts import (
     GeneValueCountCollection,
     SampleAnnotationVersionVariantSource,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from eventlog.models import create_event
 from genes.models import Gene, GeneVersion

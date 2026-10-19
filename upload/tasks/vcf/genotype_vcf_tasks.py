@@ -5,7 +5,8 @@ import celery
 import cyvcf2
 
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
-from annotation.models.models import AnnotationVersion, VCFAnnotationStats
+from annotation.models.models_annotation_run import VCFAnnotationStats
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from eventlog.models import create_event
 from library.log_utils import log_traceback

@@ -12,7 +12,8 @@ from annotation.annotation_versions import get_annotation_range_lock_and_unannot
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.sv_conservation import (
     ConservationTrack,
     conservation_sidecar_filename,
