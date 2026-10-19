@@ -1,6 +1,5 @@
 import itertools
 import operator
-from collections.abc import Iterator
 from functools import reduce
 from typing import NamedTuple, Optional
 
@@ -50,10 +49,21 @@ class StructuralFilter(models.TextChoices):
 
 class _ColumnFilter(NamedTuple):
     """ A DamageNode filter over one annotation column """
+    column: str  # VariantAnnotation column the filter reads
     value_field: str
     required_field: str
     prediction: bool = True  # a per-tool pathogenicity prediction, rather than a LoF flag
     rankscore: bool = False
+
+
+_COLUMN_FILTERS = (
+    *(_ColumnFilter(t.rankscore_field, f"{t.rankscore_field}_min", f"{t.rankscore_field}_required", rankscore=True)
+      for t in TOOLS if t.rankscore_field),
+    *(_ColumnFilter(t.raw_field, t.node_threshold_field, f"{t.raw_field}_required") for t in TOOLS if t.raw_field),
+    *(_ColumnFilter(t.pred_field, t.pred_field, f"{t.pred_field}_required") for t in TOOLS if t.pred_field),
+    _ColumnFilter("nmd_escaping_variant", "nmd_escaping_variant", "nmd_escaping_variant_required", prediction=False),
+    _ColumnFilter("aloft_pred", "aloft", "aloft_required", prediction=False),
+)
 
 
 class DamageNode(AnalysisNode):
@@ -237,30 +247,20 @@ class DamageNode(AnalysisNode):
         visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
         return [t for t in TOOLS if t.pred_field in visible_columns]
 
-    def _column_filters(self) -> Iterator[_ColumnFilter]:
+    def _column_filters(self) -> list[_ColumnFilter]:
         """ The per-column filters this analysis's annotation version offers - gated off visible_columns
             (VEP_COLUMNS), so the version and build decide, as they do for the editor's sliders. """
         if self.columns_version == 1:
             # cadd_phred / revel_score are populated again from v4, where the node filters them as raw scores
-            yield _ColumnFilter("cadd_score_min", "cadd_score_required")
-            yield _ColumnFilter("revel_score_min", "revel_score_required")
-            return
-
+            return [_ColumnFilter("cadd_phred", "cadd_score_min", "cadd_score_required"),
+                    _ColumnFilter("revel_score", "revel_score_min", "revel_score_required")]
         visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
-        for tool in TOOLS:
-            if tool.rankscore_field in visible_columns:
-                yield _ColumnFilter(f"{tool.rankscore_field}_min", f"{tool.rankscore_field}_required", rankscore=True)
-            if tool.raw_field in visible_columns:
-                yield _ColumnFilter(tool.node_threshold_field, f"{tool.raw_field}_required")
-            if tool.pred_field in visible_columns:
-                yield _ColumnFilter(tool.pred_field, f"{tool.pred_field}_required")
-        if "nmd_escaping_variant" in visible_columns:
-            yield _ColumnFilter("nmd_escaping_variant", "nmd_escaping_variant_required", prediction=False)
-        if "aloft_pred" in visible_columns:
-            yield _ColumnFilter("aloft", "aloft_required", prediction=False)
+        column_filters = [cf for cf in _COLUMN_FILTERS if cf.column in visible_columns]
         # nmd_escape_status is calculated by VariantGrid, not a VEP column
         if self.columns_version >= 5:
-            yield _ColumnFilter("ptc_nmd_escaping", "ptc_nmd_escaping_required", prediction=False)
+            column_filters.append(_ColumnFilter("nmd_escape_status", "ptc_nmd_escaping",
+                                                "ptc_nmd_escaping_required", prediction=False))
+        return column_filters
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
@@ -281,7 +281,7 @@ class DamageNode(AnalysisNode):
 
     def has_rankscore_predictions(self) -> bool:
         """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
-        return any(getattr(self, f"{t.rankscore_field}_min") for t in TOOLS if t.rankscore_field)
+        return any(getattr(self, cf.value_field) for cf in _COLUMN_FILTERS if cf.rankscore)
 
     def show_rankscore_sliders(self) -> bool:
         """ v2/v3 only have rankscores so always show them. At v4 they're legacy: offered when the
