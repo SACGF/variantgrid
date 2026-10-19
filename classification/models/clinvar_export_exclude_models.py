@@ -31,9 +31,6 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
     case_insensitive = models.BooleanField(default=True, blank=True)
     mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
 
-    class Meta:
-        db_table = "snpdb_clinvarkeyexcludepattern"
-
     @cached_property
     def regex(self):
         flags = 0

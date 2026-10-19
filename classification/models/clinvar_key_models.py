@@ -34,7 +34,6 @@ class ClinVarCitationsModes(TextChoices):
 class ClinVarKey(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar key"
-        db_table = "snpdb_clinvarkey"
 
     id = models.TextField(primary_key=True)
     api_key = models.TextField(null=True, blank=True)
