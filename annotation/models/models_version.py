@@ -370,11 +370,16 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         ).exclude(pk=self.pk)
         prior_pks = list(prior_qs.values_list("pk", flat=True))
         prior_qs.update(status=VariantAnnotationVersion.Status.HISTORICAL)
+        # The dispatcher never leases runs on a HISTORICAL version, so theirs would sit incomplete forever (#1940)
+        annotation_run_model = apps.get_model("annotation", "AnnotationRun")
+        num_cancelled = annotation_run_model.cancel_incomplete_runs(
+            prior_pks, f"Cancelled: VariantAnnotationVersion went HISTORICAL when pk={self.pk} was promoted")
 
         self.status = VariantAnnotationVersion.Status.ACTIVE
         self.save(update_fields=["status"])
-        logging.info("Promoted VariantAnnotationVersion pk=%s (build=%s) to ACTIVE; demoted prior ACTIVE pks=%s to HISTORICAL",
-                     self.pk, self.genome_build, prior_pks)
+        logging.info("Promoted VariantAnnotationVersion pk=%s (build=%s) to ACTIVE; demoted prior ACTIVE pks=%s to "
+                     "HISTORICAL, cancelling %d incomplete annotation runs", self.pk, self.genome_build, prior_pks,
+                     num_cancelled)
 
     def get_any_annotation_version(self):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """

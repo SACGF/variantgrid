@@ -238,6 +238,17 @@ class AnnotationRun(TimeStampedModel):
         return qs.exclude(status=AnnotationStatus.FINISHED).count()
 
     @staticmethod
+    def cancel_incomplete_runs(variant_annotation_version_ids, reason: str) -> int:
+        """ ERROR the incomplete runs on these versions, for a version the dispatcher no longer leases
+            (HISTORICAL). A run a worker holds a live lease on is left to finish or fail on its own: the
+            worker's next save would overwrite the error with its in-memory state. """
+        qs = AnnotationRun.objects.filter(annotation_range_lock__version__in=variant_annotation_version_ids)
+        qs = qs.exclude(status__in=AnnotationStatus.get_completed_states())
+        qs = qs.exclude(lease_expires__gte=timezone.now())
+        # update() skips save(), so set the status get_status() derives from error_exception
+        return qs.update(error_exception=reason, status=AnnotationStatus.ERROR)
+
+    @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
         # For newly created variants, there will only be one per build for latest annotation version.
         # Each version routes by its own cut-off, so the pipeline is decided per run
@@ -418,6 +429,8 @@ class AnnotationRun(TimeStampedModel):
     def delete_related_objects(self):
         from annotation.annotation_version_querysets import get_queryset_for_annotation_version
 
+        if self.annotation_range_lock_id is None:
+            return  # no version to name a partition by - delete()'s cascade over the base tables covers it
         annotation_version = self.variant_annotation_version.get_any_annotation_version()
         for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
             qs = get_queryset_for_annotation_version(klass, annotation_version)
