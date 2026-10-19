@@ -141,9 +141,10 @@ without biocommons (`HGVSMatcher._fast_variant_coordinate_to_g_hgvs`). Symbolic 
 `AssemblyMapper` with reference replacement and normalisation off, so a 2 Mb deletion never reads 2 Mb of reference
 (#1571). Parsing without the database is `genes/hgvs/hgvs.py:HGVSComponents` (with `HGVSComponents.diff` for comparing
 two) and `genes/hgvs/hgvs.py:HGVSDisplay` for the view layer; the matcher is only for coordinates. A c.HGVS with a gene symbol and no transcript raises in the matcher - the search app owns that
-feature: `snpdb/signals/variant_search.py:_search_hgvs` catches the error, ranks the symbol's transcripts through
+feature: `snpdb/signals/hgvs_search.py:_search_hgvs` catches the error and hands it to
+`snpdb/signals/hgvs_search.py:_search_hgvs_without_transcript`, which ranks the symbol's transcripts through
 `HGVSMatcher.rank_gene_symbol_transcripts` (cdot, MANE first) and searches each under the `SEARCH_HGVS_GENE_SYMBOL*`
-settings (`snpdb/signals/variant_search.py:_search_hgvs_using_gene_symbol`).
+settings (`snpdb/signals/hgvs_search.py:_search_hgvs_using_gene_symbol`).
 
 ### Canonical transcripts and MANE
 
@@ -203,7 +204,7 @@ canonical match than do - the symptom of the wrong collection on a kit. Collecti
 partitions.
 
 HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt, RefSeq gene summaries and the PanelApp listings all load through
-`annotation.CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
+`snpdb/models/models_cached_web_resource.py:CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
 `genes/signals/manual_signals.py:hgnc_post_save_handler` and siblings): saving the named resource row runs the
 download on a worker and the row's description records what arrived. Pfam domains are the exception:
 `genes/interpro.py:store_domains_for_transcripts` fetches them per gene from InterPro the first time a gene page

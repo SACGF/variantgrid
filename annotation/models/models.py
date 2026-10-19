@@ -113,6 +113,7 @@ from snpdb.models import (
     Q,
     Variant,
 )
+from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_enums import AlleleOriginBucket, ImportStatus, SomaticClinicalSignificance
 
 
@@ -551,7 +552,7 @@ class ClinVarRecord(TimeStampedModel):
 
 
 class ClinVarCitationsCollection(models.Model):
-    cached_web_resource = models.ForeignKey('CachedWebResource', null=True, on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)
 
 
 class ClinVarCitation(models.Model):
@@ -3076,29 +3077,6 @@ class AnnotationVersion(models.Model):
                         f"Ontology: {self.ontology_version}"]
         sub_versions_str = ", ".join(sub_versions)
         return f"{self.short_description}. {sub_versions_str}"
-
-
-class CachedWebResource(TimeStampedModel):
-    """ These are annotations that can populate themselves via the web
-
-        * Can be manually updated via button kicking off annotation.views.load_cached_web_resource
-        * List of names each system uses is in settings
-        * Creation of one with name triggers signals which apps can configure to listen to / run populators
-    """
-    name = models.TextField(primary_key=True)
-    description = models.TextField(blank=True)
-    import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-
-    @staticmethod
-    def named_handler_factory(name, celery_task_class):
-        def handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-            created = kwargs.get("created")
-
-            if created and instance.name == name:
-                task_signature = celery_task_class.si(instance.pk)
-                task_signature.apply_async()
-
-        return handler
 
 
 class GeneSymbolCitation(models.Model):

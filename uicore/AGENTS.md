@@ -113,8 +113,9 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   are class flags; the definition JSON from snpdb/views/datatable_view.py:datatable_definition is all the client reads.
 - CSV follows the config: `server_csv_download = True` streams `csv_columns()` over `iter_export_rows()`
   (snpdb/views/datatable_view.py:DatatableConfig.export_columns) with the grid's filters and ordering; set `csv_rendered=True`
-  where the server renderer changes the value, `include_in_csv=False` on action columns. The client CSV button only
-  exports rows already fetched.
+  where the server renderer changes the value, `include_in_csv=False` on action columns; a keyless (renderer only) column needs
+  `include_in_csv=True, csv_rendered=True`, and a hidden column with a key is exported. Datetimes go out as dates, not
+  the epoch seconds the JSON carries. The client CSV button only exports rows already fetched.
 - COUNTs cost: `count_unfiltered = False` skips the unfiltered one; `known_count()` / `approximate_count_enabled`
   supply a stored or estimated total (snpdb/views/datatable_view.py:datatable_response).
 - The Variant cell's kind badge (`VariantGridFormat.variantKindBadge` in

@@ -13,7 +13,7 @@ class AnnotationConfig(AppConfig):
         from Bio import Entrez
         from django.conf import settings
 
-        from annotation.models import AnnotationRun, CachedWebResource
+        from annotation.models import AnnotationRun
 
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
@@ -41,6 +41,7 @@ class AnnotationConfig(AppConfig):
             classification_withdraw_signal,
         )
         from genes.models import GeneSymbolWiki
+        from snpdb.models.models_cached_web_resource import CachedWebResource
         from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
 

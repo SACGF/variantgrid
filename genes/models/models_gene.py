@@ -124,7 +124,7 @@ class HGNC(models.Model):
 class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     function = models.TextField(null=True, blank=True)
     pathway = models.TextField(null=True, blank=True)
     pathway_interaction_db = models.TextField(null=True, blank=True)
@@ -1554,7 +1554,7 @@ class LRGRefSeqGene(models.Model):
         These map to RefSeq, see https://www.ncbi.nlm.nih.gov/refseq/rsg/lrg/
 
         We don't link directly to TranscriptVersion as they are per-build """
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     lrg = models.TextField()
     rna = models.TextField()  # RefSeq transcript accession
     t = models.TextField(null=True)

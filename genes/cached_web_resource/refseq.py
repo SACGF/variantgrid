@@ -8,7 +8,7 @@ import requests
 from Bio import Entrez, SeqIO
 from django.db.models.functions import Upper
 
-from annotation.models import CachedWebResource, GenePubMedCount
+from annotation.models import GenePubMedCount
 from genes.models import (
     Gene,
     GeneSymbol,
@@ -22,6 +22,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
 from library.utils import iter_http_lines, sha256sum_str
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):
