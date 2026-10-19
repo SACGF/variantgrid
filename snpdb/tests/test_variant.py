@@ -323,6 +323,17 @@ class VariantAcrossGenomeBuildsTestCase(TestCase):
         self.assertEqual([variant], variant.all_build_variants, "Both builds share the one variant")
         self.assertEqual({self.grch37, self.grch38}, variant.all_genome_builds)
 
+    def test_shared_contig_genome_build_choice(self):
+        """ genome_builds is a set, so picking from it directly gives a different build in each process """
+        variant = slowly_create_test_variant("MT", 5050, 'A', 'T', self.grch38)
+        self.assertEqual([self.grch37, self.grch38], variant.ordered_genome_builds)
+        self.assertEqual(self.grch37, variant.any_genome_build)
+        self.assertEqual(self.grch38, variant.preferred_genome_build(self.grch38))
+        self.assertEqual(self.grch37, variant.preferred_genome_build(None))
+
+        variant_3 = slowly_create_test_variant("3", 5050, 'A', 'T', self.grch37)
+        self.assertEqual(self.grch37, variant_3.preferred_genome_build(self.grch38), "Not in GRCh38")
+
     def test_allele_all_genome_builds(self):
         variant_37, _ = self._linked_variants("3", 5200)
         self.assertEqual({self.grch37, self.grch38}, variant_37.allele.all_genome_builds)

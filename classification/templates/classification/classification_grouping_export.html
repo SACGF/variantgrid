@@ -31,10 +31,8 @@
                     This should help avoid double counting your records if you import this data into your system.<br/></span>
                 <label class="mt-2">Include</label><br/>
                 <div class="ml-4">
-                    {% for org in all_orgs %}
-                        {% for lab in org.sharing_labs %}
-                            <input class="form-check-input" type="checkbox" {% if lab not in user_labs %}checked{% endif %} disabled />{{ lab }}<br/>
-                        {% endfor %}
+                    {% for lab in sharing_labs %}
+                        <input class="form-check-input" type="checkbox" {% if lab not in user_labs %}checked{% endif %} disabled />{{ lab }}<br/>
                     {% endfor %}
                 </div>
             {% end_ui_register_tab_embedded %}
@@ -42,10 +40,8 @@
                 <span class="text-secondary">Use this option to review the data you've submitted or to share with 3rd parties.<br/></span>
                 <label class="mt-2">Include</label><br/>
                 <div class="ml-4">
-                    {% for org in all_orgs %}
-                        {% for lab in org.sharing_labs %}
-                            <input class="form-check-input" type="checkbox" {% if lab in user_labs %}checked{% endif %} disabled />{{ lab }}<br/>
-                        {% endfor %}
+                    {% for lab in sharing_labs %}
+                        <input class="form-check-input" type="checkbox" {% if lab in user_labs %}checked{% endif %} disabled />{{ lab }}<br/>
                     {% endfor %}
                 </div>
             {% end_ui_register_tab_embedded %}
@@ -53,10 +49,8 @@
                 <span class="text-secondary">This will export data from all labs within the system including your own.<br/></span>
                 <label class="mt-2">Include</label>
                 <div class="ml-4">
-                    {% for org in all_orgs %}
-                        {% for lab in org.sharing_labs %}
-                            <input class="form-check-input" type="checkbox" checked disabled />{{ lab }}<br/>
-                        {% endfor %}
+                    {% for lab in sharing_labs %}
+                        <input class="form-check-input" type="checkbox" checked disabled />{{ lab }}<br/>
                     {% endfor %}
                 </div>
             {% end_ui_register_tab_embedded %}
@@ -78,13 +72,11 @@
                     <a onclick="selectAll()" class="hover-link"><i class="fa-solid fa-square-check text-secondary" style="opacity:0.3"></i> Select All</a><br/>
                 </div>
                 <div class="ml-4">
-                    {% for org in all_orgs %}
-                        {% for lab in org.sharing_labs %}
-                            <label class="form-check-label">
-                            <input class="form-check-input custom-lab-selection" type="checkbox" checked id="{{ lab.group_name }}"/>{{ lab }}
-                            </label>
-                            <br/>
-                        {% endfor %}
+                    {% for lab in sharing_labs %}
+                        <label class="form-check-label">
+                        <input class="form-check-input custom-lab-selection" type="checkbox" checked id="{{ lab.group_name }}"/>{{ lab }}
+                        </label>
+                        <br/>
                     {% endfor %}
                 </div>
                 <div id="custom-lab-warning" class="mt-1" style="display: none">{{ 'W' | severity_icon }} At least one lab must be selected.</div>

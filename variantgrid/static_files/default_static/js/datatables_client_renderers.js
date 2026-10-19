@@ -153,12 +153,12 @@ $(window).on('resize', closeRowActionsMenus);
 document.addEventListener('scroll', closeRowActionsMenus, true);
 
 
-// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse
-function renderIconFlag(settings, data, type, row) {
+// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse. kwargs: {cssClass, title}
+function renderIconFlag(data, type, row, ctx) {
     if (!data) {
         return '';
     }
-    return $('<div>', {class: settings.cssClass, title: settings.title}).prop('outerHTML');
+    return $('<div>', {class: ctx.kwargs.cssClass, title: ctx.kwargs.title}).prop('outerHTML');
 }
 
 
@@ -300,18 +300,6 @@ function renderGeneSymbolNewWindow(data, type, row) {
             text: geneSymbol
         }).appendTo(dom);
     });
-    return dom.prop('outerHTML');
-}
-
-
-// Cohort page sample pickers - the checkbox is what add/remove to cohort reads
-function renderCohortSampleCheckbox(data, type, row) {
-    if (!data || !data.text) {
-        return '<span class="no-value">-</span>';
-    }
-    const dom = $('<span>');
-    $('<input>', {type: 'checkbox', class: 'sample-checkbox', sample_id: data.text}).appendTo(dom);
-    $('<a>', {href: data.url, class: 'hover-link ml-1', text: data.text}).appendTo(dom);
     return dom.prop('outerHTML');
 }
 

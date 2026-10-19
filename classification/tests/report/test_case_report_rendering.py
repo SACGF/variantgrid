@@ -5,7 +5,6 @@ import zipfile
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from classification.enums.classification_enums import SomaticClinicalSignificance
 from classification.models import ClassificationReportTemplate
 from classification.models.classification_report_models import case_report_json_signal
 from classification.report.case_report_context import (
@@ -24,6 +23,7 @@ from classification.report.renderers import (
     render_docx,
 )
 from classification.tests.report.fake_report_variants import fake_report_variant
+from snpdb.models.models_enums import SomaticClinicalSignificance
 
 TIER_1 = SomaticClinicalSignificance.TIER_1
 

@@ -46,8 +46,8 @@ by `data` keys via `old_data` / `close_other_data`), `FlagCollection.ensure_reso
 latest flag to a resolution, creating it only if that resolution is open - used by classification import, significance
 change and ClinVar exclusion) and `close_open_flags_of_type` (bot-closes every open flag of a type, optionally matching
 `data`). `FlagCollection.filter_for_flags` (and its deprecated alias `filter_for_open_flags`, still the one callers use)
-turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard and
-`snpdb/models/models_user_settings.py:UserSettings.classification_issue_count` are built from it.
+turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard is
+built from it.
 
 ### Permissions
 

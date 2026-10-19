@@ -84,29 +84,6 @@ class CohortGenotypeStats(TimeStampedModel):
     def total_count(self):
         return self.variant_count
 
-    @staticmethod
-    def percent(a, b):
-        percent = float('NaN')
-        if b:
-            percent = 100.0 * a / b
-        return percent
-
-    @property
-    def variant_percent(self):
-        return self.percent(self.variant_count, self.total_count)
-
-    @property
-    def snp_percent(self):
-        return self.percent(self.snp_count, self.total_count)
-
-    @property
-    def insertions_percent(self):
-        return self.percent(self.insertions_count, self.total_count)
-
-    @property
-    def deletions_percent(self):
-        return self.percent(self.deletions_count, self.total_count)
-
     def count_for_zygosity(self, zygosity_ref, zygosity_het, zygosity_hom, zygosity_unk, label=None):
         count = 0
         if zygosity_ref:

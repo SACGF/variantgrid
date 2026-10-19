@@ -88,6 +88,11 @@ Gotchas:
   as gnomAD-SV mixes '4.6e-05' and '0.006085' notation and string order puts the rarest record last.
 - Reading a data-file VCF back to rewrite a column: cyvcf2 parses Float INFO through float32 ('4.6e-05' comes back as
   4.600000102072954e-05), so take the value off the raw INFO text (str(record)) to store what VEP's own pass-through would.
+- Cohort stats are counted in SQL (annotation/tasks/calculate_sample_stats.py:_count_cohort_stats, #2283): rows are
+  grouped by (samples_zygosity, flag bits) into an ON COMMIT DROP temp table, so it only works inside
+  calculate_cohort_stats' locked transaction. Python folds the grouped rows onto the counter fields and keeps the trio
+  predicates (_trio_predicates, mirroring analysis/models/nodes/sources/trio_node.py) and the compound het pairing.
+  A new per-row input is a bit in _BOOLEAN_FLAGS_SQL; a new counting rule goes in _flag_field_indexes / _add_count.
 - settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED gates whether gene_annotation_version joins the partition SQL
   (annotation/models/models.py:AnnotationVersion.sub_annotations_inheritance_partitioning); validate() still checks it.
 - transcripts_annotation_selections.py:VariantTranscriptSelections converts the coordinate to explicit once before

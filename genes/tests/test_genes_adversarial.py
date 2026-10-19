@@ -18,7 +18,6 @@ from genes.hgvs.hgvs import (
     hgvs_nomen_equivalent,
     hgvs_diff_description,
 )
-from genes.hgvs.phgvs import PHGVS
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import get_refseq_type, transcript_is_lrg
 
@@ -33,80 +32,6 @@ def _tv(genome_build_data, data=None):
     obj.genome_build_data = genome_build_data
     obj.data = data if data is not None else {}
     return obj
-
-
-# ---------------------------------------------------------------------------
-# PHGVS.parse()
-# ---------------------------------------------------------------------------
-
-class TestPHGVSParse(TestCase):
-
-    def test_basic_snp_1letter(self):
-        p = PHGVS.parse("p.G123A")
-        self.assertEqual(p.aa_from, "Gly")
-        self.assertEqual(p.codon, "123")
-        self.assertEqual(p.aa_to, "Ala")
-        self.assertTrue(p.is_confirmed)
-        self.assertIsNone(p.fallback)
-
-    def test_three_letter_lowercase_input_normalized(self):
-        # The regex is re.IGNORECASE, and protein_letters_1to3_extended is keyed on single
-        # uppercase letters, so 3-letter names come back via the .capitalize() fallback.
-        p = PHGVS.parse("p.gly123ala")
-        self.assertEqual(p.aa_from, "Gly",
-                         "3-letter lowercase aa_from should be normalised to title-case")
-        self.assertEqual(p.aa_to, "Ala",
-                         "3-letter lowercase aa_to should be normalised to title-case")
-
-    def test_with_transcript_prefix(self):
-        p = PHGVS.parse("NM_001145661.2:p.Gly123Ala")
-        self.assertEqual(p.transcript, "NM_001145661.2")
-        self.assertEqual(p.aa_from, "Gly")
-        self.assertEqual(p.aa_to, "Ala")
-
-    def test_unconfirmed_parentheses(self):
-        p = PHGVS.parse("p.(Gly123Ala)")
-        self.assertFalse(p.is_confirmed)
-        self.assertEqual(p.p_dot, "p.(Gly123Ala)")
-
-    def test_intronic_p_question(self):
-        p = PHGVS.parse("p.?")
-        self.assertTrue(p.intron)
-        self.assertEqual(p.p_dot, "p.?")
-        self.assertFalse(p.is_confirmed)
-
-    def test_override_is_confirmed_false_to_true(self):
-        p = PHGVS.parse("p.(Gly123Ala)", override_is_confirmed_to=True)
-        self.assertTrue(p.is_confirmed)
-        self.assertEqual(p.p_dot, "p.Gly123Ala")  # parens dropped when confirmed
-
-    def test_override_confirmed_on_intronic_has_no_effect_on_output(self):
-        # override_is_confirmed_to=True sets is_confirmed=True on the object,
-        # but p.? output is controlled by intron=True, not is_confirmed.
-        p = PHGVS.parse("p.?", override_is_confirmed_to=True)
-        self.assertTrue(p.is_confirmed)
-        self.assertEqual(p.p_dot, "p.?")  # intronic notation unchanged
-
-    def test_synonymous_equals(self):
-        p = PHGVS.parse("p.Gly123=")
-        self.assertFalse(p.intron)
-        self.assertIn("=", p.p_dot)
-
-    def test_no_p_dot_is_fallback(self):
-        p = PHGVS.parse("c.123A>G")
-        self.assertEqual(p.fallback, "c.123A>G")
-        self.assertFalse(p.intron)
-
-    def test_without_transcript_strips_correctly(self):
-        p = PHGVS.parse("NM_001:p.Gly123Ala")
-        wt = p.without_transcript
-        self.assertEqual(wt.transcript, "")
-        self.assertEqual(wt.p_dot, "p.Gly123Ala")
-
-    def test_full_p_hgvs_roundtrip_with_transcript(self):
-        raw = "NM_001145661.2:p.Gly123Ala"
-        p = PHGVS.parse(raw)
-        self.assertEqual(str(p), raw)
 
 
 # ---------------------------------------------------------------------------

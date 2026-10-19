@@ -146,7 +146,6 @@ grouping's first record and otherwise waits for `classification/signals/classifi
 which does nothing while an import run is ongoing and lets `classification_imports_complete` do one sweep instead.
 `classification/models/classification_grouping.py:ClassificationGroupingSearchTerm` rows (gene symbol, condition terms,
 SCV) are fed by `classification_grouping_search_term_signal` so the grid's search never touches evidence JSON.
-`settings.CLASSIFICATION_NEW_GROUPING` (on for Shariant) switches the listing pages to these groupings.
 
 ### Discordance
 
@@ -252,7 +251,7 @@ classification is what makes "you can see what was published, not what is being 
 of every view. The cost is that `Classification.evidence` is a denormalised copy that must be kept in step, which is why
 the app insists on `patch_value`.
 
-**Buckets come from key metadata, not the enum.** `classification/enums/classification_enums.py:ClinicalSignificance`
+**Buckets come from key metadata, not the enum.** `snpdb/models/models_enums.py:ClinicalSignificance`
 only knows B/LB/VUS/LP/P, but deployments add VUS-A/B/C, oncogenic tiers, risk alleles and "other" as options on the
 `clinical_significance` key, and which of those count as the same bucket is a policy each deployment sets in the option's
 `bucket` attribute. Reading the bucket from `EvidenceKeyMap` means a new option is a data change, not code, and the

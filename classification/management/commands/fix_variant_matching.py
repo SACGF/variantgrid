@@ -6,7 +6,6 @@ from django.conf import settings
 from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
-from annotation.models import CachedWebResource
 from classification.management.commands.fix_migrate_flags_to_imported_allele_info import (
     FlagDatabase,
 )
@@ -16,6 +15,7 @@ from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from library.guardian_utils import admin_bot
 from library.utils import md5sum_str
 from snpdb.models import GenomeBuild
+from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_enums import ImportStatus
 
 

@@ -4,7 +4,7 @@ from django.db.models.query_utils import Q
 from django.dispatch import receiver
 from django.utils import timezone as django_timezone
 
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import (
     Classification,
     ImportedAlleleInfo,

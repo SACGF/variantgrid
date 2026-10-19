@@ -44,7 +44,6 @@ from classification.classification_stats import (
     get_grouped_classification_counts,
 )
 from classification.enums import (
-    AlleleOriginBucket,
     LabExternalFilter,
     OverlapStatus,
     OverlapType,
@@ -116,6 +115,7 @@ from snpdb.forms import (
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
 from sync.classification_sync_status import classification_sync_status
@@ -487,7 +487,8 @@ def view_classification(request: HttpRequest, classification_id: str):
         'withdraw_reasons': withdraw_reasons,
         'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
         # Card body is loaded lazily - the gene candidates are a query the page shouldn't wait on
-        'gene_consensus_enabled': vc.can_write(request.user) and bool(classification_gene_symbol(vc)),
+        'gene_consensus_enabled': settings.CLASSIFICATION_GENE_CONSENSUS and vc.can_write(request.user)
+                                  and bool(classification_gene_symbol(vc)),
         'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
@@ -839,7 +840,7 @@ class CreateClassificationForVariantView(TemplateView):
                 classification_ids = ",".join(str(cm.classification_id) for cm in allele_records)
                 compare_url = f"{reverse('classification_diff')}?cids={classification_ids}&copied_only=1"
             gene_groups = []
-            if gene_symbol:
+            if gene_symbol and settings.CLASSIFICATION_GENE_CONSENSUS:
                 gene_groups = ClassificationConsensus.gene_consensus_groups(
                     gene_symbol=gene_symbol, user=self.request.user, allele_origin_bucket=bucket,
                     exclude_modifications=allele_records)

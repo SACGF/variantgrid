@@ -83,7 +83,9 @@ Liftover is per Allele, not per Variant: the goal is a Variant in every annotate
 cursor is held open for the hours a big run takes and alleles lifted over by earlier batches drop out), holds one batch
 of `settings.LIFTOVER_BATCH_SIZE` in memory and writes one VCF per (batch, tool, destination build). The celery entry
 `snpdb/tasks/liftover_tasks.py:liftover_alleles` fans out `snpdb/tasks/liftover_tasks.py:liftover_allele_batch` per pk
-range, and each batch re-queries `Allele.missing_variants_for_build` so a failure only loses its own batch.
+range, and each batch re-queries `Allele.missing_variants_for_build` so a failure only loses its own batch. The Allele
+admin action queues `snpdb/tasks/liftover_tasks.py:liftover_selected_allele_batch` per `LIFTOVER_BATCH_SIZE` of the
+selected ids instead (ids, as a selection isn't a pk range); each links ClinGen alleles and retries every tool.
 
 `snpdb/liftover.py:_get_build_liftover_dicts` chooses the method per allele, stopping at the first that works:
 `snpdb/liftover.py:_liftover_using_existing_contig` when the contig is shared between builds (MT), which just creates the
@@ -208,8 +210,8 @@ admits only Variant searches) and `SearchReceiver.search` returns a `SearchRespo
 `settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
 `SearchInput.get_visible_variants` restricts to a build's contigs and, on Shariant, to classified variants.
 `SearchResultMatchStrength` decides whether the UI jumps straight to a single result. The variant receivers live in
-`snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, HGVS via `snpdb/signals/variant_search.py:_search_hgvs`, ids,
-fusions as lookup only); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
+`snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, ids, fusions as lookup only) and
+`snpdb/signals/hgvs_search.py` (HGVS, via `snpdb/signals/hgvs_search.py:_search_hgvs`); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
 searches from `snpdb/signals/`.
 
 ## Why it is shaped this way

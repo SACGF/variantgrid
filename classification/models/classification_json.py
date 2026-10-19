@@ -5,10 +5,11 @@ from django.conf import settings
 from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
+    ClassificationGroupingEntry,
     ClassificationJsonParams,
     ClassificationModification,
     EvidenceKeyMap,
-    ImportedAlleleInfo, ClassificationGroupingEntry,
+    ImportedAlleleInfo,
 )
 from classification.models.classification_evidence_normalise import validate_evidence
 from classification.models.classification_json_definitions import (

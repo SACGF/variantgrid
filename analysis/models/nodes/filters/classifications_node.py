@@ -8,10 +8,13 @@ from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
 from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
-from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginFilterDefault
+from snpdb.models.models_enums import (
+    AlleleOriginFilterDefault,
+    ClinicalSignificance,
+    SomaticClinicalSignificance,
+)
 
 
 class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):

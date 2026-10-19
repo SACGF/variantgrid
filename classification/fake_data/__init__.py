@@ -7,7 +7,8 @@ import random
 
 from django.contrib.auth.models import User
 
-from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel
 from classification.fake_data import reclassifications  # registers the "reclassifications" step
 from classification.fake_data.shared import create_fake_allele_infos, delete_fake_classifications
 from classification.models.classification import Classification

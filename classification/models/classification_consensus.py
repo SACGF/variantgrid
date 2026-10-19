@@ -13,11 +13,12 @@ from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from classification.enums import AlleleOriginBucket, CopyScope, SubmissionSource
+from classification.enums import CopyScope, SubmissionSource
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.models.evidence_key import EvidenceKeyMap, VCPatch
 from library.utils import nest_dict
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.user_settings_manager import UserSettingsManager
 
 if TYPE_CHECKING:
