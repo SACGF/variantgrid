@@ -20,3 +20,4 @@ from classification.signals.classification_hooks_overlaps import *
 from classification.signals.clinvar_record_to_contribution import *
 from classification.signals.overlap_review_formatting import *
 from classification.signals.classification_hooks_citations import *
+from classification.signals.classification_flag_extra_info import *  # so we load the receivers

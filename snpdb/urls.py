@@ -8,7 +8,6 @@ from library.preview_request import preview_view
 from snpdb.grids import (
     AlleleLiftoverFailureColumns,
     CohortListColumns,
-    CohortSampleListColumns,
     CustomColumnsCollectionColumns,
     DuosListColumns,
     GenomicIntervalsListColumns,
@@ -155,7 +154,6 @@ urlpatterns = [
 
     # Grids
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
-    path('cohort_sample/datatable/<int:cohort_id>/', DatabaseTableView.as_view(column_class=CohortSampleListColumns), name='cohort_sample_datatable'),
     path('sample/list/datatable/', DatabaseTableView.as_view(column_class=SamplesListColumns),
          name='samples_list_datatable'),
     path('sample/skipped_annotation/datatable/<int:sample_id>/',

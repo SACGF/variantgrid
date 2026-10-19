@@ -104,12 +104,6 @@
             function relatedVariantTagsDatatableFilter(data) {
                 data["analysis_ids"] = JSON.stringify(relatedAnalysisIds);
             }
-
-            function downloadRelatedVariantTagsCSV(url) {
-                const params = {};
-                relatedVariantTagsDatatableFilter(params);
-                window.location = url + "?" + EncodeQueryData(params);
-            }
         </script>
         <h3>Variants tagged in analyses</h3>
         {% load datatable_tags %}
@@ -119,10 +113,6 @@
                 <table id="{{ table_id }}" class="sticky-header"
                        data-datatable-url="{% url 'variant_tags_datatable' genome_build_name|slugify %}"
                        data-datatable-data="relatedVariantTagsDatatableFilter"></table>
-                <div data-toolbar="#{{ table_id }}">
-                    <a class="btn btn-outline-secondary fas fa-download"
-                       href="javascript:downloadRelatedVariantTagsCSV('{% url 'variant_tags_export' genome_build_name|slugify %}')">CSV</a>
-                </div>
             {% endwith %}
         {%  endfor %}
     {% endif %}

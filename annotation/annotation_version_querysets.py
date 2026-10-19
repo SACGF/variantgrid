@@ -19,7 +19,8 @@ from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
-from annotation.models.models import AnnotationVersion, VariantAnnotation
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_enums import VariantAnnotationPipelineType
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook

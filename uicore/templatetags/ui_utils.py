@@ -470,20 +470,6 @@ def severity_bs(severity: LogLevel) -> str:
 
 
 @register.filter()
-def danger_badge(count: Optional[int]) -> str:
-    """
-    If count is None, does nothing
-    If count is 0, shows a success badge with 0 in it
-    If count is anything else, shown in a danger badge
-    """
-    if count is None:
-        return ""
-    if count == 0:
-        return SafeString(' <span class="d-inline-block ml-1 badge badge-success">0</span>')
-    return SafeString(f' <span class="d-inline-block ml-1 badge badge-danger">{count}</span>')
-
-
-@register.filter()
 def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
     """ count is usually a number, but can be a short label such as "hidden: 1" """
     if count is None:
@@ -495,15 +481,6 @@ def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
     if count == 0:
         render_status = "info"
     return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
-
-
-@register.filter()
-def success_badge(count: Optional[int]) -> str:
-    if count is None:
-        return ""
-    if count == 0:
-        return SafeString(' <span class="d-inline-block ml-1 badge badge-secondary">0</span>')
-    return SafeString(f' <span class="d-inline-block ml-1 badge badge-success">{count}</span>')
 
 
 @register.filter()

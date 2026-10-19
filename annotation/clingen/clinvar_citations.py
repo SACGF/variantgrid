@@ -7,8 +7,8 @@ import pandas as pd
 import requests
 
 from annotation.models import Citation
-from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection
 from annotation.models.models_citations import CitationIdNormalized
+from annotation.models.models_clinvar import ClinVarCitation, ClinVarCitationsCollection
 
 ALLELE_ID = '#AlleleID'
 VARIATION_ID = 'VariationID'

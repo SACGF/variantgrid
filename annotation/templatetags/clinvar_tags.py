@@ -2,7 +2,6 @@ from typing import Optional, Union
 
 import pydantic
 from django.template import Library
-from more_itertools import first
 from pydantic import ConfigDict
 
 from annotation.models import AnnotationVersion, ClinVar, VariantAnnotation
@@ -70,7 +69,7 @@ class ClinVarDetails(pydantic.BaseModel):
             variant = allele.variant_for_build_optional(genome_build)
             if not variant:
                 if variant := allele.variants.first():
-                    genome_build = first(variant.genome_builds)
+                    genome_build = variant.any_genome_build
                 is_desired_build = False
 
         if not annotation_version:

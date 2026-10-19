@@ -13,12 +13,14 @@ the two commands are in the generated maps ([urls](../maps/urls.md#variantopedia
 
 ### Variant page
 
-`variantopedia/views.py:view_variant` picks a build (URL, else the user's default build if the variant is in it, else
-`Variant.any_genome_build` - contigs such as MT sit in several builds), sets it on
+`variantopedia/views.py:view_variant` picks a build (URL, else `snpdb/models/models_variant.py:Variant.preferred_genome_build`:
+the user's default build if the variant is in it, else the first by name - contigs such as MT sit in several builds), sets it on
 `snpdb/genome_build_manager.py:GenomeBuildManager`, and hands off to
 `variantopedia/views.py:variant_details_annotation_version` with the build's latest AnnotationVersion. That view is also
 reachable directly with an explicit annotation version id, with the bare `variant_details.html` template - analysis
-grids load it that way from `grid.js`. It builds
+grids load it that way from `grid.js`. That template is the layout and the inline JS, which fills panels in by element
+`id`; each card is an include under `variantopedia/templates/variantopedia/variant_details/` (`annotation_*.html` for
+the VEP panels, whose `{% if %}` guards stay in the layout). The view builds
 `annotation/transcripts_annotation_selections.py:VariantTranscriptSelections` for the transcript picker, the canonical
 transcripts per enrichment kit (`variantopedia/views.py:get_genes_canonical_transcripts`), the VariantAllele/ClinGen data
 (left out when `needs_clingen_call()` so the page fetches it asynchronously), tag presence across the allele's builds,
@@ -70,8 +72,9 @@ coordinate is picked with a `FilteredRelation` on the allele's VariantAllele, co
 (`_annotation_version_queryset`). Resolved taggings (a classify-queue tag whose classification exists) are hidden unless
 the tag config says show them or the page flips `show_resolved` for one view
 (`variantopedia/grids.py:show_resolved_variant_tags`, #1901). Without `show_group_data` a user sees only their own
-taggings; an explicit user filter overrides that but stays permission checked. The CSV export
-(`variantopedia/views.py:variant_tags_export`) streams straight off the grid's queryset rather than paging it.
+taggings; an explicit user filter overrides that but stays permission checked. The CSV is the grid's own
+server CSV (`server_csv_download`), streamed off the filtered queryset rather than paged; Analysis ID, Variant ID and Tag
+ID are hidden columns that exist for it.
 
 `variantopedia/views_tag_stats.py` (#1751) is a skeleton page whose cards each fetch a JSON endpoint cached in Redis per
 user and parameters for a day (`_cached_json`). It counts on allele, so there is no build switch; tags with no allele yet
@@ -120,7 +123,7 @@ page goes further and drops builds entirely, because counting per build double-c
 ## Traps
 
 Viewing a page writes: `view_allele` calls `snpdb/clingen_allele.py:link_allele_to_existing_variants` (may create
-VariantAlleles) and both pages call `annotation/models/models.py:ClinVarRecordCollection.set_allele_for_variants`, which
+VariantAlleles) and both pages call `annotation/models/models_clinvar.py:ClinVarRecordCollection.set_allele_for_variants`, which
 backfills `allele` on ClinVar record collections so the ClinVar AJAX finds them. A read-only replica would break these
 pages.
 

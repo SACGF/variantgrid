@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 from django_extensions.db.models import TimeStampedModel
 
 from annotation.models.data_enums import EffectiveDate
-from annotation.models.models import ClinVarRecord
+from annotation.models.models_clinvar import ClinVarRecord
 from classification.enums import (
     OverlapOverrideStatus,
     OverlapSnapshot,
@@ -32,13 +32,13 @@ from classification.enums.overlaps_enums import (
     TriageComment,
     TriageDecision,
 )
-from classification.models.classification import ConditionResolved
+from classification.models.condition_resolved import ConditionResolved
 from classification.models.classification_grouping import ClassificationGrouping
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices
 from library.django_utils.model_utils import AuditSingleChange, AuditUtils
-from library.preview_request import PreviewKeyValue, PreviewModelMixin, PreviewData
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import first
 from ontology.models import OntologyTerm
 from review.models import Review, ReviewableModelMixin
@@ -600,6 +600,8 @@ class OverlapDiscordanceNotification(TimeStampedModel):
     overlap = models.ForeignKey('Overlap', on_delete=CASCADE)
     old_state = models.JSONField(default=OverlapSnapshot.default_json)
     new_state = models.JSONField(default=OverlapSnapshot.default_json)
+    # Set on a retry of a lab message whose send failed: only this lab is sent it again, and admins aren't
+    lab = models.ForeignKey(Lab, null=True, blank=True, on_delete=CASCADE)
 
     notification_sent_date = models.DateTimeField(null=True, blank=True)
 

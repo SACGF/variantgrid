@@ -13,13 +13,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classification.enums import (
-    AlleleOriginBucket,
+    ClassificationResultValue,
     EvidenceCategory,
     LabExternalFilter,
     ShareLevel,
-    TriageDecision, TriageStatus, TestingContextBucket, ClassificationResultValue,
+    TestingContextBucket,
+    TriageDecision,
+    TriageStatus,
 )
 from classification.models import (
+    IN_REVIEW_VALUE,
     Classification,
     ClassificationGrouping,
     ClassificationGroupingEntry,
@@ -28,7 +31,8 @@ from classification.models import (
     ClassificationModification,
     DiscordanceReport,
     EvidenceKeyMap,
-    ImportedAlleleInfo, OverlapContribution, IN_REVIEW_VALUE,
+    ImportedAlleleInfo,
+    OverlapContribution,
 )
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
@@ -37,6 +41,7 @@ from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -431,8 +436,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classificationGroupingDetailUrl',
-                                                                       expected_height=108)
+        self.set_expand_ajax('classificationGroupingDetailUrl', expected_height=108)
         self.rich_columns = [
             RichColumn(
                 key='lab',

@@ -220,16 +220,22 @@ class TaggedVariantGridTest(TestCase):
         self.assertNotIn(stray.pk, set(for_build.values_list("pk", flat=True)))
 
     def test_variant_tags_export(self):
-        """ CSV comes off the queryset - the DataTable itself only ever pages 100 rows at a time """
+        """ The CSV streams off the grid's queryset - the DataTable itself only ever pages 100 rows at a time """
         self.client.force_login(self.user)
-        url = reverse('variant_tags_export', kwargs={"genome_build_name": self.genome_build.name})
-        response = self.client.get(url, {"tag": self.reportable.pk})
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": self.reportable.pk, "dataTableCsv": 1})
         self.assertEqual(response.status_code, 200)
 
         lines = b"".join(response.streaming_content).decode().strip().splitlines()
-        self.assertEqual(len(lines), 2, lines)
-        self.assertTrue(lines[1].startswith(f"{self.genome_build.name},"), lines[1])
-        self.assertIn(self.reportable.pk, lines[1])
+        self.assertEqual(lines[0], "Variant,Genome Build,Gene,Tag,Analysis ID,Analysis,Sample,Patient,"
+                                   "Username,Created,Variant ID,Tag ID")
+        rows = list(csv.DictReader(lines))
+        self.assertEqual(len(rows), 1, lines)
+        tag = VariantTag.objects.get(pk=rows[0]["Tag ID"])
+        self.assertEqual(tag.tag, self.reportable)
+        self.assertEqual(rows[0]["Genome Build"], self.genome_build.name)
+        self.assertEqual(rows[0]["Variant ID"], str(tag.variant_id))
+        self.assertEqual(rows[0]["Created"], str(tag.created))
 
     def _variant_tag_counts_tags(self) -> list[str]:
         url = reverse('variant_tag_counts_datatable', kwargs={"variant_id": self.both_variant.pk})
@@ -556,8 +562,8 @@ class VariantTagCaseColumnsTest(TestCase):
 
     def test_export_names_the_sample_and_patient(self):
         self.client.force_login(self.user)
-        url = reverse('variant_tags_export', kwargs={"genome_build_name": self.genome_build.name})
-        response = self.client.get(url, {"tag": self.tag.pk})
+        url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
+        response = self.client.get(url, {"tag": self.tag.pk, "dataTableCsv": 1})
         self.assertEqual(response.status_code, 200)
 
         lines = b"".join(response.streaming_content).decode().strip().splitlines()

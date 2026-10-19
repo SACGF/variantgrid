@@ -46,8 +46,8 @@ by `data` keys via `old_data` / `close_other_data`), `FlagCollection.ensure_reso
 latest flag to a resolution, creating it only if that resolution is open - used by classification import, significance
 change and ClinVar exclusion) and `close_open_flags_of_type` (bot-closes every open flag of a type, optionally matching
 `data`). `FlagCollection.filter_for_flags` (and its deprecated alias `filter_for_open_flags`, still the one callers use)
-turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard and
-`snpdb/models/models_user_settings.py:UserSettings.classification_issue_count` are built from it.
+turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard is
+built from it.
 
 ### Permissions
 
@@ -67,7 +67,7 @@ returns one collection's full comment history and `?since=<ts>` the comments sin
 `flags/views/views.py:FlagView` returns or acts on one flag. Serialisation is `flags/views/views.py:FlagHelper`, which
 calls `flags/models/models.py:fetch_flag_infos`: it sends `flag_collection_extra_info_signal` with a
 `flags/models/models.py:FlagInfos`, and the owning apps' receivers
-(`classification/models/classification.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
+(`classification/signals/classification_flag_extra_info.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
 label, links and the `source_object` for each collection. ClinicalContext has no receiver, so its collections fall back
 to the `*_set` probe and a generic label.
 

@@ -35,7 +35,8 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (
@@ -994,13 +995,13 @@ class ImportedAlleleInfo(TimeStampedModel):
         if preferred := self[genome_build]:
             return HGVSDisplay(dna_hgvs=preferred.resolved_hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
         else:
-            for genome_build in GenomeBuild.builds_with_annotation_cached():
-                if alternative := self[genome_build]:
+            for annotated_build in GenomeBuild.builds_with_annotation_cached():
+                if alternative := self[annotated_build]:
                     if hgvs_obj := alternative.resolved_hgvs_obj:
                         return HGVSDisplay(
                             dna_hgvs=hgvs_obj,
                             is_desired_build=False,
-                            genome_build=genome_build,
+                            genome_build=annotated_build,
                             p_hgvs=alternative.p_hgvs
                         )
 

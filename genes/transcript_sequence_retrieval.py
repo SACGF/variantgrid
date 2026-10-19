@@ -101,6 +101,9 @@ class TranscriptSequenceFetcher:
             raise NoTranscript(f"Unable to understand Ensembl API response: {r.text[:200]}") from e
 
         if r.ok:
+            # An unversioned accession resolves to the latest version, as Entrez does for RefSeq
+            if requested_version is None:
+                requested_version = data["version"]
             return FetchedTranscriptSequence(transcript_id=data["id"],
                                              annotation_consortium=AnnotationConsortium.ENSEMBL,
                                              version=requested_version,

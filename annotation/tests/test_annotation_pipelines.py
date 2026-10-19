@@ -20,7 +20,11 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_run import (
+    AnnotationPipelineVersion,
+    AnnotationRangeLock,
+    AnnotationRun,
+)
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import blocking_pipeline_types, enabled_pipeline_types, get_runner
 from annotation.tasks.annotation_scheduler_task import (

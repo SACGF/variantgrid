@@ -33,17 +33,10 @@ from typing import Optional
 import cyvcf2
 
 from genes.gene_splice import ResolvedSpliceEvent, SpliceEventResolver
-from library.genomics.vcf_enums import VCFColumns, VCFSymbolicAllele
-from library.genomics.vcf_writer import (
-    VCFInfoHeader,
-    VCFWriter,
-    build_header_lines,
-    percent_encode_info_value,
-)
+from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_writer import VCFInfoHeader, percent_encode_info_value
 from library.utils.json_utils import json_dumps_nan_as_null
-from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
 from snpdb.models import GenomeBuild
-from snpdb.vcf_utils import vcf_header_filter_ids
 from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.tso500.dragen_combined_variant_output_parser import (
@@ -55,6 +48,7 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     SPLICE_OBSERVATION_INFO,
     SPLICE_SUPPORTING_READS,
 )
+from upload.vcf.gene_level_rewrite import GeneLevelRecord, write_gene_level_vcf
 from upload.vcf.vcf_import import resolve_genome_build
 from variantgrid.celery import app
 
@@ -67,9 +61,6 @@ NOT_A_JUNCTION_MESSAGE = "SpliceGirl records skipped - not a <DEL> with an END"
 UNRESOLVED_MESSAGE = "SpliceGirl records skipped - no single gene at the junction"
 DUPLICATE_MESSAGE = "SpliceGirl records skipped - the junction was already called"
 
-# Header lines the rewrite replaces with its own
-_REPLACED_HEADER_PREFIXES = ("##fileformat", "##INFO", "##FORMAT", "##contig", "##ALT", "#CHROM")
-
 
 def can_process_file(filename: str) -> bool:
     try:
@@ -81,25 +72,9 @@ def can_process_file(filename: str) -> bool:
 
 
 @dataclass
-class _SpliceRecord:
-    """ One rewritten record - the identity it resolved to, plus the caller's columns kept as written """
-    event: ResolvedSpliceEvent
-    observation: dict
-    vcf_id: str
-    qual: str
-    vcf_filter: str
-    fmt: str
-    sample_calls: list[str]
-
-    @property
-    def sort_key(self) -> tuple:
-        return self.event.gene.pk, self.event.alt
-
-
-@dataclass
 class SpliceGirlRewrite:
     """ What the rewrite made of the caller's file """
-    records: list[_SpliceRecord] = field(default_factory=list)
+    records: list[GeneLevelRecord] = field(default_factory=list)
     records_read: int = 0
     not_a_junction: int = 0
     unresolved: int = 0
@@ -152,67 +127,18 @@ def read_splicegirl_records(reader: cyvcf2.VCF, genome_build: GenomeBuild,
             continue
         seen.add(event)
 
-        columns = str(record).rstrip("\n").split("\t")
-        rewrite.records.append(_SpliceRecord(
-            event=event,
-            observation=_observation(record, event, end),
-            vcf_id=columns[VCFColumns.ID],
-            qual=columns[VCFColumns.QUAL],
-            vcf_filter=columns[VCFColumns.FILTER],
-            fmt=columns[VCFColumns.FORMAT],
-            sample_calls=columns[VCFColumns.FORMAT + 1:]))
-
-    rewrite.records.sort(key=lambda r: r.sort_key)
+        info = {SPLICE_INFO: event.canonical_str,
+                SPLICE_OBSERVATION_INFO: json_dumps_nan_as_null(_observation(record, event, end))}
+        rewrite.records.append(GeneLevelRecord.from_caller(record, event, info))
     return rewrite
 
 
-def _header_lines_from(raw_header: str, prefix: str) -> list[str]:
-    return [line for line in raw_header.splitlines() if line.startswith(prefix)]
-
-
 def write_splicegirl_vcf(filename: str, rewrite: SpliceGirlRewrite, reader: cyvcf2.VCF):
-    """ Written already-clean and sorted, which is what lets preprocess skip straight to the split.
-        END = POS gives svlen 0 through vcf_get_ref_alt_svlen_and_modification, which needs one of
-        SVLEN/END for any symbolic alt (and reads SVLEN=0 as absent). """
-
-    raw_header = reader.raw_header
-    meta_lines = [line for line in raw_header.splitlines()
-                  if not line.startswith(_REPLACED_HEADER_PREFIXES)]
-    # SpliceGirl writes LowUniqueAlignments without declaring it. The gene-level preprocess skips
-    # vcf_clean_and_filter, which would otherwise have carried it through, so declare it here
-    declared_filters = vcf_header_filter_ids(raw_header.splitlines())
-    used_filters = {f for record in rewrite.records for f in record.vcf_filter.split(";")}
-    for filter_id in sorted(used_filters - declared_filters - {"PASS", "."}):
-        meta_lines.append(f'##FILTER=<ID={filter_id},Description="Not declared by the caller">')
-    contig_lines = [*_header_lines_from(raw_header, "##contig"),
-                    f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},length={GENE_LEVEL_CONTIG_LENGTH}>"]
-    header_lines = build_header_lines(
-        meta_lines=meta_lines,
-        info=[
-            VCFInfoHeader(id="END", type="Integer", description="Stop position of the interval"),
-            VCFInfoHeader(id=SPLICE_INFO, type="String",
-                          description="Splice event as gene and label, eg 'AR-V7'"),
-            VCFInfoHeader(id=SPLICE_OBSERVATION_INFO, type="String",
-                          description="JSON of the caller record this splice event was called from"),
-        ],
-        formats=_header_lines_from(raw_header, "##FORMAT"),
-        contig_lines=contig_lines,
-        samples=reader.samples,
-    )
-
-    with open(filename, "w") as f:
-        writer = VCFWriter(f, header_lines, encode_info=percent_encode_info_value)
-        for record in rewrite.records:
-            variant_coordinate = record.event.variant_coordinate
-            info = {
-                "END": variant_coordinate.position,
-                SPLICE_INFO: record.event.canonical_str,
-                SPLICE_OBSERVATION_INFO: json_dumps_nan_as_null(record.observation),
-            }
-            writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
-                                variant_coordinate.ref, variant_coordinate.alt,
-                                vcf_id=record.vcf_id, qual=record.qual, vcf_filter=record.vcf_filter,
-                                info=info, fmt=record.fmt, sample_calls=record.sample_calls)
+    write_gene_level_vcf(filename, rewrite.records, info=[
+        VCFInfoHeader(id=SPLICE_INFO, type="String", description="Splice event as gene and label, eg 'AR-V7'"),
+        VCFInfoHeader(id=SPLICE_OBSERVATION_INFO, type="String",
+                      description="JSON of the caller record this splice event was called from"),
+    ], samples=reader.samples, raw_header=reader.raw_header, encode_info=percent_encode_info_value)
 
 
 class SpliceGirlCreateVCFTask(ImportVCFStepTask):

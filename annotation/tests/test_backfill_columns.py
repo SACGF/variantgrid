@@ -20,7 +20,7 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
-from annotation.models.models import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.vep_field_formatters import format_pick_highest_int
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_partition import temporary_db_table

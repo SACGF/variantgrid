@@ -1,6 +1,5 @@
 import logging
 import os
-from functools import cached_property
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -32,12 +31,6 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
     user = models.ForeignKey(User, on_delete=CASCADE)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     error_message = models.TextField(null=True, blank=True)
-
-    @cached_property
-    def num_intervals(self):
-        if self.processed_file:
-            return self.processed_records
-        return self.genomicinterval_set.count()
 
     def check_processed_file_exists(self) -> bool:
         """ A BED file's processed file can go missing from disk (eg a database cloned without its data

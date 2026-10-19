@@ -10,7 +10,7 @@ from annotation.models import (
     InvalidAnnotationVersionError,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationPipelineVersion
+from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types
 from annotation.tasks.annotate_variants import annotation_run_retry, recheck_vep_version

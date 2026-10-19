@@ -9,7 +9,7 @@ from django.urls.base import reverse
 from django.views.decorators.http import require_POST
 
 from classification.classification_stats import get_grouped_classification_counts
-from classification.enums import AlleleOriginBucket
+from classification.lab_classification_stats import labs_with_classifications_qs
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import (
     AccumulationReportMode,
@@ -39,6 +39,7 @@ from snpdb.models import (
     State,
     UserSettings,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -248,15 +249,10 @@ def labs(request):
         max_groups=15,
         show_unclassified=show_unclassified)
     """
-    active_organizations = Organization.objects.filter(active=True).order_by('name')
-    organization_labs = {}
-    for org in active_organizations:
-        if settings.CLASSIFICATION_STATS_USE_SHARED:
-            org_labs = org.sharing_labs
-        else:
-            org_labs = org.classifying_labs
-        if org_labs:
-            organization_labs[org] = list(org_labs)
+    labs_qs = labs_with_classifications_qs().filter(organization__active=True).select_related("organization")
+    organization_labs: dict[Organization, list[Lab]] = {}
+    for lab in labs_qs.order_by("organization__name", "name"):
+        organization_labs.setdefault(lab.organization, []).append(lab)
     lab_list = [l for ll in organization_labs.values() for l in ll]
     context = {
         "organization_labs": organization_labs,

@@ -8,7 +8,6 @@ from django.conf import settings
 from django.db import transaction
 from requests import Response
 
-from classification.enums import AlleleOriginBucket
 from classification.models import (
     ClinVarExportBatch,
     ClinVarExportBatchStatus,
@@ -20,6 +19,7 @@ from classification.models import (
 from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import JsonObjType
+from snpdb.models.models_enums import AlleleOriginBucket
 
 """
 This code is responsible for sending our data to ClinVar API (after everything else has run to work out what

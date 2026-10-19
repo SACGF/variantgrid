@@ -3,8 +3,10 @@ Owns: Classification / ClassificationModification, EvidenceKey + EvidenceKeyMap,
 DiscordanceReport, ConditionText matching, ClassificationGrouping, ClinVarExport, the classification API and import pipeline.
 Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
+- models/classification_evidence_normalise.py — normalise_evidence_cell: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
+- models/condition_resolved.py (ConditionResolved), models/classification_consensus.py (copying content between records).
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
-- enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
+- enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/models/models_enums.py (re-exported by classification.enums; import them from snpdb).
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
   Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
   not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
@@ -88,7 +90,7 @@ Gotchas:
   the attribute and models/evidence_mixin.py:EvidenceMixin.__getitem__ answers any evidence key. Resolve model fields in
   the view or tag (templatetags/classification_tags.py:classification_quick passes `sample` / `username`).
 - Legacy (VG3-era) records can hold a select key's option label or a comma separated string of labels ("Autosomal
-  recessive") instead of the list of option keys every write now stores (models/classification.py:Classification.option_value_parts).
+  recessive") instead of the list of option keys every write now stores (models/classification_evidence_normalise.py:evidence_option_value_parts).
   management/commands/classification_normalise_option_values.py converts them; compare on normalised values until it has run.
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
@@ -106,15 +108,15 @@ Gotchas:
   EvidenceKeyMap.instance caches for 60s. Tests that need a key create it with EvidenceKey.objects.create in setUp
   (tests/views/test_classification_view.py).
 - What copying from a previous classification brings across is EvidenceKey.copy_scope (NONE / ALLELE / GENE) filtered by
-  copy_allele_origin (models/classification.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
+  copy_allele_origin (models/classification_consensus.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
   a GENE key also copies at allele level; copy_allele_origin=GERMLINE keeps segregation and de novo data out of somatic records.
-  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification.py:ClassificationConsensus.apply_to to
+  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification_consensus.py:ClassificationConsensus.apply_to to
   write one into a record (fills empty fields only, as SubmissionSource.CONSENSUS).
 - The target allele origin bucket is decided before the candidates are listed, never after: nothing germline is ever offered
   as the source for a somatic record. The create page takes it from the user's allele_origin_focus (flippable), the Classify
   & Report dialog from Tag.allele_origin_bucket, the in-form box from the record's own bucket. External labs' records are
   shown for context with no copy control - their evidence was assembled under a config reviewed elsewhere.
-- Gene level candidates come from models/classification.py:ClassificationConsensus.gene_consensus_groups - one row per
+- Gene level candidates come from models/classification_consensus.py:ClassificationConsensus.gene_consensus_groups - one row per
   distinct set of GENE-scope values, most used first then newest, capped at ten, each later row naming the fields it
   differs from the first in. Most records in a gene carry identical gene content because they were copied from each
   other. The pick is always a human's: AMP tiering and therapy content are gene *and* tumour type, so the row leads with
@@ -122,7 +124,7 @@ Gotchas:
   The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
   views/views_gene_consensus.py) all call that one function and render templates/classification/tags/gene_consensus_group.html.
 - The allele level pick (create page "Copy values from", the Classify & Report dialog's previous classifications) is the
-  same grouping over every copied key (models/classification.py:ClassificationConsensus.consensus_groups): one column
+  same grouping over every copied key (models/classification_consensus.py:ClassificationConsensus.consensus_groups): one column
   per distinct set of copied values, rendered side by side by templates/classification/tags/consensus_comparison.html
   with the fields the choices differ in first and the shared ones folded away (ConsensusComparison.of). Record
   identity (lab id, curator) is provenance, not the choice - the diff page (`?cids=...&copied_only=1`) is the full view.

@@ -1,10 +1,7 @@
-import itertools
 import logging
 import re
-import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from itertools import zip_longest
 from typing import Optional, Union
 
 from django.conf import settings
@@ -15,33 +12,28 @@ from django.urls import reverse
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import CreateManualVariantForbidden, check_can_create_variants
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSException, HGVSImplementationException, HGVSMatcher, \
-    HGVSNomenclatureException, HgvsOriginallyNormalized, VariantResolvingError
-from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException, HgvsMatchRefAllele
-from genes.hgvs.hgvs_matcher import VariantCoordinateAndDetails
 from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
     find_gene_copy_number_events_for_string,
 )
 from genes.gene_fusions import FUSION_STRING_SEPARATOR, find_gene_fusions_for_string
 from genes.gene_splice import SPLICE_STRING_PATTERN, find_splice_events_for_string
-from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
-from genes.models_enums import AnnotationConsortium, MANEStatus
+from genes.hgvs import (
+    HGVSException,
+    HGVSMatcher,
+)
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
-from library.log_utils import report_exc_info
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (
     DBSNP_PATTERN,
-    HGVS_UNCLEANED_PATTERN,
     LOCUS_NO_REF_PATTERN,
     LOCUS_PATTERN,
     VARIANT_PATTERN,
     VARIANT_SYMBOLIC_PATTERN,
     Allele,
     ClinGenAllele,
-    Contig,
     DbSNP,
     GenomeBuild,
     Sequence,
@@ -49,7 +41,6 @@ from snpdb.models import (
     VariantCoordinate,
 )
 from snpdb.search import (
-    INVALID_INPUT,
     SearchExample,
     SearchInputInstance,
     SearchMessage,
@@ -244,8 +235,8 @@ def allele_search(search_input: SearchInputInstance):
 
             try:
                 variant_coordinate = clingen_allele.get_variant_coordinate(genome_build)
-                yield from _yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
-                                                                    variant_coordinate, [])
+                yield from yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
+                                                                   variant_coordinate, [])
             except ValueError as e:
                 yield SearchMessageOverall(str(e), severity=LogLevel.ERROR, genome_builds=[genome_build])
 
@@ -277,10 +268,10 @@ def _alt_mismatch_message(variant_coordinate: VariantCoordinate, alternative_var
     return f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"'
 
 
-def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
-                                             variant_coordinate: VariantCoordinate,
-                                             search_messages: list[SearchMessage],
-                                             hgvs_matcher: Optional[HGVSMatcher] = None) -> Iterable[SearchResult]:
+def yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
+                                            variant_coordinate: VariantCoordinate,
+                                            search_messages: list[SearchMessage],
+                                            hgvs_matcher: Optional[HGVSMatcher] = None) -> Iterable[SearchResult]:
     # manual variants
     variant_string = variant_coordinate.format()
     if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build,
@@ -355,8 +346,8 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
                     messages = [*search_messages, SearchMessage(msg, LogLevel.WARNING, substituted=True)]
                 yield SearchResult(v.preview, messages=messages)
         else:
-            yield from _yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
-                                                                variant_coordinate, search_messages)
+            yield from yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
+                                                               variant_coordinate, search_messages)
 
 
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
@@ -453,422 +444,6 @@ def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -
                 genome_build=genome_build
         ):
             yield SearchResult(create_manual)
-
-
-def _search_hgvs_using_gene_symbol(
-        candidates: dict[str, Optional[str]],
-        allele: str,
-        search_messages: list[SearchMessage],
-        user: User,
-        genome_build: GenomeBuild,
-        variant_qs: QuerySet) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
-    """ candidates: {transcript_accession: mane_status_or_None}, best-first, sourced from cdot.
-        Each accession + allele is searched via the standard _search_hgvs path (which
-        resolves the transcript version), and hits are grouped/deduped by variant. """
-
-    # Group results + hgvs by result.identifier
-    results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
-    transcript_accessions_by_variant_identifier: dict[str, list] = defaultdict(list)
-    transcript_accessions_by_exception: dict[str, list] = defaultdict(list)
-
-    for accession, mane_status in candidates.items():
-        transcript_hgvs = f"{accession}:{allele}"
-        tv_message = accession
-        if mane_status:
-            tv_message += f" ({mane_status})"
-        try:
-            for result in _search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
-                if isinstance(result, SearchResult):
-                    result.preview.annotation_consortia = [AnnotationConsortium.get_from_transcript_accession(accession)]
-                    if result.preview.category == "Variant":
-                        variant_identifier = result.preview.identifier
-                        results_by_variant_identifier[variant_identifier].append(result)
-                        transcript_accessions_by_variant_identifier[variant_identifier].append(tv_message)
-                    else:
-                        # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
-                        yield result
-        except Exception as e:
-            transcript_accessions_by_exception[str(e)].append(tv_message)
-
-    have_results = False
-    for variant_identifier, results_for_record in results_by_variant_identifier.items():
-        result_message = f"Results for: {', '.join(transcript_accessions_by_variant_identifier[variant_identifier])}"
-        # Use a dict for uniqueness while preserving order
-        unique_messages = {
-            SearchMessage(result_message): True
-        }
-        # Go through messages for each result together, so they stay in same order
-        for messages in zip_longest(*[r.messages for r in results_for_record]):
-            for m in messages:
-                if m:
-                    unique_messages[m] = True
-
-        unique_annotation_consortia = set()
-        for r in results_for_record:
-            unique_annotation_consortia.update(r.annotation_consortia)
-
-        # All weights should be the same, just take 1st
-        have_results = True
-        preview = results_for_record[0].preview  # These will all be the same
-        if unique_annotation_consortia:
-            preview.annotation_consortia = unique_annotation_consortia
-        yield SearchResult(preview=preview, messages=search_messages + list(unique_messages))
-
-    if transcript_accessions_by_exception:
-        resolution_errors = []
-        for exception_msg, tv_message_list in transcript_accessions_by_exception.items():
-            resolution_errors.append(f"Error resolving transcripts: {', '.join(tv_message_list)}: {exception_msg}")
-
-        resolution_msg = "\n".join(resolution_errors)
-        if settings.SEARCH_HGVS_GENE_SYMBOL_REPORT_FAILURES:
-            yield SearchResult.error_result(resolution_msg, genome_build)
-        elif not have_results:
-            raise VariantResolvingError(resolution_msg)
-
-    if not have_results:
-        # In some special cases, add in special messages for no result
-        messages_as_strs = [str(message) for message in search_messages]
-        if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-            message = "\n".join(messages_as_strs + [f"Only searched MANE transcripts: {', '.join(candidates)}"])
-            yield SearchMessageOverall(message)
-
-        elif not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
-            yield SearchMessageOverall("\n".join(messages_as_strs))
-
-
-# cdot MANE tag spellings -> MANEStatus display strings (for per-transcript messages)
-_CDOT_TAG_TO_MANE_DISPLAY = {
-    "MANE_Select": MANEStatus.MANE_SELECT.label,
-    "MANE_Plus_Clinical": MANEStatus.MANE_PLUS_CLINICAL.label,
-}
-
-
-def _get_search_hgvs_gene_symbol_transcripts(hgvs_matcher: HGVSMatcher, gene_symbol_str: str):
-    """ Source candidate transcripts for a gene symbol from cdot's ranking
-        (MANE/canonical tags), honouring VG's MANE / all-transcripts settings.
-
-        Returns (candidates, has_non_mane_transcripts) where candidates is a list of
-        (transcript_accession, mane_status_or_None) best-first (cdot's versionless
-        accessions), and has_non_mane_transcripts is True if the gene has non-MANE
-        transcripts that were not included (used to warn they may resolve differently). """
-    candidates = []
-    has_non_mane_transcripts = False
-
-    ranked, _warnings = hgvs_matcher.rank_gene_symbol_transcripts(gene_symbol_str)
-    for tx_ac, _tags, matched_tag in ranked:
-        mane_status = _CDOT_TAG_TO_MANE_DISPLAY.get(matched_tag)
-        is_mane = mane_status is not None
-        include = settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS or \
-            (is_mane and settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE)
-        if not include:
-            if not is_mane:
-                has_non_mane_transcripts = True
-            continue
-        candidates.append((tx_ac, mane_status))
-    return candidates, has_non_mane_transcripts
-
-
-@search_receiver(
-    search_type=Variant,
-    pattern=HGVS_UNCLEANED_PATTERN,
-    sub_name="HGVS",
-    example=SearchExample(
-        note="Provide a c. or g. HGVS",
-        examples=["NM_001080463.1:c.5972T>A", "NM_000492.3(CFTR):c.1438G>T", "NC_000007.13:g.117199563G>T"]
-    )
-)
-def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
-    if search_input.search_string.lower().startswith("medgen"):
-        return [INVALID_INPUT]
-    for_all_genome_builds = []
-    for genome_build in search_input.genome_builds:
-        results = []
-        error_message = None
-        try:
-            results =_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user,
-                                  genome_build=genome_build,
-                                  visible_variants=search_input.get_visible_variants(genome_build),
-                                  classify=search_input.classify)
-            results = list(results)  # read iterator to trigger exceptions
-        except (HGVSNomenclatureException, BadTranscript) as e:
-            # Show errors about HGVS the user can fix
-            error_message = str(e)
-        except (Exception, HGVSImplementationException) as e:
-            # Hide implementation details (user can't fix)
-            # log_traceback()
-            # logging.info("HGVS exception type(%s): %s", type(e), str(e))
-            if search_input.user.is_superuser:
-                error_message = str(e)
-            else:
-                report_exc_info()
-                # error_message = "Error resolving HGVS"
-                error_message = str(e)
-                # work has been done to improve the error messages
-                # planning a future change where the technical errors identify themselves rather than the
-                # user-friendly errors identifying themselves
-
-        if error_message:
-            results = [SearchResult.error_result(error_message, genome_build)]
-            if search_input.classify:
-                results.extend(_classify_unresolved_hgvs(search_input.user, genome_build,
-                                                         search_input.search_string, error_message))
-        if results:
-            for_all_genome_builds.append(results)
-
-    return itertools.chain(*for_all_genome_builds)
-
-
-def _classify_unresolved_hgvs(user: User, genome_build: GenomeBuild, hgvs_string: str, error_message: str) -> Iterable[SearchResult]:
-    if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, genome_build=genome_build, hgvs_string=hgvs_string):
-        yield SearchResult(classify_no_variant, messages=[SearchMessage(f"Error reading HGVS \"{error_message}\"")])
-
-
-def _get_non_coding_c_hgvs_as_n_details(hgvs_matcher: HGVSMatcher, hgvs_string: str,
-                                        search_messages: list[SearchMessage]) -> VariantCoordinateAndDetails:
-    """ Import refuses c.HGVS on a non-coding transcript (it may be numbered from a coding model, so shifted by
-        the 5' UTR length). Search resolves it as n. with a warning, unless the provided reference doesn't match """
-    hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
-    hgvs_variant.kind = 'n'
-    n_hgvs_string = hgvs_variant.format(max_ref_length=sys.maxsize)
-    vc_details = hgvs_matcher.get_variant_coordinate_and_details(n_hgvs_string)
-    matches_reference = vc_details.matches_reference
-    if isinstance(matches_reference, HgvsMatchRefAllele) and not matches_reference:
-        raise HGVSNomenclatureException(f'c.HGVS used on non-coding transcript. Not resolved as "{n_hgvs_string}" '
-                                        'as the provided reference does not match, so it is probably numbered '
-                                        'from a coding transcript')
-    msg = f'c.HGVS used on non-coding transcript, resolved as "{n_hgvs_string}". If the c. was numbered from a ' \
-          "coding transcript, the position will be shifted by the length of its 5' UTR"
-    search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
-    return vc_details
-
-
-def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
-    hgvs_matcher = HGVSMatcher.instance(genome_build)
-    variant_qs = visible_variants
-
-    # TODO, add genome build to more of the SearchMessages that are genome build specific
-
-    # can add on search_message to objects to (stop auto-jump and show message)
-    original_hgvs_string = hgvs_string
-    variant_coordinate = None
-    used_transcript_accession: Optional[str] = None
-    kind = None
-    clean_hgvs_string, _ = hgvs_matcher.clean_hgvs(hgvs_string)
-    if clean_hgvs_string != hgvs_string:
-        # TODO add proper support for "cleaned" where a before and after value are presented
-        yield SearchMessageOverall(f'Cleaned hgvs from \n"{hgvs_string}" to\n"{clean_hgvs_string}"', severity=LogLevel.INFO)
-        hgvs_string = clean_hgvs_string
-
-    search_messages: list[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
-
-    try:
-        try:
-            vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
-        except HGVSNonCodingTranscriptException:
-            vc_details = _get_non_coding_c_hgvs_as_n_details(hgvs_matcher, hgvs_string, search_messages)
-        variant_coordinate = vc_details.variant_coordinate
-        used_transcript_accession = vc_details.transcript_accession
-        kind = vc_details.kind
-        matches_reference = vc_details.matches_reference
-        originally_normalized = vc_details.originally_normalized
-        logging.info("get_variant_coordinate_and_details - variant_coordinate=%s", variant_coordinate)
-        if not matches_reference:
-            # reporting on the "provided" reference is slightly problematic as it's not always provided directly, it could be indirectly
-
-            if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
-                msg = matches_reference.get_message()
-                search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
-
-        if not originally_normalized:
-            if isinstance(originally_normalized, HgvsOriginallyNormalized):
-                if msg := originally_normalized.get_message():
-                    search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
-
-    except MissingTranscript:
-        pass
-    except Contig.ContigNotInBuildError:
-        # HGVS is valid but g.HGVS contig from a different genome build than this one
-        # we don't want to throw an error for 37 contig not in 38 (if both enabled)
-        # but we do want to throw one if the contig is completely unrecognised
-        hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
-        contig_accession = hgvs_variant.transcript
-        if contig := Contig.objects.filter(refseq_accession=contig_accession).first():
-            # Contig is known to system
-            contig_builds = contig.genomebuildcontig_set.all()
-            search_builds = GenomeBuild.builds_with_annotation()
-            if contig_builds.filter(genome_build__in=search_builds).exists():
-                pass  # skip silently - will get in other build
-            else:
-                build_names = ", ".join(contig_builds.order_by("genome_build__name").values_list("genome_build__name", flat=True))
-                msg = f"{contig_accession=} is from builds {build_names} which are not enabled/annotated."
-                yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
-        else:
-            enabled_builds = GenomeBuild.get_enabled_builds_comma_separated_string()
-            msg = f"{contig_accession=} not in enabled builds: {enabled_builds}"
-            yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
-
-    except (ValueError, NotImplementedError) as hgvs_error:
-        if gene_symbol_str := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-            has_results = False
-
-            if settings.SEARCH_HGVS_GENE_SYMBOL:
-                msg_hgvs_given_symbol = "Searching without transcript is only supported for coordinates resolved against MANE transcripts."
-
-                mane_and_aliases = MANE.get_mane_and_aliases_list_from_symbol(gene_symbol_str)
-                if not mane_and_aliases:
-                    raise ValueError(
-                        msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts") from hgvs_error
-
-                gene_aliases_to_mane_symbols = set()
-                genes_with_non_mane_transcripts = set()
-                # {accession: mane_status} best-first, deduped across aliases
-                candidates: dict[str, Optional[str]] = {}
-                for mane, alias in mane_and_aliases:
-                    if alias:
-                        gene_aliases_to_mane_symbols.add(f"{alias.gene_symbol} ({alias.get_source_display()})")
-
-                    gene_candidates, has_non_mane = _get_search_hgvs_gene_symbol_transcripts(
-                        hgvs_matcher, str(mane.symbol))
-                    for accession, mane_status in gene_candidates:
-                        candidates.setdefault(accession, mane_status)
-
-                    if has_non_mane:
-                        # We want to make the messages the same for both genome builds, so they are collected into 1
-                        genes_with_non_mane_transcripts.add(str(mane.symbol))
-
-                # Combine messages into 1
-                gene_search_sentences = [msg_hgvs_given_symbol]
-                if gene_aliases_to_mane_symbols:
-                    if len(gene_aliases_to_mane_symbols) == 1:
-                        alias_word = "alias"
-                    else:
-                        alias_word = "aliases"
-                    gene_search_sentences.append(f"Matched to MANE symbols via {alias_word}: {', '.join(gene_aliases_to_mane_symbols)}.")
-                if genes_with_non_mane_transcripts:
-                    if len(genes_with_non_mane_transcripts) == 1:
-                        gene_word = "Gene symbol"
-                        has_word = "has"
-                    else:
-                        gene_word = "Gene symbols"
-                        has_word = "have"
-
-                    gene_search_sentences.append(
-                        f"{gene_word} {', '.join(genes_with_non_mane_transcripts)} {has_word} "
-                        "non-MANE transcripts that may resolve to different coordinates. "
-                        "You may wish to add a transcript or search for the gene symbol to view all results")
-
-                yield SearchMessageOverall(" ".join(gene_search_sentences), severity=LogLevel.INFO)
-
-                try:
-                    # gene-only HGVS is "SYMBOL:allele" - swap each cdot transcript in for the symbol
-                    allele = hgvs_string.split(":", 1)[1]
-                    for result in _search_hgvs_using_gene_symbol(candidates, allele, search_messages,
-                                                                 user, genome_build, variant_qs):
-                        if isinstance(result, SearchResult):
-                            # don't count SearchMessageOverall as a result
-                            has_results = True
-                            # FIXME - not sure what a SearchMessage of the alias is meant to accomplish by itself?
-                            # result.messages.append(SearchMessage(str(alias)))
-                            yield result
-                except HGVSException as e:
-                    logging.error(e)
-                    # might just not be a HGVS name at all
-            else:
-                yield SearchMessageOverall("HGVS search requires a transcript")
-
-            if has_results:
-                return
-            else:  # Valid - just no results
-                hgvs_error = None
-
-        # yield SearchMessageOverall(str(hgvs_error))
-        if hgvs_error:  # May have been cleared if matched gene symbol HGVS
-            raise hgvs_error
-    except HGVSNomenclatureException as hgvs_ex:
-        raw_message = str(hgvs_ex)
-        if classify:
-            yield from _classify_unresolved_hgvs(user, genome_build, original_hgvs_string, raw_message)
-        if "char" not in raw_message and "EOF" not in raw_message:
-            # this is likely not a technical message, send it directly to the user
-            yield SearchMessageOverall(raw_message)
-            return
-
-        if match := HGVSMatcher.HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT.match(hgvs_string):
-            yield SearchMessageOverall(f"Invalid HGVS cDNA allele : \"{match.group('letter')}.{match.group('nomen')}\"")  # {hgvs_ex}
-        else:
-            yield SearchMessageOverall(f"Invalid HGVS cDNA allele \"{hgvs_string}\"")  # {hgvs_ex}
-
-    if used_transcript_accession:
-        if used_transcript_accession not in hgvs_string:
-            reported = False
-            # are we just inserting a version because none was provided, or are we changing it
-
-            if '.' in used_transcript_accession:
-                used_transcript_parts = used_transcript_accession.split('.')
-                used_transcript_versionless = used_transcript_parts[0]
-                used_transcript_version = used_transcript_parts[1]
-                if (used_transcript_versionless + '.') in hgvs_string:
-                    transcript_index = hgvs_string.index(used_transcript_versionless)
-                    transcript_version_index = transcript_index + len(used_transcript_versionless) + 1
-                    old_transcript_version = ''
-                    for c in hgvs_string[transcript_version_index:]:
-                        if '0' <= c <= '9':
-                            old_transcript_version += c
-                        else:
-                            break
-                    search_messages.append(SearchMessage(
-                        f"Using transcript \"{used_transcript_versionless}\" version \"{used_transcript_version}\" instead of provided version \"{old_transcript_version}\"",
-                        severity=LogLevel.ERROR, substituted=True))
-                    reported = True
-
-            if not reported:
-                search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\"", severity=LogLevel.INFO))
-
-        hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
-        # If these were in wrong order they have been switched now
-        if hgvs_variant.transcript and hgvs_variant.gene:
-            annotation_consortium = AnnotationConsortium.get_from_transcript_accession(used_transcript_accession)
-            try:
-                # If we look it up using a different method (eg ClinGen Allele registry) the used transcript accession
-                # May not exist on our system. That's ok
-                transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
-                                                           annotation_consortium=annotation_consortium)
-                alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
-                if hgvs_variant.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
-                    search_messages.append(SearchMessage(f"Symbol \"{hgvs_variant.gene}\" not associated with transcript "
-                                           f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')"))
-            except TranscriptVersion.DoesNotExist:
-                pass  # Doesn't exist - OK just can't check
-
-    # TODO: alter initial_score based on warning messages of alt not matching?
-    # also - _lrg_get_variant_coordinate should add matches_reference to search warnings list
-
-    if variant_coordinate:
-        try:
-            results = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)
-            variant = results.get()
-            if classify:
-                yield VariantExtra.classify_variant(
-                    variant=variant,
-                    genome_build=genome_build
-                ), search_messages
-            else:
-                # doesn't matter what the preferred genome build is (explicit contig version)
-                is_genomic = kind in ('g', 'm')
-                yield SearchResult(preview=variant.preview, messages=search_messages,
-                                   ignore_genome_build_mismatch=is_genomic)
-
-        except Variant.DoesNotExist:
-            variant_string_abbreviated = Variant.format_tuple(*variant_coordinate, abbreviate=True)
-            search_messages.append(
-                SearchMessage(f'"{hgvs_string}" resolved to genomic coordinates "{variant_string_abbreviated}"',
-                              LogLevel.INFO,
-                              genome_build=genome_build))
-            # if we're saying what we're resolving to, no need to complain about reference_message
-
-            yield from _yield_no_results_for_variant_coordinate(user, genome_build, variant_qs,
-                                                                variant_coordinate, search_messages,
-                                                                hgvs_matcher=hgvs_matcher)
 
 
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")

@@ -68,7 +68,7 @@ class ClinVarExportBatchColumns(DatatableConfig[ClinVarExportBatch]):
     def __init__(self, request):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
+        self.set_expand_ajax('clinvar_export_batch_detail', expected_height=120)
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, renderer=self.batch_id, client_renderer='batchId', default_sort=SortOrder.DESC, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
@@ -196,7 +196,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         self.export_to_batches = {}
 
         self.search_box_enabled = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
+        self.set_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
             RichColumn("id",
                        label="ID",
