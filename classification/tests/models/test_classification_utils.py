@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification, EvidenceMixin, ValidationMerger
 
 

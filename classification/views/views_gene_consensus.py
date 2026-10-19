@@ -20,7 +20,7 @@ from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
 
-from classification.enums import AlleleOriginBucket, SubmissionSource
+from classification.enums import SubmissionSource
 from classification.models import (
     Classification,
     ClassificationConsensus,
@@ -30,6 +30,7 @@ from classification.models import (
 from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 def _as_date(value: Union[date, datetime]) -> date:

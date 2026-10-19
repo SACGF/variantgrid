@@ -21,7 +21,7 @@ import pydantic
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError, models, transaction
-from django.db.models import Exists, F, OuterRef, QuerySet, Value
+from django.db.models import Exists, OuterRef, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
@@ -1042,33 +1042,6 @@ class Variant(PreviewModelMixin, models.Model):
             return [self]
         return Variant.objects.filter(variantallele__allele=allele)
 
-    def get_canonical_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        from annotation.models import VariantAnnotationVersion
-        vav = VariantAnnotationVersion.latest(genome_build)
-        return self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first()
-
-    def get_best_variant_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        from annotation.models import VariantAnnotationVersion
-        vav = VariantAnnotationVersion.latest(genome_build)
-        # canonical is nullable, so nulls_last keeps a canonical=True row ahead of the rest
-        canonical_first = F("canonical").desc(nulls_last=True)
-        if version := self.varianttranscriptannotation_set.filter(version=vav).order_by(canonical_first).first():
-            return version
-        if any_at_all := self.varianttranscriptannotation_set.first():
-            return any_at_all
-
-    def get_canonical_c_hgvs(self, genome_build):
-        from annotation.models import VariantAnnotationVersion
-        if cta := self.get_canonical_transcript_annotation(genome_build):
-            return cta.get_hgvs_c_with_symbol()
-        if self.is_gene_level:
-            # Sits on no transcript, so the representative annotation is the only one there is - it
-            # carries the VICC gene-level nomenclature. @see snpdb.gene_level_variants
-            vav = VariantAnnotationVersion.latest(genome_build)
-            if va := self.variantannotation_set.filter(version=vav).first():
-                return va.get_hgvs_c_with_symbol()
-        return None
-
     @property
     def start(self):
         return self.locus.position
@@ -1114,10 +1087,6 @@ class VariantAllele(TimeStampedModel):
 
     class Meta:
         unique_together = ("variant", "genome_build")
-
-    @property
-    def canonical_c_hgvs(self):
-        return self.variant.get_canonical_c_hgvs(self.genome_build)
 
     def needs_clingen_call(self):
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:

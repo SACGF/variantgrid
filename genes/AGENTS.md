@@ -60,7 +60,7 @@ Gotchas:
   that recognised the string refused it (a typo'd fusion partner), which is what the record's message and its
   `gene_level_unresolved` validation tag say. A resolution is falsy until it resolved, so test `.recognised` /
   `.reason` rather than `or`-ing one.
-- models/models_gene_list.py:GeneList.get_q imports from annotation inside the method — the genes/annotation import cycle is real; keep new cross-imports out of module level.
+- genes models never import annotation: annotation.models imports genes.models at module level. Logic that needs both lives in annotation (annotation/models/models.py:VariantAnnotationVersion.latest_gene_annotation_releases, annotation/signals/gene_symbol_wiki_citations.py) or at the call site.
 - Creating a second SampleGeneList for a sample deletes the ActiveSampleGeneList instead of switching it (models/models_gene_list.py:sample_gene_list_created); set the active one explicitly.
 - `PanelAppPanel.cache_valid` expires after `settings.PANEL_APP_CACHE_DAYS` (models/models_panel_app.py:PanelAppPanel.cache_valid); panel_app.py:get_panel_app_local_cache re-fetches from the live API when stale, so tests must not depend on it.
 - GeneCoverageCollection is a partitioned model (models/models_gene_coverage.py:GeneCoverageCollection); delete via the model so partitions are dropped.

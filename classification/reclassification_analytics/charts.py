@@ -6,7 +6,6 @@ from collections import defaultdict
 from math import ceil, log10
 from typing import Any
 
-from classification.enums.classification_enums import ClinicalSignificance
 from classification.reclassification_analytics.analytics import ReclassificationAnalytics
 from classification.reclassification_analytics.evidence_movement import (
     OTHER_EVIDENCE_GROUP,
@@ -30,6 +29,7 @@ from classification.reclassification_analytics.results import (
     EvidenceMovement,
     significance_label,
 )
+from snpdb.models.models_enums import ClinicalSignificance
 
 # the days axis is logarithmic - most records move within a few months, and a year either side of the
 # two year mark is not a distinction anybody reads off a chart

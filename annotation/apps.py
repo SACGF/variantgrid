@@ -27,6 +27,7 @@ class AnnotationConfig(AppConfig):
             annotation_run_post_delete_handler,
         )
         from annotation.signals.citation_search import search_citations
+        from annotation.signals.gene_symbol_wiki_citations import gene_symbol_wiki_post_save_handler
         from annotation.signals.manual_signals import (
             annotation_run_complete_signal,
             annotation_run_discarded_signal,
@@ -39,6 +40,7 @@ class AnnotationConfig(AppConfig):
             classification_post_publish_signal,
             classification_withdraw_signal,
         )
+        from genes.models import GeneSymbolWiki
         from snpdb.models.models_cached_web_resource import CachedWebResource
         from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
@@ -52,6 +54,7 @@ class AnnotationConfig(AppConfig):
             Entrez.email = entrez_email
 
         post_save.connect(clinvar_citations_post_save_handler, sender=CachedWebResource)
+        post_save.connect(gene_symbol_wiki_post_save_handler, sender=GeneSymbolWiki)
 
         # #1670: every route by which an AnnotationRun's on-disk output is reclaimed
         annotation_run_complete_signal.connect(annotation_run_complete_cleanup_handler)

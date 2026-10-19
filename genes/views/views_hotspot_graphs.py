@@ -14,7 +14,7 @@ from django.views.generic import TemplateView
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification, ClassificationModification
 from genes.interpro import store_domains_for_transcripts
 from genes.models import Gene, Transcript, TranscriptVersion

@@ -103,13 +103,6 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
 
-    def get_q(self, variant_annotation_version):
-        """ For a Variant queryset """
-        from annotation.models.models import VariantTranscriptAnnotation
-        genes_qs = self.get_genes(variant_annotation_version.gene_annotation_release)
-        return VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version,
-                                                                   genes_qs)
-
     @staticmethod
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
         """ For GeneList node, we need to get query for multiple lists - and it's much faster to build the merged

@@ -1,3 +1,8 @@
+"""
+vcf_replace_data swaps a re-called VCF in for an old one with the same samples: patients, cohorts (VCF, sub and
+custom), trios, pedigrees, classifications and analysis nodes move to the new VCF's samples and cohorts, and the
+analyses that used them are reloaded. Run through the replace_vcf management command.
+"""
 import itertools
 import logging
 

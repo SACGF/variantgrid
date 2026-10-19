@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
-from classification.enums.classification_enums import ClinicalSignificance
 from classification.reclassification_analytics.palette import (
     BENIGN_DIRECTION_COLOUR,
     PATHOGENIC_DIRECTION_COLOUR,
 )
 from classification.reclassification_analytics.survival import SURVIVAL_INTERVAL_YEARS
+from snpdb.models.models_enums import ClinicalSignificance
 
 # top to bottom / left to right on every chart and table
 SIGNIFICANCE_ORDER = [

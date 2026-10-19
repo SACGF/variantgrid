@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SubmissionSource
+from classification.enums import ShareLevel, SubmissionSource
 from classification.models import (
     AlleleOriginGrouping,
     Classification,
@@ -11,6 +11,7 @@ from classification.models import (
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
 from snpdb.models import Allele, AlleleConversionTool
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class AlleleMergeRehomingTestCase(TestCase):

@@ -2,7 +2,7 @@
 Colours for the reclassification analytics tables and charts. Shared by the result objects, the significance
 matrix and the plotly JSON, so they live apart from all three.
 """
-from classification.enums.classification_enums import ClinicalSignificance
+from snpdb.models.models_enums import ClinicalSignificance
 
 BENIGN_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance.BENIGN)
 PATHOGENIC_DIRECTION_COLOUR = ClinicalSignificance.chart_colour(ClinicalSignificance.PATHOGENIC)

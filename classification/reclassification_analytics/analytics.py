@@ -17,11 +17,7 @@ from django.db.models import Count, Min, OuterRef, QuerySet, Subquery
 from django.db.models.functions import ExtractYear
 from django.utils.timezone import localdate
 
-from classification.enums.classification_enums import (
-    ClinicalSignificance,
-    LabExternalFilter,
-    ReclassificationEventType,
-)
+from classification.enums.classification_enums import LabExternalFilter, ReclassificationEventType
 from classification.models.classification_reclassification_models import ReclassificationEvent
 from classification.reclassification_analytics.evidence_movement import EvidenceMovements
 from classification.reclassification_analytics.palette import (
@@ -52,6 +48,7 @@ from classification.reclassification_analytics.survival import (
     withdrawal_dates,
 )
 from snpdb.models.models import Lab, Organization
+from snpdb.models.models_enums import ClinicalSignificance
 
 TOP_GENE_COUNT = 30
 SURVIVAL_ORIGIN_YEARS_BACK = 5
