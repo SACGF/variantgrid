@@ -11,6 +11,7 @@ and the LIS fields - are classification/views/views_case_report.py, since they n
 """
 from typing import Optional
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.http.response import HttpResponseBase, JsonResponse
@@ -26,7 +27,7 @@ from analysis.classify_report import (
     tag_summary,
 )
 from analysis.models import VariantTag
-from analysis.models.nodes.analysis_node import AnalysisClassification
+from analysis.models.models_analysis import AnalysisClassification
 from analysis.variant_tag_operations import (
     classification_is_of_another_person,
     resolve_launching_variant_tag,
@@ -170,7 +171,7 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
             classification_ids = ",".join(str(previous.modification.classification_id) for previous in with_content)
             compare_url = f"{reverse('classification_diff')}?cids={classification_ids}&copied_only=1"
     gene_groups = []
-    if not groups and row.gene_symbol:
+    if not groups and row.gene_symbol and settings.CLASSIFICATION_GENE_CONSENSUS:
         gene_groups = ClassificationConsensus.gene_consensus_groups(
             gene_symbol=row.gene_symbol, user=request.user, allele_origin_bucket=row.allele_origin_bucket)
 

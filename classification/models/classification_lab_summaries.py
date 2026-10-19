@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.models.evidence_key import EvidenceKeyMap
 from snpdb.models import Lab
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)

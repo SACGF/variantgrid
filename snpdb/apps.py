@@ -34,6 +34,7 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals.cohort_search import search_cohort
         from snpdb.signals.duo_search import search_duo
         from snpdb.signals.genomics_search import contig_search, genome_build_search
+        from snpdb.signals.hgvs_search import search_hgvs
         from snpdb.signals.lab_search import lab_search
         from snpdb.signals.organization_search import organization_search
         from snpdb.signals.quad_search import search_quad
@@ -49,7 +50,6 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals.variant_search import (
             allele_search,
             search_allele_id,
-            search_hgvs,
             search_variant_db_snp,
             search_variant_gene_copy_number,
             search_variant_gene_fusion,

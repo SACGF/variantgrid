@@ -39,11 +39,11 @@ from genes.gene_copy_number import (
 from genes.gene_level_resolver import GeneLevelNameResolver
 from genes.models import GeneCopyNumberEventKind
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
-from library.genomics.vcf_enums import VCFColumns, VCFSymbolicAllele
-from library.genomics.vcf_writer import VCFInfoHeader, VCFWriter, build_header_lines
-from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_LENGTH, GENE_LEVEL_CONTIG_NAME
+from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_writer import VCFInfoHeader
 from upload.models import SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
+from upload.vcf.gene_level_rewrite import GeneLevelRecord, write_gene_level_vcf
 from variantgrid.celery import app
 
 # The canonical string of the event a record became, so the file says what it is - the peer of the
@@ -62,9 +62,6 @@ VCF_MISSING_VALUE = "."
 NO_SEGMENT_MESSAGE = "Gene-level CNV records skipped - no gene named in the segment field"
 DUPLICATE_MESSAGE = "Gene-level CNV records skipped - the gene and direction were already called"
 AMBIGUOUS_MESSAGE_PREFIX = "Gene-level CNV records skipped - "
-
-# Header lines the rewrite replaces with its own
-_REPLACED_HEADER_PREFIXES = ("##fileformat", "##INFO", "##FORMAT", "##contig", "##ALT", "#CHROM")
 
 
 def can_process_file(filename: str) -> bool:
@@ -85,25 +82,9 @@ def get_segment_field(filename: str) -> Optional[str]:
 
 
 @dataclass
-class _GeneLevelRecord:
-    """ One rewritten record - the identity it resolved to, plus the caller's columns kept as written """
-    event: ResolvedGeneCopyNumberEvent
-    written_gene: str
-    vcf_id: str
-    qual: str
-    vcf_filter: str
-    fmt: str
-    sample_calls: list[str]
-
-    @property
-    def sort_key(self) -> tuple:
-        return self.event.gene.pk, self.event.alt
-
-
-@dataclass
 class GeneLevelCNVRewrite:
     """ What the rewrite made of the caller's file """
-    records: list[_GeneLevelRecord] = field(default_factory=list)
+    records: list[GeneLevelRecord] = field(default_factory=list)
     records_read: int = 0
     no_segment: int = 0
     duplicates: int = 0
@@ -117,10 +98,6 @@ def _segment_gene(record: cyvcf2.Variant, segment_field: str) -> Optional[str]:
     if not value or value == VCF_MISSING_VALUE:
         return None
     return value
-
-
-def _header_lines_from(raw_header: str, prefix: str) -> list[str]:
-    return [line for line in raw_header.splitlines() if line.startswith(prefix)]
 
 
 def read_gene_level_cnv_records(reader: cyvcf2.VCF, segment_field: str,
@@ -162,58 +139,17 @@ def read_gene_level_cnv_records(reader: cyvcf2.VCF, segment_field: str,
             continue
         seen.add(event)
 
-        columns = str(record).rstrip("\n").split("\t")
-        rewrite.records.append(_GeneLevelRecord(
-            event=event,
-            written_gene=written_gene,
-            vcf_id=columns[VCFColumns.ID],
-            qual=columns[VCFColumns.QUAL],
-            vcf_filter=columns[VCFColumns.FILTER],
-            fmt=columns[VCFColumns.FORMAT],
-            sample_calls=columns[VCFColumns.FORMAT + 1:]))
-
-    rewrite.records.sort(key=lambda r: r.sort_key)
+        info = {segment_field: written_gene, GENE_COPY_NUMBER_INFO: event.canonical_str}
+        rewrite.records.append(GeneLevelRecord.from_caller(record, event, info))
     return rewrite
 
 
 def write_gene_level_cnv_vcf(filename: str, rewrite: GeneLevelCNVRewrite, reader: cyvcf2.VCF,
                              segment_field: str):
-    """ Written already-clean and sorted, which is what lets preprocess skip straight to the split.
-        END = POS gives svlen 0 through vcf_get_ref_alt_svlen_and_modification, which needs one of
-        SVLEN/END for any symbolic alt (and reads SVLEN=0 as absent). """
-
-    raw_header = reader.raw_header
-    meta_lines = [line for line in raw_header.splitlines()
-                  if not line.startswith(_REPLACED_HEADER_PREFIXES)]
-    contig_lines = [*_header_lines_from(raw_header, "##contig"),
-                    f"##contig=<ID={GENE_LEVEL_CONTIG_NAME},length={GENE_LEVEL_CONTIG_LENGTH}>"]
-    segment_description = "Gene the caller's segment named, as written"
-    header_lines = build_header_lines(
-        meta_lines=meta_lines,
-        info=[
-            VCFInfoHeader(id="END", type="Integer", description="Stop position of the interval"),
-            VCFInfoHeader(id=segment_field, type="String", description=segment_description),
-            VCFInfoHeader(id=GENE_COPY_NUMBER_INFO, type="String",
-                          description="Whole-gene copy number event"),
-        ],
-        formats=_header_lines_from(raw_header, "##FORMAT"),
-        contig_lines=contig_lines,
-        samples=reader.samples,
-    )
-
-    with open(filename, "w") as f:
-        writer = VCFWriter(f, header_lines)
-        for record in rewrite.records:
-            variant_coordinate = record.event.variant_coordinate
-            info = {
-                "END": variant_coordinate.position,
-                segment_field: record.written_gene,
-                GENE_COPY_NUMBER_INFO: record.event.canonical_str,
-            }
-            writer.write_record(variant_coordinate.chrom, variant_coordinate.position,
-                                variant_coordinate.ref, variant_coordinate.alt,
-                                vcf_id=record.vcf_id, qual=record.qual, vcf_filter=record.vcf_filter,
-                                info=info, fmt=record.fmt, sample_calls=record.sample_calls)
+    write_gene_level_vcf(filename, rewrite.records, info=[
+        VCFInfoHeader(id=segment_field, type="String", description="Gene the caller's segment named, as written"),
+        VCFInfoHeader(id=GENE_COPY_NUMBER_INFO, type="String", description="Whole-gene copy number event"),
+    ], samples=reader.samples, raw_header=reader.raw_header)
 
 
 class GeneLevelCNVCreateVCFTask(ImportVCFStepTask):

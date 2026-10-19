@@ -1,0 +1,27 @@
+{% load ui_help %}
+{% load variant_transcript_select_tags %}
+<div id="transcript" class="container mt-4">
+    {% if variant_annotation.transcript_id %}
+        {% page_help page_id="variantdetails/transcript_choice_help" title="Transcript Choice" %}
+    {% else %}
+        {% if variant_annotation.variant.locus.contig.name == 'MT' and variant_annotation.version.annotation_consortium == 'R' and variant_annotation.version.vep <= 109 %}
+            <div class='alert alert-warning'>
+                Warning: There may be a transcript over this position, there is a <a href="https://github.com/Ensembl/ensembl-vep/issues/1425">known issue</a> where Ensembl VEP does not annotate RefSeq transcripts on Mitochondria
+            </div>
+        {% endif %}
+
+        <div class='alert alert-warning'>
+            Variant is intergenic and has no assigned gene / transcript. Many annotations will not be available.
+        </div>
+    {% endif %}
+        <div class='select-transcript-container'></div>
+        {% variant_transcript_select transcript_select_jquery='#select-transcript-container' vts=vts transcript_func='transcriptFunc' gene_func='geneFunc' show_all_transcript_details=True %}
+</div>
+
+<div id="gene-info" class="container">
+    <div class="card mt-4">
+        <div id='gene-info-gene-symbol-header' class="card-header"></div>
+        <div id="gene-info-details" class="card-body">
+        </div>
+    </div>
+</div>

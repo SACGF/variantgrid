@@ -9,7 +9,7 @@ from django.db.models import QuerySet
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import SpecialEKeys
 from classification.models import EvidenceKeyMap, ClassificationGrouping
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObjDate
@@ -22,6 +22,7 @@ from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, delimited_row, export_column
 from ontology.models import OntologyTerm
 from snpdb.models import GenomeBuild
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class TestingContextMode(StrEnum):

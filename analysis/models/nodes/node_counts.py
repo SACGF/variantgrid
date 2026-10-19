@@ -8,10 +8,14 @@ from analysis.exceptions import NonFatalNodeError
 from annotation.models import AnnotationVersion, GeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
-from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models import Classification
 from snpdb.models import Tag, Variant
-from snpdb.models.models_enums import BuiltInFilters, TagFilter
+from snpdb.models.models_enums import (
+    BuiltInFilters,
+    ClinicalSignificance,
+    SomaticClinicalSignificance,
+    TagFilter,
+)
 from snpdb.models.models_user_settings import AbstractNodeCountSettings
 from snpdb.utils import get_tag_styles_and_colors
 

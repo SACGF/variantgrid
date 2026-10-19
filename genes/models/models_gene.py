@@ -124,7 +124,7 @@ class HGNC(models.Model):
 class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     function = models.TextField(null=True, blank=True)
     pathway = models.TextField(null=True, blank=True)
     pathway_interaction_db = models.TextField(null=True, blank=True)
@@ -1554,7 +1554,7 @@ class LRGRefSeqGene(models.Model):
         These map to RefSeq, see https://www.ncbi.nlm.nih.gov/refseq/rsg/lrg/
 
         We don't link directly to TranscriptVersion as they are per-build """
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     lrg = models.TextField()
     rna = models.TextField()  # RefSeq transcript accession
     t = models.TextField(null=True)
@@ -1584,28 +1584,9 @@ class LRGRefSeqGene(models.Model):
 
 
 class GeneSymbolWiki(Wiki):
+    """ Saving one links the citations in its markdown to the gene symbol
+        (annotation/signals/gene_symbol_wiki_citations.py) """
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.update_citations()
-
-    def update_citations(self):
-        existing_citations = {}
-        for gc in self.gene_symbol.genesymbolcitation_set.all():
-            existing_citations[gc.citation.pk] = gc
-
-        gene_citation_ids_to_keep = []
-        from annotation.models import CitationFetchRequest
-        for citation in CitationFetchRequest.get_unfetched_citations(self.markdown):
-            gene_citation = existing_citations.get(citation.pk)
-            if not gene_citation:
-                gene_citation = self.gene_symbol.genesymbolcitation_set.create(citation=citation)
-            gene_citation_ids_to_keep.append(gene_citation.pk)
-
-        # Delete any non-used ones
-        num_deleted = self.gene_symbol.genesymbolcitation_set.exclude(pk__in=gene_citation_ids_to_keep).delete()[0]
-        logging.info("Kept %s, deleted %d", gene_citation_ids_to_keep, num_deleted)
 
 
 class ProteinDomain(models.Model):

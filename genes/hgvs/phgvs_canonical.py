@@ -5,8 +5,8 @@ short display form. Canonical keeps the protein accession the source gave (none 
 p.? and p.(=).
 
 Entry points: canonical_p_hgvs (any string), canonical_from_sequence_variant (a biocommons p. variant),
-short_p_hgvs (canonical -> p.(G12D), no accession) and is_frameshift_in_disguise. Parsing is biocommons' -
-genes/hgvs/phgvs.py:PHGVS is a regex for single residue changes and can't read ranges, dups or delins (#1383).
+short_p_hgvs (canonical -> p.(G12D), no accession) and is_frameshift_in_disguise. Parsing is biocommons', so
+ranges, dups and delins read as well as single residue changes (#1383).
 """
 import re
 from typing import Optional
@@ -35,7 +35,7 @@ def _format_posedit(posedit: Optional[PosEdit], conf: dict) -> str:
         return P_HGVS_UNKNOWN
     if posedit.pos is None and str(posedit.edit) == "=":
         return P_HGVS_NO_CHANGE
-    posedit.uncertain = True  # predicted, matching EvidenceMixin.p_parts' override_is_confirmed_to=False
+    posedit.uncertain = True  # always predicted: we can't confirm a lab's p.HGVS was experimentally determined
     return f"p.{posedit.format(conf)}"
 
 

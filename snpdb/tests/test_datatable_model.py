@@ -60,3 +60,13 @@ class DatatableModelTests(SimpleTestCase):
         with self.assertLogs("snpdb.views.datatable_view", level="WARNING") as logs:
             self.assertIs(config._model, Cohort)
         self.assertIn("BareColumns", logs.output[0])
+
+
+class ClientRendererNameTests(SimpleTestCase):
+    """ The client looks renderers up by name rather than eval'ing them (#2270) - settings go in kwargs """
+
+    def test_client_renderer_must_be_a_function_name(self):
+        RichColumn(key="name", client_renderer="TableFormat.limit", client_renderer_kwargs={"limit": 75})
+        for expression in ["TableFormat.limit.bind(null, 75)", "renderFoo()", "a['b']"]:
+            with self.assertRaises(ValueError, msg=expression):
+                RichColumn(key="name", client_renderer=expression)

@@ -34,17 +34,6 @@ class GeneAnnotationRelease(models.Model):
         return Gene.objects.filter(annotation_consortium=self.annotation_consortium,
                                    geneversion__releasegeneversion__release=self)
 
-    @staticmethod
-    def get_for_latest_annotation_versions_for_builds(status=None) -> list['GeneAnnotationRelease']:
-        """ status: VariantAnnotationVersion.Status - defaults to ACTIVE (see VariantAnnotationVersion.latest) """
-        from annotation.models import VariantAnnotationVersion
-        gene_annotation_releases = []
-        for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
-            if vav := VariantAnnotationVersion.latest(genome_build, status=status):
-                if vav.gene_annotation_release:
-                    gene_annotation_releases.append(vav.gene_annotation_release)
-        return gene_annotation_releases
-
     def genes_for_symbols(self, gene_symbols) -> QuerySet:
         rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=self,
                                                        release_gene_symbol__gene_symbol__in=gene_symbols)
@@ -60,9 +49,6 @@ class GeneAnnotationRelease(models.Model):
     def transcript_versions_for_genes(self, genes) -> QuerySet:
         return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
                                                 gene_version__gene__in=genes)
-
-    def transcript_versions_for_gene(self, gene) -> QuerySet:
-        return self.transcript_versions_for_genes([gene])
 
     def transcript_versions_for_symbol(self, gene_symbol) -> QuerySet:
         return self.transcript_versions_for_genes(self.genes_for_symbol(gene_symbol))

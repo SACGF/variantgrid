@@ -130,7 +130,7 @@ class EnrichmentKitGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTran
             RichColumn(key=self.SEQUENCING_RUN_PATH, name="sequencing_run", label="Sequencing Run", orderable=True,
                        renderer=self._render_sequencing_run, client_renderer='renderOptionalLink'),
             RichColumn(key=self.GOLD_PATH, name="gold", label="Gold", orderable=True,
-                       client_renderer='TableFormat.boolean.bind(null, null)'),
+                       client_renderer='TableFormat.boolean'),
             RichColumn(key=self.SAMPLE_NAME_PATH, name="sample_name", label="Sample", orderable=True,
                        default_sort=SortOrder.DESC),
             RichColumn(key="min", label="Min", orderable=True, css_class="num"),

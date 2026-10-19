@@ -14,7 +14,6 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from annotation.models.models import (
-    CachedWebResource,
     DBNSFPGeneAnnotationVersion,
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasAnnotationVersion,
@@ -43,6 +42,7 @@ from snpdb.models import (
     SomalierConfig,
     VariantGridColumn,
 )
+from snpdb.models.models_cached_web_resource import CachedWebResource
 from variantgrid.deployment_validation.somalier_check import verify_somalier_config
 
 

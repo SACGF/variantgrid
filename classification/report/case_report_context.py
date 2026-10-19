@@ -29,7 +29,6 @@ from django.utils import timezone
 
 from annotation.models import VariantAnnotationVersion
 from classification.enums import SpecialEKeys
-from classification.enums.classification_enums import SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_json import ClassificationJsonParams
 from classification.models.classification_report_models import CaseReportStatus, Measure
@@ -44,6 +43,7 @@ from patients.sample_grouping import get_patient_for_source, get_sample_group
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
 from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from snpdb.models import GenomeBuild, Lab, Sample
+from snpdb.models.models_enums import SomaticClinicalSignificance
 
 
 class ReportVariantKind:

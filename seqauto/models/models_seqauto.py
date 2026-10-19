@@ -764,10 +764,6 @@ class QC(SeqAutoRecord):
     def get_params(self):
         return self.vcf_file.get_params()
 
-    @property
-    def qc_dir_path(self):
-        return os.path.dirname(self.path)
-
     @staticmethod
     def get_path_from_vcf(vcf):
         pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_EXEC_SUMMARY_PATTERN)
@@ -1580,5 +1576,3 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     else:
         count = existing_count
     return count
-
-
