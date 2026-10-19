@@ -1,0 +1,14 @@
+{% load ui_utils %}
+<div class="col-md-6 mt-4">
+    <div class="card">
+        <div class="card-header">General Info</div>
+        <div class="card-body">
+            {% labelled id='variant_class' label='Variant Class' help=annotation_description.variant_class hint="tiny" %}{{ variant_annotation.get_variant_class_display }}{% endlabelled %}
+            {% labelled id='amino_acids' label='Amino Acids' help=annotation_description.amino_acids hint="tiny" %}{% endlabelled %}
+            {% labelled id='codons' label='Codons' help=annotation_description.codons hint="tiny" %}{% endlabelled %}
+            {% labelled id='exon' label='Exon' help=annotation_description.exon hint="tiny" %}{% endlabelled %}
+            {% labelled id='intron' label='Intron' help=annotation_description.intron hint="tiny" %}{% endlabelled %}
+            {% labelled id='distance' label='Gene Distance' help=annotation_description.distance hint="tiny" %}{% endlabelled %}
+        </div>
+    </div>
+</div>

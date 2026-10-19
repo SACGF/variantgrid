@@ -5,14 +5,16 @@ Owns: template tags (labelled/modal/tabs/menus/help), js_tags JSON-for-JS filter
 Start with: templatetags/ui_utils.py (labelled, modal, preview, if_user_can_edit, embed), templatetags/js_tags.py
   (jsonify, format_value, timestamp, code_json), templatetags/ui_tabs_builder.py (ui_register_tab, ui_render_tabs),
   views/ajax_form_view.py (LazyRender, AjaxFormView), json/validated_json.py (ValidatedJson, JsonMessages),
-  variantgrid/static_files/default_static/js/global.js (the processors list that wires behaviour to markup).
+  variantgrid/static_files/default_static/js/global.js (the DOM processor registry that wires behaviour to markup).
 Patterns here:
-- Behaviour is attached to markup, not called: global.js keeps a `processors` list of {test: selector, func} that
-  runs on document ready and again for every node the MutationObserver sees added
-  (variantgrid/static_files/default_static/js/global.js:checkNode). Render the attribute/class
+- Behaviour is attached to markup, not called: `registerDomProcessor(selector, func)` adds a processor that runs on
+  document ready and again for every node the MutationObserver sees added
+  (variantgrid/static_files/default_static/js/global.js:processDomNode). Render the attribute/class
   (`table[data-datatable-url]`, `.format-json`, `[data-preview-db]`, `[data-toggle="ajax-modal"]`, `[data-replace]`,
-  `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike; add a behaviour as
-  a new processor entry.
+  `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike. Generic behaviours
+  register in global.js; a feature's register from its own file (`[data-citation-id]` in citations.js,
+  `[data-preview-db]` in vc_form.js), which must load before `globalSetup()` runs on ready - registration order
+  is the order processors run.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
   it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
@@ -51,9 +53,9 @@ Gotchas:
 - `{% load %}` names matter: labelled/modal/preview/badge/boolean live in `ui_utils`;
   jsonify/format_value/timestamp/code_json/duration/get_item live in `js_tags` (uicore/templatetags/js_tags.py:format_value).
   The wrong library fails `uicore/tests/test_templates_compile.py`, which compiles every project template.
-- The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `ignoreSelectors` (third
-  party widgets) - a processor that never fires on injected HTML is usually inside one
-  (variantgrid/static_files/default_static/js/global.js:checkNode).
+- The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `domIgnoreMutationsWithin`
+  (third party widgets) and nodes matching a `registerDomIgnore` selector - a processor that never fires on injected
+  HTML is usually inside one (variantgrid/static_files/default_static/js/global.js:processDomNode).
 - Preview handlers run under send_robust: an exception becomes a report_message and the card shows nothing
   (library/preview_request.py:PreviewRequest.preview_data).
 - `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the

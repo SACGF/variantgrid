@@ -36,13 +36,13 @@ from analysis.models import (
     NodeStatus,
     VariantTag,
 )
-from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
     get_node_extra_filters_q,
     is_extra_filter,
 )
 from analysis.models.nodes.node_types import get_node_class_choices, get_node_class_name_expression
+from analysis.models.nodes.node_version import NodeColumnSummaryCacheCollection
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
@@ -59,7 +59,10 @@ from library.utils import (
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
 from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_all_variant_grid_columns, get_variantgrid_extra_annotate
+from snpdb.grid_columns.custom_columns import (
+    get_all_variant_grid_columns,
+    get_variantgrid_extra_annotate,
+)
 from snpdb.grid_columns.grid_sample_columns import (
     COPY_NUMBER_COLUMN,
     SAMPLE_COMPOSITE_COLUMNS,

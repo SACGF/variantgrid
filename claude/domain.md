@@ -174,7 +174,7 @@ An Analysis is a DAG of nodes over one build and AnnotationVersion; each node is
 down the graph into a queryset - not a stored result set. Source nodes (sample, cohort, trio, pedigree, all variants) start
 the graph; filter nodes narrow it.
 
-**NodeVersion / NodeCache / NodeTask** - `analysis/models/nodes/analysis_node.py:NodeVersion`. Each node edit bumps the
+**NodeVersion / NodeCache / NodeTask** - `analysis/models/nodes/node_version.py:NodeVersion`. Each node edit bumps the
 version; counts live on NodeVersion, caches hold materialised variant sets for slow nodes,
 and NodeTask is the lease the celery scheduler works from.
 

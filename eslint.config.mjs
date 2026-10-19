@@ -36,6 +36,8 @@ export default [
                 VcSettings: "readonly", // vc_settings.js
                 CitationsManager: "readonly", // citations.js
                 createModalShell: "readonly", // global.js
+                registerDomProcessor: "readonly", // global.js
+                registerDomIgnore: "readonly", // global.js
                 showReloadPageErrorDialog: "readonly", // global.js
                 limitLength: "readonly", // global.js
                 debounce: "readonly", // global.js
@@ -116,7 +118,7 @@ export default [
                 createMessage: "readonly", // global.js
                 DataTableDefinition: "readonly", // datatable_definition.js
                 resolveFunctionName: "readonly", // datatable_definition.js
-                VCTable: "readonly", // vc_form.js
+                VCTable: "readonly", // classification/vc_table.js
                 Flags: "readonly", // flags.js
                 VCLinks: "readonly", // vc_links.js
                 // cross-execution state in fragment-loaded files: these scripts are

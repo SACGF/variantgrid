@@ -47,12 +47,14 @@ side item once the side bar arrives.
 
 ### Markup that turns into behaviour
 
-The base page loads jQuery, Bootstrap 4, DataTables and then `global.js`, whose `processors` list pairs a selector with
-a function. It runs every processor over the document on ready, then a `MutationObserver` on `body` runs
-`checkNode` over each added node recursively, marking matched nodes (and each added top-level node) `data-p` so they
-are not processed twice. This is why an AJAX tab, a modal and a full page all behave the same: server code only ever
+The base page loads jQuery, Bootstrap 4, DataTables and then `global.js`, where `registerDomProcessor` pairs a selector
+with a function; feature files loaded after it (`citations.js`, `vc_form.js`) register their own. `enhanceAndMonitor`
+runs every processor over the document on ready, then a `MutationObserver` on `body` runs `processDomNode` over each
+added node recursively, marking matched nodes (and each added top-level node) `data-p` so they are not processed twice.
+`processDomNode` first tests the node against every selector joined into one list, so the many nodes that match
+nothing cost one selector match rather than one per processor. This is why an AJAX tab, a modal and a full page all behave the same: server code only ever
 emits attributes (`data-toggle="ajax-modal"`, `table[data-datatable-url]`, `.format-json`, `[data-help]`,
-`[data-preview-db]` ...). Processors with `func: null` (`[role="gridcell"]`, select2 bits) mark subtrees to leave alone
+`[data-preview-db]` ...). `registerDomIgnore` selectors (`[role="gridcell"]`, select2 bits) mark subtrees to leave alone
 during observation.
 
 ### Tabs
@@ -160,7 +162,7 @@ picks a random feature tip server-side (from `variantgrid/tips.py`, filtered by 
   Versions sit in Settings with a `condition`, so they appear there only when their own menu is off.
 - **`ChoiceFieldWithOther.valid_value` is always `True`** (`uicore/widgets/radio_other_widget.py`): any posted string
   is accepted as a choice, since "other" text is legitimately anything. Validate the value downstream if it matters.
-- **global.js's `ignoreSelectors` (`.wiki-tag`) is tested against the mutation target's parents only**, and only
+- **global.js's `domIgnoreMutationsWithin` (`.wiki-tag`) is tested against the mutation target's parents only**, and only
   the top-level added node is marked `data-p`, so a child re-added elsewhere can be processed twice.
 - **There is no `jsstring` filter** (commented out in `js_tags`); which library holds which tag is in `uicore/AGENTS.md`.
 - **Few tests in uicore** (`uicore/tests/`: menus, jsonify escaping, embedded `admin_only` tabs). Other tag

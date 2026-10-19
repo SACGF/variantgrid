@@ -17,19 +17,17 @@ from django.db.models.lookups import (
 )
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import (
-    AnalysisNode,
-    NodeAlleleFrequencyFilter,
-    NodeAuditLogMixin,
-    NodeVCFFilter,
-)
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import (
     SampleMixin,
     get_sample_annotation_kwargs,
     get_samples_pk_q,
 )
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
 )

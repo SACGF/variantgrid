@@ -3,7 +3,8 @@ Analysis (a DAG of nodes over one build and AnnotationVersion, Guardian-permissi
 version that invalidates every node cache) and its template machinery: AnalysisTemplate /
 AnalysisTemplateVersion snapshot an analysis, AnalysisVariable exposes node fields as parameters,
 AnalysisTemplateRun records a run and its arguments, and Sample/CohortAnalysisTemplateRun plus
-AutoLaunchAnalysisTemplate drive the auto-analyses on import. Nodes are in nodes/analysis_node.py.
+AutoLaunchAnalysisTemplate drive the auto-analyses on import. AnalysisClassification links the
+classifications made from an analysis. Nodes are in nodes/analysis_node.py.
 """
 from collections import defaultdict
 from datetime import datetime
@@ -27,6 +28,7 @@ from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
+from classification.models import Classification
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
@@ -860,6 +862,12 @@ class SampleAnalysisTemplateRun(models.Model):
 
     class Meta:
         unique_together = ('sample', 'analysis_template_run')
+
+
+
+class AnalysisClassification(models.Model):
+    analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
+    classification = models.ForeignKey(Classification, on_delete=CASCADE)
 
 
 auditlog.register(Analysis)

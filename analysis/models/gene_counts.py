@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE
 
-from analysis.models.nodes.analysis_node import NodeVersion
+from analysis.models.nodes.node_version import NodeVersion
 from annotation.models.models import VariantAnnotation
 from genes.models import Gene
 

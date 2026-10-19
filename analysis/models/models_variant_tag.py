@@ -7,7 +7,8 @@ from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_version import NodeVersion
 from annotation.canonical_annotation import (
     get_canonical_c_hgvs,
     get_canonical_transcript_annotation,

@@ -29,7 +29,7 @@ from django.db import transaction
 from django.utils.timezone import now
 
 from analysis.models import Analysis, AnalysisEdge, VariantTag
-from analysis.models.nodes.analysis_node import NodeProband
+from analysis.models.nodes.node_samples_mixin import NodeProband
 from analysis.models.nodes.node_utils import get_nodes_by_id
 from classification.models import Classification
 from patients.models_enums import SampleSourceLevel, Zygosity
