@@ -101,9 +101,9 @@ class ClassificationsNodeFilterTest(ClassificationTestDataMixin, TestCase):
                                    tier_1=False, tier_2=False, tier_4=False)
         self.assertEqual(self._matching_classification_ids(node), {self.somatic_tier_3.pk})
 
-    def test_get_classifications_qs_ors_germline_and_somatic(self):
+    def test_published_for_user_ors_germline_and_somatic(self):
         # A record matches if either its germline or somatic clinical significance is in its list
-        qs = Classification.get_classifications_qs(
+        qs = Classification.objects.published_for_user(
             self.user,
             clinical_significance_list=[ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC],
             somatic_clinical_significance_list=SomaticClinicalSignificance.TIER_1_AND_2_VALUES)

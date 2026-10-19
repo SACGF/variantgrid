@@ -21,14 +21,17 @@ from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums.classification_enums import MultiCondition
 from classification.models import flag_types
 from classification.models.classification import (
     Classification,
     ClassificationModification,
+    classification_post_publish_signal,
+)
+from classification.models.condition_resolved import (
     ConditionReference,
     ConditionResolved,
     ConditionResolvedDict,
-    classification_post_publish_signal,
 )
 from classification.models.condition_text_search import monarch_condition_text_search
 from classification.models.evidence_key import EvidenceKeyMap
@@ -135,20 +138,6 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     def get_absolute_url(self):
         return reverse("condition_matching", kwargs={"pk": self.pk})
-
-
-class MultiCondition(models.TextChoices):
-    """
-    For when multiple terms exist, are we uncertain which one it is, or are we curating for multiple.
-    NOT_DECIDED means a choice is still required
-    """
-    NOT_DECIDED = 'N', 'Not decided'
-    UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
-    CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
-
-    @property
-    def clinvar_label(self):
-        return self.label
 
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):

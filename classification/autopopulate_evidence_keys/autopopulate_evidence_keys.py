@@ -20,12 +20,15 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
     Classification,
-    ClassificationConsensus,
     ClassificationImport,
     ClassificationModification,
     EvidenceKey,
 )
-from classification.models.classification import COPY_SCOPES_ALL, COPY_SCOPES_GENE
+from classification.models.classification_consensus import (
+    COPY_SCOPES_ALL,
+    COPY_SCOPES_GENE,
+    ClassificationConsensus,
+)
 from classification.models.classification_variant_fields_validation import (
     apply_somatic_tier_from_amp_level,
 )

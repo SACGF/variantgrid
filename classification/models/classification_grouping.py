@@ -36,12 +36,8 @@ from classification.enums import (
     TestingContextBucket,
     TestingContextFull,
 )
-from classification.models.classification import (
-    Classification,
-    ClassificationModification,
-    ConditionReference,
-    ConditionResolved,
-)
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.condition_resolved import ConditionReference, ConditionResolved
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObj

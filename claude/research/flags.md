@@ -67,7 +67,7 @@ returns one collection's full comment history and `?since=<ts>` the comments sin
 `flags/views/views.py:FlagView` returns or acts on one flag. Serialisation is `flags/views/views.py:FlagHelper`, which
 calls `flags/models/models.py:fetch_flag_infos`: it sends `flag_collection_extra_info_signal` with a
 `flags/models/models.py:FlagInfos`, and the owning apps' receivers
-(`classification/models/classification.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
+(`classification/signals/classification_flag_extra_info.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
 label, links and the `source_object` for each collection. ClinicalContext has no receiver, so its collections fall back
 to the `*_set` probe and a generic label.
 

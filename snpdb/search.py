@@ -131,7 +131,7 @@ class SearchInput:
             variant_qs = Variant.objects.all()
         variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
         if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not self.user.is_superuser:
-            variant_qs = variant_qs.filter(Classification.get_variant_q(self.user, genome_build))
+            variant_qs = variant_qs.filter(Classification.objects.published_variant_q(self.user, genome_build))
 
         return variant_qs
 

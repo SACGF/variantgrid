@@ -11,11 +11,12 @@ from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 
 from classification.enums.clinvar_export_enums import ClinVarExportStatus
-from classification.models.classification import ClassificationModification, ConditionResolved
+from classification.models.classification import ClassificationModification
 from classification.models.clinvar_export_convertor import (
     CLINVAR_EXPORT_CONVERSION_VERSION,
     ClinVarExportConverter,
 )
+from classification.models.condition_resolved import ConditionResolved
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import JsonObjType, first, invalidate_cached_property
 from snpdb.models import Allele, ClinVarKey

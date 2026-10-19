@@ -6,11 +6,8 @@ from typing import Optional
 
 from classification.enums import ShareLevel, SubmissionSource
 from classification.enums.classification_enums import SpecialEKeys
-from classification.models.classification import (
-    Classification,
-    ClassificationModification,
-    ConditionResolved,
-)
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.condition_resolved import ConditionResolved
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
 from ontology.models import OntologyService, OntologyTerm
 from snpdb.models import GenomeBuild

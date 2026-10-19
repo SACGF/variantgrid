@@ -121,7 +121,7 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
         classification_qs = Classification.objects.filter(classificationmodification__in=cm_qs)
 
         for genome_build in GenomeBuild.builds_with_annotation():
-            variant_q = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
+            variant_q = classification_qs.variant_q(genome_build)
             # variant_qs = Variant.objects.filter(variant_q)
             # variants_qs = Variant.objects.filter(variantallele__allele__in=classifications_by_allele,
             #                                     variantallele__genome_build=genome_build)

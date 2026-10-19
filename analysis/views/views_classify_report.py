@@ -38,13 +38,15 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from classification.models import (
     CaseReport,
     Classification,
-    ClassificationConsensus,
     ClassificationModification,
     ClassificationReportTemplate,
-    ConsensusComparison,
     get_case_report_deliveries,
 )
-from classification.models.classification import COPY_SCOPES_ALL
+from classification.models.classification_consensus import (
+    COPY_SCOPES_ALL,
+    ClassificationConsensus,
+    ConsensusComparison,
+)
 from classification.models.classification_report_models import describe_tick_when, tick_for
 from classification.report.case_report_builder import build_case_report, preview_case_report_html
 from classification.report.case_report_context import (
