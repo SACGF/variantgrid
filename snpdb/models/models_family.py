@@ -128,7 +128,7 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
     MEMBER_FIELDS = ("mother", "father", "proband")
-    # Inheritance modes calculate_cohort_stats precomputes counts for
+    # Inheritance modes calculate_trio_stats precomputes counts for
     STATS_INHERITANCE_MODES = ("denovo", "autosomal_recessive", "autosomal_dominant", "x_linked_recessive", "compound_het")
 
     @classmethod
@@ -143,8 +143,10 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
             come through here so they can't drift apart. autosomal_dominant's predicate branches on
             which parents are affected, so those flags belong in its key: editing them misses the
             old bucket and recomputes, rather than reading one built for the previous flags.
-            A trio on a sub cohort shares its parent's CGC, so its keys carry the sub cohort's scope. """
-        key = {**self.cohort.stats_filter_scope, "inheritance": mode}
+            A cohort can have several trios, so the key names the members (#2327), and a trio on a sub
+            cohort shares its parent's CGC, so its keys carry the sub cohort's scope. """
+        key = {**self.cohort.stats_filter_scope, "inheritance": mode,
+               "trio": [self.mother_id, self.father_id, self.proband_id]}
         if mode == "autosomal_dominant":
             key["mother_affected"] = bool(self.mother_affected)
             key["father_affected"] = bool(self.father_affected)

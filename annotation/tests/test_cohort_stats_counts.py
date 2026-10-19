@@ -3,7 +3,8 @@ Cohort stats are counted in SQL and folded onto the counter fields in Python (#2
 counts for a trio whose rows exercise every rule the fold has to reproduce: variant class (SNP,
 insertion, deletion, symbolic, fusion, MNV), the "truthy" annotation flags, the chrX fields, the
 passing-filter buckets, the aggregate's priority zygosity, each inheritance mode and the compound het
-gene pairing. A sub cohort's stats live on its parent's CGC, under keys of its own (#2311).
+gene pairing. A sub cohort's stats live on its parent's CGC, under keys of its own (#2311), as do each
+trio's, which are computed apart from the cohort's (#2327).
 """
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -15,7 +16,7 @@ from annotation.models.models_annotation_run import AnnotationRangeLock, Annotat
 from annotation.models.models_clinvar import ClinVar
 from annotation.models.models_gene_annotation import GeneAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
-from annotation.tasks import calculate_sample_stats
+from annotation.tasks import calculate_sample_stats, calculate_trio_stats
 from genes.models.models_gene import Gene, Transcript
 from genes.models_enums import AnnotationConsortium
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
@@ -99,10 +100,11 @@ class CohortStatsCountsTest(TestCase):
     def _nonzero_counts(self) -> dict:
         """ {(sample name or filter key, passing_filter): {field: count}} with the zero fields left out """
         cgc = self.cohort.cohort_genotype_collection
-        has_filters = calculate_sample_stats._cohort_has_filters(self.cohort)
-        keys = calculate_sample_stats.get_filter_keys_to_precompute_for_cohort(self.cohort)
+        has_filters = calculate_sample_stats.cohort_has_filters(self.cohort)
         sample_counters, aggregate_counters = calculate_sample_stats._count_cohort_stats(
-            self.cohort, cgc, self.annotation_version, has_filters, keys)
+            self.cohort, cgc, self.annotation_version, has_filters)
+        aggregate_counters.update(calculate_trio_stats._count_trio_stats(
+            self.trio, cgc, self.annotation_version, has_filters))
         sample_names = {cs.sample.pk: cs.sample.name for cs in self.cohort.get_cohort_samples()}
         counts = {}
         for (sample_pk, passing_filter), counter in sample_counters.items():
@@ -199,8 +201,6 @@ class CohortStatsCountsTest(TestCase):
         self.assertEqual({"proband", "mother", "father"},
                          set(stats_qs.filter(sample__isnull=False).values_list("sample__name", flat=True)))
         self.assertEqual(10, stats_qs.get(sample__isnull=True, filter_key__isnull=True).variant_count)
-        for key in self.trio.get_stats_filter_keys():
-            self.assertTrue(stats_qs.filter(filter_key=key).exists(), key)
         # Only rows where mother or father has a call, classified by their letters alone
         sub_cohort_stats = stats_qs.get(sample__isnull=True, filter_key=sub_cohort.get_stats_filter_key())
         self.assertEqual((8, 0, 6, 2, 0), (sub_cohort_stats.variant_count, sub_cohort_stats.ref_count,
@@ -227,10 +227,29 @@ class CohortStatsCountsTest(TestCase):
         sub_trio = Trio.objects.create(user=self.trio.user, cohort=sub_cohort, mother=sub_cohort_samples["mother"], mother_affected=False,
                                        father=sub_cohort_samples["father"], father_affected=False,
                                        proband=sub_cohort_samples["proband"])
-        calculate_sample_stats.calculate_cohort_stats(sub_cohort, self.annotation_version)
+        calculate_trio_stats.calculate_trio_stats(self.trio, self.annotation_version)
+        calculate_trio_stats.calculate_trio_stats(sub_trio, self.annotation_version)
 
         stats_qs = CohortGenotypeStats.objects.filter(cohort_genotype_collection=self.cohort.cohort_genotype_collection,
                                                       passing_filter=False, sample__isnull=True)
         # Parent trio has mother affected, the sub cohort's doesn't - each reads its own bucket
         self.assertEqual(3, stats_qs.get(filter_key=self.trio.get_stats_filter_key("autosomal_dominant")).variant_count)
         self.assertEqual(2, stats_qs.get(filter_key=sub_trio.get_stats_filter_key("autosomal_dominant")).variant_count)
+
+    def test_each_trio_on_a_cohort_reads_its_own_buckets(self):
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+        cohort_samples = {cs.sample.name: cs for cs in self.cohort.get_cohort_samples()}
+        other_trio = Trio.objects.create(user=self.trio.user, cohort=self.cohort, mother=cohort_samples["proband"],
+                                         father=cohort_samples["father"], proband=cohort_samples["mother"])
+        # Same members and flags as self.trio, so the same buckets - fresh, so it writes nothing
+        same_trio = Trio.objects.create(user=self.trio.user, cohort=self.cohort, mother=self.trio.mother,
+                                        mother_affected=True, father=self.trio.father, proband=self.trio.proband)
+        for trio in (self.trio, other_trio, same_trio):
+            calculate_trio_stats.calculate_trio_stats(trio, self.annotation_version)
+
+        stats_qs = CohortGenotypeStats.objects.filter(cohort_genotype_collection=self.cohort.cohort_genotype_collection,
+                                                      passing_filter=False, sample__isnull=True)
+        for mode, trio_count, other_trio_count in [("denovo", 2, 0), ("autosomal_recessive", 1, 0)]:
+            self.assertEqual(trio_count, stats_qs.get(filter_key=self.trio.get_stats_filter_key(mode)).variant_count)
+            self.assertEqual(other_trio_count,
+                             stats_qs.get(filter_key=other_trio.get_stats_filter_key(mode)).variant_count)

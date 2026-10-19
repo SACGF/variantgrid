@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -26,6 +27,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
+from annotation.tasks.calculate_trio_stats import enqueue_trio_stats_recompute
 from patients.models_enums import Zygosity
 from snpdb.models import Trio
 
@@ -93,7 +95,7 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
         TrioInheritance.ANY_AFFECTED: TrioAnyAffected,
     }
-    # Modes calculate_cohort_stats precomputes counts for, as named in Trio.STATS_INHERITANCE_MODES
+    # Modes calculate_trio_stats precomputes counts for, as named in Trio.STATS_INHERITANCE_MODES
     STATS_INHERITANCE_MODES = {
         TrioInheritance.DENOVO: "denovo",
         TrioInheritance.RECESSIVE: "autosomal_recessive",
@@ -140,6 +142,9 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     def get_stats_filter_key(self) -> str:
         return self.trio.get_stats_filter_key(self._stats_inheritance_mode())
+
+    def _get_stats_enqueue_recompute(self):
+        return partial(enqueue_trio_stats_recompute, self.trio, self.analysis.annotation_version)
 
     def _get_cached_label_count(self, label):
         # Compound het is the only trio mode that takes a parent (max_inputs=1), and its queryset
