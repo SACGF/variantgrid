@@ -6,8 +6,8 @@ and ontology genes inside a node, the audit log and candidate search runs. Grid
 plumbing is snpdb/views/datatable_view.py; columns come from the user's CustomColumnsCollection.
 """
 import operator
-from collections import defaultdict
-from collections.abc import Callable, Iterator
+from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Iterator
 from functools import reduce
 from typing import Any, Optional
 
@@ -346,6 +346,24 @@ class VariantGrid(AbstractVariantGrid):
                           renderer=source_renderer, csv_rendered=True, include_in_csv=True,
                           extra_columns=sorted({pc for _vcf, pc, _i in vcf_packed_columns}))
 
+    @staticmethod
+    def _get_sample_labels(samples: Iterable[Sample], sample_formatter: Optional[Callable] = None) -> dict:
+        """ sample -> the name its genotype columns are labelled with. Samples sharing a name (one specimen
+            in a small variant and a CNV VCF) get their VCF's name too, so each CSV header is unique #2209 """
+        sample_labels = {}
+        for sample in samples:
+            label = None
+            if sample_formatter:
+                try:
+                    label = sample_formatter(sample)
+                except Exception:
+                    pass
+            sample_labels[sample] = label or str(sample.name)
+
+        label_counts = Counter(sample_labels.values())
+        return {sample: f"{label} ({sample.vcf})" if label_counts[label] > 1 else label
+                for sample, label in sample_labels.items()}
+
     def _get_grid_genotype_columns(self, sample_formatter: Optional[Callable] = None) -> list[RichColumn]:
         available_format_columns = get_available_format_columns(self.cohorts)
         sample_columns = {
@@ -366,21 +384,15 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace.update(dict.fromkeys(MISSING_VALUES, VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE))
 
         # We now have separate aliases for packed data, so each cohort handled separately
+        sample_cohort_index = self._get_sample_cohort_index()
+        sample_labels = self._get_sample_labels(sample_cohort_index, sample_formatter)
         rich_columns = []
-        for sample, (cohort, cohort_index) in self._get_sample_cohort_index().items():
+        for sample, (cohort, cohort_index) in sample_cohort_index.items():
+            sample_formatted_str = sample_labels[sample]
             for column, (column_label, label_format, width) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
                 name = f"sample_{sample.pk}_{column}"
-                sample_formatted_str = None
-                if sample_formatter:
-                    try:
-                        sample_formatted_str = sample_formatter(sample)
-                    except Exception:
-                        pass
-                if sample_formatted_str is None or len(sample_formatted_str) == 0:
-                    sample_formatted_str = str(sample.name)
-
                 cgc = cohort.cohort_genotype_collection
                 if column == COPY_NUMBER_COLUMN:
                     if not sample.vcf.copy_number_field:
