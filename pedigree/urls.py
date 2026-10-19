@@ -8,7 +8,7 @@ urlpatterns = [
     path('view_pedigree/<int:pedigree_id>', views.view_pedigree, name='view_pedigree'),
     path('ped_files', views.ped_files, name='ped_files'),
     path('view_ped_file/<int:ped_file_id>', views.view_ped_file, name='view_ped_file'),
-    path('pedigree_chart/<int:ped_file_id>', views.pedigree_chart, name='pedigree_chart'),
+    path('pedigree_chart/<int:ped_file_family_id>', views.pedigree_chart, name='pedigree_chart'),
 
     path('ped_files/datatables/', DatabaseTableView.as_view(column_class=PedFilesColumns), name='ped_files_datatables'),
     path('pedigree/datatables/', DatabaseTableView.as_view(column_class=PedigreeColumns), name='pedigree_datatables'),

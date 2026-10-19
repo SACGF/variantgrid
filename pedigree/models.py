@@ -42,19 +42,6 @@ class PedFile(GuardianPermissionsMixin, models.Model):
     def allow_group_permission_delete(cls) -> bool:
         return True  # User-uploaded file; deletable via the group_permissions delete view
 
-    def write_ped(self, filename):
-        """ Writes the imported records as a PED file - the original upload may since have been deleted """
-        sex_codes = {Sex.MALE: "1", Sex.FEMALE: "2"}
-        affection_codes = {True: "2", False: "1"}
-        records = PedFileRecord.objects.filter(family__ped_file=self).select_related("family", "father", "mother")
-        with open(filename, "w", encoding="utf-8") as f:
-            for record in records.order_by("family__name", "pk"):
-                father = record.father.sample if record.father else "0"
-                mother = record.mother.sample if record.mother else "0"
-                sex = sex_codes.get(record.sex, "0")
-                affection = affection_codes.get(record.affection, "0")
-                f.write("\t".join([record.family.name, record.sample, father, mother, sex, affection]) + "\n")
-
 
 class PedFileFamily(models.Model):
     """ Collects records together by family/pedigree (1st column)
@@ -73,6 +60,19 @@ class PedFileFamily(models.Model):
     @property
     def is_valid(self):
         return not self.errors
+
+    def write_ped(self, filename):
+        """ Writes the imported records as a PED file - the original upload may since have been deleted """
+        sex_codes = {Sex.MALE: "1", Sex.FEMALE: "2"}
+        affection_codes = {True: "2", False: "1"}
+        records = self.pedfilerecord_set.select_related("father", "mother")
+        with open(filename, "w", encoding="utf-8") as f:
+            for record in records.order_by("pk"):
+                father = record.father.sample if record.father else "0"
+                mother = record.mother.sample if record.mother else "0"
+                sex = sex_codes.get(record.sex, "0")
+                affection = affection_codes.get(record.affection, "0")
+                f.write("\t".join([self.name, record.sample, father, mother, sex, affection]) + "\n")
 
     @staticmethod
     def filter_for_user(user):

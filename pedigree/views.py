@@ -40,10 +40,10 @@ def view_ped_file(request, ped_file_id):
     return render(request, 'pedigree/view_ped_file.html', context)
 
 
-def pedigree_chart(request, ped_file_id):
-    ped_file = PedFile.get_for_user(request.user, ped_file_id)  # Make sure we can access it
+def pedigree_chart(request, ped_file_family_id):
+    ped_file_family = get_object_or_404(PedFileFamily.filter_for_user(request.user), pk=ped_file_family_id)
     graph_class_name = full_class_name(PedigreeChart)
-    cached_graph = graphcache.async_graph(graph_class_name, ped_file.pk)
+    cached_graph = graphcache.async_graph(graph_class_name, ped_file_family.pk)
     return redirect(cached_graph)
 
 

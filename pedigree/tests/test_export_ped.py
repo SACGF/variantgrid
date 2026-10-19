@@ -17,7 +17,6 @@ import django.test
 from django.contrib.auth.models import User
 
 from patients.models_enums import Sex
-from pedigree.models import PedFileRecord
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
 from pedigree.ped.import_ped import import_ped
 
@@ -138,8 +137,8 @@ class TestWriteUnrelatedPed(_TmpPedFile):
         self.assertEqual(rows, {})
 
 
-class TestPedFileWritePedRoundTrip(_TmpPedFile):
-    """ PedFile.write_ped → import_ped gives back the same records, across families """
+class TestPedFileFamilyWritePedRoundTrip(_TmpPedFile):
+    """ PedFileFamily.write_ped → import_ped gives back that family's records, and only them """
 
     PED = ("FAM1 proband father mother 1 2\n"
            "FAM1 father 0 0 1 1\n"
@@ -148,15 +147,19 @@ class TestPedFileWritePedRoundTrip(_TmpPedFile):
            "FAM2 dad 0 0 1 2\n")
 
     @staticmethod
-    def _records(ped_file):
-        return {(r.family.name, r.sample): (r.father and r.father.sample, r.mother and r.mother.sample,
-                                           r.sex, r.affection)
-                for r in PedFileRecord.objects.filter(family__ped_file=ped_file)}
+    def _records(family):
+        return {(family.name, r.sample): (r.father and r.father.sample, r.mother and r.mother.sample,
+                                          r.sex, r.affection)
+                for r in family.pedfilerecord_set.all()}
 
     def test_round_trip(self):
         user = User.objects.create_user('write_ped_test')
-        ped_file, _ = import_ped(io.StringIO(self.PED), "orig.ped", user)
-        ped_file.write_ped(self.fname)
-        reimported, _ = _import_file(self.fname, user)
-        self.assertEqual(self._records(ped_file), self._records(reimported))
-        self.assertEqual(self._records(ped_file)[("FAM1", "mother")], (None, None, Sex.FEMALE, None))
+        _, families = import_ped(io.StringIO(self.PED), "orig.ped", user)
+        for family in families:
+            family.write_ped(self.fname)
+            _, reimported_families = _import_file(self.fname, user)
+            self.assertEqual(len(reimported_families), 1)
+            self.assertEqual(self._records(family), self._records(reimported_families[0]))
+
+        fam1 = next(f for f in families if f.name == "FAM1")
+        self.assertEqual(self._records(fam1)[("FAM1", "mother")], (None, None, Sex.FEMALE, None))
