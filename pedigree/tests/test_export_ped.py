@@ -9,6 +9,7 @@ Two complementary strategies:
 - Round-trip tests (TestWriteTrioPedRoundTrip): check end-to-end behaviour after import.
   Used for properties where the encoding is ambiguous ('M'/'F' vs '1'/'2' both import fine).
 """
+import io
 import os
 import tempfile
 
@@ -16,6 +17,7 @@ import django.test
 from django.contrib.auth.models import User
 
 from patients.models_enums import Sex
+from pedigree.models import PedFileRecord
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
 from pedigree.ped.import_ped import import_ped
 
@@ -134,3 +136,27 @@ class TestWriteUnrelatedPed(_TmpPedFile):
         write_unrelated_ped(self.fname, [], family_code='FAM001')
         rows = self._read_rows()
         self.assertEqual(rows, {})
+
+
+class TestPedFileWritePedRoundTrip(_TmpPedFile):
+    """ PedFile.write_ped → import_ped gives back the same records, across families """
+
+    PED = ("FAM1 proband father mother 1 2\n"
+           "FAM1 father 0 0 1 1\n"
+           "FAM1 mother 0 0 2 0\n"
+           "FAM2 child dad 0 2 2\n"
+           "FAM2 dad 0 0 1 2\n")
+
+    @staticmethod
+    def _records(ped_file):
+        return {(r.family.name, r.sample): (r.father and r.father.sample, r.mother and r.mother.sample,
+                                           r.sex, r.affection)
+                for r in PedFileRecord.objects.filter(family__ped_file=ped_file)}
+
+    def test_round_trip(self):
+        user = User.objects.create_user('write_ped_test')
+        ped_file, _ = import_ped(io.StringIO(self.PED), "orig.ped", user)
+        ped_file.write_ped(self.fname)
+        reimported, _ = _import_file(self.fname, user)
+        self.assertEqual(self._records(ped_file), self._records(reimported))
+        self.assertEqual(self._records(ped_file)[("FAM1", "mother")], (None, None, Sex.FEMALE, None))
