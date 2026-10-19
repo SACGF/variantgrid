@@ -8,12 +8,12 @@ from django.core.management.base import BaseCommand
 from annotation.models import (
     AnnotationRun,
     AnnotationStatus,
-    TranscriptVersion,
     VariantAnnotation,
     VariantAnnotationPipelineType,
     VariantTranscriptAnnotation,
 )
 from genes.hgvs import HGVSMatcher
+from genes.models.models_gene import TranscriptVersion
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 

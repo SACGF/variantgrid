@@ -3,7 +3,7 @@ from collections import Counter
 from django.core.management import BaseCommand
 from django.db.models import Q
 
-from annotation.models.models import ClinVar, ClinVarVersion
+from annotation.models.models_clinvar import ClinVar, ClinVarVersion
 from annotation.vcf_files.clinvar_significance import (
     NO_CLASSIFICATION_FOR_THE_SINGLE_VARIANT,
     highest_oncogenicity,

@@ -129,3 +129,14 @@ class ClassificationTestQuirks(TestCase):
         data = VCDataDict(vc.evidence, evidence_keys)
         self.assertEqual(data[SpecialEKeys.CONDITION].value, 'yaps')
         self.assertFalse('immutable' in data[SpecialEKeys.PATIENT_ID].raw)
+
+    def test_note_non_breaking_spaces(self):
+        lab, user = ClassificationTestUtils.lab_and_user()
+        vc = Classification.create(
+            user=user,
+            lab=lab,
+            data={SpecialEKeys.C_HGVS: {'value': 'NM_000059.3:c.37G>C', 'note': 'seen\u00a0in\u00a0clinic'}},
+            save=True,
+            source=SubmissionSource.API
+        )
+        self.assertEqual(vc.evidence[SpecialEKeys.C_HGVS]['note'], 'seen in clinic')

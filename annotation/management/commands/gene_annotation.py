@@ -13,12 +13,10 @@ from annotation.models import (
     DBNSFPGeneAnnotationVersion,
     GeneAnnotation,
     GeneAnnotationVersion,
-    GenomeBuild,
     InvalidAnnotationVersionError,
-    OntologyTerm,
     VariantAnnotationVersion,
 )
-from annotation.models.models import SubVersionPartition
+from annotation.models.models_version import SubVersionPartition
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import (
@@ -32,8 +30,10 @@ from ontology.models import (
     OntologyTermRelation,
     OntologyVersion,
 )
+from ontology.models.models_ontology import OntologyTerm
 from ontology.ontology_traversal import get_ontology_traverser
 from ontology.panel_app_ontology import bulk_update_gene_relations, panel_app_bulk_data_age
+from snpdb.models.models_genome import GenomeBuild
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 
@@ -175,7 +175,7 @@ class Command(BaseCommand):
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
 
             status = VariantAnnotationVersion.Status.NEW if new_releases else VariantAnnotationVersion.Status.ACTIVE
-            releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds(status=status)
+            releases = VariantAnnotationVersion.latest_gene_annotation_releases(status=status)
             if not releases:
                 print(f"No GeneAnnotationReleases linked to the latest {status.label} "
                       f"VariantAnnotationVersions - nothing to do")

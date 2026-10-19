@@ -7,7 +7,6 @@ from django.urls import reverse
 
 from analysis.models import Analysis, VariantTag
 from annotation.fake_data import create_fake_variants
-from classification.enums import AlleleOriginBucket
 from snpdb.models import (
     Allele,
     AlleleOriginFilterDefault,
@@ -16,6 +15,7 @@ from snpdb.models import (
     UserSettingsOverride,
     Variant,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from variantopedia.views_tag_stats import _grouped_series
 
 LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}

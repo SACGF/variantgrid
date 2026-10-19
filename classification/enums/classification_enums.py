@@ -1,11 +1,13 @@
 """
 The classification vocabulary: SpecialEKeys (the evidence keys code refers to by name - use these,
 never string literals), ShareLevel (lab -> institution -> logged-in users -> public, with which levels
-count toward discordance), AlleleOriginBucket, CopyScope / CopyAlleleOrigin (how far a value travels
-when copied from a previous classification), ClinicalSignificance / SomaticClinicalSignificance value
-helpers, EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema), CriteriaEvaluation
-(ACMG strengths), SubmissionSource, ValidationCode and WithdrawReason. Buckets and option metadata
-come from EvidenceKey rows, not from these enums.
+count toward discordance), CopyScope / CopyAlleleOrigin (how far a value travels when copied from a
+previous classification), EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema),
+CriteriaEvaluation (ACMG strengths), SubmissionSource, ValidationCode, WithdrawReason and MultiCondition
+(how a classification's multiple condition terms combine). Buckets and option metadata come from
+EvidenceKey rows, not from these enums.
+AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification,
+so are defined in snpdb/models/models_enums.py and re-exported here.
 """
 import typing
 from dataclasses import dataclass
@@ -19,6 +21,12 @@ from django.db.models.enums import IntegerChoices
 
 from library.guardian_utils import all_users_group, public_group
 from library.utils import ChoicesEnum
+from snpdb.models.models_enums import (  # noqa: F401 - re-exported, see module docstring
+    AlleleOriginBucket,
+    ClinicalSignificance,
+    SomaticClinicalSignificance,
+)
+
 
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
@@ -117,12 +125,6 @@ class TestingContextFull:
             case TestingContextBucket.HAEMATOLOGY: return "#aa3399"
             case TestingContextBucket.NON_CANCER: return "#aa3388"
             case _: return "#000"
-
-
-class AlleleOriginBucket(TextChoices):
-    GERMLINE = "G", "Germline"
-    SOMATIC = "S", "Somatic"
-    UNKNOWN = "U", "Unknown"
 
 
 class CopyScope(TextChoices):
@@ -556,112 +558,6 @@ class SubmissionSource(str, Enum):
         return 0
 
 
-class ClinicalSignificance:
-    OTHER = '0'
-    BENIGN = '1'
-    LIKELY_BENIGN = '2'
-    VUS = '3'
-    LIKELY_PATHOGENIC = '4'
-    PATHOGENIC = '5'
-
-    CHOICES = [
-        (OTHER, 'Other'),
-        (BENIGN, 'Benign'),
-        (LIKELY_BENIGN, 'Likely Benign'),
-        (VUS, 'VUS'),
-        (LIKELY_PATHOGENIC, 'Likely Pathogenic'),
-        (PATHOGENIC, 'Pathogenic'),
-    ]
-
-    LABELS = dict(CHOICES + [(None, "No Data")])
-
-    SHORT_CHOICES = [
-        (OTHER, 'O'),
-        (BENIGN, 'B'),
-        (LIKELY_BENIGN, 'LB'),
-        (VUS, 'VUS'),
-        (LIKELY_PATHOGENIC, 'LP'),
-        (PATHOGENIC, 'P'),
-    ]
-    SHORT_LABELS = dict(SHORT_CHOICES + [(None, "U")])
-
-    CHART_COLOURS = {
-        'B': "#44d", 'LB': "#88d", 'VUS': "#666", 'LP': "#d88", 'P': "#d44", 'O': "#aaa",
-    }
-    """ Saturated equivalents of the pale .c-pill.cs- fills in global.scss, keyed by SHORT_LABELS """
-
-    DEFAULT_CHART_COLOUR = "#aaa"
-
-    @staticmethod
-    def css_class(clinical_significance: Optional[str]) -> str:
-        """ Class for the .c-pill.cs-* rules in global.scss, from a CHOICES value """
-        if clinical_significance and (short_label := ClinicalSignificance.SHORT_LABELS.get(clinical_significance)):
-            return f"cs-{short_label.lower()}"
-        return "cs-none"
-
-    @staticmethod
-    def chart_colour(clinical_significance: Optional[str]) -> str:
-        """ Saturated equivalent of the .cs- fill, for chart marks and swatches """
-        short_label = ClinicalSignificance.SHORT_LABELS.get(clinical_significance)
-        return ClinicalSignificance.CHART_COLOURS.get(short_label, ClinicalSignificance.DEFAULT_CHART_COLOUR)
-
-    @staticmethod
-    def is_significant_change(old_classification: str, new_classification: str) -> bool:
-        was_vus_change = old_classification and new_classification and old_classification == 'VUS' and new_classification.startswith('VUS')
-        return old_classification != new_classification and not was_vus_change
-
-    @staticmethod
-    def distance(old_classification: int|str, new_classification: int|str) -> int | None:
-        """ Returns distance (0-4) between classifications (returns None if any are OTHER) """
-        d = None
-        try:
-            oc_val = int(old_classification)
-            nc_val = int(new_classification)
-            if oc_val and nc_val:
-                return oc_val - nc_val
-        except ValueError:
-            pass
-        return d
-
-
-class SomaticClinicalSignificance:
-    """ Values of the 'somatic:clinical_significance' EvidenceKey (AMP tiers) that code needs to reference
-        directly - the authoritative option list lives on the EvidenceKey record """
-    TIER_1 = "tier_1"
-    TIER_1_OR_2 = "tier_1_or_2"
-    TIER_2 = "tier_2"
-    TIER_3 = "tier_3"
-    TIER_4 = "tier_4"
-
-    CHOICES = [
-        (TIER_1, "Tier I"),
-        (TIER_1_OR_2, "Tier I/II"),
-        (TIER_2, "Tier II"),
-        (TIER_3, "Tier III"),
-        (TIER_4, "Tier IV"),
-    ]
-    LABELS = dict(CHOICES)
-
-    SHORT_CHOICES = [
-        (TIER_1, "I"),
-        (TIER_1_OR_2, "I/II"),
-        (TIER_2, "II"),
-        (TIER_3, "III"),
-        (TIER_4, "IV"),
-    ]
-    SHORT_LABELS = dict(SHORT_CHOICES)
-
-    TIER_1_AND_2_VALUES = [TIER_1, TIER_1_OR_2, TIER_2]
-    """ Tiers of strong/potential clinical significance - the somatic analogue of germline LP/P """
-
-    @staticmethod
-    def css_class(somatic_clinical_significance: Optional[str]) -> str:
-        """ Class for the .cs-* rules in global.scss """
-        if somatic_clinical_significance in SomaticClinicalSignificance.LABELS:
-            return f"cs-{somatic_clinical_significance}"
-        return "cs-none"
-
-
 class CriteriaEvaluation:
     NOT_MET = CRITERIA_NOT_MET
     NOT_APPLICABLE = CRITERIA_NOT_APPLICABLE
@@ -754,3 +650,17 @@ class WithdrawReason(TextChoices):
     DUPLICATE = 'DUPLICATE', 'This record has an exact duplicate'
     SENSITIVE_DATA = 'SENSITIVE_DATA', 'This record contains sensitive data'
     OTHER = 'OTHER', 'Other'
+
+
+class MultiCondition(TextChoices):
+    """
+    For when multiple terms exist, are we uncertain which one it is, or are we curating for multiple.
+    NOT_DECIDED means a choice is still required
+    """
+    NOT_DECIDED = 'N', 'Not decided'
+    UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
+    CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
+
+    @property
+    def clinvar_label(self):
+        return self.label

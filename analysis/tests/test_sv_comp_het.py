@@ -14,7 +14,8 @@ from analysis.models.nodes.sources.quad_node import QuadCompHet
 from analysis.models.nodes.sources.trio_node import CompHet
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
-from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.fake_data import (
     create_fake_gene_version,
     create_fake_transcript_version,

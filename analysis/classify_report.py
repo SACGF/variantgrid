@@ -32,7 +32,7 @@ from analysis.variant_tag_operations import (
     get_sample_genotype_for_variant_tag,
     sample_carries_variant,
 )
-from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.models import (
     CaseReport,
     CaseReportStatus,
@@ -43,6 +43,7 @@ from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import SampleSourceLevel, Zygosity
 from patients.sample_grouping import get_patient_for_source, get_sample_group
 from snpdb.models import Lab, Sample, SampleGenotype, Tag
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)

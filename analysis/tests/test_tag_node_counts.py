@@ -10,7 +10,6 @@ from django.urls import reverse
 from analysis.grids import VariantGrid
 from analysis.models import Analysis, NodeStatus, TagNode, VariantTag
 from analysis.models.enums import TagNodeInput, TagNodeMode, ZygosityNodeZygosity
-from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
@@ -19,6 +18,7 @@ from analysis.models.nodes.node_counts import (
     get_node_extra_filters_q,
 )
 from analysis.models.nodes.node_utils import update_analysis_tag_node_counts
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils import FakeRequest
 from snpdb.models import Tag, Variant

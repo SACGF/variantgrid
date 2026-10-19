@@ -66,18 +66,19 @@ class PatientListColumns(DatatableConfig[Patient]):
                        client_renderer='TableFormat.linkUrl'),
             RichColumn('external_pk__code', label='External ID', orderable=True),
             RichColumn('family_code', label='Family Code', orderable=True),
-            RichColumn('phenotype', orderable=True, client_renderer='TableFormat.limit.bind(null, 200)'),
+            RichColumn('phenotype', orderable=True, client_renderer='TableFormat.limit',
+                       client_renderer_kwargs={"limit": 200}),
             RichColumn('affected', orderable=True, search=False, renderer=_render_optional_boolean),
             RichColumn('consanguineous', orderable=True, search=False, renderer=_render_optional_boolean),
             RichColumn('reference_id', label='Specimen Reference IDs', orderable=True),
             RichColumn('hpo', label='HPO', orderable=True, search=False, css_class='ontology-terms',
-                       client_renderer="ontologyTermsRenderer.bind(null, 'HP')"),
+                       client_renderer="ontologyTermsRenderer", client_renderer_kwargs={"termType": "HP"}),
             RichColumn('omim', label='OMIM', orderable=True, search=False, css_class='ontology-terms',
-                       client_renderer="ontologyTermsRenderer.bind(null, 'OMIM')"),
+                       client_renderer="ontologyTermsRenderer", client_renderer_kwargs={"termType": "OMIM"}),
             RichColumn('mondo', label='MONDO', orderable=True, search=False, css_class='ontology-terms',
-                       client_renderer="ontologyTermsRenderer.bind(null, 'MONDO')"),
+                       client_renderer="ontologyTermsRenderer", client_renderer_kwargs={"termType": "MONDO"}),
             RichColumn('hgnc', label='Genes', orderable=True, search=False, css_class='ontology-terms',
-                       client_renderer="ontologyTermsRenderer.bind(null, 'HGNC')"),
+                       client_renderer="ontologyTermsRenderer", client_renderer_kwargs={"termType": "HGNC"}),
             RichColumn('sample_count', label='# Samples', orderable=True, search=False, css_class='num'),
             RichColumn('samples', orderable=True),
             RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
@@ -126,7 +127,7 @@ class PatientRecordsColumns(DatatableConfig[PatientRecords]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
-        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        # self.set_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('id', orderable=True, renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
@@ -148,7 +149,7 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
-        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        # self.set_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('id', orderable=True, renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
@@ -218,7 +219,7 @@ class SpecimenColumns(DatatableConfig[Specimen]):
                        client_renderer='TableFormat.linkUrl'),
             RichColumn('tissue__name', label='Tissue', orderable=True),
             RichColumn('tissue_status', label='Tissue Status', orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(TissueStatus.choices)),
+                       **RichColumn.choices_client_renderer(TissueStatus.choices)),
             RichColumn('collection_date', label='Collected', orderable=True,
                        client_renderer='TableFormat.timestamp'),
             RichColumn('received_date', label='Received', orderable=True,
@@ -265,7 +266,7 @@ class ExtractionColumns(DatatableConfig[Extraction]):
                        renderer=partial(_render_patient_link, patient_id_column='specimen__patient_id'),
                        client_renderer='TableFormat.linkUrl'),
             RichColumn('nucleic_acid_source', label='Nucleic Acid', orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(NucleicAcid.choices)),
+                       **RichColumn.choices_client_renderer(NucleicAcid.choices)),
             RichColumn('extraction_date', label='Extracted', orderable=True,
                        client_renderer='TableFormat.timestamp'),
             RichColumn('external_pk__code', label='External ID', orderable=True),
@@ -314,7 +315,7 @@ def _unmatched_extraction_columns() -> list[RichColumn]:
         RichColumn('extraction_reference', label='Claimed reference', orderable=False, search=False,
                    renderer=_render_extraction_reference),
         RichColumn('extraction_match_status', label='Status', orderable=True, search=False,
-                   client_renderer=RichColumn.choices_client_renderer(MatchStatus.choices)),
+                   **RichColumn.choices_client_renderer(MatchStatus.choices)),
         RichColumn('extraction_match_error', label='Problem', orderable=False),
         RichColumn('extraction_match_date', label='Waiting since', orderable=True, search=False,
                    default_sort=SortOrder.ASC, client_renderer='TableFormat.timestamp'),

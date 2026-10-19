@@ -27,7 +27,7 @@ from snpdb.models import (
     Organization,
     UserSettings,
 )
-from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
 
@@ -167,8 +167,8 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
     def test_definition_declares_row_expansion(self):
         definition = datatable_definition(self.grid)
         annotation_version_id = self.node.analysis.annotation_version_id
-        self.assertEqual(definition["expandClientRenderer"],
-                         f"variantGridRowDetail.bind(null, {annotation_version_id})")
+        self.assertEqual(definition["expandClientRenderer"], "variantGridRowDetail")
+        self.assertEqual(definition["expandClientRendererKwargs"], {"annotationVersionId": annotation_version_id})
         self.assertFalse(definition["expandPrefetch"])
 
     def test_system_default_collection(self):
@@ -244,6 +244,11 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
                       kwargs={"variant_id": variant.pk,
                               "annotation_version_id": self.analysis.annotation_version_id})
         return client.get(url)
+
+    def test_row_detail_labels_shared_contig_with_every_build(self):
+        """ MT is the one variant in both builds - labelled with one of them, it changed between processes """
+        variant = slowly_create_test_variant("MT", 5000, "A", "T", self.genome_build)
+        self.assertContains(self._row_detail(variant), "<th>GRCh37 / GRCh38</th>", html=False)
 
     def test_row_detail_names_the_fusion_partners(self):
         """ The expanded row is the one place every grid shares, so the partners and the direction

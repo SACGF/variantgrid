@@ -183,8 +183,7 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.scroll_x = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('upload_step_detail',
-                                                                       expected_height=120)
+        self.set_expand_ajax('upload_step_detail', expected_height=120)
         self.rich_columns = [
             RichColumn(key='sort_order', orderable=True),
             RichColumn(key='id', orderable=True),

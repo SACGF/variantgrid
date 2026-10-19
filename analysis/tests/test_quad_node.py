@@ -325,9 +325,11 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
 
     # ── Zygosity table ────────────────────────────────────────────────────────
 
-    def test_zygosity_table_all_recessive_sibling_two_line_cell(self):
-        data = QuadNode.get_zygosity_table_data()
-        self.assertIn('AR:', data[QuadInheritance.ALL_RECESSIVE]['sibling'])
+    def test_zygosity_table_all_recessive_sibling_varies_with_affected_status(self):
+        """ Both branches read the sibling's affected status, so the cell is split like the modes it ORs """
+        entry = QuadNode.get_zygosity_table_data()[QuadInheritance.ALL_RECESSIVE]
+        self.assertEqual(entry['sibling_unaffected'], "AR: HET, REF\nXLR: HET, REF")
+        self.assertEqual(entry['sibling_affected'], "AR: HET, HOM_ALT\nXLR: HOM_ALT")
 
     def test_zygosity_table_mosaic_sibling_varies_with_affected_status(self):
         entry = QuadNode.get_zygosity_table_data()[QuadInheritance.MOSAIC_PARENT]

@@ -28,7 +28,8 @@ from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from library.django_utils.django_partition import temporary_db_table
 from patients.models_enums import Zygosity
 from snpdb.fake_data import create_fake_trio

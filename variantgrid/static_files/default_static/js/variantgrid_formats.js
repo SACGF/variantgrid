@@ -13,6 +13,7 @@ const VariantGridFormat = (function() {
     VariantGridFormat.prototype = {};
     return VariantGridFormat;
 })();
+window.VariantGridFormat = VariantGridFormat;  // @see resolveFunctionName in datatable_definition.js
 
 
 // Filter children and variant selection only exist inside the analysis editor, and analysis-wide
@@ -295,7 +296,7 @@ function _compositeMemberHtml(member, value, type, rowData, ctx) {
     if (member.renderer) {
         // The member's own separator, not the composite's
         const memberCtx = {...ctx, kwargs: {...(ctx && ctx.kwargs), separator: member.separator}};
-        return eval(member.renderer)(value, type, rowData, memberCtx);
+        return resolveFunctionName(member.renderer)(value, type, rowData, memberCtx);
     }
     return escapeHtml(_memberText(member, value));
 }
