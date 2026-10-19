@@ -1,6 +1,6 @@
 """
-DamageNode at columns_version 5 (#579): the version dicts gain a `5:` key with v5 as the
-fallback, rankscores become legacy-only, and ptc_nmd_escaping joins the LoF filters.
+DamageNode at columns_version 5 (#579): rankscores become legacy-only, and ptc_nmd_escaping
+joins the LoF filters.
 """
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -61,6 +61,12 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
         q_str = str(node._get_node_q())
         self.assertIn("variantannotation__nmd_escape_status", q_str)
         self.assertTrue(node.has_required())
+
+    def test_tool_not_annotated_on_build_does_not_modify_parents(self):
+        """ EVE is GRCh38 only, so a value left on a GRCh37 node filters nothing (#2345) """
+        node = DamageNode(analysis=self.analysis, eve_score_min=0.5, eve_score_required=True)
+        self.assertFalse(node.modifies_parents())
+        self.assertFalse(node.has_required())
 
     def test_empty_node_does_not_modify_parents(self):
         node = DamageNode(analysis=self.analysis)
