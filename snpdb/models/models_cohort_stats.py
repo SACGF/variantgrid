@@ -7,6 +7,8 @@
       filter_key IS NULL → no extra filter beyond cohort/sample identity
       filter_key IS NOT NULL → canonical-JSON string identifying a node-side filter
                                config the calc function pre-populated (e.g. trio inheritance)
+    A sub cohort has no CGC of its own: its per-sample rows are its parent's, and its aggregate rows sit
+    on the parent's CGC under a filter_key carrying its samples (Cohort.get_stats_filter_key).
 
     See annotation/models/models_cohort_stats.py for the annotation-version-keyed
     counterparts.

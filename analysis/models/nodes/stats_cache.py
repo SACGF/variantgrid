@@ -4,8 +4,9 @@
     bucket.
 
     The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats) and the readers
-    both build inheritance keys through Trio.get_stats_filter_key. A silent mismatch between the two
-    would produce cache misses forever.
+    both build keys through Cohort.get_stats_filter_key and Trio.get_stats_filter_key. A silent mismatch
+    between the two would produce cache misses forever. A sub cohort reads its parent's CGC: its
+    per-sample rows are the parent's, its aggregate rows are keyed by its samples.
 """
 from typing import Optional
 

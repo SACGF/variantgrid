@@ -30,6 +30,7 @@ from annotation.tasks.calculate_sample_stats import (
 from library.utils.json_utils import canonical_filter_key
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
+    Cohort,
     CohortGenotypeStats,
     GenomeBuild,
     ImportStatus,
@@ -66,7 +67,7 @@ class TestStatsFilterKeyRoundTrip(TestCase):
 
     @staticmethod
     def _trio_node(inheritance, mother_affected=False, father_affected=True, require_zygosity=True):
-        trio = Trio(mother_affected=mother_affected, father_affected=father_affected)
+        trio = Trio(cohort=Cohort(), mother_affected=mother_affected, father_affected=father_affected)
         return TrioNode(inheritance=inheritance, require_zygosity=require_zygosity, trio=trio)
 
     def test_trio_node_round_trip(self):
@@ -84,8 +85,8 @@ class TestStatsFilterKeyRoundTrip(TestCase):
 
     def test_modes_without_affected_flags_keep_one_key(self):
         """ Only dominant depends on affected status - a flag edit leaves the other buckets valid """
-        unaffected_parents = set(Trio(mother_affected=False, father_affected=False).get_stats_filter_keys())
-        affected_mother = set(Trio(mother_affected=True, father_affected=False).get_stats_filter_keys())
+        unaffected_parents = set(Trio(cohort=Cohort(), mother_affected=False, father_affected=False).get_stats_filter_keys())
+        affected_mother = set(Trio(cohort=Cohort(), mother_affected=True, father_affected=False).get_stats_filter_keys())
         self.assertEqual(len(unaffected_parents & affected_mother), len(Trio.STATS_INHERITANCE_MODES) - 1)
 
     def test_trio_node_uncacheable_without_require_zygosity(self):
@@ -177,34 +178,38 @@ class TestCohortStatsRecomputeLock(TestCase):
         cls.cgc = cls.cohort.cohort_genotype_collection
         cls.code_version = _get_sample_stats_code_version()
 
-    def _create_fresh_stats(self, cgc, code_version):
+    def _create_fresh_stats(self, cgc, code_version, samples=()):
         """ Pre-create one of each of the four stat families for cgc at the given
-            code_version + the test annotation versions, enough to satisfy
-            _cohort_stats_are_fresh. """
+            code_version + the test annotation versions, for the aggregate and each of samples,
+            enough to satisfy _cohort_stats_are_fresh. """
+        for sample in [None, *samples]:
+            self._create_stats_row(cgc, code_version, sample)
+
+    def _create_stats_row(self, cgc, code_version, sample):
         av = self.annotation_version
         CohortGenotypeStats.objects.create(
-            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            cohort_genotype_collection=cgc, sample=sample, filter_key=None,
             passing_filter=False, code_version=code_version,
             import_status=ImportStatus.SUCCESS)
         CohortGenotypeVariantAnnotationStats.objects.create(
-            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            cohort_genotype_collection=cgc, sample=sample, filter_key=None,
             passing_filter=False, code_version=code_version,
             variant_annotation_version=av.variant_annotation_version)
         CohortGenotypeGeneAnnotationStats.objects.create(
-            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            cohort_genotype_collection=cgc, sample=sample, filter_key=None,
             passing_filter=False, code_version=code_version,
             gene_annotation_version=av.gene_annotation_version)
         CohortGenotypeClinVarAnnotationStats.objects.create(
-            cohort_genotype_collection=cgc, sample=None, filter_key=None,
+            cohort_genotype_collection=cgc, sample=sample, filter_key=None,
             passing_filter=False, code_version=code_version,
             clinvar_version=av.clinvar_version)
 
     def test_cohort_stats_are_fresh_true_when_all_present(self):
         self.assertFalse(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
         self._create_fresh_stats(self.cgc, self.code_version)
         self.assertTrue(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
 
     def test_cohort_stats_are_fresh_false_on_code_version_mismatch(self):
         # Rows present but at a different code_version → a bump must force recompute.
@@ -212,7 +217,7 @@ class TestCohortStatsRecomputeLock(TestCase):
             name="test_other", version=98)
         self._create_fresh_stats(self.cgc, other_code_version)
         self.assertFalse(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
 
     def test_cohort_stats_are_fresh_false_when_partial(self):
         # Only the genotype-level row present; annotation-version rows missing.
@@ -221,10 +226,25 @@ class TestCohortStatsRecomputeLock(TestCase):
             passing_filter=False, code_version=self.code_version,
             import_status=ImportStatus.SUCCESS)
         self.assertFalse(
-            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version))
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
+
+    def test_cohort_stats_are_fresh_false_when_a_key_is_missing(self):
+        # Eg a trio's affected flags changed its autosomal dominant key since the last compute
+        self._create_fresh_stats(self.cgc, self.code_version)
+        keys = [None, canonical_filter_key({"inheritance": "denovo"})]
+        self.assertFalse(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, keys, []))
+
+    def test_cohort_stats_are_fresh_false_when_a_sample_is_missing(self):
+        # Eg a sub cohort recompute before #2311 left the parent with only the sub cohort's per-sample rows
+        samples = list(self.cohort.get_samples())
+        self._create_fresh_stats(self.cgc, self.code_version, samples[:-1])
+        sample_ids = [s.pk for s in samples]
+        self.assertFalse(
+            _cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], sample_ids))
 
     def test_early_exit_when_fresh_skips_recompute(self):
-        self._create_fresh_stats(self.cgc, self.code_version)
+        self._create_fresh_stats(self.cgc, self.code_version, self.cohort.get_samples())
         with patch("annotation.tasks.calculate_sample_stats._compute_and_persist_cohort_stats") as mock_compute:
             calculate_cohort_stats(self.cohort, self.annotation_version)
             mock_compute.assert_not_called()

@@ -8,7 +8,7 @@ import celery
 import numpy as np
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.functions import Length
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -79,26 +79,38 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
     return code_version
 
 
-def _cohort_stats_are_fresh(cgc, annotation_version, code_version) -> bool:
-    """ True when this CGC already has a genotype-level per-sample row at the current
-        code_version plus matching variant/gene/clinvar annotation-version rows, i.e.
-        a recompute would reproduce what is already stored. """
-    vav = annotation_version.variant_annotation_version
-    gav = annotation_version.gene_annotation_version
-    cv = annotation_version.clinvar_version
-    return (
-        CohortGenotypeStats.objects.filter(
-            cohort_genotype_collection=cgc, code_version=code_version).exists()
-        and CohortGenotypeVariantAnnotationStats.objects.filter(
-            cohort_genotype_collection=cgc, code_version=code_version,
-            variant_annotation_version=vav).exists()
-        and CohortGenotypeGeneAnnotationStats.objects.filter(
-            cohort_genotype_collection=cgc, code_version=code_version,
-            gene_annotation_version=gav).exists()
-        and CohortGenotypeClinVarAnnotationStats.objects.filter(
-            cohort_genotype_collection=cgc, code_version=code_version,
-            clinvar_version=cv).exists()
-    )
+def _filter_keys_q(filter_keys: list[Optional[str]]) -> Q:
+    q = Q(filter_key__in=[k for k in filter_keys if k is not None])
+    if None in filter_keys:
+        q |= Q(filter_key__isnull=True)
+    return q
+
+
+def _cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: list[Optional[str]],
+                            sample_ids: list[int]) -> bool:
+    """ True when this CGC already has an aggregate row for every filter key and a per-sample row for every
+        sample_id, in each of the four families at the current code_version and annotation versions, i.e. a
+        recompute would reproduce what is already stored. Checking every key and sample, not any row, is what
+        recomputes a bucket whose key changed (trio affected flags), a sub cohort's buckets on its parent's
+        CGC, and a parent left with only its sub cohort's per-sample rows by an earlier recompute (#2311) """
+    version_kwargs = {
+        CohortGenotypeStats: {},
+        CohortGenotypeVariantAnnotationStats: {"variant_annotation_version": annotation_version.variant_annotation_version},
+        CohortGenotypeGeneAnnotationStats: {"gene_annotation_version": annotation_version.gene_annotation_version},
+        CohortGenotypeClinVarAnnotationStats: {"clinvar_version": annotation_version.clinvar_version},
+    }
+    key_q = _filter_keys_q(filter_keys)
+    for model, kwargs in version_kwargs.items():
+        qs = model.objects.filter(cohort_genotype_collection=cgc, code_version=code_version, **kwargs)
+        stored_keys = set(qs.filter(key_q, sample__isnull=True).values_list("filter_key", flat=True).distinct())
+        if stored_keys != set(filter_keys):
+            return False
+        if sample_ids:
+            stored_sample_ids = set(qs.filter(sample__in=sample_ids, filter_key__isnull=True)
+                                    .values_list("sample", flat=True).distinct())
+            if stored_sample_ids != set(sample_ids):
+                return False
+    return True
 
 
 def _compute_vcf_specific_stats(vcf: VCF, annotation_version: AnnotationVersion):
@@ -235,9 +247,9 @@ def _trio_predicates(mum_zyg, dad_zyg, proband_zyg, is_x: bool, mother_affected,
 
 
 def get_filter_keys_to_precompute_for_cohort(cohort) -> list[Optional[str]]:
-    """ The filter_key buckets calculate_cohort_stats populates: the raw aggregate (None) row, plus
-        the inheritance modes when the cohort has a Trio. """
-    keys = [None]
+    """ The filter_key buckets calculate_cohort_stats populates: the raw aggregate row (None, or a sub
+        cohort's own key on its parent's CGC), plus the inheritance modes when the cohort has a Trio. """
+    keys = [cohort.get_stats_filter_key()]
     if trio := cohort.trio_set.first():
         keys.extend(trio.get_stats_filter_keys())
     return keys
@@ -254,6 +266,11 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
         Idempotent: any existing rows for this CGC + the four annotation versions
         are deleted and rewritten.
 
+        A sub cohort reads its parent's CGC, and a sample's per-sample row is the same whichever
+        cohort it's read through, so per-sample rows only come from the base cohort - a sub cohort
+        brings its parent up to date first, then writes only its own aggregate rows, under keys
+        scoped to its samples (@see Cohort.get_stats_filter_key, #2311).
+
         Serialized per CGC: the CohortGenotypeCollection row is locked with
         select_for_update() inside a transaction so two concurrent recomputes for
         the same CGC can't race the delete/bulk_create (issue #1576). A task that
@@ -264,25 +281,33 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
     with transaction.atomic():
         cgc = CohortGenotypeCollection.objects.select_for_update().get(
             pk=cohort.cohort_genotype_collection.pk)
-        if _cohort_stats_are_fresh(cgc, annotation_version, code_version):
-            logging.info("Cohort stats already fresh for %s; skipping recompute", cgc)
-            return
-        _compute_and_persist_cohort_stats(cohort, cgc, annotation_version, code_version)
+        stats_cohorts = [cohort.get_base_cohort()]
+        if cohort.is_sub_cohort:
+            stats_cohorts.append(cohort)
+        for stats_cohort in stats_cohorts:
+            precompute_keys = get_filter_keys_to_precompute_for_cohort(stats_cohort)
+            # Per-sample rows only come from the base cohort
+            sample_ids = [] if stats_cohort.is_sub_cohort else list(stats_cohort.get_samples().values_list("pk", flat=True))
+            if _cohort_stats_are_fresh(cgc, annotation_version, code_version, precompute_keys, sample_ids):
+                logging.info("Cohort stats already fresh for %s on %s; skipping recompute", stats_cohort, cgc)
+                continue
+            _compute_and_persist_cohort_stats(stats_cohort, cgc, annotation_version, code_version, precompute_keys)
 
 
 def _compute_and_persist_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection,
                                       annotation_version: AnnotationVersion,
-                                      code_version: SampleStatsCodeVersion):
+                                      code_version: SampleStatsCodeVersion,
+                                      precompute_keys: list[Optional[str]]):
     """ Count the four CohortGenotype*Stats families for the cohort and persist
         them via _persist_cohort_stats. Must run inside the per-CGC locked
         transaction opened by calculate_cohort_stats, using the locked cgc. """
     has_filters = _cohort_has_filters(cohort)
-    precompute_keys = get_filter_keys_to_precompute_for_cohort(cohort)
     sample_counters, aggregate_counters = _count_cohort_stats(cohort, cgc, annotation_version,
                                                               has_filters, precompute_keys)
-    samples = [cs.sample for cs in cohort.get_cohort_samples()]
+    samples = [] if cohort.is_sub_cohort else [cs.sample for cs in cohort.get_cohort_samples()]
     _persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
-                          sample_counters, aggregate_counters, precompute_keys, samples)
+                          sample_counters, aggregate_counters, precompute_keys, samples,
+                          replace_all=not cohort.is_sub_cohort)
 
 
 class _VariantFlags(NamedTuple):
@@ -456,6 +481,8 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
         by the aggregate's priority zygosity, and by the trio's three zygosities. Python folds the
         small results onto the counter arrays, and keeps the trio predicates (shared with
         trio_node.py) and the compound het gene pairing (#2283).
+        A sub cohort's rows are its parent's: it has no per-sample counts (those are the parent's), and
+        its aggregate only reads its own samples' characters (#2311).
         Must run inside a transaction - the temp table is ON COMMIT DROP """
     cohort_samples = list(cohort.get_cohort_samples())
     trio, trio_indexes = _get_trio_and_packed_indexes(cohort, cohort_samples)
@@ -481,49 +508,34 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
                        f"FROM ({rows_sql}) v GROUP BY {group_by_positions}",
                        [*_BOOLEAN_FLAGS_PARAMS, *rows_params])
 
-        # Per-sample: string_to_table(.., NULL) splits into characters - substr per index would walk the
-        # string from the start each time, O(samples²) per row. Rows split by gene for the trio are merged
-        # first, as the split almost doubles the rows of a wide cohort. A sub-cohort reads its parent's
-        # strings, so the other samples' characters are dropped before they are grouped
-        without_gene = f"(SELECT samples_zygosity, symbolic_alt, flag_bits, sum(n) AS n FROM {table} GROUP BY 1, 2, 3)" \
-            if with_gene else table
-        sub_cohort_where = ""
-        sub_cohort_params = []
-        if cohort.is_sub_cohort:
-            sub_cohort_where = "WHERE s.packed_index = ANY(%s)"
-            sub_cohort_params = [[cs.cohort_genotype_packed_field_index + 1 for cs in cohort_samples]]
-        cursor.execute(f"SELECT s.packed_index - 1, s.zygosity, g.symbolic_alt, g.flag_bits, sum(g.n)::bigint "
-                       f"FROM {without_gene} g CROSS JOIN LATERAL "
-                       f"string_to_table(g.samples_zygosity, NULL) WITH ORDINALITY AS s(zygosity, packed_index) "
-                       f"{sub_cohort_where} GROUP BY 1, 2, 3, 4", sub_cohort_params)
-        # A sample's totals count the rows it has a variant call on - in a multi-sample VCF the other rows
-        # are the other samples' variants. Without a GT field every call is unknown zygosity, so count them all.
-        sample_by_packed_index = {}
-        for cs in cohort_samples:
-            call_zygosities = {Zygosity.HET, Zygosity.HOM_ALT}
-            if not cs.sample.has_genotype:
-                call_zygosities.add(Zygosity.UNKNOWN_ZYGOSITY)
-            sample_by_packed_index[cs.cohort_genotype_packed_field_index] = (cs.sample.pk, call_zygosities)
-        for packed_index, zygosity, symbolic_alt, flag_bits, n in cursor.fetchall():
-            if sample_and_calls := sample_by_packed_index.get(packed_index):
-                sample_pk, call_zygosities = sample_and_calls
-                flags = _decode_flags(symbolic_alt, flag_bits)
-                for pf_pass in passing_filter_buckets(flags):
-                    _add_count(sample_counters[(sample_pk, pf_pass)], flags, zygosity, n,
-                               has_call=zygosity in call_zygosities)
+        if not cohort.is_sub_cohort:
+            _count_per_sample(cursor, table, with_gene, cohort_samples, sample_counters, passing_filter_buckets)
 
-        # Aggregate: every cohort row counts, as a CohortNode with no zygosity filter returns every row,
-        # classified by the highest-priority zygosity present across the cohort's samples - hom > het > ref > unk.
-        # This makes ref+het+hom+unk_count sum to variant_count, the invariant CohortGenotypeStats relies on.
-        priority_sql = " ".join("WHEN strpos(g.samples_zygosity, %s) > 0 THEN %s" for _ in _AGGREGATE_ZYGOSITY_PRIORITY)
+        # Aggregate: every row a CohortNode with no zygosity filter returns, classified by the highest-priority
+        # zygosity present across the cohort's samples - hom > het > ref > unk. This makes ref+het+hom+unk_count
+        # sum to variant_count, the invariant CohortGenotypeStats relies on. A sub cohort node returns the rows
+        # where one of its samples has a call (@see CohortMixin.get_cohort_and_arg_q_dict), so a row with
+        # none of its letters has no class, and is skipped. A VCF cohort that has had a sample deleted keeps
+        # that sample's letters in the arrays (num_samples), so it also only reads its members' letters
+        if cohort.is_sub_cohort or len(cohort_samples) < cgc.num_samples:
+            member_letters = ", ".join(f"substr(g.samples_zygosity, {cs.cohort_genotype_sql_index}, 1)"
+                                       for cs in cohort_samples)
+            zygosity_sql = f"concat({member_letters})"
+        else:
+            zygosity_sql = "g.samples_zygosity"
+        unclassified = None if cohort.is_sub_cohort else Zygosity.UNKNOWN_ZYGOSITY
+        priority_sql = " ".join(f"WHEN strpos({zygosity_sql}, %s) > 0 THEN %s" for _ in _AGGREGATE_ZYGOSITY_PRIORITY)
         priority_params = [z for zygosity in _AGGREGATE_ZYGOSITY_PRIORITY for z in (zygosity, zygosity)]
         cursor.execute(f"SELECT CASE {priority_sql} ELSE %s END, g.symbolic_alt, g.flag_bits, sum(g.n)::bigint "
                        f"FROM {table} g GROUP BY 1, 2, 3",
-                       [*priority_params, Zygosity.UNKNOWN_ZYGOSITY])
+                       [*priority_params, unclassified])
+        aggregate_key = cohort.get_stats_filter_key()
         for zygosity, symbolic_alt, flag_bits, n in cursor.fetchall():
+            if zygosity is None:
+                continue
             flags = _decode_flags(symbolic_alt, flag_bits)
             for pf_pass in passing_filter_buckets(flags):
-                _add_count(aggregate_counters[(None, pf_pass)], flags, zygosity, n)
+                _add_count(aggregate_counters[(aggregate_key, pf_pass)], flags, zygosity, n)
 
         if with_gene:
             # Only a proband HET can be compound het (_compound_het_source), so only those rows keep their gene
@@ -537,12 +549,41 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
     return sample_counters, aggregate_counters
 
 
+def _count_per_sample(cursor, table: str, with_gene: bool, cohort_samples, sample_counters, passing_filter_buckets):
+    """ Folds the temp table's rows onto each sample's counters, by that sample's zygosity """
+    # string_to_table(.., NULL) splits into characters - substr per index would walk the string from the
+    # start each time, O(samples²) per row. Rows split by gene for the trio are merged first, as the split
+    # almost doubles the rows of a wide cohort
+    without_gene = f"(SELECT samples_zygosity, symbolic_alt, flag_bits, sum(n) AS n FROM {table} GROUP BY 1, 2, 3)" \
+        if with_gene else table
+    cursor.execute(f"SELECT s.packed_index - 1, s.zygosity, g.symbolic_alt, g.flag_bits, sum(g.n)::bigint "
+                   f"FROM {without_gene} g CROSS JOIN LATERAL "
+                   f"string_to_table(g.samples_zygosity, NULL) WITH ORDINALITY AS s(zygosity, packed_index) "
+                   f"GROUP BY 1, 2, 3, 4")
+    # A sample's totals count the rows it has a variant call on - in a multi-sample VCF the other rows
+    # are the other samples' variants. Without a GT field every call is unknown zygosity, so count them all.
+    sample_by_packed_index = {}
+    for cs in cohort_samples:
+        call_zygosities = {Zygosity.HET, Zygosity.HOM_ALT}
+        if not cs.sample.has_genotype:
+            call_zygosities.add(Zygosity.UNKNOWN_ZYGOSITY)
+        sample_by_packed_index[cs.cohort_genotype_packed_field_index] = (cs.sample.pk, call_zygosities)
+    for packed_index, zygosity, symbolic_alt, flag_bits, n in cursor.fetchall():
+        if sample_and_calls := sample_by_packed_index.get(packed_index):
+            sample_pk, call_zygosities = sample_and_calls
+            flags = _decode_flags(symbolic_alt, flag_bits)
+            for pf_pass in passing_filter_buckets(flags):
+                _add_count(sample_counters[(sample_pk, pf_pass)], flags, zygosity, n,
+                           has_call=zygosity in call_zygosities)
+
+
 def _count_trio_modes(trio: Trio, trio_rows, precompute_keys, aggregate_counters, passing_filter_buckets):
     """ trio_rows are (mum, dad, proband zygosity, gene_id, symbolic_alt, flag_bits, n). Each inheritance mode
         bucket counts like the aggregate, classified by the proband's zygosity, without chrX fields.
         Compound het rows (proband HET from exactly one parent) only count for genes that have a
         mum-only and a dad-only source """
-    chet_key = trio.get_stats_filter_key("compound_het")
+    key_by_mode = {mode: trio.get_stats_filter_key(mode) for mode in Trio.STATS_INHERITANCE_MODES}
+    chet_key = key_by_mode["compound_het"]
     chet_gene_sources: dict[tuple[int, bool], set] = defaultdict(set)
     chet_pending = []
     for mum_zyg, dad_zyg, proband_zyg, gene_id, symbolic_alt, flag_bits, n in trio_rows:
@@ -552,7 +593,7 @@ def _count_trio_modes(trio: Trio, trio_rows, precompute_keys, aggregate_counters
         chet_source = _compound_het_source(mum_zyg, dad_zyg, proband_zyg)
         for pf_pass in passing_filter_buckets(flags):
             for mode in modes:
-                key = trio.get_stats_filter_key(mode)
+                key = key_by_mode[mode]
                 if key in precompute_keys:
                     _add_count(aggregate_counters[(key, pf_pass)], flags, proband_zyg, n, count_chrx=False)
             if chet_source is not None and gene_id is not None:
@@ -600,21 +641,23 @@ def _cohort_has_filters(cohort: Cohort) -> bool:
 
 
 def _persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
-                          sample_counters, aggregate_counters, precompute_keys, samples):
+                          sample_counters, aggregate_counters, precompute_keys, samples, replace_all: bool):
     """ Replace any existing rows for this CGC + annotation versions on the
-        new models with the computed counters. """
+        new models with the computed counters. replace_all (a base cohort) clears the CGC, sub cohorts'
+        buckets included, which recompute on their next read; otherwise only precompute_keys' aggregate
+        rows are replaced. """
     vav = annotation_version.variant_annotation_version
     gav = annotation_version.gene_annotation_version
     cv = annotation_version.clinvar_version
 
     # Wipe existing rows for this CGC scoped by annotation version where applicable
-    CohortGenotypeStats.objects.filter(cohort_genotype_collection=cgc).delete()
-    CohortGenotypeVariantAnnotationStats.objects.filter(
-        cohort_genotype_collection=cgc, variant_annotation_version=vav).delete()
-    CohortGenotypeGeneAnnotationStats.objects.filter(
-        cohort_genotype_collection=cgc, gene_annotation_version=gav).delete()
-    CohortGenotypeClinVarAnnotationStats.objects.filter(
-        cohort_genotype_collection=cgc, clinvar_version=cv).delete()
+    replaced_q = Q(cohort_genotype_collection=cgc)
+    if not replace_all:
+        replaced_q &= Q(sample__isnull=True) & _filter_keys_q(precompute_keys)
+    CohortGenotypeStats.objects.filter(replaced_q).delete()
+    CohortGenotypeVariantAnnotationStats.objects.filter(replaced_q, variant_annotation_version=vav).delete()
+    CohortGenotypeGeneAnnotationStats.objects.filter(replaced_q, gene_annotation_version=gav).delete()
+    CohortGenotypeClinVarAnnotationStats.objects.filter(replaced_q, clinvar_version=cv).delete()
 
     rows_genotype = []
     rows_variant = []
