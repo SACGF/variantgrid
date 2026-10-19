@@ -38,13 +38,12 @@ from analysis.models import (
     ZygosityNode,
 )
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import (
-    AnalysisNode,
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeWiki
+from analysis.models.nodes.filters.conservation_node import ConservationNode
+from analysis.models.nodes.node_allele_frequency import (
     NodeAlleleFrequencyFilter,
     NodeAlleleFrequencyRange,
-    NodeWiki,
 )
-from analysis.models.nodes.filters.conservation_node import ConservationNode
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
