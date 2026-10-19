@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models.classification import (
     Classification,
     ClassificationModification,
@@ -13,7 +13,6 @@ from classification.models.classification_utils import ClassificationJsonParams
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot, all_users_group
 from snpdb.models.models import CodeVersion, Lab
-from snpdb.models.models_enums import ShareLevel
 
 
 class ClassificationTestCaseModifications(TestCase):

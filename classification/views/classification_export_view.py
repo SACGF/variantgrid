@@ -16,6 +16,7 @@ from drf_spectacular.utils import extend_schema
 from requests.models import Response
 from rest_framework.views import APIView
 
+from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
@@ -38,7 +39,6 @@ from library.utils import utc_from_timestamp
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import ShareLevel
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 

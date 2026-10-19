@@ -21,14 +21,14 @@ from analysis.variant_tag_operations import (
     resolve_variant_tag,
 )
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationReportTemplate, ReportNames
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from patients.models import Patient
 from patients.models_enums import SampleSourceLevel
 from snpdb.fake_data import create_fake_cohort, create_fake_trio, make_cohort_genotype
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
-from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 
 # The mandatory keys - a record missing any of them has errors, so the form will not submit it

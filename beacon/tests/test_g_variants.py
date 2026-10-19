@@ -4,14 +4,13 @@ from rest_framework.test import APIClient
 
 from beacon.models import BeaconInboundQuery
 from beacon.schema import CLASSIFICATIONS_DATASET_ID, OBSERVATIONS_DATASET_ID
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification, ClassificationModification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import public_group
 from patients.models_enums import Zygosity
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
-from snpdb.models.models_enums import ShareLevel
 from snpdb.models.models_zygosity_counts import VariantZygosityCount, VariantZygosityCountCollection
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 

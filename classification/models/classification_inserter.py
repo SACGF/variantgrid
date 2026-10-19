@@ -7,7 +7,7 @@ from django.db import transaction
 from django.utils.timezone import now
 
 # from classification.enums import ForceUpdate
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import (
     ClassificationImportRun,
     ClassificationJsonParams,
@@ -23,7 +23,6 @@ from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
 from library.log_utils import report_exc_info
 from library.utils import DebugTimer, reset_timer
-from snpdb.models.models_enums import ShareLevel
 
 
 class BulkClassificationInserter:

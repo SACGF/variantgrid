@@ -145,7 +145,7 @@ modifications are visible (`ClassificationModification.latest_for_user`), and vi
 type, options, share level, immutability. Name keys via `classification/enums/classification_enums.py:SpecialEKeys`.
 Change evidence only through `Classification.patch_value`.
 
-**ShareLevel / published** - `snpdb/models/models_enums.py:ShareLevel`: lab → institution → logged-in users
+**ShareLevel / published** - `classification/enums/classification_enums.py:ShareLevel`: lab → institution → logged-in users
 → public. Publishing (`ClassificationModification.publish`) grants the level's Guardian group read access; only
 `ShareLevel.is_discordant_level` levels count toward discordance.
 

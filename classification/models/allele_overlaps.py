@@ -9,7 +9,7 @@ from typing import Optional
 from django.db.models import Count, QuerySet, Subquery
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
-from classification.enums import SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
     ClassificationFlagTypes,
@@ -26,7 +26,7 @@ from genes.hgvs import HGVSDisplay
 from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
-from snpdb.models.models_enums import ShareLevel
+
 """
 This live calculation of Overlaps will is deprecated and will be removed once
 VUS functionality has been migrated to the new Overlaps

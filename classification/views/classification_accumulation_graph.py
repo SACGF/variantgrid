@@ -9,6 +9,7 @@ from typing import Any, Optional, Union
 import pandas as pd
 from django.http import StreamingHttpResponse
 
+from classification.enums.classification_enums import ShareLevel
 from classification.models import (
     Classification,
     ClassificationModification,
@@ -18,7 +19,7 @@ from classification.models import (
 from flags.models import FlagComment
 from library.utils import IterableStitcher, IterableTransformer, delimited_row
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @total_ordering

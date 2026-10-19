@@ -62,6 +62,7 @@ from classification.enums import (
     CRITERIA_NOT_MET,
     CopyScope,
     CriteriaEvaluation,
+    ShareLevel,
     SpecialEKeys,
     SubmissionSource,
     TestingContextBucket,
@@ -129,7 +130,7 @@ from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
 from snpdb.models.models import CodeVersion, CodeVersionMixin
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance, ShareLevel
+from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager

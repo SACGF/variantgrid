@@ -22,7 +22,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource
+from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.enums.classification_enums import (
     CopyAlleleOrigin,
     CopyScope,
@@ -32,7 +32,7 @@ from classification.enums.classification_enums import (
 from library.cache import timed_cache
 from library.utils import empty_to_none, first, pretty_label, strip_json
 from snpdb.models import VariantGridColumn
-from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
+from snpdb.models.models_enums import AlleleOriginBucket
 
 if TYPE_CHECKING:
     from classification.models.evidence_mixin import EvidenceMixin

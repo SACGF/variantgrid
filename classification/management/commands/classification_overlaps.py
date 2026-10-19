@@ -12,20 +12,40 @@ from django.db.models.functions import Coalesce
 from annotation.models import ClinVarRecordCollection
 from annotation.models.data_enums import EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import TestingContextBucket, OverlapStatus, OverlapType, SpecialEKeys, OverlapEntrySourceTextChoices
-from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
+from classification.enums import (
+    OverlapEntrySourceTextChoices,
+    OverlapStatus,
+    OverlapType,
+    ShareLevel,
+    SpecialEKeys,
+    TestingContextBucket,
+)
 from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import ClassificationGrouping, Overlap, OverlapContribution, ClassificationResultValue, \
-    DiscordanceReport, DiscordanceReportTriageStatus, classification_flag_types, \
-    ClassificationFlagTypes, ClassificationModification, Classification, ClassificationGroupingEntry, \
-    OverlapContributionNextStep
-from classification.enums.overlaps_enums import OverlapContributionStatus, TriageDecision, \
-    TriageStatus
+from classification.enums.overlaps_enums import (
+    OverlapContributionStatus,
+    TriageDecision,
+    TriageStatus,
+)
+from classification.models import (
+    Classification,
+    ClassificationFlagTypes,
+    ClassificationGrouping,
+    ClassificationGroupingEntry,
+    ClassificationModification,
+    ClassificationResultValue,
+    DiscordanceReport,
+    DiscordanceReportTriageStatus,
+    Overlap,
+    OverlapContribution,
+    OverlapContributionNextStep,
+    classification_flag_types,
+)
 from classification.services.overlap_calculator import overlap_calculator_for_value_type
-from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
+from classification.services.overlaps_services import OverlapPageDetails, OverlapServices
 from flags.models import Flag, FlagStatus
 from library.django_utils import chunked_queryset
 from snpdb.models import Allele
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class Command(BaseCommand):

@@ -10,7 +10,7 @@ from urllib.parse import quote, urljoin
 from django.db.models import QuerySet
 from django.urls import reverse
 
-from classification.enums.classification_enums import SpecialEKeys
+from classification.enums.classification_enums import ShareLevel, SpecialEKeys
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
@@ -18,7 +18,6 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from snpdb.models import Lab, Variant
-from snpdb.models.models_enums import ShareLevel
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter

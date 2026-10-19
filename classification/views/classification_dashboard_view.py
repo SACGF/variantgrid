@@ -10,14 +10,15 @@ from django.shortcuts import render
 from django.urls import reverse
 from termsandconditions.decorators import terms_required
 
-from classification.enums import TriageStatus
+from classification.enums import ShareLevel, TriageStatus
 from classification.models import (
     ClinVarExport,
     ConditionText,
     ConditionTextMatch,
     DiscordanceReport,
     DiscordanceReportClassification,
-    classification_flag_types, OverlapContribution,
+    OverlapContribution,
+    classification_flag_types,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -36,7 +37,6 @@ from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey
-from snpdb.models.models_enums import ShareLevel
 from snpdb.models.models_genome import GenomeBuild
 
 

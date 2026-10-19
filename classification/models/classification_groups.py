@@ -9,7 +9,7 @@ from more_itertools import first
 from typing_extensions import deprecated
 
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     ClassificationModification,
     ConditionResolved,
@@ -24,7 +24,6 @@ from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
-from snpdb.models.models_enums import ShareLevel
 
 #
 # DEPRECATED

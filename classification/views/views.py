@@ -47,6 +47,7 @@ from classification.enums import (
     LabExternalFilter,
     OverlapStatus,
     OverlapType,
+    ShareLevel,
     SpecialEKeys,
     TestingContextBucket,
     WithdrawReason,
@@ -114,7 +115,7 @@ from snpdb.forms import (
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
-from snpdb.models.models_enums import AlleleOriginBucket, ShareLevel
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
 from sync.classification_sync_status import classification_sync_status

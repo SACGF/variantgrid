@@ -1,25 +1,31 @@
 """
 The classification vocabulary: SpecialEKeys (the evidence keys code refers to by name - use these,
-never string literals), CopyScope / CopyAlleleOrigin (how far a value travels when copied from a
+never string literals), ShareLevel (lab -> institution -> logged-in users -> public, with which levels
+count toward discordance), CopyScope / CopyAlleleOrigin (how far a value travels when copied from a
 previous classification), EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema),
 CriteriaEvaluation (ACMG strengths), SubmissionSource, ValidationCode and WithdrawReason. Buckets and
 option metadata come from EvidenceKey rows, not from these enums.
-AlleleOriginBucket, ShareLevel, ClinicalSignificance and SomaticClinicalSignificance are used below
-classification, so are defined in snpdb/models/models_enums.py and re-exported here.
+AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification,
+so are defined in snpdb/models/models_enums.py and re-exported here.
 """
+import typing
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Self
+from functools import total_ordering
+from typing import Optional, Self, Union
 
+from django.contrib.auth.models import User
 from django.db.models import Q, TextChoices
 from django.db.models.enums import IntegerChoices
 
+from library.guardian_utils import all_users_group, public_group
+from library.utils import ChoicesEnum
 from snpdb.models.models_enums import (  # noqa: F401 - re-exported, see module docstring
     AlleleOriginBucket,
     ClinicalSignificance,
-    ShareLevel,
     SomaticClinicalSignificance,
 )
+
 
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
@@ -390,6 +396,134 @@ class EvidenceKeyValueType:
         (INTEGER, 'integer'),
         (FLOAT, 'float')
     )
+
+
+class _ShareLevelData(typing.NamedTuple):
+    index: int
+    label: str
+
+
+@total_ordering
+class ShareLevel(ChoicesEnum):
+    # note the following aren't enums (thus the _ignore_) type is defined here, contents is defined below ShareLevel definition
+    _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS', '_DATA']
+    ALL_LEVELS: list['ShareLevel']
+    DISCORDANT_LEVEL_KEYS: list[str]
+    _DATA: dict['ShareLevel', _ShareLevelData]
+
+    # These strings have to be <= 16 characters for choice field
+    CURRENT_USER = 'user'
+    LAB = 'lab'
+    ORGANISATION = 'organisation'
+    ALL_USERS = 'logged_in_users'
+    PUBLIC = 'public'
+
+    @property
+    def _data(self):
+        return ShareLevel._DATA[self]
+
+    @property
+    def index(self):
+        return self._data.index
+
+    @property
+    def label(self):
+        return self._data.label
+
+    def __lt__(self, other):
+        return self.index < other.index
+
+    @property
+    def is_discordant_level(self) -> bool:
+        return self.value in ShareLevel.DISCORDANT_LEVEL_KEYS
+
+    def has_access(self, lab: 'Lab', user: User) -> bool:
+        if user.is_superuser:
+            return True
+        match self:
+            case _ if self.is_discordant_level:
+                return True
+            case ShareLevel.ORGANISATION:
+                return user.groups.filter(name=lab.group_institution).exists()
+            case ShareLevel.LAB:
+                return user.groups.filter(name=lab.group).exists()
+            case _:
+                raise ValueError(f"Unhandled share level {self}")
+
+    def group(self, lab: 'Lab', user: User = None):
+        groups = {
+            ShareLevel.CURRENT_USER: user,
+            ShareLevel.LAB: lab.group,
+            ShareLevel.ORGANISATION: lab.group_institution,
+            ShareLevel.ALL_USERS: all_users_group(),
+            ShareLevel.PUBLIC: public_group()
+        }
+        return groups.get(self)
+
+    def context_label(self, vc: 'Classification') -> str:
+        context_labels = {
+            ShareLevel.CURRENT_USER: vc.user.username,
+            ShareLevel.LAB: vc.lab.name,
+            ShareLevel.ORGANISATION: vc.lab.organization.name,
+        }
+        return context_labels.get(self, self.label)
+
+    # deprecated - just provided as a halfway measure when switching ShareLevel from class to Enum
+    @property
+    def key(self) -> str:
+        return self.value
+
+    @property
+    def icon(self) -> str:
+        return f'icons/share_level/{self.value}.png'
+
+    @classmethod
+    def _missing_(cls, value):
+        # Backwards compatibility: old DB rows used 'institution' before the rename to 'organisation'
+        if value == 'institution':
+            return cls.ORGANISATION
+        return None
+
+    def __str__(self):
+        return self.value
+
+    @staticmethod
+    def same_and_higher(level: 'ShareLevel') -> list['ShareLevel']:
+        return [iter_level for iter_level in ShareLevel.ALL_LEVELS if iter_level.index >= level.index]
+
+    @staticmethod
+    def from_key(source: Optional[Union['ShareLevel', str, int]]) -> Optional['ShareLevel']:
+        if source is None:
+            return None
+
+        if isinstance(source, ShareLevel):
+            return source
+
+        index = -1
+        if isinstance(source, int):
+            index = source
+        elif str(source).isnumeric():
+            index = int(source)
+
+        # Backwards compatibility: old DB rows and old API clients used 'institution'
+        if str(source) == 'institution':
+            return ShareLevel.ORGANISATION
+
+        for sl in ShareLevel.ALL_LEVELS:
+            if sl.value == str(source) or sl.index == index:
+                return sl
+        raise ValueError('Unknown share level ' + str(source))
+
+
+ShareLevel._DATA = {
+        ShareLevel.CURRENT_USER: _ShareLevelData(index=0, label='Current User'),
+        ShareLevel.LAB: _ShareLevelData(index=1, label='Lab'),
+        ShareLevel.ORGANISATION: _ShareLevelData(index=2, label='Organisation'),
+        ShareLevel.ALL_USERS: _ShareLevelData(index=3, label='App Users'),
+        ShareLevel.PUBLIC: _ShareLevelData(index=4, label='3rd Party Databases')
+    }
+ShareLevel.ALL_LEVELS = [ShareLevel.CURRENT_USER, ShareLevel.LAB, ShareLevel.ORGANISATION, ShareLevel.ALL_USERS, ShareLevel.PUBLIC]
+ShareLevel.DISCORDANT_LEVEL_KEYS = {ShareLevel.ALL_USERS.value, ShareLevel.PUBLIC.value}
 
 
 class ForceUpdate(str, Enum):

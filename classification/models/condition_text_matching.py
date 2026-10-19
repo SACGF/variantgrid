@@ -20,7 +20,7 @@ from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import flag_types
 from classification.models.classification import (
     Classification,
@@ -59,7 +59,6 @@ from ontology.ontology_matching import (
     pretty_set,
 )
 from snpdb.models import Lab
-from snpdb.models.models_enums import ShareLevel
 
 condition_set_signal = django.dispatch.Signal()  # args: "classification", "resolved_condition"
 

@@ -1,11 +1,10 @@
 from django.test import TestCase
 
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from classification.enums import SubmissionSource
+from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
 from classification.tasks.classification_citation_tasks import classification_citation_ids
 from classification.tests.models.test_utils import ClassificationTestUtils
-from snpdb.models.models_enums import ShareLevel
 
 
 class ClassificationCitationsTest(TestCase):

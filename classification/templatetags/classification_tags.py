@@ -20,6 +20,7 @@ from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.enums import (
     ClassificationResultValue,
     OverlapStatus,
+    ShareLevel,
     SpecialEKeys,
     TestingContextBucket,
     TestingContextFull,
@@ -62,7 +63,7 @@ from ontology.models import OntologyTerm
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, LabLike
-from snpdb.models.models_enums import ClinicalSignificance, ShareLevel
+from snpdb.models.models_enums import ClinicalSignificance
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant

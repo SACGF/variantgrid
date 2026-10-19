@@ -1,7 +1,7 @@
 from django.test import TestCase
 
+from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification, EvidenceMixin, ValidationMerger
-from snpdb.models.models_enums import ShareLevel
 
 
 class ClassificationTestCaseUtils(TestCase):

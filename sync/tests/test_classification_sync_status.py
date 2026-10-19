@@ -2,14 +2,13 @@ from django.contrib.auth.models import User
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from classification.enums import SubmissionSource
+from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_gene_level_variant
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import Lab, VariantCoordinate
-from snpdb.models.models_enums import ShareLevel
 from sync.classification_sync_status import ClassificationSyncState, classification_sync_status
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun

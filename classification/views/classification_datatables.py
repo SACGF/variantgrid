@@ -9,7 +9,7 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast, Lower
 from django.http import HttpRequest
 
-from classification.enums import EvidenceCategory, LabExternalFilter, SpecialEKeys
+from classification.enums import EvidenceCategory, LabExternalFilter, ShareLevel, SpecialEKeys
 from classification.models import (
     ClassificationModification,
     DiscordanceReport,
@@ -24,7 +24,7 @@ from library.utils import JsonDataType
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Lab, UserSettings, Variant
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance, ShareLevel
+from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']

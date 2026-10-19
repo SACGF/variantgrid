@@ -115,7 +115,7 @@ group read permission on the modification, rewrites `Classification.summary` thr
 grouping assignment, condition text sync, ClinVar exclusion patterns, the significance-change flag, common-variant
 partition moves in snpdb, and gene-count refresh in annotation.
 
-Share levels are `snpdb/models/models_enums.py:ShareLevel` - user, lab, organisation, logged-in users,
+Share levels are `classification/enums/classification_enums.py:ShareLevel` - user, lab, organisation, logged-in users,
 public - and only the last two are `is_discordant_level`, i.e. count as "shared" for discordance, grouping visibility
 and export. The web form republishes at the record's current level (`classification/views/views.py:create_classification_object`)
 and the inserter refuses to go lower, republishing at the current level with a `shared_higher` warning, but the model has

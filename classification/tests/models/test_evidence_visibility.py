@@ -3,11 +3,11 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import Classification, EvidenceVisibility
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.tests.models.test_utils import ClassificationTestUtils
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import ShareLevel
 
 HIDDEN = {'value': "(hidden)", 'hidden': True}
 

@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from annotation.fake_data import get_fake_annotation_version
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
@@ -20,7 +20,6 @@ from snpdb.models import (
     VariantZygosityCountCollection,
     VCFFilter,
 )
-from snpdb.models.models_enums import ShareLevel
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.variant_sample_information import VariantSampleGenotypes
 
