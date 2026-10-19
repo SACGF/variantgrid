@@ -38,7 +38,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.utils import pretty_label
 from snpdb.grids import AbstractVariantGrid, get_standard_overrides
 from snpdb.models import ImportStatus, Q, VariantGridColumn
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
     variant_qs_filter_has_internal_data,
@@ -256,6 +256,13 @@ class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
         return ReleaseGeneVersion.objects.filter(
             release_id=gene_annotation_release_id,
             gene_version__gene__geneannotation__version=gene_annotation_version)
+
+    def get_csv_name(self) -> str:
+        """ Server CSV downloads carry the page's filter params, so a contig page's export is named after it """
+        name_parts = ["genes", self.get_query_param("genome_build_name")]
+        if contig_id := self.get_query_param("contig_id"):
+            name_parts.append(get_object_or_404(Contig, pk=contig_id).name)
+        return "_".join(name_parts)
 
     def filter_queryset(self, qs: QuerySet[ReleaseGeneVersion]) -> QuerySet[ReleaseGeneVersion]:
         if contig_id := self.get_query_param("contig_id"):
