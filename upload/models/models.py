@@ -76,8 +76,10 @@ class FileUpload(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     @property
-    def exists(self):
-        if self.file_field:
+    def exists(self) -> bool:
+        """ Whether the file is still on disk - uploads can be cleaned up, or a database restored without them """
+        has_file = self.file_field if self.import_source == ImportSource.WEB_UPLOAD else self.path
+        if has_file:
             return os.path.exists(self.get_filename())
         return False
 
