@@ -3,7 +3,7 @@ The gene content box on the classification form - for records the create-from-va
 made from the Classify & Report tab with nothing to copy, imported, or created before the gene was curated.
 
 It offers the same deduplicated gene candidates as the create page
-(classification/models/classification.py:ClassificationConsensus.gene_consensus_groups), and applying one
+(classification/models/classification_consensus.py:ClassificationConsensus.gene_consensus_groups), and applying one
 patches the empty fields as SubmissionSource.CONSENSUS.
 
 Entry points: gene_consensus_panel (the card, its dialog rows, and the apply POST), reached at
@@ -21,13 +21,12 @@ from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
 
 from classification.enums import SubmissionSource
-from classification.models import (
-    Classification,
+from classification.models import Classification, ClassificationModification
+from classification.models.classification_consensus import (
+    COPY_SCOPES_GENE,
     ClassificationConsensus,
-    ClassificationModification,
     ConsensusGroup,
 )
-from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from snpdb.models.models_enums import AlleleOriginBucket

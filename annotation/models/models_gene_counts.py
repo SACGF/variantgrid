@@ -68,7 +68,7 @@ class GeneCountType(models.Model):
     def _get_variant_q(self, genome_build: GenomeBuild) -> Optional[Q]:
         if self.uses_classifications:
             vc_qs = self.get_classification_qs()
-            return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
+            return vc_qs.variant_q(genome_build)
 
     def get_variant_queryset(self, variant_annotation_version: VariantAnnotationVersion):
         annotation_version = variant_annotation_version.get_any_annotation_version()

@@ -32,7 +32,7 @@ from classification.enums.overlaps_enums import (
     TriageComment,
     TriageDecision,
 )
-from classification.models.classification import ConditionResolved
+from classification.models.condition_resolved import ConditionResolved
 from classification.models.classification_grouping import ClassificationGrouping
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
