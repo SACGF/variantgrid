@@ -22,10 +22,13 @@ class Test(URLTestCase):
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
         cls.user_viewer = User.objects.get_or_create(username='pedigree_viewer')[0]
+        cls.user_pedigree_writer = User.objects.get_or_create(username='pedigree_writer')[0]
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.pedigree = create_fake_pedigree(cls.user_owner, grch37)
         cls.ped_file = cls.pedigree.ped_file_family.ped_file
         assign_perm(Pedigree.get_read_perm(), cls.user_viewer, cls.pedigree)
+        for perm in (Pedigree.get_read_perm(), Pedigree.get_write_perm()):
+            assign_perm(perm, cls.user_pedigree_writer, cls.pedigree)
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_pedigree', {"pedigree_id": cls.pedigree.pk}, 200),
@@ -91,6 +94,16 @@ class Test(URLTestCase):
         response = self._post_view_pedigree(self.user_viewer, "renamed by viewer")
         self.assertEqual(response.status_code, 403)
         self.assertEqual(Pedigree.objects.get(pk=self.pedigree.pk).name, "fake pedigree")
+
+    def testViewPedigreeWithoutPedFilePermission(self):
+        """ Pedigree shared without its PED file or cohort: no link to the PED file, and saving keeps them """
+        self.client.force_login(self.user_pedigree_writer)
+        response = self.client.get(reverse('view_pedigree', kwargs={"pedigree_id": self.pedigree.pk}))
+        self.assertNotContains(response, reverse('view_ped_file', kwargs={"ped_file_id": self.ped_file.pk}))
+
+        response = self._post_view_pedigree(self.user_pedigree_writer, "renamed by writer")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Pedigree.objects.get(pk=self.pedigree.pk).name, "renamed by writer")
 
     def testCreatePedigreeIsPostOnly(self):
         kwargs = {"cohort_id": self.pedigree.cohort.pk, "ped_file_family_id": self.pedigree.ped_file_family.pk}
