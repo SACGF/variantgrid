@@ -1487,7 +1487,13 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                                f"no RNA accession - there is no transcript sequence")
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():
+        tvi_qs = TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id)
+        if version is None:
+            # An unversioned accession resolves to the latest version, as the APIs do
+            tvi_qs = tvi_qs.order_by("-version")
+        else:
+            tvi_qs = tvi_qs.filter(version=version)
+        if tvi := tvi_qs.first():
             tvi.raise_any_errors()
             return tvi
 

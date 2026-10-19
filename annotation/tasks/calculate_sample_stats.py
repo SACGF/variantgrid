@@ -86,11 +86,13 @@ def _filter_keys_q(filter_keys: list[Optional[str]]) -> Q:
     return q
 
 
-def _cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: list[Optional[str]]) -> bool:
-    """ True when this CGC already has an aggregate row for every filter key, in each of the four
-        families at the current code_version and annotation versions, i.e. a recompute would reproduce
-        what is already stored. Checking every key, not any row, is what recomputes a bucket whose key
-        changed (trio affected flags) or a sub cohort's buckets on its parent's CGC (#2311) """
+def _cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: list[Optional[str]],
+                            sample_ids: list[int]) -> bool:
+    """ True when this CGC already has an aggregate row for every filter key and a per-sample row for every
+        sample_id, in each of the four families at the current code_version and annotation versions, i.e. a
+        recompute would reproduce what is already stored. Checking every key and sample, not any row, is what
+        recomputes a bucket whose key changed (trio affected flags), a sub cohort's buckets on its parent's
+        CGC, and a parent left with only its sub cohort's per-sample rows by an earlier recompute (#2311) """
     version_kwargs = {
         CohortGenotypeStats: {},
         CohortGenotypeVariantAnnotationStats: {"variant_annotation_version": annotation_version.variant_annotation_version},
@@ -99,11 +101,15 @@ def _cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: 
     }
     key_q = _filter_keys_q(filter_keys)
     for model, kwargs in version_kwargs.items():
-        stored_keys = set(model.objects.filter(key_q, cohort_genotype_collection=cgc, code_version=code_version,
-                                               sample__isnull=True, **kwargs)
-                          .values_list("filter_key", flat=True).distinct())
+        qs = model.objects.filter(cohort_genotype_collection=cgc, code_version=code_version, **kwargs)
+        stored_keys = set(qs.filter(key_q, sample__isnull=True).values_list("filter_key", flat=True).distinct())
         if stored_keys != set(filter_keys):
             return False
+        if sample_ids:
+            stored_sample_ids = set(qs.filter(sample__in=sample_ids, filter_key__isnull=True)
+                                    .values_list("sample", flat=True).distinct())
+            if stored_sample_ids != set(sample_ids):
+                return False
     return True
 
 
@@ -291,7 +297,9 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
             stats_cohorts.append(cohort)
         for stats_cohort in stats_cohorts:
             precompute_keys = get_filter_keys_to_precompute_for_cohort(stats_cohort)
-            if _cohort_stats_are_fresh(cgc, annotation_version, code_version, precompute_keys):
+            # Per-sample rows only come from the base cohort
+            sample_ids = [] if stats_cohort.is_sub_cohort else list(stats_cohort.get_samples().values_list("pk", flat=True))
+            if _cohort_stats_are_fresh(cgc, annotation_version, code_version, precompute_keys, sample_ids):
                 logging.info("Cohort stats already fresh for %s on %s; skipping recompute", stats_cohort, cgc)
                 continue
             _compute_and_persist_cohort_stats(stats_cohort, cgc, annotation_version, code_version, precompute_keys)
@@ -518,15 +526,15 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
         # zygosity present across the cohort's samples - hom > het > ref > unk. This makes ref+het+hom+unk_count
         # sum to variant_count, the invariant CohortGenotypeStats relies on. A sub cohort node returns the rows
         # where one of its samples has a call (@see CohortMixin.get_cohort_and_arg_q_dict), so a row with
-        # none of its letters has no class, and is skipped
-        if cohort.is_sub_cohort:
-            sub_cohort_letters = ", ".join(f"substr(g.samples_zygosity, {cs.cohort_genotype_sql_index}, 1)"
-                                           for cs in cohort_samples)
-            zygosity_sql = f"concat({sub_cohort_letters})"
-            unclassified = None
+        # none of its letters has no class, and is skipped. A VCF cohort that has had a sample deleted keeps
+        # that sample's letters in the arrays (num_samples), so it also only reads its members' letters
+        if cohort.is_sub_cohort or len(cohort_samples) < cgc.num_samples:
+            member_letters = ", ".join(f"substr(g.samples_zygosity, {cs.cohort_genotype_sql_index}, 1)"
+                                       for cs in cohort_samples)
+            zygosity_sql = f"concat({member_letters})"
         else:
             zygosity_sql = "g.samples_zygosity"
-            unclassified = Zygosity.UNKNOWN_ZYGOSITY
+        unclassified = None if cohort.is_sub_cohort else Zygosity.UNKNOWN_ZYGOSITY
         priority_sql = " ".join(f"WHEN strpos({zygosity_sql}, %s) > 0 THEN %s" for _ in _AGGREGATE_ZYGOSITY_PRIORITY)
         priority_params = [z for zygosity in _AGGREGATE_ZYGOSITY_PRIORITY for z in (zygosity, zygosity)]
         cursor.execute(f"SELECT CASE {priority_sql} ELSE %s END, g.symbolic_alt, g.flag_bits, sum(g.n)::bigint "

@@ -208,6 +208,19 @@ class CohortStatsCountsTest(TestCase):
                                            sub_cohort_stats.het_count, sub_cohort_stats.hom_count,
                                            sub_cohort_stats.unk_count))
 
+    def test_deleted_sample_drops_out_of_vcf_cohort_aggregate(self):
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+        stats_qs = CohortGenotypeStats.objects.filter(cohort_genotype_collection=self.cohort.cohort_genotype_collection,
+                                                      passing_filter=False, sample__isnull=True, filter_key__isnull=True)
+        self.cohort.get_samples().get(name="proband").delete()
+        self.assertFalse(stats_qs.exists())
+
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+        # Still every row, but classified by the mother and father letters alone
+        stats = stats_qs.get()
+        self.assertEqual((10, 0, 6, 2, 2), (stats.variant_count, stats.ref_count, stats.het_count,
+                                            stats.hom_count, stats.unk_count))
+
     def test_sub_cohort_trio_buckets_dont_share_parent_keys(self):
         cohort_samples = {cs.sample.name: cs for cs in self.cohort.get_cohort_samples()}
         sub_cohort = self.cohort.create_sub_cohort(self.trio.user, [cs.sample for cs in cohort_samples.values()])
