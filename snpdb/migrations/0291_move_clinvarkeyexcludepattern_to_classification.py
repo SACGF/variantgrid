@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('snpdb', '0288_one_off_allele_liftover_stuck_processing'),
+        ('snpdb', '0290_cachedwebresource_rename_table'),
     ]
 
     operations = [

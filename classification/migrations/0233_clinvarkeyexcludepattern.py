@@ -8,8 +8,8 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('classification', '0231_conditiontext_monarch_search_failed'),
-        ('snpdb', '0289_move_clinvarkeyexcludepattern_to_classification'),
+        ('classification', '0232_overlapdiscordancenotification_lab'),
+        ('snpdb', '0291_move_clinvarkeyexcludepattern_to_classification'),
     ]
 
     operations = [
