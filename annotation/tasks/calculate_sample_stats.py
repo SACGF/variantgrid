@@ -515,15 +515,15 @@ def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotatio
         # zygosity present across the cohort's samples - hom > het > ref > unk. This makes ref+het+hom+unk_count
         # sum to variant_count, the invariant CohortGenotypeStats relies on. A sub cohort node returns the rows
         # where one of its samples has a call (@see CohortMixin.get_cohort_and_arg_q_dict), so a row with
-        # none of its letters has no class, and is skipped
-        if cohort.is_sub_cohort:
-            sub_cohort_letters = ", ".join(f"substr(g.samples_zygosity, {cs.cohort_genotype_sql_index}, 1)"
-                                           for cs in cohort_samples)
-            zygosity_sql = f"concat({sub_cohort_letters})"
-            unclassified = None
+        # none of its letters has no class, and is skipped. A VCF cohort that has had a sample deleted keeps
+        # that sample's letters in the arrays (num_samples), so it also only reads its members' letters
+        if cohort.is_sub_cohort or len(cohort_samples) < cgc.num_samples:
+            member_letters = ", ".join(f"substr(g.samples_zygosity, {cs.cohort_genotype_sql_index}, 1)"
+                                       for cs in cohort_samples)
+            zygosity_sql = f"concat({member_letters})"
         else:
             zygosity_sql = "g.samples_zygosity"
-            unclassified = Zygosity.UNKNOWN_ZYGOSITY
+        unclassified = None if cohort.is_sub_cohort else Zygosity.UNKNOWN_ZYGOSITY
         priority_sql = " ".join(f"WHEN strpos({zygosity_sql}, %s) > 0 THEN %s" for _ in _AGGREGATE_ZYGOSITY_PRIORITY)
         priority_params = [z for zygosity in _AGGREGATE_ZYGOSITY_PRIORITY for z in (zygosity, zygosity)]
         cursor.execute(f"SELECT CASE {priority_sql} ELSE %s END, g.symbolic_alt, g.flag_bits, sum(g.n)::bigint "

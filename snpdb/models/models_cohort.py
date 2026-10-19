@@ -477,10 +477,17 @@ def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-arg
 @receiver(pre_delete, sender=Sample)
 def pre_delete_sample(sender, instance, **kwargs):  # pylint: disable=unused-argument
     """ The CASCADE from Sample deletes CohortSamples in bulk, skipping CohortSample.delete(), so the cohort
-        version (and everything keyed by it) would stay as it was. A VCF cohort is left alone: its genotype
-        data is the VCF's and is only rebuilt by a reload, so a version bump would orphan it """
-    for cohort_sample in instance.cohortsample_set.filter(cohort__vcf__isnull=True).select_related("cohort"):
-        cohort_sample.delete()
+        version (and everything keyed by it) would stay as it was. A VCF cohort keeps its version: its genotype
+        data is the VCF's and is only rebuilt by a reload, so a bump would orphan it. Its aggregate stats
+        counted the deleted sample, so they're cleared, to recompute on their next read """
+    for cohort_sample in instance.cohortsample_set.select_related("cohort"):
+        if cohort_sample.cohort.vcf_id:
+            for cgc in CohortGenotypeCollection.objects.filter(cohort=cohort_sample.cohort):
+                for stats in (cgc.genotype_stats, cgc.variant_annotation_stats,
+                              cgc.gene_annotation_stats, cgc.clinvar_annotation_stats):
+                    stats.filter(sample__isnull=True).delete()
+        else:
+            cohort_sample.delete()
 
 
 class CohortSample(models.Model):
