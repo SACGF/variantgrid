@@ -3,7 +3,7 @@ import json
 from django.conf import settings
 from django.template import Library
 
-from analysis.models.nodes.node_support_models import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.serializers import NodeAlleleFrequencyFilterSerializer
 
 register = Library()

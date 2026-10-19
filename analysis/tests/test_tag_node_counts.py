@@ -17,8 +17,8 @@ from analysis.models.nodes.node_counts import (
     get_node_counts_mine_and_available,
     get_node_extra_filters_q,
 )
-from analysis.models.nodes.node_support_models import NodeVersion
 from analysis.models.nodes.node_utils import update_analysis_tag_node_counts
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils import FakeRequest
 from snpdb.models import Tag, Variant

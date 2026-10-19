@@ -15,7 +15,7 @@ from django.db.models import BooleanField, F, Func, IntegerField, QuerySet, Valu
 from django.db.models.expressions import RawSQL
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.node_support_models import NodeCache, NodeVersion
+from analysis.models.nodes.node_version import NodeCache, NodeVersion
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from library.django_utils.database_utils import queryset_to_sql
 from library.django_utils.major_operation import planner_join_collapse_limit

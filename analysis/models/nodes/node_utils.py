@@ -31,7 +31,7 @@ from analysis.models.nodes.node_counts import (
     get_tagged_variant_ids_by_label,
 )
 from analysis.models.nodes.node_query_mixin import node_query_planner_settings
-from analysis.models.nodes.node_support_models import NodeTask, NodeVersion
+from analysis.models.nodes.node_version import NodeTask, NodeVersion
 from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
 from library.utils.collection_utils import toposort_groups

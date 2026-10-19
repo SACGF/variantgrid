@@ -3,8 +3,8 @@ import logging
 import celery
 from django.db import transaction
 
-from analysis.models.nodes.node_support_models import NodeTask
 from analysis.models.nodes.node_utils import cancel_node_tasks
+from analysis.models.nodes.node_version import NodeTask
 from analysis.tasks.auto_analysis_tasks import (
     auto_run_analyses_for_sample,
     auto_run_analyses_for_vcf,
@@ -44,7 +44,7 @@ def analysis_pre_delete(sender, instance, **kwargs):  # pylint: disable=unused-a
         VariantCollection partition (AccessExclusiveLock). A node mid-load holds AccessShareLock on
         it, so the delete blocks behind the load in the web request, or the two deadlock - stop the
         loads first. Registered from apps.ready() rather than beside the model: models_analysis is
-        imported by node_support_models, which is where NodeTask lives. SACGF/variantgrid_com#2 """
+        imported by node_version, which is where NodeTask lives. SACGF/variantgrid_com#2 """
     node_task_qs = NodeTask.objects.filter(node_version__node__analysis=instance, celery_task__isnull=False)
     cancel_node_tasks(node_task_qs)
 

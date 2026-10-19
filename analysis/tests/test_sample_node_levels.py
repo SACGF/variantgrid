@@ -45,7 +45,7 @@ from analysis.models import (
 )
 from analysis.models.enums import NodeStatus, TagLocation
 from analysis.models.nodes.filters.merge_node import MergeNode
-from analysis.models.nodes.node_support_models import NodeVCFFilter
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag

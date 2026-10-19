@@ -41,8 +41,8 @@ from analysis.models.nodes.node_counts import (
     get_node_extra_filters_q,
     is_extra_filter,
 )
-from analysis.models.nodes.node_support_models import NodeColumnSummaryCacheCollection
 from analysis.models.nodes.node_types import get_node_class_choices, get_node_class_name_expression
+from analysis.models.nodes.node_version import NodeColumnSummaryCacheCollection
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation

@@ -24,12 +24,10 @@ from analysis.models.nodes.cohort_mixin import (
     get_samples_pk_q,
 )
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
-from analysis.models.nodes.node_support_models import (
-    NodeAlleleFrequencyFilter,
-    NodeAuditLogMixin,
-    NodeVCFFilter,
-)
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
 )

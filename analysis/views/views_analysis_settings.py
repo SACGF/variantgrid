@@ -17,7 +17,7 @@ from analysis.models import AnalysisLock
 from analysis.models.enums import AnalysisTemplateType
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.node_counts import get_node_counts_mine_and_available
-from analysis.models.nodes.node_support_models import NodeVersion
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.views.analysis_permissions import get_analysis_or_404
 from analysis.views.views import get_analysis_settings
 from classification.models import ClassificationModification

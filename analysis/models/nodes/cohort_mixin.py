@@ -9,12 +9,13 @@ from django.db.models import Q, QuerySet
 
 from analysis.models.enums import GroupOperation
 from analysis.models.models_analysis import Analysis
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.models.nodes.node_query_mixin import (
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
     querysets_to_pk_any_array_q,
 )
-from analysis.models.nodes.node_support_models import NodeAlleleFrequencyFilter, NodeVCFFilter
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_writer import percent_decode_info_value
 from patients.models import Patient

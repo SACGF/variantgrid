@@ -10,8 +10,8 @@ from analysis.models.nodes.cohort_mixin import (
     AncestorSampleMixin,
     get_sample_any_zygosity_arg_q_dict,
 )
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.models.nodes.node_display import NodeIcon
-from analysis.models.nodes.node_support_models import NodeAlleleFrequencyFilter
 from patients.models import Patient
 from snpdb.models import Sample
 

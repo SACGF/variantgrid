@@ -26,7 +26,8 @@ from analysis.models.nodes.filters.selected_in_parent_node import SelectedInPare
 from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
-from analysis.models.nodes.node_support_models import NodeAlleleFrequencyFilter, NodeVCFFilter
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.cohort_node import (
     CohortNode,

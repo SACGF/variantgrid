@@ -5,7 +5,8 @@ Start with:
 - models/nodes/analysis_node.py — AnalysisNode base (fields, versioning, load/counts, save cascade) + AnalysisEdge/Dag;
   node_samples_mixin / node_query_mixin (Q composition) / node_display_mixin / node_errors_mixin hold the rest,
   each docstring listing the hooks a node overrides
-- models/nodes/node_support_models.py — NodeVersion/Cache/Task, VCF and allele frequency filters
+- models/nodes/node_version.py — NodeVersion and what cascades from it (NodeTask, NodeCache, column summaries);
+  node_vcf_filter.py / node_allele_frequency.py — the VCF and allele frequency filters several nodes share
 - models/nodes/sources/*.py, models/nodes/filters/*.py — one module per concrete node
 - models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run
 - tasks/analysis_update_tasks.py + tasks/node_update_tasks.py — dispatcher and the per-node celery tasks

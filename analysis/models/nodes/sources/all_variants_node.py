@@ -6,8 +6,8 @@ from django.db import models
 from django.db.models import CASCADE, SET_NULL, Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
-from analysis.models.nodes.node_support_models import NodeAuditLogMixin
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from genes.models import GeneSymbol
 from library.django_utils import highest_pk

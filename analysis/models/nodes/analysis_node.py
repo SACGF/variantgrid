@@ -26,23 +26,19 @@ from analysis.exceptions import (
 )
 from analysis.models.enums import NodeErrorSource, NodeStatus
 from analysis.models.models_analysis import Analysis
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_counts import get_node_counts_and_labels_dict
 from analysis.models.nodes.node_display_mixin import NodeDisplayMixin
 from analysis.models.nodes.node_errors_mixin import NodeErrorsMixin
 from analysis.models.nodes.node_query_mixin import NodeQueryMixin
 from analysis.models.nodes.node_samples_mixin import NodeSamplesMixin
-from analysis.models.nodes.node_support_models import (
-    NodeAlleleFrequencyFilter,
-    NodeAuditLogMixin,
-    NodeCache,
-    NodeTask,
-    NodeVCFFilter,
-    NodeVersion,
-)
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
+from analysis.models.nodes.node_version import NodeCache, NodeTask, NodeVersion
 from library.constants import MINUTE_SECS
 from library.django_utils.django_postgres import get_backend_pid
 from library.django_utils.model_utils import get_model_content_type_dict
-from snpdb.models import BuiltInFilters, Variant
+from snpdb.models import AlleleSource, BuiltInFilters, Variant, Wiki
 from snpdb.views.datatable_view import RichColumn
 
 # How long a node's lease is good for. The window is (re)started when a worker claims the node for
@@ -786,6 +782,32 @@ class AnalysisDag:
     def root_ids(self, node_id) -> set[int]:
         """ Ancestors without parents - empty if node_id has none itself """
         return {pk for pk in self.ancestor_ids(node_id) if not self.parent_ids.get(pk)}
+
+
+class NodeWiki(Wiki):
+    node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
+
+    def _get_restricted_object(self):
+        return self.node.analysis
+
+
+class AnalysisNodeAlleleSource(AlleleSource):
+    """ Used to link a nodes variants to alleleles and liftover to other builds """
+    node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)
+
+    def get_genome_build(self):
+        if self.node:
+            genome_build = self.node.analysis.genome_build
+        else:
+            genome_build = None
+        return genome_build
+
+    def get_variant_qs(self):
+        if self.node:
+            qs = self.node.get_subclass().get_queryset()
+        else:
+            qs = Variant.objects.none()
+        return qs
 
 
 auditlog.register(AnalysisEdge)

@@ -27,7 +27,7 @@ from analysis.classify_report import (
     tag_summary,
 )
 from analysis.models import VariantTag
-from analysis.models.nodes.node_support_models import AnalysisClassification
+from analysis.models.models_analysis import AnalysisClassification
 from analysis.variant_tag_operations import (
     classification_is_of_another_person,
     resolve_launching_variant_tag,

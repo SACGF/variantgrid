@@ -20,7 +20,7 @@ from analysis.models import (
     AnalysisTemplateVersion,
     AnalysisVariable,
 )
-from analysis.models.nodes.node_support_models import NodeVCFFilter
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationVersion
