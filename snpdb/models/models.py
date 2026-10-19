@@ -455,6 +455,8 @@ class ClinVarCitationsModes(TextChoices):
 
 
 class ClinVarKey(TimeStampedModel):
+    """ ClinVar submission is classification's, but ClinVarKey stays in snpdb because Lab.clinvar_key points at it:
+        in classification it would make snpdb's models and migrations depend on classification, which depends on snpdb """
     class Meta:
         verbose_name = "ClinVar key"
 
