@@ -775,6 +775,13 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
     def is_member(self, user: User, admin_check=False) -> bool:
         return self.valid_labs_qs(user=user, admin_check=admin_check).filter(pk=self.pk).exists()
 
+    @staticmethod
+    def get_only_head_for_member(user: User) -> Optional[User]:
+        """ The one active head (other than user) across user's labs - None when there's none or a choice to make """
+        heads = list(User.objects.filter(is_active=True, labhead__lab__in=Lab.valid_labs_qs(user))
+                     .exclude(pk=user.pk).distinct()[:2])
+        return heads[0] if len(heads) == 1 else None
+
     def is_head(self, user: User) -> bool:
         return self.labhead_set.filter(user=user).exists()
 

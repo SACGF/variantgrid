@@ -168,6 +168,14 @@ Patterns here:
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
+- The request user decides who may open an analysis; everything inside it is permission-checked as the analysis owner
+  (`analysis.user`): the grid (`analysis/grids.py:VariantGrid._get_permission_user`), the source pickers
+  (`analysis/forms/forms_nodes.py:SampleNodeForm.clean_source`), tag / classification / phenotype nodes, template runs.
+  So every viewer sees the same analysis, and adding a sample or VCF to it shares it with everyone who can see the
+  analysis. For a deactivated owner, object checks (`has_perm`, `get_for_user`) always fail while guardian's queryset
+  filters still pass, so the analysis keeps showing but can't take new inputs: someone with write access takes it over
+  (`analysis/models/models_analysis.py:Analysis.change_owner`, from Analysis Settings or the user admin's lab head
+  action), then the nodes reload as the new owner (#2325).
 Gotchas:
 - Walk ancestors / descendants / roots with `analysis/models/nodes/analysis_node.py:AnalysisDag` (one edge query, pks),
   not recursive `parents()` calls. `parents()` returns base `AnalysisNode` rows, which never `==` a subclass instance -

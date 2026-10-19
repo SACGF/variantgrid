@@ -25,13 +25,14 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from guardian.shortcuts import assign_perm
 
 from analysis.models.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from classification.models import Classification
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
+from library.guardian_utils import DjangoPermission, admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
 from seqauto.models import EnrichmentKit
 from snpdb.models import (
@@ -142,6 +143,18 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         if super().can_write(user_or_group):
             return not self.is_locked
         return False
+
+    def can_take_ownership(self, user: User) -> bool:
+        """ Someone who can write to the analysis of a deactivated owner can take it over """
+        return not self.user.is_active and self.can_write(user)
+
+    def change_owner(self, user: User):
+        """ Everything inside an analysis is permission-checked as its owner, so the caller reloads the nodes
+            afterwards (analysis/models/nodes/node_utils.py:reload_analysis_nodes) """
+        self.user = user
+        self.save()
+        for permission in (DjangoPermission.READ, DjangoPermission.WRITE):
+            assign_perm(DjangoPermission.perm(self, permission), user, self)
 
     @classmethod
     def filter_writable_for_user(cls, user, pks=None):
@@ -400,6 +413,12 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             warnings.append("INPUT LOCKED - cannot create new input source nodes.")
         if not self.can_write(user) and not self.is_locked:  # Locked has own icon, no need for warning
             warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
+        if not self.user.is_active:
+            warning = (f"The analysis owner ({self.user}) is deactivated - permissions are checked as the owner, "
+                       "so changing inputs may fail.")
+            if self.can_take_ownership(user):
+                warning += " Take ownership from Analysis Settings."
+            warnings.append(warning)
         return warnings
 
 
