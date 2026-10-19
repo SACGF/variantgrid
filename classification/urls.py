@@ -36,7 +36,12 @@ from classification.views.classification_view_metrics import (
     view_classification_metrics,
     view_page_metrics_detail,
 )
-from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
+from classification.views.clinvar_export_view import (
+    ClinVarMatchView,
+    clinvar_match_detail,
+    lab_clinvar_key_tab,
+    view_clinvar_key,
+)
 from classification.views.condition_match_test_view import (
     condition_match_test_download_view,
     condition_match_test_view,
@@ -70,6 +75,7 @@ from classification.views.imported_allele_info_view import (
     view_imported_allele_info,
     view_imported_allele_info_detail,
 )
+from classification.views.lab_classification_settings_view import lab_classification_settings_tab
 from classification.views.overlaps_datatables import OverlapColumns
 from classification.views.overlaps_view import (
     TriageView,
@@ -163,6 +169,9 @@ urlpatterns = [
     path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
+    path('clinvar_key/<str:pk>', view_clinvar_key, name='clinvar_key'),
+    path('lab/clinvar_key_tab/<int:pk>', lab_clinvar_key_tab, name='lab_clinvar_key_tab'),
+    path('lab/classification_settings_tab/<int:pk>', lab_classification_settings_tab, name='lab_classification_settings_tab'),
     path('clinvar_match', ClinVarMatchView.as_view(), name='clinvar_match'),
     path('clinvar_match/<str:clinvar_key_id>', ClinVarMatchView.as_view(), name='clinvar_match'),
     path('clinvar_match/<str:clinvar_key_id>/match_detail', clinvar_match_detail, name='clinvar_match_detail'),

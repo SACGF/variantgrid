@@ -8,13 +8,11 @@ etc and things that don't fit anywhere else.
 import json
 import logging
 import os
-import re
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, total_ordering
 from html import escape
-from re import RegexFlag
 from typing import Optional, TypedDict
 
 from avatar.templatetags.avatar_tags import avatar_url
@@ -44,7 +42,7 @@ from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
-from library.utils import JsonObjType, import_class, string_deterministic_hash
+from library.utils import import_class, string_deterministic_hash
 from snpdb.models.models_enums import AlleleOriginBucket, UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
@@ -351,7 +349,6 @@ class Organization(models.Model, PreviewModelMixin):
     name = models.TextField()
     short_name = models.TextField(blank=False, null=True)  # Don't use for anything other than human labels
     group_name = models.TextField(blank=True, null=True, unique=True)
-    classification_config = models.JSONField(null=True, blank=True)
     active = models.BooleanField(default=True, blank=True)
 
     objects = ObjectManagerCachingRequest()
@@ -440,145 +437,6 @@ class LabUser:
         return self.user == other.user
 
 
-class ClinVarAssertionMethods(TextChoices):
-    # "yes", "no", "unknown", "not provided", "not applicable"
-    yes = "yes"
-    no = "no"
-    unknown = "unknown"
-    not_provided = "not provided"
-    not_applicable = "not applicable"
-
-
-class ClinVarCitationsModes(TextChoices):
-    all = "all"
-    interpretation_summary_only = "interpret"
-
-
-class ClinVarKey(TimeStampedModel):
-    class Meta:
-        verbose_name = "ClinVar key"
-
-    id = models.TextField(primary_key=True)
-    api_key = models.TextField(null=True, blank=True)
-    org_id = models.TextField(null=False, blank=True, default='')  # maybe this should have been the id?
-    name = models.TextField(blank=True, default='')
-    last_full_run = models.DateTimeField(null=True)
-
-    default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
-    inject_acmg_description = models.BooleanField(blank=True, default=False)
-    include_interpretation_summary = models.BooleanField(blank=True, default=True)
-    assertion_method_lookup = models.JSONField(null=False, default=dict)
-    citations_mode = models.TextField(choices=ClinVarCitationsModes.choices, default=ClinVarCitationsModes.all)
-
-    def assertion_criteria_vg_to_code(self, vg_value: str) -> Optional[JsonObjType]:
-        """
-        :param vg_value: Value as stored in the evidence key
-        :return: The code we map to, None indicates we don't have a mapping
-        """
-        def map_value(raw_value: str):
-            if not raw_value:
-                raw_value = ""
-
-            if self.assertion_method_lookup:
-                if lookups := self.assertion_method_lookup.get("lookups"):
-                    for lookup in lookups:
-                        if match_text := lookup.get("match"):
-                            if re.compile(match_text, RegexFlag.IGNORECASE).match(raw_value):
-                                return lookup.get("citation")
-                        else:
-                            raise ValueError("Assertion Method Lookup, lacking a 'match' field")
-                else:
-                    raise ValueError("Assertion Method Lookup, needs a key 'lookups', with dict entries of 'match' and 'citation'")
-            elif raw_value == "acmg":
-                # if no method lookups have been setup, only accept "acmg"
-                return raw_value
-            else:
-                raise ValueError(f"Unable to map {raw_value=}")
-
-        mapped_value = map_value(vg_value)
-        if mapped_value == "acmg":
-            return {
-                "db": "PubMed",
-                "id": "PMID:25741868"
-            }
-        return mapped_value
-
-    @property
-    def label(self) -> str:
-        return self.name if self.name else self.id
-
-    def __str__(self):
-        return f"ClinVarKey ({self.label})"
-
-    def __lt__(self, other):
-        return self.id < other.id
-
-    @staticmethod
-    def clinvar_keys_for_user(user: User) -> QuerySet:
-        """
-        Ideally this would be on ClinVarKey but can't be due to ordering
-        """
-        if user.is_superuser:
-            return ClinVarKey.objects.all().order_by('pk')
-
-        labs = Lab.valid_labs_qs(user).filter(clinvar_key__isnull=False)
-        if labs:
-            return ClinVarKey.objects.filter(pk__in=labs.values_list('clinvar_key', flat=True)).order_by('pk')
-        else:
-            return ClinVarKey.objects.none()
-
-    def check_user_can_access(self, user: User) -> None:
-        """
-        :throw PermissionDenied if user is not associated to ClinVarKey
-        """
-        if not user.is_superuser:
-            allowed_clinvar_keys = ClinVarKey.clinvar_keys_for_user(user)
-            if not allowed_clinvar_keys.filter(pk=self.pk).exists():
-                raise PermissionDenied("User does not belong to a lab that uses the submission key")
-
-
-class ClinVarKeyExcludePatternMode(TextChoices):
-    EXCLUDE_IF_MATCH = 'X'
-    EXCLUDE_IF_NO_MATCH = 'N'
-
-
-class ClinVarKeyExcludePattern(TimeStampedModel):
-    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=CASCADE)
-    evidence_key = models.TextField()  # Actually EvidenceKey but can't link to that from snpdb
-    pattern = models.TextField()
-    name = models.TextField(blank=True)
-    case_insensitive = models.BooleanField(default=True, blank=True)
-    mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
-
-    @cached_property
-    def regex(self):
-        flags = 0
-        if self.case_insensitive:
-            flags = RegexFlag.IGNORECASE
-        return re.compile(self.pattern, flags=flags)
-
-    def should_exclude(self, text: str) -> bool:
-        matches = bool(self.regex.search(text))
-        if self.mode == ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH:
-            return matches
-        else:
-            return not matches
-
-    def clean(self):
-        try:
-            re.compile(self.pattern)
-        except Exception as exc:
-            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')}) from exc
-
-        from classification.models import EvidenceKeyMap
-        if EvidenceKeyMap.cached_key(self.evidence_key).is_dummy:
-            raise ValidationError({'evidence_key': ValidationError(f'{self.evidence_key} is not a valid EvidenceKey')})
-
-    def __str__(self):
-        from classification.models import EvidenceKeyMap
-        return EvidenceKeyMap.cached_key(self.evidence_key).pretty_label + " : " + (self.name or self.pattern)
-
-
 class Country(models.Model):
     name = models.TextField(primary_key=True)
     short_name = models.TextField(unique=True, null=True)
@@ -650,7 +508,6 @@ CLINVAR_EXPERT_PANEL_LAB = SpecialLab(name="ClinVar Expert Panel")
 class Lab(models.Model, PreviewModelMixin, LabLike):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
-    research = models.BooleanField(default=False, blank=True)
     city = models.TextField()
     state = models.ForeignKey(State, null=True, on_delete=PROTECT)
     country = models.ForeignKey(Country, null=True, on_delete=PROTECT)
@@ -668,25 +525,11 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
     # is a deliberate lab decision and requires a resolvable MME contact (see clean()).
     mme_enabled = models.BooleanField(default=False, blank=True)
 
-    clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=SET_NULL)
-
     group_name = models.TextField(blank=True, null=True, unique=True)
-    classification_config = models.JSONField(null=True, blank=True)
 
     # want every lab to have an organization, but not going to have them
     # at point of migration
     organization = models.ForeignKey(Organization, null=False, blank=False, on_delete=CASCADE)
-    # location where the lab can upload files to, (in some environments may refer to s3 directory)
-    upload_location = models.TextField(null=True, blank=True)
-    upload_automatic = models.BooleanField(default=False, blank=True)
-    upload_instructions = models.TextField(default="", blank=True)
-
-    consolidates_variant_classifications = models.BooleanField(default=False)
-    # does this lab produce one classification
-
-    """
-    If provided, and filename matches, file upload will be automatically set to auto_processed
-    """
 
     email = models.TextField(blank=True)
     slack_webhook = models.TextField(blank=True)

@@ -29,7 +29,6 @@ from snpdb.forms import (
     SettingsInitialGroupPermissionForm,
 )
 from snpdb.models import (
-    ClinVarKey,
     Lab,
     LabHead,
     LabUserSettingsOverride,
@@ -182,16 +181,6 @@ def lab_remove_member(request, pk):
     lab.remove_member(user, removed_by=request.user)
     messages.add_message(request, messages.SUCCESS, f"{user} removed from {lab}")
     return redirect(reverse('view_lab', kwargs={"lab_id": lab.pk}))
-
-
-def view_clinvar_key(request, pk: str):
-    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
-    clinvar_key.check_user_can_access(request.user)
-
-    return render(request, 'snpdb/settings/clinvar_key.html', {
-        'clinvar_key': clinvar_key,
-        'labs': Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    })
 
 
 def view_organization(request, organization_id: int):

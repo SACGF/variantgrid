@@ -28,11 +28,12 @@ from classification.models import (
     ConditionResolved,
     EvidenceKeyMap,
 )
+from classification.models.clinvar_key_models import ClinVarKey
 from genes.hgvs import HGVSComponents, HGVSException
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
-from snpdb.models import Allele, ClinVarKey, GenomeBuild, Variant
+from snpdb.models import Allele, GenomeBuild, Variant
 from snpdb.search import SearchInput
 from snpdb.signals.hgvs_search import search_hgvs
 
@@ -153,7 +154,7 @@ class ClinVarLegacyRow:
 
     @property
     def labs(self):
-        return list(self.clinvar_key.lab_set.all())
+        return list(self.clinvar_key.labs)
 
     @property
     def scv(self):

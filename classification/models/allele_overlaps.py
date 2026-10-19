@@ -55,7 +55,7 @@ class PatientCount:
 
     @cached_property
     def consolidates_variant_classifications(self) -> bool:
-        return any(key.lab.consolidates_variant_classifications for key in self.counts.keys())
+        return any(key.lab.classification_settings.consolidates_variant_classifications for key in self.counts.keys())
 
     @staticmethod
     def count_classification(cms: ClassificationModification):

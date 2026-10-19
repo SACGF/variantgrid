@@ -1,0 +1,11 @@
+{% load crispy_forms_tags %}
+<div id="lab-classification-settings-tab-container">
+    <div class="alert alert-info">Only administrators can modify the upload settings</div>
+    <form method="post" action="{% url 'lab_classification_settings_tab' lab.pk %}">
+        {% csrf_token %}
+        {% crispy form form_helper.horizontal_nested %}
+        {% if has_write_permission %}
+            <input id="lab-classification-settings-save" type="submit" class="btn btn-primary" value="Save">
+        {% endif %}
+    </form>
+</div>

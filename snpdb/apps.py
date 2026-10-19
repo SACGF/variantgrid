@@ -30,7 +30,6 @@ class SnpdbConfig(AppConfig):
             vcf_health_check,
         )
         from snpdb.search import search_registry
-        from snpdb.signals.clinvar_export_search import clinvar_export_batch_search, clinvar_id_search
         from snpdb.signals.cohort_search import search_cohort
         from snpdb.signals.duo_search import search_duo
         from snpdb.signals.genomics_search import contig_search, genome_build_search
@@ -39,7 +38,6 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals.organization_search import organization_search
         from snpdb.signals.quad_search import search_quad
         from snpdb.signals.sample_search import sample_search
-        from snpdb.signals.scv_search import scv_search
         from snpdb.signals.signal_handlers import (
             group_post_save_handler,
             trio_post_save_handler,
@@ -67,7 +65,6 @@ class SnpdbConfig(AppConfig):
         # pylint: enable=import-outside-toplevel,unused-import
 
         search_registry.register(
-            clinvar_id_search, clinvar_export_batch_search,
             search_cohort,
             search_duo,
             genome_build_search, contig_search,
@@ -75,7 +72,6 @@ class SnpdbConfig(AppConfig):
             organization_search,
             search_quad,
             sample_search,
-            scv_search,
             search_trio,
             user_search,
             variant_cosmic_search, search_variant_locus_no_ref, search_variant_locus_with_ref, allele_search,

@@ -1397,8 +1397,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def lab_evidence_key_overrides(lab: Lab) -> EvidenceKeyOverrides:
         return EvidenceKeyOverrides.merge(
-            EvidenceKeyOverrides.from_dict(lab.organization.classification_config),
-            EvidenceKeyOverrides.from_dict(lab.classification_config)
+            EvidenceKeyOverrides.from_dict(lab.organization.classification_settings.classification_config),
+            EvidenceKeyOverrides.from_dict(lab.classification_settings.classification_config)
         )
 
     @cached_property

@@ -2,12 +2,9 @@ import re
 import unicodedata
 
 from django.contrib import admin, messages
-from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
 
 from classification.models import Overlap
-from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
-from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.services.overlaps_services import OverlapServices
 from library.django_utils.admin_utils import (
     GuardedModelAdminBasics,
@@ -20,8 +17,6 @@ from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 from snpdb.models import (
     Allele,
     AlleleLiftover,
-    ClinVarKey,
-    ClinVarKeyExcludePattern,
     GlobalSettings,
     Lab,
     LabUserSettingsOverride,
@@ -173,60 +168,6 @@ class UserPageAckAdmin(ModelAdminBasics):
     list_display = ('user', 'page_id')
 
 
-class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
-    model = ClinVarKeyExcludePattern
-
-    formfield_overrides = {
-        models.TextField: {'widget': AdminTextInputWidget}
-    }
-
-
-@admin.register(ClinVarKey)
-class ClinVarKeyAdmin(ModelAdminBasics):
-    list_display = ('id', 'name', 'last_full_run')
-    inlines = (ClinVarKeyExcludePatternAdmin,)
-
-    def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
-        for clinvar_key in queryset:
-            ignore_util = ClinVarExcludePatternUtil(clinvar_key)
-            test_results = ignore_util.run_all(apply=apply)
-            if not apply:
-                self.message_user(request, "Dry-run Only")
-            if test_results:
-                for key, ids in test_results.items():
-                    message = f"{clinvar_key} {key} : {len(ids)} - e.g. classification ids {ids[0:5]}"
-                    self.message_user(request, message)
-            else:
-                self.message_user(request, f"{clinvar_key} no ignores")
-
-    @admin_action("Don't Share Flags - Dry Run")
-    def ignore_dry_run(self, request, queryset: QuerySet[ClinVarKey]):
-        self.run_ignores(request, queryset, False)
-
-    @admin_action("Don't Share Flags - Apply")
-    def ignore_apply(self, request, queryset: QuerySet[ClinVarKey]):
-        self.run_ignores(request, queryset, True)
-
-    @admin_action("ClinVar Export Prepare")
-    def prepare_clinvar(self, request, queryset):
-        report = ClinvarExportPrepare().update_export_records_for_keys(set(queryset.all()))
-        if len(report) > 10:
-            self.message_user(request, message="Showing first 10 messages", level=messages.INFO)
-        for report_row in report[0:10]:
-            self.message_user(request, message=report_row, level=messages.INFO)
-
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, widgets={
-            'id': admin.widgets.AdminTextInputWidget(),
-            'api_key': admin.widgets.AdminTextInputWidget(),
-            'org_id': admin.widgets.AdminTextInputWidget(),
-            'name': admin.widgets.AdminTextInputWidget()
-        }, **kwargs)
-        form.base_fields["assertion_method_lookup"].help_text = \
-            'Preferred format is<br/>{"lookups":[<br/>&nbsp;{"match": "(regex1)", "citation": "acmg"},<br/>&nbsp;{"match": "(regex2)", "citation": {"db": "PubMed", "id": "PMID:123456"}}<br/>]}'
-        return form
-
-
 def make_code_friendly(text: str) -> str:
     """
     convert accented characters to non-accented counterparts
@@ -243,9 +184,8 @@ def make_code_friendly(text: str) -> str:
 @admin.register(Lab)
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'state', 'country',
-                    'external', 'research', 'clinvar_key', 'upload_location', 'classification_config')
-    list_filter = ('external', 'research')
+    list_display = ('name', 'group_name', 'organization', 'state', 'country', 'external')
+    list_filter = ('external', )
     search_fields = ('organization__name', 'name')
 
     fieldsets = (
@@ -253,12 +193,11 @@ class LabAdmin(ModelAdminBasics):
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Contact', {'fields': ('url', 'contact_name', 'contact_email', 'contact_phone')}),
         ('Notifications', {'fields': ('email', 'slack_webhook')}),
-        ('Uploads', {'fields': ('upload_location', 'upload_automatic', 'upload_instructions')}),
-        ('Submissions', {'fields': ('classification_config', 'external', 'research', 'clinvar_key', 'consolidates_variant_classifications')})
+        ('Submissions', {'fields': ('external', )})
     )
 
     def is_readonly_field(self, f) -> bool:
-        if f.name in ('clinvar_key', 'organization', 'state', 'country'):
+        if f.name in ('organization', 'state', 'country'):
             return False
         return super().is_readonly_field(f)
 
@@ -275,7 +214,6 @@ class LabAdmin(ModelAdminBasics):
             'contact_name': admin.widgets.AdminTextInputWidget(),
             'contact_email': admin.widgets.AdminEmailInputWidget(),
             'contact_phone': admin.widgets.AdminTextInputWidget(),
-            'upload_location': admin.widgets.AdminTextInputWidget(),
             'email': admin.widgets.AdminEmailInputWidget(),
             'slack_webhook': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
@@ -303,11 +241,10 @@ class LabAdmin(ModelAdminBasics):
 @admin.register(Organization)
 class OrganizationAdmin(ModelAdminBasics):
 
-    list_display = ('name', 'group_name', 'classification_config')
+    list_display = ('name', 'group_name')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'short_name', 'group_name', 'active')}),
-        ('Submissions', {'fields': ('classification_config', )})
     )
 
     def fix_group_name(self, request, queryset):

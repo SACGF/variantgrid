@@ -387,7 +387,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def classifications_qs(self) -> QuerySet[Classification]:
         qs = self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
         if not settings.DISCORDANCE_RESEARCH_ENABLED:
-            qs = qs.exclude(lab__research=True)
+            qs = qs.exclude(lab__classification_settings__research=True)
         return qs
 
     @property
