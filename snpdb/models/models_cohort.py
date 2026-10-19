@@ -474,6 +474,15 @@ def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-arg
         sub_cohort.set_sample_order_packed_indexes()
 
 
+@receiver(pre_delete, sender=Sample)
+def pre_delete_sample(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ The CASCADE from Sample deletes CohortSamples in bulk, skipping CohortSample.delete(), so the cohort
+        version (and everything keyed by it) would stay as it was. A VCF cohort is left alone: its genotype
+        data is the VCF's and is only rebuilt by a reload, so a version bump would orphan it """
+    for cohort_sample in instance.cohortsample_set.filter(cohort__vcf__isnull=True).select_related("cohort"):
+        cohort_sample.delete()
+
+
 class CohortSample(models.Model):
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
