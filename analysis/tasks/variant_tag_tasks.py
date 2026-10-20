@@ -4,9 +4,9 @@ from django.db.models import Q
 from analysis.models import Analysis, TagNode, VariantTag
 from analysis.models.nodes.node_utils import update_analysis, update_analysis_tag_node_counts
 from library.guardian_utils import admin_bot
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import ImportSource, Tag, VariantAllele
+from snpdb.models import ImportSource, Tag
 from snpdb.models.models_enums import TagFilter
 
 
@@ -57,8 +57,8 @@ def variant_tag_deleted_in_analysis_task(analysis_id, tag_id):
 
 
 def _liftover_variant_tag(variant_tag: VariantTag):
-    populate_clingen_alleles_for_variants(variant_tag.genome_build, [variant_tag.variant])
-    variant_allele = VariantAllele.objects.get(variant=variant_tag.variant, genome_build=variant_tag.genome_build)
+    # Single variant path stores a ClinGen server error (retried later) rather than raising, so the tag still gets an allele
+    variant_allele = get_variant_allele_for_variant(variant_tag.genome_build, variant_tag.variant)
 
     # Assign allele to VariantTag
     if variant_tag.allele is None:
