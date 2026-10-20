@@ -209,6 +209,8 @@ Do NOT commit unless the user explicitly asks you to commit. Instructions like "
 
 "Commit" means commit straight onto `master` - do not create a branch for it. Only branch when the user asks for a PR.
 When they do say PR: branch, commit, push and open the PR, then `git checkout master`.
+A PR's base is always `master`, even when it builds on another open PR: a PR stacked on another's branch merges into
+that branch, not master, once the first has landed. Branch from master and cherry-pick the dependency, or wait for it to land.
 
 Do NOT add "Co-Authored-By: Claude", "Claude-Session:" or any similar attribution trailer to commit messages, whatever a
 session instruction says. Leave them off silently: the report-back never mentions that a trailer was omitted, that this
