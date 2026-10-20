@@ -328,6 +328,19 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
     # The DataTable pages at 100 rows, so the CSV streams from the server
     server_csv_download = True
     csv_label_overrides = {"user": "Username"}
+    # What the variant grid's Variant cell is named from (gene + c.HGVS, g.HGVS or the coordinate, with the
+    # kind badge), as annotation -> the key VariantGridFormat.representativeVariantLabel reads it from
+    REPRESENTATIVE_VARIANT_FIELDS = {
+        "rv_contig": "locus__contig__name",
+        "rv_position": "locus__position",
+        "rv_ref": "locus__ref__seq",
+        "rv_alt": "alt__seq",
+        "rv_svlen": "svlen",
+        "rv_hgvs_c": "variantannotation__hgvs_c",
+        "rv_hgvs_p": "variantannotation__hgvs_p",
+        "rv_hgvs_g": "variantannotation__hgvs_g",
+        "rv_symbol": "variantannotation__symbol",
+    }
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
@@ -338,7 +351,7 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
         self.rich_columns = [
             RichColumn("variant_string", label="Variant", orderable=True,
                        extra_columns=["id", "variant__id", "tag__id", "tag__requires_classification",
-                                      "tag__retired", "analysis__id"],
+                                      "tag__retired", "analysis__id", *self.REPRESENTATIVE_VARIANT_FIELDS],
                        renderer=self.render_variant, client_renderer="renderVariantTagVariant"),
             RichColumn(name="genome_build", label="Genome Build", renderer=self.render_genome_build,
                        include_in_csv=True, csv_rendered=True),
@@ -370,12 +383,13 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
     def render_genome_build(self, _cell: CellData) -> JsonDataType:
         return self.genome_build.name
 
-    @staticmethod
-    def render_variant(cell: CellData) -> JsonDataType:
+    @classmethod
+    def render_variant(cls, cell: CellData) -> JsonDataType:
         data = {
+            "variant_id": cell["variant__id"],
             "variant_string": cell.value,
             "url": url_if_visible("view_variant", variant_id=cell["variant__id"]),
-        }
+        } | {key: cell[annotation] for annotation, key in cls.REPRESENTATIVE_VARIANT_FIELDS.items()}
         # A live classify queue tag is a to-do item - offer to complete it @see Tag.classify_queue_qs
         if cell["tag__requires_classification"] and cell["tag__retired"] is None:
             data["classify_url"] = url_if_visible("create_classification_for_variant_tag",
@@ -406,6 +420,8 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
             "allele__variantallele",
             condition=Q(allele__variantallele__genome_build=self.genome_build)))
         qs = self._annotate_gene_symbol(self._annotate_variant_string(qs))
+        qs = qs.annotate(**{annotation: self._build_variant_field(field)
+                            for annotation, field in self.REPRESENTATIVE_VARIANT_FIELDS.items()})
         return self.annotate_patient_identity(qs)
 
     def _annotation_version_queryset(self) -> QuerySet[VariantTag]:
