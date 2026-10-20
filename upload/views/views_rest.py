@@ -24,7 +24,7 @@ from snpdb.models.models_enums import ImportStatus
 from upload.models import FileUpload
 from upload.upload_metadata import UploadMetadataError
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
-from upload.views.views_json import get_upload_status_dict, handle_file_upload
+from upload.views.views_json import EmptyUploadError, get_upload_status_dict, handle_file_upload
 
 
 def _get_file_upload_for_user(user, *, file_upload_id=None, sha256_hash=None) -> FileUpload:
@@ -94,7 +94,7 @@ class APIFileUploadView(APIView):
             response_data["uploaded_file_id"] = file_upload.pk  # deprecated alias
             response_data["sha256_hash"] = file_upload.sha256_hash
             return JsonResponse(response_data)
-        except UploadMetadataError as e:
+        except (UploadMetadataError, EmptyUploadError) as e:
             return JsonResponse({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
         except Exception:
             report_exc_info(request=request)

@@ -103,6 +103,26 @@ class UploadFileAPITest(UploadAPITestBase):
         self.assertEqual(file_upload.sha256_hash, expected_hash)
         self.assertEqual(data["sha256_hash"], expected_hash)
 
+    def test_empty_file_rejected(self):
+        """ A 0-byte file is a 400 with no FileUpload left behind - CSV type sniffing can't read one """
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            reverse("api_file_upload"),
+            {"file": SimpleUploadedFile("empty.csv", b"")},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("empty", response.json()["error"])
+        self.assertFalse(FileUpload.objects.filter(user=self.owner, name="empty.csv").exists())
+
+    def test_empty_file_rejected_web(self):
+        """ FilePond endpoint returns the message as text so the upload page can show it """
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse("upload_file"), {"filepond": SimpleUploadedFile("empty.csv", b"")})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("empty", response.content.decode())
+        self.assertFalse(FileUpload.objects.filter(user=self.owner, name="empty.csv").exists())
+
     def test_deprecated_uploaded_file_id_alias(self):
         """ file_upload_id is the identifier - uploaded_file_id is a retained alias for older clients.
             Delete this test along with the alias. """
