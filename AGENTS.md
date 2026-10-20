@@ -133,8 +133,10 @@ legitimate reason to inline an import is to break a genuine circular import cycl
 cycle to the user, and ask whether to refactor the code instead of papering over it with an inline import. If you are
 about to write `from … import …` anywhere except the top of the file, go back and add it to the top-level import block.
 Inside a package, import a name from the module that defines it (`from snpdb.models.models_vcf import VCF`), not
-through the package `__init__` that re-exports it - that is the usual cause of a cycle. `scripts/vg imports cycles`
-and `lint-imports` (`.importlinter`: `library` never imports an app) both gate CI.
+through the package `__init__` that re-exports it - that is the usual cause of a cycle. Importing any submodule still
+runs its package `__init__` first, so a module that an app's models import can't import anything under that `models`
+package (enums used by both live outside it, as in `annotation/enums/`). `scripts/vg imports cycles` (which follows
+those `__init__` imports) and `lint-imports` (`.importlinter`: `library` never imports an app) both gate CI.
 
 ### Code comments and docs
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't
