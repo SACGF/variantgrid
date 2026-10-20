@@ -563,9 +563,11 @@ def discordance_report(discordance_report: DiscordanceReport):
     return {"discordance_report": discordance_report}
 
 
-@register.inclusion_tag("classification/tags/review.html")
-def review(review: Review, edit: bool=False):
-    return {"review": review, edit:edit}
+@register.inclusion_tag("classification/tags/review.html", takes_context=True)
+def review(context, review: Review, edit: bool=False):
+    user = context.request.user
+    can_write = review.can_write(user)
+    return {"review": review, "can_write": can_write, edit:edit}
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")

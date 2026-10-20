@@ -29,7 +29,7 @@ import json
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
 from library.utils.collection_utils import batch_iterator
-from review.models import Review
+from review.models import Review, ReviewableModelMixin
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, LabLike, UserSettings
 from snpdb.utils import LabNotificationBuilder
@@ -698,6 +698,10 @@ class OverlapPageDetails:
 
     overlap: Overlap
     user: User
+
+    @property
+    def can_review(self) -> bool:
+        return self.overlap.can_review(self.user)
 
     @cached_property
     def next_steps(self) -> list[OverlapContributionNextStep]:
