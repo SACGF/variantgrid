@@ -7,14 +7,12 @@ function vcfGridFilterContainer(tableId) {
     return $(".vcf-grid-filter-tags-" + tableId);
 }
 
-// The DataTables ajax `data` hook for tableId - data-datatable-data="vcfGridDatatableFilter('samples-datatable')"
-function vcfGridDatatableFilter(tableId) {
-    return function(data) {
-        const datatableFilter = vcfGridFilterContainer(tableId).data("vcfGridDatatableFilter");
-        if (datatableFilter) {
-            datatableFilter(data);
-        }
-    };
+// The DataTables ajax `data` hook - data-datatable-data="vcfGridDatatableFilter" on the table the tag was given the id of
+function vcfGridDatatableFilter(data, settings) {
+    const datatableFilter = vcfGridFilterContainer(settings.sTableId).data("vcfGridDatatableFilter");
+    if (datatableFilter) {
+        datatableFilter(data);
+    }
 }
 
 function initVcfGridFilter(tableId, options) {

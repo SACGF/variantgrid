@@ -103,7 +103,7 @@ def parse_skipped_variants_file(filename: str) -> list[VEPSkippedVariant]:
 
         (printf "Line %-5s\t%-40.40s\t%s\n", so both leading fields are blank-padded). """
     skipped_variants = []
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         for line in f:
             line = line.rstrip("\n")
             if not line or line.startswith(SKIPPED_VARIANTS_FILE_HEADER_PREFIX):

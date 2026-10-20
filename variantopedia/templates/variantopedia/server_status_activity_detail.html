@@ -28,9 +28,7 @@
                                         <div class="col-5">
                                             <a class="toggle-link" data-toggle="collapse" href="#active-users{{ preview.obj | id_safe }}">View Events</a>
                                         </div>
-
                                         {% user_view_events preview.obj dashboard_notices.days_ago as user_views %}
-
                                     {% else %}
                                         <div class="col-5">
                                         {% for extra in preview.summary_extra %}
@@ -55,8 +53,6 @@
                 {% endif %}
                 {% if not forloop.last %}<hr>{% endif %}
             {% endfor %}
-
         </div>
     </div>
-
 </div>

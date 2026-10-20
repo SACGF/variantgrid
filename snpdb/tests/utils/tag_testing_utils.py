@@ -5,8 +5,8 @@ classified (@see snpdb/models/models.py:Tag.classify_queue_qs).
 A test wants a tag with the property, not a tag with a particular name: the name a fresh install is
 seeded with is deployment settings, so tests make their own and say what it is for.
 """
-from classification.enums import AlleleOriginBucket
 from snpdb.models import Tag
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 def create_classify_queue_tag(tag_id: str = "ToDo", bucket: str = AlleleOriginBucket.UNKNOWN) -> Tag:

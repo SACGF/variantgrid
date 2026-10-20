@@ -44,7 +44,6 @@ from classification.classification_stats import (
     get_grouped_classification_counts,
 )
 from classification.enums import (
-    AlleleOriginBucket,
     LabExternalFilter,
     OverlapStatus,
     OverlapType,
@@ -58,7 +57,6 @@ from classification.models import (
     AlleleOriginGrouping,
     Classification,
     ClassificationAttachment,
-    ClassificationConsensus,
     ClassificationGrouping,
     ClassificationImportRun,
     ClassificationJsonParams,
@@ -66,7 +64,6 @@ from classification.models import (
     ClassificationReportTemplate,
     ConditionResolvedDict,
     DiscordanceReport,
-    GeneConsensusGroup,
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
     Overlap,
@@ -74,10 +71,13 @@ from classification.models import (
     OverlapContributionNextStep,
     ReportNames,
 )
-from classification.models.classification import (
+from classification.models.classification import ClassificationModification
+from classification.models.classification_consensus import (
     COPY_SCOPES_ALL,
     COPY_SCOPES_GENE,
-    ClassificationModification,
+    ClassificationConsensus,
+    ConsensusComparison,
+    ConsensusGroup,
 )
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
@@ -115,6 +115,7 @@ from snpdb.forms import (
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
 from sync.classification_sync_status import classification_sync_status
@@ -486,7 +487,8 @@ def view_classification(request: HttpRequest, classification_id: str):
         'withdraw_reasons': withdraw_reasons,
         'mme_enabled': settings.MME_ENABLED,   # shows the MatchMaker Exchange card
         # Card body is loaded lazily - the gene candidates are a query the page shouldn't wait on
-        'gene_consensus_enabled': vc.can_write(request.user) and bool(classification_gene_symbol(vc)),
+        'gene_consensus_enabled': settings.CLASSIFICATION_GENE_CONSENSUS and vc.can_write(request.user)
+                                  and bool(classification_gene_symbol(vc)),
         'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
@@ -614,7 +616,8 @@ def view_classification_diff(request):
             record.get('data')[SpecialEKeys.CONDITION] = condition_ekey
 
     context = {
-        'records_json': records_json
+        'records_json': records_json,
+        'copied_only': request.GET.get('copied_only') == '1',
     }
     return render(request, 'classification/classification_diff.html', context)
 
@@ -730,10 +733,11 @@ def get_classification_attachment_file_dicts(classification) -> list[dict]:
 
 
 def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponse:
-    """ This is not done via static files, so we add security later """
+    """ Served through a view rather than static files so only users who can view the classification get it """
 
-    # TODO: Check security/access to Classification
     vc_attachment = get_object_or_404(ClassificationAttachment, pk=pk)
+    # Same check as the classification page - a lab can see its own unpublished record
+    ClassificationRef.init_from_obj(request.user, vc_attachment.classification).check_security()
 
     if thumbnail and vc_attachment.thumbnail_path:
         filename = vc_attachment.thumbnail_path
@@ -755,11 +759,12 @@ class CopyFromOptions:
     """ The copy sources on offer for one allele origin bucket - the create page renders a set per bucket
         and shows the one the scientist has chosen """
     allele_origin_bucket: AlleleOriginBucket
-    consensuses: list[ClassificationConsensus]
+    comparison: Optional[ConsensusComparison]
     gene_symbol: Optional[str]
-    gene_groups: list[GeneConsensusGroup]
+    gene_groups: list[ConsensusGroup]
     external: list[ClassificationModification]
     default_consensus_pk: int
+    compare_url: Optional[str] = None
 
 
 class CreateClassificationForVariantView(TemplateView):
@@ -822,24 +827,33 @@ class CreateClassificationForVariantView(TemplateView):
         selected_transcript = first((td for td in vts.transcript_data if td.get("selected")), default={})
         gene_symbol = selected_transcript.get(VariantTranscriptSelections.GENE_SYMBOL)
 
+        default_bucket = ClassificationConsensus.default_allele_origin_bucket(self.request.user)
         options = []
         for bucket in (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC):
-            consensuses = ClassificationConsensus.all_consensus_candidates(allele=allele, user=self.request.user,
-                                                                          allele_origin_bucket=bucket)
+            groups = ClassificationConsensus.allele_consensus_groups(allele=allele, user=self.request.user,
+                                                                    allele_origin_bucket=bucket)
+            allele_records = [cm for group in groups for cm in group.records]
+            comparison = None
+            compare_url = None
+            if groups:
+                comparison = ConsensusComparison.of(groups)
+                classification_ids = ",".join(str(cm.classification_id) for cm in allele_records)
+                compare_url = f"{reverse('classification_diff')}?cids={classification_ids}&copied_only=1"
             gene_groups = []
-            if gene_symbol:
+            if gene_symbol and settings.CLASSIFICATION_GENE_CONSENSUS:
                 gene_groups = ClassificationConsensus.gene_consensus_groups(
                     gene_symbol=gene_symbol, user=self.request.user, allele_origin_bucket=bucket,
-                    exclude_modifications=[c.modification for c in consensuses])
+                    exclude_modifications=allele_records)
             options.append(CopyFromOptions(
                 allele_origin_bucket=bucket,
-                consensuses=consensuses,
+                comparison=comparison,
                 gene_symbol=gene_symbol,
                 gene_groups=gene_groups,
                 external=ClassificationConsensus.external_lab_candidates(allele=allele, user=self.request.user,
                                                                         allele_origin_bucket=bucket),
-                default_consensus_pk=first((c.modification.pk for c in consensuses if c.default_suggestion),
-                                           default=0),
+                # The widest used content of the bucket the scientist works in - another bucket starts from nothing
+                default_consensus_pk=groups[0].representative.pk if groups and bucket == default_bucket else 0,
+                compare_url=compare_url,
             ))
         return options
 
@@ -850,6 +864,9 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     sample_autocomplete_form = SampleChoiceForm(genome_build=genome_build)
     sample_autocomplete_form.fields['sample'].required = False
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
+    lab_form = None
+    if lab:
+        lab_form = UserLabChoiceForm(user=request.user, default_lab=lab)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
     matcher = HGVSMatcher.instance(genome_build)
@@ -878,7 +895,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
                "refseq_transcript_accession": refseq_transcript_accession,
                "ensembl_transcript_accession": ensembl_transcript_accession,
                'sample_autocomplete_form': sample_autocomplete_form,
-               "lab": lab,
+               "lab_form": lab_form,
                "lab_error": lab_error,
                "initially_require_sample": settings.CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE}
     return render(request, 'classification/create_classification_from_hgvs.html', context)

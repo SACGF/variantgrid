@@ -17,10 +17,12 @@ from classification.models import (
     ConditionTextMatch,
     DiscordanceReport,
     DiscordanceReportClassification,
-    classification_flag_types, OverlapContribution,
+    OverlapContribution,
+    classification_flag_types,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.discordance_models_utils import (
     DiscordanceReportCategories,
     DiscordanceReportRowData,
@@ -35,7 +37,6 @@ from classification.views.exports.classification_export_filter import Classifica
 from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -77,7 +78,8 @@ class ClassificationDashboard:
 
     @property
     def clinvar_keys(self) -> list[ClinVarKey]:
-        return sorted(set(lab.clinvar_key for lab in self.lab_picker.selected_labs if lab.clinvar_key))
+        lab_clinvar_keys = (lab.classification_settings.clinvar_key for lab in self.lab_picker.selected_labs)
+        return sorted({clinvar_key for clinvar_key in lab_clinvar_keys if clinvar_key})
 
     @cached_property
     def uploads_to_clinvar_qs(self) -> QuerySet[ClinVarExport]:

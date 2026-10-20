@@ -223,3 +223,7 @@ CitationsManager.normalizeInPlace = function(dbRef) {
 
 CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
 CitationsManager.defaultManager = new CitationsManager();
+
+registerDomProcessor('[data-citation-id]', (node) => {
+    CitationsManager.defaultManager.populate(node);
+});

@@ -1,7 +1,7 @@
 import itertools
 import operator
 from functools import reduce
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from auditlog.registry import auditlog
 from django.conf import settings
@@ -45,6 +45,25 @@ class StructuralFilter(models.TextChoices):
     ANY = 'A', "Any"
     ONLY = 'O', "Structural only"
     EXCLUDE = 'E', "Exclude structural"
+
+
+class _ColumnFilter(NamedTuple):
+    """ A DamageNode filter over one annotation column """
+    column: str  # VariantAnnotation column the filter reads
+    value_field: str
+    required_field: str
+    prediction: bool = True  # a per-tool pathogenicity prediction, rather than a LoF flag
+    rankscore: bool = False
+
+
+_COLUMN_FILTERS = (
+    *(_ColumnFilter(t.rankscore_field, f"{t.rankscore_field}_min", f"{t.rankscore_field}_required", rankscore=True)
+      for t in TOOLS if t.rankscore_field),
+    *(_ColumnFilter(t.raw_field, t.node_threshold_field, f"{t.raw_field}_required") for t in TOOLS if t.raw_field),
+    *(_ColumnFilter(t.pred_field, t.pred_field, f"{t.pred_field}_required") for t in TOOLS if t.pred_field),
+    _ColumnFilter("nmd_escaping_variant", "nmd_escaping_variant", "nmd_escaping_variant_required", prediction=False),
+    _ColumnFilter("aloft_pred", "aloft", "aloft_required", prediction=False),
+)
 
 
 class DamageNode(AnalysisNode):
@@ -228,98 +247,41 @@ class DamageNode(AnalysisNode):
         visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
         return [t for t in TOOLS if t.pred_field in visible_columns]
 
-    def _v4_score_min_fields(self) -> list:
-        return [getattr(self, t.node_threshold_field) for t in TOOLS if t.raw_field]
-
-    def _v4_pred_fields(self) -> list:
-        return [getattr(self, t.pred_field) for t in TOOLS if t.pred_field]
-
-    def _v4_score_required_fields(self) -> list:
-        return [getattr(self, f"{t.raw_field}_required") for t in TOOLS if t.raw_field]
-
-    def _v4_pred_required_fields(self) -> list:
-        return [getattr(self, f"{t.pred_field}_required") for t in TOOLS if t.pred_field]
+    def _column_filters(self) -> list[_ColumnFilter]:
+        """ The per-column filters this analysis's annotation version offers - gated off visible_columns
+            (VEP_COLUMNS), so the version and build decide, as they do for the editor's sliders. """
+        if self.columns_version == 1:
+            # cadd_phred / revel_score are populated again from v4, where the node filters them as raw scores
+            return [_ColumnFilter("cadd_phred", "cadd_score_min", "cadd_score_required"),
+                    _ColumnFilter("revel_score", "revel_score_min", "revel_score_required")]
+        visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
+        column_filters = [cf for cf in _COLUMN_FILTERS if cf.column in visible_columns]
+        # nmd_escape_status is calculated by VariantGrid, not a VEP column
+        if self.columns_version >= 5:
+            column_filters.append(_ColumnFilter("nmd_escape_status", "ptc_nmd_escaping",
+                                                "ptc_nmd_escaping_required", prediction=False))
+        return column_filters
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
                         self.protein_domain, self.published, self.variant_class,
                         self.structural != StructuralFilter.ANY]
-        v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
-                self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
-                self.nmd_escaping_variant, self.aloft]
-        v3_fields = v2_fields + [self.alphamissense_rankscore_min]
-        v4_fields = v3_fields + self._v4_score_min_fields() + self._v4_pred_fields()
-        # v5 offers the raw scores and preds; rankscores are legacy from here, so they only
-        # count when this node already carries one.
-        v5_fields = [self.nmd_escaping_variant, self.aloft, self.ptc_nmd_escaping,
-                     self.has_rankscore_predictions()] \
-            + self._v4_score_min_fields() + self._v4_pred_fields()
-
-        _COLUMNS_VERSION = {
-            1: [self.cadd_score_min, self.revel_score_min],
-            2: v2_fields,
-            3: v3_fields,
-            4: v4_fields,
-            5: v5_fields,
-        }
-        modifiers = all_versions + _COLUMNS_VERSION.get(self.columns_version, v5_fields)
-        return any(modifiers)
+        return any(all_versions) or any(getattr(self, cf.value_field) for cf in self._column_filters())
 
     def has_required(self) -> bool:
         all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
                         self.damage_predictions_required, self.protein_domain_required, self.published_required]
-        v2_fields = [self.bayesdel_noaf_rankscore_required, self.cadd_raw_rankscore_required,
-                self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
-                self.vest4_rankscore_required, self.nmd_escaping_variant_required, self.aloft_required]
-        v3_fields = v2_fields + [self.alphamissense_rankscore_required]
-        v4_fields = v3_fields + self._v4_score_required_fields() + self._v4_pred_required_fields()
-        # Legacy rankscore filters still apply at v5, so their required flags still count -
-        # but only on nodes that actually carry a rankscore.
-        v5_fields = [self.nmd_escaping_variant_required, self.aloft_required, self.ptc_nmd_escaping_required] \
-            + self._v4_score_required_fields() + self._v4_pred_required_fields()
-        if self.has_rankscore_predictions():
-            v5_fields += self._rankscore_required_fields()
-        _COLUMNS_VERSION = {
-            1: [self.cadd_score_required, self.revel_score_required],
-            2: v2_fields,
-            3: v3_fields,
-            4: v4_fields,
-            5: v5_fields,
-        }
-        required = all_versions + _COLUMNS_VERSION.get(self.columns_version, v5_fields)
-        return any(required)
+        # A rankscore's required checkbox is only on screen while the rankscore sliders are
+        show_rankscores = self.show_rankscore_sliders()
+        return any(all_versions) or any(getattr(self, cf.required_field) for cf in self._column_filters()
+                                        if show_rankscores or not cf.rankscore)
 
     def has_individual_pathogenic_predictions(self) -> bool:
-        v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
-                self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min]
-        v3_fields = v2_fields + [self.alphamissense_rankscore_min]
-        v4_fields = v3_fields + self._v4_score_min_fields() + self._v4_pred_fields()
-        # Matching v2-v4, the v5 list excludes nmd_escaping_variant / aloft / ptc_nmd_escaping -
-        # those are categorical LoF flags rather than per-tool pathogenicity predictions.
-        v5_fields = self._v4_score_min_fields() + self._v4_pred_fields() + self._rankscore_min_fields()
-        _COLUMNS_VERSION = {
-            1: [self.cadd_score_min, self.revel_score_min],
-            2: v2_fields,
-            3: v3_fields,
-            4: v4_fields,
-            5: v5_fields,
-        }
-        pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, v5_fields)
-        return any(pathogenic_predictions)
-
-    def _rankscore_min_fields(self) -> list:
-        return [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min,
-                self.clinpred_rankscore_min, self.metalr_rankscore_min, self.revel_rankscore_min,
-                self.vest4_rankscore_min, self.alphamissense_rankscore_min]
-
-    def _rankscore_required_fields(self) -> list:
-        return [self.bayesdel_noaf_rankscore_required, self.cadd_raw_rankscore_required,
-                self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
-                self.vest4_rankscore_required, self.alphamissense_rankscore_required]
+        return any(getattr(self, cf.value_field) for cf in self._column_filters() if cf.prediction)
 
     def has_rankscore_predictions(self) -> bool:
         """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
-        return any(self._rankscore_min_fields())
+        return any(getattr(self, cf.value_field) for cf in _COLUMN_FILTERS if cf.rankscore)
 
     def show_rankscore_sliders(self) -> bool:
         """ v2/v3 only have rankscores so always show them. At v4 they're legacy: offered when the

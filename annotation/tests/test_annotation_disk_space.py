@@ -20,6 +20,7 @@ from annotation.annotation_run_files import get_annotsv_dir
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    link_fake_gene_annotation_release,
     retire_seeded_annotation_version,
 )
 from annotation.models import (
@@ -96,11 +97,11 @@ class AnnotationRunCleanupTestCase(TestCase):
             annotsv_dir = get_annotsv_dir(run)
             os.makedirs(annotsv_dir, exist_ok=True)
             # AnnotSV writes more than just the TSV into its directory
-            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w").close()
+            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w", encoding="utf-8").close()
 
         paths = runner.get_output_paths(run, run.vcf_dump_filename)
         for path in paths:
-            open(path, "w").close()
+            open(path, "w", encoding="utf-8").close()
         runner.record_resume_state(run, run.vcf_dump_filename)
         for k, v in run_kwargs.items():
             setattr(run, k, v)
@@ -217,6 +218,7 @@ class AnnotationDiskGateTestCase(TestCase):
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+        link_fake_gene_annotation_release(cls.vav)
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
     def _make_run(self, lo_idx, hi_idx, status=AnnotationStatus.CREATED):

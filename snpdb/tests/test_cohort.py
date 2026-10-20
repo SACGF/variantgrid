@@ -133,6 +133,22 @@ class CohortGenotypeTestCase(TestCase):
             "cohort_genotype_packed_field_index", flat=True)
         self.assertEqual([0, 1], list(packed_indexes))
 
+    def test_sample_delete_bumps_cohorts_except_vcf_cohort(self):
+        parent_cohort = self.trio1.cohort
+        father = list(parent_cohort.get_samples())[-1]
+        sub_cohort = parent_cohort.create_sub_cohort(self.user_owner, list(parent_cohort.get_samples())[1:])
+        custom_cohort = Cohort.objects.create(name="custom", user=self.user_owner, genome_build=self.grch37)
+        custom_cohort.set_samples([father.pk, self.trio2.get_samples().first().pk])
+        versions = {c.pk: Cohort.objects.get(pk=c.pk).version for c in (parent_cohort, sub_cohort, custom_cohort)}
+
+        father.delete()
+
+        self.assertEqual(versions[parent_cohort.pk], Cohort.objects.get(pk=parent_cohort.pk).version)
+        for cohort in (sub_cohort, custom_cohort):
+            cohort = Cohort.objects.get(pk=cohort.pk)
+            self.assertEqual(versions[cohort.pk] + 1, cohort.version)
+            self.assertEqual(1, cohort.sample_count)
+
     def test_set_samples_requires_a_sample(self):
         cohort = Cohort.objects.create(name="empty", user=self.user_owner, genome_build=self.grch37)
         self.assertRaises(ValueError, cohort.set_samples, [])

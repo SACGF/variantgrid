@@ -106,7 +106,7 @@
                      {% endlabelled %}
                      {% labelled label="Allele" %}{% allele data.allele %}{% endlabelled %}
                     {% labelled label="c.HGVS "|add:data.genome_build.name %}
-                        {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
+                        {% for hgvs in data.hgvses %}<div>{% hgvs hgvs %}</div>{% endfor %}
                     {% endlabelled %}
                     {% if data.clinical_context.name != "default" %}
                     {% labelled label="Variant Interpreted in Context of" %}{{ data.clinical_context }}{% endlabelled %}

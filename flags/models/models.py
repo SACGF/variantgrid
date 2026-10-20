@@ -1,4 +1,3 @@
-import datetime
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
@@ -165,7 +164,7 @@ class Flag(TimeStampedModel):
         if resolution is not None:
             if permission_check:
                 if current_permission < self.flag_type.permission_enum:
-                    raise PermissionError(f"User does not have permission to {resolution.label} flag")
+                    raise PermissionError("Insufficient permissions to change flag resolution")
 
             # don't need to save the flag on creation as it will be created with the correct resolution
             if not first_comment:
@@ -511,11 +510,11 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         if permission_check:
             if flag_type.context_id != self.context_id:
-                raise PermissionError(f"Flag type {flag_type.id} not available in flag context {self.context.label}")
+                raise PermissionError("Flag type not available in this context")
             current_level = self.permission_level(user)
             required_level = flag_type.raise_permission_enum
             if current_level < required_level:
-                raise PermissionError(f"User does not have {required_level.name} permissions on flag collection")
+                raise PermissionError("Insufficient permissions to raise this flag type")
 
         if resolution is None:
             resolution = flag_type.default_resolution()
@@ -569,17 +568,6 @@ class FlagsMixin(models.Model):
             return FlagPermissionLevel.USERS if self.can_view(user) else FlagPermissionLevel.NO_PERM
         return FlagPermissionLevel.USERS
 
-    def flags_of_type(self, flag_type: FlagType) -> QuerySet[Flag]:
-        if not self.flag_collection:
-            return Flag.objects.none()
-        return Flag.objects.filter(collection=self.flag_collection, flag_type=flag_type)
-
-    @property
-    def has_open_flags(self) -> bool:
-        if not self.flag_collection:
-            return False
-        return Flag.objects.filter(collection=self.flag_collection).filter(FlagCollection.Q_OPEN_FLAGS).exists()
-
     def has_open_flag_with_attribute(self, attribute, value) -> bool:
         if not self.flag_collection:
             return False
@@ -596,13 +584,6 @@ class FlagsMixin(models.Model):
             return False
         fc = self.flag_collection_safe
         fc.close_open_flags_of_type(flag_type, comment=comment, user=None, resolution=resolution, data=data)
-
-    def has_flag_activity(self, since=None) -> bool:
-        if since is None:
-            since = datetime.datetime.now() - datetime.timedelta(days=1)
-        if self.flag_collection:
-            return FlagComment.objects.filter(flag__collection=self.flag_collection, created__gte=since).exists()
-        return False
 
     @property
     def flag_collection_safe(self) -> FlagCollection:

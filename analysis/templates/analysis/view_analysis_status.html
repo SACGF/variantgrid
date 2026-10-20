@@ -1,0 +1,143 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_utils %}
+{% load js_tags %}
+{% block title %}Analysis Status{% endblock title %}
+{% block head %}
+    <script type="text/javascript" src="{% static 'js/lib/plotly-custom-3.7.0.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/node_type_select.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/analysis/view_analysis_status.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
+    <script>
+        $(document).ready(() => {
+            initViewAnalysisStatus({
+                schedulerSummary: {% if scheduler_status.has_work %}{{ scheduler_status.graph_counts|jsonify }}{% else %}null{% endif %},
+                nodesStatusSummary: {{ nodes_status_summary|jsonify }},
+                nodeTypesDisplay: {{ node_types_display|jsonify }},
+            });
+        });
+
+        function analysisNodeIssuesFilter(data, type) {
+            {% for field in filter_form %}
+                data.{{ field.name }} = blankToNull($("#{{ field.id_for_label }}").val());
+            {% endfor %}
+        }
+    </script>
+{% endblock head %}
+{% block content %}
+
+    <div class="container-table">
+        <h3>Analysis Status</h3>
+
+        {% if jobs_paused %}
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading"><i class="fas fa-pause-circle"></i> Analysis &amp; annotation jobs are PAUSED</h4>
+                <p class="mb-1">No new analysis or annotation work is being leased or launched - in-flight tasks finish, everything else (including newly started analyses) waits until resumed.</p>
+                {% if jobs_control.reason %}<p class="mb-1"><strong>Reason:</strong> {{ jobs_control.reason }}</p>{% endif %}
+                {% if jobs_control.paused_at %}<p class="mb-2"><small>Paused {{ jobs_control.paused_at }}{% if jobs_control.paused_by %} by {{ jobs_control.paused_by }}{% endif %}</small></p>{% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <button name="unpause-jobs" class="btn btn-success">Unpause jobs</button>
+                </form>
+            </div>
+        {% endif %}
+        <form method="post" class="mb-3">
+            {% csrf_token %}
+            <div class="btn-toolbar">
+                {% if jobs_paused %}
+                    <span class="d-inline-block" tabindex="0" title="Jobs are paused - the dispatcher would exit without leasing anything">
+                        <button name="dispatch-backlog" class="btn btn-outline-primary" style="pointer-events: none;" disabled>Dispatch backlog now</button>
+                    </span>
+                {% else %}
+                    <button name="dispatch-backlog" class="btn btn-outline-primary">Dispatch backlog now</button>
+                    <button name="pause-jobs" class="btn btn-outline-warning ml-2">Pause jobs</button>
+                {% endif %}
+            </div>
+        </form>
+
+        <div id="analysis-scheduler" class="card mb-3">
+            <div class="card-header">Scheduler</div>
+            <div class="card-body">
+                {% if scheduler_status.has_work %}
+                    <div id="analysis-scheduler-graph" style="height: 100px"></div>
+                {% else %}
+                    <p class="text-muted">Nothing queued</p>
+                {% endif %}
+                {% labelled label="Waiting" hint="Dirty nodes, leased as their parents finish and capacity allows" %}{{ scheduler_status.waiting }}{% endlabelled %}
+                {% labelled label="Backing off" hint="Dirty nodes retrying after a transient error, not leasable until their backoff ends" %}{{ scheduler_status.backing_off }}{% endlabelled %}
+                {% labelled label="Dispatched" hint="Queued with a live lease - sent to analysis_workers, not yet started" %}{{ scheduler_status.dispatched }}{% endlabelled %}
+                {% labelled label="Running" hint="Loading with a live lease" %}{{ scheduler_status.running }}{% endlabelled %}
+                {% labelled label="Lapsed" hint="Queued or loading with no live lease - the next dispatch re-leases a queued node and fails a loading one" %}{{ scheduler_status.lapsed }}{% endlabelled %}
+                {% labelled label="In flight / target" hint="Dispatched + running, against what the periodic backlog dispatch tops up to" %}{{ scheduler_status.in_flight }} / {{ scheduler_status.in_flight_target }}{% endlabelled %}
+                {% labelled label="Analyses with work" %}{{ scheduler_status.analyses_with_work }}{% endlabelled %}
+                {% for queue_name, depth in scheduler_status.queues.items %}
+                    {% labelled label=queue_name hint="Broker queue" %}
+                        {% if depth.error %}
+                            <span class="text-danger">{{ depth.error }}</span>
+                        {% else %}
+                            {{ depth.messages }} message{{ depth.messages|pluralize }}, {{ depth.consumers }} consumer{{ depth.consumers|pluralize }}
+                        {% endif %}
+                    {% endlabelled %}
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if analyses_with_work %}
+            <div id="analyses-with-work" class="card mb-3">
+                <div class="card-header">Analyses with outstanding work</div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Analysis</th>
+                                <th>User</th>
+                                <th class="text-right">Waiting</th>
+                                <th class="text-right">Dispatched</th>
+                                <th class="text-right">Running</th>
+                                <th class="text-right">Lapsed</th>
+                                <th>Oldest modified</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for work in analyses_with_work %}
+                                <tr>
+                                    <td><a href="{% url 'analysis' work.analysis_id %}">{{ work.analysis_name|default:work.analysis_id }}</a></td>
+                                    <td>{{ work.username }}</td>
+                                    <td class="text-right">{{ work.waiting }}</td>
+                                    <td class="text-right">{{ work.dispatched }}</td>
+                                    <td class="text-right">{{ work.running }}</td>
+                                    <td class="text-right{% if work.lapsed %} text-danger{% endif %}">{{ work.lapsed }}</td>
+                                    <td>{% timestamp work.oldest_modified time_ago=True %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="card mb-3">
+            <div class="card-header">All nodes</div>
+            <div class="card-body">
+                <div id="analysis-node-summary-graph" style="height: 100px"></div>
+                {% for field, count in field_counts.items %}
+                    {% labelled label=field %}{{ count }}{% endlabelled %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <form id="analysis-node-issues-filter" method="post" class="form-inline mb-2">
+            {% csrf_token %}
+            {% for field in filter_form %}
+                <label class="mr-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <span class="mr-3">{{ field }}</span>
+            {% endfor %}
+            <button id="clear-filters" type="button" class="btn btn-outline-secondary mr-2">Clear filters</button>
+            <button name="reload-matching" class="btn btn-outline-primary">Reload matching</button>
+        </form>
+        <table id="analysis-node-issues-datatable" data-datatable-url="{% url 'analysis_node_issues_datatable' %}"
+               data-datatable-data="analysisNodeIssuesFilter" class="sticky-header"></table>
+    </div>
+
+{% endblock content %}

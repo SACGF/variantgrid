@@ -5,11 +5,13 @@ from django.conf import settings
 from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
+    ClassificationGroupingEntry,
     ClassificationJsonParams,
     ClassificationModification,
     EvidenceKeyMap,
-    ImportedAlleleInfo, ClassificationGroupingEntry,
+    ImportedAlleleInfo,
 )
+from classification.models.classification_evidence_normalise import evidence_validation_messages
 from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
     ClassificationJsonAlleleRevolvedDict,
@@ -36,10 +38,10 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
                 (c_hgvs := preferred_build.resolved_hgvs_display):
             resolved_dict.update(c_hgvs.to_json())
         elif c_hgvs_raw := classification.get(SpecialEKeys.C_HGVS):
-            resolved_dict.update(HGVSDisplay.parse(c_hgvs_raw).to_json())
+            resolved_dict.update(HGVSDisplay.parse(dna_hgvs=c_hgvs_raw).to_json())
         elif g_hgvs := allele_info.imported_g_hgvs_obj:
             # g.HGVS only submission where the variant ran off the transcript, show what was imported
-            resolved_dict.update(HGVSDisplay(g_hgvs).to_json())
+            resolved_dict.update(HGVSDisplay(dna_hgvs=g_hgvs).to_json())
 
         include = False
         if latest_validation := allele_info.latest_validation:
@@ -157,7 +159,7 @@ def populate_classification_json(classification: Classification, params: Classif
         content['has_changes'] = last_published_version.id != latest_modification.id
 
     if include_messages:
-        content['messages'] = Classification.validate_evidence(classification.evidence)
+        content['messages'] = evidence_validation_messages(classification.evidence)
 
     if can_write and latest_modification:
         content['last_edited'] = latest_modification.created.timestamp()
@@ -172,7 +174,7 @@ def populate_classification_json(classification: Classification, params: Classif
         content['version'] = version_timestamp
         content['data'] = classification.get_visible_evidence(versioned_data, lowest_share_level)
         if include_messages:
-            content['messages'] = Classification.validate_evidence(versioned_data)
+            content['messages'] = evidence_validation_messages(versioned_data)
         content['can_write'] = False
 
     if include_lab_config:
@@ -254,7 +256,7 @@ def populate_classification_json(classification: Classification, params: Classif
             data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url()) + "?refer=json&seen=" + params.date_str}
 
         if params.populate_literature_with_citations:
-            if citations := classification.loaded_citations().all_citations:
+            if citations := classification.stored_citations():
                 data[SpecialEKeys.LITERATURE] = f"Citations scanned from this classification by {settings.SITE_NAME}\n" + "\n".join(f"{citation}" for citation in citations)
             else:
                 data[SpecialEKeys.LITERATURE] = None

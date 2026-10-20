@@ -1,5 +1,9 @@
 from django.db.models import Count
 
+from annotation.abandoned_annotation_runs import (
+    abandoned_annotation_runs_by_reason,
+    incomplete_annotation_runs_qs,
+)
 from annotation.annotation_versions import get_range_lock_gaps_with_variants
 from annotation.models import (
     AnnotationRangeLock,
@@ -93,6 +97,15 @@ def check_variant_annotation_runs_status() -> dict:
     annotation_status = {
         "AnnotationRangeLock duplicates": arl_data,
     }
+
+    for reason, qs in abandoned_annotation_runs_by_reason(incomplete_annotation_runs_qs()).items():
+        abandoned_data = {
+            "valid": True,  # Just a warning
+        }
+        if num_abandoned := qs.count():
+            abandoned_data["warning"] = (f"{num_abandoned} incomplete annotation runs ({reason}) will never be "
+                                         "dispatched. Run: python3 manage.py clean_up_abandoned_annotation_runs")
+        annotation_status[f"Abandoned annotation runs ({reason})"] = abandoned_data
 
     for genome_build in GenomeBuild.builds_with_annotation():
         vav = VariantAnnotationVersion.latest(genome_build)

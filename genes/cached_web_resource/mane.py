@@ -5,11 +5,11 @@ from collections import Counter
 import pandas as pd
 import requests
 
-from annotation.models import CachedWebResource
 from genes.models import HGNC, MANE, GeneSymbol, GeneVersion, TranscriptVersion
 from genes.models_enums import MANEStatus
 from library.constants import MINUTE_SECS
 from snpdb.models import GenomeBuild
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_mane_from_web(cached_web_resource: CachedWebResource):

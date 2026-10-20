@@ -8,7 +8,8 @@ from django.test import TestCase
 
 from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
-from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, GeneLevelId
+from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, GeneLevelId, GeneSymbolAlias
+from genes.models_enums import GeneSymbolAliasSource
 from genes.tests.gene_level_test_utils import create_gene_copy_number_event
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
@@ -116,6 +117,23 @@ class TestGeneLevelCNVRewrite(GeneFusionTestCase):
         self.assertEqual(1, SimpleVCFImportInfo.objects.get(message_string=NO_SEGMENT_MESSAGE).count)
         self.assertEqual(5, self.records_read)
         self.assertEqual(3, len(self.records), "the no-call and the unnamed record are not written")
+
+    def test_an_ambiguous_alias_is_dropped_and_named(self):
+        for symbol in ["SEPTIN2", "SEPTIN6"]:
+            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        input_filename = os.path.join(settings.PRIVATE_DATA_ROOT, "gene_level_cnv_ambiguous.vcf")
+        with open(GENE_LEVEL_CNV_VCF) as source, open(input_filename, "w") as f:
+            f.write(source.read().replace("SEGID=EGFR", "SEGID=SEPTX"))
+        upload_step = UploadStep.objects.create(upload_pipeline=self.upload_pipeline, name="Ambiguous", sort_order=1,
+                                                input_filename=input_filename,
+                                                output_filename=os.path.join(settings.PRIVATE_DATA_ROOT,
+                                                                             "gene_level_cnv_ambiguous_variants.vcf"))
+        GeneLevelCNVCreateVCFTask.process_items(upload_step)
+
+        message = ("Gene-level CNV records skipped - 'SEPTX' is an ambiguous alias for SEPTIN2, SEPTIN6 - "
+                   "change it to the explicit gene symbol")
+        self.assertEqual(1, SimpleVCFImportInfo.objects.get(message_string=message).count)
+        self.assertEqual(2, len(list(cyvcf2.VCF(upload_step.output_filename))), "the other calls are still written")
 
     def test_an_old_symbol_resolves_to_the_approved_one(self):
         """ The file says SEPT14; the event is SEPTIN14 loss """

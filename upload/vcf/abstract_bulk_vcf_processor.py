@@ -9,7 +9,7 @@ from django.conf import settings
 from django.db.models import Max
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
-from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
 from snpdb.models import Variant, VariantCoordinate

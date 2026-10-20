@@ -103,13 +103,6 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
 
-    def get_q(self, variant_annotation_version):
-        """ For a Variant queryset """
-        from annotation.models.models import VariantTranscriptAnnotation
-        genes_qs = self.get_genes(variant_annotation_version.gene_annotation_release)
-        return VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version,
-                                                                   genes_qs)
-
     @staticmethod
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
         """ For GeneList node, we need to get query for multiple lists - and it's much faster to build the merged
@@ -240,7 +233,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         # Sample gene lists for samples we have permission to see
         samples_qs = Sample.filter_for_user(user)
         sample_gene_list_qs = GeneList.objects.filter(category__name=GeneListCategory.SAMPLE_GENE_LIST,
-                                                      customtextgenelist__qcgenelist__qc__alignment_file__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+                                                      customtextgenelist__qcgenelist__qc__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
 
         qs = user_qs | sample_gene_list_qs
         if success_only:

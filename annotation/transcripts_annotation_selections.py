@@ -9,14 +9,11 @@ from django.utils.html import format_html
 from django.utils.timesince import timesince
 
 from annotation.models import AnnotationStatus, VEPSkippedReason
-from annotation.models.models import (
-    AnnotationRun,
-    AnnotationVersion,
-    InvalidAnnotationVersionError,
-    VariantAnnotation,
-    VariantTranscriptAnnotation,
-)
+from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_enums import NMDEscapeStatus
+from annotation.models.models_version import InvalidAnnotationVersionError
 from genes.hgvs import HGVSException, HGVSMatcher
 from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -34,6 +31,7 @@ class VariantTranscriptSelections:
     GNOMAD_GENE_CONSTRAINT_URL = "gnomad_gene_constraint_url"
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
+    CDOT_FAKE = "cdot_fake"  # RefSeq mitochondrial stand-in, see TranscriptVersion.is_cdot_fake
     NO_TRANSCRIPT = ''  # Can't be None as needs to be sortable
     # CSS classes used to collapse rows behind their respective toggle links (see template)
     OTHER_CONSORTIUM_COLLAPSE_CLASS = "other-annotation-consortium-transcripts"
@@ -186,7 +184,9 @@ class VariantTranscriptSelections:
         transcript_canonical_score = 0
         if obj.transcript_version:
             data["tags"] = obj.transcript_version.tags
-            data["protein_length"] = obj.transcript_version.protein_length
+            data[self.CDOT_FAKE] = obj.transcript_version.is_cdot_fake
+            if obj.transcript_version.has_valid_data:  # A legacy pre-cdot row has no exons to measure
+                data["protein_length"] = obj.transcript_version.protein_length
             transcript_canonical_score = obj.transcript_version.canonical_score
             ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
             if ggc:
@@ -312,6 +312,7 @@ class VariantTranscriptSelections:
                     other_ac_key: transcript_version.accession,
                     "transcript_id": transcript_version.accession,  # for transcript data keys
                     self.REPRESENTATIVE: False,
+                    self.CDOT_FAKE: transcript_version.is_cdot_fake,
                     "consequence": "?",
                     "canonical_score": -1,
                 }

@@ -1,5 +1,5 @@
-from annotation.tasks.cached_web_resource_tasks import CachedWebResourceTask
 from ontology.gencc import store_gencc_from_web
+from snpdb.tasks.cached_web_resource_tasks import CachedWebResourceTask
 from variantgrid.celery import app
 
 

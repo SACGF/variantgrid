@@ -111,7 +111,7 @@
                             <td class="td-variant-coordinate"><div class="variant-coordinate">{{ output.variant_coordinate|dash_if_empty }}</div></td>
                             <td class="td-variant-coordinate"><div class="variant-coordinate">{{ output.variant_coordinate|stringformat:'r'|dash_if_empty }}</div></td>
                             <td><div class="variant-coordinate">{{ output.transcript_version|dash_if_empty }}</div></td>
-                            <td><div class="variant-coordinate">{% c_hgvs output.hgvs %}</div></td>
+                            <td><div class="variant-coordinate">{% hgvs output.hgvs %}</div></td>
                             <td><div class="variant-coordinate">
                                 {% if output.message %}
                                     {% if output.is_error %}

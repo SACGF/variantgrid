@@ -5,7 +5,7 @@ Verified against 7c4408c62 on 2026-09-06
 The annotation app takes the Variants snpdb has stored and attaches what the world knows about them: VEP's per-transcript
 consequences and the plugin/custom scores that ride along with it, ClinVar's summary per variant, per-gene annotation
 (ontology terms, GenCC gene-disease strength, dbNSFP gene scores, gnomAD constraint), Human Protein Atlas tissue data,
-and citations. Every one of these is versioned, and `annotation/models/models.py:AnnotationVersion` is the bundle per
+and citations. Every one of these is versioned, and `annotation/models/models_annotation_version.py:AnnotationVersion` is the bundle per
 build that an analysis or a variant page pins itself to. This document is the story behind `annotation/AGENTS.md`:
 how a version comes to exist, how a variant gets its rows, why the tables are partitioned, and the traps.
 Model fields, URLs, commands, tasks and signals are in the generated maps
@@ -16,7 +16,7 @@ Model fields, URLs, commands, tasks and signals are in the generated maps
 
 ### A new VariantAnnotationVersion
 
-A `annotation/models/models.py:VariantAnnotationVersion` (VAV) is a database snapshot of one VEP install for one build:
+A `annotation/models/models_version.py:VariantAnnotationVersion` (VAV) is a database snapshot of one VEP install for one build:
 the VEP code version, the cache version, and a pin for every data file and plugin the command line will reference
 (gnomAD, dbNSFP, SpliceAI, COSMIC, MaveDB, Open Targets ...), plus `columns_version`, which selects the set of columns
 the pipeline writes. `annotation/vep_annotation.py:get_vep_version` runs `vep --help`-style introspection and
@@ -29,20 +29,20 @@ re-annotated yet: NEW is a version being built.
 The VAV must know which gene set VEP used, because the import lane links every annotation row to a
 `TranscriptVersion` by FK. `annotation/gene_annotation_release_matching.py:VepGeneSetVersions` reads the release
 token out of the VAV's `refseq` / `genebuild` / `vep_cache` pins (eg `RS_2025_08`), and
-`annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release` looks for an existing
+`annotation/models/models_version.py:VariantAnnotationVersion.link_gene_annotation_release` looks for an existing
 `GeneAnnotationRelease` whose cdot import URL names that release; if there is none, the genes app's
 `import_cdot_gene_annotation_release` command downloads the matching cdot per-GFF file and creates it (see
 `claude/research/genes.md`). A VAV with no release is a VAV whose every run will fail at pipeline time, which is what
-`annotation/models/models.py:VariantAnnotationVersion.get_annotation_run_blocker` reports on the runs page. Gene
+`annotation/models/models_version.py:VariantAnnotationVersion.get_annotation_run_blocker` reports on the runs page. Gene
 annotation is then built for that release (`manage.py gene_annotation --new-releases`, below), and only then can
-`annotation/models/models.py:VariantAnnotationVersion.promote_to_active` run: it refuses while
+`annotation/models/models_version.py:VariantAnnotationVersion.promote_to_active` run: it refuses while
 `get_gene_annotation_promote_blocker` says the AnnotationVersion would be inconsistent, then demotes the prior ACTIVE
 VAV for the build to HISTORICAL inside a `select_for_update`. A partial unique constraint (`one_active_vav_per_build`)
 makes "the VAV" a database fact rather than a convention.
 
-Saving any sub-version creates its partition tables (`annotation/models/models.py:SubVersionPartition.save` via
+Saving any sub-version creates its partition tables (`annotation/models/models_version.py:SubVersionPartition.save` via
 `library/django_utils/django_partition.py:RelatedModelsPartitionModel`) and calls
-`annotation/models/models.py:AnnotationVersion.new_sub_version`, which assembles a new AnnotationVersion from the latest
+`annotation/models/models_annotation_version.py:AnnotationVersion.new_sub_version`, which assembles a new AnnotationVersion from the latest
 sub-version of each kind for the build - overwriting the previous AnnotationVersion in place if nothing references it
 yet, because a deploy that imports ClinVar, HPA and a new VAV in one go should not leave three half-built versions
 behind. `SubVersionPartition.defer_new_sub_version` holds the bump back while a batch of sub-versions is written.
@@ -57,14 +57,14 @@ inserted) runs on `scheduling_single_worker` under a cache lock and, for each an
 requested status, loops `annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version` until
 `annotation/annotation_versions.py:get_annotation_range_lock_and_unannotated_count` finds no more unannotated variants.
 That function walks pk blocks above the highest existing lock (never a sort-and-limit over the whole table, which does
-not scale) and returns an `annotation/models/models.py:AnnotationRangeLock` of at least
+not scale) and returns an `annotation/models/models_annotation_run.py:AnnotationRangeLock` of at least
 `ANNOTATION_VEP_BATCH_MIN` and at most `ANNOTATION_VEP_BATCH_MAX` variants. "Unannotated" is defined once, in
 `annotation/annotation_version_querysets.py:get_variants_qs_for_annotation`: variants in the build's contigs passing
 `annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list` (no reference-alt, no `.`/`*` alt) with no
 VariantAnnotation row in this version's partition, restricted to a pipeline type by
 `annotation/annotation_version_querysets.py:pipeline_type_variant_q`.
 
-Each lock gets one `annotation/models/models.py:AnnotationRun` per enabled pipeline type
+Each lock gets one `annotation/models/models_annotation_run.py:AnnotationRun` per enabled pipeline type
 (`annotation/tasks/annotation_scheduler_task.py:_handle_range_lock`). The types are the registry in
 `annotation/pipelines/__init__.py:PIPELINES`: STANDARD (VEP over short variants), STRUCTURAL_VARIANT (VEP over symbolic
 variants), GENE_LEVEL (fusions, computed locally by `annotation/gene_level_annotation.py:annotate_gene_level_run`) and
@@ -88,8 +88,8 @@ against the VAV's pins (`annotation/vep_annotation.py:vep_check_command_line_ver
 re-picks the run in its resume lane and launches `annotation/tasks/annotate_variants.py:import_annotation_run` on
 `db_workers`, which checks the annotated file's header the same way, streams it through
 `annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter`, clears any stale error and sends
-`annotation_run_complete_signal`. Status is never set directly: `annotation/models/models.py:AnnotationRun.get_status`
-derives it from the timestamp and error fields on every save, and `annotation/models/models.py:AnnotationRun.save_if_owner`
+`annotation_run_complete_signal`. Status is never set directly: `annotation/models/models_annotation_run.py:AnnotationRun.get_status`
+derives it from the timestamp and error fields on every save, and `annotation/models/models_annotation_run.py:AnnotationRun.save_if_owner`
 is the write used after any stage during which the lease could have expired. The import lane counts VEP's
 `--skipped_variants_file` against the dump so truncated output fails the run (#1701), and SV conservation is scored with
 pyBigWig into a sidecar file (#1657).
@@ -112,7 +112,7 @@ partition path.
 
 Reading goes the other way through one hook. Partitions are old-style inheritance children, so a plain ORM join to
 `annotation_variantannotation` hits the empty parent; `annotation/annotation_version_querysets.py:get_queryset_for_annotation_version`
-attaches `annotation/models/models.py:AnnotationVersion.sql_partition_transformer` to the queryset via
+attaches `annotation/models/models_annotation_version.py:AnnotationVersion.sql_partition_transformer` to the queryset via
 `library/django_utils/django_queryset_sql_transformer.py:get_queryset_with_transformer_hook`, and the compiled SQL has
 its table names rewritten to the version's partitions. Django's `FilteredRelation` cannot do this job because it cannot
 follow nested relations (`variantannotation__gene__geneannotation`).
@@ -121,19 +121,19 @@ follow nested relations (`variantannotation__gene__geneannotation`).
 
 ClinVar arrives two ways. The bulk summary is the ClinVar VCF, imported through the upload app's step pipeline
 (`annotation/import_task_factories.py` registers the steps): `annotation/tasks/import_clinvar_vcf_task.py:ImportCreateVersionForClinVarVCFTask`
-makes a `annotation/models/models.py:ClinVarVersion` keyed on the file's sha256 (a re-upload of the same file wipes and
+makes a `annotation/models/models_clinvar.py:ClinVarVersion` keyed on the file's sha256 (a re-upload of the same file wipes and
 refills the same version's partition), unknown variants are inserted by the normal VCF machinery, then
-`annotation/vcf_files/import_clinvar_vcf.py:BulkClinVarInserter` maps INFO fields onto `annotation/models/models.py:ClinVar`
+`annotation/vcf_files/import_clinvar_vcf.py:BulkClinVarInserter` maps INFO fields onto `annotation/models/models_clinvar.py:ClinVar`
 rows, including the oncogenic (ONC*) and somatic clinical impact (SCI*) fields (#1791). Only staff may upload one
 (`annotation/vcf_files/import_clinvar_vcf.py:check_can_import_clinvar`). The per-submission detail is fetched lazily
 from ClinVar's XML: `annotation/clinvar_fetch_request.py:ClinVarFetchRequest.fetch` caches a
-`annotation/models/models.py:ClinVarRecordCollection` per variation id, refreshing when older than
+`annotation/models/models_clinvar.py:ClinVarRecordCollection` per variation id, refreshing when older than
 `CLINVAR_RECORD_CACHE_DAYS` or when `annotation/clinvar_xml_parser_via_vcv.py:ClinVarXmlParserViaVCV` bumps its
 `PARSER_VERSION`, holding a `select_for_update` so two page loads do not both hit the API.
 
 ### Gene annotation
 
-`annotation/models/models.py:GeneAnnotation` is a per-gene, per-`annotation/models/models.py:GeneAnnotationVersion` row
+`annotation/models/models_gene_annotation.py:GeneAnnotation` is a per-gene, per-`annotation/models/models_gene_annotation.py:GeneAnnotationVersion` row
 of pipe-joined OMIM/HPO/MONDO terms, GenCC strength flags, a dbNSFP gene row and gnomAD LoF o/e. It is built by
 `annotation/management/commands/gene_annotation.py:Command`, which must be re-run whenever the GeneAnnotationRelease or
 the OntologyVersion changes because the version is unique on both: `_populate_gene_annotation_version` matches every
@@ -152,7 +152,7 @@ VEP upgrade that changes nothing in the schema is a new VAV without a migration,
 columns) is a new `VEPColumnDef` gated by `min_columns_version`; `annotation/vep_columns.py:VEP_COLUMNS` is code, not a
 table, so the mapping is versioned with the code that reads it and can be tested and diffed. `columns_version` 2 adds
 dbNSFP rankscores, 3 gnomAD v4 and the `_xy` fields, 4 raw dbNSFP 5.3 scores with per-transcript resolution
-(`annotation/refseq_ensembl_resolver.py`), denovo-db and the VEP 116 plugins (#1652). `annotation/models/models.py:AnnotationPipelineVersion`
+(`annotation/refseq_ensembl_resolver.py`), denovo-db and the VEP 116 plugins (#1652). `annotation/models/models_annotation_run.py:AnnotationPipelineVersion`
 (#720) is deliberately not the VAV: pinning AnnotSV on the VEP version would make rolling its data bundle cost a full
 re-annotation, so non-VEP tools get their own NEW/ACTIVE/HISTORICAL lifecycle and their runs hang off the locks the VEP
 run already created - "this lock has no run at the ACTIVE version" is the same query as "this lock has no run of this
@@ -181,18 +181,21 @@ The pins on a VAV must match the VEP that will run and the VCF that comes back: 
 and `annotation/vep_annotation.py:vep_check_annotated_file_version_match` both raise `VEPVersionMismatchError`, so
 changing a `settings.ANNOTATION` data path without creating a new VAV halts every run. `gencode_subset` and `distance`
 are settings snapshots, not VEP header facts, and are excluded from the comparison
-(`annotation/vep_annotation.py:_vep_check_version_match`).
+(`annotation/vep_annotation.py:_vep_check_version_match`). The first mismatch latches the VAV
+(`annotation/models/models_version.py:VariantAnnotationVersion.latch_vep_version_mismatch`, #1679), which stops the scheduler and the
+dispatcher's VEP lane for it; only the runs page's re-check button
+(`annotation/tasks/annotate_variants.py:recheck_vep_version`) clears it.
 
-`annotation/models/models.py:AnnotationRun.get_for_variant` answers "is this variant in progress" by range-lock bounds
+`annotation/models/models_annotation_run.py:AnnotationRun.get_for_variant` answers "is this variant in progress" by range-lock bounds
 and pipeline type, so a variant inside a lock with no row reads as pending, not missing; an unannotated count must apply
 `get_variant_annotation_q_list` or it will count reference variants that never get rows. Range locks and ClinVar rows PROTECT
-their variants (`annotation/models/models.py:AnnotationRangeLock.release_variant` is the way to move a lock's endpoint
+their variants (`annotation/models/models_annotation_run.py:AnnotationRangeLock.release_variant` is the way to move a lock's endpoint
 off a variant you need to delete).
 
 Merging is only safe while every run on a lock is still CREATED and un-leased
 (`annotation/annotation_versions.py:_range_lock_is_dispatchable`); an empty-finished run is reopened when its lock grows
-because it owns no rows (`annotation/models/models.py:AnnotationRun.reopen_to_created`). A retry must reuse the run in
-place (`annotation/models/models.py:AnnotationRun.reset_for_retry`, #1654) - deleting and recreating it leaves a rangeless
+because it owns no rows (`annotation/models/models_annotation_run.py:AnnotationRun.reopen_to_created`). A retry must reuse the run in
+place (`annotation/models/models_annotation_run.py:AnnotationRun.reset_for_retry`, #1654) - deleting and recreating it leaves a rangeless
 run stuck forever - and it also removes the import scratch directory, or the leftover TSVs trip the copy-CSV overwrite guard
 (#1596).
 

@@ -104,11 +104,12 @@ li.logout {
     overflow-y: hidden;
   }
   .main-content {
-    padding-top: 80px;
+    margin-top: 57px;
+    padding-top: 23px;
     margin-left: 170px;
     overflow: auto;
     max-width: 100vw;
-    height: 100vh;
+    height: calc(100vh - 57px);
   }
   .nav-side-bar {
     border-right: 1px solid #cfcfcf;
@@ -2955,13 +2956,6 @@ body.dt-col-resizing {
   float: left;
 }
 
-a.clinical-context {
-  display: inline-block;
-  padding: 2px 4px 2px 4px;
-  border: 1px solid gray;
-  border-radius: 4px;
-}
-
 #gene-grid-link {
   display: flex;
   align-items: center;
@@ -3431,6 +3425,13 @@ a .c-hgvs-body .c-hgvs-nomen {
   letter-spacing: 0.5px;
 }
 
+.p-hgvs {
+  margin-left: 0.4em;
+  color: #6c757d;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
 .genome-build {
   font-size: 8px;
   margin-right: 4px;
@@ -3647,6 +3648,59 @@ table.overlap-summary tr.cross-context-row {
 table.overlap-summary .overlap-criteria {
   padding: 3px 0 3px 0;
   color: #444;
+}
+
+.gene-consensus-group table.gene-content th.gene-content-label {
+  width: 160px;
+  font-weight: normal;
+  color: #666;
+  white-space: nowrap;
+}
+.gene-consensus-group table.gene-content td {
+  white-space: pre-wrap;
+}
+.gene-consensus-group .gene-content-text.clamp {
+  max-height: 4.5em;
+  overflow: hidden;
+}
+.gene-consensus-group .gene-content-conditions .badge {
+  white-space: normal;
+  text-align: left;
+}
+
+/* Previous classifications of an allele side by side, grouped by what applying one would copy
+   (classification/tags/consensus_comparison.html) */
+.consensus-comparison table.consensus-compare th.consensus-label {
+  width: 160px;
+  font-weight: normal;
+  color: #666;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.consensus-comparison table.consensus-compare th.consensus-choice {
+  font-weight: normal;
+  vertical-align: top;
+  min-width: 220px;
+}
+.consensus-comparison table.consensus-compare td {
+  white-space: pre-wrap;
+  vertical-align: top;
+}
+.consensus-comparison table.consensus-compare tr.differences td {
+  background-color: #fff8f0;
+}
+.consensus-comparison table.consensus-compare tr.consensus-section th {
+  font-weight: normal;
+  color: #666;
+  background-color: #f7f7f7;
+}
+.consensus-comparison .gene-content-text.clamp {
+  max-height: 4.5em;
+  overflow: hidden;
+}
+.consensus-comparison .consensus-conditions .badge {
+  white-space: normal;
+  text-align: left;
 }
 
 /* Feature tips (see variantgrid/tips.py) - sits over a grid loading overlay or under a page

@@ -9,7 +9,7 @@ from django.urls.base import reverse
 from django.views.decorators.http import require_POST
 
 from classification.classification_stats import get_grouped_classification_counts
-from classification.enums import AlleleOriginBucket
+from classification.lab_classification_stats import labs_with_classifications_qs
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import (
     AccumulationReportMode,
@@ -29,7 +29,6 @@ from snpdb.forms import (
     SettingsInitialGroupPermissionForm,
 )
 from snpdb.models import (
-    ClinVarKey,
     Lab,
     LabHead,
     LabUserSettingsOverride,
@@ -39,6 +38,7 @@ from snpdb.models import (
     State,
     UserSettings,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -183,16 +183,6 @@ def lab_remove_member(request, pk):
     return redirect(reverse('view_lab', kwargs={"lab_id": lab.pk}))
 
 
-def view_clinvar_key(request, pk: str):
-    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
-    clinvar_key.check_user_can_access(request.user)
-
-    return render(request, 'snpdb/settings/clinvar_key.html', {
-        'clinvar_key': clinvar_key,
-        'labs': Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    })
-
-
 def view_organization(request, organization_id: int):
     organization = get_object_or_404(Organization, pk=organization_id)
     organization_form = OrganizationForm(request.POST or None, instance=organization)
@@ -248,15 +238,10 @@ def labs(request):
         max_groups=15,
         show_unclassified=show_unclassified)
     """
-    active_organizations = Organization.objects.filter(active=True).order_by('name')
-    organization_labs = {}
-    for org in active_organizations:
-        if settings.CLASSIFICATION_STATS_USE_SHARED:
-            org_labs = org.sharing_labs
-        else:
-            org_labs = org.classifying_labs
-        if org_labs:
-            organization_labs[org] = list(org_labs)
+    labs_qs = labs_with_classifications_qs().filter(organization__active=True).select_related("organization")
+    organization_labs: dict[Organization, list[Lab]] = {}
+    for lab in labs_qs.order_by("organization__name", "name"):
+        organization_labs.setdefault(lab.organization, []).append(lab)
     lab_list = [l for ll in organization_labs.values() for l in ll]
     context = {
         "organization_labs": organization_labs,

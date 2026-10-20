@@ -13,6 +13,7 @@ from library.log_utils import report_message
 from library.oauth import ServerAuth
 from library.utils import batch_iterator, make_json_safe_in_place
 from snpdb.models.models import Country, Lab, Organization
+from sync.shariant.remote_response import request_json_with_retries
 from sync.sync_runner import SyncRunInstance, SyncRunner, register_sync_runner
 
 ORG_GROUP_NAME_PATTERN = re.compile(r'[\w\-]+')
@@ -137,11 +138,15 @@ class VariantGridDownloadSyncer(SyncRunner):
 
         sync_run_instance.run_start()
         download_start = time.time()
-        response = other_variant_grid.get(
-            url_suffix='classification/api/classifications/export',
-            params=params,
-            stream=False,
-            timeout=MINUTE_SECS
+        # stream=False so a body cut short in transit fails (and retries) here, before any record is inserted
+        response = request_json_with_retries(
+            lambda: other_variant_grid.get(
+                url_suffix='classification/api/classifications/export',
+                params=params,
+                stream=False,
+                timeout=MINUTE_SECS
+            ),
+            description=f"{sync_destination}: download export",
         )
         logging.info("%s: downloaded export in %.1fs", sync_destination, time.time() - download_start)
 

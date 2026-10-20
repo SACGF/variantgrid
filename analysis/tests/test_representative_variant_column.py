@@ -27,7 +27,7 @@ from snpdb.models import (
     Organization,
     UserSettings,
 )
-from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
 
@@ -167,8 +167,8 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
     def test_definition_declares_row_expansion(self):
         definition = datatable_definition(self.grid)
         annotation_version_id = self.node.analysis.annotation_version_id
-        self.assertEqual(definition["expandClientRenderer"],
-                         f"variantGridRowDetail.bind(null, {annotation_version_id})")
+        self.assertEqual(definition["expandClientRenderer"], "variantGridRowDetail")
+        self.assertEqual(definition["expandClientRendererKwargs"], {"annotationVersionId": annotation_version_id})
         self.assertFalse(definition["expandPrefetch"])
 
     def test_system_default_collection(self):
@@ -200,14 +200,22 @@ class CohortNodeCompositeColumnsTest(GridExportTestCase):
 
     def test_counts_cell_carries_its_partners(self):
         columns = self._columns_by_name()
-        het = columns[self.node.het_count_column]
-        self.assertEqual(het.client_renderer, "VariantGridFormat.dbZygosityCounts")
-        self.assertEqual(het.client_renderer_kwargs, {"countPrefix": self.node.count_column_prefix})
-        self.assertEqual([entry["column"] for entry in het.sort_menu],
-                         [self.node.het_count_column, self.node.hom_count_column,
-                          self.node.ref_count_column])
-        for partner in [self.node.hom_count_column, self.node.ref_count_column]:
-            self.assertFalse(columns[partner].visible, partner)
+        count_columns = [self.node.het_count_column, self.node.hom_count_column, self.node.ref_count_column]
+        cell = columns[self.node.count_column_prefix + "counts"]
+        self.assertEqual(cell.client_renderer, "VariantGridFormat.dbZygosityCounts")
+        self.assertEqual(cell.client_renderer_kwargs, {"countPrefix": self.node.count_column_prefix})
+        self.assertEqual([entry["column"] for entry in cell.sort_menu], count_columns)
+        self.assertFalse(cell.include_in_csv)
+        for c in count_columns:
+            self.assertFalse(columns[c].visible, c)
+
+    def test_counts_export_under_cohort_labels(self):
+        """ A fixed header per count, not 'Cohort Counts' over the het count or the cohort's alias #2209 """
+        csv_labels = {rc.name: rc.label for rc in self.grid.export_columns()}
+        self.assertNotIn(self.node.count_column_prefix + "counts", csv_labels)
+        self.assertEqual([csv_labels[c] for c in [self.node.het_count_column, self.node.hom_count_column,
+                                                  self.node.ref_count_column]],
+                         ["Cohort Het Count", "Cohort Hom Count", "Cohort Ref Count"])
 
     def test_rows_carry_every_count_the_cell_draws(self):
         self.grid.request.GET = {"length": "1"}
@@ -244,6 +252,11 @@ class VariantGridRowDetailViewTest(GridExportTestCase):
                       kwargs={"variant_id": variant.pk,
                               "annotation_version_id": self.analysis.annotation_version_id})
         return client.get(url)
+
+    def test_row_detail_labels_shared_contig_with_every_build(self):
+        """ MT is the one variant in both builds - labelled with one of them, it changed between processes """
+        variant = slowly_create_test_variant("MT", 5000, "A", "T", self.genome_build)
+        self.assertContains(self._row_detail(variant), "<th>GRCh37 / GRCh38</th>", html=False)
 
     def test_row_detail_names_the_fusion_partners(self):
         """ The expanded row is the one place every grid shares, so the partners and the direction

@@ -85,6 +85,12 @@ class GeneIdentityTestCase(TestCase):
         self.assertNotIn("TP53", gene_identity_from_id("MYH11").match_keys())
         self.assertNotIn("ENSG00000141510", gene_identity_from_id("MYH11").match_keys())
 
+    def test_alias_of_several_genes_does_not_resolve(self):
+        make_gene_version("ENSG00000141510", "TP53", AnnotationConsortium.ENSEMBL)
+        for symbol in ["MYH11", "TP53"]:
+            GeneSymbolAlias.objects.create(alias="SHARED", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        self.assertIsNone(gene_identity_from_id("SHARED"))
+
     def test_unknown_identifier_does_not_resolve(self):
         self.assertIsNone(gene_identity_from_id("NOT_A_GENE"))
         self.assertIsNone(gene_identity_from_id(""))

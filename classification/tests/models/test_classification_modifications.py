@@ -1,7 +1,8 @@
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models.classification import (
     Classification,
     ClassificationModification,
@@ -10,8 +11,8 @@ from classification.models.classification import (
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
 from classification.tests.models.test_utils import ClassificationTestUtils
-from library.guardian_utils import admin_bot
-from snpdb.models.models import CodeVersion
+from library.guardian_utils import admin_bot, all_users_group
+from snpdb.models.models import CodeVersion, Lab
 
 
 class ClassificationTestCaseModifications(TestCase):
@@ -335,3 +336,24 @@ class ClassificationTestCaseModifications(TestCase):
             'idx': '555444',
             'url': 'https://www.ncbi.nlm.nih.gov/pubmed/555444'
         })
+
+    @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
+    def test_latest_for_user_with_unpublished_edit(self):
+        """ The owning lab sees an unpublished edit, another lab still sees the last published version """
+        lab, user = ClassificationTestUtils.lab_and_user()
+        other_lab = Lab.objects.create(name='Other', organization=lab.organization, city='CityA', country=lab.country,
+                                       group_name='instx/other')
+        other_user = User.objects.create(username='other_lab_user')
+        other_user.groups.add(other_lab.group, all_users_group())
+
+        vc = Classification.create(user=user, lab=lab, data={'foo': {'value': 'published'}},
+                                   save=True, source=SubmissionSource.API)
+        vc.publish_latest(user=user, share_level=ShareLevel.ALL_USERS)
+        published = vc.last_published_version
+        vc.patch_value(patch={'foo': {'value': 'unpublished'}}, user=user, source=SubmissionSource.API,
+                       save=True)
+        unpublished = vc.last_edited_version
+        self.assertNotEqual(published, unpublished)
+
+        self.assertEqual(list(ClassificationModification.latest_for_user(user)), [unpublished])
+        self.assertEqual(list(ClassificationModification.latest_for_user(other_user)), [published])

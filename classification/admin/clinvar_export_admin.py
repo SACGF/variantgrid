@@ -2,6 +2,7 @@ import re
 from datetime import timedelta
 
 from django.contrib import admin, messages
+from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import Q, QuerySet, TextField
 from django.db.models.functions import Cast, Length
 from django.http import HttpRequest, JsonResponse
@@ -15,7 +16,11 @@ from classification.models import (
     ClinVarExportRequest,
     ClinVarExportSubmission,
 )
+from classification.models.clinvar_export_exclude_models import ClinVarKeyExcludePattern
+from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
+from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import ClinVarRequestException, clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from library.django_utils.admin_utils import (
     AllValuesChoicesFieldListFilter,
     ModelAdminBasics,
@@ -232,3 +237,57 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
                     messages.success(request, message=f"Batch {batch.pk} - updated")
                 except ClinVarRequestException as clinvar_except:
                     messages.error(request, message=f"Batch {batch.pk} - {clinvar_except}")
+
+
+class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
+    model = ClinVarKeyExcludePattern
+
+    formfield_overrides = {
+        TextField: {'widget': AdminTextInputWidget}
+    }
+
+
+@admin.register(ClinVarKey)
+class ClinVarKeyAdmin(ModelAdminBasics):
+    list_display = ('id', 'name', 'last_full_run')
+    inlines = (ClinVarKeyExcludePatternAdmin,)
+
+    def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
+        for clinvar_key in queryset:
+            ignore_util = ClinVarExcludePatternUtil(clinvar_key)
+            test_results = ignore_util.run_all(apply=apply)
+            if not apply:
+                self.message_user(request, "Dry-run Only")
+            if test_results:
+                for key, ids in test_results.items():
+                    message = f"{clinvar_key} {key} : {len(ids)} - e.g. classification ids {ids[0:5]}"
+                    self.message_user(request, message)
+            else:
+                self.message_user(request, f"{clinvar_key} no ignores")
+
+    @admin_action("Don't Share Flags - Dry Run")
+    def ignore_dry_run(self, request, queryset: QuerySet[ClinVarKey]):
+        self.run_ignores(request, queryset, False)
+
+    @admin_action("Don't Share Flags - Apply")
+    def ignore_apply(self, request, queryset: QuerySet[ClinVarKey]):
+        self.run_ignores(request, queryset, True)
+
+    @admin_action("ClinVar Export Prepare")
+    def prepare_clinvar(self, request, queryset):
+        report = ClinvarExportPrepare().update_export_records_for_keys(set(queryset.all()))
+        if len(report) > 10:
+            self.message_user(request, message="Showing first 10 messages", level=messages.INFO)
+        for report_row in report[0:10]:
+            self.message_user(request, message=report_row, level=messages.INFO)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, widgets={
+            'id': admin.widgets.AdminTextInputWidget(),
+            'api_key': admin.widgets.AdminTextInputWidget(),
+            'org_id': admin.widgets.AdminTextInputWidget(),
+            'name': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+        form.base_fields["assertion_method_lookup"].help_text = \
+            'Preferred format is<br/>{"lookups":[<br/>&nbsp;{"match": "(regex1)", "citation": "acmg"},<br/>&nbsp;{"match": "(regex2)", "citation": {"db": "PubMed", "id": "PMID:123456"}}<br/>]}'
+        return form

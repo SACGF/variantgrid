@@ -8,7 +8,7 @@ from crispy_forms.layout import Field, Layout
 from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
@@ -36,7 +36,8 @@ from analysis.models.nodes.node_types import (
     get_node_types_hash_by_class_name,
     get_nodes_by_classification,
 )
-from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models.models_gene import GeneSymbol
 from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2, Select2Multiple
@@ -390,7 +391,7 @@ def _roles_for_sex(choices, sex: Sex, parent_role_by_sex: dict) -> list:
 class FamilyWizardForm(forms.Form):
     """ Give each of a cohort's samples a role in the family, and say which of them are affected.
         Pass sample_sexes (one Sex per sample, in field order) to keep a female off Father """
-    ROLE_ENUM = None
+    ROLE_ENUM: type[models.TextChoices]
     SAMPLE_FIELDS: list[str] = []
     PARENT_ROLE_BY_SEX: dict = {}
 

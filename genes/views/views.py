@@ -15,7 +15,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from requests import RequestException
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -260,14 +260,15 @@ def view_transcript_version(request, transcript_id, version):
         return render(request, "genes/view_transcript.html", {'transcript_id': transcript_id})
 
     accession = TranscriptVersion.get_accession(transcript_id, version)
+    tv_sequence_info = None
     no_transcript_message = ""
-    try:
-        # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
-        # if lengths are different
-        tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
-    except (NoTranscript, RequestException) as e:
-        tv_sequence_info = None
-        no_transcript_message = str(e)
+    if not transcript.is_cdot_fake:  # A cdot stand-in has no sequence to fetch (the template says why)
+        try:
+            # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
+            # if lengths are different
+            tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
+        except (NoTranscript, RequestException) as e:
+            no_transcript_message = str(e)
 
     tv_set = transcript.transcriptversion_set.filter(version=version)
     tv: TranscriptVersion = tv_set.first()
@@ -424,7 +425,7 @@ def view_canonical_transcript_collection(request, pk):
     summary = None
     qs = canonical_transcript_collection.genecoveragecanonicaltranscript_set.all()
     if qs.exists():
-        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__enrichment_kit__name")
+        summary = get_field_counts(qs, "gene_coverage_collection__qcgenecoverage__qc__sequencing_sample__enrichment_kit__name")
 
     is_system_default = pk == str(settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID)
     context = {"canonical_transcript_collection": canonical_transcript_collection,

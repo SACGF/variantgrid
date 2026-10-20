@@ -93,6 +93,6 @@ def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_
                     f.flush()
                     f.detach()
 
-    with open(vcf_filename, "w") as f:
+    with open(vcf_filename, "w", encoding="utf-8") as f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict,
                                                       use_accession=use_accession, samples=samples)

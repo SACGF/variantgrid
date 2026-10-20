@@ -1,0 +1,11 @@
+#sample_id	predicted_ancestry	given_ancestry	EAS_prob	AFR_prob	AMR_prob	SAS_prob	EUR_prob
+proband_9000001	EUR		0.01	0.02	0.03	0.04	0.9
+mother_9000002	EUR		0.01	0.02	0.03	0.04	0.9
+father_9000003	EUR		0.01	0.02	0.03	0.04	0.9
+proband_9000004	EAS		0.9	0.02	0.03	0.04	0.01
+mother_9000005	EAS		0.9	0.02	0.03	0.04	0.01
+father_9000006	EAS		0.9	0.02	0.03	0.04	0.01
+proband_9000007	AFR		0.01	0.9	0.03	0.04	0.02
+mother_9000008	AFR		0.01	0.9	0.03	0.04	0.02
+father_9000009	AFR		0.01	0.9	0.03	0.04	0.02
+not_ours_999999	SAS		0.01	0.02	0.03	0.9	0.04

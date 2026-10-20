@@ -15,14 +15,23 @@ bare reference can match several rows, and that is ambiguity rather than a prece
 from dataclasses import dataclass
 from typing import Optional
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Model, Q, QuerySet
+from django.utils.module_loading import import_string
 
 from patients.models_enums import MatchStatus
 
 REFERENCE_KEYS = frozenset({"code", "external_type", "external_manager", "reference_id"})
 # Not a reference key - it says how the reference was arrived at, and only VG ever sets it
 DERIVED_KEY = "derived"
+
+
+def normalize_specimen_reference(reference_id: Optional[str]) -> Optional[str]:
+    """ The canonical form of a Specimen / Extraction reference_id - @see PATIENT_SPECIMEN_REFERENCE_NORMALIZER """
+    if reference_id and (normalizer := settings.PATIENT_SPECIMEN_REFERENCE_NORMALIZER):
+        return import_string(normalizer)(reference_id)
+    return reference_id
 
 
 class ExternalReferenceError(ValueError):
@@ -77,7 +86,7 @@ class ExternalReference:
         if self.external_manager:
             q &= Q(external_pk__external_manager=self.external_manager)
         if self.reference_id:
-            q &= Q(**{model.LOCAL_REFERENCE_FIELD: self.reference_id})
+            q &= Q(**{model.LOCAL_REFERENCE_FIELD: model.normalize_reference_id(self.reference_id)})
         return q
 
     def halves(self) -> list['ExternalReference']:

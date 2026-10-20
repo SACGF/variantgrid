@@ -4,9 +4,11 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from django.conf import settings
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http import Http404
-from django.http.response import HttpResponse, JsonResponse
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -46,7 +48,14 @@ from seqauto.sequencing_files.sample_sheet import (
     assign_old_sample_sheet_data_to_current_sample_sheet,
 )
 from snpdb.models import VCF, Sample, UserSettings
-from upload.models import UploadedFileTypes
+from snpdb.models.models_enums import ProcessingStatus
+from upload.models import UploadedFileTypes, UploadPipeline
+from upload.tasks.retry_upload_pipelines_task import (
+    fail_stuck_upload_pipelines,
+    get_retryable_upload_pipelines,
+    retry_message,
+    retry_upload_pipelines,
+)
 
 
 def sequencing_data(request):
@@ -152,7 +161,7 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
             multi_sample_vcfs.append(rv)
 
     single_sample_vcfs = {}
-    ss_vcf_qs = SingleSampleVCF.objects.filter(alignment_file__sequencing_sample__sample_sheet=sample_sheet)
+    ss_vcf_qs = SingleSampleVCF.objects.filter(sequencing_sample__sample_sheet=sample_sheet)
     for single_sample_vcf in ss_vcf_qs.select_related("backendvcf__uploaded_vcf__vcf"):
         single_sample_vcfs[single_sample_vcf.pk] = run_vcf(single_sample_vcf, single_sample_vcf.vcf)
 
@@ -161,6 +170,37 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
         "sequencing_sample_vcfs": dict(sequencing_sample_vcfs),
         "single_sample_vcfs": single_sample_vcfs,
     }
+
+
+def _get_run_upload_pipelines_qs(run_vcfs: dict) -> QuerySet[UploadPipeline]:
+    """ The import pipelines of the run's VCFs (from _get_sequencing_run_vcfs) """
+    all_run_vcfs = [*run_vcfs["multi_sample_vcfs"], *run_vcfs["single_sample_vcfs"].values()]
+    for sample_run_vcfs in run_vcfs["sequencing_sample_vcfs"].values():
+        all_run_vcfs.extend(sample_run_vcfs)
+    vcf_ids = {run_vcf.vcf.pk for run_vcf in all_run_vcfs if run_vcf.vcf}
+    return UploadPipeline.objects.filter(uploadedvcf__vcf__in=vcf_ids)
+
+
+def _get_run_import_counts(run_vcfs: dict, user) -> dict:
+    """ For the run page's retry form (#2188): failed imports the user may retry, and imports still processing -
+        the retry checks whether a worker is still running those """
+    upload_pipelines_qs = _get_run_upload_pipelines_qs(run_vcfs)
+    return {
+        "num_retryable_imports": len(get_retryable_upload_pipelines(upload_pipelines_qs, user)),
+        "num_processing_imports": upload_pipelines_qs.filter(status=ProcessingStatus.PROCESSING).count(),
+    }
+
+
+@require_POST
+def sequencing_run_retry_failed_imports(request, sequencing_run_id):
+    sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    sample_sheet = sequencing_run.get_current_sample_sheet()
+    run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+    upload_pipelines_qs = _get_run_upload_pipelines_qs(run_vcfs)
+    num_stuck = fail_stuck_upload_pipelines(upload_pipelines_qs)
+    num_queued = retry_upload_pipelines(get_retryable_upload_pipelines(upload_pipelines_qs, request.user))
+    messages.add_message(request, messages.INFO, retry_message(num_queued, num_stuck))
+    return HttpResponseRedirect(reverse("view_sequencing_run", kwargs={"sequencing_run_id": sequencing_run.pk}))
 
 
 @dataclass
@@ -290,7 +330,10 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
             "enrichment_kit",
         ).prefetch_related("samplefromsequencingsample_set__sample__patient", "sequencingsampledata_set")
         context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
-        context.update(_get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user))
+        run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+        context.update(run_vcfs)
+        if settings.UPLOAD_ENABLED:
+            context.update(_get_run_import_counts(run_vcfs, request.user))
         context.update(_get_sequencing_run_patients(sample_sheet, request.user))
     except Exception:
         log_traceback()

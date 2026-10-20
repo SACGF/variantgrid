@@ -2,8 +2,8 @@ import django.dispatch
 from django.conf import settings
 
 from annotation.models import GeneCountType
-from annotation.models.models import CachedWebResource
 from annotation.tasks.cached_web_resource_tasks import ClinVarCitationsWebResourceTask
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 annotation_run_complete_signal = django.dispatch.Signal()
 

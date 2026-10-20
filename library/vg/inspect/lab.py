@@ -29,19 +29,20 @@ def inspect(key: str, depth: int) -> dict[str, Any]:
     heads = set(LabHead.objects.filter(lab=lab).values_list("user_id", flat=True))
     members = list(lab.active_users.order_by("username"))
     classifications = Classification.objects.filter(lab=lab)
+    classification_settings = lab.classification_settings
     data: dict[str, Any] = {
         "id": lab.pk,
         "name": lab.name,
         "group_name": lab.group_name,
         "organization": {"id": lab.organization_id, "name": lab.organization.name, "group_name": lab.organization.group_name},
         "external": lab.external,
-        "research": lab.research,
+        "research": classification_settings.research,
         "location": ", ".join(p for p in (lab.city, lab.state.name if lab.state_id else None, lab.country.name if lab.country_id else None) if p) or None,
-        "clinvar_key": lab.clinvar_key_id,
-        "upload_location": lab.upload_location,
-        "upload_automatic": lab.upload_automatic,
-        "consolidates_variant_classifications": lab.consolidates_variant_classifications,
-        "classification_config": bool(lab.classification_config),
+        "clinvar_key": classification_settings.clinvar_key_id,
+        "upload_location": classification_settings.upload_location,
+        "upload_automatic": classification_settings.upload_automatic,
+        "consolidates_variant_classifications": classification_settings.consolidates_variant_classifications,
+        "classification_config": bool(classification_settings.classification_config),
         "members": capped(members, lambda u: u.username + (" (head)" if u.pk in heads else ""), cap=25),
         "classifications": {
             "total": classifications.count(),

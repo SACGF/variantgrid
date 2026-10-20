@@ -1,52 +1,38 @@
 from datetime import timedelta
-
 from django.contrib.auth.models import User
 from django.utils.timezone import localtime
-
 from library.health_check import HealthCheckRecentActivity, HealthCheckRequest, health_check_signal
-from library.utils import flatten_nested_lists
 
 
 def get_dashboard_notices(user: User, days_ago: int) -> dict:
-    """ returns {} if nothing to show """
     MAX_PAST_DAYS = 30
-    notice_header = ""
-
-    # if days ago was passed in, don't update upa
     days_ago = min(days_ago, MAX_PAST_DAYS)
     notice_header = f"Since the last {days_ago} day{'s' if days_ago > 1 else ''}"
 
     now = localtime()
     since = now - timedelta(days=days_ago)
     health_request = HealthCheckRequest(since=since, now=now)
-    results = []
-    previews = {}
+    results: list[HealthCheckRecentActivity] = []
+
     for _, result in health_check_signal.send_robust(sender=None, health_request=health_request):
-        if not isinstance(result, Exception):
-            if isinstance(result, list):
-                results.extend(result)
-                for activity in result:
-                    if isinstance(activity, HealthCheckRecentActivity):
-                        if activity.preview is not None:
-                            previews.setdefault(activity.name, []).append(activity.preview)
-            elif isinstance(result, HealthCheckRecentActivity):
-                results.append(result)
-                if result.preview is not None:
-                    previews.setdefault(result.name, []).append(result.preview)
+        if isinstance(result, list):
+            for single in result:
+                if isinstance(single, HealthCheckRecentActivity):
+                    results.append(single)
+        elif isinstance(result, HealthCheckRecentActivity):
+            results.append(result)
 
-    checks = flatten_nested_lists(results)
-    checks = sorted(checks, key=lambda hc: hc.sort_order())
+    results = sorted(results, key=lambda hc: hc.sort_order())
 
-    recent_lines_with_previews = []
-    overall_lines = []
+    recent_lines_with_previews: list[HealthCheckRecentActivity] = []
+    overall_lines: list[HealthCheckRecentActivity] = []
 
-    for check in checks:
-        line_content = check.as_html()
-        line_previews = previews.get(check.name, [])
-        if check.is_recent_activity():
-            recent_lines_with_previews.append((line_content, line_previews))
+    for result in results:
+        if result.is_recent_activity():
+            if result.preview:
+                recent_lines_with_previews.append(result)
         else:
-            overall_lines.append(line_content)
+            overall_lines.append(result)
 
     return {
         "notice_header": notice_header,

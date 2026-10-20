@@ -2,5 +2,23 @@
 {% labelled label="ID" %}{{ api_request.pk }}{% endlabelled %}
 {% labelled label="Request" %}{{ api_request.method }} {{ api_request.path }}{% if api_request.query_string %}?{{ api_request.query_string }}{% endif %}{% endlabelled %}
 {% if api_request.view_kwargs %}{% labelled label="View args" %}{{ api_request.view_kwargs }}{% endlabelled %}{% endif %}
+{% if api_request.changes %}
+    {% labelled label="Changes" %}
+        {% if not api_request.num_changes %}<p class="text-muted mb-1">Re-post, nothing differed</p>{% endif %}
+        <table class="table table-sm w-auto">
+            <thead><tr><th>Model</th><th>Created</th><th>Updated</th><th>Unchanged</th><th>Deleted</th></tr></thead>
+            <tbody>
+            {% for row in api_request.change_rows %}
+                <tr title="{{ row.label }}">
+                    <td>{{ row.model_name }}</td><td>{{ row.created }}</td><td>{{ row.updated }}</td><td>{{ row.unchanged }}</td><td>{{ row.deleted }}</td>
+                </tr>
+                {% if row.fields %}
+                    <tr><td></td><td colspan="4" class="text-muted">Changed: {{ row.fields|join:", " }}</td></tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endlabelled %}
+{% endif %}
 {% labelled label="Request body" %}{% if request_body %}<pre class="code">{{ request_body }}</pre>{% else %}<span class="no-value">-</span>{% endif %}{% endlabelled %}
 {% if api_request.response_body %}{% labelled label="Response body" %}<pre class="code">{{ api_request.response_body }}</pre>{% endlabelled %}{% endif %}

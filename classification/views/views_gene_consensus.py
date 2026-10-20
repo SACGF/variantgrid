@@ -3,46 +3,33 @@ The gene content box on the classification form - for records the create-from-va
 made from the Classify & Report tab with nothing to copy, imported, or created before the gene was curated.
 
 It offers the same deduplicated gene candidates as the create page
-(classification/models/classification.py:ClassificationConsensus.gene_consensus_groups), and applying one
+(classification/models/classification_consensus.py:ClassificationConsensus.gene_consensus_groups), and applying one
 patches the empty fields as SubmissionSource.CONSENSUS.
 
 Entry points: gene_consensus_panel (the card, its dialog rows, and the apply POST), reached at
 classification_gene_consensus.
 """
-from dataclasses import dataclass
+from dataclasses import replace
 from datetime import date, datetime
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404, render
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys, SubmissionSource
-from classification.models import (
-    Classification,
+from classification.enums import SubmissionSource
+from classification.models import Classification, ClassificationModification
+from classification.models.classification_consensus import (
+    COPY_SCOPES_GENE,
     ClassificationConsensus,
-    ClassificationModification,
-    GeneConsensusGroup,
+    ConsensusGroup,
 )
-from classification.models.classification import COPY_SCOPES_GENE
 from classification.models.evidence_key import EvidenceKeyMap
-
-
-@dataclass(frozen=True)
-class GeneContentValue:
-    """ One gene scope key: what this record has now, and what the candidate would bring """
-    label: str
-    current: Any
-    candidate: Any
-
-
-@dataclass(frozen=True)
-class GeneContentComparison:
-    """ A candidate row in the dialog - the group, and its content beside this record's own """
-    group: GeneConsensusGroup
-    values: list[GeneContentValue]
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 def _as_date(value: Union[date, datetime]) -> date:
@@ -50,12 +37,13 @@ def _as_date(value: Union[date, datetime]) -> date:
 
 
 def classification_gene_symbol(classification: Classification) -> Optional[str]:
-    """ The gene the record is about - what it says itself, else what its allele resolved to """
-    if gene_symbol := classification.get(SpecialEKeys.GENE_SYMBOL):
-        return gene_symbol
-    if allele_info := classification.allele_info:
-        if gene_symbols := allele_info.gene_symbols:
-            return str(gene_symbols[0])
+    """ The gene the record is about, by its current symbol (ClassificationModification.gene_symbol_best), so a
+        record submitted with an old name or alias finds the gene's other records. None for an ambiguous alias """
+    try:
+        if gene_symbol := classification.last_edited_version.gene_symbol_best():
+            return gene_symbol.symbol
+    except AmbiguousGeneSymbolAlias:
+        pass
     return None
 
 
@@ -72,7 +60,7 @@ def gene_content_applied_at(classification: Classification,
     return None
 
 
-def newer_than(groups: list[GeneConsensusGroup], applied_at: datetime) -> list[GeneConsensusGroup]:
+def newer_than(groups: list[ConsensusGroup], applied_at: datetime) -> list[ConsensusGroup]:
     """ The gene has been re-curated since this record copied from it """
     applied_date = _as_date(applied_at)
     return [group for group in groups if _as_date(group.representative.curated_date) > applied_date]
@@ -81,6 +69,8 @@ def newer_than(groups: list[GeneConsensusGroup], applied_at: datetime) -> list[G
 def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpResponseBase:
     """ The gene content box: the card on the classification form, the rows its dialog shows (?rows=1), and
         the POST that copies a chosen record's gene content into this one """
+    if not settings.CLASSIFICATION_GENE_CONSENSUS:
+        raise Http404("Gene content reuse is disabled (settings.CLASSIFICATION_GENE_CONSENSUS)")
     classification = get_object_or_404(Classification, pk=classification_id)
     if not classification.can_write(request.user):
         raise PermissionDenied(f"You do not have WRITE permission on classification {classification_id}")
@@ -103,7 +93,7 @@ def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpRe
         "record_count": sum(group.record_count for group in groups),
     }
     if request.GET.get("rows"):
-        context["comparisons"] = _comparisons(classification, groups, allele_origin_bucket)
+        context["groups"] = _with_current_values(classification, groups)
         return render(request, 'classification/gene_consensus_rows.html', context)
 
     # The box only takes space while it is useful - once gene content has been copied in it collapses to a
@@ -116,24 +106,17 @@ def gene_consensus_panel(request: HttpRequest, classification_id: int) -> HttpRe
     return render(request, 'classification/gene_consensus_card.html', context)
 
 
-def _comparisons(classification: Classification, groups: list[GeneConsensusGroup],
-                 allele_origin_bucket: Optional[AlleleOriginBucket]) -> list[GeneContentComparison]:
-    """ What each candidate would bring, beside what the record already has - only the empty ones are filled """
+def _with_current_values(classification: Classification, groups: list[ConsensusGroup]) -> list[ConsensusGroup]:
+    """ The same rows the create page shows, each value beside what this record already has - only the empty
+        ones are filled """
     e_keys = EvidenceKeyMap.cached()
-    gene_scope_keys = ClassificationConsensus.gene_scope_keys(allele_origin_bucket)
-    comparisons = []
-    for group in groups:
-        evidence = group.representative.published_evidence or {}
-        values = []
-        for key in gene_scope_keys:
-            candidate = (evidence.get(key) or {}).get("value")
-            if candidate is None or candidate == "" or candidate == []:
-                continue
-            values.append(GeneContentValue(label=e_keys.get(key).pretty_label,
-                                           current=classification.get(key),
-                                           candidate=candidate))
-        comparisons.append(GeneContentComparison(group=group, values=values))
-    return comparisons
+
+    def current(key: str):
+        value = classification.get(key)
+        return e_keys.get(key).pretty_value(value) if value is not None else None
+
+    return [replace(group, content=[replace(value, current=current(value.key)) for value in group.content])
+            for group in groups]
 
 
 def _apply_gene_consensus(request: HttpRequest, classification: Classification) -> HttpResponseBase:

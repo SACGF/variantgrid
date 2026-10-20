@@ -24,7 +24,7 @@ from rest_framework.exceptions import ParseError
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
-from classification.enums import AlleleOriginBucket, ClinicalContextStatus, ShareLevel
+from classification.enums import ClinicalContextStatus, ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import (
     Classification,
@@ -36,7 +36,8 @@ from classification.models import (
     classification_flag_types,
 )
 from flags.models import Flag, FlagComment, FlagsMixin
-from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models import GeneSymbol
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import batch_iterator, http_header_date_now, local_date_string
 from snpdb.clingen_allele import get_clingen_allele
@@ -52,6 +53,7 @@ from snpdb.models import (
     Variant,
     VariantCoordinate,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 
@@ -145,24 +147,8 @@ class AlleleData:
             return item in cached_data
         return False
 
-    # @staticmethod
-    # def pre_process(batch: List['AlleleData']):
-    #     if batch:
-    #         genome_build = batch[0].genome_build
-    #         allele_ids = [ad.allele_id for ad in batch]
-    #         alleles = Allele.objects.filter(pk__in=allele_ids).select_related('clingen_allele')
-    #         allele_dict = {allele.pk: allele for allele in alleles}
-    #         # FIXME select related all this variant stuff outside?
-    #         variant_alleles = VariantAllele.objects.filter(allele_id__in=allele_ids, genome_build=genome_build).select_related('variant', 'variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
-    #         variant_dict = {variant_allele.allele_id: variant_allele.variant for variant_allele in variant_alleles}
-    #
-    #         for ad in batch:
-    #             ad.cached_allele = allele_dict.get(ad.allele_id)
-    #             ad.cached_variant = variant_dict.get(ad.allele_id)
-
     @property
     def allele(self) -> Allele:
-        # return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
         return self.cached_allele
 
     @cached_property
@@ -249,8 +235,9 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
     """
     filter_set: set[str] = set(filter_str_list)
     error_set: set[str] = set()
+    ambiguous_aliases: list[AmbiguousGeneSymbolAlias] = []
 
-    gene_symbols: set[GeneSymbol] = set()
+    gene_symbol_ids: set[str] = set()
     if possible_gene_symbols := [filter_str for filter_str in filter_set if GENE_SYMBOL_PATTERN.match(filter_str)]:
         possible_gene_symbols_set = set(possible_gene_symbols)
         if gene_symbols_matched := list(GeneSymbol.objects.filter(symbol__in=possible_gene_symbols)):
@@ -260,16 +247,19 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
                 if gene_symbol := gene_symbols_upper.get(filter_str.upper()):
                     filter_set.remove(filter_str)
                     possible_gene_symbols_set.remove(filter_str)
-                    gene_symbols.add(gene_symbol)
+                    gene_symbol_ids.add(gene_symbol.pk)
 
-        if possible_gene_symbols_set:
-            # check aliases
-            if aliases := list(GeneSymbolAlias.objects.filter(alias__in=filter_set).select_related('gene_symbol')):
-                gene_symbol_alias_upper = {alias.alias.upper(): alias.gene_symbol for alias in aliases}
-                for filter_str in possible_gene_symbols_set:
-                    if gene_symbol := gene_symbol_alias_upper.get(filter_str.upper()):
-                        filter_set.remove(filter_str)
-                        gene_symbols.add(gene_symbol)
+        # the few names that aren't a symbol as written are old names or aliases
+        for filter_str in possible_gene_symbols_set:
+            try:
+                gene_symbol_id, _hgnc = GeneSymbol.resolve_name(filter_str)
+            except AmbiguousGeneSymbolAlias as ambiguous:
+                filter_set.remove(filter_str)
+                ambiguous_aliases.append(ambiguous)
+                continue
+            if gene_symbol_id:
+                filter_set.remove(filter_str)
+                gene_symbol_ids.add(gene_symbol_id)
 
     clingen_alleles: set[ClinGenAllele] = set()
     if filter_set:
@@ -291,16 +281,19 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
                     filter_set.remove(filter_str)
 
     error_set.update(filter_set)
+    errors = [str(ambiguous) for ambiguous in ambiguous_aliases]
     if error_set:
         unmatched_str = ", ".join(f'"{filter_str}"' for filter_str in sorted(error_set))
-        raise ValueError(f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
+        errors.insert(0, f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
+    if errors:
+        raise ValueError("; ".join(errors))
 
     queries: list[Q] = []
-    if gene_symbols:
+    if gene_symbol_ids:
         # TODO change this to handle only supported genome builds, maybe even the genome build
         queries.append(
-            Q(classification__allele_info__grch37__gene_symbol__in=gene_symbols) |
-            Q(classification__allele_info__grch38__gene_symbol__in=gene_symbols)
+            Q(classification__allele_info__grch37__gene_symbol__in=gene_symbol_ids) |
+            Q(classification__allele_info__grch38__gene_symbol__in=gene_symbol_ids)
         )
     if clingen_alleles:
         queries.append(Q(classification__allele_info__allele__clingen_allele__in=clingen_alleles))

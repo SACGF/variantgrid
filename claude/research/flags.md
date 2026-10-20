@@ -6,10 +6,11 @@ The flags app hangs typed, commentable, resolvable "flags" off any model that mi
 `flags/models/models.py:FlagsMixin` - today `snpdb/models/models_variant.py:Allele`,
 `classification/models/classification.py:Classification` and
 `classification/models/clinical_context_models.py:ClinicalContext`. It is small (one models module, one REST views
-module, no tasks or commands, and one test module for the permission checks), but classification leans on it for workflow state: submitted, unshared,
-withdrawn, discordant, pending changes, significance change, condition resolution, internal review and suggestions are
-all flag types (`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the
-team's position: new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
+module, no tasks or commands, and test modules for permissions and the REST API's input validation), but classification leans on
+it for workflow state: submitted, unshared, withdrawn, discordant, pending changes, significance change, condition
+resolution, internal review and suggestions are all flag types
+(`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the team's position:
+new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
 ([models](../maps/models.md#flags), [urls](../maps/urls.md#flags)); receivers are in [signals](../maps/signals.md).
 
 ## Flows
@@ -46,8 +47,8 @@ by `data` keys via `old_data` / `close_other_data`), `FlagCollection.ensure_reso
 latest flag to a resolution, creating it only if that resolution is open - used by classification import, significance
 change and ClinVar exclusion) and `close_open_flags_of_type` (bot-closes every open flag of a type, optionally matching
 `data`). `FlagCollection.filter_for_flags` (and its deprecated alias `filter_for_open_flags`, still the one callers use)
-turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard and
-`snpdb/models/models_user_settings.py:UserSettings.classification_issue_count` are built from it.
+turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard is
+built from it.
 
 ### Permissions
 
@@ -67,7 +68,7 @@ returns one collection's full comment history and `?since=<ts>` the comments sin
 `flags/views/views.py:FlagView` returns or acts on one flag. Serialisation is `flags/views/views.py:FlagHelper`, which
 calls `flags/models/models.py:fetch_flag_infos`: it sends `flag_collection_extra_info_signal` with a
 `flags/models/models.py:FlagInfos`, and the owning apps' receivers
-(`classification/models/classification.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
+(`classification/signals/classification_flag_extra_info.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
 label, links and the `source_object` for each collection. ClinicalContext has no receiver, so its collections fall back
 to the reverse-relation probe and a generic label.
 
@@ -109,10 +110,10 @@ never fires - test `== FlagPermissionLevel.NO_PERM`. `flags/tests/test_flag_perm
 picks up Django's `Model._is_pk_set()` method, so `source_object` raises AttributeError whenever the extra-info signal
 has not already set it (e.g. `permission_level` from `FlagView` POST for a non-superuser).
 
-**A `watch` POST 500s (confirmed, dead path).** `FlagsView` POST with `watch` calls `fc.set_watcher`, which
-`FlagCollection` does not define; `watch_toggle()` in `flags.js` exists but nothing calls it. Delete both rather than
-revive them. `FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele
-flag types (`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
+**`watch_toggle()` in `flags.js` is dead.** Nothing calls it, and `FlagsView` POST answers 400 to its `watch` body
+(no `flag_type`), as it does to an unknown flag type or resolution and a bad `?history=` / `?since=`.
+`FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele flag types
+(`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
 
 **`classification_not_public` is switched off in JSON only.** Without `CLINVAR_EXPORT` mode, `FlagHelper.to_json`
 sends that type's `permission` / `raise_permission` as `FlagPermissionLevel.SYSTEM.level` (4), above any browser user's

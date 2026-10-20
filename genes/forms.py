@@ -1,6 +1,5 @@
 from dal import forward
 from django import forms
-from django.forms.models import ALL_FIELDS
 from django.forms.widgets import HiddenInput, TextInput
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -26,8 +25,8 @@ class GeneListForm(forms.ModelForm, ROFormMixin):
 
     class Meta:
         model = GeneList
-        fields = ALL_FIELDS
-        read_only = ('category', 'import_status', 'error_message', 'locked')
+        fields = ['category', 'name', 'user', 'error_message', 'locked', 'url']
+        read_only = ('category', 'error_message', 'locked')
         widgets = {"name": TextInput(),
                    "url": TextInput(),
                    "user": ModelSelect2(url='user_autocomplete',

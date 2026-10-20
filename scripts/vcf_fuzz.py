@@ -49,7 +49,7 @@ def parse_args():
 
 def load_bed(path):
     features = {}
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             if line.startswith(("#", "track", "browser")):
                 continue
@@ -158,7 +158,7 @@ def main():
     renames = dict(pair.split("=", 1) for pair in args.rename_sample + args.replace)
 
     header, records = [], []
-    with open(args.vcf) as f:
+    with open(args.vcf, encoding="utf-8") as f:
         for line in f:
             line = line.rstrip("\n")
             (header if line.startswith("#") else records).append(line)
@@ -167,7 +167,7 @@ def main():
         header = [line.replace(old, new) for line in header]
 
     if args.max_shift == 0:
-        with open(args.out or args.vcf, "w") as f:
+        with open(args.out or args.vcf, "w", encoding="utf-8") as f:
             for line in header + records:
                 f.write(line + "\n")
         print(f"{args.vcf}: samples renamed, {len(records)} records left in place")
@@ -195,8 +195,10 @@ def main():
                 continue
             if any(int(f[1]) + candidate < 1 for f in parsed):
                 continue
-            if feature and not all(feature[0] < int(f[1]) + candidate <= feature[1] for f in parsed):
-                continue
+            if feature:
+                feature_start, feature_end = feature
+                if not all(feature_start < int(f[1]) + candidate <= feature_end for f in parsed):
+                    continue
             spread = max(int(f[1]) for f in parsed) - anchor
             if reference.fetch(contig, anchor + candidate, spread + longest) is None:
                 continue
@@ -229,7 +231,7 @@ def main():
     out_records.sort(key=lambda r: (contig_order.get(r.split("\t")[0], 1 << 30),
                                     int(r.split("\t")[1])))
 
-    with open(args.out or args.vcf, "w") as f:
+    with open(args.out or args.vcf, "w", encoding="utf-8") as f:
         for line in header:
             f.write(line + "\n")
         for record in out_records:

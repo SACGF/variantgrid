@@ -66,6 +66,7 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
     num_matched_transcript = 0
     num_matched_transcript_version = 0
 
+    gene_matcher.resolve_names(df[GENE_SYMBOL_COLUMN])
     for _, row in df.iterrows():
         total += 1
         original_gene_symbol = row[GENE_SYMBOL_COLUMN]

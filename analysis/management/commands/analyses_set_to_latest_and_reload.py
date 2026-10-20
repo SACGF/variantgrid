@@ -3,7 +3,7 @@ from django.db.models import F
 
 from analysis.models import NodeStatus
 from analysis.models.models_analysis import Analysis
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 
 
 class Command(BaseCommand):

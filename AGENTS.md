@@ -39,6 +39,7 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | VCF import | `upload/AGENTS.md` | `claude/maps/tasks.md` |
 | a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`) | `vg page <url> --queries` |
 | permissions, notifications, previews, `library/utils` | `library/AGENTS.md` | - |
+| the user-facing changelog (`system/changelog`) | `variantgrid/templates/default_templates/changelog.html` (rules in its header comment) | `git log` since its last update |
 | a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
@@ -58,7 +59,7 @@ same name (`claude/guides/operations.md#deployments`). Identify the box before r
 
 | Host (settings stem) | What it is | Rules |
 |---|---|---|
-| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` and `--keepdb` tests without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those) and `vg status`, without a separate ask |
+| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page`, `--keepdb` tests and creating fake/test data (left in place afterwards) without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those, named without `.service`) and `vg status`, without a separate ask |
 | `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2, without the restart exception |
 | `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only only. Never run tests, `migrate`, management commands that write, service restarts, or edit files; ask before anything else |
 | `dlawrence-Precision-3680` (`dlawrenceprecision3680`, in `env_developers/`) | Developer box, disposable local database | Just work: `migrate` (forwards or back), tests, management commands, annotation/VEP, fake or test data, service restarts - no ask needed |
@@ -82,7 +83,8 @@ python3 manage.py vg settings NAME [--diff]       # resolved value and every set
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
 scripts/vg health [--no-ci]                       # the ratchets: docstring coverage, dead citations, one-off
-                                                  #   commands, pylint messages, deprecated calls, last CI suite time
+                                                  #   commands, pylint messages (errors listed), ruff findings,
+                                                  #   deprecated calls, last CI suite time
 scripts/vg deprecations                           # calls to deprecated APIs as the next Python sees them
                                                   #   (basedpyright) plus warnings raised at import
 scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
@@ -92,7 +94,8 @@ scripts/vg imports cycles                         # import cycles among module-l
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
 scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
 python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
-./scripts/linting/run_pylint.sh                   # pylint to lint.txt; ruff runs per file from the edit hook
+./scripts/linting/run_pylint.sh                   # pylint to lint.txt (~4 min); --errors-only to stdout is what CI
+                                                  #   warns with; ruff runs per file from the edit hook
 python3 manage.py runserver | migrate | shell
 ```
 
@@ -154,6 +157,8 @@ top: renaming or editing one that a deployment has applied leaves `django_migrat
 exists (`InconsistentMigrationHistory`), repaired by hand on every database. A migration that only exists locally
 (unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
 pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
+Changing a library call inside a pushed migration (a renamed helper, an inlined one) is fine when the migration's behaviour
+stays identical: migrations never freeze the names of the code they import.
 
 ### Manual migrations (management commands on deploy)
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
@@ -219,6 +224,8 @@ confirm with the user before proceeding - do not include them in the commit.
 ### GitHub comments
 Preface any comment on a GitHub issue or pull request with 🤖 Written by Claude. Do NOT close GitHub issues
 unless I tell you to.
+Updating an issue or PR means its title as well as its body: rewrite the title whenever the body's
+description of the problem or the fix has changed.
 
 ### Which repo an issue goes in
 `SACGF/variantgrid_private` is the repo from before the code went public: its code and history stop in 2021 and

@@ -23,6 +23,8 @@ class Command(BaseCommand):
         parser.add_argument('--clear', action='store_true', default=False)
         parser.add_argument('--classifications', action='store_true', default=False)
         parser.add_argument('--orphans', action='store_true', default=False)
+        parser.add_argument('--failed', action='store_true', default=False,
+                            help="Only retry automatch on texts whose Monarch search failed")
 
     def check_obsoletes(self):
         for cm in Classification.objects.filter(condition_resolution__isnull=False).iterator():
@@ -40,6 +42,11 @@ class Command(BaseCommand):
                         f"ConditionTextMatch ({ctm.condition_text.lab.name} '{ctm.condition_text.normalized_text}' {ctm.condition_text.pk}) refers to obsolete term {term}")
 
     def handle(self, *args, **options):
+        if options["failed"]:
+            print("Retrying automatch where the Monarch search failed")
+            cleared = ConditionTextMatch.retry_failed_automatch()
+            print(f"Cleared {cleared}, {ConditionText.objects.filter(monarch_search_failed__isnull=False).count()} still failed")
+            return
         if options["obsolete"]:
             print("Checking for obsoletes")
             self.check_obsoletes()

@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -102,15 +103,19 @@ class FlagHelper:
         if not flag_collection:
             flag_collection = self.flag_collections[0]
 
-        flag_type = data.pop('flag_type')
+        flag_type = data.pop('flag_type', None)
         comment = data.pop('comment', None)
         user_private = data.pop('user_private', False)
         resolution = data.pop('resolution', None)
-        if resolution:
-            resolution = FlagResolution.objects.get(pk=resolution)
+        try:
+            if resolution:
+                resolution = FlagResolution.objects.get(pk=resolution)
+            flag_type_obj = FlagType.objects.get(pk=flag_type)
+        except (FlagResolution.DoesNotExist, FlagType.DoesNotExist) as e:
+            raise ValueError(f"Invalid flag data: {e}") from e
 
         flag = flag_collection.add_flag(
-            FlagType.objects.get(pk=flag_type),
+            flag_type_obj,
             user=self.user,
             comment=comment,
             user_private=user_private,
@@ -224,8 +229,9 @@ class FlagHelper:
                 'name': avatar.preferred_label,
                 'avatar': avatar.url,
                 'color': avatar.background_color,
-                'lab': self.lab_text(user)
             }
+            if user == self.user:
+                json_entry['lab'] = self.lab_text(user)
             users_json.append(json_entry)
         json_data['users'] = users_json
 
@@ -343,7 +349,7 @@ class FlagHelper:
 
 
 class FlagsView(APIView):
-    """API for one or more FlagCollections: retrieve flags/comments and raise flags or set watch status."""
+    """API for one or more FlagCollections: retrieve flags/comments and raise flags."""
 
     @extend_schema(
         summary="Retrieve flag types, collections, open flags and comments for the given flag collection(s)",
@@ -365,11 +371,17 @@ class FlagsView(APIView):
 
         if history:
             # user has now seen the flags, mark them as such
-            history = int(history)
+            try:
+                history = int(history)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid history parameter'}, status=400)
             flag_helper.include_history(history)
 
         if since:
-            since = ensure_timezone_aware(datetime.datetime.fromtimestamp(float(since)))
+            try:
+                since = ensure_timezone_aware(datetime.datetime.fromtimestamp(float(since)))
+            except (ValueError, OverflowError, OSError, TypeError):
+                return Response({'error': 'Invalid since parameter'}, status=400)
             flag_helper.include_comments_since(since)
 
         if not history and not since:
@@ -383,7 +395,7 @@ class FlagsView(APIView):
         return Response(flag_helper.to_json())
 
     @extend_schema(
-        summary="Raise a new flag on the flag collection, or set the user's watch status for it",
+        summary="Raise a new flag on the flag collection",
         request=OpenApiTypes.OBJECT,
         responses=OpenApiTypes.OBJECT,
         parameters=[OpenApiParameter("flag_collection_id", OpenApiTypes.STR, OpenApiParameter.PATH,
@@ -395,12 +407,10 @@ class FlagsView(APIView):
 
         flag_helper = FlagHelper(flag_collections=fc, user=request.user)
 
-        watch = request.data.get('watch')
-        if watch is not None:
-            fc.set_watcher(user=request.user, watch=watch)
-            flag_helper.include_collections()
-        else:
+        try:
             flag_helper.add_flag(data=request.data)
+        except ValueError:
+            return Response({'error': 'Invalid flag data'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(flag_helper.to_json())
 
@@ -431,8 +441,11 @@ class FlagView(APIView):
         f = Flag.objects.get(pk=pk)  # type: Flag
         data = request.data
         resolution = data.get('resolution', None)
-        if resolution:
-            resolution = FlagResolution.objects.get(pk=resolution)
+        try:
+            if resolution:
+                resolution = FlagResolution.objects.get(pk=resolution)
+        except FlagResolution.DoesNotExist:
+            return Response({'error': 'Invalid resolution'}, status=400)
 
         f.flag_action(
             user=request.user,

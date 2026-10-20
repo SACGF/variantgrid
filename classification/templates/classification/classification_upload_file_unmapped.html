@@ -25,7 +25,7 @@
     <div class="container">
         {% page_help_embedded title="Classifications Upload" %}
             <p>This page allows you to upload classification data to be shared within {{ site_name }}.</p>
-            {% if selected_lab.upload_location %}
+            {% if selected_lab.classification_settings.upload_location %}
                 <p>{{ site_name }} administrators will be notified once your file is uploaded.<br/>
                 They will then be able to process the file, you can check the status of your uploads in the table below.<br/>
                 Please allow a business day for your file to be processed.</p>
@@ -35,19 +35,19 @@
         {% end_page_help_embedded %}
 
         {% lab_picker data=lab_picker %}
-        {% if lab_picker.selected_lab.upload_location %}
+        {% if lab_picker.selected_lab.classification_settings.upload_location %}
              <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="card">
                     <div class="card-header">File Upload</div>
                     <div class="card-body">
-                        {% if lab_picker.selected_lab.upload_automatic %}
+                        {% if lab_picker.selected_lab.classification_settings.upload_automatic %}
                             <p class="text-info">Once the file is uploaded it will be automatically processed.</p>
                         {% else %}
                             <p class="text-info">Once the file is uploaded it will be manually reviewed and processed over the next few days.</p>
                         {% endif %}
-                        {% if lab_picker.selected_lab.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
-                        {% labelled admin_only=True label="Destination" %}{{ lab_picker.selected_lab.upload_location }}{% endlabelled %}
+                        {% if lab_picker.selected_lab.classification_settings.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
+                        {% labelled admin_only=True label="Destination" %}{{ lab_picker.selected_lab.classification_settings.upload_location }}{% endlabelled %}
                         {% labelled admin_only=True label="On Behalf Of" %}
                             <input name="on-behalf-of" placeholder="Enter email address or username of the owner of this file - otherwise it will be associated to you" class="form-control"/>
                         {% endlabelled %}

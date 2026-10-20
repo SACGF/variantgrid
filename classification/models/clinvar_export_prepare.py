@@ -7,7 +7,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.timezone import now
 
-from classification.enums import AlleleOriginBucket, ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import (
     ClassificationModification,
     ClinVarAllele,
@@ -16,9 +16,11 @@ from classification.models import (
     ConditionResolved,
 )
 from classification.models.abstract_utils import ConsolidatingMerger
+from classification.models.clinvar_key_models import ClinVarKey
 from library.utils import pretty_collection
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Allele, ClinVarKey, Lab
+from snpdb.models import Allele, Lab
+from snpdb.models.models_enums import AlleleOriginBucket
 
 """
 This code creates or updates ClinVarExports with the latest data.
@@ -140,7 +142,8 @@ class ClinvarExportPrepare:
     def update_export_records(perspective: Optional[LabPickerData] = None):
         clinvar_keys: set[ClinVarKey]
         if perspective:
-            clinvar_keys = {lab.clinvar_key for lab in perspective.selected_labs if lab.clinvar_key}
+            lab_clinvar_keys = (lab.classification_settings.clinvar_key for lab in perspective.selected_labs)
+            clinvar_keys = {clinvar_key for clinvar_key in lab_clinvar_keys if clinvar_key}
         else:
             clinvar_keys = set(ClinVarKey.objects.all())
         if clinvar_keys:
@@ -204,7 +207,7 @@ class ClinvarExportPrepare:
     def update_export_records_for_keys(clinvar_keys: set[ClinVarKey]) -> ClinVarAlleleExportLog:
         # work on clinvar keys, not on labs, as a user could have access to one lab but the clinvar key might be for 2
         # and a clinvar key has to get all labs updated or none, can't deal with partial
-        clinvar_labs = Lab.objects.filter(clinvar_key__in=clinvar_keys)
+        clinvar_labs = Lab.objects.filter(classification_settings__clinvar_key__in=clinvar_keys)
 
         all_classifications = ClassificationModification.objects.filter(
             classification__withdrawn=False,
@@ -216,8 +219,8 @@ class ClinvarExportPrepare:
             'classification',
             'classification__allele_info__allele',
             'classification__lab',
-            'classification__lab__clinvar_key'
-        ).order_by('classification__allele_id', 'classification__lab__clinvar_key_id').iterator(chunk_size=1000)
+            'classification__lab__classification_settings__clinvar_key'
+        ).order_by('classification__allele_id', 'classification__lab__classification_settings__clinvar_key_id').iterator(chunk_size=1000)
 
         combined_log = []
 
@@ -234,7 +237,7 @@ class ClinvarExportPrepare:
         # loop through classifications for the lab grouping by allele
         for allele, classifications_for_allele in itertools.groupby(all_classifications, lambda cm: cm.classification.allele_object):
             # now loop that grouping by clinvar key
-            for clinvar_key, alleles_for_clinvar_key in itertools.groupby(classifications_for_allele, lambda cm: cm.classification.lab.clinvar_key):
+            for clinvar_key, alleles_for_clinvar_key in itertools.groupby(classifications_for_allele, lambda cm: cm.classification.lab.classification_settings.clinvar_key):
                 alleles_for_clinvar_key = list(alleles_for_clinvar_key)
                 for allele_origin_bucket in valid_allele_origin_buckets:
                     clinvar_allele_classifications_allele_origin = [cac for cac in alleles_for_clinvar_key if cac.classification.allele_origin_bucket == allele_origin_bucket]

@@ -113,7 +113,7 @@ def _somalier_ibs0(cfg: SomalierConfig, genome_build: GenomeBuild, work_dir: str
     if return_code != 0:
         raise ValueError(f"somalier relate failed: {stderr}")
 
-    with open(os.path.join(relate_dir, "somalier.pairs.tsv")) as f:
+    with open(os.path.join(relate_dir, "somalier.pairs.tsv"), encoding="utf-8") as f:
         return int(next(iter(csv.DictReader(f, delimiter="\t")))["ibs0"])
 
 

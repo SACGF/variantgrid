@@ -176,6 +176,18 @@
         {% endwith %}
     </div>
 
+    {% if num_retryable_imports or num_processing_imports %}
+        <form class="alert {% if num_retryable_imports %}alert-danger{% else %}alert-info{% endif %} d-flex align-items-center" method="post"
+              action="{% url 'sequencing_run_retry_failed_imports' sequencing_run.pk %}">
+            {% csrf_token %}
+            <span class="mr-3">
+                {% if num_retryable_imports %}{{ num_retryable_imports }} VCF import{{ num_retryable_imports|pluralize }} from this run failed.{% endif %}
+                {% if num_processing_imports %}{{ num_processing_imports }} VCF import{{ num_processing_imports|pluralize }} from this run still processing (retry restarts any whose worker has died).{% endif %}
+            </span>
+            <button type="submit" class="btn btn-sm btn-primary">Retry failed imports</button>
+        </form>
+    {% endif %}
+
 	<div id="sequencing-run-tabs">
 		<ul class="nav nav-tabs mb-4" role="tablist">
         {% if run_patients %}

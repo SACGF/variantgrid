@@ -1,23 +1,29 @@
+import itertools
+import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Set, Union, Optional, Iterator
+from typing import Iterator, Optional, Set, Union
 
-import itertools
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools.more import peekable
-from classification.enums import ShareLevel, AlleleOriginBucket
-from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
-    OverlapContribution, OverlapContributionNextStep
-from classification.models import EvidenceKeyMap
+
+from classification.enums.classification_enums import ShareLevel
+from classification.models import (
+    ClassificationGrouping,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+    OverlapContribution,
+    OverlapContributionNextStep,
+)
 from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
-from snpdb.models import Organization, Lab, GenomeBuild, Variant, VariantAllele
-import re
+from snpdb.models import GenomeBuild, Lab, Organization, Variant, VariantAllele
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass
@@ -149,6 +155,8 @@ class ClassificationGroupingExportFileSettings:
         rows_per_file: Optional[int] = None
         if rows_per_file_str := request.GET.get("rows_per_file"):
             rows_per_file = int(rows_per_file_str)
+            if rows_per_file < 100:
+                rows_per_file = 100
         return ClassificationGroupingExportFileSettings(
             rows_per_file=rows_per_file
         )

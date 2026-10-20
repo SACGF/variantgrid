@@ -1,10 +1,14 @@
+from datetime import timedelta
+
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.utils import timezone
 
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    link_fake_gene_annotation_release,
     retire_seeded_annotation_version,
 )
 from annotation.models import (
@@ -19,6 +23,7 @@ from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from genes.models import GeneAnnotationImport, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 def _make_vav(genome_build, status=None, **overrides):
@@ -58,6 +63,24 @@ class VariantAnnotationVersionStatusTests(TestCase):
 
         self.assertEqual(new_vav.status, VariantAnnotationVersion.Status.ACTIVE)
         self.assertEqual(prior_active.status, VariantAnnotationVersion.Status.HISTORICAL)
+
+    def test_promote_to_active_cancels_prior_active_incomplete_runs(self):
+        """ The dispatcher never leases runs on a HISTORICAL version (#1940) - unless a worker holds one now """
+        prior_active = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.ACTIVE)
+        new_vav = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.NEW)
+        variant = slowly_create_test_variant("1", 100000, 'A', 'T', self.grch37)
+        lock = AnnotationRangeLock.objects.create(version=prior_active, min_variant=variant, max_variant=variant)
+        queued = AnnotationRun.objects.create(annotation_range_lock=lock)
+        leased = AnnotationRun.objects.create(annotation_range_lock=lock,
+                                              pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
+                                              lease_expires=timezone.now() + timedelta(minutes=5))
+
+        new_vav.promote_to_active()
+        queued.refresh_from_db()
+        leased.refresh_from_db()
+
+        self.assertEqual(queued.status, AnnotationStatus.ERROR)
+        self.assertEqual(leased.status, AnnotationStatus.CREATED)
 
     def test_promote_to_active_with_no_prior_active(self):
         new_vav = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.NEW)
@@ -112,6 +135,24 @@ class VariantAnnotationVersionStatusTests(TestCase):
         # Assign after creation - creating with it set while no GeneAnnotationVersion exists raises in new_sub_version
         vav.gene_annotation_release = gar
         vav.save(update_fields=["gene_annotation_release"])
+        self.assertIsNone(vav.get_annotation_run_blocker())
+
+    def test_vep_mismatch_latch(self):
+        """ #1679: only the first block reports (returns True), and its reason/date survive later blocks. """
+        vav = _make_vav(self.grch37)
+        link_fake_gene_annotation_release(vav)
+        self.assertTrue(vav.latch_vep_version_mismatch("first"))
+        first_date = vav.vep_version_mismatch_date
+        self.assertFalse(vav.latch_vep_version_mismatch("second"))
+
+        vav.refresh_from_db()
+        self.assertEqual(vav.vep_version_mismatch_reason, "first")
+        self.assertEqual(vav.vep_version_mismatch_date, first_date)
+        self.assertIn("VEP mismatch", vav.get_annotation_run_blocker())
+        self.assertIn("first", vav.get_annotation_run_blocker())
+
+        vav.clear_vep_version_mismatch()
+        vav.refresh_from_db()
         self.assertIsNone(vav.get_annotation_run_blocker())
 
     def test_latest_default_returns_active_only(self):

@@ -93,7 +93,7 @@ class SomalierVCFExtract(AbstractSomalierModel):
 
     def get_somalier_dir(self):
         cfg = SomalierConfig()
-        return os.path.join(cfg["vcf_base_dir"], str(self.vcf.pk))
+        return os.path.join(cfg["vcf_base_dir"], str(self.vcf_id))
 
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf.sample_set.filter(no_dna_control=False).order_by("pk")
@@ -132,9 +132,8 @@ class SomalierSampleExtract(models.Model):
         return self.het_count >= self.MIN_HET_HOM_COUNT and self.hom_count >= self.MIN_HET_HOM_COUNT
 
 
-class SomalierAncestryRun(AbstractSomalierModel):
-    """ We do a run against a whole VCF """
-    vcf_extract = models.OneToOneField(SomalierVCFExtract, on_delete=CASCADE)
+class SomalierAncestryBatch(AbstractSomalierModel):
+    """ One 'somalier ancestry' call over the samples of one or more VCFs, and the report it wrote """
     uuid = models.UUIDField(default=uuid.uuid4, editable=False)  # code to hide directories in media_root
 
     def get_report_dir(self):
@@ -142,7 +141,8 @@ class SomalierAncestryRun(AbstractSomalierModel):
         return cfg.ancestry_dir(self.uuid)
 
     def get_samples(self) -> Iterable[Sample]:
-        return self.vcf_extract.get_samples()
+        return Sample.objects.filter(vcf__somaliervcfextract__somalierancestryrun__batch=self,
+                                     no_dna_control=False).order_by("pk")
 
     @property
     def url(self):
@@ -150,12 +150,27 @@ class SomalierAncestryRun(AbstractSomalierModel):
         return self.media_url(os.path.join(report_dir, "somalier-ancestry.somalier-ancestry.html"))
 
 
-@receiver(pre_delete, sender=SomalierAncestryRun)
-def somalier_ancestry_run_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+@receiver(pre_delete, sender=SomalierAncestryBatch)
+def somalier_ancestry_batch_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     report_dir = instance.get_report_dir()
     if os.path.exists(report_dir):
         logging.info("Deleting %s - removing dir: %s", instance, report_dir)
         shutil.rmtree(report_dir)
+
+
+class SomalierAncestryRun(AbstractSomalierModel):
+    """ A VCF's ancestry stage. Its report is the batch's, which covers every VCF run alongside it """
+    vcf_extract = models.OneToOneField(SomalierVCFExtract, on_delete=CASCADE)
+    batch = models.ForeignKey(SomalierAncestryBatch, null=True, on_delete=CASCADE)  # null = never ran somalier
+
+    def get_samples(self) -> Iterable[Sample]:
+        return self.vcf_extract.get_samples()
+
+    @property
+    def url(self) -> Optional[str]:
+        if self.batch is None:
+            return None
+        return self.batch.url
 
 
 class SomalierAncestry(TimeStampedModel):

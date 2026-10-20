@@ -23,7 +23,6 @@ from guardian.shortcuts import assign_perm, remove_perm
 
 from annotation.models import ManualVariantEntry
 from annotation.models.models_enums import ManualVariantEntryType
-from classification.enums import AlleleOriginBucket
 from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
@@ -52,7 +51,7 @@ from snpdb.models import (
     VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import SampleFileType
+from snpdb.models.models_enums import AlleleOriginBucket, SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision
@@ -202,8 +201,8 @@ class LabForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = Lab
         # fields = '__all__'
-        exclude = ("classification_config", "css_class", "research")
-        read_only = ("name", "external", "group_name", "organization", "upload_location", "upload_automatic", "upload_instructions", "clinvar_key")
+        exclude = ("css_class", )
+        read_only = ("name", "external", "group_name", "organization")
         widgets = {
             "name": TextInput(),
             "city": TextInput(),
@@ -215,18 +214,14 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "url": TextInput(),
             "css_class": TextInput(),
             "group_name": TextInput(),
-            "upload_location": TextInput(),
             "email": EmailInput(),
             "slack_webhook": URLInput()
         }
         labels = {
             "email": "Group Email",
             "url": "URL",
-            "clinvar_key": "ClinVar Key",
             "group_name": "Group Name",
             "organization": "Organisation",  # really need to do translations, even if just en-US vs en-UK
-            "upload_location": "Upload Location",
-            "upload_auto_pattern": "Upload Auto Pattern",
             "slack_webhook": "Slack Webhook",
             "contact_name": "Contact Name",
             "contact_email": "Contact Email",
@@ -245,10 +240,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "contact_name": "Name of contact person available for other labs to contact (if applicable)",
             "contact_email": "Email address to be provided to other labs when needing to communicate",
             "contact_phone": "Phone number to be provided to other labs when needing to communicate",
-            "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
-            "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
-            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit.",
             "mme_enabled": "Opt this lab into MatchMaker Exchange, a federated rare-disease "
                            "patient-matching network. Classifications of VUS and above that are "
                            "shared at '3rd Party Databases' level become candidate genes other "
@@ -275,8 +267,8 @@ class OrganizationForm(forms.ModelForm, ROFormMixin):
 class VCFForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.VCF
-        fields = ['name', 'date', 'genome_build', 'user', 'project', 'import_status']
-        read_only = ('date', 'import_status')
+        fields = ['name', 'date', 'genome_build', 'user', 'project']
+        read_only = ('date',)
         widgets = {'name': TextInput(),
                    'user': ModelSelect2(url='user_autocomplete',
                                         attrs={'data-placeholder': 'User...'})}
@@ -377,9 +369,8 @@ class SampleForm(forms.ModelForm, ROFormMixin):
 
     class Meta:
         model = models.Sample
-        exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'uploaded_by', 'vcf_sample_name', 'import_status',
-                     'grid_sample_label') + EXTRACTION_MATCH_FIELDS
+        exclude = ['vcf', 'has_genotype', 'import_status']
+        read_only = ('genome_build', 'uploaded_by', 'vcf_sample_name', 'grid_sample_label') + EXTRACTION_MATCH_FIELDS
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
                    'extraction_reference': TextInput(),
@@ -864,8 +855,8 @@ class UserSettingsGenomeBuildMixin:
 class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = GenomicIntervalsCollection
-        exclude = ['category']
-        read_only = ('processed_file', 'processed_records', 'import_status', 'error_message')
+        exclude = ['category', 'import_status']
+        read_only = ('processed_file', 'processed_records', 'error_message')
         widgets = {'name': TextInput(),
                    'processed_file': TextInput(),
                    'user': ModelSelect2(url='user_autocomplete',

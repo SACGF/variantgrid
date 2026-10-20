@@ -74,11 +74,11 @@
                             <div class="mb-1">
                                 <div class="d-flex">
                                     <div class="text-right text-info mr-2" style="width:80px">Submitted</div>
-                                    <div class="flex-grow">{% c_hgvs row.variant_description %}</div>
+                                    <div class="flex-grow">{% hgvs row.variant_description %}</div>
                                 </div>
                                 <div class="d-flex">
                                     <div class="text-right text-info mr-2" style="width:80px">Normalised</div>
-                                    <div class="flex-grow">{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
+                                    <div class="flex-grow">{% hgvs row.c_hgvs_with_gene_symbol %}</div>
                                 </div>
                             </div>
                             {% for term in row.ontology_terms %}<div style="font-size:10px">{% ontology_term term %}</div>{% endfor %}

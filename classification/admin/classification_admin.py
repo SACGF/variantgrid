@@ -15,7 +15,7 @@ from django.forms import Widget
 from django.utils import timezone
 from django.utils.safestring import SafeString
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import (
     get_evidence_fields_for_variant,
 )
@@ -23,10 +23,9 @@ from classification.classification_import import (
     reattempt_variant_matching,
     variant_matching_dry_run,
 )
-from classification.enums import WithdrawReason
+from classification.enums import ShareLevel, WithdrawReason
 from classification.enums.classification_enums import (
     EvidenceCategory,
-    ShareLevel,
     SpecialEKeys,
     SubmissionSource,
 )
@@ -1117,7 +1116,7 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
 
 @admin.register(OverlapDiscordanceNotification)
 class OverlapDiscordanceNotificationAdmin(ModelAdminBasics):
-    list_display = ("overlap", "old_state", "new_state", "notification_sent_date")
+    list_display = ("overlap", "lab", "old_state", "new_state", "notification_sent_date")
     #list_filter = (('notification_sent_date', DateFieldListFilter))
 
     @admin_action("Resend Notifications")
@@ -1165,10 +1164,14 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'genome_build',
         'variant',
         'resolved_hgvs',
+        'p_hgvs',
+        'p_hgvs_short',
+        'p_hgvs_source',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
-        'error'
+        'error',
+        'p_hgvs_error',
     )
 
     search_fields = (

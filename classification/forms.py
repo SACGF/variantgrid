@@ -1,18 +1,9 @@
 from django import forms
+from django.forms.widgets import TextInput
 
-from classification.models import EvidenceKey
-from library.django_utils.autocomplete_utils import ModelSelect2
+from classification.models.classification_settings_models import LabClassificationSettings
+from library.forms import ROFormMixin
 from uicore.utils.form_helpers import form_helper_horizontal
-
-
-class EvidenceKeyForm(forms.Form):
-    evidence_key = forms.ModelChoiceField(queryset=EvidenceKey.objects.all(),
-                                          required=False,
-                                          widget=ModelSelect2(url='evidence_key_autocomplete',
-                                                              attrs={'data-placeholder': 'EKey...',
-                                                                     'class': 'custom-key'}))
-    value = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'value...', 'class': 'custom-value'}),
-                            required=False)
 
 
 class ClassificationAlleleOriginForm(forms.Form):
@@ -54,3 +45,24 @@ class ClassificationEvidenceUpdateForm(forms.Form):
     clinvar_min_stars = forms.IntegerField(required=False, initial=2)
 
     computational_vus_spliceai_min = forms.FloatField(required=False, initial=0.5)
+
+
+class LabClassificationSettingsForm(forms.ModelForm, ROFormMixin):
+    class Meta:
+        model = LabClassificationSettings
+        fields = ("consolidates_variant_classifications", "upload_location", "upload_automatic", "upload_instructions")
+        read_only = ("upload_location", "upload_automatic", "upload_instructions")
+        widgets = {
+            "upload_location": TextInput(),
+        }
+        labels = {
+            "consolidates_variant_classifications": "Consolidates Variant Classifications",
+            "upload_location": "Upload Location",
+            "upload_automatic": "Upload Automatic",
+            "upload_instructions": "Upload Instructions",
+        }
+        help_texts = {
+            "consolidates_variant_classifications": "The lab makes one classification per variant rather than one per patient, so patient counts are a minimum.",
+            "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
+            "upload_automatic": "Uploaded files are processed automatically, otherwise they wait for manual review.",
+        }

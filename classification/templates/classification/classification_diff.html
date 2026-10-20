@@ -3,6 +3,7 @@
 {% load js_tags %}
 {% block title %}Variant Diffs{% endblock %}
 {% block head %}
+<script src="{% static 'js/vc_diff.js' %}"></script>
 <script>
     let records = {{ records_json | jsonify }};
 
@@ -14,7 +15,8 @@
                 keys,
                 {
                     userId: '{{user.id}}'
-                }
+                },
+                {copiedOnly: {{ copied_only|jsonify }}}
             );
             diff.render();
         });

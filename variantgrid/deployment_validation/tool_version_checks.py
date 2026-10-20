@@ -63,9 +63,9 @@ def check_vcf_split_pipe() -> bool:
         records_filename = os.path.join(tmp_dir, "records.vcf")
         split_vcf_dir = os.path.join(tmp_dir, "split")
         os.mkdir(split_vcf_dir)
-        with open(header_filename, "w") as f:
+        with open(header_filename, "w", encoding="utf-8") as f:
             f.write(_SPLIT_CHECK_VCF)
-        with open(records_filename, "w") as f:
+        with open(records_filename, "w", encoding="utf-8") as f:
             f.writelines(_SPLIT_CHECK_RECORDS)
 
         split_cmd = shlex.join(get_split_vcf_command("check", split_file_rows=2))
@@ -106,6 +106,12 @@ def check_tool_versions() -> dict:
         cfg = SomalierConfig()
         somalier_bin = cfg.get_annotation("command")
         tools["somalier"] = (lambda: _run_ensure_success([somalier_bin]), "https://github.com/brentp/somalier")
+
+    if settings.ANNOTATION_ANNOTSV_ENABLED:
+        tools["AnnotSV"] = (lambda: _run_ensure_success([settings.ANNOTATION_ANNOTSV_BIN, "-version"]),
+                            "Install AnnotSV and set ANNOTATION_ANNOTSV_BIN")
+        tools["AnnotSV annotations"] = (lambda: os.path.isdir(settings.ANNOTATION_ANNOTSV_ANNOTATIONS_DIR),
+                                        "ANNOTATION_ANNOTSV_ANNOTATIONS_DIR must be the directory containing Annotations_Human")
 
     if madeline2_cmd := settings.PEDIGREE_MADELINE2_COMMAND:
         tools["ped_parser"] = (lambda: _run_ensure_success([*get_ped_parser_command(), "--version"]), _INSTALL_PED_PARSER_MADELINE2)

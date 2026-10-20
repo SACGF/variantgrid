@@ -12,7 +12,7 @@ from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun
@@ -24,6 +24,7 @@ from library.django_utils.database_utils import IntegerFieldChoices, TextFieldCh
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property
 from snpdb.models import Lab
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
@@ -386,7 +387,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def classifications_qs(self) -> QuerySet[Classification]:
         qs = self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
         if not settings.DISCORDANCE_RESEARCH_ENABLED:
-            qs = qs.exclude(lab__research=True)
+            qs = qs.exclude(lab__classification_settings__research=True)
         return qs
 
     @property

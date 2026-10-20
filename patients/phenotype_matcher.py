@@ -603,7 +603,7 @@ class PhenotypeMatcher:
         PAVM = (load_hpo_by_name, "Pulmonary arteriovenous malformation")
         CMS = (load_hpo_by_name, "Fatigable weakness")
         HYDROPS_FETALIS = (load_hpo_by_name, "Hydrops fetalis")
-        AFEBRILE = (load_hpo_by_id, 7359)  # Focal seizures, afebrile (HP:0040168) is obsolete, links to "Focal-onset seizure"
+        AFEBRILE = (load_hpo_by_id, 1250)  # Seizure: "afebrile" says nothing about onset, so not "Focal-onset seizure"
         FEBRILE_SEIZURES = (load_hpo_by_id, 11171)
         GEFS = FEBRILE_SEIZURES  # GEFS+ is a multi-type OMIM disease (febrile seizures links to all)
         PIG_GENES = (load_genes_by_name, ['PIG' + i for i in 'ABCFGHKLMNOPQSTUVWXYZ'])

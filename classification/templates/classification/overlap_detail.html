@@ -51,12 +51,12 @@
                 {% endif %}
             {% endlabelled %}
             {% labelled label="c.HGVS" %}
-                {% for c_hgvs in overlap.c_hgvses %}
+                {% for hgvs in overlap.hgvses %}
                     <div>
                         {% if overlap_details.overlap.allele %}
-                            <a class="hover-link" href="{{ overlap_details.overlap.allele.get_absolute_url }}">{% c_hgvs c_hgvs show_genome_build=True %}</a>
+                            <a class="hover-link" href="{{ overlap_details.overlap.allele.get_absolute_url }}">{% hgvs hgvs show_genome_build=True %}</a>
                         {% else %}
-                            {% c_hgvs c_hgvs %}
+                            {% hgvs hgvs %}
                         {% endif %}
                     </div>
                 {% endfor %}

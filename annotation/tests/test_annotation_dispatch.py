@@ -24,6 +24,7 @@ from annotation.annotation_versions import _absorb_range_lock, merge_pending_ran
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    link_fake_gene_annotation_release,
     retire_seeded_annotation_version,
 )
 from annotation.models import (
@@ -34,12 +35,16 @@ from annotation.models import (
 )
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import enabled_pipeline_types, get_runner
+from annotation.pipelines import vep as vep_pipeline
 from annotation.pipelines.vep import VEPRunner
+from annotation.tasks import annotate_variants as annotate_variants_module
 from annotation.tasks import annotation_scheduler_task
 from annotation.tasks.annotate_variants import (
+    AnnotationRunBlockedError,
     _trigger_dispatch,
     annotate_variants,
     import_annotation_run,
+    recheck_vep_version,
 )
 from annotation.tasks.annotation_scheduler_task import (
     _IMPORT_RUNNING_STATUSES,
@@ -54,8 +59,9 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     reclaim_stalled_annotation_runs,
 )
-from annotation.vep_annotation import get_vep_skipped_variants_filename
+from annotation.vep_annotation import VEPVersionMismatchError, get_vep_skipped_variants_filename
 from genes.models_enums import AnnotationConsortium
+from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -75,6 +81,7 @@ class AnnotationDispatchTestCase(TestCase):
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+        link_fake_gene_annotation_release(cls.vav)
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
     # ------------------------------------------------------------------ helpers
@@ -156,10 +163,7 @@ class AnnotationDispatchTestCase(TestCase):
             is actively built on a NEW VAV (external upload-only runs land there), so without a heartbeat
             here it only advances on discrete kicks and a stalled dispatch never self-recovers. """
         # cls.vav is ACTIVE on grch37. Add a NEW version on the same build with one pending run.
-        new_kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
-        new_kwargs["status"] = VariantAnnotationVersion.Status.NEW
-        new_vav = VariantAnnotationVersion.objects.create(**new_kwargs)
-        AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
+        new_vav = self._make_new_vav()
         new_lock = AnnotationRangeLock.objects.create(version=new_vav, min_variant=self.variants[0],
                                                       max_variant=self.variants[1], count=100)
         new_run = AnnotationRun.objects.create(annotation_range_lock=new_lock, pipeline_type=STANDARD,
@@ -191,10 +195,7 @@ class AnnotationDispatchTestCase(TestCase):
             run on ANOTHER version both launch in the same sweep - the cheap DB import does not consume
             the single VEP slot, and the VEP run does not consume the single import slot. """
         # NEW version (iterated before ACTIVE on the same build) carries only a CREATED VEP run.
-        new_kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
-        new_kwargs["status"] = VariantAnnotationVersion.Status.NEW
-        new_vav = VariantAnnotationVersion.objects.create(**new_kwargs)
-        AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
+        new_vav = self._make_new_vav()
         created_lock = AnnotationRangeLock.objects.create(version=new_vav, min_variant=self.variants[0],
                                                           max_variant=self.variants[1], count=100)
         created_run = AnnotationRun.objects.create(annotation_range_lock=created_lock, pipeline_type=STANDARD,
@@ -695,8 +696,8 @@ class AnnotationDispatchTestCase(TestCase):
             run = self._run_with_dump(tmp_dir)
             annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
             skipped_variants_filename = get_vep_skipped_variants_filename(annotated_filename)
-            open(annotated_filename, "w").close()  # VEP finished; row not saved yet
-            open(skipped_variants_filename, "w").close()  # ... written by Runner::finish()
+            open(annotated_filename, "w", encoding="utf-8").close()  # VEP finished; row not saved yet
+            open(skipped_variants_filename, "w", encoding="utf-8").close()  # ... written by Runner::finish()
             self.assertIsNone(run.vcf_annotated_filename)
 
             with mock.patch.object(AnnotationRun, "delete_related_objects"):
@@ -720,7 +721,7 @@ class AnnotationDispatchTestCase(TestCase):
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
             run = self._run_with_dump(tmp_dir)
             annotated_filename = get_annotated_filename(run, run.vcf_dump_filename)
-            with open(annotated_filename, "w") as f:
+            with open(annotated_filename, "w", encoding="utf-8") as f:
                 f.write("##fileformat=VCFv4.2\n")  # VEP got as far as the header
             self.assertFalse(os.path.exists(get_vep_skipped_variants_filename(annotated_filename)))
 
@@ -750,7 +751,7 @@ class AnnotationDispatchTestCase(TestCase):
             derived = get_runner(run.pipeline_type).get_output_paths(run, dump_filename)
             self.assertIn(annotated_filename, derived)
             for path in derived:
-                open(path, "w").close()
+                open(path, "w", encoding="utf-8").close()
             # Reclaim takes the scrub branch only when there's no annotated VCF to resume from
             os.remove(annotated_filename)
 
@@ -866,6 +867,7 @@ class AnnotationDispatchTestCase(TestCase):
         kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.REFSEQ, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.NEW
         new_vav = VariantAnnotationVersion.objects.create(**kwargs)
+        link_fake_gene_annotation_release(new_vav)
         AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=new_vav)
         return new_vav
 
@@ -944,3 +946,80 @@ class AnnotationDispatchTestCase(TestCase):
             annotate_variants.apply((run.pk,)).get()
         run.refresh_from_db()
         self.assertEqual(run.attempt_count, 1)  # bumped exactly once, when the task took its lock
+
+    # ================================================================== #1679 VEP mismatch latch
+    def test_blocked_vav_skips_vep_lane_only(self):
+        """ A blocked version's CREATED runs are not leased while another version's are, and its
+            already-annotated run still imports. """
+        other_vav = self._make_new_vav()
+        self.vav.latch_vep_version_mismatch("mismatch")
+        blocked_created = self._make_lock(0, 0, count=100).annotationrun_set.first()
+        blocked_completed = self._make_past_vep_run(lo_idx=1)
+        other_created = self._make_lock(2, 2, count=100, vav=other_vav).annotationrun_set.first()
+
+        launch = self._dispatch(slots=4, merge_noop=True)
+        self.assertEqual({c.args[0][0] for c in launch.call_args_list}, {other_created.pk})
+        self.assertEqual({c.args[0][0] for c in self.import_launch.call_args_list}, {blocked_completed.pk})
+        blocked_created.refresh_from_db()
+        self.assertIsNone(blocked_created.lease_expires)
+
+    def test_scheduler_makes_no_range_locks_for_blocked_vav(self):
+        self.vav.latch_vep_version_mismatch("mismatch")
+        with mock.patch.object(annotation_scheduler_task, "_handle_variant_annotation_version",
+                               return_value=None) as handle, \
+                mock.patch.object(dispatch_annotation_runs, "si") as dispatch_kick:
+            annotation_scheduler_task.annotation_scheduler()
+        handled_pks = {c.args[0].pk for c in handle.call_args_list}
+        self.assertNotIn(self.vav.pk, handled_pks)
+        dispatch_kick.assert_any_call(self.vav.pk)  # import lane still drains
+
+    def _annotate_with_vep_mismatch(self, annotation_run, report_message):
+        with mock.patch.object(vep_pipeline, "vep_check_command_line_version_match",
+                               side_effect=VEPVersionMismatchError("mismatch")), \
+                mock.patch.object(annotate_variants_module, "report_message", report_message), \
+                mock.patch.object(annotate_variants_module, "_trigger_dispatch"):
+            return annotate_variants.apply((annotation_run.pk,))
+
+    def test_vep_mismatch_latches_vav_and_reports_once(self):
+        runs = [self._make_lock(i, i, count=100).annotationrun_set.first() for i in range(3)]
+        report_message = mock.Mock()
+        # The first two were leased before the latch: both fail at the version check, only one reports
+        for annotation_run in runs[:2]:
+            result = self._annotate_with_vep_mismatch(annotation_run, report_message)
+            self.assertIsInstance(result.result, RollbarIgnoreException)
+        report_message.assert_called_once()
+        self.vav.refresh_from_db()
+        self.assertIsNotNone(self.vav.vep_version_mismatch_date)
+
+        # Leased in the same sweep the latch was set - fails on the in-run blocker, silently
+        result = self._annotate_with_vep_mismatch(runs[2], report_message)
+        self.assertIsInstance(result.result, AnnotationRunBlockedError)
+        report_message.assert_called_once()
+        for annotation_run in runs:
+            annotation_run.refresh_from_db()
+            self.assertEqual(annotation_run.status, AnnotationStatus.ERROR)
+
+    def test_recheck_vep_version_clears_latch_when_check_passes(self):
+        self.vav.latch_vep_version_mismatch("mismatch")
+        with mock.patch.object(annotate_variants_module, "vep_check_command_line_version_match"), \
+                mock.patch.object(annotate_variants_module, "_trigger_dispatch") as trigger_dispatch:
+            recheck_vep_version(self.vav.pk)
+        self.vav.refresh_from_db()
+        self.assertIsNone(self.vav.vep_version_mismatch_date)
+        self.assertIsNone(self.vav.vep_version_mismatch_reason)
+        trigger_dispatch.assert_called_once_with(self.vav.pk)
+
+    def test_recheck_vep_version_keeps_latch_when_check_fails(self):
+        self.vav.latch_vep_version_mismatch("old reason")
+        mismatch_date = self.vav.vep_version_mismatch_date
+        with mock.patch.object(annotate_variants_module, "vep_check_command_line_version_match",
+                               side_effect=VEPVersionMismatchError("new reason")), \
+                mock.patch.object(annotate_variants_module, "report_message") as report_message, \
+                mock.patch.object(annotate_variants_module, "_trigger_dispatch") as trigger_dispatch:
+            recheck_vep_version(self.vav.pk)
+        self.vav.refresh_from_db()
+        self.assertEqual(self.vav.vep_version_mismatch_date, mismatch_date)
+        self.assertEqual(self.vav.vep_version_mismatch_reason, "new reason")
+        report_message.assert_not_called()
+        trigger_dispatch.assert_not_called()
+

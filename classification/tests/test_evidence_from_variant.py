@@ -16,8 +16,15 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
 )
 from classification.enums import SpecialEKeys
 from classification.models import EvidenceKey
-from genes.models import HGNC, GeneCopyNumberEventKind, GeneSymbol, HGNCImport, SpliceEvent
-from genes.models_enums import HGNCStatus
+from genes.models import (
+    HGNC,
+    GeneCopyNumberEventKind,
+    GeneSymbol,
+    GeneSymbolAlias,
+    HGNCImport,
+    SpliceEvent,
+)
+from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,
@@ -82,6 +89,7 @@ class GeneLevelGeneSymbolTest(TestCase):
         HGNC.objects.create(pk=7553, gene_symbol_id="MYCL", hgnc_import=hgnc_import,
                             status=HGNCStatus.APPROVED, approved_name="MYCL proto-oncogene",
                             previous_symbols="MYCL1")
+        GeneSymbolAlias.objects.create(alias="MYCL1", gene_symbol_id="MYCL", source=GeneSymbolAliasSource.HGNC)
 
         # AR is seeded with the junctions the TSO 500 panel reports (genes/migrations/0093)
         GeneSymbol.objects.get_or_create(symbol="AR")

@@ -30,14 +30,7 @@ from typing import Optional
 
 from django.utils.timezone import get_current_timezone, now
 
-from classification.enums import (
-    AlleleOriginBucket,
-    ClinicalSignificance,
-    CriteriaEvaluation,
-    ShareLevel,
-    SpecialEKeys,
-    SubmissionSource,
-)
+from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.fake_data.shared import (
     assign_all_users_permissions,
     create_fake_allele_infos,
@@ -59,6 +52,7 @@ from classification.models.classification_grouping import (
 from library.fake_data import FakeData, FakeDataContext, in_preferred_order, register, zipf_weight
 from snpdb.fake_data import GERMLINE, SOMATIC
 from snpdb.models import Lab
+from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 
 LAB_RECORD_PREFIX = "fake-recl-"
 SOMATIC_LAB_RECORD_PREFIX = f"{LAB_RECORD_PREFIX}som-"
