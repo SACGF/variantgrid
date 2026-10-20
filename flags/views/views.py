@@ -439,14 +439,18 @@ class FlagsView(APIView):
 class FlagView(APIView):
     """API for a single Flag: retrieve it with its comments, or apply a resolution/comment to it."""
 
+    @staticmethod
+    def _get_viewable_flag(request, **kwargs) -> Flag:
+        flag = get_object_or_404(Flag, pk=kwargs.get('flag_id'))
+        check_can_view_flag_collection(flag.collection, request.user)
+        return flag
+
     @extend_schema(
         summary="Retrieve a single flag with its comments",
         responses=OpenApiTypes.OBJECT
     )
     def get(self, request, **kwargs) -> Response:
-        pk = kwargs.get('flag_id')
-        f = get_object_or_404(Flag, pk=pk)
-        check_can_view_flag_collection(f.collection, request.user)
+        f = self._get_viewable_flag(request, **kwargs)
         flag_helper = FlagHelper(flag_collections=f.collection, user=request.user)
         flag_helper.include_flag(f, include_comments=True)
         flag_helper.include_user(request.user)
@@ -458,9 +462,7 @@ class FlagView(APIView):
         responses=OpenApiTypes.OBJECT
     )
     def post(self, request, **kwargs) -> Response:
-        pk = kwargs.get('flag_id')
-        f: Flag = get_object_or_404(Flag, pk=pk)
-        check_can_view_flag_collection(f.collection, request.user)
+        f = self._get_viewable_flag(request, **kwargs)
         data = request.data
         resolution = data.get('resolution', None)
         try:
