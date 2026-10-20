@@ -26,23 +26,20 @@
         }
 
         $(document).ready(function() {
-            const geneTextForm = $("#gene-text-form");
-            const originalGenes = geneTextTokens($("#gene-text").val());
-            geneTextForm.submit(function() {
-                const genes = geneTextTokens($("#gene-text").val());
+            const geneText = $("#gene-text");
+            const originalGenes = geneTextTokens(geneText.val());
+            geneText.on("input", function() {
+                const genes = geneTextTokens(geneText.val());
                 const added = [...genes].filter(g => !originalGenes.has(g));
                 const removed = [...originalGenes].filter(g => !genes.has(g));
-                if (!added.length && !removed.length) {
-                    return false;
-                }
-                const lines = [];
+                const changes = $("#gene-text-changes").empty();
                 if (added.length) {
-                    lines.push(geneChangeSummary("Add", added));
+                    changes.append($("<div>", {"class": "text-success", text: geneChangeSummary("Add", added)}));
                 }
                 if (removed.length) {
-                    lines.push(geneChangeSummary("Remove", removed));
+                    changes.append($("<div>", {"class": "text-danger", text: geneChangeSummary("Remove", removed)}));
                 }
-                return confirm(lines.join("\n\n"));
+                $("#save-gene-text-button").prop("disabled", !added.length && !removed.length);
             });
         });
     </script>
@@ -131,7 +128,8 @@
             {% csrf_token %}
             <textarea class="form-control" rows="10" name="gene_text" id="gene-text">{{ gene_symbols_text }}</textarea>
             <small class="form-text text-muted">Separate genes with spaces, commas or new lines. Saving adds genes not in the list and removes genes no longer in the text.</small>
-            <button class="btn btn-primary mt-2 mb-4">Save Genes</button>
+            <div id="gene-text-changes" class="mt-2"></div>
+            <button id="save-gene-text-button" class="btn btn-primary mt-2 mb-4" disabled>Save Genes</button>
         </form>
     {% else %}
         <textarea class="form-control" rows="10" readonly onclick="this.select()">{{ gene_symbols_text }}</textarea>
