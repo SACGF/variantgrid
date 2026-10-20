@@ -132,12 +132,12 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def _has_filters_that_affect_label_counts(self) -> bool:
         # Anything other than the raw "no zygosity filtering" config defeats the
         # cache — the precomputed aggregate row only matches accordion_panel=COUNT
-        # with no extra zygosity restriction.
+        # with no count limits (#2370).
         if super()._has_filters_that_affect_label_counts():
             return True
         if self.accordion_panel != self.COUNT:
             return True
-        return False
+        return self.has_effective_count_limits()
 
     def _get_cohort(self):
         return self.cohort
