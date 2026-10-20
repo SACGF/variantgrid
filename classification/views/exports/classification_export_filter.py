@@ -7,9 +7,10 @@ AlleleData - all the visible modifications for one allele - that a formatter
 the output.
 """
 import operator
+import re
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
@@ -18,6 +19,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
+from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
 
@@ -39,7 +41,12 @@ from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
-from library.utils import batch_iterator, http_header_date_now, local_date_string
+from library.utils import (
+    batch_iterator,
+    http_header_date_now,
+    local_date_string,
+    utc_from_timestamp,
+)
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (
     VARIANT_PATTERN,
@@ -202,6 +209,48 @@ def flag_ids_to(model: type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[Flag
         raise ValueError(f"Cannot deal with a QuerySet of model {qs.model}")
 
     return set(model.objects.filter(flag_collection_id__in=qs).values_list('pk', flat=True))
+
+
+class InvalidExportParameter(Exception):
+    pass
+
+
+def parse_since(since_str: str) -> datetime:
+    try:
+        since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
+        since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
+        return since_date
+    except BaseException:
+        pass
+
+    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
+        amount = int(m.group(1))
+        unit = m.group(2)
+        if unit:
+            unit = unit.strip().lower()
+
+        if amount > 100000 and not unit:
+            return utc_from_timestamp(float(since_str))
+
+        since = timezone.now()
+        if not unit or unit == 'd':
+            since -= timedelta(days=amount)
+        elif unit == 'm':
+            since -= timedelta(minutes=amount)
+        elif unit == 'w':
+            since -= timedelta(weeks=amount)
+        elif unit == 's':
+            since -= timedelta(seconds=amount)
+        else:
+            raise ValueError(f"Cannot parse {since_str} don't know time unit {unit}")
+        return since
+
+    try:
+        return utc_from_timestamp(float(since_str))
+    except BaseException:
+        pass
+
+    raise ValueError(f"Could not parse since string {since_str}")
 
 
 class DiscordanceReportStatus(str, Enum):
@@ -474,7 +523,6 @@ class ClassificationFilter:
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         since: Optional[datetime] = None
         if since_str := request.query_params.get('since'):
-            from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
         # just for debugging purposes allows us to download a single allele
