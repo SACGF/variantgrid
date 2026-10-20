@@ -1193,7 +1193,9 @@ SOMALIER = {
     "report_base_dir": os.path.join(MEDIA_ROOT, "somalier"),  # Static files served by Nginx
     "annotation_base_dir": os.path.join(ANNOTATION_BASE_DIR, "somalier"),
     "annotation": {  # All annotation paths relative to "annotation_base_dir"
-        "command": "somalier",
+        # brentp/somalier master at edf6c917 (the --unknown half of brentp/somalier#163), built statically
+        # and hosted on variantgrid.com until a release includes it - 'download_annotation_data' fetches it
+        "command": "somalier-0.3.5-edf6c91",
         "ancestry_labels": "ancestry-labels-1kg.tsv",
         "ancestry_somalier_dir": "1kg-somalier",
         "sites": {
@@ -1202,13 +1204,13 @@ SOMALIER = {
             "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
-    # A somalier before v0.3.5 reads a record against its own alphabetically sorted site alleles rather
-    # than the record's REF/ALT (https://github.com/brentp/somalier/issues/163), so we write the AD pair
-    # in the site's order. Turn this off for v0.3.5+, where relate is instead handed the sites VCF and
-    # reads REF/ALT from it (older ones have no --sites, so the two move together) - deployment_check's
-    # somalier_allele_order tells you which way this should be set, and the extracts need rebuilding
-    # with 'somalier_existing_vcfs --clear' whenever it changes
-    "compensate_allele_order": True,
+    # somalier reads a record against its own alphabetically sorted site alleles rather than the record's
+    # REF/ALT (https://github.com/brentp/somalier/issues/163). Up to v0.3.5 that inflates relatedness under
+    # --unknown, so we write the AD pair in the site's order instead; the build above fixes it given the
+    # sites VCF at relate time, and compensating it then turns ancestry inside out. deployment_check's
+    # somalier_allele_order says which way this must be set for the installed binary, and the extracts
+    # need rebuilding with 'somalier_existing_vcfs --clear' whenever it changes
+    "compensate_allele_order": False,
     "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
     # Max query samples per 'somalier ancestry' call when somalier_existing_vcfs backfills - one call fits the
     # 1kg background once for all of them, and a bad .somalier file only fails its own batch

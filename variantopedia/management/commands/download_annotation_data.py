@@ -14,9 +14,21 @@ from variantgrid.deployment_validation.annotation_files_check import annotation_
 _DIRECTORY_ARCHIVE_KEYS = {"maxentscan"}
 
 
-def _is_directory_archive(key):
+# Entries that are programs, made executable once downloaded
+_EXECUTABLE_KEYS = {"somalier"}
+
+
+def _base_key(key):
     # key may be plain ("maxentscan") or flattened ("GRCh37/maxentscan")
-    return key.rsplit("/", 1)[-1] in _DIRECTORY_ARCHIVE_KEYS
+    return key.rsplit("/", 1)[-1]
+
+
+def _is_directory_archive(key):
+    return _base_key(key) in _DIRECTORY_ARCHIVE_KEYS
+
+
+def _is_executable(key):
+    return _base_key(key) in _EXECUTABLE_KEYS
 
 
 class Command(BaseCommand):
@@ -78,6 +90,8 @@ class Command(BaseCommand):
                 if is_archive:
                     _extract_tarball(filename, dirname)
                     os.remove(filename)
+                elif _is_executable(key):
+                    os.chmod(filename, 0o755)
                 self.stdout.write(f"  -> {filename}")
             except Exception as e:
                 self.stderr.write(f"  FAILED: {e}")
@@ -114,6 +128,9 @@ class Command(BaseCommand):
                 lines.append(f"rm {shlex.quote(tarball)}")
             else:
                 lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)}")
+                if _is_executable(key):
+                    filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
+                    lines.append(f"chmod a+x {shlex.quote(filename)}")
             lines.append("")
 
         for key in skipped:
