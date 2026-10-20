@@ -7,6 +7,10 @@
     </script>
     <div class="container mt-4">
         <h4>Classifications</h4>
-        {% classification_groupings show_summary_counts=True %}
+        {% if has_classifications %}
+            {% classification_groupings show_summary_counts=True %}
+        {% else %}
+            <p class="no-value">No classifications</p>
+        {% endif %}
     </div>
 {% endif %}
