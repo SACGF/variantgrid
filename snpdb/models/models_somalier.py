@@ -144,11 +144,6 @@ class SomalierAncestryBatch(AbstractSomalierModel):
         return Sample.objects.filter(vcf__somaliervcfextract__somalierancestryrun__batch=self,
                                      no_dna_control=False).order_by("pk")
 
-    @property
-    def url(self):
-        report_dir = self.get_report_dir()
-        return self.media_url(os.path.join(report_dir, "somalier-ancestry.somalier-ancestry.html"))
-
 
 @receiver(pre_delete, sender=SomalierAncestryBatch)
 def somalier_ancestry_batch_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
@@ -159,18 +154,13 @@ def somalier_ancestry_batch_pre_delete_handler(sender, instance, **kwargs):  # p
 
 
 class SomalierAncestryRun(AbstractSomalierModel):
-    """ A VCF's ancestry stage. Its report is the batch's, which covers every VCF run alongside it """
+    """ A VCF's ancestry stage. The batch's somalier report covers every VCF run alongside it, so pages show
+        this VCF's SomalierAncestry rows rather than linking the report """
     vcf_extract = models.OneToOneField(SomalierVCFExtract, on_delete=CASCADE)
     batch = models.ForeignKey(SomalierAncestryBatch, null=True, on_delete=CASCADE)  # null = never ran somalier
 
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf_extract.get_samples()
-
-    @property
-    def url(self) -> Optional[str]:
-        if self.batch is None:
-            return None
-        return self.batch.url
 
 
 class SomalierAncestry(TimeStampedModel):
