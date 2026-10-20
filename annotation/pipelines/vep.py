@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotated_filename
 from annotation.annotation_version_querysets import filter_vep_sv_max_size
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.pipelines.base import AnnotationPipelineRunner
 from annotation.sv_conservation import (
     conservation_sidecar_filename,

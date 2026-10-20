@@ -29,7 +29,7 @@ import shutil
 from django.conf import settings
 
 from annotation.annotation_run_files import get_annotsv_dir
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.pipelines import get_runner
 from annotation.sv_conservation import conservation_sidecar_filename
 from annotation.vep_annotation import get_vep_skipped_variants_filename

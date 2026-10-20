@@ -12,8 +12,8 @@ from annotation.annotation_version_querysets import (
     filter_vep_sv_max_size,
     get_variants_qs_for_annotation,
 )
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.models import AnnotationRun, VEPSkippedReason
-from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vep_annotation import vep_check_annotated_file_version_match
 from annotation.vep_warnings import (

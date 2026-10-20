@@ -5,13 +5,13 @@ ACTIVE versions) and abandoned (it never will: no range lock, #1654, or a HISTOR
 from django.test import TestCase
 from django.test.utils import override_settings
 
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from library.vg.status import _annotation_runs, _annotation_runs_abandoned
 from snpdb.models import GenomeBuild

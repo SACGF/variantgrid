@@ -3,6 +3,7 @@ from collections import Counter, defaultdict
 
 from celery.app.task import Task
 
+from annotation.gene_count_variants import gene_count_classification_qs, gene_count_variant_queryset
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_gene_counts import (
     CohortGeneCounts,
@@ -102,7 +103,7 @@ class CohortSampleGeneDamageCountTask(Task):
     def _get_gene_value_counts(cls, cohort_gene_counts, gene_values, variant_annotation_version, update_gene_id):
         cohort = cohort_gene_counts.cohort
         cohort_genotype_collection = cohort.cohort_genotype_collection
-        qs = cohort_gene_counts.gene_count_type.get_variant_queryset(variant_annotation_version)
+        qs = gene_count_variant_queryset(cohort_gene_counts.gene_count_type, variant_annotation_version)
         qs = qs.filter(cohortgenotype__collection=cohort_genotype_collection)
         if update_gene_id:
             gene = Gene.objects.get(pk=update_gene_id)
@@ -179,7 +180,7 @@ class CohortSampleClassificationGeneDamageCountTask(CohortSampleGeneDamageCountT
     def _get_gene_value_counts(cls, cohort_gene_counts, gene_values, variant_annotation_version, update_gene_id):
         # There are way less Classifications, and each has a sample, so handle this per-sample
         # As it's classified for this sample, we know the builds are the same (hence can use variant not allele)
-        vc_qs = cohort_gene_counts.gene_count_type.get_classification_qs()
+        vc_qs = gene_count_classification_qs(cohort_gene_counts.gene_count_type)
         if update_gene_id:
             gene = Gene.objects.get(pk=update_gene_id)
             vc_qs = vc_qs.for_gene(gene)

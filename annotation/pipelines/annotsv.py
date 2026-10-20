@@ -10,7 +10,7 @@ from annotation.annotsv_annotation import (
     get_annotsv_command_line_version,
     get_annotsv_tsv_filename,
 )
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.pipelines.base import AnnotationPipelineRunner
 from annotation.vcf_files.bulk_annotsv_tsv_inserter import import_annotsv_tsv
 from library.utils import execute_cmd

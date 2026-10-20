@@ -11,13 +11,13 @@ from django.db import connection, transaction
 from django.db.models import F, Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from annotation.enums.damage_enums import PathogenicityImpact
 from annotation.models import (
     AnnotationVersion,
     CohortGenotypeClinVarAnnotationStats,
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
-from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models_annotation_run import VCFAnnotationStats
 from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create

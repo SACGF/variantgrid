@@ -16,7 +16,6 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
-from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.enums import (
     ClassificationResultValue,
     OverlapStatus,
@@ -46,6 +45,7 @@ from classification.models.classification_groups import (
 )
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
+from classification.models.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import (
     DiscordanceReportRowData,

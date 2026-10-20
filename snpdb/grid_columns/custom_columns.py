@@ -10,8 +10,8 @@ from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
 from annotation import vep_columns
+from annotation.enums.annotation_enums import VEPPlugin
 from annotation.models import AnnotationVersion
-from annotation.models.models_enums import VEPPlugin
 from classification.models import ClassificationModification
 from library.django_utils import resolve_field_path
 from library.utils import JsonDataType, add_exception_note

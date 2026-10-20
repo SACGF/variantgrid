@@ -5,7 +5,11 @@ from analysis.forms.forms_nodes import ClinVarNodeForm
 from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
+from annotation.enums.annotation_enums import (
+    ClinVarOncogenicity,
+    ClinVarReviewStatus,
+    Pathogenicity,
+)
 from snpdb.models.models_enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
 
 

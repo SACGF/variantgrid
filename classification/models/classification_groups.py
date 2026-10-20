@@ -8,7 +8,6 @@ from django.contrib.auth.models import User
 from more_itertools import first
 from typing_extensions import deprecated
 
-from classification.criteria_strengths import CriteriaStrength
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     ClassificationModification,
@@ -18,6 +17,7 @@ from classification.models import (
     ImportedAlleleInfo,
     classification_flag_types,
 )
+from classification.models.criteria_strengths import CriteriaStrength
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
 from genes.hgvs import HGVSDisplay

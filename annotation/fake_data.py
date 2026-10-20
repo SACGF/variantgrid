@@ -14,8 +14,9 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
+from annotation.enums.annotation_enums import AnnotationStatus
+from annotation.enums.damage_enums import PathogenicityImpact
 from annotation.models import ClinVarReviewStatus
-from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
@@ -26,7 +27,6 @@ from annotation.models.models_clinvar import (
     ClinVarCitationsCollection,
     ClinVarVersion,
 )
-from annotation.models.models_enums import AnnotationStatus
 from annotation.models.models_gene_annotation import (
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,

@@ -11,13 +11,13 @@ from collections import Counter
 from django.db.models import QuerySet
 from django.utils import timezone
 
+from annotation.enums.annotation_enums import AnnotationStatus
 from annotation.models.models import (
     VariantAnnotation,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
-from annotation.models.models_enums import AnnotationStatus
 from annotation.models.models_version import VariantAnnotationVersion
 
 ABANDONED_ERROR_EXCEPTION = "Abandoned: no range lock or HISTORICAL version, so it will never be dispatched"

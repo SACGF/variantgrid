@@ -22,6 +22,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -33,7 +34,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.pipelines import base as pipelines_base
 from annotation.pipelines import get_runner
 from annotation.pipelines import vep as vep_pipeline

@@ -8,16 +8,16 @@ from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     get_or_create_variant_annotation_version_from_current_vep,
 )
-from annotation.fake_data import get_fake_annotation_settings_dict
-from annotation.models import VariantAnnotation
-from annotation.models.damage_enums import (
+from annotation.enums.annotation_enums import NMDEscapeStatus, VariantAnnotationPipelineType
+from annotation.enums.damage_enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
     PathogenicityImpact,
 )
+from annotation.fake_data import get_fake_annotation_settings_dict
+from annotation.models import VariantAnnotation
 from annotation.models.models import VariantTranscriptAnnotation
 from annotation.models.models_annotation_run import AnnotationRun
-from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations

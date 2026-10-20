@@ -2,7 +2,7 @@ import logging
 
 from django.db import migrations
 
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 
 # Small enough that Postgres keeps every partition on an index scan - a few hundred run ids in one
 # IN list estimates high enough that the biggest partitions get sequentially scanned instead

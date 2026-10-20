@@ -8,12 +8,12 @@ from django.views.decorators.http import require_POST
 
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
+from annotation.enums.annotation_enums import VariantAnnotationPipelineType
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import VariantAnnotationPipelineType
 from annotation.models.models_gene_annotation import (
     DBNSFPGeneAnnotationVersion,
     HumanProteinAtlasAnnotation,

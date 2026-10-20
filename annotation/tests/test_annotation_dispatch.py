@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotated_filename
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
+from annotation.enums.annotation_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -33,7 +34,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import enabled_pipeline_types, get_runner
 from annotation.pipelines import vep as vep_pipeline
 from annotation.pipelines.vep import VEPRunner

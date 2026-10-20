@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.enums.annotation_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -18,7 +19,6 @@ from annotation.models import (
     InvalidAnnotationVersionError,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from genes.models import GeneAnnotationImport, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium

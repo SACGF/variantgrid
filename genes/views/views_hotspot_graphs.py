@@ -278,7 +278,7 @@ class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
         return title + " (Germline)"
 
     def _get_classifications(self):
-        # Modified from RUNX1_classified_damage - GeneCountType.get_classification_qs()
+        # Modified from RUNX1_classified_damage - gene_count_classification_qs()
         kwargs = {"share_level__in": ShareLevel.same_and_higher(ShareLevel.ALL_USERS),
                   "published_evidence__allele_origin__value__in": ['germline', 'likely_germline'],
                   "is_last_published": True}
