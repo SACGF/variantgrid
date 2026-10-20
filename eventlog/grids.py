@@ -82,6 +82,7 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             RichColumn('num_changes', label='Changes', orderable=True, extra_columns=['changes'],
                        renderer=self.render_changes, client_renderer='renderApiRequestLogChanges'),
             RichColumn('path', search=['path', 'request_body'], client_renderer='TableFormat.limit', client_renderer_kwargs={"limit": 75}),
+            RichColumn('notes', renderer=self.render_notes, client_renderer='TableFormat.limit', client_renderer_kwargs={"limit": 75}),
             RichColumn('id', visible=False)
         ]
 
@@ -93,6 +94,10 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             "num_changes": row['num_changes'],
             "summary": ApiRequestLog.changes_summary(changes),
         }
+
+    @staticmethod
+    def render_notes(row: CellData) -> str:
+        return "\n".join(row['notes'])
 
     def get_initial_queryset(self) -> QuerySet[ApiRequestLog]:
         if not self.user.is_superuser:

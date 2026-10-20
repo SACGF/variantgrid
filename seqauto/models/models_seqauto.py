@@ -147,30 +147,6 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         current_sample_sheet = self.get_current_sample_sheet()
         return SampleSheet.objects.filter(sequencing_run=self).exclude(pk=current_sample_sheet.pk)
 
-    @property
-    def is_data_out_of_date_from_current_sample_sheet(self):
-        try:
-            current_sample_sheet = self.get_current_sample_sheet()
-        except SequencingRunCurrentSampleSheet.DoesNotExist:
-            return False
-
-        for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
-            if joint_called_vcf.needs_to_be_linked():
-                return True
-
-        old_sample_sheets = self.get_old_sample_sheets()
-        illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet=current_sample_sheet)
-        old_illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-        old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
-        old_alignment_files = AlignmentFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-        return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
-                    old_joint_called_vcfs.exists(),
-                    old_unaligned_reads.exists(),
-                    old_alignment_files.exists(),
-                    old_sample_links.exists()])
-
     @staticmethod
     def get_external_links_for(name: str, date: Optional[datetime.date],
                                enrichment_kit_name: Optional[str]) -> list[tuple[str, str]]:
@@ -488,11 +464,6 @@ class UnalignedReads(models.Model):
         if self.fastq_r2:
             params["read_2"] = self.fastq_r2.path
         return params
-
-    @staticmethod
-    def get_for_old_sample_sheets(sequencing_run):
-        old_sample_sheets = sequencing_run.get_old_sample_sheets()
-        return UnalignedReads.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
 
     def __str__(self):
         return f"UnalignedReads from sample {self.sequencing_sample}"

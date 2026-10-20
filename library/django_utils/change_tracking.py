@@ -1,7 +1,8 @@
 """
 Records what a block of code wrote, per model: rows created, updated, unchanged and deleted, and the
-names of the fields an update changed (#1413). IntegrationApiMiddleware wraps each tracked API call in
-collect_changes() and stores the result on its ApiRequestLog row.
+names of the fields an update changed (#1413), plus free-text notes about what it did (#2349).
+IntegrationApiMiddleware wraps each tracked API call in collect_changes() and stores the result on its
+ApiRequestLog row.
 
 Entry points:
 - collect_changes(): context manager that installs a fresh ChangeCollector for the block and yields it
@@ -59,6 +60,7 @@ class ModelChanges:
 @dataclass
 class ChangeCollector:
     by_model: dict[str, ModelChanges] = field(default_factory=dict)  # key "app_label.model"
+    notes: list[str] = field(default_factory=list)
 
     def record(self, model: type[models.Model], created: int = 0, updated: int = 0, unchanged: int = 0,
                deleted: int = 0, fields: Iterable[str] = ()):

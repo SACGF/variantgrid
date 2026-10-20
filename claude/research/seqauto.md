@@ -62,13 +62,16 @@ protects it (SACGF/variantgrid_sapath#395).
 ### A sheet is re-sent
 
 A second sheet for a run becomes current, and `seqauto/sequencing_files/sample_sheet.py:current_sample_sheet_changed`
-compares it with the old one (`sample_sheet_meaningfully_changed`: same sample names and barcodes). If nothing
-meaningful changed it re-points `SampleFromSequencingSample` links and cross-run joint-call members at the new rows
-and moves FastQs / UnalignedReads / BAMs across by sample name. If it did change, nothing moves: the run page shows
-"data out of date" (`SequencingRun.is_data_out_of_date_from_current_sample_sheet`) and an admin presses the button
-that runs `assign_old_sample_sheet_data_to_current_sample_sheet`, which relinks everything and re-runs
-`link_samples_and_vcfs_to_sequencing(replace_existing=True)`. Only the automatic path sends
-`sequencing_run_current_sample_sheet_changed_signal`. seqauto itself receives none of its signals; SA Pathology
+always moves the run's data onto it (`assign_old_sample_sheet_data_to_current_sample_sheet`, the API client being
+authoritative): IlluminaFlowcellQC, joint calls and cross-run joint-call members, then FastQs / UnalignedReads /
+alignment files / single-sample VCFs / QC and the `SampleFromSequencingSample` links by sample name, then
+`link_samples_and_vcfs_to_sequencing(replace_existing=True)` for the joint calls. Only after that does it send
+`sequencing_run_current_sample_sheet_changed_signal`, with `meaningfully_changed` from
+`sample_sheet_meaningfully_changed` (sample names or barcodes differ), so a receiver finds the new rows linked. A
+re-post that changes the rows of the sheet already current (the same hash with a late SAPOrderNumber column, or a
+PUT) sends the signal too (`current_sample_sheet_data_changed`). Each step writes a line to the call's
+`ApiRequestLog.notes` (`eventlog/models.py:api_request_note`), shown on the API Log and, for a week, as a message on
+the run page for superusers. seqauto itself receives none of its signals; SA Pathology
 connects them in the sapath app's `AppConfig.ready()` (the sibling `variantgrid_sapath` repo) - the sheet-created one sets kits from the sheet's Panel
 columns, the sheet-changed one relinks samples to patients.
 
@@ -125,9 +128,8 @@ it down to every Sample so one link call covers all of an arm's VCFs.
   sheet is left alone. The pipeline only ever POSTs a new sheet.
 - `sequencing_run_created_signal` is sent by `SequencingRunSerializer.create` only when the POST creates the run
   (re-posting an existing name sends nothing). `backend_vcf_import_success_signal` is sent with no receiver.
-- `seqauto/views.py:assign_data_to_current_sample_sheet` (relinks a run's data and samples, `replace_existing=True`)
-  and `reload_experiment_name` are superuser-only, like `delete_sequencing_run`. The second reads `RunParameters.xml`
-  from the run's path on the web host, which only works where the sequencing filesystem is mounted.
+- `seqauto/views.py:reload_experiment_name` is superuser-only, like `delete_sequencing_run`. It reads
+  `RunParameters.xml` from the run's path on the web host, which only works where the sequencing filesystem is mounted.
 - `seqauto/models/models_seqauto.py:get_20x_gene_coverage` caches (count, num collections, max pk) per gene and
   threshold and only counts collections above the cached max pk on later calls, both queries restricted to
   current-sheet collections; the cache is dropped when the number of current collections at or below the max changes.

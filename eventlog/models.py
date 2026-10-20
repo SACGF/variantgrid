@@ -5,7 +5,8 @@ updated in place through `IntegrationActivity.track`) and ApiRequestLog (one row
 INTEGRATION_API_TRACKING endpoint, written by IntegrationApiMiddleware). Write events with create_event /
 create_login_event; the logging handler and middleware in this app fill the rest. An API view links its
 ApiRequestLog row to the objects it worked on with log_api_request_objects; what the call wrote is
-collected by library/django_utils/change_tracking.py.
+collected by library/django_utils/change_tracking.py, and any code the call runs can add a line saying
+what it did with api_request_note.
 """
 import inspect
 import json
@@ -26,6 +27,7 @@ from django.db.models.deletion import SET_NULL
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
 
+from library.django_utils.change_tracking import active_collector
 from library.enums.log_level import LogLevel
 from library.integration_status import IntegrationDirection
 
@@ -216,6 +218,8 @@ class ApiRequestLog(models.Model):
     changes = models.JSONField(default=dict)
     # created + updated + deleted across all models - the grid's sortable "Changes" column and its "wrote data" filter
     num_changes = models.IntegerField(default=0)
+    # what the call did beyond the rows it wrote, from api_request_note - eg data moved onto a re-sent sample sheet
+    notes = ArrayField(models.TextField(), default=list)
 
     class Meta:
         indexes = [models.Index(fields=["view_name", "created"])]
@@ -274,6 +278,14 @@ def log_api_request_objects(request, *object_pks):
     django_request = getattr(request, "_request", request)
     logged_pks = django_request.__dict__.setdefault("api_log_object_pks", set())
     logged_pks.update(str(pk) for pk in object_pks if pk is not None)
+
+
+def api_request_note(text: str):
+    """ Adds a line to the ApiRequestLog row of the tracked API call this runs inside. Code with no request in
+        hand (a signal handler) can call it too, as the call's notes live with its change collector """
+    logging.info("API request note: %s", text)
+    if collector := active_collector():
+        collector.notes.append(text)
 
 
 def create_login_event(sender, user, request, **kwargs):  # pylint: disable=unused-argument
