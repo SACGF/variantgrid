@@ -115,7 +115,7 @@
           </div>
 
 			{% if family.pedigree_set.exists %}
-			     <h3>Pedigrees from this Pedigree</h3>
+			     <h3>Pedigrees from this PED file</h3>
 			     <table class="table">
                 {% for pedigree in family.pedigree_set.all %}
                     <tr><td><a href="{% url 'view_pedigree' pedigree.pk %}">{{ pedigree }}</a>
