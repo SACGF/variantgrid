@@ -32,7 +32,6 @@ from snpdb.models import (
     Quad,
     Sample,
     Trio,
-    UserGridConfig,
     UserSettings,
 )
 from snpdb.models.models_enums import (
@@ -58,9 +57,7 @@ def cohorts(request):
         else:
             add_save_message(request, valid, "Cohort", created=True)
 
-    show_group_data = UserGridConfig.get(request.user, 'Cohorts').show_group_data
-    context = {"form": form, "show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/cohorts.html', context)
+    return render(request, 'snpdb/patients/cohorts.html', {"form": form})
 
 
 def view_cohort(request, cohort_id):
@@ -205,9 +202,7 @@ def cohort_gene_counts_matrix(request, cohort_id, gene_count_type_id, gene_list_
 
 
 def trios(request):
-    show_group_data = UserGridConfig.get(request.user, 'Trios').show_group_data
-    context = {"show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/trios.html', context)
+    return render(request, 'snpdb/patients/trios.html')
 
 
 def view_trio(request, pk):
@@ -218,9 +213,7 @@ def view_trio(request, pk):
 
 
 def quads(request):
-    show_group_data = UserGridConfig.get(request.user, 'Quads').show_group_data
-    context = {"show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/quads.html', context)
+    return render(request, 'snpdb/patients/quads.html')
 
 
 def view_quad(request, pk):
@@ -231,9 +224,7 @@ def view_quad(request, pk):
 
 
 def duos(request):
-    show_group_data = UserGridConfig.get(request.user, 'Duos').show_group_data
-    context = {"show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/duos.html', context)
+    return render(request, 'snpdb/patients/duos.html')
 
 
 def view_duo(request, pk):
