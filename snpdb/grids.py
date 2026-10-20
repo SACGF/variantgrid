@@ -346,6 +346,7 @@ class CohortListColumns(DatatableConfig[Cohort]):
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='import_status', label='Status', orderable=True,
                        renderer=render_import_status, client_renderer='TableFormat.importStatus'),
+            RichColumn(key='genome_build__name', label='Genome Build', orderable=True),
             self.user_column(label='User'),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -362,6 +363,8 @@ class CohortListColumns(DatatableConfig[Cohort]):
         user_grid_config = UserGridConfig.get(self.user, 'Cohorts')
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
         return qs
 
 
@@ -385,6 +388,7 @@ class FamilyGroupListColumns(DatatableConfig[DC]):
             RichColumn(key='name', label='Name', orderable=True,
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='cohort__genome_build__name', label='Genome Build', orderable=True),
             self.user_column(label='User'),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -401,6 +405,8 @@ class FamilyGroupListColumns(DatatableConfig[DC]):
         user_grid_config = UserGridConfig.get(self.user, self.GRID_NAME)
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(cohort__genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
         return qs
 
 
