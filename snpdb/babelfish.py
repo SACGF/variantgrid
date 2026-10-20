@@ -5,14 +5,17 @@ symbolic one (vcf_coordinate_as_explicit). Entry points: get_genome_babelfish, b
 The HGVS converter builds its own Babelfish over the transcript data provider, with the same assembly name.
 """
 from functools import cache
+from typing import TYPE_CHECKING
 
 from cdot.hgvs.dataproviders.fasta_seqfetcher import GenomeFastaSeqFetcher
 from hgvs.extras.babelfish import Babelfish
 
-from snpdb.models.models_genome import GenomeBuild
+if TYPE_CHECKING:
+    # snpdb.models.models_variant imports this module, so importing snpdb.models here closes a cycle
+    from snpdb.models.models_genome import GenomeBuild
 
 
-def babelfish_assembly_name(genome_build: GenomeBuild) -> str:
+def babelfish_assembly_name(genome_build: 'GenomeBuild') -> str:
     # GRCh37 needs the patch name to get the MT chromosome mapping
     if genome_build.name == 'GRCh37':
         return genome_build.get_build_with_patch()
@@ -28,6 +31,6 @@ class GenomeFastaSequenceProvider(GenomeFastaSeqFetcher):
 
 
 @cache
-def get_genome_babelfish(genome_build: GenomeBuild) -> Babelfish:
+def get_genome_babelfish(genome_build: 'GenomeBuild') -> Babelfish:
     """ No symbolic_alt_min_length - callers pass the length rule they need """
     return Babelfish(GenomeFastaSequenceProvider(genome_build.reference_fasta), babelfish_assembly_name(genome_build))
