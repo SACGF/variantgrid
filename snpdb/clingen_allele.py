@@ -52,7 +52,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                                           clingen_api: ClinGenAlleleRegistryAPI = None):
     """ Ensures that we have ClinGenAllele for variants
         You don't need to, but more efficient to make variants distinct """
-    # Circular imports
+    # genes.hgvs.hgvs_matcher resolves HGVS through this module, so the g.HGVS conversion is imported here
     from genes.hgvs import HGVSMatcher
     from upload.models import ModifiedImportedVariant
 
@@ -289,7 +289,7 @@ def clingen_check_variant_length(rep: str, variant_length: int, is_dup: bool = F
 def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                            clingen_api: ClinGenAlleleRegistryAPI = None) -> VariantAllele:
     """ Call ClinGen and setup VariantAllele - use existing if provided, otherwise create """
-    # Circular import
+    # genes.hgvs.hgvs_matcher resolves HGVS through this module, so the g.HGVS conversion is imported here
     from genes.hgvs import HGVSMatcher
 
     if clingen_api is None:

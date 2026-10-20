@@ -1,4 +1,3 @@
-import logging
 import re
 from datetime import timedelta
 from functools import cached_property, lru_cache
@@ -124,64 +123,7 @@ class ClinGenAllele(TimeStampedModel):
                     return p_hgvs
         return None
 
-    def get_c_hgvs_variant(self, hgvs_converter, transcript_accession):
-        """ c.HGVS has reference bases on it """
-        from genes.models import TranscriptVersionSequenceInfo
-
-        hgvs_variant = None
-        raw_hgvs_string, t_data = self._get_raw_hgvs_and_data(transcript_accession)
-        if raw_hgvs_string:  # Has for this transcript version
-            hgvs_variant = hgvs_converter.create_hgvs_variant(raw_hgvs_string)
-            # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
-            if hgvs_variant.kind == "n":
-                if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:
-                    hgvs_variant.kind = 'c'
-
-            if not hgvs_variant.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
-                hgvs_variant.gene = t_data.get("geneSymbol")
-
-            if hgvs_variant.mutation_type in {"dup", "del", "delins"}:
-                # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
-                coord = t_data["coordinates"][0]
-                if "startIntronOffset" in coord:
-                    # We have to accept these - as we get so many but we can't add on the bases
-                    msg = "A coding DNA reference sequence does not contain intron or 5' and 3' gene "\
-                          "flanking sequences and can therefore not be used as a reference to describe " \
-                          "variants in these regions"
-                    if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
-                        raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
-                    else:
-                        logging.warning(msg)
-                elif transcript_accession.startswith("LRG_"):
-                    logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
-                                    "bases which may be wrong")
-                else:
-                    from genes.models import NoTranscript
-
-                    try:
-                        if tvsi := TranscriptVersionSequenceInfo.get(transcript_accession):
-                            if hgvs_variant.mutation_type == "dup":
-                                ref_end = coord["end"]
-                                ref_start = ref_end - len(coord["allele"])
-                            else:
-                                ref_start = coord["start"]
-                                ref_end = coord["end"]
-                            hgvs_variant.ref_allele = tvsi.sequence[ref_start:ref_end]
-                        else:
-                            msg = f"Could not retrieve reference allele for '{transcript_accession}'"
-                            if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
-                                raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
-                            else:
-                                logging.warning(msg)
-                    except NoTranscript as e_no_transcript:
-                        if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
-                            raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
-                        else:
-                            logging.warning(e_no_transcript)
-
-        return hgvs_variant
-
-    def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> tuple[Optional[str],
+    def get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> tuple[Optional[str],
                                                                                         Optional[dict]]:
         if ta := self._get_transcript_allele(transcript_accession, match_version):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
@@ -231,6 +173,7 @@ class ClinGenAllele(TimeStampedModel):
     def get_variant_coordinate(self, genome_build: GenomeBuild, hgvs_matcher=None) -> 'VariantCoordinate':
         """ Optionally pass in hgvs_matcher to save re-instantiating it all the time
             (each one opens genome FASTA file handles) """
+        # genes.hgvs imports snpdb.models, so the g.HGVS conversion is imported here
         from genes.hgvs import get_hgvs_variant_coordinate
         g_hgvs = self.get_g_hgvs(genome_build)
         if hgvs_matcher:
