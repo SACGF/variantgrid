@@ -268,9 +268,9 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
         if not self._source_object:
-            foreign_sets = [rel.get_accessor_name() for rel in self._meta.related_objects if rel.related_model is not Flag]
-            for foreign_set in foreign_sets:
-                source_object = getattr(self, foreign_set).first()
+            accessor_names = [rel.get_accessor_name() for rel in self._meta.related_objects if rel.related_model is not Flag]
+            for accessor_name in accessor_names:
+                source_object = getattr(self, accessor_name).first()
                 if source_object:
                     self._source_object = source_object
                     break
