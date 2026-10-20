@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from functools import cached_property
 from typing import Optional
 
+from django.db import transaction
 from django.db.models import Q
 from django.db.models.functions import Upper
 
@@ -99,6 +100,33 @@ class GeneSymbolMatcher:
             self._match_unmatched_symbols_in_releases(gene_symbol_ids)
 
         return gene_list_gene_symbols
+
+    def set_gene_list_gene_symbols_from_text(self, gene_list, gene_text, modification_info=None) -> tuple[list[str], list[str]]:
+        """ Makes gene_list contain the names in gene_text, leaving rows that are still named untouched.
+            A row is kept if the text has its original name or its resolved symbol (an alias row shows as
+            its symbol in the text box). Returns (added_names, removed_names) """
+        tokens = tokenize_gene_symbols(gene_text)
+        names = tokens.valid
+
+        kept_names = set()
+        removed = {}
+        for glgs in gene_list.genelistgenesymbol_set.all():
+            row_names = {n.upper() for n in (glgs.original_name, glgs.gene_symbol_id) if n}
+            if row_names & names:
+                kept_names.update(row_names)
+            else:
+                removed[glgs.pk] = glgs.original_name or glgs.gene_symbol_id
+
+        added = sorted(names - kept_names)
+        with transaction.atomic():
+            if removed:
+                gene_list.genelistgenesymbol_set.filter(pk__in=removed).delete()
+            if added or tokens.oversized:
+                self.create_gene_list_gene_symbols(gene_list, added, modification_info=modification_info,
+                                                   oversized_skipped=tokens.oversized)
+            elif removed:
+                gene_list.set_modified_to_now()
+        return added, sorted(removed.values())
 
 
 class ReleaseGeneMatcher:

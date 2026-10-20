@@ -46,6 +46,24 @@ class TestGeneSymbolMatcherGeneList(TestCase):
         self.assertIn("'SEPTX' is an ambiguous alias for SEPTIN2, SEPTIN6", gene_list.error_message)
 
 
+class TestSetGeneListFromText(TestCase):
+    def test_diff_keeps_alias_and_removes_unmatched(self):
+        for symbol in ["ANOS1", "RUNX1", "GATA2"]:
+            GeneSymbol.objects.create(symbol=symbol)
+        GeneSymbolAlias.objects.create(alias="KAL1", gene_symbol_id="ANOS1", source=GeneSymbolAliasSource.HGNC)
+        user = User.objects.get_or_create(username='test_user')[0]
+        gene_list = GeneList.objects.create(name="test_set_from_text", user=user)
+        matcher = GeneSymbolMatcher()
+        matcher.create_gene_list_gene_symbols(gene_list, ["KAL1", "RUNX1", "NOTAGENE"], modification_info="original")
+
+        # Text box shows the alias row as its symbol, and the unmatched row by its name
+        added, removed = matcher.set_gene_list_gene_symbols_from_text(gene_list, "anos1, GATA2", modification_info="edit")
+
+        self.assertEqual((["GATA2"], ["NOTAGENE", "RUNX1"]), (added, removed))
+        rows = dict(gene_list.genelistgenesymbol_set.values_list("original_name", "modification_info"))
+        self.assertEqual({"KAL1": "original", "GATA2": "edit"}, rows)
+
+
 class TestOversizedTokens(TestCase):
     def test_tokenize_splits_oversized(self):
         oversized = "X" * (MAX_GENE_SYMBOL_LENGTH + 50)
