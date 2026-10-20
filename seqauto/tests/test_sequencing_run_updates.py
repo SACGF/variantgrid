@@ -1,10 +1,14 @@
 """Sequencing run and sample sheet maintenance: re-posting a sheet, the run-created signal, the 20x gene coverage
 count and the superuser-only run actions (SACGF/variantgrid_private#3913)."""
 from django.contrib.auth.models import User
+from django.contrib.messages import get_messages
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from eventlog.models import ApiRequestLog
 from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection, GeneSymbol
 from seqauto.models import (
     QC,
@@ -13,15 +17,19 @@ from seqauto.models import (
     EnrichmentKit,
     Experiment,
     QCGeneCoverage,
+    SampleFromSequencingSample,
     SampleSheet,
     SequencingSample,
     SingleSampleVCF,
     VariantCaller,
     get_20x_gene_coverage,
 )
-from seqauto.signals.signals_list import sequencing_run_created_signal
+from seqauto.signals.signals_list import (
+    sequencing_run_created_signal,
+    sequencing_run_current_sample_sheet_changed_signal,
+)
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import DataState, GenomeBuild
+from snpdb.models import VCF, DataState, GenomeBuild, Sample
 
 SAMPLE_NAMES = ["sample_a", "sample_b"]
 
@@ -161,7 +169,7 @@ class Gene20xCoverageCountTest(APITestCase):
 
 
 class SequencingRunActionPermissionTest(APITestCase):
-    """ Relinking a run's data and reloading its experiment name are superuser actions """
+    """ Reloading a run's experiment name is a superuser action """
 
     @classmethod
     def setUpTestData(cls):
@@ -172,6 +180,84 @@ class SequencingRunActionPermissionTest(APITestCase):
 
     def test_non_superuser_gets_403(self):
         self.client.force_login(self.user)
-        for url_name in ("assign_data_to_current_sample_sheet", "reload_experiment_name"):
-            url = reverse(url_name, kwargs={"sequencing_run_id": self.sequencing_run.pk})
-            self.assertEqual(self.client.post(url).status_code, 403, url_name)
+        url = reverse("reload_experiment_name", kwargs={"sequencing_run_id": self.sequencing_run.pk})
+        self.assertEqual(self.client.post(url).status_code, 403)
+
+
+@override_settings(INTEGRATION_API_TRACKING={"/seqauto/api/v1/": "Sequencing pipeline API"})
+class ResentSampleSheetDataTest(APITestCase):
+    """ A re-sent sheet takes the run's data with it, and receivers of the changed signal are told after the
+        move - or, for the same sheet re-posted with new data, at all - so patients can be re-matched (#2349) """
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="resent_sheet_user")
+        self.client.force_authenticate(user=self.user)
+        self.sequencing_run = make_sequencing_run("RESENT_SHEET_RUN")
+        self.sample_sheet, sequencing_samples = make_sample_sheet(self.sequencing_run, SAMPLE_NAMES)
+        self.enrichment_kit = EnrichmentKit.objects.create(name="resent_sheet_kit")
+        aligner = Aligner.objects.get_or_create(name="bwa", version="0.7")[0]
+        self.alignment_file = AlignmentFile.objects.create(path="/data/RESENT_SHEET_RUN/sample_a.bam",
+                                                           name="sample_a.bam", sequencing_run=self.sequencing_run,
+                                                           sequencing_sample=sequencing_samples[0], aligner=aligner)
+        vcf = VCF.objects.create(name="sample_a.vcf", date=timezone.now(), user=self.user, genotype_samples=1)
+        sample = Sample.objects.create(vcf=vcf, name="sample_a", vcf_sample_name="sample_a")
+        self.sample_link = SampleFromSequencingSample.objects.create(sample=sample,
+                                                                     sequencing_sample=sequencing_samples[0])
+        self.signals = []  # (meaningfully_changed, sequencing samples linked to a Sample at the time)
+        sequencing_run_current_sample_sheet_changed_signal.connect(self._receiver)
+        self.addCleanup(sequencing_run_current_sample_sheet_changed_signal.disconnect, self._receiver)
+
+    def _receiver(self, sender, sequencing_run, meaningfully_changed, **kwargs):  # pylint: disable=unused-argument
+        current_sample_sheet = sequencing_run.get_current_sample_sheet()
+        linked = current_sample_sheet.sequencingsample_set.filter(samplefromsequencingsample__isnull=False)
+        self.signals.append((meaningfully_changed, sorted(linked.values_list("sample_name", flat=True))))
+
+    def _post_sheet(self, sample_sheet, sample_names, sequencing_sample_data=None) -> ApiRequestLog:
+        payload = _sheet_payload(self.sequencing_run, sample_sheet, sample_names, self.enrichment_kit)
+        if sequencing_sample_data:
+            payload["sequencingsample_set"][0]["sequencingsampledata_set"] = sequencing_sample_data
+        response = self.client.post(reverse("api_sample_sheet-list"), payload, format="json")
+        self.assertEqual(response.status_code, 201, response.content)
+        return ApiRequestLog.objects.order_by("pk").last()
+
+    def test_resent_sheet_moves_data_then_signals(self):
+        new_sheet = SampleSheet(path="/data/RESENT_SHEET_RUN/HASH2.csv", hash="HASH2")
+        api_log = self._post_sheet(new_sheet, ["sample_a", "sample_c"])
+
+        new_sample_a = SequencingSample.objects.get(sample_sheet__hash="HASH2", sample_name="sample_a")
+        self.alignment_file.refresh_from_db()
+        self.sample_link.refresh_from_db()
+        self.assertEqual(new_sample_a, self.alignment_file.sequencing_sample)
+        self.assertEqual(new_sample_a, self.sample_link.sequencing_sample)
+        self.assertEqual([(True, ["sample_a"])], self.signals)
+
+        self.assertTrue(api_log.notes[0].startswith("Current sample sheet changed HASH1 -> HASH2: "), api_log.notes)
+        self.assertIn("Not on the new sheet, their data stays on HASH1: sample_b", api_log.notes)
+        self.assertIn("Moved onto sample sheet HASH2: 1 alignment files, 1 sample links", api_log.notes)
+
+    def test_same_sheet_reposted_with_new_data_signals(self):
+        self._post_sheet(self.sample_sheet, SAMPLE_NAMES)
+        self.signals.clear()  # the first post fills in the kit
+
+        sap_order_number = [{"column": "SAPOrderNumber", "value": "SAP1"}]
+        api_log = self._post_sheet(self.sample_sheet, SAMPLE_NAMES, sap_order_number)
+        self.assertEqual([(False, ["sample_a"])], self.signals)
+        self.assertEqual(["Sample sheet data changed, patient matching re-run"], api_log.notes)
+
+        api_log = self._post_sheet(self.sample_sheet, SAMPLE_NAMES, sap_order_number)
+        self.assertEqual(1, len(self.signals))
+        self.assertEqual([], api_log.notes)
+
+    def test_run_page_shows_recent_note_to_superuser_only(self):
+        self._post_sheet(SampleSheet(path="/data/RESENT_SHEET_RUN/HASH2.csv", hash="HASH2"), SAMPLE_NAMES)
+        run_url = reverse("view_sequencing_run", kwargs={"sequencing_run_id": self.sequencing_run.pk})
+        api_log_url = reverse("view_sequencing_run_tab", kwargs={"sequencing_run_id": self.sequencing_run.pk,
+                                                                 "tab": "api-log"})
+        self.client.force_login(self.user)
+        message, = get_messages(self.client.get(run_url).wsgi_request)
+        self.assertIn("Current sample sheet changed HASH1 -&gt; HASH2", message.message)
+        self.assertIn(api_log_url, message.message)
+
+        plain_user_client = self.client_class()  # the superuser's unread message stays in their cookie
+        plain_user_client.force_login(User.objects.create_user(username="resent_sheet_plain_user"))
+        self.assertEqual([], list(get_messages(plain_user_client.get(run_url).wsgi_request)))

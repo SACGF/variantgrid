@@ -238,6 +238,7 @@ class IntegrationApiMiddleware:
             object_pks=sorted(getattr(request, "api_log_object_pks", ())),
             changes=collector.as_dict(),
             num_changes=collector.num_changes,
+            notes=collector.notes,
         )
 
 

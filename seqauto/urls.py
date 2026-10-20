@@ -98,7 +98,6 @@ urlpatterns = [
     path('view_tso500_pair/<str:sequencing_run_name>/<str:pair_id>', views.view_tso500_pair, name='view_tso500_pair'),
     path('sequencing_run/reload_experiment_name/<sequencing_run_id>', views.reload_experiment_name, name='reload_experiment_name'),
     path('sequencing_run/delete/<sequencing_run_id>', views.delete_sequencing_run, name='delete_sequencing_run'),
-    path('sequencing_run/assign_data_to_current_sample_sheet/<sequencing_run_id>', views.assign_data_to_current_sample_sheet, name='assign_data_to_current_sample_sheet'),
 
     path('view_unaligned_reads/<int:unaligned_reads_id>', views.view_unaligned_reads, name='view_unaligned_reads'),
     path('view_alignment_file/<int:alignment_file_id>', views.view_alignment_file, name='view_alignment_file'),

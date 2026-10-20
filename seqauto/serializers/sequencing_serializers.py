@@ -24,12 +24,14 @@ from seqauto.models import (
     Sequencer,
     SequencerModel,
     SequencingRun,
+    SequencingRunCurrentSampleSheet,
     SequencingSample,
     SequencingSampleData,
     SingleSampleVCF,
     UnalignedReads,
     VariantCaller,
 )
+from seqauto.sequencing_files.sample_sheet import current_sample_sheet_data_changed
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from seqauto.signals.signals_list import sequencing_run_created_signal
 from snpdb.models import Manufacturer
@@ -331,7 +333,9 @@ class SampleSheetSerializer(serializers.ModelSerializer):
         fields = ("path", "sequencing_run", "file_last_modified", "hash", "sequencingsample_set")
 
     @staticmethod
-    def _create_sequencing_samples(sample_sheet, sequencing_samples_data):
+    def _create_sequencing_samples(sample_sheet, sequencing_samples_data) -> bool:
+        """ Returns whether any SequencingSample or SequencingSampleData row was created or updated """
+        changed = False
         for sample_data in sequencing_samples_data:
             if not sample_data.get("sample_name"):
                 sample_data["sample_name"] = sample_data["sample_id"]
@@ -341,16 +345,19 @@ class SampleSheetSerializer(serializers.ModelSerializer):
                 enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
                 sample_data["enrichment_kit"] = enrichment_kit
             sample_id = sample_data.pop("sample_id")
-            sequencing_sample, _ = update_or_create_if_changed(SequencingSample,
-                                                               sample_sheet=sample_sheet,
-                                                               sample_id=sample_id,
-                                                               defaults=sample_data)
+            sequencing_sample, outcome = update_or_create_if_changed(SequencingSample,
+                                                                     sample_sheet=sample_sheet,
+                                                                     sample_id=sample_id,
+                                                                     defaults=sample_data)
+            changed |= outcome != WriteOutcome.UNCHANGED
             for data in ss_data:
                 column = data.pop("column")
-                update_or_create_if_changed(SequencingSampleData,
-                                            sequencing_sample=sequencing_sample,
-                                            column=column,
-                                            defaults=data)
+                _, outcome = update_or_create_if_changed(SequencingSampleData,
+                                                         sequencing_sample=sequencing_sample,
+                                                         column=column,
+                                                         defaults=data)
+                changed |= outcome != WriteOutcome.UNCHANGED
+        return changed
 
     def create(self, validated_data):
         sequencing_samples_data = validated_data.pop('sequencingsample_set')
@@ -364,11 +371,13 @@ class SampleSheetSerializer(serializers.ModelSerializer):
             hash=validated_data["hash"],
             defaults=validated_data,
         )
-        self._create_sequencing_samples(sample_sheet, sequencing_samples_data)
+        rows_changed = self._create_sequencing_samples(sample_sheet, sequencing_samples_data)
         if previous_sheet and previous_sheet != sample_sheet:
             carry_extractions_to_new_sample_sheet(previous_sheet, sample_sheet)
         # Whatever is last sent via API is the current sample sheet
         sample_sheet.set_as_current_sample_sheet(sequencing_run, outcome == WriteOutcome.CREATED)
+        if rows_changed and previous_sheet == sample_sheet:
+            current_sample_sheet_data_changed(sequencing_run)
         return sample_sheet
 
     def update(self, instance, validated_data):
@@ -376,7 +385,9 @@ class SampleSheetSerializer(serializers.ModelSerializer):
             A sample_id no longer in the sheet stays as it is """
         sequencing_samples_data = validated_data.pop('sequencingsample_set')
         instance = super().update(instance, validated_data)
-        self._create_sequencing_samples(instance, sequencing_samples_data)
+        rows_changed = self._create_sequencing_samples(instance, sequencing_samples_data)
+        if rows_changed and SequencingRunCurrentSampleSheet.objects.filter(sample_sheet=instance).exists():
+            current_sample_sheet_data_changed(instance.sequencing_run)
         return instance
 
 
