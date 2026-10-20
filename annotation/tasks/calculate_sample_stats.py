@@ -48,7 +48,7 @@ SAMPLE_STATS_CODE_VERSION = 5
 
 @celery.shared_task
 def calculate_vcf_stats(vcf_id, annotation_version_id):
-    vcf = VCF.objects.get(pk=vcf_id)
+    vcf: VCF = VCF.objects.get(pk=vcf_id)
     try:
         annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
         msg = f"Build for annotation: {annotation_version.genome_build} and VCF: {vcf.genome_build} match"
