@@ -558,8 +558,10 @@ class DamageNode(AnalysisNode):
         return q
 
     @property
-    def num_prediction_fields(self) -> int:
+    def num_prediction_fields(self) -> Optional[int]:
         vav = self.analysis.annotation_version.variant_annotation_version
+        if vav is None:
+            return None
         if vav.columns_version >= 4:
             return len(vav.get_raw_score_pathogenic_prediction_funcs())
         return len(vav.get_rankscore_pathogenic_prediction_funcs())
@@ -576,7 +578,10 @@ class DamageNode(AnalysisNode):
         name = ''
         if self.modifies_parents():
             if self.damage_predictions_min:
-                name = f"{self.damage_predictions_min} of {self.num_prediction_fields}"
+                if (num_prediction_fields := self.num_prediction_fields) is None:
+                    name = f"{self.damage_predictions_min} damage predictions"
+                else:
+                    name = f"{self.damage_predictions_min} of {num_prediction_fields}"
         return name
 
     @staticmethod
