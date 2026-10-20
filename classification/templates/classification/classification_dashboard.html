@@ -116,8 +116,9 @@
             <p>Below are the overlaps where your lab has a triage pending.</p>
         {% end_page_help_embedded %}
         <p>Showing overlaps requiring triage raised in the last 14 days.<br/>
-            You have {{ overlap_counts_waiting_triage | format_value }} outstanding overlap{% plural overlap_counts_waiting_triage %} requiring triage, ({{ overlap_counts_others_triaged | format_value }} of which {% plural overlap_counts_others_triaged singular="has" plural="have" %} been triaged by other labs)
-        - <a href="{% url 'overlaps' %}" class="hover-link">Click here</a> to see all overlaps.</p>
+            You have {{ overlap_counts_waiting_triage | format_value }} outstanding overlap{% plural overlap_counts_waiting_triage %} requiring triage ({{ overlap_counts_others_triaged | format_value }} of which {% plural overlap_counts_others_triaged singular="has" plural="have" %} been triaged by other labs).
+            <a href="{% url 'overlaps' %}" class="hover-link">Click here</a> to see all overlaps.
+        </p>
 
         <script>
         function overlapsGroupingFilter(data) {
