@@ -268,9 +268,9 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
         if not self._source_object:
-            foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('flag')]
-            for foreign_set in foreign_sets:
-                source_object = getattr(self, foreign_set).first()
+            accessor_names = [rel.get_accessor_name() for rel in self._meta.related_objects if rel.related_model is not Flag]
+            for accessor_name in accessor_names:
+                source_object = getattr(self, accessor_name).first()
                 if source_object:
                     self._source_object = source_object
                     break
@@ -303,7 +303,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             qs = Flag.objects.filter(collection=self)
         else:
             permission_level = self.permission_level(user)
-            if not permission_level:
+            if permission_level == FlagPermissionLevel.NO_PERM:
                 return Flag.objects.none()
             qs = Flag.objects.filter(collection=self)
             if permission_level == FlagPermissionLevel.USERS:
@@ -512,7 +512,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             if flag_type.context_id != self.context_id:
                 raise PermissionError("Flag type not available in this context")
             current_level = self.permission_level(user)
-            required_level = flag_type.raise_permission
+            required_level = flag_type.raise_permission_enum
             if current_level < required_level:
                 raise PermissionError("Insufficient permissions to raise this flag type")
 
