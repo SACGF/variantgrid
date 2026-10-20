@@ -5,6 +5,8 @@ from typing import Any, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -119,7 +121,8 @@ class FlagHelper:
             user=self.user,
             comment=comment,
             user_private=user_private,
-            resolution=resolution
+            resolution=resolution,
+            permission_check=True
         )
         self.include_flag(flag)
         self.created_flag_id = flag.id
@@ -348,6 +351,19 @@ class FlagHelper:
         return json_data
 
 
+def viewable_flag_collections(flag_collections: Iterable[FlagCollection], user: User) -> list[FlagCollection]:
+    """ The collections whose source object gives user at least USERS permission """
+    flag_collections = list(flag_collections)
+    # sets each collection's source_object in one query per owning model, rather than probing them one by one
+    fetch_flag_infos(flag_collections=flag_collections, flags=[], user=user)
+    return [fc for fc in flag_collections if fc.permission_level(user) != FlagPermissionLevel.NO_PERM]
+
+
+def check_can_view_flag_collection(flag_collection: FlagCollection, user: User):
+    if not viewable_flag_collections([flag_collection], user):
+        raise PermissionDenied()
+
+
 class FlagsView(APIView):
     """API for one or more FlagCollections: retrieve flags/comments and raise flags."""
 
@@ -359,8 +375,8 @@ class FlagsView(APIView):
     )
     def get(self, request, **kwargs) -> Response:
         pks = kwargs.get('flag_collection_id').split(',')
-        fcs = FlagCollection.objects.filter(pk__in=pks)
-        fcs = fcs.select_related("context")
+        fcs = FlagCollection.objects.filter(pk__in=pks).select_related("context")
+        fcs = viewable_flag_collections(fcs, request.user)
 
         flag_helper = FlagHelper(flag_collections=fcs, user=request.user)
 
@@ -375,6 +391,8 @@ class FlagsView(APIView):
                 history = int(history)
             except (ValueError, TypeError):
                 return Response({'error': 'Invalid history parameter'}, status=400)
+            if history not in {fc.pk for fc in fcs}:
+                raise PermissionDenied()
             flag_helper.include_history(history)
 
         if since:
@@ -403,7 +421,8 @@ class FlagsView(APIView):
     )
     def post(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_collection_id')
-        fc = FlagCollection.objects.get(pk=pk)
+        fc = get_object_or_404(FlagCollection, pk=pk)
+        check_can_view_flag_collection(fc, request.user)
 
         flag_helper = FlagHelper(flag_collections=fc, user=request.user)
 
@@ -411,6 +430,8 @@ class FlagsView(APIView):
             flag_helper.add_flag(data=request.data)
         except ValueError:
             return Response({'error': 'Invalid flag data'}, status=status.HTTP_400_BAD_REQUEST)
+        except PermissionError as pe:
+            raise PermissionDenied() from pe
 
         return Response(flag_helper.to_json())
 
@@ -424,8 +445,8 @@ class FlagView(APIView):
     )
     def get(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_id')
-        f = Flag.objects.get(pk=pk)
-        # TODO - add comments
+        f = get_object_or_404(Flag, pk=pk)
+        check_can_view_flag_collection(f.collection, request.user)
         flag_helper = FlagHelper(flag_collections=f.collection, user=request.user)
         flag_helper.include_flag(f, include_comments=True)
         flag_helper.include_user(request.user)
@@ -438,7 +459,8 @@ class FlagView(APIView):
     )
     def post(self, request, **kwargs) -> Response:
         pk = kwargs.get('flag_id')
-        f = Flag.objects.get(pk=pk)  # type: Flag
+        f: Flag = get_object_or_404(Flag, pk=pk)
+        check_can_view_flag_collection(f.collection, request.user)
         data = request.data
         resolution = data.get('resolution', None)
         try:
@@ -447,10 +469,13 @@ class FlagView(APIView):
         except FlagResolution.DoesNotExist:
             return Response({'error': 'Invalid resolution'}, status=400)
 
-        f.flag_action(
-            user=request.user,
-            resolution=resolution,
-            comment=empty_to_none(data.get('comment')))
+        try:
+            f.flag_action(
+                user=request.user,
+                resolution=resolution,
+                comment=empty_to_none(data.get('comment')))
+        except PermissionError as pe:
+            raise PermissionDenied() from pe
 
         flag_helper = FlagHelper(flag_collections=f.collection, user=request.user)
         flag_helper.include_flag(f, include_comments=True)

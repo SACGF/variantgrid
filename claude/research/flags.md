@@ -93,12 +93,10 @@ owner so the app has no dependency on classification or snpdb; the signal is the
 
 ## Traps
 
-**The REST API trusts the browser for permissions (confirmed, not fixed).** `flags/views/views.py:FlagHelper.add_flag`
-calls `FlagCollection.add_flag` without `permission_check`, whose default is False, so `FlagsView` POST lets any
-logged-in user raise any flag type - SYSTEM-only ones included, even from another context - on any collection id;
-`raisableFlags()` in `flags.js` is the only gate. `FlagsView` GET and `?history=` likewise return non-private flags
-and comments of any collection to a user whose level is NO_PERM, and `Flag.flag_action` lets a NO_PERM user comment
-on a flag (including a private one: its private check only looks at USERS).
+**The REST views enforce permissions; `flags.js` only hides buttons.** `FlagsView` GET keeps only the collections the
+viewer is above NO_PERM on (`flags/views/views.py:viewable_flag_collections`) and `?history=` must be one of them;
+`FlagsView` POST raises with `permission_check=True`, and `FlagView` answers 403 to a NO_PERM viewer. Any new path that
+reaches a collection by id needs the same check, since `raisableFlags()` in `flags.js` is presentation only.
 
 **Compare `FlagPermissionLevel`s as enums, never as raw strings or truthiness.** `FlagPermissionLevel.__lt__` reads
 `other.level`, so comparing against the stored `raise_permission` / `permission` str raises AttributeError - use

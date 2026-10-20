@@ -1,4 +1,4 @@
-"""FlagsView / FlagView input validation: bad parameters answer 400, and other users' labs stay hidden."""
+"""FlagsView / FlagView: bad parameters answer 400, other users' labs stay hidden, and collection permissions apply."""
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -6,6 +6,7 @@ from django.urls import reverse
 from flags.models import FlagCollection
 from flags.models.enums import FlagStatus
 from flags.models.models import Flag, FlagResolution, FlagType, FlagTypeContext, FlagTypeResolution
+from snpdb.models.models_variant import Allele
 
 
 class FlagsApiTest(TestCase):
@@ -53,3 +54,29 @@ class FlagsApiTest(TestCase):
         users = {u["id"]: u for u in self.client.get(self.url).json()["users"]}
         self.assertIn("lab", users[self.user.pk])
         self.assertNotIn("lab", users[self.other.pk])
+
+    def test_no_perm_user(self):
+        """ The collection has no source object, so a non-superuser has NO_PERM on it """
+        self._post(self.url, {"flag_type": self.flag_type.pk})
+        flag_url = reverse("flag_api", kwargs={"flag_id": Flag.objects.get(collection=self.fc).pk})
+        self.client.force_login(self.other)
+
+        data = self.client.get(self.url).json()
+        self.assertEqual(data["collections"], [])
+        self.assertEqual(data["flags"], [])
+        self.assertEqual(self.client.get(self.url, {"history": self.fc.pk}).status_code, 403)
+        self.assertEqual(self._post(self.url, {"flag_type": self.flag_type.pk}).status_code, 403)
+        self.assertEqual(self.client.get(flag_url).status_code, 403)
+        self.assertEqual(self._post(flag_url, {"comment": "hello"}).status_code, 403)
+        self.assertEqual(Flag.objects.filter(collection=self.fc).count(), 1)
+
+    def test_raise_permission(self):
+        """ Allele collections give every user USERS, which can't raise an ADMIN-only flag type """
+        allele_fc = Allele.objects.create().flag_collection_safe
+        url = reverse("flags_api", kwargs={"flag_collection_id": allele_fc.pk})
+        admin_type = FlagType.objects.create(id="flag_api_test_admin", context_id="allele", label="Admin",
+                                             description="Admin", raise_permission="X", permission="X")
+        self.client.force_login(self.other)
+        self.assertEqual(self._post(url, {"flag_type": self.flag_type.pk}).status_code, 200)
+        self.assertEqual(self._post(url, {"flag_type": admin_type.pk}).status_code, 403)
+        self.assertEqual(self.client.get(url, {"history": self.fc.pk}).status_code, 403)
