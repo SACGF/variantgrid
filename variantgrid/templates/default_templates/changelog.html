@@ -18,7 +18,7 @@
 
     {% if sapath_enabled %}
         <!-- Do all as 1 big change -->
-        <!-- Last audited/updated: 16 October 2026 (includes features up to 16 October 2026) -->
+        <!-- Last audited/updated: 19 October 2026 (includes features up to 19 October 2026) -->
 
         <div class="card mt-4">
             <div class="card-header">VariantGrid 4.0 - FAQ</div>
@@ -105,6 +105,7 @@
                     <li>Node warnings - a badge on the node card, eg out of date PanelApp panels, or new variants / classifications since the analysis was saved</li>
                     <li>Copying nodes keeps their parent connections, so the copy keeps the original's counts</li>
                     <li>Karyomapping moved onto the trio page - per-chromosome phase QC graph, per-gene graph and CSV</li>
+                    <li>An analysis whose owner has left (deactivated) can be taken over in Analysis Settings</li>
                 </ul>
 
                 <h4>Annotation</h4>
@@ -358,7 +359,7 @@
 
     {% else %}
        <div class="card mt-4">
-            <div class="card-header">16 October 2026</div>
+            <div class="card-header">19 October 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
                 <ul>
@@ -376,6 +377,9 @@
                     <li>#1894 - Faster patient / specimen level SampleNode filters</li>
                     <li>#2120 - Intersection node with a BED file missing from disk shows an error naming the file</li>
                     <li>#1754 - Karyomapping moved onto the trio page - per-chromosome phase QC graph, per-gene graph and CSV</li>
+                    <li>#2325 - Take ownership of an analysis whose owner has been deactivated (Analysis Settings)</li>
+                    <li>#2209 - Cohort node CSV exports separate Het / Hom / Ref count columns</li>
+                    <li>#2311 - Cohort counts recalculate after a sample is deleted from the cohort or VCF</li>
                 </ul>
                 <h4>Classification</h4>
                 <ul>
@@ -444,6 +448,7 @@
                     <li>#2125 - Phenotype matching doesn't fuzzy-match correctly spelled words (table -&gt; "Stable"), handles British spelling</li>
                     <li>#2131 - Phenotype matches redone when the matcher or ontology updates, keeping links and approvals</li>
                     <li>PED import validates every family and reports all the invalid ones</li>
+                    <li>#2336 - PED file page draws a pedigree chart for every family, not only single family files</li>
                     <li>#1870 - Patient CSV - extraction reference, nucleic acid source and date columns, one row per extraction (eg DNA and RNA from one specimen)</li>
                 </ul>
                 <h4>Search</h4>
@@ -473,6 +478,7 @@
                     <li>Annotation run page explains its Retry / Subdivide / Make Local buttons</li>
                     <li>Nearby variants only count tags you can see</li>
                     <li>#2137 - Nearby variants tab no longer hangs on some variants</li>
+                    <li>#2341 - CSV download of grids with many columns no longer fails</li>
                 </ul>
             </div>
        </div>
