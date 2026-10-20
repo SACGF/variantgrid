@@ -78,7 +78,7 @@ class AbstractZygosityCountNode(Model):
 
     def _get_zygosity_count_description(self) -> str:
         name = []
-        for label, _, _, min_count, max_count in self._effective_count_bounds():
+        for label, _, min_count, max_count in self._effective_count_limits():
             if min_count is not None and max_count is not None:
                 name.append(f"{min_count} <= {label} <= {max_count}")
             elif min_count is not None:
