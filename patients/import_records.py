@@ -45,6 +45,8 @@ from patients.tasks.extraction_matching_tasks import reconcile_pending_extractio
 from snpdb.models import Sample
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
+LEGACY_COLUMNS = {'Specimen Nucleic acid source (DNA/RNA)': PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE}
+OPTIONAL_COLUMNS = [PatientColumns.EXTRACTION_REFERENCE_ID, PatientColumns.EXTRACTION_DATE]
 
 
 class InvalidPatientRecord(ValueError):
@@ -535,8 +537,14 @@ def pandas_read_encoded_csv(*args, **kwargs):
 
 
 def get_patient_record_imports_dataframe(f):
+    """ A file written before #1870 (one extraction per specimen) has the nucleic acid column under its old
+        Specimen name and no extraction reference / date - blank ones match the sample's extraction as before """
     df = pandas_read_encoded_csv(f, index_col=None, dtype=str)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.rename(columns=LEGACY_COLUMNS)
+    for column in OPTIONAL_COLUMNS:
+        if column not in df.columns:
+            df[column] = None
     return df_nan_to_none(df)
 
 
