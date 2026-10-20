@@ -85,11 +85,12 @@ def _filter_keys_q(filter_keys: list[Optional[str]]) -> Q:
     return q
 
 
-def cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: list[Optional[str]],
-                            sample_ids: list[int]) -> bool:
+def cohort_stats_are_fresh(cgc, annotation_version, code_version: SampleStatsCodeVersion,
+                           filter_keys: list[Optional[str]], sample_ids: list[int]) -> bool:
     """ True when this CGC already has an aggregate row for every filter key and a per-sample row for every
-        sample_id, in each of the four families at the current code_version and annotation versions, i.e. a
-        recompute would reproduce what is already stored. Checking every key and sample, not any row, is what
+        sample_id, in each of the four families at code_version's stats version and the annotation versions,
+        i.e. a recompute would reproduce what is already stored. Rows written by another deploy (git hash) of
+        the same SAMPLE_STATS_CODE_VERSION count as fresh (#2372). Checking every key and sample, not any row, is what
         recomputes a bucket whose key changed (trio affected flags), a sub cohort's buckets on its parent's
         CGC, and a parent left with only its sub cohort's per-sample rows by an earlier recompute (#2311) """
     version_kwargs = {
@@ -100,7 +101,8 @@ def cohort_stats_are_fresh(cgc, annotation_version, code_version, filter_keys: l
     }
     key_q = _filter_keys_q(filter_keys)
     for model, kwargs in version_kwargs.items():
-        qs = model.objects.filter(cohort_genotype_collection=cgc, code_version=code_version, **kwargs)
+        qs = model.objects.filter(cohort_genotype_collection=cgc, code_version__name=code_version.name,
+                                  code_version__version=code_version.version, **kwargs)
         stored_keys = set(qs.filter(key_q, sample__isnull=True).values_list("filter_key", flat=True).distinct())
         if stored_keys != set(filter_keys):
             return False

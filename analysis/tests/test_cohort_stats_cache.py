@@ -29,6 +29,7 @@ from annotation.tasks.calculate_sample_stats import (
 from library.utils.json_utils import canonical_filter_key
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
+    CodeVersion,
     Cohort,
     CohortGenotypeStats,
     GenomeBuild,
@@ -207,11 +208,20 @@ class TestCohortStatsRecomputeLock(TestCase):
             cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
 
     def test_cohort_stats_are_fresh_false_on_code_version_mismatch(self):
-        # Rows present but at a different code_version → a bump must force recompute.
-        other_code_version = SampleStatsCodeVersion.objects.create(
-            name="test_other", version=98)
-        self._create_fresh_stats(self.cgc, other_code_version)
+        # Rows present but from an older stats version → a bump must force recompute.
+        older_code_version = SampleStatsCodeVersion.objects.create(
+            name=self.code_version.name, version=self.code_version.version - 1)
+        self._create_fresh_stats(self.cgc, older_code_version)
         self.assertFalse(
+            cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
+
+    def test_cohort_stats_are_fresh_across_deploys(self):
+        """ Rows written by an earlier deploy of the same SAMPLE_STATS_CODE_VERSION are still fresh #2372 """
+        earlier_deploy = SampleStatsCodeVersion.objects.create(
+            name=self.code_version.name, version=self.code_version.version,
+            code_version=CodeVersion.objects.create(git_hash="earlier_deploy"))
+        self._create_fresh_stats(self.cgc, earlier_deploy)
+        self.assertTrue(
             cohort_stats_are_fresh(self.cgc, self.annotation_version, self.code_version, [None], []))
 
     def test_cohort_stats_are_fresh_false_when_partial(self):
