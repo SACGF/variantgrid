@@ -8,6 +8,7 @@ etc and things that don't fit anywhere else.
 import json
 import logging
 import os
+import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -213,6 +214,10 @@ def cgf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unuse
     if instance.filename:
         if os.path.exists(instance.filename):
             os.unlink(instance.filename)
+    # Files derived from it on request (eg the API's zip of a CSV export) sit beside it in its own dir
+    cgf_dir = os.path.join(settings.GENERATED_DIR, instance.generator, str(instance.pk))
+    if os.path.isdir(cgf_dir):
+        shutil.rmtree(cgf_dir)
 
 class Company(models.Model):
     name = models.TextField(primary_key=True)

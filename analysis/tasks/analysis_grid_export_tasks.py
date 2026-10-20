@@ -2,6 +2,7 @@ import gzip
 import json
 import logging
 import os
+import uuid
 import zipfile
 from collections import defaultdict
 from datetime import timedelta
@@ -133,9 +134,20 @@ def _get_annotated_basename(analysis, name: str) -> str:
                      str(analysis.genome_build)])
 
 
-def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, zip_csv=True, **export_kwargs):
-    """ zip_csv: whole cohort/sample exports run to millions of rows so are zipped; a node export is what the
-        user filtered the grid down to, and they open it straight away, so it stays a plain .csv """
+def get_zipped_csv_filename(cgf: CachedGeneratedFile) -> str:
+    """ The CSV export zipped beside it, built on first request. Pages serve the plain CSV via /media/ (nginx
+        gzips it on the wire), but the API's FileResponse is uncompressed, so API clients get the zip by default
+        (#2368). Written under a temp name then renamed, so a concurrent request never serves a partial zip """
+    zip_filename = cgf.filename + ".zip"
+    if not os.path.exists(zip_filename):
+        partial_filename = f"{zip_filename}.{uuid.uuid4()}.partial"
+        with zipfile.ZipFile(partial_filename, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(cgf.filename, arcname=os.path.basename(cgf.filename))
+        os.replace(partial_filename, zip_filename)
+    return zip_filename
+
+
+def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, **export_kwargs):
     total_records = node.count
     update_size = max(1000, total_records / 100)  # 1% or every 1k records
 
@@ -157,13 +169,6 @@ def _write_node_to_cached_generated_file(cgf, request, node, basename, export_ty
             for chunk in file_iterator:
                 f.write(chunk)  # Already has newline
 
-        if export_type == 'csv' and zip_csv:
-            original_filename = media_root_filename
-            zip_file_path = media_root_filename + ".zip"
-            with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-                zipf.write(original_filename, arcname=os.path.basename(original_filename))
-            os.unlink(original_filename)
-            media_root_filename = zip_file_path
         cgf.filename = media_root_filename
         cgf.task_status = "SUCCESS"
         cgf.progress = 1  # row_wrapper updated the DB directly, so our copy is still at its starting value
@@ -283,7 +288,6 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
         request.GET = grid_params
         with node_query_planner_settings():
             _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
-                                                 zip_csv=False,
                                                  canonical_transcript_collection=canonical_transcript_collection,
                                                  variant_tags_dict=variant_tags_dict)
     except Retry:

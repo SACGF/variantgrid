@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.views import APIView
 
 from analysis.models import AnalysisTemplate
@@ -17,6 +17,7 @@ from analysis.tasks.analysis_grid_export_tasks import (
     export_cohort_to_downloadable_file,
     get_export_annotation_version,
     get_grid_downloadable_file_params_hash,
+    get_zipped_csv_filename,
 )
 from library.log_utils import report_exc_info
 from snpdb.models import CachedGeneratedFile, Cohort
@@ -150,17 +151,25 @@ class APIUploadStatusView(APIView):
 class APIAnnotatedDownloadView(APIView):
     """ Download the annotated VCF/CSV for an uploaded VCF (by id or sha256 hash).
 
-        Returns 202 with progress while the export is still generating, then streams the file. """
+        Returns 202 with progress while the export is still generating, then streams the file.
+        ?compression=zip|none (CSV only, default zip): the VCF is always gzipped """
     EXPORT_TYPES = {"vcf", "csv"}
+    CSV_COMPRESSIONS = {"zip", "none"}
 
     @extend_schema(
         summary="Download the annotated VCF/CSV for an uploaded VCF (cohort-level export)",
+        parameters=[OpenApiParameter("compression", str, enum=["zip", "none"], default="zip",
+                                     description="CSV only: 'none' for a plain .csv")],
         responses=OpenApiTypes.BINARY,
     )
     def get(self, request, *args, **kwargs):
         export_type = kwargs["export_type"]
         if export_type not in self.EXPORT_TYPES:
             return JsonResponse({"error": f"export_type must be one of {sorted(self.EXPORT_TYPES)}"},
+                                status=HTTPStatus.BAD_REQUEST)
+        compression = request.GET.get("compression", "zip")
+        if compression not in self.CSV_COMPRESSIONS:
+            return JsonResponse({"error": f"compression must be one of {sorted(self.CSV_COMPRESSIONS)}"},
                                 status=HTTPStatus.BAD_REQUEST)
 
         file_upload = _get_file_upload_for_user(
@@ -200,12 +209,17 @@ class APIAnnotatedDownloadView(APIView):
             return JsonResponse({"status": "generating", "progress": cgf.progress or 0.0},
                                 status=HTTPStatus.ACCEPTED)
 
-        basename = os.path.basename(cgf.filename)
+        filename = cgf.filename
+        if export_type == "csv" and compression == "zip" and not filename.endswith(".zip"):
+            filename = get_zipped_csv_filename(cgf)
+        basename = os.path.basename(filename)
         if basename.endswith(".zip"):
             content_type = "application/zip"
         elif basename.endswith(".gz"):
             content_type = "application/gzip"
+        elif basename.endswith(".csv"):
+            content_type = "text/csv"
         else:
             content_type = "application/octet-stream"
-        return FileResponse(open(cgf.filename, "rb"), as_attachment=True, filename=basename,
+        return FileResponse(open(filename, "rb"), as_attachment=True, filename=basename,
                             content_type=content_type)
