@@ -83,7 +83,7 @@
                     {% analysis_output_node_downloads analysis %}
                 </td>
             {% endif %}
-            <td>{{ analysis.get_analysis_type_display }}
+            <td>{{ analysis.get_analysis_type_display|default_if_none:"-" }}
             <td>{{ analysis.user }}
             {% if show_sample_info %}
             <td>{{ sample_info }}
