@@ -361,6 +361,12 @@ class TestHGVS(TestCase):
         hgvs_string = "NC_000001.10:m.100000A>G"
         self.assertRaises(HGVSException, lambda: matcher.get_variant_coordinate(hgvs_string))
 
+    def test_mitochondria_hgvs_contig_not_in_build(self):
+        """ 'm.' on a contig from another build (e.g. NC_012920.1 on T2T) is left to ContigNotInBuildError
+            so search can skip it, rather than a nomenclature error (#2365) """
+        matcher = HGVSMatcher(GenomeBuild.grch37())
+        self.assertRaises(Contig.ContigNotInBuildError, lambda: matcher.get_variant_coordinate("NC_999999.1:m.100A>G"))
+
     def test_biocommons_invalid_trailing_int(self):
         return self._test_invalid_trailing_int(HGVSConverterType.BIOCOMMONS_HGVS)
 

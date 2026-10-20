@@ -496,12 +496,13 @@ class HGVSMatcher:
 
             biocommons treats the 'm' kind like 'g' (coordinates resolved against
             whichever reference the accession names), so without this an m. on a nuclear
-            contig is silently resolved as g. - see SACGF/variantgrid#1632. """
+            contig is silently resolved as g. - see SACGF/variantgrid#1632.
+            A contig not in this build is left to Contig.ContigNotInBuildError like any g. (#2365) """
         if hgvs_variant.kind != 'm':
             return
         contig_accession = hgvs_variant.contig_accession
         contig = self.genome_build.chrom_contig_mappings.get(contig_accession)
-        if contig is None or contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
+        if contig is not None and contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
             raise HGVSNomenclatureException(
                 f"'m.' (mitochondrial) HGVS requires the mitochondrial reference, "
                 f"but '{contig_accession}' is not the mitochondrion for {self.genome_build}")
