@@ -13,6 +13,7 @@ import cyvcf2
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -21,7 +22,9 @@ from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
 from snpdb.management.commands.somalier_existing_vcfs import batch_by_sample_count
 from snpdb.models import (
     VCF,
+    Cohort,
     CohortGenotype,
+    CohortSample,
     GenomeBuild,
     ImportStatus,
     ProcessingStatus,
@@ -437,6 +440,27 @@ class SomalierAncestryBatchTest(TestCase):
                              set(run.somalierancestry_set.values_list("sample_extract__sample", flat=True)))
             self.assertEqual({ancestry}, set(run.somalierancestry_set.values_list("predicted_ancestry", flat=True)))
         self.assertEqual(9, SomalierAncestry.objects.count())
+
+    def test_vcf_page_shows_only_its_own_samples_ancestry(self):
+        """ The batch's somalier report covers every VCF in it - a VCF's page must not reveal the others """
+        batch = SomalierAncestryBatch.objects.create(status=ProcessingStatus.SUCCESS)
+        runs = [SomalierAncestryRun.objects.create(vcf_extract=ve, batch=batch, status=ProcessingStatus.SUCCESS)
+                for ve in self.vcf_extracts]
+        self._copy_tsv(batch)
+        _load_ancestry_tsv(batch, runs)
+
+        vcf = self.vcf_extracts[0].vcf
+        cohort = Cohort.objects.create(name="ancestry_page", user=self.user, vcf=vcf, genome_build=vcf.genome_build,
+                                       import_status=ImportStatus.SUCCESS)
+        for i, sample in enumerate(vcf.sample_set.order_by("pk")):
+            CohortSample.objects.create(cohort=cohort, sample=sample, cohort_genotype_packed_field_index=i, sort_order=i)
+        self.client.force_login(self.user)
+        with override_settings(SOMALIER={**settings.SOMALIER, "enabled": True, "admin_only": False}):
+            response = self.client.get(reverse("view_vcf", kwargs={"vcf_id": vcf.pk}))
+        self.assertEqual(200, response.status_code)
+        ancestry_sample_ids = {a.sample_extract.sample_id for a in response.context["somalier_ancestries"]}
+        self.assertEqual({s.pk for s in vcf.sample_set.all()}, ancestry_sample_ids)
+        self.assertNotContains(response, str(batch.uuid))
 
     def test_too_few_sites_skipped_while_neighbour_runs(self):
         too_few, runs_ok = self.vcf_extracts[:2]

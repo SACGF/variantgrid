@@ -29,6 +29,7 @@ from snpdb.models import (
     SomalierVCFExtract,
     Trio,
 )
+from snpdb.models.models_somalier import SomalierAncestry
 
 FAMILY_GROUP_MODELS = (Trio, Duo, Quad)
 
@@ -179,6 +180,10 @@ def vcf_cohort_page_context(user, cohort: Cohort, has_write_permission: bool, vc
         if settings.SOMALIER.get("enabled"):
             if vcf_extract := SomalierVCFExtract.objects.filter(vcf=vcf).first():
                 context["somalier_stages"] = vcf_extract.get_stages()
+                # This VCF's own rows - the batch's somalier report also covers the other VCFs run alongside it
+                context["somalier_ancestries"] = SomalierAncestry.objects.filter(
+                    sample_extract__vcf_extract=vcf_extract).select_related("sample_extract__sample") \
+                    .order_by("sample_extract__sample__pk")
     else:
         context["page_title"] = "Cohort"
         membership_context, candidate_samples = _membership_editor_context(cohort, cohort_samples,
