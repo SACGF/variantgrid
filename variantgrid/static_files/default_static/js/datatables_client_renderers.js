@@ -234,23 +234,32 @@ $(document).on('click', '.sequencing-run-vcfs-toggle', function(e) {
 });
 
 
-// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter
+// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter.
+// The variant is named the way the variant grid's Variant cell names it - the data carries the same keys
 function renderVariantTagVariant(data, type, row) {
     if (!data || !data.variant_string) {
         return '';
     }
     const dom = $('<div>');
+    const label = VariantGridFormat.representativeVariantLabel(data.variant_id, data);
+    const labelAttrs = {class: 'rv-label', title: label.title, html: label.html};
     if (data.url) {
-        $('<a>', {href: data.url, target: '_blank', text: data.variant_string}).appendTo(dom);
+        $('<a>', {...labelAttrs, href: data.url, target: '_blank'}).appendTo(dom);
     } else {
-        $('<span>', {text: data.variant_string}).appendTo(dom);
+        $('<span>', labelAttrs).appendTo(dom);
+    }
+    const badge = VariantGridFormat.variantKindBadge(data["alt__seq"], data["svlen"],
+                                                     data["locus__contig__name"], data["locus__position"]);
+    if (badge) {
+        dom.append(' ').append(badge);
     }
     if (data.classify_url) {
         $('<a>', {
             href: data.classify_url,
             target: '_blank',
-            class: 'btn btn-primary btn-sm new-classification-button',
-            text: 'New Classification'
+            class: 'btn btn-outline-primary new-classification-button',
+            title: 'New Classification',
+            html: '<i class="fas fa-plus-circle"></i> Classify'
         }).appendTo(dom);
     }
     return dom.prop('outerHTML');

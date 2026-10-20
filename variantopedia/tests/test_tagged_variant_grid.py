@@ -144,6 +144,9 @@ class TaggedVariantGridTest(TestCase):
         self.assertEqual(row["tag"], {"tag": self.reportable.pk, "variant_id": self.both_variant.pk})
         self.assertEqual(row["variant_string"]["url"],
                          reverse("view_variant", kwargs={"variant_id": self.both_variant.pk}))
+        # Keyed the way VariantGridFormat.representativeVariantLabel reads them
+        self.assertEqual(row["variant_string"]["locus__position"], self.both_variant.locus.position)
+        self.assertEqual(row["variant_string"]["alt__seq"], self.both_variant.alt.seq)
         self.assertTrue(row["delete"], "Tag owner can delete their own tag")
 
     def _classify_button_row(self, tag: Tag) -> dict:
