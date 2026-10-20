@@ -25,6 +25,7 @@ from genes.hgvs import (
     HGVSNoRepresentationException,
     HGVSVariant,
 )
+from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
     HgvsMatchTranscriptAndGenomeRefAllele,
 )
@@ -549,3 +550,19 @@ class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
         matches_reference.transcript_ref_from_sequence = False
         self.assertIsNone(matches_reference.transcript_and_genome_ref_differ)
         self.assertEqual("", matches_reference.get_transcript_and_genome_ref_message())
+
+
+class DjangoTranscriptDataProviderCacheTest(TestCase):
+
+    def test_get_transcript_cached_and_bounded(self):
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        create_gata2_as1_transcript_version(genome_build)
+        data_provider = DjangoTranscriptDataProvider(genome_build)
+        data_provider._get_transcript("NM_001145661.2")
+        with self.assertNumQueries(0):
+            data_provider._get_transcript("NM_001145661.2")
+
+        with patch.object(DjangoTranscriptDataProvider, "TRANSCRIPT_CACHE_SIZE", 1):
+            data_provider._get_transcript("NR_125398.1")
+            self.assertEqual(["NR_125398.1"], list(data_provider._transcript_cache))
