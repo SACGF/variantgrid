@@ -18,7 +18,7 @@ from classification.models import (
     DiscordanceReport,
     DiscordanceReportClassification,
     OverlapContribution,
-    classification_flag_types,
+    classification_flag_types, TriageNextStep,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -34,6 +34,7 @@ from classification.views.classification_accumulation_graph import (
 )
 from classification.views.exports import ClassificationExportFormatterFlags
 from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.overlaps_datatables import OverlapColumns
 from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
@@ -204,10 +205,21 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
         return redirect_response
 
     dlab = ClassificationDashboard(lab_picker=lab_picker)
+    overlap_counts: dict[TriageNextStep, int] = {}
+    # TT for pending and pending and other labs have triaged
+    # S for solved
+    # V for VUS
+    for skew_status in [
+        TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED,
+        TriageNextStep.AWAITING_YOUR_TRIAGE]:
+        overlap_counts[skew_status] = OverlapColumns(request, {"skew_status": str(skew_status), "lab_selection": lab_id}).get_initial_queryset().count()
+
 
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
         "clinvar_export_enabled": clinvar_export_sync.is_enabled,
+        "overlap_counts_waiting_triage": overlap_counts[TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED] + overlap_counts[TriageNextStep.AWAITING_YOUR_TRIAGE],
+        "overlap_counts_others_triaged": overlap_counts[TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED],
         "genome_build": GenomeBuildManager.get_current_genome_build(),
     })
 
