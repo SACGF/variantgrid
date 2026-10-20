@@ -92,8 +92,8 @@ def _closest_version(versions: list[int], version: Optional[int]) -> int:
 
 
 class DjangoTranscriptDataProvider(LocalDataProvider):
-    # One conversion asks for the same transcript 3-4 times (tx info, exons, identity, mapping options), and
-    # hgvs's per-method LRU caches (100 entries) all miss on a page converting more transcripts than that
+    # One conversion asks for the same transcript 3-4 times (tx info, exons, identity, mapping options), so this
+    # only needs to span a conversion (plus the 2-3 versions cdot's substitution check reads), not a whole page
     TRANSCRIPT_CACHE_SIZE = 32
 
     def __init__(self, genome_build, retrieve_transcripts: Optional[bool] = None):
