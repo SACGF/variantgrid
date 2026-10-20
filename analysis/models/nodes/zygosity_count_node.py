@@ -35,10 +35,9 @@ class AbstractZygosityCountNode(Model):
         ("Hom Alt", "hom_count", "min_hom_count", "max_hom_count"),
     ]
 
-    def _effective_count_bounds(self):
-        """ (label, annotation arg, column, min, max) with bounds that match everything dropped -
-            a min of 0 or a max of every sample filters nothing, and leaving them out keeps the count
-            annotation out of the query entirely (eg AllVariantsNode's global zygosity count join) """
+    def _effective_count_limits(self):
+        """ (label, count name, min, max) with bounds that match everything dropped - a min of 0 or a max
+            of every sample filters nothing """
         max_fields = [f for *_, f in self.COUNT_COLUMNS]
         max_samples = None
         if any(getattr(self, f) is not None for f in max_fields):
@@ -51,9 +50,18 @@ class AbstractZygosityCountNode(Model):
             if max_count is not None and max_samples and max_count >= max_samples:
                 max_count = None
             if min_count is not None or max_count is not None:
-                arg = getattr(self, f"{count_name}_annotation_arg")
-                column = getattr(self, f"{count_name}_column")
-                yield label, arg, column, min_count, max_count
+                yield label, count_name, min_count, max_count
+
+    def has_effective_count_limits(self) -> bool:
+        return any(True for _ in self._effective_count_limits())
+
+    def _effective_count_bounds(self):
+        """ (label, annotation arg, column, min, max) - leaving out bounds that filter nothing keeps the
+            count annotation out of the query entirely (eg AllVariantsNode's global zygosity count join) """
+        for label, count_name, min_count, max_count in self._effective_count_limits():
+            arg = getattr(self, f"{count_name}_annotation_arg")
+            column = getattr(self, f"{count_name}_column")
+            yield label, arg, column, min_count, max_count
 
     def get_zygosity_count_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = defaultdict(dict)

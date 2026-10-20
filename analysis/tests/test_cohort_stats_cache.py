@@ -13,7 +13,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from analysis.models import TrioNode
+from analysis.models import CohortNode, TrioNode
 from analysis.models.enums import TrioInheritance
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
@@ -94,6 +94,27 @@ class TestStatsFilterKeyRoundTrip(TestCase):
         for inheritance in TrioNode.STATS_INHERITANCE_MODES:
             node = self._trio_node(inheritance, require_zygosity=False)
             self.assertIsNone(node._stats_inheritance_mode())
+
+
+class TestCohortNodeCountLimitsDefeatCache(TestCase):
+    """ The aggregate row is the cohort's unfiltered counts, so a count limit has to count live (#2370) """
+
+    @staticmethod
+    def _cohort_node(**kwargs):
+        return CohortNode(cohort=Cohort(sample_count=3), accordion_panel=CohortNode.COUNT, **kwargs)
+
+    def test_defaults_use_cache(self):
+        self.assertFalse(self._cohort_node()._has_filters_that_affect_label_counts())
+
+    def test_count_limits_defeat_cache(self):
+        for limits in ({"min_het_or_hom_count": 1}, {"max_het_or_hom_count": 2}, {"min_hom_count": 1},
+                       {"max_ref_count": 0}):
+            with self.subTest(limits=limits):
+                self.assertTrue(self._cohort_node(**limits)._has_filters_that_affect_label_counts())
+
+    def test_limits_that_filter_nothing_use_cache(self):
+        node = self._cohort_node(max_het_or_hom_count=3, min_het_count=0)
+        self.assertFalse(node._has_filters_that_affect_label_counts())
 
 
 class TestCohortStatsCascade(TestCase):
