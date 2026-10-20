@@ -426,6 +426,14 @@ def set_gene_list_genes_from_text(request, gene_list_id):
 
 
 @require_POST
+def copy_gene_list(request, gene_list_id):
+    gene_list = GeneList.get_for_user(request.user, gene_list_id)
+    copy = gene_list.copy_for_user(request.user)
+    messages.add_message(request, messages.INFO, f"Copied from '{gene_list.name}'")
+    return redirect(reverse('view_gene_list', kwargs={'gene_list_id': copy.pk}))
+
+
+@require_POST
 def create_custom_gene_list(request):
     form = NamedCustomGeneListForm(request.POST, username=request.user)
     if form.is_valid():

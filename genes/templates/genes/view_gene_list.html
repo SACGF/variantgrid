@@ -87,6 +87,12 @@
                     You can view but not modify this data.
                 {% endif %}
             </form>
+            {% if gene_list.import_status == 'S' %}
+            <form method="post" action="{% url 'copy_gene_list' gene_list.pk %}" class="mt-2">
+                {% csrf_token %}
+                <button class="btn btn-outline-secondary" title="Create your own editable copy of this gene list"><i class="fas fa-copy"></i> Copy Gene List</button>
+            </form>
+            {% endif %}
     	</div>
         <div class="tab-pane" role="tabpanel" id="wiki">
             {% wiki_editor gene_list.genelistwiki class_name='genes.models.GeneListWiki' unique_keyword='gene_list_id' unique_value=gene_list.pk %}
