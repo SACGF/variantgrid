@@ -11,3 +11,5 @@ Start with: `eventlog/models.py` · `eventlog/middleware.py:IntegrationApiMiddle
   `{}`, meaning "not recorded" rather than "no changes".
 - Deletes are opt-in per model because a `post_delete` receiver stops Django fast-deleting that model; never connect
   one without a sender.
+- `ApiRequestLog.notes` are free-text lines from `eventlog/models.py:api_request_note`, kept on the call's
+  `ChangeCollector` so code with no request in hand (a signal handler) can add one; outside a tracked call it only logs.

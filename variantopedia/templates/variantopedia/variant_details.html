@@ -208,6 +208,9 @@ function transcriptFunc(transcriptId, data) {
     $.each(data, (name, value) => {
         applyValue(name, value);
     });
+    const hasMaxEntScan = ["maxentscan_ref", "maxentscan_alt", "maxentscan_diff"].some(name => data[name] != null);
+    $("#maxentscan_values", transcriptInfoTable).toggle(hasMaxEntScan);
+    $("#maxentscan_none", transcriptInfoTable).toggle(!hasMaxEntScan);
 
     formatField($("#cosmic_id"), VariantGridFormat.cosmicLink);
     formatField($("#cosmic_legacy_id"), VariantGridFormat.cosmicLink);
@@ -448,6 +451,9 @@ function applyVariantValues() {
     applyValue("varity_r_score", {{ variant_annotation.varity_r_score | jsonify}});
     applyValue("vest4_score", {{ variant_annotation.vest4_score | jsonify}});
     {% endif %}
+
+    applyValue("eve_score", {{ variant_annotation.eve_score | jsonify}});
+    applyValue("popeve_score", {{ variant_annotation.popeve_score | jsonify}});
 
     applyValue("aloft_pred", {{ variant_annotation.get_aloft_pred_display | jsonify}});
 

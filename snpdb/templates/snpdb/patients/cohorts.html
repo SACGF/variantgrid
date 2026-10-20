@@ -1,6 +1,7 @@
 {% extends "uicore/page/base.html" %}
-{% load static %}
 {% load crispy_forms_tags %}
+{% load genome_build_tags %}
+{% load datatable_tags %}
 
 {% block title %}Cohorts{% endblock %}
 {% block content %}
@@ -17,25 +18,9 @@
             </div>
         </form>
 
-        <div class="mb-2">
-            <label><input type="checkbox" id="cohort-group-data" {% if show_group_data %}checked{% endif %}> Show Group Data</label>
-        </div>
-        <table id="cohort-grid" data-datatable-url="{% url 'cohort_datatable' %}" class="sticky-header"></table>
-        <script>
-        $(document).ready(function() {
-            $("#cohort-group-data").change(function() {
-                $.ajax({
-                    type: "POST",
-                    data: {grid_name: "Cohorts", filter_level: "groups", checked: $(this).is(":checked")},
-                    url: "{% url 'set_user_data_grid_config' %}",
-                    headers: {"X-CSRFToken": Cookies.get("csrftoken")},
-                    success: function() {
-                        $("#cohort-grid").DataTable().ajax.reload(null, false);
-                    }
-                });
-            });
-        });
-        </script>
+        {% genome_build_grid_filter table_id="cohort-grid" %}
+        {% datatable_user_data_filter 'cohort-grid' 'Cohorts' %}
+        <table id="cohort-grid" data-datatable-url="{% url 'cohort_datatable' %}" data-datatable-data="genomeBuildGridFilter" class="sticky-header"></table>
     </div>
 
 {% endblock content %}

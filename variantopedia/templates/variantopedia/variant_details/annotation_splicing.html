@@ -6,9 +6,12 @@
             {% labelled id="splice_region" label="Splice Region" help=annotation_description.splice_region hint="tiny" %}{% endlabelled %}
 
             {% labelled id="maxentscan" label="MaxEntScan" help=annotation_description.maxentscan hint="tiny" %}
-                <span id="maxentscan_ref"></span>&nbsp;<span class="text-secondary">Ref</span>,
-                <span id="maxentscan_alt"></span>&nbsp;<span class="text-secondary">Alt</span>,
-                <span id="maxentscan_diff"></span>&nbsp;<span class="text-secondary">Diff</span>
+                <span id="maxentscan_values">
+                    <span id="maxentscan_ref"></span>&nbsp;<span class="text-secondary">Ref</span>,
+                    <span id="maxentscan_alt"></span>&nbsp;<span class="text-secondary">Alt</span>,
+                    <span id="maxentscan_diff"></span>&nbsp;<span class="text-secondary">Diff</span>
+                </span>
+                <span id="maxentscan_none" class="no-value">-</span>
             {% endlabelled %}
             {% labelled label="MaxEnt %Diff/Ref" help=annotation_description.maxentscan_percent_diff_ref hint="tiny" %}<span id="maxentscan_percent_diff_ref" data-suffix="%"></span>{% endlabelled %}
             {% labelled id="dbscsnv_ada_score" label="dbscSNV (Ada)" help=annotation_description.dbscsnv_ada_score hint="tiny" %}{{ variant_annotation.dbscsnv_ada_score|floatformat:2 }}{% endlabelled %}

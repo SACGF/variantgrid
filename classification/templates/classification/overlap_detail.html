@@ -94,13 +94,15 @@
                     {% review review edit=True %}
                 </div>
             {% endfor %}
-            <div {% if overlap_details.overlap.has_reviews %}class="mt-2"{% endif %}>
-            {% if overlap_details.overlap.has_outstanding_triages %}
-                <span class="no-value">Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_details.overlap.pk %}">Click here</a> to discuss anyway.</span>
-            {% else %}
-                <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_details.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
+            {% if overlap_details.can_review %}
+                <div {% if overlap_details.overlap.has_reviews %}class="mt-2"{% endif %}>
+                {% if overlap_details.overlap.has_outstanding_triages %}
+                    <span class="no-value">Still waiting on all labs to triage. <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_details.overlap.pk %}">Click here</a> to discuss anyway.</span>
+                {% else %}
+                    <a class="hover-link" href="{% url 'overlap_report_review' overlap_id=overlap_details.overlap.pk %}"><i class="fa-solid fa-message" style="opacity:0.5; position:relative;top:1px"></i> Start Multi-Lab Discussion Discussion</a>
+                {% endif %}
+                </div>
             {% endif %}
-            </div>
         {% endlabelled %}
     {% endif %}
 

@@ -25,6 +25,7 @@ from genes.hgvs import (
     HGVSNoRepresentationException,
     HGVSVariant,
 )
+from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
     HgvsMatchTranscriptAndGenomeRefAllele,
 )
@@ -361,6 +362,12 @@ class TestHGVS(TestCase):
         hgvs_string = "NC_000001.10:m.100000A>G"
         self.assertRaises(HGVSException, lambda: matcher.get_variant_coordinate(hgvs_string))
 
+    def test_mitochondria_hgvs_contig_not_in_build(self):
+        """ 'm.' on a contig from another build (e.g. NC_012920.1 on T2T) is left to ContigNotInBuildError
+            so search can skip it, rather than a nomenclature error (#2365) """
+        matcher = HGVSMatcher(GenomeBuild.grch37())
+        self.assertRaises(Contig.ContigNotInBuildError, lambda: matcher.get_variant_coordinate("NC_999999.1:m.100A>G"))
+
     def test_biocommons_invalid_trailing_int(self):
         return self._test_invalid_trailing_int(HGVSConverterType.BIOCOMMONS_HGVS)
 
@@ -543,3 +550,19 @@ class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
         matches_reference.transcript_ref_from_sequence = False
         self.assertIsNone(matches_reference.transcript_and_genome_ref_differ)
         self.assertEqual("", matches_reference.get_transcript_and_genome_ref_message())
+
+
+class DjangoTranscriptDataProviderCacheTest(TestCase):
+
+    def test_get_transcript_cached_and_bounded(self):
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        create_gata2_as1_transcript_version(genome_build)
+        data_provider = DjangoTranscriptDataProvider(genome_build)
+        data_provider._get_transcript("NM_001145661.2")
+        with self.assertNumQueries(0):
+            data_provider._get_transcript("NM_001145661.2")
+
+        with patch.object(DjangoTranscriptDataProvider, "TRANSCRIPT_CACHE_SIZE", 1):
+            data_provider._get_transcript("NR_125398.1")
+            self.assertEqual(["NR_125398.1"], list(data_provider._transcript_cache))

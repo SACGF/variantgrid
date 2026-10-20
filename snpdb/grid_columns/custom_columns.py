@@ -273,6 +273,7 @@ def build_variant_grid_columns(columns: Iterable[VariantGridColumn],
 
     fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
     composites: dict[str, tuple] = {}  # field path -> (column, the members its cell draws)
+    member_paths: set[str] = set()
     sample_columns_position = None
 
     for column, members in shown_columns:
@@ -289,6 +290,7 @@ def build_variant_grid_columns(columns: Iterable[VariantGridColumn],
         # The members the cell draws ride along hidden, right after it - unless the collection shows
         # one standalone, where it is simply visible, once, in its own place
         for member in members:
+            member_paths.add(member.column.variant_column)
             if member.column.variant_column in shown_paths:
                 continue
             fields_kwargs[member.column.variant_column] = {**_catalogue_column_kwargs(member.column),
@@ -299,7 +301,12 @@ def build_variant_grid_columns(columns: Iterable[VariantGridColumn],
         if composite := composites.get(path):
             rich_columns.append(composite_rich_column(*composite, column_overrides))
         else:
-            rich_columns.append(variant_column_rich_column(path, **{**kwargs, **column_overrides.get(path, {})}))
+            rich_column = variant_column_rich_column(path, **{**kwargs, **column_overrides.get(path, {})})
+            if path in member_paths and not (rich_column.renderer or rich_column.client_renderer):
+                # The composite's renderer reads the raw value off the row and escapes it itself, so the
+                # server mustn't escape it too (escape_cell) - a standalone column escapes on the client
+                rich_column.client_renderer = "TableFormat.plain"
+            rich_columns.append(rich_column)
     return rich_columns, sample_columns_position
 
 

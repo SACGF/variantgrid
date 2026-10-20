@@ -112,14 +112,17 @@
     {% endif %}
 
     {% if 'overlaps'|is_view_enabled %}
-        {% page_help_embedded title="Discordant Overlaps Awaiting Triage" %}
+        {% page_help_embedded title="Recent Overlaps Awaiting Triage" %}
             <p>Below are the overlaps where your lab has a triage pending.</p>
         {% end_page_help_embedded %}
-        <p><a href="{% url 'overlaps' %}" class="hover-link">Click here</a> to see all overlaps your lab is involved in.</p>
+        <p>Showing overlaps requiring triage raised in the last 14 days.<br/>
+            You have {{ overlap_counts_waiting_triage | format_value }} outstanding overlap{% plural overlap_counts_waiting_triage %} requiring triage, ({{ overlap_counts_others_triaged | format_value }} of which {% plural overlap_counts_others_triaged singular="has" plural="have" %} been triaged by other labs)
+        - <a href="{% url 'overlaps' %}" class="hover-link">Click here</a> to see all overlaps.</p>
 
         <script>
         function overlapsGroupingFilter(data) {
             data.skew_status = 'TT';
+            data.since = '14';  // show data form last 14 days
             data.lab_selection = {{ dlab.lab_picker.selection | jsonify }};
         }
         </script>
@@ -129,7 +132,7 @@
            data-datatable-url="{% url 'overlaps_datatables' %}"
            class="sticky-header thick-border overlaps"
            id="overlaps-table"
-           data-adjust-columns="false">
+           data-adjust-columns="true">
         </table>
         
     {% endif %}

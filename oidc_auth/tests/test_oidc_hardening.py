@@ -4,6 +4,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import SuspiciousOperation
 from django.test import RequestFactory, TestCase, override_settings
+from django.urls import ResolverMatch
 from requests import HTTPError, Response
 
 from oidc_auth.backend import VariantGridOIDCAuthenticationBackend
@@ -16,10 +17,6 @@ def _http_error(status_code: int) -> HTTPError:
     return HTTPError("Get Token Error", response=response)
 
 
-def _missing_state() -> SuspiciousOperation:
-    return SuspiciousOperation("OIDC callback state not found in session `oidc_states`!")
-
-
 class HandleOIDC400MiddlewareTest(TestCase):
     """ Only a stale/replayed /oidc/ callback is swallowed into a redirect """
 
@@ -29,9 +26,13 @@ class HandleOIDC400MiddlewareTest(TestCase):
 
     def _callback_request(self, **session):
         request = self.factory.get("/oidc/callback/", {"state": "abc", "code": "abc"})
+        request.resolver_match = ResolverMatch(lambda r: None, (), {}, url_name="oidc_authentication_callback")
         SessionMiddleware(lambda r: None).process_request(request)
-        request.session.update(session)
+        request.session.update({"oidc_states": {"other": {}}, **session})
         return request
+
+    def _process_view(self, request):
+        return self.middleware.process_view(request, None, (), {})
 
     def test_rejected_token_on_oidc_path_redirects_to_root(self):
         request = self.factory.get("/oidc/callback/")
@@ -41,17 +42,21 @@ class HandleOIDC400MiddlewareTest(TestCase):
 
     def test_missing_state_retries_login_once(self):
         request = self._callback_request(oidc_login_next="/classification/overlaps/overlap/1")
-        response = self.middleware.process_exception(request, _missing_state())
+        response = self._process_view(request)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, "/classification/overlaps/overlap/1")
 
         retry = self._callback_request(**dict(request.session))
-        self.assertIsNone(self.middleware.process_exception(retry, _missing_state()))
+        self.assertIsNone(self._process_view(retry))
 
     def test_missing_state_ignores_offsite_next(self):
         request = self._callback_request(oidc_login_next="https://evil.example.com/")
-        response = self.middleware.process_exception(request, _missing_state())
+        response = self._process_view(request)
         self.assertEqual(response.url, "/")
+
+    def test_known_state_goes_to_view(self):
+        request = self._callback_request(oidc_states={"abc": {}})
+        self.assertIsNone(self._process_view(request))
 
     def test_other_exceptions_are_left_to_django(self):
         request = self._callback_request()

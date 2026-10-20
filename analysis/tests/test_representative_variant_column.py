@@ -28,7 +28,7 @@ from snpdb.models import (
     UserSettings,
 )
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
-from snpdb.views.datatable_view import datatable_definition, datatable_response
+from snpdb.views.datatable_view import CellData, datatable_definition, datatable_response
 
 
 class RepresentativeVariantColumnTest(GridExportTestCase):
@@ -89,6 +89,14 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
                 if member in columns:
                     self.assertIn(member, row, member)
         self.assertIsNone(row["classifications"])  # renderer-only column, like tags
+
+    def test_members_reach_the_renderer_unescaped(self):
+        """ The composite renderer escapes what it reads off the row - escaped on the server too, a
+            symbolic alt or a g.HGVS would show '&lt;DEL&gt;' / 'm.16319G&gt;A' """
+        columns = self._columns_by_name()
+        for path, value in [("alt__seq", "<DEL>"), ("variantannotation__hgvs_g", "NC_012920.1:m.16319G>A")]:
+            cell = CellData(all_data={path: value}, key=path)
+            self.assertEqual(self.grid._render_json_cell(cell, columns[path]), value, path)
 
     def test_composite_columns_carry_their_renderers(self):
         columns = self._columns_by_name()

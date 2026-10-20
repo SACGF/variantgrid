@@ -11,6 +11,41 @@
 
 {% block head %}
     <script src="{% static 'js/cached_generated_files.js' %}"></script>
+    <script>
+        function geneTextTokens(text) {
+            return new Set(text.toUpperCase().match(/[^,;\s]+/g) || []);
+        }
+
+        function geneChangeSummary(action, genes) {
+            const MAX_SHOWN = 20;
+            let shown = genes.slice(0, MAX_SHOWN).join(", ");
+            if (genes.length > MAX_SHOWN) {
+                shown += ` (and ${genes.length - MAX_SHOWN} more)`;
+            }
+            return `${action} ${genes.length}: ${shown}`;
+        }
+
+        $(document).ready(function() {
+            const geneTextForm = $("#gene-text-form");
+            const originalGenes = geneTextTokens($("#gene-text").val());
+            geneTextForm.submit(function() {
+                const genes = geneTextTokens($("#gene-text").val());
+                const added = [...genes].filter(g => !originalGenes.has(g));
+                const removed = [...originalGenes].filter(g => !genes.has(g));
+                if (!added.length && !removed.length) {
+                    return false;
+                }
+                const lines = [];
+                if (added.length) {
+                    lines.push(geneChangeSummary("Add", added));
+                }
+                if (removed.length) {
+                    lines.push(geneChangeSummary("Remove", removed));
+                }
+                return confirm(lines.join("\n\n"));
+            });
+        });
+    </script>
 {% endblock head %}
 
 {% block container_table_content %}
@@ -52,6 +87,12 @@
                     You can view but not modify this data.
                 {% endif %}
             </form>
+            {% if gene_list.import_status == 'S' %}
+            <form method="post" action="{% url 'copy_gene_list' gene_list.pk %}" class="mt-2">
+                {% csrf_token %}
+                <button class="btn btn-outline-secondary" title="Create your own editable copy of this gene list"><i class="fas fa-copy"></i> Copy Gene List</button>
+            </form>
+            {% endif %}
     	</div>
         <div class="tab-pane" role="tabpanel" id="wiki">
             {% wiki_editor gene_list.genelistwiki class_name='genes.models.GeneListWiki' unique_keyword='gene_list_id' unique_value=gene_list.pk %}
@@ -81,11 +122,20 @@
 
     <p>
         <a class="hover-link" data-toggle="collapse" href="#gene-list-text" role="button" aria-expanded="false" aria-controls="gene-list-text">
-            <i class="fas fa-clipboard-list"></i> Show genes as text ({{ num_gene_symbols }})
+            <i class="fas fa-clipboard-list"></i> {% if has_write_permission %}Edit{% else %}Show{% endif %} genes as text ({{ num_gene_symbols }})
         </a>
     </p>
     <div id="gene-list-text" class="collapse">
+    {% if has_write_permission %}
+        <form method="post" id="gene-text-form" action="{% url 'set_gene_list_genes_from_text' gene_list.pk %}">
+            {% csrf_token %}
+            <textarea class="form-control" rows="10" name="gene_text" id="gene-text">{{ gene_symbols_text }}</textarea>
+            <small class="form-text text-muted">Separate genes with spaces, commas or new lines. Saving adds genes not in the list and removes genes no longer in the text.</small>
+            <button class="btn btn-primary mt-2 mb-4">Save Genes</button>
+        </form>
+    {% else %}
         <textarea class="form-control" rows="10" readonly onclick="this.select()">{{ gene_symbols_text }}</textarea>
+    {% endif %}
     </div>
 
     <table id="gene-lists-genes-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=gene_list.pk %}"></table>

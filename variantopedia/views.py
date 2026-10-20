@@ -22,6 +22,7 @@ from annotation.models import (
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models.classification import Classification, ClassificationModification
+from classification.models.classification_grouping import ClassificationGrouping
 from eventlog.models import create_event
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.models import (
@@ -446,6 +447,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
+    has_classifications = False
+    if allele := variant.allele:
+        grouping_qs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele=allele).exclude(classification_count=0)
+        has_classifications = ClassificationGrouping.filter_for_user(request.user, grouping_qs).exists()
     gene_fusion = _get_gene_fusion(variant)
     gene_copy_number_event = _get_gene_copy_number_event(variant)
     splice_event_variant = _get_splice_event_variant(variant)
@@ -462,6 +467,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
+        "has_classifications": has_classifications,
         "has_tags": has_tags,
         "show_resolved_tags": show_resolved_variant_tags(request),
         "hgvs_g": hgvs_g,

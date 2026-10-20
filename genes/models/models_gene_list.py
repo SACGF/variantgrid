@@ -141,6 +141,17 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
 
         return copy
 
+    def copy_for_user(self, user) -> 'GeneList':
+        """ An unlocked, uncategorised copy owned by user - unlike clone(), which keeps the owner, lock and
+            category, and is used to snapshot a list for an analysis node or pathology test """
+        copy = GeneList.objects.create(name=f"Copy of {self.name}", user=user, import_status=self.import_status)
+        gene_list_gene_symbols = list(self.genelistgenesymbol_set.all())
+        for glgs in gene_list_gene_symbols:
+            glgs.pk = None
+            glgs.gene_list = copy
+        GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
+        return copy
+
     def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", False)
         initial_save = not self.pk

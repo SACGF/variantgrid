@@ -1,16 +1,21 @@
 import os
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
 from django.http import Http404
 from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import format_html
 from django.views.decorators.http import require_POST
 
 from eventlog.models import ApiRequestLog, create_event
@@ -44,9 +49,6 @@ from seqauto.models import (
 from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from seqauto.qc.sequencing_run_utils import SEQUENCING_RUN_QC_COLUMNS
-from seqauto.sequencing_files.sample_sheet import (
-    assign_old_sample_sheet_data_to_current_sample_sheet,
-)
 from snpdb.models import VCF, Sample, UserSettings
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadedFileTypes, UploadPipeline
@@ -286,6 +288,24 @@ def _tso500_pair_urls_by_sequencing_sample(sequencing_run) -> dict[int, dict[str
     return pair_urls
 
 
+API_LOG_NOTE_MESSAGE_DAYS = 7
+
+
+def _add_recent_api_log_note_message(request, sequencing_run):
+    """ Points an admin at the API Log tab when a recent call did something to the run worth knowing about,
+        eg moved its data onto a re-sent sample sheet (#2349) """
+    content_type = ContentType.objects.get_for_model(SequencingRun)
+    since = timezone.now() - timedelta(days=API_LOG_NOTE_MESSAGE_DAYS)
+    latest = ApiRequestLog.for_object(content_type, sequencing_run.pk).filter(created__gte=since) \
+        .exclude(notes=[]).order_by("-created").first()
+    if latest:
+        api_log_url = reverse("view_sequencing_run_tab", kwargs={"sequencing_run_id": sequencing_run.pk,
+                                                                 "tab": "api-log"})
+        message = format_html('API call {}: {} - see the <a href="{}">API Log</a>',
+                              naturaltime(latest.created), latest.notes[0], api_log_url)
+        messages.add_message(request, messages.INFO, message, extra_tags="html")
+
+
 def view_sequencing_run(request, sequencing_run_id, tab=None):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
 
@@ -329,7 +349,6 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         context["sequencing_samples"] = sample_sheet.sequencingsample_set.order_by("sample_number").select_related(
             "enrichment_kit",
         ).prefetch_related("samplefromsequencingsample_set__sample__patient", "sequencingsampledata_set")
-        context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
         run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
         context.update(run_vcfs)
         if settings.UPLOAD_ENABLED:
@@ -337,6 +356,9 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         context.update(_get_sequencing_run_patients(sample_sheet, request.user))
     except Exception:
         log_traceback()
+
+    if request.user.is_superuser:
+        _add_recent_api_log_note_message(request, sequencing_run)
 
     if not tab:
         tab = "patients" if context.get("run_patients") else "data"
@@ -512,16 +534,6 @@ def reload_experiment_name(request, sequencing_run_id):
     create_event(request.user, "SequencingRun Experiment change", msg)
 
     return JsonResponse(str(experiment), safe=False)
-
-
-@require_POST
-def assign_data_to_current_sample_sheet(request, sequencing_run_id):
-    sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
-    if not request.user.is_superuser:
-        raise PermissionDenied()
-
-    assign_old_sample_sheet_data_to_current_sample_sheet(request.user, sequencing_run)
-    return HttpResponse()
 
 
 def view_unaligned_reads(request, unaligned_reads_id):
