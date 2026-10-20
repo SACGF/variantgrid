@@ -21,7 +21,7 @@ and an interactive DAG-based analysis filter. Deployments include Shariant (Aust
 Apps, in dependency order: `library/` (shared utilities, not a Django app) → `snpdb/` (Variant/Allele, builds, VCF/Sample/
 Cohort, Lab/Organization, the DataTables engine) → `genes/` → `annotation/` → `analysis/` → `classification/` (the largest).
 Supporting: `uicore/` (UI components), `upload/` (VCF import), `patients/`, `ontology/` (HPO/OMIM/MONDO), `flags/`,
-`seqauto/` (sequencing automation), `sync/` (Alissa and other VariantGrid instances), `variantopedia/` (variant pages),
+`seqauto/` (sequencing automation), `sync/` (other VariantGrid instances, e.g. Shariant), `variantopedia/` (variant pages),
 `eventlog/`, `manual/` (deploy-time steps), `pedigree/`, `pathtests/`, `vcauth/` / `oidc_auth/` (authentication).
 PostgreSQL through the `psqlextra` backend (partitioning, upserts), Redis for caching, RabbitMQ for Celery.
 

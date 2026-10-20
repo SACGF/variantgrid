@@ -84,12 +84,10 @@ The OmniImporter picks the appropriate converter based on the org and lab, makes
 Syncing is its own Django app for automated upload and download of data.
 Examples include SA Path's VariantGrid uploading/downloading to/from Shariant - utilising Shariant's import process, as well as its export process. In this mode each classification to be uploaded is individually tracked to see if the last uploaded version is up to date.
 
-Also introduced in 2023 was syncing to Alissa (a commonly used curation system), where all the relevant data from Alissa has to be downloaded each time, and then passed onto OmniImporter. When uploading to Alissa check the last successful since date of upload, then using the export functionality in the MVL JSON format.
-
 ## Export
 
 VariantGrid can export its classification data in a myriad of formats, with the intent that this data can then be imported into other curation systems.
-Export formats include Alissa's MVL, CSV (which we can review for general validation), JSON (can be used to import into other VariantGrid systems), VCF, REDCap, ClinVar Compare (which shows where a lab's data differs from what's present in ClinVar).
+Export formats include CSV (which we can review for general validation), JSON (can be used to import into other VariantGrid systems), VCF, REDCap, ClinVar Compare (which shows where a lab's data differs from what's present in ClinVar).
 
 ## ClinVar Export
 

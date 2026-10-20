@@ -204,16 +204,6 @@ def flag_ids_to(model: type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[Flag
     return set(model.objects.filter(flag_collection_id__in=qs).values_list('pk', flat=True))
 
 
-class TranscriptStrategy(str, Enum):
-    """
-    What transcripts are going to be included
-    :cvar ALL: Include all transcripts
-    :cvar REFSEQ: More accurately only include transcripts that Alissa supports NM/NR
-    """
-    ALL = "all"
-    REFSEQ = "refseq"
-
-
 class DiscordanceReportStatus(str, Enum):
     """
     Different from DiscordanceReportResolution as that uses None to indicate an ongoing discordance
@@ -360,7 +350,6 @@ class ClassificationFilter:
         include_sources: If provided Labs/Orgs that should only be included
         since: Try to optimise data so we only include alleles that have been modified since this date
         min_share_level: Minimum share level of classifications to include
-        transcript_strategy: Which classification transcripts should be considered
         rows_per_file: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
         starting_query: If this is provided then instead of using all of the above filters, just this
         TODO rename row_limit to indicate that it's the max per file, not
@@ -375,7 +364,6 @@ class ClassificationFilter:
     include_sources: Optional[set[Lab]] = None
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.LAB
-    transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
     rows_per_file: Optional[int] = None
     allele: Optional[int] = None
     file_prefix: str = "classifications"
@@ -484,7 +472,6 @@ class ClassificationFilter:
 
         share_level = ShareLevel(share_level_str)
         genome_build = GenomeBuild.get_name_or_alias(build_name)
-        transcript_strategy = TranscriptStrategy(request.query_params.get('transcript_strategy', 'all'))
         since: Optional[datetime] = None
         if since_str := request.query_params.get('since'):
             from classification.views.classification_export_view import parse_since
@@ -531,7 +518,6 @@ class ClassificationFilter:
             genome_build=genome_build,
             allele_origin_filter=allele_origin_filter,
             min_share_level=share_level,
-            transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
             benchmarking=benchmarking,
@@ -729,13 +715,6 @@ class ClassificationFilter:
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
         # can't filter out transcript versions (due to 37!=38) easily here, do that later
-
-        if self.transcript_strategy == TranscriptStrategy.REFSEQ:
-            from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
-            acceptable_transcripts: list[Q] = [
-                Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
-            ]
-            cms = cms.filter(reduce(operator.or_, acceptable_transcripts))
 
         return cms
 
