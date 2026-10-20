@@ -210,8 +210,8 @@ admits only Variant searches) and `SearchReceiver.search` returns a `SearchRespo
 `settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
 `SearchInput.get_visible_variants` restricts to a build's contigs and, on Shariant, to classified variants.
 `SearchResultMatchStrength` decides whether the UI jumps straight to a single result. The variant receivers live in
-`snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, ids, fusions as lookup only) and
-`snpdb/signals/hgvs_search.py` (HGVS, via `snpdb/signals/hgvs_search.py:_search_hgvs`); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
+`variantopedia/signals/variant_search.py` (locus, dbSNP, gnomAD, ids, fusions as lookup only) and
+`variantopedia/signals/hgvs_search.py` (HGVS, via `variantopedia/signals/hgvs_search.py:_search_hgvs`); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
 searches from `snpdb/signals/`.
 
 ## Why it is shaped this way
@@ -243,7 +243,7 @@ searches from `snpdb/signals/`.
 - `GenomeFasta.get_for_genome_build` uses `get_or_create`, so an empty row created once is returned forever with its
   index never loaded.
 - `AlleleLiftover.BULK_UPDATE_BATCH_SIZE` is 1000 because `bulk_update` writes one CASE arm per row.
-- Search must never mint a fusion identity; `snpdb/signals/variant_search.py:search_variant_gene_fusion` is lookup only.
+- Search must never mint a fusion identity; `variantopedia/signals/variant_search.py:search_variant_gene_fusion` is lookup only.
 - Client-side grid renderers add links; they never convert data (`snpdb/grids.py:get_standard_overrides`).
 - `snpdb/forms.py:VCFForm` hides unused sample-field columns, so not every model field is on the form.
 - `ManualVariantEntry` lives in annotation (`annotation/models/models_manual_variant.py:ManualVariantEntryCollection`); snpdb only

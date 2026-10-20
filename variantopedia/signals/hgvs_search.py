@@ -44,9 +44,10 @@ from snpdb.search import (
     SearchResult,
     search_receiver,
 )
-from snpdb.signals.variant_search import (
+from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
+from variantopedia.signals.variant_search import (
     VariantExtra,
-    get_results_from_variant_coordinate,
+    get_visible_variants,
     yield_no_results_for_variant_coordinate,
 )
 
@@ -175,7 +176,7 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
         try:
             results =_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user,
                                   genome_build=genome_build,
-                                  visible_variants=search_input.get_visible_variants(genome_build),
+                                  visible_variants=get_visible_variants(search_input, genome_build),
                                   classify=search_input.classify)
             results = list(results)  # read iterator to trigger exceptions
         except (HGVSNomenclatureException, BadTranscript) as e:

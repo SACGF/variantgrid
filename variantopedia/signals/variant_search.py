@@ -9,8 +9,10 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.urls import reverse
 
+from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import CreateManualVariantForbidden, check_can_create_variants
+from annotation.models import AnnotationVersion
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.gene_copy_number import (
     COPY_NUMBER_STRING_PATTERN,
@@ -48,9 +50,24 @@ from snpdb.search import (
     SearchResult,
     search_receiver,
 )
-from upload.models import ModifiedImportedVariant
+from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]{3,}$", re.IGNORECASE)
+
+
+def get_visible_variants(search_input: SearchInputInstance, genome_build: GenomeBuild) -> QuerySet[Variant]:
+    """ The build's variants, restricted on Shariant to those with a classification published to a non-admin user """
+    # Search receivers filter Variants by locus/position/pk/alt and don't join to annotation
+    # partitions, so a plain queryset returns identical results without the partition transformer.
+    if annotation_version := AnnotationVersion.latest_or_none(genome_build, context="Search"):
+        variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
+    else:
+        variant_qs = Variant.objects.all()
+    variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
+    if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not search_input.user.is_superuser:
+        variant_qs = variant_qs.filter(Classification.objects.published_variant_q(search_input.user, genome_build))
+
+    return variant_qs
 
 
 class VariantExtra:
@@ -174,7 +191,7 @@ def search_variant_locus_no_ref(search_input: SearchInputInstance):
     for genome_build in search_input.genome_builds:
         chrom, position = search_input.match.groups()
         chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
-        yield search_input.get_visible_variants(genome_build).filter(
+        yield get_visible_variants(search_input, genome_build).filter(
             locus__contig__name=chrom,
             locus__position=position
         )
@@ -193,7 +210,7 @@ def search_variant_locus_with_ref(search_input: SearchInputInstance):
     for genome_build in search_input.genome_builds:
         chrom, position, ref = search_input.match.groups()
         chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
-        variants_qs = search_input.get_visible_variants(genome_build)
+        variants_qs = get_visible_variants(search_input, genome_build)
         position_qs = variants_qs.filter(
             locus__contig__name=chrom,
             locus__position=position,
@@ -223,7 +240,7 @@ def allele_search(search_input: SearchInputInstance):
         allele = clingen_allele.allele
         for genome_build in search_input.genome_builds:
             # This ensures we retrieve using correct permissions
-            visible_variants_qs = search_input.get_visible_variants(genome_build)
+            visible_variants_qs = get_visible_variants(search_input, genome_build)
             if variant := allele.variant_for_build_optional(genome_build):
                 yield from visible_variants_qs.filter(pk=variant.pk)
                 continue
@@ -286,32 +303,6 @@ def yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, var
         yield SearchResult(alternative_variant.preview, messages=alt_messages)
 
 
-def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet, variant_coordinate: VariantCoordinate,
-                                        any_alt: bool = False) -> QuerySet[Variant]:
-    """
-    :param genome_build: genome build (used for format variant_coordinate.chromosome for variant search
-    :param qs: A query set that we'll be searching inside of (including variants found via ModifiedImportedVariant)
-    :param variant_coordinate: The variant coordinate to lookup
-    :param any_alt: If true, search without using alt and return all matches
-    :return: A QuerySet of variants
-    """
-    chrom = format_chrom(variant_coordinate.chrom, genome_build.reference_fasta_has_chr)
-    results = qs.filter(Variant.get_chrom_q(chrom),
-                        locus__position=variant_coordinate.position,
-                        locus__ref__seq=variant_coordinate.ref)
-    if not any_alt:
-        results = results.filter(alt__seq=variant_coordinate.alt, svlen=variant_coordinate.svlen)
-
-    if not results.exists():
-        if not any_alt:
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(qs, variant_coordinate)
-        else:
-            # should we really be searching ModifiedImportVariants with any alt? or should that just happen for
-            # the filter of "real" variants
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(qs, variant_coordinate)
-    return results
-
-
 def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
     for genome_build in search_input.genome_builds:
         variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
@@ -335,7 +326,7 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
                 search_messages.append(sm)
                 variant_coordinate.ref = calculated_ref
 
-        visible_variants_qs = search_input.get_visible_variants(genome_build)
+        visible_variants_qs = get_visible_variants(search_input, genome_build)
         results = get_results_from_variant_coordinate(genome_build, visible_variants_qs, variant_coordinate)
         if results.exists():
             search_coordinate = variant_coordinate.as_contig_accession(genome_build)
@@ -432,7 +423,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
 
 def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -> Iterable[SearchResult]:
     variant_coordinate = matcher.get_variant_coordinate(hgvs_string)
-    results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build),
+    results = get_results_from_variant_coordinate(genome_build, get_visible_variants(search_input, genome_build),
                                                   variant_coordinate)
     if results.exists():
         yield from results
@@ -547,7 +538,7 @@ def _yield_gene_level_results(search_input: SearchInputInstance, events, label: 
             continue
         seen.add(event.variant_id)
         for genome_build in search_input.genome_builds:
-            visible_variants_qs = search_input.get_visible_variants(genome_build)
+            visible_variants_qs = get_visible_variants(search_input, genome_build)
             if variant := visible_variants_qs.filter(pk=event.variant_id).first():
                 yield SearchResult(variant.preview,
                                    messages=[SearchMessage(f"{label} {event.canonical_str}",

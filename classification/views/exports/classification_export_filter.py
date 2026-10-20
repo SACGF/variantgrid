@@ -54,7 +54,7 @@ from snpdb.models import (
     VariantCoordinate,
 )
 from snpdb.models.models_enums import AlleleOriginBucket
-from snpdb.signals.variant_search import get_results_from_variant_coordinate
+from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
 
 
 @dataclass

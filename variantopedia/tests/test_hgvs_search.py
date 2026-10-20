@@ -6,7 +6,7 @@ from library.enums.log_level import LogLevel
 from library.preview_request import PreviewData
 from snpdb.models import GenomeBuild, Variant
 from snpdb.search import SearchMessage, SearchResult
-from snpdb.signals.hgvs_search import (
+from variantopedia.signals.hgvs_search import (
     _contig_not_in_build_message,
     _gene_symbol_search_message,
     _hgvs_nomenclature_error_message,
@@ -79,7 +79,7 @@ class SearchHGVSUsingGeneSymbolTestCase(TestCase):
             yield SearchResult(preview=preview, messages=[SearchMessage(f"resolved {accession}")])
 
         candidates = {"ENST_A.1": "MANE Select", "NM_A.1": "MANE Select", "NM_B.1": "MANE Plus Clinical"}
-        with mock.patch("snpdb.signals.hgvs_search._search_hgvs", side_effect=fake_search_hgvs):
+        with mock.patch("variantopedia.signals.hgvs_search._search_hgvs", side_effect=fake_search_hgvs):
             results = list(_search_hgvs_using_gene_symbol(candidates, "c.1A>G", None, grch38, Variant.objects.none()))
 
         messages_by_identifier = {r.preview.identifier: [m.message for m in r.messages] for r in results}
