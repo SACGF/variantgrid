@@ -1,6 +1,8 @@
 import gzip
+import io
 import os
 import tempfile
+import zipfile
 from hashlib import sha256
 from unittest.mock import patch
 from urllib.parse import quote
@@ -8,6 +10,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -423,3 +426,42 @@ class AnnotatedDownloadAPITest(UploadAPITestBase):
         self.assertIn("attachment", response["Content-Disposition"])
         streamed = b"".join(response.streaming_content)
         self.assertEqual(gzip.decompress(streamed), payload)
+
+    def _download_ready_csv(self, **params):
+        """ The export as written, in its own dir under a temp GENERATED_DIR as the task writes it """
+        file_upload = self._create_vcf_upload("dl_csv")
+        self._make_export_template()
+        self.client.force_authenticate(user=self.owner)
+        cgf = CachedGeneratedFile.objects.create(generator="export_cohort_to_downloadable_file",
+                                                 params_hash="fake", progress=1.0)
+        url = reverse("api_annotated_download", kwargs={"file_upload_id": file_upload.pk, "export_type": "csv"})
+        with tempfile.TemporaryDirectory() as generated_dir, override_settings(GENERATED_DIR=generated_dir), \
+                patch.object(CachedGeneratedFile, "get_or_create_and_launch", return_value=cgf):
+            csv_filename = os.path.join(generated_dir, cgf.generator, str(cgf.pk), "annotated.csv")
+            os.makedirs(os.path.dirname(csv_filename))
+            with open(csv_filename, "w", encoding="utf-8") as f:
+                f.write("chrom,pos\n1,100\n")
+            cgf.filename = csv_filename
+            cgf.save()
+            response = self.client.get(url, params)
+            streamed = b"".join(response.streaming_content) if response.status_code == status.HTTP_200_OK else None
+            cgf.delete()
+            self.assertFalse(os.path.exists(os.path.dirname(csv_filename)), "zip removed with the export")
+        return response, streamed
+
+    def test_download_csv_zipped_by_default(self):
+        """ Clients up to variantgrid_api 1.10 expect the .csv.zip #2368 """
+        response, streamed = self._download_ready_csv()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        with zipfile.ZipFile(io.BytesIO(streamed)) as zipf:
+            self.assertEqual(zipf.read("annotated.csv"), b"chrom,pos\n1,100\n")
+
+    def test_download_csv_uncompressed(self):
+        response, streamed = self._download_ready_csv(compression="none")
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertEqual(streamed, b"chrom,pos\n1,100\n")
+
+    def test_download_invalid_compression(self):
+        response, _ = self._download_ready_csv(compression="bz2")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
