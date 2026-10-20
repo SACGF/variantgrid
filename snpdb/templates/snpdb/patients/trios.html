@@ -1,9 +1,12 @@
 {% extends "uicore/page/base_container_table.html" %}
+{% load genome_build_tags %}
+{% load datatable_tags %}
 
 {% block title %}Trios{% endblock %}
 {% block container_table_content %}
     <H3>Trios</H3>
     <p>Create Trios <a href="{% url 'data' %}" class="hover-link">from VCFs</a> or on the <a href="{% url 'cohorts' %}" class="hover-link">cohorts page.</a></p>
-    {% url 'trio_datatable' as datatable_url %}
-    {% include "snpdb/patients/_cohort_list_grid.html" with grid_id="trio-grid" grid_name="Trios" %}
+    {% genome_build_grid_filter table_id="trio-grid" %}
+    {% datatable_user_data_filter 'trio-grid' 'Trios' %}
+    <table id="trio-grid" data-datatable-url="{% url 'trio_datatable' %}" data-datatable-data="genomeBuildGridFilter" class="sticky-header"></table>
 {% endblock %}

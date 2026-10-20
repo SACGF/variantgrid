@@ -1,6 +1,7 @@
 {% extends "uicore/page/base.html" %}
-{% load static %}
 {% load crispy_forms_tags %}
+{% load genome_build_tags %}
+{% load datatable_tags %}
 
 {% block title %}Cohorts{% endblock %}
 {% block content %}
@@ -17,8 +18,9 @@
             </div>
         </form>
 
-        {% url 'cohort_datatable' as datatable_url %}
-        {% include "snpdb/patients/_cohort_list_grid.html" with grid_id="cohort-grid" grid_name="Cohorts" %}
+        {% genome_build_grid_filter table_id="cohort-grid" %}
+        {% datatable_user_data_filter 'cohort-grid' 'Cohorts' %}
+        <table id="cohort-grid" data-datatable-url="{% url 'cohort_datatable' %}" data-datatable-data="genomeBuildGridFilter" class="sticky-header"></table>
     </div>
 
 {% endblock content %}
