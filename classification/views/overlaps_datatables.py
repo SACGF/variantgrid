@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from functools import cached_property
 from typing import Optional, Set
@@ -9,6 +10,7 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.utils import html
 from django.utils.safestring import SafeString
+from django.utils.timezone import now
 
 from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
 from classification.models import ClassificationGrouping, Overlap, OverlapType, \
@@ -142,6 +144,16 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         # only display single context overlaps, but later we merge with cross context data
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
+
+        if since_days_str := self.get_query_param("since"):
+            try:
+                since_days = int(since_days_str)
+                modified_since = now() - timedelta(days=since_days)
+                qs = qs.filter(overlap_status_change_timestamp__gte=modified_since)
+            except ValueError:
+                pass
+
+
 
         next_step = self.get_query_param("skew_status")
 
