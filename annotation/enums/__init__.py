@@ -1,5 +1,7 @@
 """
-annotation's enums, outside the models package so a module the models import (vep_columns,
+annotation's enums as one namespace, outside the models package so a module the models import (vep_columns,
 annotation_pipeline_routing) can use them without running annotation/models/__init__.
-Import from the defining module: annotation_enums.py (pipeline, ClinVar, HPA) or damage_enums.py (prediction scales).
+Callers write `from annotation.enums import AnnotationStatus, PathogenicityImpact`.
 """
+from annotation.enums.annotation_enums import *
+from annotation.enums.damage_enums import *
