@@ -11,8 +11,9 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from library.utils import JsonDataType
+from ontology.enums import OntologyService
 from ontology.grids import AbstractOntologyGenesConfig
-from ontology.models import OntologyService, OntologyTerm
+from ontology.models import OntologyTerm
 from patients.enums import (
     MatchStatus,
     NucleicAcid,

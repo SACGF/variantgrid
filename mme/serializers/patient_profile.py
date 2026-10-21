@@ -17,7 +17,8 @@ from classification.enums.classification_enums import ShareLevel, SpecialEKeys
 from classification.models.classification import ClassificationModification
 from mme.contact import mme_contact_for_classification
 from mme.genes import resolve_gene
-from ontology.models import OntologyService, OntologySnake, OntologyTerm, OntologyTermRelation
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 from snpdb.enums import ClinicalSignificance
 
 

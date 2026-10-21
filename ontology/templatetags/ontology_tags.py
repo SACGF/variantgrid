@@ -6,14 +6,8 @@ from typing import Optional, Union
 
 from django.template import Library
 
-from ontology.models import (
-    GeneDiseaseClassification,
-    OntologyService,
-    OntologySnake,
-    OntologyTerm,
-    OntologyTermRelation,
-    PanelAppClassification,
-)
+from ontology.enums import GeneDiseaseClassification, OntologyService, PanelAppClassification
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 
 register = Library()
 

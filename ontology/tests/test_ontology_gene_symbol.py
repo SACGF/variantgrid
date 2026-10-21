@@ -4,7 +4,8 @@ from django.utils import timezone
 
 from genes.enums import GeneSymbolAliasSource, HGNCStatus
 from genes.models import HGNC, GeneSymbol, GeneSymbolAlias, HGNCImport
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
 
 
 class TestOntologyTermGetGeneSymbol(TestCase):

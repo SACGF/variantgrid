@@ -5,8 +5,9 @@ from django.conf import settings
 from django.utils import timezone
 
 from genes.models import GeneSymbol
+from ontology.enums import OntologyService
 from ontology.management.commands import ontology_import
-from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
+from ontology.models import OntologyImport, OntologyTerm, OntologyVersion
 from ontology.ontology_builder import OntologyBuilderDataUpToDateException
 
 # HGNC terms so phenotype_to_genes.txt can link OMIM -> gene (the other symbols in the file stay unresolved)

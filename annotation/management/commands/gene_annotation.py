@@ -23,10 +23,9 @@ from library.django_utils.django_file_utils import (
     get_import_processing_filename,
     remove_import_processing_dir,
 )
+from ontology.enums import GeneDiseaseClassification, OntologyService
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
-    GeneDiseaseClassification,
-    OntologyService,
     OntologyTermRelation,
     OntologyVersion,
 )

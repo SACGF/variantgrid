@@ -30,7 +30,7 @@ from annotation.models import AnnotationVersion, ManualVariantEntryCollection, V
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
 from patients.enums import GnomADPopulation, Sex
 from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
 from snpdb.enums import (

@@ -16,15 +16,14 @@ from django.utils import timezone
 from annotation.enums import HPOSynonymScope
 from annotation.models import InvalidAnnotationVersionError
 from genes.models import HGNC, HGNCImport
+from ontology.enums import OntologyService, OntologyTermStatus
 from ontology.gencc import load_gencc
 from ontology.models import (
     OntologyImport,
     OntologyImportSource,
     OntologyRelation,
-    OntologyService,
     OntologyTerm,
     OntologyTermRelation,
-    OntologyTermStatus,
     OntologyVersion,
 )
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException

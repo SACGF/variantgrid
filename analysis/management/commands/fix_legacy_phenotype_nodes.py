@@ -9,7 +9,8 @@ from django.core.management import BaseCommand
 from django.db import IntegrityError
 
 from analysis.models import PhenotypeNodeOntologyTerm
-from ontology.models import OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyTerm
 
 
 class Command(BaseCommand):

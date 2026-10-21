@@ -58,8 +58,9 @@ from library.utils import (
     iter_fixed_chunks,
     sha256sum_str,
 )
+from ontology.enums import GeneDiseaseClassification
 from ontology.grids import AbstractOntologyGenesConfig
-from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
+from ontology.models import OntologyTermRelation, OntologyVersion
 from patients.enums import Zygosity
 from snpdb.enums import ProcessingStatus, SequenceRole
 from snpdb.grid_columns.custom_columns import (

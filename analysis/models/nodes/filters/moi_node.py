@@ -15,7 +15,8 @@ from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import GeneSymbol
-from ontology.models import GeneDiseaseClassification, OntologyTermRelation
+from ontology.enums import GeneDiseaseClassification
+from ontology.models import OntologyTermRelation
 from ontology.models.models_ontology import OntologyTerm
 from patients.enums import Zygosity
 from patients.models import Patient

@@ -7,7 +7,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from library.constants import MINUTE_SECS
-from ontology.models import OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyTerm
 
 MONARCH_SEARCH_URL = 'https://api.monarchinitiative.org/v3/api/search'
 

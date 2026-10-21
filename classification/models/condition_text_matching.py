@@ -44,13 +44,8 @@ from library.django_utils.model_utils import ArrayLength
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import get_timer
-from ontology.models import (
-    OntologyRelation,
-    OntologyService,
-    OntologySnake,
-    OntologyTerm,
-    OntologyTermRelation,
-)
+from ontology.enums import OntologyService
+from ontology.models import OntologyRelation, OntologySnake, OntologyTerm, OntologyTermRelation
 from ontology.monarch_search import monarch_condition_text_search
 from ontology.ontology_matching import (
     IGNORE_TERMS,

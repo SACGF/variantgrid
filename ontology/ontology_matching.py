@@ -9,7 +9,8 @@ from django.urls import reverse
 from annotation.regexes import db_ref_regexes
 from library.log_utils import report_exc_info, report_message
 from library.utils import empty_to_none
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm
 from ontology.monarch_search import monarch_condition_text_search
 
 

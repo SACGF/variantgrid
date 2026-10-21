@@ -9,7 +9,8 @@ from django.views.decorators.cache import cache_page
 
 from library.constants import HOUR_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
-from ontology.models import OntologyIdNormalized, OntologyService, OntologyTerm, OntologyTermStatus
+from ontology.enums import OntologyService, OntologyTermStatus
+from ontology.models import OntologyIdNormalized, OntologyTerm
 
 
 class AbstractOntologyTermAutocompleteView(abc.ABC, AutocompleteView):
