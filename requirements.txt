@@ -887,9 +887,6 @@ django-crispy-forms==2.7 \
     # via
     #   -r requirements.in
     #   crispy-bootstrap4
-django-dag==1.4.3 \
-    --hash=sha256:e5b003c2352be3ec80f983efde4a848533685a4039d0f5ce2e558553a8109e81
-    # via -r requirements.in
 django-datetime-utc==1.0.6 \
     --hash=sha256:59a3c5c33a483ef4d3a007da54f8bd5dc77f6366b74671710b6f2ad4aea39400 \
     --hash=sha256:88e6276619ef401220e4abf660e56e500d5cd27b261076d92addc54190435b13

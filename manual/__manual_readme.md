@@ -59,5 +59,10 @@ Use `manage.py manual_gate` to list gate status.
 ## Obsolete tasks
 
 A `manage` task whose command has since been deleted is never auto-run (it would just crash) — it's
-reported as obsolete for review. `migrations/0004_complete_obsolete_manual_tasks.py` marks the known
-obsolete task ids complete so they drop out of the upgrade flow.
+reported as obsolete for review, where selecting it offers to mark it complete.
+
+## The migration squash
+
+Every app's migrations were squashed into fresh initials and a `seed_data` migration (#736); an older database
+upgrades through branch `migration_checkpoint` first. `squashed_history.py` holds the guard and the reset - see the
+paragraph in `claude/guides/operations.md#deploy-and-upgrade`.

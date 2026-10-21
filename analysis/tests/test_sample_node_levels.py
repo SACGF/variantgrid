@@ -20,7 +20,6 @@ import pickle
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.core.management import call_command
 from django.template import Context, Template
 from django.test import TestCase, override_settings
 from django.urls.base import reverse
@@ -43,7 +42,6 @@ from analysis.models import (
     VariantTag,
     ZygosityNode,
 )
-from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.related_analyses import get_related_analysis_details_for_samples
@@ -918,54 +916,10 @@ class VariantTagPatientTest(SampleNodeLevelsTestCase):
         self.assertEqual(tagging["patient"], self.patient.pk)
         self.assertEqual(tagging["patient_name"], str(self.patient))
 
-    # ── The backfill ──────────────────────────────────────────────────────────
-
     def _old_tagging(self, node=None, sample=None) -> VariantTag:
         """ A tagging from before the field existed - patient null """
         return VariantTag.objects.create(variant=self.v_snv, tag=self.tag, genome_build=self.grch37,
                                          analysis=self.analysis, node=node, sample=sample, user=self.user)
-
-    def _two_patient_node(self):
-        other_patient, other_sample = self._other_patient()
-        merge = MergeNode.objects.create(analysis=self.analysis)
-        merge.add_parent(self.patient_node)
-        merge.add_parent(self._node(SampleSourceLevel.SAMPLE, other_sample))
-        return merge, other_patient
-
-    def test_backfill_takes_the_patient_from_the_node(self):
-        variant_tag = self._old_tagging(node=self.patient_node)
-
-        call_command("one_off_backfill_variant_tag_patient")
-
-        variant_tag.refresh_from_db()
-        self.assertEqual(variant_tag.patient, self.patient)
-
-    def test_backfill_takes_the_patient_of_a_tagging_that_has_a_sample(self):
-        """ The sample is the more specific answer, even where the graph has since become ambiguous """
-        merge, _ = self._two_patient_node()
-        variant_tag = self._old_tagging(node=merge, sample=self.snv_sample)
-
-        call_command("one_off_backfill_variant_tag_patient")
-
-        variant_tag.refresh_from_db()
-        self.assertEqual(variant_tag.patient, self.patient)
-
-    def test_backfill_leaves_a_two_patient_node_alone(self):
-        merge, _ = self._two_patient_node()
-        variant_tag = self._old_tagging(node=merge)
-
-        call_command("one_off_backfill_variant_tag_patient")
-
-        variant_tag.refresh_from_db()
-        self.assertIsNone(variant_tag.patient)
-
-    def test_backfill_dry_run_writes_nothing(self):
-        variant_tag = self._old_tagging(node=self.patient_node)
-
-        call_command("one_off_backfill_variant_tag_patient", "--dry-run")
-
-        variant_tag.refresh_from_db()
-        self.assertIsNone(variant_tag.patient)
 
     # ── The classify form ─────────────────────────────────────────────────────
 

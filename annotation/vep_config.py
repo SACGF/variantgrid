@@ -65,11 +65,7 @@ def vep_component_version_kwargs(build_settings: dict) -> dict:
         line. Takes the raw settings.ANNOTATION[build] dict (@see #462).
 
         Values come from the configured paths alone, with no filesystem access, so this returns the same
-        answer on a web node as on an annotation node.
-
-        annotation/migrations/0161_vep_command_line_component_versions.py imports this to backfill
-        existing versions, so it runs during upgrades - keep it pure (no VEP, no disk, no DB), and be
-        aware that changing what it returns changes what that migration writes. """
+        answer on a web node as on an annotation node. """
 
     vep_config_data = build_settings.get("vep_config", {})
     kwargs = {field: _pin_basename(vep_config_data.get(key))

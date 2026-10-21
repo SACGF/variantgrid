@@ -103,7 +103,15 @@ once per process from the checkout and reported by the API docs and `variantgrid
 new major means bumping that setting in the same commit as the tag.
 
 Pushed migrations stay as they are unless the user says an edit is safe (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
-migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
+migration, not a note in a PR.
+
+Every app's migrations start from fresh initials plus a `seed_data` migration (the rows a fresh database starts with),
+with no `replaces`, so a database from before the squash first upgrades through the dead-end branch
+`migration_checkpoint`: its last migration (`manual 0009_migration_checkpoint`) depends on every app's final old
+migration and refuses while manual tasks are outstanding, since their one-off commands are gone here. Back on this
+branch, `manual/squashed_history.py` refuses to run (system check, and `pre_migrate`) against an old history until the
+upgrader's `s` step (`reset_squashed_migration_history`) swaps the old django_migrations rows for the new initials.
+A seed migration is `initial = True` so that reset records it; nothing added after the squash may be. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.
 

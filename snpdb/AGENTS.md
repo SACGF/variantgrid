@@ -47,7 +47,7 @@ Gotchas:
 - T2T has no MT contig and must not share GRCh37/38's: CHM13's own mitochondrion (CP068254.1, UCSC hs1 chrM) is rCRS rotated to start at rCRS 577 with indels, so every position differs. bcftools_liftover.py:check_bcftools_destination_has_chrom rejects such records before the bcftools VCF - one record on a chrom the destination lacks fails the whole run.
 - Liftover has left an Allele with 2 VariantAlleles in the destination build - the real match plus a
   "build difference" variant that other Alleles at the locus also picked up. That's what a variant with 2
-  ClinGen Alleles is; `one_off_dedupe_variant_alleles` drops the artefact link rather than merging them.
+  ClinGen Alleles is: drop the artefact link rather than merging the Alleles.
 - A tool that has ever errored on an allele/build is skipped forever (models/models_variant.py:AlleleLiftover.get_failed_conversion_tools),
   which is why re-clicking liftover does nothing. Pass `retry_conversion_tools=` to liftover.py:create_liftover_pipelines to
   override it for chosen tools - the liftover page's per-tool retry buttons, "Create Variant" and the admin action all do (#1273).

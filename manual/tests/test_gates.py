@@ -1,5 +1,4 @@
 from contextlib import redirect_stdout
-from importlib import import_module
 from io import StringIO
 from unittest.mock import patch
 
@@ -24,12 +23,6 @@ from manual.upgrader import (
     record_attempt,
     run_scheduler,
 )
-
-# Migration module names start with a digit, so they can't be imported with normal import syntax.
-complete_obsolete_tasks = import_module(
-    "manual.migrations.0004_complete_obsolete_manual_tasks").complete_obsolete_tasks
-backfill_requires = import_module(
-    "manual.migrations.0005_backfill_manual_task_requires").backfill_requires
 
 
 class GateResolutionTest(TestCase):
@@ -152,40 +145,6 @@ class OutstandingRunnableTest(TestCase):
             result = obsolete.run()
         self.assertEqual(result.status, StepStatus.SKIP)  # SKIP -> upgrader records no attempt
         self.assertIsNotNone(ManualMigrationOutstanding.outstanding_task(task))
-
-
-class ObsoleteCleanupTest(TestCase):
-    """ complete_obsolete_tasks (manual/0004): retire dead tasks, never touch ones we keep. """
-
-    def _request(self, task):
-        ManualMigrationRequired.objects.create(task=task)
-
-    def _outstanding(self, task):
-        return ManualMigrationOutstanding.outstanding_task(task) is not None
-
-    def test_completes_obsolete_but_leaves_kept_tasks(self):
-        # command deleted -> completed generically (can't run anyway)
-        missing_cmd = ManualMigrationTask.objects.create(id="manage*one_off_calc_variant_end")
-        # command still exists, but this exact variant is a vetted skip
-        skip_variant = ManualMigrationTask.objects.create(id="manage*gene_annotation --add-missing-omim")
-        # free-text reminder retired by exact id
-        reminder = ManualMigrationTask.objects.create(
-            id='other*"Import dbNSFP gene annotation (see annotation page)"')
-        # kept: a sibling of the skipped variant, a live command, and an unrelated human step
-        kept_sibling = ManualMigrationTask.objects.create(id="manage*gene_annotation --new-releases")
-        kept_command = ManualMigrationTask.objects.create(id="manage*migrate")
-        kept_reminder = ManualMigrationTask.objects.create(id='other*"A human step we keep"')
-        for t in (missing_cmd, skip_variant, reminder, kept_sibling, kept_command, kept_reminder):
-            self._request(t)
-
-        complete_obsolete_tasks(apps, None)
-
-        self.assertFalse(self._outstanding(missing_cmd))
-        self.assertFalse(self._outstanding(skip_variant))
-        self.assertFalse(self._outstanding(reminder))
-        self.assertTrue(self._outstanding(kept_sibling))    # exact-id match must not hit siblings
-        self.assertTrue(self._outstanding(kept_command))
-        self.assertTrue(self._outstanding(kept_reminder))
 
 
 class SchedulerTest(TestCase):

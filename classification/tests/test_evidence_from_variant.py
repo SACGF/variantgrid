@@ -84,7 +84,7 @@ class GeneLevelGeneSymbolTest(TestCase):
                             previous_symbols="MYCL1")
         GeneSymbolAlias.objects.create(alias="MYCL1", gene_symbol_id="MYCL", source=GeneSymbolAliasSource.HGNC)
 
-        # AR is seeded with the junctions the TSO 500 panel reports (genes/migrations/0093)
+        # AR is seeded with the junctions the TSO 500 panel reports (genes seed data)
         GeneSymbol.objects.get_or_create(symbol="AR")
         HGNC.objects.create(pk=644, gene_symbol_id="AR", hgnc_import=hgnc_import,
                             status=HGNCStatus.APPROVED, approved_name="androgen receptor")
