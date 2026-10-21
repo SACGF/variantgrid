@@ -34,15 +34,9 @@ from genes.models import GeneList, GeneListGeneSymbol
 from ontology.models import OntologyTerm
 from patients.enums import GnomADPopulation
 from pedigree.models import PedigreeInheritance
+from snpdb.enums import BuiltInFilters, ImportStatus
 from snpdb.fake_data import create_fake_pedigree, create_fake_trio
-from snpdb.models import (
-    AbstractNodeCountSettings,
-    BuiltInFilters,
-    GenomeBuild,
-    ImportStatus,
-    Tag,
-    Variant,
-)
+from snpdb.models import AbstractNodeCountSettings, GenomeBuild, Tag, Variant
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

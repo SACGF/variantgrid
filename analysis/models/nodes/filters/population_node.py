@@ -16,8 +16,8 @@ from annotation.models.models import VariantAnnotation
 from classification.models.classification import Classification
 from library.constants import MINUTE_SECS
 from patients.enums import GnomADPopulation, SimpleZygosity
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import VariantZygosityCountCollection
-from snpdb.models.models_enums import ClinicalSignificance
 
 
 class PopulationNode(AnalysisNode):

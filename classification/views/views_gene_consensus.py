@@ -29,7 +29,7 @@ from classification.models.classification_consensus import (
 )
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 
 
 def _as_date(value: Union[date, datetime]) -> date:

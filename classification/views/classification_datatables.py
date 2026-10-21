@@ -22,9 +22,9 @@ from genes.hgvs import HGVSDisplay
 from genes.models import TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Lab, UserSettings, Variant
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']

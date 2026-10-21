@@ -20,6 +20,7 @@ from library.django_utils import (
     get_model_fields,
     set_form_read_only,
 )
+from snpdb.enums import AlleleOriginBucket
 from snpdb.forms import (
     LabForm,
     LabMemberForm,
@@ -38,7 +39,6 @@ from snpdb.models import (
     State,
     UserSettings,
 )
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.utils import LabNotificationBuilder
 
 

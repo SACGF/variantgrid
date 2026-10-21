@@ -4,8 +4,9 @@ from django.core.management.base import BaseCommand
 from library.guardian_utils import admin_bot
 from library.utils import iter_fixed_chunks
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.enums import ImportSource
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, GenomeBuild, ImportSource, Variant
+from snpdb.models import Allele, GenomeBuild, Variant
 
 
 class Command(BaseCommand):

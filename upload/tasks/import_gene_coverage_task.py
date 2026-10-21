@@ -11,7 +11,8 @@ from genes.models import GeneCoverageCollection, TranscriptVersion
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
 from seqauto.models.models_seqauto import QCGeneCoverage
-from snpdb.models import DataState, GenomeBuild, Sample
+from snpdb.enums import DataState
+from snpdb.models import GenomeBuild, Sample
 from upload.models import UploadedGeneCoverage
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app

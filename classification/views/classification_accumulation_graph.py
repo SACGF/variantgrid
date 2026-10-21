@@ -18,8 +18,8 @@ from classification.models import (
 )
 from flags.models import FlagComment
 from library.utils import IterableStitcher, IterableTransformer, delimited_row
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @total_ordering

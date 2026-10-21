@@ -8,6 +8,7 @@ from analysis.grids import VariantGrid
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils import FakeRequest
+from snpdb.enums import VCFInfoTypes
 from snpdb.grid_columns.grid_sample_columns import (
     COPY_NUMBER_COLUMN,
     get_available_format_columns,
@@ -15,7 +16,6 @@ from snpdb.grid_columns.grid_sample_columns import (
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.models import VCFFormat
-from snpdb.models.models_enums import VCFInfoTypes
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from snpdb.views.datatable_view import datatable_response
 from upload.vcf.vcf_import import get_copy_number_field

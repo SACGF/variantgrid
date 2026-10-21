@@ -25,12 +25,10 @@ from library.guardian_utils import DjangoPermission
 from library.utils import rgb_invert
 from ontology.models import OntologyTerm
 from patients.models import Patient
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     GenomeBuild,
     Sample,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
 )
 
 

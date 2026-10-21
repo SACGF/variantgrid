@@ -34,8 +34,8 @@ from seqauto.models import (
 from seqauto.sequencing_files.sample_sheet import current_sample_sheet_data_changed
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from seqauto.signals.signals_list import sequencing_run_created_signal
+from snpdb.enums import SampleFileType
 from snpdb.models import Manufacturer
-from snpdb.models.models_enums import SampleFileType
 
 
 class ManufacturerSerializer(serializers.ModelSerializer):

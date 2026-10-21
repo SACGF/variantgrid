@@ -35,7 +35,7 @@ from analysis.models.nodes.node_version import NodeTask, NodeVersion
 from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
 from library.utils.collection_utils import toposort_groups
-from snpdb.models.models_enums import TagFilter
+from snpdb.enums import TagFilter
 from variantgrid.celery import app
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"

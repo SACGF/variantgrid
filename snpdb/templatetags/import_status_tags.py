@@ -4,7 +4,7 @@ grids draw through TableFormat.importStatus (@see ImportStatus.icon_css)
 """
 from django.template import Library
 
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 
 register = Library()
 

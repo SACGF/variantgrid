@@ -31,6 +31,7 @@ from snpdb.clingen_allele_api import (
     ClinGenAlleleServerException,
     ClinGenAlleleTooLargeException,
 )
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ClinGenAlleleExternalRecordType
 from snpdb.models import (
     Allele,
     ClinGenAllele,
@@ -40,11 +41,6 @@ from snpdb.models import (
     Variant,
     VariantAllele,
     VariantCoordinate,
-)
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ClinGenAlleleExternalRecordType,
 )
 
 

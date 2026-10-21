@@ -6,8 +6,8 @@ from classification.enums import SpecialEKeys
 from library.genomics.vcf_enums import VCFConstant
 from patients.enums import Sex, TissueStatus, Zygosity
 from patients.models import Extraction
+from snpdb.enums import VariantOrigin
 from snpdb.models import Sample, SampleGenotype
-from snpdb.models.models_enums import VariantOrigin
 from snpdb.models.models_variant import Variant
 
 

@@ -33,6 +33,15 @@ from library.utils import JsonDataType, JsonObjType, calculate_age
 from ontology.models import OntologyService
 from patients.enums import GnomADPopulation, Sex
 from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
+from snpdb.enums import (
+    AlleleConversionTool,
+    DuoRelationship,
+    ImportSource,
+    ImportStatus,
+    ProcessingStatus,
+    SuperPopulationCode,
+    VariantOrigin,
+)
 from snpdb.grid_columns.custom_columns import (
     get_variant_grid_columns,
     get_variantgrid_extra_annotate,
@@ -40,30 +49,23 @@ from snpdb.grid_columns.custom_columns import (
 from snpdb.models import (
     VCF,
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
     ClinGenAllele,
     Cohort,
     CohortGenotypeStats,
     CustomColumnsCollection,
     Duo,
-    DuoRelationship,
     GenomeBuild,
     GenomicIntervalsCollection,
-    ImportSource,
-    ImportStatus,
     LiftoverRun,
-    ProcessingStatus,
     Quad,
     Sample,
-    SuperPopulationCode,
     TagConfigCollection,
     Trio,
     UserGridConfig,
     UserSettings,
     Variant,
     VariantAllele,
-    VariantOrigin,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q

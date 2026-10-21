@@ -36,11 +36,11 @@ from seqauto.models import (
     VCFFromSequencingRun,
 )
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
+from snpdb.enums import ImportSource, ImportStatus, VariantOrigin, VCFInfoTypes
 from snpdb.models import (
     VCF,
     AbstractVCFField,
     Cohort,
-    ImportStatus,
     Sample,
     UserSettings,
     VCFFilter,
@@ -48,7 +48,6 @@ from snpdb.models import (
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, VariantOrigin, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (

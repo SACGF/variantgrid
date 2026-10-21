@@ -49,8 +49,8 @@ from seqauto.models import (
 from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from seqauto.qc.sequencing_run_utils import SEQUENCING_RUN_QC_COLUMNS
+from snpdb.enums import ProcessingStatus
 from snpdb.models import VCF, Sample, UserSettings
-from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadedFileTypes, UploadPipeline
 from upload.tasks.retry_upload_pipelines_task import (
     fail_stuck_upload_pipelines,

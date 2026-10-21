@@ -29,13 +29,8 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.enums import Sex
 from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
+from snpdb.enums import ImportStatus, SampleFileType, VariantOrigin, VCFInfoTypes
 from snpdb.models.models import CodeVersionMixin, LabProject
-from snpdb.models.models_enums import (
-    ImportStatus,
-    SampleFileType,
-    VariantOrigin,
-    VCFInfoTypes,
-)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Variant
 

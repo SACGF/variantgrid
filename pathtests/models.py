@@ -26,8 +26,8 @@ from patients.models import (
     Patient,
 )
 from seqauto.models import EnrichmentKit, Experiment, SequencingRun
+from snpdb.enums import ImportStatus
 from snpdb.models import Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
 
 
 class PathologyTest(TimeStampedModel):

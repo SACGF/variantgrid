@@ -11,7 +11,8 @@ from django.views.generic import FormView
 from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
 from analysis.models.enums import DuoSample, QuadSample, TrioSample
 from patients.enums import Sex
-from snpdb.models import Cohort, Duo, ImportStatus, Quad, Sample, Trio
+from snpdb.enums import ImportStatus
+from snpdb.models import Cohort, Duo, Quad, Sample, Trio
 
 
 def _confident_sex(sample: Sample) -> Sex:

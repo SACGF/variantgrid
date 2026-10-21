@@ -60,9 +60,9 @@ from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
 from review.models import Review
+from snpdb.enums import ClinicalSignificance
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, LabLike
-from snpdb.models.models_enums import ClinicalSignificance
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant

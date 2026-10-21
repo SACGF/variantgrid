@@ -20,8 +20,8 @@ from analysis.tasks.analysis_grid_export_tasks import (
     get_zipped_csv_filename,
 )
 from library.log_utils import report_exc_info
+from snpdb.enums import ImportStatus
 from snpdb.models import CachedGeneratedFile, Cohort
-from snpdb.models.models_enums import ImportStatus
 from upload.models import FileUpload
 from upload.upload_metadata import UploadMetadataError
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file

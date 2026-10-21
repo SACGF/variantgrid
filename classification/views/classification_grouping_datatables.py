@@ -39,9 +39,9 @@ from genes.models import GeneSymbol, TranscriptVersion
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
+from snpdb.enums import AlleleOriginBucket
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 
 

@@ -9,7 +9,9 @@ from annotation.models import (
 )
 from classification.enums import OverlapType
 from classification.models import (
-    OverlapStatus, Classification, Overlap,
+    Classification,
+    Overlap,
+    OverlapStatus,
 )
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -17,9 +19,10 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import link_allele_to_existing_variants
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ImportSource
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, AlleleConversionTool, AlleleOrigin, ImportSource
+from snpdb.models import Allele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_genome_build_or_404

@@ -23,8 +23,8 @@ from library.django_utils import get_url_from_view_path
 from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"

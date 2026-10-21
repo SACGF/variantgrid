@@ -20,7 +20,8 @@ from library.django_utils.guardian_permissions_mixin import (
 )
 from library.preview_request import PreviewModelMixin, SvgSymbolPreviewIconMixin
 from patients.enums import Sex
-from snpdb.models import Cohort, CohortSample, GenomeBuild, ImportStatus, Sample, SomalierRelate
+from snpdb.enums import ImportStatus
+from snpdb.models import Cohort, CohortSample, GenomeBuild, Sample, SomalierRelate
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):

@@ -56,6 +56,7 @@ from snpdb.archive import (
     restore_vcf,
     vcf_can_be_archived,
 )
+from snpdb.enums import ImportStatus
 from snpdb.forms import (
     SampleChoiceForm,
     SampleForm,
@@ -79,9 +80,6 @@ from snpdb.models import (
     VariantZygosityCountForVCF,
     VCFLengthStatsCollection,
     get_igv_data,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
 )
 from snpdb.models.models_somalier import DUPLICATE_SAMPLE_RELATEDNESS
 from snpdb.sample_file_path import (

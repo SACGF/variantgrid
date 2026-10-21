@@ -13,7 +13,7 @@ from genes.models import GeneCoverageCollection
 from genes.tasks.gene_coverage_tasks import reload_gene_coverage_collection
 from library.log_utils import log_traceback
 from seqauto.models import QCGeneCoverage, SequencingRun
-from snpdb.models import DataState
+from snpdb.enums import DataState
 
 
 class Command(BaseCommand):

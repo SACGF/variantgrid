@@ -21,6 +21,7 @@ from patients.models import (
     Specimen,
 )
 from patients.sample_grouping import get_patient_sample_tree, get_sample_group, sample_as_json
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -28,7 +29,6 @@ from snpdb.models import (
     CohortGenotypeStats,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Sample,
     SampleStatsCodeVersion,
     VCFFilter,

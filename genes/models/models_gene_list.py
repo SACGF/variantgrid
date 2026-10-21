@@ -23,8 +23,8 @@ from library.guardian_utils import (
     DjangoPermission,
     assign_permission_to_user_and_groups,
 )
+from snpdb.enums import ImportStatus
 from snpdb.models import Company, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
 
 
 class GeneListCategory(models.Model):

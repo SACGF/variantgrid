@@ -20,8 +20,9 @@ from analysis.models.nodes.family_inheritance import MOSAIC_JOINT_CALL_WARNING
 from analysis.models.nodes.sources.duo_node import COMP_HET_SIBLING_UNPHASED
 from annotation.fake_data import get_fake_annotation_version
 from patients.enums import Sex, Zygosity
+from snpdb.enums import DuoRelationship
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_duo, make_cohort_genotype
-from snpdb.models import Duo, DuoRelationship, GenomeBuild, Variant
+from snpdb.models import Duo, GenomeBuild, Variant
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

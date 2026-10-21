@@ -17,7 +17,8 @@ from analysis.models.nodes.stats_cache import (
 )
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from patients.enums import SimpleZygosity, Zygosity
-from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample, VariantOrigin
+from snpdb.enums import VariantOrigin
+from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample
 from snpdb.views.datatable_view import NullOrder, RichColumn
 
 

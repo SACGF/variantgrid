@@ -19,12 +19,11 @@ from django.db.models.query_utils import Q
 from library.django_utils.data_archive_mixin import DataArchivedError
 from patients.enums import SampleSourceLevel, TissueStatus
 from patients.models import Extraction, Patient, Specimen
+from snpdb.enums import CohortGenotypeCollectionType, ImportStatus
 from snpdb.models import (
     CohortGenotypeCollection,
-    CohortGenotypeCollectionType,
     CohortGenotypeStats,
     GenomeBuild,
-    ImportStatus,
     Sample,
     VCFFilter,
 )

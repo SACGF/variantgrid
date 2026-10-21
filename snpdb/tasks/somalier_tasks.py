@@ -31,11 +31,11 @@ from library.log_utils import get_traceback
 from library.utils import execute_cmd
 from patients.enums import Zygosity
 from patients.models import Patient
+from snpdb.enums import ProcessingStatus, SuperPopulationCode
 from snpdb.models import (
     VCF,
     AbstractSomalierModel,
     Cohort,
-    ProcessingStatus,
     Sample,
     SomalierAllSamplesRelate,
     SomalierAncestry,
@@ -50,7 +50,6 @@ from snpdb.models import (
     SomalierSampleExtract,
     SomalierTrioRelate,
     SomalierVCFExtract,
-    SuperPopulationCode,
     Trio,
 )
 from snpdb.models.models_somalier import AbstractSomalierRelatePair, get_sample_patient_ids
