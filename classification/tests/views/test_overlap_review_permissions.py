@@ -1,5 +1,8 @@
+from datetime import date
+from importlib import import_module
 from unittest.mock import PropertyMock, patch
 
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -8,7 +11,9 @@ from django.utils import timezone
 from classification.enums.overlaps_enums import ClassificationResultValue, OverlapType
 from classification.models.overlaps_model import Overlap
 from classification.tests.models.test_utils import ClassificationTestUtils
-from review.models import Review, ReviewTopic
+from review.models import Review, ReviewQuestion, ReviewTopic
+
+create_discordance_report_topic = import_module("review.migrations.0005_discordance_report_topic")._create_discordance_report_topic
 
 
 class OverlapReviewPermissionTestCase(TestCase):
@@ -18,7 +23,7 @@ class OverlapReviewPermissionTestCase(TestCase):
         ClassificationTestUtils.setUp()
         self.lab, self.lab_user = ClassificationTestUtils.lab_and_user()
         self.outsider = User.objects.get_or_create(username="overlap_review_outsider")[0]
-        self.topic = ReviewTopic.objects.get_or_create(key="discordance_report", defaults={"name": "Discordance"})[0]
+        self.topic = ReviewTopic.objects.get(pk="discordance_report")  # seeded by review migration 0005
         self.overlap = Overlap.objects.create(overlap_type=OverlapType.SINGLE_CONTEXT,
                                               value_type=ClassificationResultValue.ONC_PATH)
         self.reviewed_object = self.overlap.reviews_safe
@@ -57,3 +62,51 @@ class OverlapReviewPermissionTestCase(TestCase):
         self.assertEqual(response.status_code, 403)
         review.refresh_from_db()
         self.assertFalse(review.is_complete)
+
+    def test_edit_keeps_review_date_and_records_editor(self):
+        review = self._review()
+        review.review_date = date(2024, 1, 2)
+        review.save()
+        editor = User.objects.get_or_create(username="overlap_review_editor")[0]
+        url = reverse("edit_review", kwargs={"review_id": review.pk})
+        self.client.force_login(editor)
+        with patch.object(Overlap, "can_review", return_value=True):
+            self.assertEqual(self.client.get(url).context["form"]["review_date"].initial, "2024-01-02")
+            question = self.topic.questions[0]
+            self.client.post(url, {
+                "review_date": "2024-01-02",
+                "review_method-email": "on",
+                "review_participants-curation": "on",
+                f"reviewing_labs-{self.lab.pk}": "on",
+                question.key: "on",
+                f"{question.key}-details": "Agreed on PM2",
+                f"{question.key}-resolution": "Y",
+            })
+        review.refresh_from_db()
+        self.assertEqual(review.review_date, date(2024, 1, 2))
+        self.assertEqual(review.user, editor)
+
+    def test_answers_skip_deleted_question(self):
+        kept, deleted = self.topic.questions[:2]
+        review = self._review()
+        review.meeting_meta = {"answers": {q.key: {"resolution": "Y"} for q in (kept, deleted)}}
+        ReviewQuestion.objects.filter(pk=deleted.pk).delete()
+        self.assertEqual([a.question for a in review.answers], [kept])
+
+
+class DiscordanceReportTopicMigrationTestCase(TestCase):
+    """ Re-running the seed migration over an admin-configured topic must not change it """
+
+    def test_existing_topic_and_questions_are_kept(self):
+        topic = ReviewTopic.objects.get(pk="discordance_report")
+        ReviewQuestion.objects.filter(topic=topic).delete()
+        ReviewTopic.objects.filter(pk=topic.pk).update(name="Lab's own name", heading="Lab's own heading")
+        ReviewQuestion.objects.create(topic=topic, key="evidence_lab", heading="Custom", label="Edited label",
+                                      order=7, enabled=False)
+        before = list(ReviewQuestion.objects.values())
+
+        create_discordance_report_topic(apps, None)
+
+        topic.refresh_from_db()
+        self.assertEqual((topic.name, topic.heading), ("Lab's own name", "Lab's own heading"))
+        self.assertEqual(list(ReviewQuestion.objects.values()), before)

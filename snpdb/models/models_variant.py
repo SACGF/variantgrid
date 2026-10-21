@@ -558,12 +558,29 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_internal_canonical_form(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Make sure we only have 1 representation for a variant - symbolic only at or beyond
-            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be """
+            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be, and a
+            symbolic svlen with its canonical sign (canonical_svlen) """
         if not self.is_symbolic:
             return self.as_internal_symbolic(genome_build)
         if self.can_be_made_explicit and abs(self.svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
             return self.as_external_explicit(genome_build)
+        canonical_svlen = self.canonical_svlen(self.alt, self.svlen)
+        if canonical_svlen != self.svlen:
+            return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=self.alt,
+                                     svlen=canonical_svlen)
         return self
+
+    @staticmethod
+    def canonical_svlen(alt: str, svlen: Optional[int]) -> Optional[int]:
+        """ A <DEL>'s svlen is stored negative (VCF 4.3) unless VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE, when
+            every svlen is positive. A <DEL> imported with END but no SVLEN used to come out positive (#1340) """
+        if svlen is None:
+            return None
+        if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+            return abs(svlen)
+        if alt == VCFSymbolicAllele.DEL:
+            return -abs(svlen)
+        return svlen
 
     def as_vcf_coordinate(self, genome_build: GenomeBuild) -> VCFCoordinate:
         """ hgvs's VCF-spec form, for Babelfish, on the contig's RefSeq accession rather than our chrom name.

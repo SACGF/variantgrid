@@ -28,7 +28,6 @@ from variantgrid.deployment_validation.settings_check import (
 from variantgrid.deployment_validation.somalier_check import check_somalier
 from variantgrid.deployment_validation.systemd_check import check_systemd_units
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
-from variantgrid.deployment_validation.variant_check import check_symbolic_variants
 from variantgrid.deployment_validation.vep_check import check_vep
 from variantgrid.deployment_validation.vep_columns_check import check_vep_columns_registry
 
@@ -60,7 +59,6 @@ class Command(BaseCommand):
             "Columns": check_variantgrid_columns(),
             "VEP Columns Registry": check_vep_columns_registry(),
             "VEP": check_vep(),
-            "Symbolic variants": check_symbolic_variants(),
             "Liftover": check_alleles_never_lifted_over(),
             "Memory": check_memory_protection(),
             "systemd units": check_systemd_units(),

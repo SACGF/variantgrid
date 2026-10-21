@@ -1,14 +1,14 @@
 """
 Brings stored del/dup/inv variants into line with settings.VARIANT_SYMBOLIC_ALT_SIZE: explicit ones at or
-over it become symbolic, symbolic ones under it become explicit. Where both forms of a variant are stored
-(#982, #2109), the copy without genotypes is merged into the other - its allele, classifications, tags and
-ClinVar records moved across - and deleted.
+over it become symbolic, symbolic ones under it become explicit, and a symbolic svlen gets its canonical sign
+(VariantCoordinate.canonical_svlen, #1340). Where both forms of a variant are stored (#982, #2109), the copy
+without genotypes is merged into the other - its allele, classifications, tags and ClinVar records moved
+across - and deleted.
 
 Run from migrations as a ManualOperation whenever the threshold changes (#1358). --dry-run reports the counts.
 Walks Variant pk ranges of --batch-size, printing progress after each.
 """
 from collections import Counter
-from functools import cache
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -18,16 +18,17 @@ from django.db.models.functions import Length
 
 from annotation.annotation_pipeline_routing import EXPLICIT_SYMBOLIC_ALTS, pipeline_type_for_variant
 from annotation.models import AnnotationRangeLock, VariantAnnotation
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import sha256sum_str
 from snpdb.enums import AlleleConversionTool
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VariantAllele
 
 
-@cache
-def _get_sequence(seq: str) -> Sequence:
-    """ By hash - seq itself isn't indexed. Created on first sight, so eg <DEL> won't exist on a legacy DB """
-    sequence, _ = Sequence.objects.get_or_create(seq_sha256_hash=sha256sum_str(seq), defaults={"seq": seq})
-    return sequence
+def wrong_sign_svlen_q() -> Q:
+    """ Symbolic variants whose stored svlen sign is not VariantCoordinate.canonical_svlen's """
+    if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+        return Q(svlen__lt=0)
+    return Q(alt__seq=VCFSymbolicAllele.DEL, svlen__gt=0)
 
 
 class _NotMerged(Exception):
@@ -46,6 +47,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         batch_size = options["batch_size"]
+        self._sequences: dict[str, Sequence] = {}
         max_pk = Variant.objects.aggregate(m=Max("pk"))["m"] or 0
         changed_label = "to change" if dry_run else "changed"
         for genome_build in GenomeBuild.builds_with_annotation():
@@ -63,14 +65,15 @@ class Command(BaseCommand):
 
     @staticmethod
     def _non_canonical_candidates(genome_build, start: int, end: int) -> list[Variant]:
-        """ Explicit variants with a sequence long enough to be symbolic, and symbolic ones short enough to
-            be explicit, with start <= pk < end. Most explicit candidates are insertions or substitutions that
-            stay as they are """
+        """ Explicit variants with a sequence long enough to be symbolic, symbolic ones short enough to
+            be explicit, and symbolic ones with the wrong svlen sign, with start <= pk < end. Most explicit
+            candidates are insertions or substitutions that stay as they are """
         size = settings.VARIANT_SYMBOLIC_ALT_SIZE
         long_sequences = Sequence.objects.annotate(seq_length=Length("seq")).filter(seq_length__gt=size)
         q_explicit = Q(svlen__isnull=True) & (Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
         q_short_symbolic = Q(alt__seq__in=EXPLICIT_SYMBOLIC_ALTS, svlen__gt=-size, svlen__lt=size)
-        qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), q_explicit | q_short_symbolic,
+        q_non_canonical = q_explicit | q_short_symbolic | wrong_sign_svlen_q()
+        qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), q_non_canonical,
                                     pk__gte=start, pk__lt=end)
         # select_related as v.coordinate reads locus/contig/ref/alt
         return list(qs.select_related("locus__contig", "locus__ref", "alt").order_by("pk"))
@@ -98,14 +101,20 @@ class Command(BaseCommand):
             except _NotMerged as e:
                 stats[f"NOT merged - {e}"] += 1
 
-    @staticmethod
-    def _convert_in_place(v: Variant, canonical):
+    def _get_sequence(self, seq: str) -> Sequence:
+        """ By hash - seq itself isn't indexed. Created on first sight, so eg <DEL> won't exist on a legacy DB """
+        if (sequence := self._sequences.get(seq)) is None:
+            sequence, _ = Sequence.objects.get_or_create(seq_sha256_hash=sha256sum_str(seq), defaults={"seq": seq})
+            self._sequences[seq] = sequence
+        return sequence
+
+    def _convert_in_place(self, v: Variant, canonical):
         """ Same pk, so genotypes, annotation and range locks stay where they are. A converted variant under
             VariantAnnotationVersion.structural_variant_min_size keeps its STANDARD annotation, as that is still
             the pipeline it routes to """
         v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=canonical.position,
-                                              ref=_get_sequence(canonical.ref))[0]
-        v.alt = _get_sequence(canonical.alt)
+                                              ref=self._get_sequence(canonical.ref))[0]
+        v.alt = self._get_sequence(canonical.alt)
         v.svlen = canonical.svlen
         v.end = canonical.end  # Stored calculated field - nothing recalcs it on save
         v.save()

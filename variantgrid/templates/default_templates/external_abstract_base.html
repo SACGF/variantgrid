@@ -21,6 +21,7 @@
     <meta name="twitter:description" content="{% block twitter_description %}{{ site_description }}{% endblock %}">
 
 	<link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
+	<script src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
 	<script type="text/javascript">
 		$(document).ready(function () {
         {% block jsdocumentready %}{% endblock %}

@@ -4,12 +4,6 @@
     {# Define a JS function "hotspot_graph_click_func(text, transcript_accession, protein_position)" to get callbacks from plotly clicks  #}
     <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}"></div>
     <style>
-        /* Explicit height: plotly's .plot-container is height:100%, which quirks mode resolves against the viewport */
-        .hotspot-graph {
-            width: 100%;
-            height: 450px;
-        }
-
         .gnomad-af-slider {
             position: relative;
             margin-left: 15px;

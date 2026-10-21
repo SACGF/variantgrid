@@ -3,7 +3,8 @@ Which variants still need annotation: get_annotation_range_lock_and_unannotated_
 get_lowest_unannotated_variant_id decide where the next AnnotationRangeLock starts, and
 merge_pending_range_locks combines small pending locks into batch-sized ones (#2667). The scheduler
 in annotation/tasks/annotation_scheduler_task.py calls these. get_range_lock_gaps_with_variants finds
-variants left between locks, which the scheduler never goes back for (deployment_check reports them).
+variants left between locks, which the scheduler never goes back for (check_annotation_range_lock_gaps
+reports them).
 """
 import logging
 import sys
