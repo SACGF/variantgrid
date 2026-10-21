@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from library.log_utils import get_traceback
 from library.utils import format_called_process_error, full_class_name, import_class
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     PipelineFailedJobTerminateEarlyException,
     ProcessingStatus,
@@ -20,8 +21,6 @@ from upload.models import (
     SkipUploadStepException,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.tasks.upload_step_lease import UploadStepLeaseHeartbeat
 

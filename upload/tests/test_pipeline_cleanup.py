@@ -19,15 +19,13 @@ from library.django_utils.django_file_utils import (
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
+from upload.enums import UploadedFileTypes, UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedManualVariantEntryCollection,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.tasks.vcf.import_vcf_step_task import pipeline_success_task
 from upload.uploaded_file_type import retry_upload_pipeline

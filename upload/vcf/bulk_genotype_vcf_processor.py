@@ -27,15 +27,13 @@ from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models import CodeVersion
 from snpdb.models.models_enums import ProcessingStatus
+from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     ModifiedImportedVariant,
-    ModifiedImportedVariantOperation,
     PipelineFailedJobTerminateEarlyException,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
     VCFImporter,
-    VCFPipelineStage,
 )
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor

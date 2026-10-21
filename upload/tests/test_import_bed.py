@@ -11,8 +11,9 @@ from snpdb.forms import GenomicIntervalsCollectionForm
 from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import datatable_response
+from upload.enums import UploadedFileTypes
 from upload.grids import FileUploadColumns
-from upload.models import FileUpload, UploadedBed, UploadedFileTypes, UploadPipeline
+from upload.models import FileUpload, UploadedBed, UploadPipeline
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.upload_processing import process_uploaded_file
 

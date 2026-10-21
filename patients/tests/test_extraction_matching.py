@@ -24,7 +24,8 @@ from seqauto.models import SampleFromSequencingSample
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.models import ImportSource, Sample, Sequence
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline, UploadStep
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadPipeline, UploadStep
 from upload.vcf.vcf_import import (
     ExtractionMismatchException,
     assign_sample_extractions,

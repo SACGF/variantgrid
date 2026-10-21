@@ -18,7 +18,8 @@ from patients.models import (
 )
 from snpdb.models import ImportSource, Sex
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 
 class Test(URLTestCase):

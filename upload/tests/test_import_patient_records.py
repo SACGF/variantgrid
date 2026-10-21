@@ -14,7 +14,8 @@ from patients.import_records import get_patient_record_imports_dataframe
 from patients.models import Extraction, Patient, PatientColumns, PatientRecord, Specimen
 from patients.models_enums import NucleicAcid, Sex, TissueStatus
 from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, ProcessingStatus, Sample
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadPipeline
 from upload.upload_processing import process_uploaded_file
 from upload.uploaded_file_type import get_uploaded_file_type
 

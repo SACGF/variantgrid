@@ -21,15 +21,14 @@ from annotation.fake_data import get_fake_annotation_version
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CachedGeneratedFile, GenomeBuild
 from snpdb.models.models_enums import ImportSource, ProcessingStatus
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     SimpleVCFImportInfo,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 
 METRICS_OUTPUT_ORIG = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
                                    "MetricsOutput_orig.tsv")

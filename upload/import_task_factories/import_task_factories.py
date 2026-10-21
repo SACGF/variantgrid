@@ -8,6 +8,7 @@ from pandas.errors import EmptyDataError
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.utils import full_class_name, import_class
 from patients.models import PatientColumns
+from upload.enums import UploadedFileTypes, UploadStepTaskType, VCFPipelineStage
 from upload.import_task_factories.abstract_vcf_import_task_factory import (
     AbstractVCFImportTaskFactory,
 )
@@ -18,7 +19,6 @@ from upload.models import (
     UploadedClassificationImport,
     UploadedDragenTSO500CombinedVariantOutput,
     UploadedDragenTSO500MetricsOutput,
-    UploadedFileTypes,
     UploadedGeneCoverage,
     UploadedGeneList,
     UploadedLiftover,
@@ -29,17 +29,10 @@ from upload.models import (
     UploadedVCF,
     UploadedWikiCollection,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
-from upload.tso500 import (
-    dragen_all_fusions_parser,
-    dragen_combined_variant_output_parser,
-    dragen_metrics_output_parser,
-)
+from upload.tasks import import_gene_level_cnv_task, import_splicegirl_vcf_task
 from upload.tasks.import_analysis_task import ImportAnalysisTask
 from upload.tasks.import_bedfile_task import ImportBedFileTask
-from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_dragen_tso500_all_fusions_task import (
     DragenTSO500AllFusionsCreateVCFTask,
     DragenTSO500AllFusionsInsertTask,
@@ -50,7 +43,7 @@ from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
-from upload.tasks import import_gene_level_cnv_task
+from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_level_cnv_task import (
     GeneLevelCNVCreateVCFTask,
     GeneLevelCNVInsertTask,
@@ -58,7 +51,6 @@ from upload.tasks.import_gene_level_cnv_task import (
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
-from upload.tasks import import_splicegirl_vcf_task
 from upload.tasks.import_splicegirl_vcf_task import SpliceGirlCreateVCFTask
 from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
 from upload.tasks.import_wiki_task import (
@@ -87,6 +79,11 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFLinkAllelesSetMaxVariantTask,
     ProcessVCFLinkManualVariantEntrySetMaxVariantTask,
     ProcessVCFSetMaxVariantTask,
+)
+from upload.tso500 import (
+    dragen_all_fusions_parser,
+    dragen_combined_variant_output_parser,
+    dragen_metrics_output_parser,
 )
 from upload.upload_metadata import SEQUENCING_RUN, VCF_METADATA_KEYS
 

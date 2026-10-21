@@ -10,9 +10,10 @@ from analysis.models import Analysis, AnalysisEdge, MergeNode, SampleNode
 from annotation.fake_data import get_fake_annotation_version
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import ImportSource
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factories import AnalysisImportTaskFactory
 from upload.import_task_factories.import_task_factory import get_import_task_factory_from_extension
-from upload.models import FileUpload, UploadedAnalysis, UploadedFileTypes
+from upload.models import FileUpload, UploadedAnalysis
 from upload.tasks.import_analysis_task import ImportAnalysisTask
 
 

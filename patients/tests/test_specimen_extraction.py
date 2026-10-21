@@ -36,7 +36,8 @@ from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAuto
 from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, Sample
 from snpdb.models.models_enums import VariantOrigin
 from snpdb.search import SearchResultMatchStrength, search_data
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 _FAKE_CSV = os.path.join(os.path.dirname(__file__), "test_data", "fake_patient_records.csv")
 

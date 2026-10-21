@@ -38,7 +38,8 @@ from snpdb.models.models_variant import (
     VariantCoordinate,
 )
 from snpdb.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
-from upload.models import FileUpload, UploadedFileTypes, UploadedLiftover, UploadPipeline
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedLiftover, UploadPipeline
 from upload.upload_processing import process_upload_pipeline
 
 # VariantCoordinate can be None, with an error string at the end

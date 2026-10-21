@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from library.guardian_utils import admin_bot
 from library.log_utils import console_logger
 from snpdb.models.models_enums import ImportSource
-from upload.models import UploadedFileTypes
+from upload.enums import UploadedFileTypes
 from upload.upload_processing import process_vcf_file
 
 

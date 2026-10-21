@@ -16,10 +16,10 @@ from django.test import TestCase, override_settings
 from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedManualVariantEntryCollection,
     UploadPipeline,
 )

@@ -43,9 +43,9 @@ from library.genomics.vcf_writer import (
 )
 from library.utils.json_utils import json_dumps_nan_as_null
 from snpdb.models import GenomeBuild
+from upload.enums import ModifiedImportedVariantOperation
 from upload.models import (
     ModifiedImportedVariant,
-    ModifiedImportedVariantOperation,
     ModifiedImportedVariants,
     SimpleVCFImportInfo,
     UploadStep,

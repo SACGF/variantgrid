@@ -8,8 +8,8 @@ from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Allele, GenomeBuild, ImportSource, Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
+from upload.enums import UploadedFileTypes
 from upload.models import ModifiedImportedVariant, UploadStep
-from upload.models.models_enums import UploadedFileTypes
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 

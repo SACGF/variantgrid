@@ -5,7 +5,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from snpdb.models import ImportSource
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline, UploadStep
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadPipeline, UploadStep
 from upload.tasks.vcf.genotype_vcf_tasks import ImportCreateVCFModelForGenotypeVCFTask
 from upload.vcf.vcf_import import VCFSamplesRemovedException
 

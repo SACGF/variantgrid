@@ -12,15 +12,14 @@ from snpdb.grids import AbstractSkippedAnnotationColumns
 from snpdb.models import GenomeBuild, ProcessingStatus
 from snpdb.models.models_variant import Variant
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from upload.enums import UploadedFileTypes, VCFPipelineStage
 from upload.file_type_icons import file_type_icon_html
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
-    VCFPipelineStage,
 )
 from upload.uploaded_file_type import get_upload_data_by_file_upload_id
 from upload.views.views_json import get_remaining_annotation_runs

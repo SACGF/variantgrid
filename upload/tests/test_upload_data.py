@@ -10,11 +10,11 @@ from snpdb.models import VCF, ImportedWikiCollection, ImportSource
 from snpdb.models.models_enums import AlleleConversionTool
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     UploadedClassificationImport,
     UploadedClinVarVersion,
-    UploadedFileTypes,
     UploadedLiftover,
     UploadedManualVariantEntryCollection,
     UploadedVariantTags,

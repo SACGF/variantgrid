@@ -15,21 +15,23 @@ from library.log_utils import log_traceback
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus
 from upload import upload_processing
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     ImportSource,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadPipeline,
     VCFImportInfo,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.upload_metadata import (
     UploadMetadataError,
     get_metadata_keys_for_file_type,
     validate_upload_metadata,
 )
-from upload.uploaded_file_type import get_uploaded_file_type, get_url_and_data_for_uploaded_file_data
+from upload.uploaded_file_type import (
+    get_uploaded_file_type,
+    get_url_and_data_for_uploaded_file_data,
+)
 
 
 def _get_basic_uploaded_file_context(file_upload) -> dict:

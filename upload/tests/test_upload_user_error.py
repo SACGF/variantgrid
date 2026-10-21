@@ -5,14 +5,13 @@ from django.test import RequestFactory, TestCase
 
 from snpdb.models.models_enums import ImportSource
 from snpdb.views.datatable_view import datatable_response
+from upload.enums import UploadedFileTypes, UploadStepTaskType
 from upload.grids import FileUploadColumns
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
 )
 from upload.vcf.vcf_ref_check import VCFRefMismatchError
 

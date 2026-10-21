@@ -9,11 +9,10 @@ from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFSymbolicAllele
 from library.utils import sha256sum_str
 from snpdb.models import ImportSource, Sequence
+from upload.enums import ModifiedImportedVariantOperation, UploadedFileTypes
 from upload.models import (
     FileUpload,
-    ModifiedImportedVariantOperation,
     ModifiedImportedVariants,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,

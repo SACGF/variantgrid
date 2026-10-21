@@ -20,15 +20,14 @@ from django.utils import timezone
 
 from snpdb.models import VCF, GenomeBuild, ImportStatus
 from snpdb.models.models_enums import ImportSource
+from upload.enums import UploadedFileTypes, UploadStepTaskType
 from upload.models import (
     FileUpload,
     SimpleVCFImportInfo,
     ToolVersion,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
 )
 from upload.vcf.vcf_preprocess import (
     SORT_VCF_SUB_STEP,
