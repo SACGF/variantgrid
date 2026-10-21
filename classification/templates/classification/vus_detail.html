@@ -49,8 +49,8 @@
     <tr id="allele-{{ grouping.allele.pk }}-header">
         <td>
             <a href="{{ grouping.allele.get_absolute_url }}" class="hover-link">
-            {% for hgvs in grouping.c_hgvses %}
-                <div>{% c_hgvs hgvs %}</div>
+            {% for hgvs in grouping.hgvses %}
+                <div>{% hgvs hgvs %}</div>
             {% endfor %}
             </a>
             <div>
@@ -108,7 +108,7 @@
                 <tr>
                     <td>{{ grouping.allele.pk }}</td>
                     {% with strengths=lab_summary.latest.criteria_strengths %}
-                        <td data-search="{% for hgvs in grouping.c_hgvses %}{{ hgvs }} {% endfor %}">
+                        <td data-search="{% for hgvs in grouping.hgvses %}{{ hgvs }} {% endfor %}">
                             {{ lab_summary.lab }}
                             {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
                             {% clinical_significance_inline lab_summary.clinical_significance_to %}

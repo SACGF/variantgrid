@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
+from django.utils.safestring import mark_safe
 from requests import Response
 
 from classification.models import (
@@ -28,26 +29,29 @@ from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, So
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
     @staticmethod
-    def render_c_hgvs(data: CellData):
+    def render_hgvs(data: CellData):
         c_hgvs_str: Optional[str]
-        c_hgvs: Optional[HGVSDisplay]
+        hgvs: Optional[HGVSDisplay]
         variant_id: Optional[int] = None
         error: Optional[str] = None
+        p_hgvs: Optional[str] = None
 
         if '37' in data.key:
             c_hgvs_str = data.get('grch37__resolved_hgvs')
             variant_id = data.get('grch37__variant')
             error = data.get('grch37__error')
+            p_hgvs = data.get('grch37__p_hgvs')
         elif '38' in data.key:
             c_hgvs_str = data.get('grch38__resolved_hgvs')
             variant_id = data.get('grch38__variant')
             error = data.get('grch38__error')
+            p_hgvs = data.get('grch38__p_hgvs')
         else:
             c_hgvs_str = data.get(data.key)
 
         if c_hgvs_str:
-            if c_hgvs := HGVSDisplay.parse(c_hgvs_str):
-                json_data = c_hgvs.to_json()
+            if hgvs := HGVSDisplay.parse(dna_hgvs=c_hgvs_str, p_hgvs=p_hgvs):
+                json_data = hgvs.to_json()
                 # json_data['variant_id'] = variant_id
                 return json_data
             else:
@@ -80,7 +84,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('view_imported_allele_info_detail', expected_height=108)
+        self.set_expand_ajax('view_imported_allele_info_detail', expected_height=108)
 
         self.rich_columns = [
             RichColumn(
@@ -91,31 +95,31 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='imported_genome_build_patch_version',
-                label='Imported<br/>Genome Build',
+                label=mark_safe('Imported<br/>Genome Build'),
                 orderable=True
             ),
             RichColumn(
                 key='imported_c_hgvs',
-                label='Imported<br/>c.HGVS',
+                label=mark_safe('Imported<br/>c.HGVS'),
                 orderable=True,
-                renderer=ImportedAlleleInfoColumns.render_c_hgvs,
+                renderer=ImportedAlleleInfoColumns.render_hgvs,
                 client_renderer='VCTable.hgvs',
                 extra_columns=['imported_g_hgvs', 'variant_coordinate']
             ),
             RichColumn(
                 key='grch37__resolved_hgvs',
-                label='Resolved GRCh37<br/>c.HGVS',
+                label=mark_safe('Resolved GRCh37<br/>c.HGVS'),
                 orderable=True,
-                extra_columns=['grch37__variant', 'grch37__error'],
-                renderer=ImportedAlleleInfoColumns.render_c_hgvs,
+                extra_columns=['grch37__variant', 'grch37__error', 'grch37__p_hgvs'],
+                renderer=ImportedAlleleInfoColumns.render_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
             RichColumn(
                 key='grch38__resolved_hgvs',
-                label='Resolved GRCh38<br/>c.HGVS',
+                label=mark_safe('Resolved GRCh38<br/>c.HGVS'),
                 orderable=True,
-                extra_columns=['grch38__variant', 'grch38__error'],
-                renderer=ImportedAlleleInfoColumns.render_c_hgvs,
+                extra_columns=['grch38__variant', 'grch38__error', 'grch38__p_hgvs'],
+                renderer=ImportedAlleleInfoColumns.render_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
             RichColumn(
@@ -128,7 +132,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='classification_count',
-                label="<span style=\"font-size:10px\">Classification<br/>Record Count</span>",
+                label=mark_safe("<span style=\"font-size:10px\">Classification<br/>Record Count</span>"),
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn('id', visible=False)  # just used for the expand
@@ -230,11 +234,11 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     multi_diff = MultiDiff(use_regex)
     # 'parts' and 'resolved_variant_info' are kept in sync
     parts = []
-    c_hgvs_resolved_variant_info = []
+    resolved_variant_info = []
 
     if allele_info.imported_c_hgvs:
         parts += [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
-        c_hgvs_resolved_variant_info.append(None)
+        resolved_variant_info.append(None)
 
     if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
         resolved_variant_info_is_reference = [
@@ -259,19 +263,21 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
         parts.append(MultiDiffInput(label, rvi.resolved_hgvs if rvi else None,
                                     is_reference=is_reference))
-        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.hgvs_converter_version if rvi else "",
-                                              label + " c.HGVS data version", rvi.hgvs_converter_data_version if rvi else ""))
+        resolved_variant_info.append((label + " c.HGVS by", rvi.hgvs_converter_version if rvi else "",
+                                              label + " c.HGVS data version", rvi.hgvs_converter_data_version if rvi else "",
+                                              rvi.p_hgvs if rvi else None))
 
     diff_output = multi_diff.diffs(parts)
     if not allele_info.imported_c_hgvs:
         diff_output = [None] + diff_output
+        resolved_variant_info = [None, *resolved_variant_info]
 
     normalized_diff: Optional[HGVSDiff] = None
     liftover_diff: Optional[HGVSDiff] = None
     if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
         if normalized := allele_info.variant_info_for_imported_genome_build:
             if c_hgvs := normalized.resolved_hgvs_obj:
-                normalized_diff = imported_c_hgvs.components.diff(c_hgvs)
+                normalized_diff = imported_c_hgvs.dna_hgvs.diff(c_hgvs)
     if (c37 := allele_info.grch37) and (c38 := allele_info.grch38):
         if (c37c := c37.resolved_hgvs_obj) and (c38c := c38.resolved_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
@@ -282,7 +288,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "allele_info": allele_info,
         "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
         "c_hgvses": diff_output,
-        "c_hgvs_resolved_variant_info": c_hgvs_resolved_variant_info,
+        "resolved_variant_info": resolved_variant_info,
         "normalized_diff": hgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": hgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Variant Coordinate (from HGVS resolution) ({allele_info.imported_genome_build_patch_version})",

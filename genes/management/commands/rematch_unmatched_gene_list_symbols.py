@@ -46,11 +46,13 @@ class Command(BaseCommand):
         gsm = GeneSymbolMatcher()
         modified_records = []
         num_unmatched = 0
-        for glgs in GeneListGeneSymbol.objects.filter(gene_symbol__isnull=True):
-            gene_symbol_id, alias_id = gsm.get_gene_symbol_id_and_alias_id(glgs.original_name)
-            if gene_symbol_id:
-                glgs.gene_symbol_id = gene_symbol_id
-                glgs.gene_symbol_alias_id = alias_id
+        unmatched = list(GeneListGeneSymbol.objects.filter(gene_symbol__isnull=True))
+        resolutions = gsm.resolve_names(glgs.original_name for glgs in unmatched)
+        for glgs in unmatched:
+            resolution, _ambiguous = resolutions[glgs.original_name]
+            if resolution.gene_symbol_id:
+                glgs.gene_symbol_id = resolution.gene_symbol_id
+                glgs.gene_symbol_alias_id = resolution.gene_symbol_alias_id
                 modified_records.append(glgs)
             else:
                 num_unmatched += 1

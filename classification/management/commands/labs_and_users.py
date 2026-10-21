@@ -6,6 +6,7 @@ from typing import Optional
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
+from classification.models.classification_settings_models import LabClassificationSettings
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_user_settings import UserSettingsOverride
 
@@ -45,13 +46,12 @@ def ensure_labs():
         org_id = lab_data.pop('organization')
         lab_data['organization'] = Organization.objects.get(group_name=org_id)
         config = lab_data.pop('classification_config')
-        if config:
-            config = json.loads(config)
-            lab_data['classification_config'] = config
 
         lab, created = Lab.objects.get_or_create(group_name=lab_data['group_name'], defaults=lab_data)
         if not created:
             Lab.objects.filter(pk=lab.id).update(**lab_data)
+        if config:
+            LabClassificationSettings.objects.filter(lab=lab).update(classification_config=json.loads(config))
 
 
 def ensure_users():

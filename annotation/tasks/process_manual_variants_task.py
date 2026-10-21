@@ -3,7 +3,7 @@ import logging
 from django.db.models.query_utils import Q
 
 from annotation.models import ManualVariantEntryType
-from annotation.models.models import ManualVariantEntry
+from annotation.models.models_manual_variant import ManualVariantEntry
 from genes.hgvs import HGVSMatcher
 from snpdb.clingen_allele import (
     get_clingen_alleles_from_external_code,

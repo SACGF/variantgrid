@@ -12,4 +12,4 @@ class Command(BaseCommand):
         if update_user_awards():
             self.stdout.write(f"Updated {len(get_award_definitions())} award definition(s)")
         else:
-            self.stdout.write("USER_AWARDS_ENABLED is off - nothing to do")
+            self.stdout.write("USER_AWARDS_ENABLED or USER_AWARDS_BADGES_ENABLED is off - nothing to do")

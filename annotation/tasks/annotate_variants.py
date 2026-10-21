@@ -12,13 +12,20 @@ from django.db.models import F
 from django.utils import timezone
 
 from annotation.models import AnnotationStatus
-from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import get_runner
 from annotation.signals.manual_signals import (
     annotation_run_complete_signal,
     annotation_run_discarded_signal,
 )
+from annotation.vep_annotation import (
+    VEPVersionMismatchError,
+    get_vep_version,
+    vep_check_command_line_version_match,
+)
 from eventlog.models import create_event
+from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback, report_message
 
@@ -54,6 +61,12 @@ class AnnotationRunReclaimedError(Exception):
         it to a fresh attempt, and this one was aborted (or finished) too late to own the result. Celery
         should still record the attempt as failed, but a distinct type keeps "did VEP break?" separable
         from "did we lose the race?" in logs and in any future retry logic. """
+
+
+class AnnotationRunBlockedError(RollbarIgnoreException):
+    """ #1679: the run failed because its VariantAnnotationVersion is blocked (a latched VEP mismatch or a
+        missing GeneAnnotationRelease). The run is still ERROR (visible, retryable), but the block has
+        already been reported once, so Celery's task_failure handler must not send each run to Rollbar. """
 
 
 def _trigger_dispatch(variant_annotation_version_id):
@@ -236,7 +249,7 @@ def annotate_variants(annotation_run_id):
         if blocker := annotation_run.variant_annotation_version.get_annotation_run_blocker():
             # We need this so that transcript/versions are in DB so FKs link
             msg = f"{annotation_run.variant_annotation_version} {blocker}"
-            raise InvalidAnnotationVersionError(msg)
+            raise AnnotationRunBlockedError(msg)
         annotation_run.task_id = my_task_id
         annotation_run.set_task_log("start", timezone.now())
         annotation_run.save()
@@ -268,6 +281,12 @@ def annotate_variants(annotation_run_id):
             create_event(None, "AnnotationRun reclaimed", tb, severity=LogLevel.WARNING)
             raise AnnotationRunReclaimedError(msg) from e
 
+        if isinstance(e, AnnotationRunBlockedError):
+            raise
+        if isinstance(e, VEPVersionMismatchError):
+            _latch_vep_version_mismatch(annotation_run.variant_annotation_version, e, tb)
+            raise AnnotationRunBlockedError(str(e)) from e
+
         error_message = f"{e}: {annotation_run.pipeline_stderr}"
         name = 'Annotation pipeline run ' + str(annotation_run.id)
         report_message(message=name,
@@ -295,6 +314,36 @@ def annotate_variants(annotation_run_id):
         # The dispatcher is single authority and fast-exits when nothing is dispatchable, so kicking it
         # from a losing attempt too is harmless.
         _trigger_dispatch(annotation_run.annotation_range_lock.version_id)
+
+
+def _latch_vep_version_mismatch(vav: VariantAnnotationVersion, e: VEPVersionMismatchError, tb: str):
+    """ #1679: a mismatch is a property of the deployment, so latch it on the VAV - the dispatcher stops
+        launching VEP runs against it. Only the run that made the transition reports it. """
+    if vav.latch_vep_version_mismatch(str(e)):
+        report_message(message=f"Annotation blocked {vav}", level='error',
+                       extra_data={'output': str(e), 'error': tb})
+        create_event(None, "Annotation blocked", f"{vav}: {e}", severity=LogLevel.ERROR)
+    else:
+        logging.warning("AnnotationRun failed against already-blocked %s: %s", vav, e)
+
+
+@celery.shared_task
+def recheck_vep_version(variant_annotation_version_id):
+    """ #1679: the only way to clear a latched VEP mismatch - re-run the command-line version check on an
+        annotation worker. get_vep_version is memoised per process, so clear it here to see the operator's
+        fix; other worker processes keep their memoised value until restarted. """
+    vav = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)
+    get_vep_version.cache_clear()
+    try:
+        vep_check_command_line_version_match(vav)
+    except VEPVersionMismatchError as e:
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(vep_version_mismatch_reason=str(e))
+        create_event(None, "Annotation still blocked", f"{vav}: {e}", severity=LogLevel.WARNING)
+        return
+
+    vav.clear_vep_version_mismatch()
+    create_event(None, "Annotation unblocked", f"{vav}: VEP version check passed", severity=LogLevel.INFO)
+    _trigger_dispatch(vav.pk)
 
 
 @celery.shared_task

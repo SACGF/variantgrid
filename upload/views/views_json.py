@@ -64,8 +64,14 @@ def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
     return ar_qs.filter(annotation_range_lock__max_variant_id__lte=max_variant_id).count()
 
 
+class EmptyUploadError(ValueError):
+    """ A 0-byte file - rejected before a FileUpload is created, as no importer can read it """
+
+
 def handle_file_upload(user, django_uploaded_file, path=None, metadata=None) -> FileUpload:
     original_filename = django_uploaded_file._name
+    if not django_uploaded_file.size:
+        raise EmptyUploadError(f"'{original_filename}' is empty")
     kwargs = {
         "name": original_filename,
         "file_field": django_uploaded_file,
@@ -181,6 +187,8 @@ def upload_file(request):
             raise
 
         file_upload = handle_file_upload(request.user, django_uploaded_file)
+    except EmptyUploadError as e:
+        return HttpResponse(str(e), status=400)
     except Exception as e:
         logging.error(e)
         log_traceback()

@@ -131,7 +131,7 @@ class SearchInput:
             variant_qs = Variant.objects.all()
         variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
         if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not self.user.is_superuser:
-            variant_qs = variant_qs.filter(Classification.get_variant_q(self.user, genome_build))
+            variant_qs = variant_qs.filter(Classification.objects.published_variant_q(self.user, genome_build))
 
         return variant_qs
 
@@ -404,6 +404,14 @@ class SearchResult:
         return False
 
     @cached_property
+    def genome_build_mismatch_blocks_auto_open(self) -> bool:
+        """
+        A variant missing from the preferred build may still be lifted over (or its liftover failed), so don't jump
+        to another build. An analysis, sample, contig etc. belongs to one build forever, so jumping to it is fine (#2174)
+        """
+        return self.genome_build_mismatch and self.preview.can_liftover
+
+    @cached_property
     def has_multiple_genome_builds(self) -> bool:
         return self.preview.genome_builds and len(self.preview.genome_builds) > 1
 
@@ -413,7 +421,7 @@ class SearchResult:
         Make sure there are no relevant errors or genome build mismatch or if this is an operation that should probably not occur instantly.
         Used to determine if a result can be auto-redirected to
         """
-        return SearchMessage.highest_severity(self.genome_build_relevant_messages) not in ('W', 'E') and not self.genome_build_mismatch and not self.preview.is_operation
+        return SearchMessage.highest_severity(self.genome_build_relevant_messages) not in ('W', 'E') and not self.genome_build_mismatch_blocks_auto_open and not self.preview.is_operation
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon
@@ -808,11 +816,11 @@ class SearchResponsesCombined:
             return None
 
         # Put in set to merge identical results (based off Preview) from diff genome builds
-        correct_genome_build_results = {result for result in self.results if not result.genome_build_mismatch}
+        auto_open_results = {result for result in self.results if not result.genome_build_mismatch_blocks_auto_open}
 
         # alternatively if we only have 1 match, return it
-        if len(correct_genome_build_results) == 1:
-            first_result = next(iter(correct_genome_build_results))
+        if len(auto_open_results) == 1:
+            first_result = next(iter(auto_open_results))
             if first_result.is_perfectly_valid and first_result.match_strength >= SearchResultMatchStrength.STRONG_MATCH:
                 return first_result
 

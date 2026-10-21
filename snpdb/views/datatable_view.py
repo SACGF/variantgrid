@@ -12,6 +12,7 @@ import itertools
 import logging
 import math
 import operator
+import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -26,7 +27,7 @@ from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Val
 from django.db.models.functions import Concat
 from django.http import HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
-from django.utils.html import escape
+from django.utils.html import conditional_escape, escape
 from kombu.utils import json
 
 from library.django_utils.datatable_mixins import JSONResponseView
@@ -43,6 +44,17 @@ logger = logging.getLogger(__name__)
 DATATABLE_CSV_PARAM = "dataTableCsv"
 # The column filter rules the client sends up (@see library.django_utils.filter_rules)
 DATATABLE_FILTERS_PARAM = "filters"
+# The client looks a renderer up by its dotted name on window (resolveFunctionName in datatable_definition.js),
+# so settings go in client_renderer_kwargs - a JS expression here would need eval
+CLIENT_RENDERER_NAME_PATTERN = re.compile(r"^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$")
+
+
+def check_client_renderer_name(name: Optional[str]) -> Optional[str]:
+    """ Raises ValueError unless name is None or a dotted JS identifier, e.g. 'TableFormat.timestamp' """
+    if name is not None and not CLIENT_RENDERER_NAME_PATTERN.match(name):
+        raise ValueError(f"Client renderer {name!r} must be a dotted JS function name - "
+                         f"pass its settings in client_renderer_kwargs")
+    return name
 
 
 class SortOrder(enum.Enum):
@@ -124,6 +136,22 @@ def sanitize_value(value: Any) -> Any:
     return value
 
 
+def export_value(value: Any) -> Any:
+    """ A raw value for the CSV/VCF export. Unlike sanitize_value a datetime stays one, so the file gets
+        a date rather than the epoch seconds TableFormat.timestamp takes """
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
+
+
+def escape_cell(value: Any) -> Any:
+    """ A string cell with no client renderer goes into the page as HTML - escaped, unless the server
+        renderer built it as HTML on purpose and returned a SafeString """
+    if isinstance(value, str):
+        return conditional_escape(value)
+    return value
+
+
 def limit_value_size(value: Any) -> Any:
     """
     Limits the amount of data that can be returned in one cell
@@ -147,21 +175,20 @@ class RichColumn:
     """
 
     @staticmethod
-    def client_renderer_combine(formatters: list[str]) -> str:
-        json_str = json.dumps(formatters)
-        return f'TableFormat.combine.bind(null, {json_str}, null)'  # 2nd null is settings
+    def client_renderer_repeat(formatter: str, group_css: Optional[str] = None) -> dict[str, Any]:
+        """ RichColumn kwargs drawing each item of a list value with formatter,
+            e.g. RichColumn(key, **RichColumn.client_renderer_repeat('VCTable.hgvs')) """
+        kwargs: dict[str, Any] = {"formatter": check_client_renderer_name(formatter)}
+        if group_css:
+            kwargs["groupCSS"] = group_css
+        return {"client_renderer": "TableFormat.repeat", "client_renderer_kwargs": kwargs}
 
     @staticmethod
-    def client_renderer_repeat(settings: Optional[dict[str, Any]]) -> str:
-        return f'TableFormat.repeat.bind(null, {settings})'
-
-    @staticmethod
-    def choices_client_renderer(choices):
-        json_data = {}
-        for choice in choices:
-            json_data[choice[0]] = choice[1]
-        json_str = json.dumps(json_data)
-        return f'TableFormat.choices.bind(null, { json_str })'
+    def choices_client_renderer(choices) -> dict[str, Any]:
+        """ RichColumn kwargs showing a value as its choice label,
+            e.g. RichColumn(key, **RichColumn.choices_client_renderer(Sex.choices)) """
+        return {"client_renderer": "TableFormat.choices",
+                "client_renderer_kwargs": {"choices": dict(choices)}}
 
     def __init__(self,
                  key: Optional[str] = None,
@@ -201,8 +228,9 @@ class RichColumn:
         :param renderer: Optional server renderer for the value
         :param default_sort: If this column should be the default sort order, provide ascending or descending here
         :param order_sequence: How the column should sort when clicked on (can change to be DESC first, can only allow ASC etc)
-        :param client_renderer: JavaScript function to render the client
-        :param client_renderer_td: JavaScript function that maps to DataTables createdCell https://datatables.net/reference/option/columns.createdCell
+        :param client_renderer: dotted name of the JavaScript function rendering the cell, called with
+                                (data, type, row, ctx) - its settings go in client_renderer_kwargs
+        :param client_renderer_td: dotted name of a JavaScript function that maps to DataTables createdCell https://datatables.net/reference/option/columns.createdCell
         :param visible: If false column would be hidden (useful for sending data we don't want to display)
         :param detail: If True, the column will be shown in the expand section of the table only (requires responsive)
         :param css_class: css class to apply to the column
@@ -213,7 +241,7 @@ class RichColumn:
                              expanded, packed genotype unpacked) so the CSV matches the grid
         :param width: column width in pixels (the variant grids lay out table-layout: fixed)
         :param header_title: tooltip on the column header
-        :param client_renderer_kwargs: per column settings handed to the client renderer
+        :param client_renderer_kwargs: per column settings handed to the client renderer as ctx.kwargs
         :param sort_menu: [{label, column}] alternative sort keys offered on a composite cell's header
         :param column_filter: offer this column in the client's filter builder, and accept rules on it
         :param null_order: where NULLs sort
@@ -253,8 +281,8 @@ class RichColumn:
         self.orderable = orderable
         self.order_sequence = order_sequence
         self.renderer = renderer
-        self.client_renderer = client_renderer
-        self.client_renderer_td = client_renderer_td
+        self.client_renderer = check_client_renderer_name(client_renderer)
+        self.client_renderer_td = check_client_renderer_name(client_renderer_td)
         self.default_sort = default_sort
         self.enabled = enabled
         self.detail = detail
@@ -349,7 +377,10 @@ class DatatableConfig(Generic[DC]):
     server_csv_download = False
     csv_name: Optional[str] = None  # filename for CSV download (date suffix added automatically)
     rich_columns: list[RichColumn]  # columns for display
-    expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
+    # If provided, rows expand and the content is rendered by the JavaScript function of this dotted name,
+    # called with (rowData, ctx) - ctx.kwargs being expand_client_renderer_kwargs
+    expand_client_renderer: Optional[str] = None
+    expand_client_renderer_kwargs: Optional[dict] = None
     scroll_x = False
     server_calculate_mode = DatatableConfigQuerySetMode.COLUMNS
     # Set to opt in to rows per page persisting per user (in UserGridConfig, keyed on this name)
@@ -615,7 +646,7 @@ class DatatableConfig(Generic[DC]):
         if columns is None:
             columns = self.export_columns()
         for row in rows:
-            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered else sanitize_value(row.get(rc.key))
+            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered else export_value(row.get(rc.key))
                    for rc in columns}
 
     def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:
@@ -649,15 +680,15 @@ class DatatableConfig(Generic[DC]):
             return [[self.column_index(rc), "desc" if rc.default_sort == SortOrder.DESC else "asc"]]
         return None
 
-    @staticmethod
-    def _row_expand_ajax(expand_view: str, id_field: str = 'id', expected_height: Optional[int] = None) -> str:
-        """
-        :expand_view Name of the django view - as found in urls.py
+    def set_expand_ajax(self, expand_view: str, id_field: str = 'id', expected_height: Optional[int] = None):
+        """ Expanded rows load expand_view for the row (TableFormat.expandAjax)
+        :expand_view Name of the django view - as found in urls.py - or of a JS function on window returning the URL
         :id_field Parameter to go to the view (assumes that the view takes 1 parameter)
         :expected_height Expected height in pixels of an expanded view, doesn't need to be accurate, just looks better if it's roughly correct
         """
-        expected_height_str = f"{expected_height if expected_height else 100}px"
-        return f"TableFormat.expandAjax.bind(null, '{expand_view}', '{id_field}', '{expected_height_str}')"
+        self.expand_client_renderer = "TableFormat.expandAjax"
+        self.expand_client_renderer_kwargs = {"view": expand_view, "idField": id_field,
+                                              "height": expected_height or 100}
 
     @cached_property
     def _querydict(self):
@@ -794,6 +825,13 @@ class DatatableConfig(Generic[DC]):
             self._page_writable_pks = set(writable_qs.values_list("pk", flat=True))
         return self._page_writable_pks
 
+    def _render_json_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
+        """ A cell for the grid, rather than the CSV - which keeps the raw value """
+        value = self.render_cell(row=row, column=column)
+        if not column.client_renderer:
+            value = escape_cell(value)
+        return value
+
     def prepare_results(self, qs: QuerySet[DC]) -> list[JsonDataType]:
         data = []
         if self.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
@@ -803,8 +841,7 @@ class DatatableConfig(Generic[DC]):
             for row in rows:
                 row_json = {}
                 for rc in self.enabled_columns:
-                    value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
-                    row_json[rc.name] = value
+                    row_json[rc.name] = self._render_json_cell(CellData(all_data=row, key=rc.key), rc)
                 if row_css := self.row_css(row):
                     row_json["row_css"] = row_css
                 data.append(row_json)
@@ -815,8 +852,7 @@ class DatatableConfig(Generic[DC]):
                 mapped_obj = self.map_object(row_obj)
                 row_json = {}
                 for rc in self.enabled_columns:
-                    value = self.render_cell(row=CellData(all_data=None, obj=mapped_obj, key=rc.key), column=rc)
-                    row_json[rc.name] = value
+                    row_json[rc.name] = self._render_json_cell(CellData(all_data=None, obj=mapped_obj, key=rc.key), rc)
                 data.append(row_json)
         else:
             raise ValueError(f"Unexpected QuerySet mode {self.server_calculate_mode}")
@@ -868,7 +904,7 @@ def rich_column_json(rc: RichColumn, default_column_width: Optional[int] = None)
         renderer) from. @see the annotation descriptions page, which draws example cells from these """
     column: JsonObjType = {
         "data": rc.name,
-        "label": rc.label,
+        "label": conditional_escape(rc.label),
         "render": rc.client_renderer,
         "createdCell": rc.client_renderer_td,
         "orderable": rc.orderable,
@@ -897,7 +933,7 @@ def datatable_definition(config: DatatableConfig, download_url: Optional[str] = 
         "searchBoxEnabled": config.search_box_enabled,
         "downloadCsvButtonEnabled": config.download_csv_button_enabled,
         "csvName": config.get_csv_name(),
-        "expandClientRenderer": config.expand_client_renderer,
+        "expandClientRenderer": check_client_renderer_name(config.expand_client_renderer),
         "scrollX": config.scroll_x,
     }
     if download_url:
@@ -914,6 +950,8 @@ def datatable_definition(config: DatatableConfig, download_url: Optional[str] = 
         data["ajaxType"] = config.ajax_type
     if config.approximate_count_enabled:
         data["approximateCount"] = True
+    if config.expand_client_renderer_kwargs:
+        data["expandClientRendererKwargs"] = config.expand_client_renderer_kwargs
     if config.expand_client_renderer and not config.expand_prefetch:
         data["expandPrefetch"] = False
     if extra := config.get_extra():

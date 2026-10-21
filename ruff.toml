@@ -43,9 +43,9 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-# __init__.py: re-exports are intentional (F401), and import order is frequently
-# deliberate to manage circular dependencies, so do not sort imports here (I001).
-"__init__.py" = ["F401", "I001"]
+# __init__.py: re-exports, star imports included, are intentional (F401, F403), and import order is
+# frequently deliberate to manage circular dependencies, so do not sort imports here (I001).
+"__init__.py" = ["F401", "F403", "I001"]
 "**/tests/**" = ["F401", "F841"]    # unused fixtures/locals common in tests
 
 [lint.isort]

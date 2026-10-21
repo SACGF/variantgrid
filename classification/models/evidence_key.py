@@ -22,18 +22,17 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource
+from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys, SubmissionSource
 from classification.enums.classification_enums import (
-    AlleleOriginBucket,
     CopyAlleleOrigin,
     CopyScope,
     EvidenceCategory,
     EvidenceKeyValueType,
-    ShareLevel,
 )
 from library.cache import timed_cache
 from library.utils import empty_to_none, first, pretty_label, strip_json
 from snpdb.models import VariantGridColumn
+from snpdb.models.models_enums import AlleleOriginBucket
 
 if TYPE_CHECKING:
     from classification.models.evidence_mixin import EvidenceMixin
@@ -438,10 +437,13 @@ class EvidenceKey(TimeStampedModel):
 
     @property
     def option_dictionary(self) -> dict[str, str]:
-        if options := self.virtual_options:
-            return {x.get('key'): x.get('label') for x in options}
-        else:
-            return {}
+        return self.option_dictionary_property("label")
+
+    def prop(self, key: str, prop: str) -> Any:
+        for option in self.virtual_options:
+            if option.get('key') == key:
+                return option.get(prop)
+        return None
 
     def option_dictionary_property(self, prop: str) -> dict[str, Any]:
         if options := self.virtual_options:
@@ -564,7 +566,8 @@ class EvidenceKey(TimeStampedModel):
             'examples': self.examples,
             'hide': self.hide,
             'mandatory': self.mandatory,
-            'see': self.see
+            'see': self.see,
+            'copy_scope': self.copy_scope
         })
 
     @staticmethod

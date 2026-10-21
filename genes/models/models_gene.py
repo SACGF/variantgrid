@@ -27,9 +27,9 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNC
 # Re-exported: callers have long imported these from genes.models
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
 from genes.transcript_parts import (
-    CDOT_FAKE_TRANSCRIPT_PREFIX,
     TranscriptParts,
     get_transcript_id_and_version,
+    is_cdot_fake_transcript,
 )
 from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher
 from genes.transcripts_utils import get_lrg_and_t
@@ -38,6 +38,8 @@ from library.constants import DAY_SECS, HOUR_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.preview_request import PreviewData, PreviewModelMixin
+from library.utils.collection_utils import batch_iterator
+from library.utils.text_utils import clean_string
 from snpdb.models import GenomicCoordinates, Wiki
 from snpdb.models.models_genome import Contig, GenomeBuild
 
@@ -122,7 +124,7 @@ class HGNC(models.Model):
 class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     function = models.TextField(null=True, blank=True)
     pathway = models.TextField(null=True, blank=True)
     pathway_interaction_db = models.TextField(null=True, blank=True)
@@ -131,6 +133,78 @@ class UniProt(models.Model):
 
     def __str__(self):
         return self.accession
+
+
+class AmbiguousGeneSymbolAlias(ValueError):
+    """ A name that is an alias for several genes, with nothing to settle which - rather than pick one, the user is
+        told the genes it could be so they can write the one they meant """
+
+    def __init__(self, name: str, gene_symbol_ids: Iterable[str]):
+        self.name = name
+        self.gene_symbol_ids = sorted(gene_symbol_ids)
+        super().__init__(f"'{name}' is an ambiguous alias for {', '.join(self.gene_symbol_ids)} - "
+                         f"change it to the explicit gene symbol")
+
+
+@dataclass(frozen=True)
+class GeneNameResolution:
+    """ What a gene name as written stands for - see GeneSymbol.resolve_names """
+    gene_symbol_id: Optional[str] = None
+    hgnc: Optional[HGNC] = None
+    gene_symbol_alias_id: Optional[int] = None  # The GeneSymbolAlias followed to reach gene_symbol_id
+
+
+# A name's resolution, and the ambiguity that left it unresolved
+GeneNameResult = tuple[GeneNameResolution, Optional[AmbiguousGeneSymbolAlias]]
+
+
+def resolve_gene_name(name: str, exact_symbol: Optional[str], alias_ids: dict[str, int],
+                      hgncs_by_uc_symbol: dict[str, list[HGNC]]) -> GeneNameResult:
+    """ The rules of GeneSymbol.resolve_names, over what was fetched for 'name':
+        exact_symbol - the GeneSymbol 'name' is, alias_ids - {gene symbol: GeneSymbolAlias pk} for each gene 'name'
+        is an alias of, hgncs_by_uc_symbol - upper case symbol -> its HGNC records, covering both """
+    uc_name = name.upper()
+
+    def hgncs_for(symbols: Iterable[str]) -> list[HGNC]:
+        hgncs = [hgnc for symbol in symbols for hgnc in hgncs_by_uc_symbol.get(symbol.upper(), [])]
+        # gene_symbol isn't unique in HGNC (eg MMP21 has multiple entries) so prefer the approved one
+        return sorted(hgncs, key=lambda hgnc: (hgnc.status != HGNCStatus.APPROVED, hgnc.pk))
+
+    def lists_name(hgnc: HGNC, field: str) -> bool:
+        return uc_name in {symbol.strip().upper() for symbol in (getattr(hgnc, field) or "").split(",")}
+
+    def single_gene(hgncs: list[HGNC]) -> Optional[HGNC]:
+        if len({hgnc.gene_symbol_id for hgnc in hgncs}) == 1:
+            return hgncs[0]
+        return None
+
+    uc_alias_ids = {symbol.upper(): alias_id for symbol, alias_id in alias_ids.items()}
+
+    def via_alias(hgnc: HGNC) -> GeneNameResult:
+        return GeneNameResolution(gene_symbol_id=hgnc.gene_symbol_id, hgnc=hgnc,
+                                  gene_symbol_alias_id=uc_alias_ids[hgnc.gene_symbol_id.upper()]), None
+
+    if exact_symbol:
+        if hgncs := hgncs_for([exact_symbol]):
+            return GeneNameResolution(gene_symbol_id=exact_symbol, hgnc=hgncs[0]), None
+
+    alias_hgncs = hgncs_for(alias_ids)
+    for hgnc in alias_hgncs:
+        if lists_name(hgnc, "previous_symbols"):
+            return via_alias(hgnc)
+    # an alias is a nickname rather than a rename, so it counts only when it names one gene
+    if hgnc := single_gene(alias_hgncs) or single_gene([h for h in alias_hgncs if lists_name(h, "alias_symbols")]):
+        return via_alias(hgnc)
+
+    if exact_symbol:
+        return GeneNameResolution(gene_symbol_id=exact_symbol), None
+    if len(alias_ids) > 1:
+        return GeneNameResolution(), AmbiguousGeneSymbolAlias(name, alias_ids)
+    if alias_ids:
+        (gene_symbol_id, alias_id), = alias_ids.items()
+        return GeneNameResolution(gene_symbol_id=gene_symbol_id, gene_symbol_alias_id=alias_id), None
+    return GeneNameResolution(), None
+
 
 class GeneSymbol(models.Model, PreviewModelMixin):
     """
@@ -146,6 +220,8 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     symbol = TextField(primary_key=True, db_collation='case_insensitive')  # See note above if 'like' breaks
 
     objects = ObjectManagerCachingRequest()
+
+    RESOLVE_NAMES_BATCH_SIZE = 2000
 
     class Meta:
         base_manager_name = 'objects'
@@ -166,6 +242,54 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     @timed_cache(ttl=3600)
     def _cast(symbol_str: str) -> Optional['GeneSymbol']:
         return GeneSymbol.objects.filter(symbol=symbol_str).first()
+
+    @staticmethod
+    def resolve_name(name: str) -> tuple[Optional[str], Optional[HGNC]]:
+        """ (gene symbol, HGNC) for a gene name as written - see GeneSymbol.resolve_names for the rules
+            :raises AmbiguousGeneSymbolAlias: when 'name' is no symbol itself, and an alias for several genes """
+        resolution, ambiguous = GeneSymbol.resolve_names([name])[name]
+        if ambiguous:
+            raise ambiguous
+        return resolution.gene_symbol_id, resolution.hgnc
+
+    @staticmethod
+    def resolve_names(names: Iterable[Optional[str]]) -> dict[Optional[str], GeneNameResult]:
+        """ (resolution, ambiguity) for each gene name as written, keyed by the name as passed - the symbol is the
+            approved one where a name is an old name. One bad name doesn't stop the rest resolving.
+
+            A name that is a current HGNC symbol in its own right is taken as written. Otherwise HGNC's rename is the
+            strongest evidence two names are one gene, so it outranks an alias: SEPT2 is SEPTIN2's previous symbol and
+            also, on an unrelated gene, one of SEPTIN6's aliases. An alias resolves only when it names a single gene,
+            otherwise the name is unresolved and paired with an AmbiguousGeneSymbolAlias naming the candidates.
+
+            Three indexed queries per batch of names: the HGNC import stores every previous and alias symbol as a
+            GeneSymbolAlias, so the alias rows are what find the HGNC records to check """
+        resolutions = {}
+        for batch in batch_iterator(set(names), batch_size=GeneSymbol.RESOLVE_NAMES_BATCH_SIZE):
+            cleaned_names = {name: clean_string(name) for name in batch}
+            query_names = {cleaned for cleaned in cleaned_names.values() if cleaned}
+
+            exact_symbols = {}
+            for symbol in GeneSymbol.objects.filter(symbol__in=query_names).values_list("symbol", flat=True):
+                exact_symbols[symbol.upper()] = symbol
+
+            alias_ids_by_uc_name = defaultdict(dict)
+            alias_qs = GeneSymbolAlias.objects.filter(alias__in=query_names)
+            for alias, gene_symbol_id, alias_id in alias_qs.values_list("alias", "gene_symbol_id", "pk"):
+                alias_ids_by_uc_name[alias.upper()][gene_symbol_id] = alias_id
+
+            symbols = set(exact_symbols.values())
+            for alias_ids in alias_ids_by_uc_name.values():
+                symbols.update(alias_ids)
+            hgncs_by_uc_symbol = defaultdict(list)
+            for hgnc in HGNC.objects.filter(gene_symbol_id__in=symbols):
+                hgncs_by_uc_symbol[hgnc.gene_symbol_id.upper()].append(hgnc)
+
+            for name, cleaned in cleaned_names.items():
+                uc_name = cleaned.upper()
+                resolutions[name] = resolve_gene_name(cleaned, exact_symbols.get(uc_name),
+                                                      alias_ids_by_uc_name.get(uc_name, {}), hgncs_by_uc_symbol)
+        return resolutions
 
     @property
     def metrics_logging_key(self) -> tuple[str, Any]:
@@ -274,10 +398,6 @@ class GeneSymbolAlias(TimeStampedModel):
     def get_absolute_url(self):
         """ So search sends it to the symbol """
         return reverse("view_gene_symbol", kwargs={"gene_symbol": self.gene_symbol_id})
-
-    @staticmethod
-    def get_upper_case_lookup():
-        return {a: (gs, alias_id) for a, gs, alias_id in GeneSymbolAlias.objects.values_list("alias", "gene_symbol", "id")}
 
 
 @dataclass
@@ -629,6 +749,11 @@ class Transcript(models.Model, PreviewModelMixin):
         kwargs = {"transcript_id": self.identifier}
         return reverse("view_transcript", kwargs=kwargs)
 
+    @property
+    def is_cdot_fake(self) -> bool:
+        """ See TranscriptVersion.is_cdot_fake """
+        return is_cdot_fake_transcript(self.identifier)
+
     def get_external_url(self, genome_build: GenomeBuild):
         if self.annotation_consortium == AnnotationConsortium.REFSEQ:
             return f"https://www.ncbi.nlm.nih.gov/nuccore/{self.identifier}"
@@ -812,7 +937,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def is_cdot_fake(self) -> bool:
         """ A cdot stand-in for a RefSeq gene with no RNA accession (mitochondrial, eg 'fake-rna-ND4'), not
             something to write HGVS against """
-        return self.transcript_id.startswith(CDOT_FAKE_TRANSCRIPT_PREFIX)
+        return is_cdot_fake_transcript(self.transcript_id)
 
     @property
     def annotation_consortium(self):
@@ -835,6 +960,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def hgvs_ok(self) -> bool:
+        if self.is_cdot_fake:
+            return False
         if self.has_valid_data:
             if settings.HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH:
                 if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
@@ -888,8 +1015,9 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def alignment_gap(self) -> bool:
-        if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-            # Sometimes RefSeq transcripts have gaps when aligning to the genome
+        if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ and not self.is_cdot_fake:
+            # Sometimes RefSeq transcripts have gaps when aligning to the genome (a cdot fake MT transcript is
+            # taken straight from the genome and has no sequence to compare)
             for ex in self.genome_build_data["exons"]:
                 if ex[-1] is not None:
                     return True
@@ -1354,8 +1482,18 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
         """ Returns DB copy if we have it, or retrieves + stores from API """
 
+        if is_cdot_fake_transcript(transcript_accession):
+            raise NoTranscript(f"'{transcript_accession}' is a fake transcript for a mitochondrial gene RefSeq gives "
+                               f"no RNA accession - there is no transcript sequence")
+
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():
+        tvi_qs = TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id)
+        if version is None:
+            # An unversioned accession resolves to the latest version, as the APIs do
+            tvi_qs = tvi_qs.order_by("-version")
+        else:
+            tvi_qs = tvi_qs.filter(version=version)
+        if tvi := tvi_qs.first():
             tvi.raise_any_errors()
             return tvi
 
@@ -1422,7 +1560,7 @@ class LRGRefSeqGene(models.Model):
         These map to RefSeq, see https://www.ncbi.nlm.nih.gov/refseq/rsg/lrg/
 
         We don't link directly to TranscriptVersion as they are per-build """
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     lrg = models.TextField()
     rna = models.TextField()  # RefSeq transcript accession
     t = models.TextField(null=True)
@@ -1452,28 +1590,9 @@ class LRGRefSeqGene(models.Model):
 
 
 class GeneSymbolWiki(Wiki):
+    """ Saving one links the citations in its markdown to the gene symbol
+        (annotation/signals/gene_symbol_wiki_citations.py) """
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.update_citations()
-
-    def update_citations(self):
-        existing_citations = {}
-        for gc in self.gene_symbol.genesymbolcitation_set.all():
-            existing_citations[gc.citation.pk] = gc
-
-        gene_citation_ids_to_keep = []
-        from annotation.models import CitationFetchRequest
-        for citation in CitationFetchRequest.get_unfetched_citations(self.markdown):
-            gene_citation = existing_citations.get(citation.pk)
-            if not gene_citation:
-                gene_citation = self.gene_symbol.genesymbolcitation_set.create(citation=citation)
-            gene_citation_ids_to_keep.append(gene_citation.pk)
-
-        # Delete any non-used ones
-        num_deleted = self.gene_symbol.genesymbolcitation_set.exclude(pk__in=gene_citation_ids_to_keep).delete()[0]
-        logging.info("Kept %s, deleted %d", gene_citation_ids_to_keep, num_deleted)
 
 
 class ProteinDomain(models.Model):

@@ -12,12 +12,13 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from guardian.shortcuts import get_objects_for_group
 
-from annotation.models.models import VariantAnnotationVersion
+from annotation.gene_count_variants import gene_count_classification_qs, gene_count_variant_queryset
 from annotation.models.models_gene_counts import (
     GeneCountType,
     GeneValueCountCollection,
     SampleAnnotationVersionVariantSource,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import GeneList
 from library.constants import HOUR_SECS
 from library.guardian_utils import DjangoPermission
@@ -48,7 +49,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
         # variant classifications)
         genes = []
         gene_symbols = []
-        qs = gene_count_type.get_variant_queryset(variant_annotation_version)
+        qs = gene_count_variant_queryset(gene_count_type, variant_annotation_version)
         GS_PATH = "variantannotation__transcript_version__gene_version__gene_symbol"
         qs = qs.filter(**{GS_PATH + "__isnull": False})
         for gene, gene_symbol in qs.values_list("variantannotation__gene", GS_PATH).distinct():
@@ -217,7 +218,7 @@ def global_sample_gene_matrix(request):
         sample_qs = get_objects_for_group(public, read_perm, Sample)
 
     if gene_count_type.uses_classifications:
-        vc_qs = gene_count_type.get_classification_qs()
+        vc_qs = gene_count_classification_qs(gene_count_type)
         sample_qs = sample_qs.filter(classification__in=vc_qs)
 
     genome_build_name = settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD

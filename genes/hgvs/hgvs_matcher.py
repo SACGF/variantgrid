@@ -154,7 +154,7 @@ class VariantResolvingError(ValueError):
 class HGVSMatcher:
     # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
 
-    # Lenient pattern used by variant_search.py to extract the c./g. allele from an
+    # Lenient pattern used by hgvs_search.py to extract the c./g. allele from an
     # unparseable HGVS string for error reporting. The transcript is optional.
     HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT = re.compile(
         r"^((?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
@@ -496,12 +496,13 @@ class HGVSMatcher:
 
             biocommons treats the 'm' kind like 'g' (coordinates resolved against
             whichever reference the accession names), so without this an m. on a nuclear
-            contig is silently resolved as g. - see SACGF/variantgrid#1632. """
+            contig is silently resolved as g. - see SACGF/variantgrid#1632.
+            A contig not in this build is left to Contig.ContigNotInBuildError like any g. (#2365) """
         if hgvs_variant.kind != 'm':
             return
         contig_accession = hgvs_variant.contig_accession
         contig = self.genome_build.chrom_contig_mappings.get(contig_accession)
-        if contig is None or contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
+        if contig is not None and contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
             raise HGVSNomenclatureException(
                 f"'m.' (mitochondrial) HGVS requires the mitochondrial reference, "
                 f"but '{contig_accession}' is not the mitochondrion for {self.genome_build}")
@@ -659,6 +660,23 @@ class HGVSMatcher:
         if variant_coordinate.symbolic_hgvs_interval is None:
             variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_name).hgvs_variant
+
+    def variant_coordinate_to_hgvs_variant_for_transcript_version(self, variant_coordinate: VariantCoordinate,
+                                                                  transcript_version: TranscriptVersion) -> HGVSVariant:
+        """ For callers already holding the TranscriptVersion: the local conversion it would rank first anyway,
+            without the queries spent finding the best version of its accession. A transcript local
+            resolution can't use goes the long way, to other versions and ClinGen """
+        if not (self.hgvs_converter.local_resolution and transcript_version.hgvs_ok):
+            return self.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_version.accession)
+
+        self._check_has_hgvs_representation(variant_coordinate)
+        if variant_coordinate.symbolic_hgvs_interval is None:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
+        vc_contig = self.genome_build.chrom_contig_mappings[variant_coordinate.chrom]
+        if vc_contig != transcript_version.contig:
+            raise self.TranscriptContigMismatchError(f"Variant contig={vc_contig} while Transcript "
+                                                     f"{transcript_version.accession} contig={transcript_version.contig}")
+        return self.hgvs_converter.variant_coordinate_to_c_hgvs(variant_coordinate, transcript_version)
 
     def _fast_variant_coordinate_to_g_hgvs(self, refseq_accession, offset, ref, alt) -> str:
         """ This only works for SNPs (ie not indels etc) """

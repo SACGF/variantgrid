@@ -66,6 +66,7 @@ from seqauto.serializers.sequencing_serializers import (
     SequencingFilesBulkCreateSerializer,
     SequencingRunSerializer,
     SequencingSampleExtractionLinkSerializer,
+    SequencingSampleExtractionLinksSerializer,
     SingleSampleVCFSerializer,
     VariantCallerSerializer,
 )
@@ -213,6 +214,14 @@ class SequencingFilesBulkCreateView(SequencingRunWriteAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _extraction_link_response(sequencing_sample) -> dict:
+    return {
+        "sequencing_sample": str(sequencing_sample),
+        "match_status": sequencing_sample.get_extraction_match_status_display(),
+        "match_error": sequencing_sample.extraction_match_error,
+        "extraction": str(sequencing_sample.extraction) if sequencing_sample.extraction else None,
+    }
+
 class SequencingSampleExtractionLinkView(SequencingRunWriteAPIView):
     """ Name the extraction a sequencing sample was made from.
 
@@ -230,14 +239,26 @@ class SequencingSampleExtractionLinkView(SequencingRunWriteAPIView):
         serializer.is_valid(raise_exception=True)
         sequencing_sample = serializer.save()
         self.log_sequencing_runs([sequencing_sample.sample_sheet])
-        response = {
-            "sequencing_sample": str(sequencing_sample),
-            "match_status": sequencing_sample.get_extraction_match_status_display(),
-            "match_error": sequencing_sample.extraction_match_error,
-            "extraction": str(sequencing_sample.extraction) if sequencing_sample.extraction else None,
-        }
         status_code = status.HTTP_200_OK if sequencing_sample.extraction else status.HTTP_202_ACCEPTED
-        return Response(response, status=status_code)
+        return Response(_extraction_link_response(sequencing_sample), status=status_code)
+
+
+class SequencingSampleExtractionLinksView(SequencingRunWriteAPIView):
+    """ Bulk SequencingSampleExtractionLinkView for one sample sheet: a 202 if any extraction is still pending """
+
+    @extend_schema(
+        summary="Link a sample sheet's sequencing samples to the extractions they were made from",
+        request=SequencingSampleExtractionLinksSerializer,
+        responses=OpenApiTypes.OBJECT,
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = SequencingSampleExtractionLinksSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sequencing_samples = serializer.save()
+        self.log_sequencing_runs([serializer.validated_data["sample_sheet"]])
+        all_matched = all(ss.extraction for ss in sequencing_samples)
+        status_code = status.HTTP_200_OK if all_matched else status.HTTP_202_ACCEPTED
+        return Response([_extraction_link_response(ss) for ss in sequencing_samples], status=status_code)
 
 
 class QCGeneListViewSet(SequencingRunModelViewSet):
@@ -314,7 +335,7 @@ class EnrichmentKitGeneCoverageView(APIView):
     """ Coverage stats (mean, percent_20x) for a gene symbol across samples sequenced with an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        return Q(gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__enrichment_kit=enrichment_kit)
+        return Q(gene_coverage_collection__qcgenecoverage__qc__sequencing_sample__enrichment_kit=enrichment_kit)
 
     @extend_schema(
         summary="Coverage stats (mean, percent_20x) for a gene symbol across samples for an enrichment kit",
@@ -367,7 +388,7 @@ class EnrichmentKitGeneGoldCoverageView(EnrichmentKitGeneCoverageView):
     """ Coverage stats for a gene symbol restricted to gold standard sequencing runs for an enrichment kit """
 
     def get_coverage_q(self, enrichment_kit):
-        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
+        gold_q = Q(gene_coverage_collection__qcgenecoverage__qc__sequencing_sample__sample_sheet__sequencing_run__gold_standard=True)
         return reduce(operator.and_, [super().get_coverage_q(enrichment_kit), gold_q])
 
 

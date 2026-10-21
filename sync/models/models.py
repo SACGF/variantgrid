@@ -15,7 +15,6 @@ class SyncDestination(models.Model):
     Examples
     - syncing records up to shariant
     - syncing records down from shariant
-    - syncing records to alissa (in future)
     """
 
     name = models.TextField(null=False, unique=True)

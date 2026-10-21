@@ -6,9 +6,9 @@ from io import BytesIO, TextIOWrapper
 
 from Bio import SwissProt
 
-from annotation.models import CachedWebResource
 from genes.models import UniProt
 from genes.models.models_gene import HGNC
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 FUNCTION_KEY = "FUNCTION: "
 TISSUE_SPEC_KEY = "TISSUE SPECIFICITY: "

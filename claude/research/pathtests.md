@@ -53,9 +53,7 @@ which genes each kit in `PATHOLOGY_TEST_SORTED_ENRICHMENT_KITS` misses.
 disables every field in that case. There is no create or edit view in this app: SA Pathology's Helix import makes a Case
 per Helix accession and a PathologyTestOrder per SAP order number, and links samples to patients through those cases.
 The pages here are read-only views, the three datatables in `pathtests/grids.py`, lookup-by-LIMS-id redirects
-(`view_external_case`, `view_external_pathology_test_order`) and "my cases" by lead scientist, which includes the
-scientists a user follows (`patients/models/models_patient.py:get_lead_scientist_users_for_user`, toggled by
-`pathtests/views.py:follow_scientist`). `pathtests/models.py:get_external_order_system_last_checked` reaches into
+(`view_external_case`, `view_external_pathology_test_order`). `pathtests/models.py:get_external_order_system_last_checked` reaches into
 `sapath` for the "last checked" time, and returns None when that app is absent.
 
 A case is visible to whoever can view its patient: `Case` delegates its Guardian permissions to
@@ -80,5 +78,5 @@ and the view pages all apply it.
 - Curator checks are an exact user match (no superuser override); `check_is_curator` raises `PermissionDenied` (403).
 - `PathologyTestOrderSample`, `PathologyTestOrderPopulation`, `CaseClinician` and `Case.workflow_status` are schema
   only - nothing (sapath included) writes them. The order's library/sequencing timestamps are copied from Helix by sapath.
-- `pathtests/models.py:cases_for_user` is what the variantopedia dashboard's `user_has_cases` uses: cases led by the
-  user or by a lead scientist they follow, the same set as the "My cases" page.
+- `patients/models/models_patient.py:FollowLeadScientist` and `get_lead_scientist_users_for_user` are schema only:
+  the "My cases" page and dashboard panel that used them were removed (their templates never reached the public repo).

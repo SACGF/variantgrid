@@ -2,7 +2,7 @@ from django.core.management import BaseCommand
 
 from classification.models import ClinVarExport
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from snpdb.models import ClinVarKey
+from classification.models.clinvar_key_models import ClinVarKey
 
 
 class Command(BaseCommand):

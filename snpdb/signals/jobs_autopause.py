@@ -9,12 +9,12 @@ from snpdb.models import JobsControl
 
 
 def _read_proc_uptime_seconds() -> float:
-    with open("/proc/uptime") as f:
+    with open("/proc/uptime", encoding="utf-8") as f:
         return float(f.read().split()[0])
 
 
 def _read_proc_boot_time() -> Optional[int]:
-    with open("/proc/stat") as f:
+    with open("/proc/stat", encoding="utf-8") as f:
         for line in f:
             if line.startswith("btime "):
                 return int(line.split()[1])

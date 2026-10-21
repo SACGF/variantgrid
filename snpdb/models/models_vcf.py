@@ -566,7 +566,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         """ An extraction names its patient, so every route that links one (import, seqauto, CVO,
             reconcile) fills an empty patient here. A different patient already set is left for
             SampleForm.clean to report rather than silently replaced """
-        if self.extraction_id and not self.patient_id:
+        if self.extraction_id and not self.patient_id:  # pylint: disable=access-member-before-definition
             self.patient_id = self.extraction.specimen.patient_id
         super().save(*args, **kwargs)
 

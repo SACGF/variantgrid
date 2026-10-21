@@ -18,12 +18,17 @@ from django.db import connection
 from django.db.models import Count
 from django.utils import timezone
 
-from annotation.models import AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus
+from annotation.abandoned_annotation_runs import (
+    abandoned_annotation_runs_by_reason,
+    incomplete_annotation_runs_qs,
+)
+from annotation.enums import AnnotationStatus
+from annotation.models import VariantAnnotationVersion
 from eventlog.models import Event
 from library.django_utils.database_utils import get_table_row_estimates
 from library.enums.log_level import LogLevel
 from library.vg.repo import REPO_ROOT, git
+from library.vg.services import service_names
 from library.vg.settings_chain import resolved_settings_module
 from manual.models import ManualMigrationOutstanding
 from patients.models.models_phenotype import TextPhenotype
@@ -33,7 +38,6 @@ from variantgrid.celery import app as celery_app
 # pg_class estimates for the tables whose size shapes how a change must be written (see claude/guides/operations.md#scale)
 SCALE_TABLES = ("snpdb_variant", "snpdb_allele", "snpdb_locus", "snpdb_sample", "snpdb_vcf",
                 "classification_classification", "analysis_analysis", "analysis_varianttag", "annotation_annotationrun")
-SERVICES = ("gunicorn", "celeryd_beat")
 RECENT_ERRORS = 10
 
 
@@ -67,7 +71,7 @@ def gather_status() -> Status:
     _section(status, "db", _db)
     _section(status, "builds", _builds)
     _section(status, "services", _services)
-    _section(status, "queues", _queues)
+    _section(status, "queues", lambda: broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES]))
     _section(status, "annotation_runs", _annotation_runs)
     _section(status, "annotation_runs_abandoned", _annotation_runs_abandoned)
     _section(status, "manual_outstanding", _manual_outstanding)
@@ -107,39 +111,37 @@ def _builds() -> dict[str, Any]:
     return builds
 
 
-def _service_names() -> list[str]:
-    return [*SERVICES, *(f"celeryd_{queue.name}" for queue in settings.CELERY_TASK_QUEUES)]
-
-
 def _services() -> dict[str, str]:
     if shutil.which("systemctl") is None:
         return {"error": "systemctl not available"}
-    names = _service_names()
+    names = service_names()
     result = subprocess.run(["systemctl", "is-active", *names], capture_output=True, text=True, check=False)
     states = result.stdout.split()
     return dict(zip(names, states)) if len(states) == len(names) else {"error": result.stderr.strip() or result.stdout.strip()}
 
 
-def _queues() -> dict[str, Any]:
-    """ Message and consumer counts per queue via a passive declare on the broker (no queue is created) """
+def broker_queue_depths(queue_names) -> dict[str, dict]:
+    """ Message and consumer counts per queue via a passive declare on the broker (no queue is created).
+        A broker that can't be reached reports its error against every queue, so callers render it
+        like any other per-queue failure. """
     queues = {}
-    with celery_app.connection_for_read() as connection_, connection_.channel() as channel:
-        for queue in settings.CELERY_TASK_QUEUES:
-            try:
-                declared = channel.queue_declare(queue=queue.name, passive=True)
-                queues[queue.name] = {"messages": declared.message_count, "consumers": declared.consumer_count}
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                queues[queue.name] = {"error": type(e).__name__}
+    try:
+        with celery_app.connection_for_read() as connection_, connection_.channel() as channel:
+            for queue_name in queue_names:
+                try:
+                    declared = channel.queue_declare(queue=queue_name, passive=True)
+                    queues[queue_name] = {"messages": declared.message_count, "consumers": declared.consumer_count}
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    queues[queue_name] = {"error": type(e).__name__}
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        for queue_name in queue_names:
+            queues.setdefault(queue_name, {"error": type(e).__name__})
     return queues
-
-
-def _incomplete_runs():
-    return AnnotationRun.objects.exclude(status__in=AnnotationStatus.get_completed_states())
 
 
 def _annotation_runs() -> dict[str, int]:
     historical = VariantAnnotationVersion.Status.HISTORICAL
-    in_flight = _incomplete_runs().filter(annotation_range_lock__isnull=False).exclude(
+    in_flight = incomplete_annotation_runs_qs().filter(annotation_range_lock__isnull=False).exclude(
         annotation_range_lock__version__status=historical)
     by_status = {}
     for run_status, count in in_flight.values_list("status").annotate(n=Count("pk")).order_by("status"):
@@ -148,15 +150,10 @@ def _annotation_runs() -> dict[str, int]:
 
 
 def _annotation_runs_abandoned() -> dict[str, int]:
-    """ Incomplete runs nothing will ever pick up: no range lock (#1654), or on a HISTORICAL
-        version. They need deleting, not waiting for. """
-    incomplete = _incomplete_runs()
-    abandoned = {
-        "no range lock": incomplete.filter(annotation_range_lock__isnull=True).count(),
-        "historical version": incomplete.filter(
-            annotation_range_lock__version__status=VariantAnnotationVersion.Status.HISTORICAL).count(),
-    }
-    return {k: v for k, v in abandoned.items() if v}
+    """ Incomplete runs nothing will ever pick up: `manage.py clean_up_abandoned_annotation_runs` removes them. """
+    abandoned = abandoned_annotation_runs_by_reason(incomplete_annotation_runs_qs())
+    counts = {reason: qs.count() for reason, qs in abandoned.items()}
+    return {k: v for k, v in counts.items() if v}
 
 
 def _manual_outstanding() -> list[str]:

@@ -6,10 +6,11 @@ The flags app hangs typed, commentable, resolvable "flags" off any model that mi
 `flags/models/models.py:FlagsMixin` - today `snpdb/models/models_variant.py:Allele`,
 `classification/models/classification.py:Classification` and
 `classification/models/clinical_context_models.py:ClinicalContext`. It is small (one models module, one REST views
-module, no tasks, commands or tests of its own), but classification leans on it for workflow state: submitted, unshared,
-withdrawn, discordant, pending changes, significance change, condition resolution, internal review and suggestions are
-all flag types (`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the
-team's position: new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
+module, no tasks or commands, and test modules for permissions and the REST API's input validation), but classification leans on
+it for workflow state: submitted, unshared, withdrawn, discordant, pending changes, significance change, condition
+resolution, internal review and suggestions are all flag types
+(`classification/models/flag_types.py:ClassificationFlagTypes`). `flags/__flags_readme.md` records the team's position:
+new development does not build on flags, but existing uses stay. Fields and URLs are in the maps
 ([models](../maps/models.md#flags), [urls](../maps/urls.md#flags)); receivers are in [signals](../maps/signals.md).
 
 ## Flows
@@ -28,7 +29,7 @@ allele types are all commented out).
 A model gets a `flags/models/models.py:FlagCollection` lazily: `FlagsMixin.flag_collection_safe` creates one in the
 model's `flag_type_context()` and saves the FK. The collection is the unit the UI and API address; it has no FK back to
 its owner, so `flags/models/models.py:FlagCollection.source_object` finds it either from the extra-info signal (below)
-or by probing every reverse `*_set` accessor on the collection until one returns a row.
+or by probing each reverse relation in `_meta.related_objects` (other than `Flag`) until one returns a row.
 
 ### Raising, commenting, resolving
 
@@ -46,8 +47,8 @@ by `data` keys via `old_data` / `close_other_data`), `FlagCollection.ensure_reso
 latest flag to a resolution, creating it only if that resolution is open - used by classification import, significance
 change and ClinVar exclusion) and `close_open_flags_of_type` (bot-closes every open flag of a type, optionally matching
 `data`). `FlagCollection.filter_for_flags` (and its deprecated alias `filter_for_open_flags`, still the one callers use)
-turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard and
-`snpdb/models/models_user_settings.py:UserSettings.classification_issue_count` are built from it.
+turns "has an open flag of these types" into a subquery on any FlagsMixin queryset - the classification dashboard is
+built from it.
 
 ### Permissions
 
@@ -67,9 +68,9 @@ returns one collection's full comment history and `?since=<ts>` the comments sin
 `flags/views/views.py:FlagView` returns or acts on one flag. Serialisation is `flags/views/views.py:FlagHelper`, which
 calls `flags/models/models.py:fetch_flag_infos`: it sends `flag_collection_extra_info_signal` with a
 `flags/models/models.py:FlagInfos`, and the owning apps' receivers
-(`classification/models/classification.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
+(`classification/signals/classification_flag_extra_info.py:get_extra_info`, `snpdb/models/models_variant.py:get_extra_info`) attach a
 label, links and the `source_object` for each collection. ClinicalContext has no receiver, so its collections fall back
-to the `*_set` probe and a generic label.
+to the reverse-relation probe and a generic label.
 
 ### Reacting to flags
 
@@ -92,31 +93,30 @@ owner so the app has no dependency on classification or snpdb; the signal is the
 
 ## Traps
 
-**The REST API trusts the browser for permissions (confirmed, not fixed).** `flags/views/views.py:FlagHelper.add_flag`
-calls `FlagCollection.add_flag` without `permission_check`, whose default is False, so `FlagsView` POST lets any
-logged-in user raise any flag type - SYSTEM-only ones included, even from another context - on any collection id;
-`raisableFlags()` in `flags.js` is the only gate. `FlagsView` GET and `?history=` likewise return non-private flags
-and comments of any collection to a user whose level is NO_PERM, and `Flag.flag_action` lets a NO_PERM user comment
-on a flag (including a private one: its private check only looks at USERS).
+**The REST views enforce permissions; `flags.js` only hides buttons.** `FlagsView` GET keeps only the collections the
+viewer is above NO_PERM on (`flags/views/views.py:viewable_flag_collections`) and `?history=` must be one of them;
+`FlagsView` POST raises with `permission_check=True`, and `FlagView` answers 403 to a NO_PERM viewer. Any new path that
+reaches a collection by id needs the same check, since `raisableFlags()` in `flags.js` is presentation only.
 
-**`add_flag(permission_check=True)` would crash (confirmed, latent).** It compares
-`current_level < flag_type.raise_permission`, a plain str; `FlagPermissionLevel.__lt__` reads `other.level`, so it
-raises AttributeError. Every caller passes `permission_check=False` or no user today, which is why it has not been seen;
-compare against `flag_type.raise_permission_enum`.
+**Compare `FlagPermissionLevel`s as enums, never as raw strings or truthiness.** `FlagPermissionLevel.__lt__` reads
+`other.level`, so comparing against the stored `raise_permission` / `permission` str raises AttributeError - use
+`raise_permission_enum` / `permission_enum`. And `NO_PERM` is `'0'`, a non-empty string, so `if not permission_level`
+never fires - test `== FlagPermissionLevel.NO_PERM`. `flags/tests/test_flag_permissions.py` covers both
+(`add_flag(permission_check=True)` and `FlagCollection.flags(user)`).
 
-**`NO_PERM` is truthy (confirmed, latent).** `FlagPermissionLevel.NO_PERM` is `'0'`, a non-empty string, so the
-`if not permission_level` guard in `flags/models/models.py:FlagCollection.flags` never fires and a NO_PERM user gets
-every flag, private ones too (only USERS is filtered). No caller passes a user at present. Compare with
-`== FlagPermissionLevel.NO_PERM` or `.level`.
+**The `source_object` probe walks `_meta.related_objects`, not `dir()`.** Scanning `dir(self)` for names ending `_set`
+picks up Django's `Model._is_pk_set()` method, so `source_object` raises AttributeError whenever the extra-info signal
+has not already set it (e.g. `permission_level` from `FlagView` POST for a non-superuser).
 
-**A `watch` POST 500s (confirmed, dead path).** `FlagsView` POST with `watch` calls `fc.set_watcher`, which
-`FlagCollection` does not define; `watch_toggle()` in `flags.js` exists but nothing calls it. Delete both rather than
-revive them. `FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele
-flag types (`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
+**`watch_toggle()` in `flags.js` is dead.** Nothing calls it, and `FlagsView` POST answers 400 to its `watch` body
+(no `flag_type`), as it does to an unknown flag type or resolution and a bad `?history=` / `?since=`.
+`FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele flag types
+(`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
 
-**`classification_not_public` is disabled by accident of JavaScript.** Without `CLINVAR_EXPORT` mode,
-`FlagHelper.to_json` sets that type's `permission` / `raise_permission` to `FlagPermissionLevel.SYSTEM` (the string `"A"`)
-instead of its `.level` (4); `flags.js` compares numbers with `>=`, and `n >= "A"` is always false, so it works.
+**`classification_not_public` is switched off in JSON only.** Without `CLINVAR_EXPORT` mode, `FlagHelper.to_json`
+sends that type's `permission` / `raise_permission` as `FlagPermissionLevel.SYSTEM.level` (4), above any browser user's
+`user_permission` (a superuser is ADMIN, 3), so `flags.js` offers nobody the raise or edit buttons; the stored type is
+unchanged.
 
 **FlagType edits need a restart.** `ObjectManagerCachingImmutable` caches `get()` per process (not under unit tests), so
 changing a type in admin or a shell is invisible to running gunicorn/celery workers until they restart. Add types by

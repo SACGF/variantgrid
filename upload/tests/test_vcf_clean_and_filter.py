@@ -36,9 +36,9 @@ UNGROUPED_CONTIG_RECORDS = [("1", 100000), ("2", 100000), ("1", 200000)]
 
 
 def _write_placeholder_fasta(genome_build):
-    with open(_TEST_FASTA, "w") as f:
+    with open(_TEST_FASTA, "w", encoding="utf-8") as f:
         f.write(">placeholder\nN\n")  # Sequence is never read - only the index below
-    with open(_TEST_FASTA + ".fai", "w") as f:
+    with open(_TEST_FASTA + ".fai", "w", encoding="utf-8") as f:
         for accession, length in genome_build.standard_contigs.values_list("refseq_accession", "length"):
             f.write(f"{accession}\t{length}\t0\t60\t61\n")
 
@@ -63,7 +63,7 @@ class TestVCFCleanAndFilterSortedCheck(TestCase):
 
     def _write_vcf(self, records) -> str:
         vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
-        with open(vcf_filename, "w") as f:
+        with open(vcf_filename, "w", encoding="utf-8") as f:
             f.write(VCF_HEADER)
             for chrom, position in records:
                 f.write(f"{chrom}\t{position}\t.\tA\tT\t.\tPASS\t.\n")
@@ -87,7 +87,7 @@ class TestVCFCleanAndFilterSortedCheck(TestCase):
             self._run(POSITION_BACKWARDS_RECORDS, unsorted_marker_file=self.marker_file)
 
         self.assertTrue(os.path.exists(self.marker_file))
-        with open(self.marker_file) as f:
+        with open(self.marker_file, encoding="utf-8") as f:
             reason = f.read()
         self.assertIn("1:154560345", reason)
         self.assertIn("1:154560359", reason)
@@ -97,7 +97,7 @@ class TestVCFCleanAndFilterSortedCheck(TestCase):
             self._run(UNGROUPED_CONTIG_RECORDS, unsorted_marker_file=self.marker_file)
 
         self.assertTrue(os.path.exists(self.marker_file))
-        with open(self.marker_file) as f:
+        with open(self.marker_file, encoding="utf-8") as f:
             self.assertIn("grouped together", f.read())
 
     def test_unsorted_fails_without_marker_file_option(self):
@@ -136,7 +136,7 @@ class TestUndeclaredFiltersMovedToInfo(TestCase):
     def _run(self, filter_column: str, info: str = ".") -> tuple[list[str], dict]:
         """ Returns (written record columns, undeclared filter counts) """
         vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
-        with open(vcf_filename, "w") as f:
+        with open(vcf_filename, "w", encoding="utf-8") as f:
             f.write(VCF_HEADER.replace(
                 "#CHROM", '##FILTER=<ID=LowQ,Description="Below the passing threshold.">\n#CHROM'))
             f.write(f"1\t100000\t.\tT\tA\t0\t{filter_column}\t{info}\n")
@@ -151,7 +151,7 @@ class TestUndeclaredFiltersMovedToInfo(TestCase):
         self.assertEqual(1, len(records))
         skipped = {}
         if os.path.exists(stats_filename):
-            with open(stats_filename) as f:
+            with open(stats_filename, encoding="utf-8") as f:
                 for line in f:
                     name, count = line.rstrip("\n").split("\t")
                     skipped[name] = int(count)
@@ -200,7 +200,7 @@ class TestVCFCleanAndFilterReferenceSpans(TestCase):
     def _run(self, records) -> tuple[str, dict]:
         """ Returns (written records with header stripped, skipped record counts) """
         vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
-        with open(vcf_filename, "w") as f:
+        with open(vcf_filename, "w", encoding="utf-8") as f:
             f.write(VCF_HEADER)
             for alt, info in records:
                 f.write(f"1\t100000\t.\tN\t{alt}\t.\tPASS\t{info}\n")
@@ -215,7 +215,7 @@ class TestVCFCleanAndFilterReferenceSpans(TestCase):
                           if not line.startswith("#"))
         skipped = {}
         if os.path.exists(stats_filename):
-            with open(stats_filename) as f:
+            with open(stats_filename, encoding="utf-8") as f:
                 for line in f:
                     name, count = line.rstrip("\n").split("\t")
                     skipped[name] = int(count)

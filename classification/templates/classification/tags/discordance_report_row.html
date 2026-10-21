@@ -7,8 +7,8 @@
         {% endif %}
     </td>
     <td>{% timestamp summary.discordance_report.created %}</td>
-    <td>{% for c_hgvs_val in summary.c_hgvses %}
-        <div>{% c_hgvs c_hgvs_val %}</div>
+    <td>{% for hgvs in summary.hgvses %}
+        <div>{% hgvs hgvs %}</div>
         {% endfor %}
     </td>
     <td style="width:40%">

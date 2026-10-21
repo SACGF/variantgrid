@@ -1,17 +1,11 @@
-import logging
-from typing import Optional
-
 from django.db import models
-from django.db.models import Q, QuerySet
 from django.db.models.deletion import CASCADE
 from model_utils.managers import InheritanceManager
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
-from classification.models.classification import Classification, ClassificationModification
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import Gene
 from library.utils import rgb_invert
-from snpdb.models import Cohort, GenomeBuild, Sample, ShareLevel, Variant
+from snpdb.models import Cohort, Sample
 from snpdb.models.models_enums import ProcessingStatus
 from variantgrid.celery import app
 
@@ -39,63 +33,6 @@ class GeneCountType(models.Model):
     celery_task_name = models.TextField(null=True)
     enabled = models.BooleanField(default=False)
     uses_classifications = models.BooleanField(default=False)
-
-    @staticmethod
-    def handle_classification_change(classification):
-        sample = classification.sample
-        if sample:
-            gene_by_vav_id = GeneCountType.get_gene_by_variant_annotation_version(classification)
-            for gene_count_type in GeneCountType.objects.filter(enabled=True, uses_classifications=True):
-                # Search through all modifications (not just last published) - so you recount if ever counted
-                qs = gene_count_type.get_classification_qs(last_published=False)
-                if qs.filter(pk=classification.pk).exists():
-                    logging.info("Need to recalculate %s - for %s", gene_count_type, classification)
-                    for cgc in gene_count_type.cohortgenecounts_set.filter(cohort__cohortsample__sample=sample):
-                        gene = gene_by_vav_id.get(cgc.variant_annotation_version.pk)
-                        if gene:
-                            cgc.launch_task(gene.pk)
-
-    @staticmethod
-    def get_gene_by_variant_annotation_version(classification: Classification):
-        gene_by_vav_id = {}
-        for vav in VariantAnnotationVersion.objects.all():
-            if variant_annotation := classification.get_variant_annotation(vav):
-                gene_by_vav_id[vav.pk] = variant_annotation.gene
-        return gene_by_vav_id
-
-    def _get_variant_q(self, genome_build: GenomeBuild) -> Optional[Q]:
-        if self.uses_classifications:
-            vc_qs = self.get_classification_qs()
-            return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
-
-    def get_variant_queryset(self, variant_annotation_version: VariantAnnotationVersion):
-        annotation_version = variant_annotation_version.get_any_annotation_version()
-
-        qs = get_variant_queryset_for_annotation_version(annotation_version=annotation_version)
-        kwargs = {VariantAnnotation.GENE_COLUMN + "__isnull": False}
-        qs = qs.filter(Variant.get_no_reference_q(), **kwargs)
-        if q_variant := self._get_variant_q(annotation_version.genome_build):
-            qs = qs.filter(q_variant)
-        return qs
-
-    def get_classification_qs(self, last_published: bool = True) -> QuerySet[Classification]:
-        """ @param last_published - set to False to look through historical modifications """
-
-        if not self.uses_classifications:
-            raise ValueError(f"{self} does has uses_classifications=False")
-
-        if self.name == "RUNX1_classified_damage":
-            kwargs = {"share_level__in": ShareLevel.same_and_higher(ShareLevel.ALL_USERS),
-                      "published_evidence__clinical_significance__note__icontains": 'Clinically Relevant',
-                      "published_evidence__allele_origin__value__in": ['somatic', 'likely_somatic'],
-                      "published_evidence__specimen_id__value__icontains": 'ML'}
-            if last_published:
-                kwargs["is_last_published"] = True
-            vcm_qs = ClassificationModification.objects.filter(**kwargs)
-            qs = Classification.objects.filter(pk__in=vcm_qs.values('classification'))
-        else:
-            qs = Classification.objects.none()
-        return qs
 
     def __str__(self):
         return self.name

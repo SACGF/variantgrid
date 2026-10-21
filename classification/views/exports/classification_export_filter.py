@@ -7,9 +7,10 @@ AlleleData - all the visible modifications for one allele - that a formatter
 the output.
 """
 import operator
+import re
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
@@ -18,13 +19,14 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
+from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
-from classification.enums import AlleleOriginBucket, ClinicalContextStatus, ShareLevel
+from classification.enums import ClinicalContextStatus, ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import (
     Classification,
@@ -36,9 +38,15 @@ from classification.models import (
     classification_flag_types,
 )
 from flags.models import Flag, FlagComment, FlagsMixin
-from genes.models import GeneSymbol, GeneSymbolAlias
+from genes.models import GeneSymbol
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
-from library.utils import batch_iterator, http_header_date_now, local_date_string
+from library.utils import (
+    batch_iterator,
+    http_header_date_now,
+    local_date_string,
+    utc_from_timestamp,
+)
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (
     VARIANT_PATTERN,
@@ -52,6 +60,7 @@ from snpdb.models import (
     Variant,
     VariantCoordinate,
 )
+from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 
@@ -145,24 +154,8 @@ class AlleleData:
             return item in cached_data
         return False
 
-    # @staticmethod
-    # def pre_process(batch: List['AlleleData']):
-    #     if batch:
-    #         genome_build = batch[0].genome_build
-    #         allele_ids = [ad.allele_id for ad in batch]
-    #         alleles = Allele.objects.filter(pk__in=allele_ids).select_related('clingen_allele')
-    #         allele_dict = {allele.pk: allele for allele in alleles}
-    #         # FIXME select related all this variant stuff outside?
-    #         variant_alleles = VariantAllele.objects.filter(allele_id__in=allele_ids, genome_build=genome_build).select_related('variant', 'variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
-    #         variant_dict = {variant_allele.allele_id: variant_allele.variant for variant_allele in variant_alleles}
-    #
-    #         for ad in batch:
-    #             ad.cached_allele = allele_dict.get(ad.allele_id)
-    #             ad.cached_variant = variant_dict.get(ad.allele_id)
-
     @property
     def allele(self) -> Allele:
-        # return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
         return self.cached_allele
 
     @cached_property
@@ -218,14 +211,46 @@ def flag_ids_to(model: type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[Flag
     return set(model.objects.filter(flag_collection_id__in=qs).values_list('pk', flat=True))
 
 
-class TranscriptStrategy(str, Enum):
-    """
-    What transcripts are going to be included
-    :cvar ALL: Include all transcripts
-    :cvar REFSEQ: More accurately only include transcripts that Alissa supports NM/NR
-    """
-    ALL = "all"
-    REFSEQ = "refseq"
+class InvalidExportParameter(Exception):
+    pass
+
+
+def parse_since(since_str: str) -> datetime:
+    try:
+        since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
+        since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
+        return since_date
+    except BaseException:
+        pass
+
+    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
+        amount = int(m.group(1))
+        unit = m.group(2)
+        if unit:
+            unit = unit.strip().lower()
+
+        if amount > 100000 and not unit:
+            return utc_from_timestamp(float(since_str))
+
+        since = timezone.now()
+        if not unit or unit == 'd':
+            since -= timedelta(days=amount)
+        elif unit == 'm':
+            since -= timedelta(minutes=amount)
+        elif unit == 'w':
+            since -= timedelta(weeks=amount)
+        elif unit == 's':
+            since -= timedelta(seconds=amount)
+        else:
+            raise ValueError(f"Cannot parse {since_str} don't know time unit {unit}")
+        return since
+
+    try:
+        return utc_from_timestamp(float(since_str))
+    except BaseException:
+        pass
+
+    raise ValueError(f"Could not parse since string {since_str}")
 
 
 class DiscordanceReportStatus(str, Enum):
@@ -249,8 +274,9 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
     """
     filter_set: set[str] = set(filter_str_list)
     error_set: set[str] = set()
+    ambiguous_aliases: list[AmbiguousGeneSymbolAlias] = []
 
-    gene_symbols: set[GeneSymbol] = set()
+    gene_symbol_ids: set[str] = set()
     if possible_gene_symbols := [filter_str for filter_str in filter_set if GENE_SYMBOL_PATTERN.match(filter_str)]:
         possible_gene_symbols_set = set(possible_gene_symbols)
         if gene_symbols_matched := list(GeneSymbol.objects.filter(symbol__in=possible_gene_symbols)):
@@ -260,16 +286,19 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
                 if gene_symbol := gene_symbols_upper.get(filter_str.upper()):
                     filter_set.remove(filter_str)
                     possible_gene_symbols_set.remove(filter_str)
-                    gene_symbols.add(gene_symbol)
+                    gene_symbol_ids.add(gene_symbol.pk)
 
-        if possible_gene_symbols_set:
-            # check aliases
-            if aliases := list(GeneSymbolAlias.objects.filter(alias__in=filter_set).select_related('gene_symbol')):
-                gene_symbol_alias_upper = {alias.alias.upper(): alias.gene_symbol for alias in aliases}
-                for filter_str in possible_gene_symbols_set:
-                    if gene_symbol := gene_symbol_alias_upper.get(filter_str.upper()):
-                        filter_set.remove(filter_str)
-                        gene_symbols.add(gene_symbol)
+        # the few names that aren't a symbol as written are old names or aliases
+        for filter_str in possible_gene_symbols_set:
+            try:
+                gene_symbol_id, _hgnc = GeneSymbol.resolve_name(filter_str)
+            except AmbiguousGeneSymbolAlias as ambiguous:
+                filter_set.remove(filter_str)
+                ambiguous_aliases.append(ambiguous)
+                continue
+            if gene_symbol_id:
+                filter_set.remove(filter_str)
+                gene_symbol_ids.add(gene_symbol_id)
 
     clingen_alleles: set[ClinGenAllele] = set()
     if filter_set:
@@ -291,16 +320,19 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
                     filter_set.remove(filter_str)
 
     error_set.update(filter_set)
+    errors = [str(ambiguous) for ambiguous in ambiguous_aliases]
     if error_set:
         unmatched_str = ", ".join(f'"{filter_str}"' for filter_str in sorted(error_set))
-        raise ValueError(f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
+        errors.insert(0, f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
+    if errors:
+        raise ValueError("; ".join(errors))
 
     queries: list[Q] = []
-    if gene_symbols:
+    if gene_symbol_ids:
         # TODO change this to handle only supported genome builds, maybe even the genome build
         queries.append(
-            Q(classification__allele_info__grch37__gene_symbol__in=gene_symbols) |
-            Q(classification__allele_info__grch38__gene_symbol__in=gene_symbols)
+            Q(classification__allele_info__grch37__gene_symbol__in=gene_symbol_ids) |
+            Q(classification__allele_info__grch38__gene_symbol__in=gene_symbol_ids)
         )
     if clingen_alleles:
         queries.append(Q(classification__allele_info__allele__clingen_allele__in=clingen_alleles))
@@ -367,7 +399,6 @@ class ClassificationFilter:
         include_sources: If provided Labs/Orgs that should only be included
         since: Try to optimise data so we only include alleles that have been modified since this date
         min_share_level: Minimum share level of classifications to include
-        transcript_strategy: Which classification transcripts should be considered
         rows_per_file: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
         starting_query: If this is provided then instead of using all of the above filters, just this
         TODO rename row_limit to indicate that it's the max per file, not
@@ -382,7 +413,6 @@ class ClassificationFilter:
     include_sources: Optional[set[Lab]] = None
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.LAB
-    transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
     rows_per_file: Optional[int] = None
     allele: Optional[int] = None
     file_prefix: str = "classifications"
@@ -491,10 +521,8 @@ class ClassificationFilter:
 
         share_level = ShareLevel(share_level_str)
         genome_build = GenomeBuild.get_name_or_alias(build_name)
-        transcript_strategy = TranscriptStrategy(request.query_params.get('transcript_strategy', 'all'))
         since: Optional[datetime] = None
         if since_str := request.query_params.get('since'):
-            from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
         # just for debugging purposes allows us to download a single allele
@@ -538,7 +566,6 @@ class ClassificationFilter:
             genome_build=genome_build,
             allele_origin_filter=allele_origin_filter,
             min_share_level=share_level,
-            transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
             benchmarking=benchmarking,
@@ -736,13 +763,6 @@ class ClassificationFilter:
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
         # can't filter out transcript versions (due to 37!=38) easily here, do that later
-
-        if self.transcript_strategy == TranscriptStrategy.REFSEQ:
-            from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
-            acceptable_transcripts: list[Q] = [
-                Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
-            ]
-            cms = cms.filter(reduce(operator.or_, acceptable_transcripts))
 
         return cms
 

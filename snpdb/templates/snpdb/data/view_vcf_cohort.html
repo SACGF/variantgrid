@@ -11,6 +11,7 @@
 {% load vcf_history_trail_tags %}
 {% load cohort_sample_actions_tag %}
 {% load phenotype_tags %}
+{% load import_status_tags %}
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block head %}
@@ -382,6 +383,7 @@ $(document).ready(function() {
         <form method="post" id='vcf-form'>
             {% csrf_token %}
             {% crispy vcf_form form_helper.horizontal %}
+            {% labelled label="Import Status" %}{% import_status_icon vcf.import_status %}{% endlabelled %}
 
             {% if vcf.uploadedvcf.file_upload.exists or annotated_download_files and not vcf.data_archived %}
                 <div class="form-group-row row">
@@ -659,7 +661,35 @@ $(document).ready(function() {
     {% endif %}
     {% if somalier_enabled and vcf.somaliervcfextract.somalierancestryrun %}
         <div class="tab-pane" role="tabpanel" id="vcf-ancestry">
-            <iframe width="100%" height="100%" src="{{ vcf.somaliervcfextract.somalierancestryrun.url }}"></iframe>
+            <p>Prediction by <a href="https://github.com/brentp/somalier">Somalier</a></p>
+            {% if somalier_ancestries %}
+                <table class="table w-auto">
+                    <tr>
+                        <th>Sample</th>
+                        <th>Predicted</th>
+                        <th>AFR prob</th>
+                        <th>AMR prob</th>
+                        <th>EAS prob</th>
+                        <th>EUR prob</th>
+                        <th>SAS prob</th>
+                    </tr>
+                    {% for ancestry in somalier_ancestries %}
+                        {% with sample=ancestry.sample_extract.sample %}
+                        <tr>
+                            <td><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></td>
+                            <td>{{ ancestry.get_predicted_ancestry_display }}</td>
+                            <td>{{ ancestry.AFR_prob }}</td>
+                            <td>{{ ancestry.AMR_prob }}</td>
+                            <td>{{ ancestry.EAS_prob }}</td>
+                            <td>{{ ancestry.EUR_prob }}</td>
+                            <td>{{ ancestry.SAS_prob }}</td>
+                        </tr>
+                        {% endwith %}
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>No ancestry predictions - see the Somalier stages on the VCF Info tab.</p>
+            {% endif %}
         </div>
     {% endif %}
     {% if skipped_annotation_count %}

@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
@@ -11,6 +12,7 @@ from classification.models import (
     ClassificationModification,
     EvidenceKeyMap,
 )
+from classification.models.evidence_mixin import EvidenceMixin
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
 )
@@ -88,6 +90,14 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
 
     def header(self) -> list[str]:
         return ['{"records":[']
+
+    def batch_pre_cache(self) -> Optional[Callable[[list[AlleleData]], None]]:
+        if not self.json_params.populate_literature_with_citations:
+            return None
+
+        def prefetch_citations(batch: list[AlleleData]):
+            EvidenceMixin.prefetch_citations(ci.classification.classification for ad in batch for ci in ad.all_cms)
+        return prefetch_citations
 
     def row(self, allele_data: AlleleData) -> list[str]:
         rows = []

@@ -50,7 +50,12 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
         return [True, True, True, True]
 
     def get_stats_filter_key(self) -> Optional[str]:
-        """ The precomputed cohort stats bucket counts are read from - None is the raw aggregate row """
+        """ The precomputed cohort stats bucket counts are read from - the cohort's raw aggregate row """
+        return self._get_cohort().get_stats_filter_key()
+
+    def _get_stats_enqueue_recompute(self):
+        """ What brings get_stats_filter_key's bucket up to date after a cache miss, None for the cohort's
+            own stats """
         return None
 
     def _get_cached_label_count(self, label):
@@ -70,6 +75,7 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
             passing_filter=bool(filter_code),
             zygosities=self._cached_label_count_zygosities(),
             label=label,
+            enqueue_recompute=self._get_stats_enqueue_recompute(),
         )
 
     def _get_q_and_list(self) -> list[Q]:
@@ -126,12 +132,12 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def _has_filters_that_affect_label_counts(self) -> bool:
         # Anything other than the raw "no zygosity filtering" config defeats the
         # cache — the precomputed aggregate row only matches accordion_panel=COUNT
-        # with no extra zygosity restriction.
+        # with no count limits (#2370).
         if super()._has_filters_that_affect_label_counts():
             return True
         if self.accordion_panel != self.COUNT:
             return True
-        return False
+        return self.has_effective_count_limits()
 
     def _get_cohort(self):
         return self.cohort
@@ -316,34 +322,36 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         return errors
 
     @property
-    def _count_columns(self) -> list:
-        """ The het count carries the cell; hom and ref ride along in it.
+    def _count_columns_and_zygosities(self) -> list[tuple[str, str]]:
+        """ The counts the cell draws from the row, het first as the one it sorts on.
             @see VariantGridFormat.dbZygosityCounts """
-        return [self.het_count_column, self.hom_count_column, self.ref_count_column]
+        return [
+            (self.het_count_column, "Het"),
+            (self.hom_count_column, "Hom"),
+            (self.ref_count_column, "Ref"),
+        ]
 
     def _get_node_extra_columns(self) -> list[RichColumn]:
         extra_columns = super()._get_node_extra_columns()
         if self.cohort and self.count_column_prefix is not None:
-            drawn_column = self._count_columns[0]
-            for c in self._count_columns:
-                kwargs = {"key": c, "orderable": True, "search": False, "include_in_csv": True,
-                          "null_order": NullOrder.FIRST_ON_ASC}
-                if c == drawn_column:
-                    # hom · het in the one cell, the counts it doesn't draw on hover
-                    kwargs.update({
-                        "label": "Cohort Counts",
-                        "width": 70,
-                        "client_renderer": "VariantGridFormat.dbZygosityCounts",
-                        "client_renderer_kwargs": {"countPrefix": self.count_column_prefix},
-                        "sort_menu": [
-                            {"label": "Het count", "column": self.het_count_column},
-                            {"label": "Hom count", "column": self.hom_count_column},
-                            {"label": "Ref count", "column": self.ref_count_column},
-                        ],
-                    })
-                else:
-                    kwargs["visible"] = False
-                extra_columns.append(RichColumn(**kwargs))
+            # hom · het in the one cell, the counts it doesn't draw on hover. Display only: the counts
+            # ride along hidden and export under their own labels (#2209)
+            extra_columns.append(RichColumn(
+                name=self.count_column_prefix + "counts",
+                label="Cohort Counts",
+                width=70,
+                client_renderer="VariantGridFormat.dbZygosityCounts",
+                client_renderer_kwargs={"countPrefix": self.count_column_prefix},
+                sort_keys=[self.het_count_column],
+                sort_menu=[{"label": f"{zygosity} count", "column": c}
+                           for c, zygosity in self._count_columns_and_zygosities],
+                null_order=NullOrder.FIRST_ON_ASC,
+                include_in_csv=False,
+            ))
+            for c, zygosity in self._count_columns_and_zygosities:
+                extra_columns.append(RichColumn(key=c, label=f"Cohort {zygosity} Count", visible=False,
+                                                orderable=True, search=False, include_in_csv=True,
+                                                null_order=NullOrder.FIRST_ON_ASC))
         return extra_columns
 
     def save(self, *args, **kwargs):

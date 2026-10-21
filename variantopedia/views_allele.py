@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -24,12 +23,6 @@ from snpdb.models import Allele, AlleleConversionTool, AlleleOrigin, ImportSourc
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_genome_build_or_404
-
-
-@dataclass
-class ShareLevelRecordCounts:
-    lab_count: int
-    # record_count: int
 
 
 def get_allele_short_label(allele: Allele, preferred_genome_build: GenomeBuild) -> str:
@@ -66,7 +59,6 @@ def view_allele(request, allele_id: int):
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "allele_short_label": get_allele_short_label(allele, user_settings.default_genome_build),
-        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
     }
     if request.user.is_superuser:
         withdrawn_count = Classification.objects.filter(allele_info__allele=allele, withdrawn=True).count()

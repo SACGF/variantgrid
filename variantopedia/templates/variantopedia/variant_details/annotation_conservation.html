@@ -1,0 +1,17 @@
+{% load ui_utils %}
+<div class="col-md-6 mt-4">
+    <div class="card">
+        <div class="card-header">Conservation</div>
+        <div class="card-body">
+            {% if variant_annotation.has_dbnsfp %}
+                {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" help=annotation_description.aloft_ensembl_transcript help=annotation_description.gerp_pp_rs hint="tiny" %}{% endlabelled %}
+            {% endif %}
+            {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate (0-1)" help=annotation_description.phastcons_100_way_vertebrate hint="tiny" %}{% endlabelled %}
+            {% labelled id="phastcons_30_way_mammalian" visible_fields=visible_fields label="PhastCons 30 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_30_way_mammalian hint="tiny" %}{% endlabelled %}
+            {% labelled id="phastcons_46_way_mammalian" visible_fields=visible_fields label="PhastCons 46 way mammalian (0-1)" label_css="text-small" help=annotation_description.phastcons_46_way_mammalian hint="tiny" %}{% endlabelled %}
+            {% labelled id="phylop_100_way_vertebrate" label="PhyloP 100 way vertebrate (-20 - 10)" label_css="text-small" help=annotation_description.phylop_100_way_vertebrate hint="tiny" %}{% endlabelled %}
+            {% labelled id="phylop_30_way_mammalian" visible_fields=visible_fields label="PhyloP 30 way mammalian (-20 - 1.3)" label_css="text-small" help=annotation_description.phylop_30_way_mammalian hint="tiny" %}{% endlabelled %}
+            {% labelled id="phylop_46_way_mammalian" visible_fields=visible_fields label="PhyloP 46 way mammalian" label_css="text-small" help=annotation_description.phylop_46_way_mammalian hint="tiny" %}{% endlabelled %}
+        </div>
+    </div>
+</div>

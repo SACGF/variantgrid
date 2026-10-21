@@ -15,6 +15,7 @@ from eventlog.models import (
     IntegrationActivityStatus,
     ViewEvent,
 )
+from library.django_utils.change_tracking import ChangeCollector, collect_changes
 from library.integration_status import IntegrationDirection
 from oidc_auth.session_refresh import VariantGridSessionRefresh
 
@@ -159,7 +160,8 @@ class IntegrationApiMiddleware:
     """
     Records each call an external client makes to us: the rolling "last run" on Server Status
     (IntegrationActivity) and one ApiRequestLog row with what was sent and what came back, for
-    endpoints that would otherwise leave nothing behind but the records they wrote.
+    endpoints that would otherwise leave nothing behind but the records they wrote. What the call
+    created, updated or left unchanged is collected by library/django_utils/change_tracking.py.
 
     Driven by settings.INTEGRATION_API_TRACKING - {url path prefix: display name} - so a
     deployment only pays for the endpoints it names.
@@ -177,13 +179,15 @@ class IntegrationApiMiddleware:
         # read before the view, which consumes the stream
         request_body = _request_body_for_log(request)
         start = time.perf_counter()
-        response = self.get_response(request)
+        with collect_changes() as collector:
+            response = self.get_response(request)
         duration_ms = int((time.perf_counter() - start) * 1000)
-        self._record(request, response, display_name, request_body, duration_ms)
+        self._record(request, response, display_name, request_body, duration_ms, collector)
         return response
 
     @staticmethod
-    def _record(request, response, display_name: str, request_body: Optional[str], duration_ms: int):
+    def _record(request, response, display_name: str, request_body: Optional[str], duration_ms: int,
+                collector: ChangeCollector):
         try:
             resolver_match = request.resolver_match or resolve(request.path_info)
         except Resolver404:
@@ -232,6 +236,9 @@ class IntegrationApiMiddleware:
             response_body=response_body,
             content_type=content_type,
             object_pks=sorted(getattr(request, "api_log_object_pks", ())),
+            changes=collector.as_dict(),
+            num_changes=collector.num_changes,
+            notes=collector.notes,
         )
 
 

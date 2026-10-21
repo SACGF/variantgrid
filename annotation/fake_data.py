@@ -14,27 +14,27 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
-from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import (
-    AnnotationRangeLock,
-    AnnotationRun,
-    AnnotationVersion,
+from annotation.enums import AnnotationStatus, PathogenicityImpact
+from annotation.models import ClinVarReviewStatus
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from annotation.models.models_clinvar import (
     ClinVar,
     ClinVarCitation,
     ClinVarCitationsCollection,
     ClinVarVersion,
+)
+from annotation.models.models_gene_annotation import (
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
-    SubVersionPartition,
-    VariantAnnotation,
-    VariantAnnotationVersion,
 )
-from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from annotation.models.models_enums import AnnotationStatus
+from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion
+from genes.models.models_gene_annotation_release import GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_partition import temporary_db_table
 from library.fake_data import FakeData, FakeDataContext, register
@@ -174,8 +174,8 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in fake_version:
-            continue  # already set
+        if f.name in fake_version or f.name == "vep_version_mismatch_reason":
+            continue  # already set, or not a VEP pin (#1679 latch)
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
@@ -252,6 +252,25 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
                                                     human_protein_atlas_version=human_protein_atlas_version,
                                                     ontology_version=ontology_version)
     return av
+
+
+def link_fake_gene_annotation_release(variant_annotation_version: VariantAnnotationVersion):
+    """ A VAV made from get_fake_vep_version has no GeneAnnotationRelease, so get_annotation_run_blocker
+        is set and the dispatcher's VEP lane skips it. Link one after creation - creating the VAV with it
+        set raises in new_sub_version when no GeneAnnotationVersion exists. """
+    genome_build = variant_annotation_version.genome_build
+    annotation_consortium = variant_annotation_version.annotation_consortium
+    gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
+                                                                        annotation_consortium=annotation_consortium,
+                                                                        url="fake")[0]
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="fake_unit_test",
+                                                                          genome_build=genome_build,
+                                                                          annotation_consortium=annotation_consortium,
+                                                                          defaults={
+                                                                              "gene_annotation_import": gene_annotation_import,
+                                                                          })[0]
+    variant_annotation_version.gene_annotation_release = gene_annotation_release
+    variant_annotation_version.save(update_fields=["gene_annotation_release"])
 
 
 def retire_seeded_annotation_version(genome_build: GenomeBuild):

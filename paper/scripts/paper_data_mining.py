@@ -89,7 +89,7 @@ class Command(BaseCommand):
     # ---- helpers -----------------------------------------------------------
     def _write(self, filename, header, rows):
         path = os.path.join(self.out_dir, filename)
-        with open(path, "w", newline="") as f:
+        with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             w.writerow(header)
             w.writerows(rows)

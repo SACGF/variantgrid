@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Optional
 
 from cdot.hgvs.dataproviders import ChainedSeqFetcher, FastaSeqFetcher, LocalDataProvider
@@ -52,6 +52,14 @@ class DBTranscriptSeqFetcher:
             end_i = len(transcript_seq)
         return transcript_seq[start_i:end_i]
 
+    def has_sequence(self, ac) -> bool:
+        """ Whether fetch_seq serves a stored sequence for this transcript. Without one the chained fasta fetcher
+            stitches the transcript out of the genome, so the two can't be compared (#1266) """
+        try:
+            return TranscriptVersionSequenceInfo.get(ac, retrieve=self.retrieve_transcripts) is not None
+        except NoTranscript:
+            return False
+
 
 class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
     """ We want this to fail with ContigNotInBuildError if asked for a contig not in the
@@ -84,6 +92,9 @@ def _closest_version(versions: list[int], version: Optional[int]) -> int:
 
 
 class DjangoTranscriptDataProvider(LocalDataProvider):
+    # One conversion asks for the same transcript 3-4 times (tx info, exons, identity, mapping options), so this
+    # only needs to span a conversion (plus the 2-3 versions cdot's substitution check reads), not a whole page
+    TRANSCRIPT_CACHE_SIZE = 32
 
     def __init__(self, genome_build, retrieve_transcripts: Optional[bool] = None):
         """ retrieve_transcripts: attempt to retrieve transcript if not present (slower) """
@@ -93,6 +104,7 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
 
         super().__init__(assemblies=[genome_build.name], seqfetcher=seqfetcher)
         self.genome_build = genome_build
+        self._transcript_cache = OrderedDict()
 
     def _get_transcript_ids_for_gene(self, gene):
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build,
@@ -103,8 +115,17 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
         raise NotImplementedError()
 
     def _get_transcript(self, tx_ac):
-        tv = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac, best_attempt=True)
-        return tv.data
+        # pop and re-insert (rather than move_to_end) so concurrent threads can't KeyError on an evicted entry
+        data = self._transcript_cache.pop(tx_ac, None)
+        if data is None:
+            data = TranscriptVersion.get_transcript_version(self.genome_build, tx_ac, best_attempt=True).data
+        self._transcript_cache[tx_ac] = data
+        while len(self._transcript_cache) > self.TRANSCRIPT_CACHE_SIZE:
+            try:
+                self._transcript_cache.popitem(last=False)
+            except KeyError:
+                break
+        return data
 
     def _get_transcripts(self, tx_acs) -> dict:
         """ Retrieve many transcripts in one query, rather than cdot's default of one each.

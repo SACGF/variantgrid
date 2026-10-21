@@ -6,8 +6,9 @@ from io import TextIOWrapper
 import pandas as pd
 import requests
 from Bio import Entrez, SeqIO
+from django.db.models.functions import Upper
 
-from annotation.models import CachedWebResource, GenePubMedCount
+from annotation.models import GenePubMedCount
 from genes.models import (
     Gene,
     GeneSymbol,
@@ -21,6 +22,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
 from library.utils import iter_http_lines, sha256sum_str
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):
@@ -38,10 +40,10 @@ def store_refseq_gene_info_from_web(cached_web_resource: CachedWebResource):
     f = gzip.GzipFile(fileobj=r.raw)
     gene_info_df = pd.read_csv(f, sep='\t')
 
-    known_gene_symbols = GeneSymbol.get_upper_case_lookup()
-    known_symbols = set(known_gene_symbols) | set(GeneSymbolAlias.get_upper_case_lookup())
-
     GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI).delete()
+    known_gene_symbols = GeneSymbol.get_upper_case_lookup()
+    uc_aliases = GeneSymbolAlias.objects.annotate(uc_alias=Upper("alias")).values_list("uc_alias", flat=True)
+    known_symbols = set(known_gene_symbols) | set(uc_aliases)
     symbols_synonyms = gene_info_df[["Symbol", "Synonyms"]]
     symbols_synonyms.loc[:, "Symbol"] = symbols_synonyms.loc[:, "Symbol"].str.upper()
     symbols_synonyms.loc[:, "Synonyms"] = symbols_synonyms.loc[:, "Synonyms"].str.upper()
