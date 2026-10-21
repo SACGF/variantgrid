@@ -1,13 +1,14 @@
-import gzip
 import logging
 from collections import Counter
+from io import BytesIO
 
 import pandas as pd
-import requests
+from django.db import transaction
 
 from genes.enums import MANEStatus
 from genes.models import HGNC, MANE, GeneSymbol, GeneVersion, TranscriptVersion
 from library.constants import MINUTE_SECS
+from library.utils.misc_utils import retrieve_http_content
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cached_web_resource import CachedWebResource
 
@@ -17,10 +18,8 @@ def store_mane_from_web(cached_web_resource: CachedWebResource):
     MANE_VERSION = "1.3"
     MANE_URL = f"https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/release_{MANE_VERSION}/MANE.GRCh38.v{MANE_VERSION}.summary.txt.gz"
     logging.info("Retrieving %s", MANE_URL)
-    r = requests.get(MANE_URL, stream=True, timeout=MINUTE_SECS)
-    f = gzip.GzipFile(fileobj=r.raw)
+    df = pd.read_csv(BytesIO(retrieve_http_content(MANE_URL, timeout=MINUTE_SECS)), sep='\t')
 
-    MANE.objects.all().delete()
     genome_build = GenomeBuild.grch38()  # MANE is for GRCh38 only
     ncbi_gene_prefix = "GeneID:"
     ncbi_gene_prefix_length = len(ncbi_gene_prefix)
@@ -33,7 +32,6 @@ def store_mane_from_web(cached_web_resource: CachedWebResource):
     if not all([uc_known_gene_symbols, hgnc_ids_by_accession, gv_ids_by_accession, tv_ids_by_accession]):
         raise ValueError("Need to insert genes/transcripts and HGNC")
 
-    df = pd.read_csv(f, sep='\t')
     new_symbols = []
     records = []
     unmatched = Counter()
@@ -56,13 +54,15 @@ def store_mane_from_web(cached_web_resource: CachedWebResource):
                 unmatched[k] += 1
         records.append(MANE(**kwargs))
 
-    if new_symbols:
-        logging.info("Creating %d new gene symbols", len(new_symbols))
-        GeneSymbol.objects.bulk_create(new_symbols, batch_size=2000)
+    with transaction.atomic():
+        if new_symbols:
+            logging.info("Creating %d new gene symbols", len(new_symbols))
+            GeneSymbol.objects.bulk_create(new_symbols, batch_size=2000)
 
-    if records:
-        logging.info("Inserting %d MANE records", len(records))
-        MANE.objects.bulk_create(records, batch_size=2000)
+        MANE.objects.all().delete()
+        if records:
+            logging.info("Inserting %d MANE records", len(records))
+            MANE.objects.bulk_create(records, batch_size=2000)
 
     logging.info("Unmatched records: %s", unmatched)
 

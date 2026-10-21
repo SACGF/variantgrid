@@ -5,7 +5,6 @@
 import logging
 
 import ijson
-import requests
 
 from genes.enums import GeneSymbolAliasSource, HGNCStatus
 from genes.gene_matching import ReleaseGeneMatcher
@@ -19,6 +18,7 @@ from genes.models import (
 )
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, get_model_fields
+from library.utils.misc_utils import retrieve_http_content
 from snpdb.models.models_cached_web_resource import CachedWebResource
 
 HGNC_BASE_URL = "https://rest.genenames.org/fetch/status/"
@@ -33,8 +33,8 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
     for hgnc_status in [HGNCStatus.APPROVED, HGNCStatus.ENTRY_WITHDRAWN]:
         url = HGNC_BASE_URL + hgnc_status.label
         logging.info("Fetching HGNC of status: %s", hgnc_status.label)
-        r = requests.get(url, headers=headers, timeout=MINUTE_SECS)
-        records = ijson.items(r.content, "response.docs.item")
+        content = retrieve_http_content(url, timeout=MINUTE_SECS, headers=headers)
+        records = ijson.items(content, "response.docs.item")
         save_hgnc_records(existing_hgnc_ids, records, status=hgnc_status.value)
 
     # Make sure gene symbols are matched to genes in each release
