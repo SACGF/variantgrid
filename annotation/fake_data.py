@@ -14,12 +14,12 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.enums import AnnotationStatus, PathogenicityImpact
+from annotation.enums import AnnotationStatus, CitationSource, PathogenicityImpact
 from annotation.models import ClinVarReviewStatus
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
-from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from annotation.models.models_citations import CitationIdNormalized
 from annotation.models.models_clinvar import (
     ClinVar,
     ClinVarCitation,
