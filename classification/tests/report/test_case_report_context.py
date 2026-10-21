@@ -23,7 +23,7 @@ from classification.tests.report.fake_report_variants import (
     fake_report_variant,
     fake_sample,
 )
-from snpdb.models.models_enums import SomaticClinicalSignificance
+from snpdb.enums import SomaticClinicalSignificance
 
 TIER_1 = SomaticClinicalSignificance.TIER_1
 TIER_2 = SomaticClinicalSignificance.TIER_2

@@ -17,7 +17,8 @@ from classification.views.exports.classification_export_filter import (
 )
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
-from snpdb.models import AlleleOriginFilterDefault, GenomeBuild
+from snpdb.enums import AlleleOriginFilterDefault
+from snpdb.models import GenomeBuild
 
 
 @dataclass(frozen=True)

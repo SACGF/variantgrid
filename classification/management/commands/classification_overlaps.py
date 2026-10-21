@@ -44,8 +44,8 @@ from classification.services.overlap_calculator import overlap_calculator_for_va
 from classification.services.overlaps_services import OverlapPageDetails, OverlapServices
 from flags.models import Flag, FlagStatus
 from library.django_utils import chunked_queryset
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class Command(BaseCommand):

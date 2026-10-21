@@ -12,6 +12,7 @@ from library.log_utils import log_traceback
 from library.utils.file_utils import rm_if_exists
 from ontology.forms import HGNCForm, HPOForm, MONDOForm, OMIMForm
 from patients import forms
+from patients.enums import MatchStatus
 from patients.forms import PatientContactForm, PatientSearchForm
 from patients.models import (
     Extraction,
@@ -23,7 +24,6 @@ from patients.models import (
     Specimen,
 )
 from patients.models.models_phenotype import TextPhenotypeMatch
-from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC, SequencingSample
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from snpdb.models import Sample

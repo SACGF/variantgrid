@@ -7,7 +7,7 @@ its loader task (a snpdb/tasks/cached_web_resource_tasks.py:CachedWebResourceTas
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 
 __all__ = ["CachedWebResource"]
 

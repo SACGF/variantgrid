@@ -58,7 +58,8 @@ from library.utils import (
 )
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
+from snpdb.enums import ProcessingStatus, SequenceRole
 from snpdb.grid_columns.custom_columns import (
     get_all_variant_grid_columns,
     get_variantgrid_extra_annotate,
@@ -72,15 +73,7 @@ from snpdb.grid_columns.grid_sample_columns import (
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import (
-    CohortGenotype,
-    ProcessingStatus,
-    Sample,
-    UserGridConfig,
-    VariantGridColumn,
-    VCFFilter,
-)
-from snpdb.models.models_enums import SequenceRole
+from snpdb.models import CohortGenotype, Sample, UserGridConfig, VariantGridColumn, VCFFilter
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_dataframe import DataFrameDatatableConfig
 from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder

@@ -17,8 +17,8 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
 from ontology.models.models_ontology import OntologyTerm
+from patients.enums import Zygosity
 from patients.models import Patient
-from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample
 
 

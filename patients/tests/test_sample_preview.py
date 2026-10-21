@@ -13,7 +13,8 @@ from patients.signals.patient_search import (
     patient_preview_phenotype_extra,
     sample_preview_patient_extra,
 )
-from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, Sample
 from snpdb.search import search_data
 
 

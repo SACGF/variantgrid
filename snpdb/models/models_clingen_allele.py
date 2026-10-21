@@ -9,7 +9,7 @@ from django.db.models.fields import DateTimeField
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
-from snpdb.models.models_enums import SequenceRole
+from snpdb.enums import SequenceRole
 from snpdb.models.models_genome import Contig, GenomeBuild
 
 

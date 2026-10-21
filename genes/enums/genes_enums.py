@@ -1,9 +1,14 @@
 """
 Enums for genes and transcripts: AnnotationConsortium (RefSeq / Ensembl - the axis every Gene and
-Transcript id carries), HGNC status, HGVS kinds, alias sources, MANE status and PanelApp confidence.
+Transcript id carries), HGNC status, alias sources, LRG RefSeqGene category, MANE status, PanelApp
+confidence and GeneCopyNumberEventKind (gain / loss of a whole-gene copy number event).
 Stored codes: add values, never renumber.
 """
+from typing import Optional
+
 from django.db import models
+
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 
 
 class AnnotationConsortium(models.TextChoices):
@@ -64,3 +69,36 @@ class PanelAppConfidence(models.TextChoices):
     INTERMEDIATE = "2", "Intermediate"
     HIGH = "3", "High"
 
+
+class GeneCopyNumberEventKind(models.TextChoices):
+    """ Which way a whole-gene copy number call went. GAIN rather than amplification because the
+        threshold that makes a gain an amplification is the lab's, not ours - identity never encodes
+        one, and the copy ratio stays per-sample on CohortGenotype. """
+
+    GAIN = "G", "Gain"
+    LOSS = "L", "Loss"
+
+    @property
+    def alt_kind(self) -> str:
+        """ The GeneLevelSymbolicAlt this kind's Variant alt is written with """
+        return GENE_COPY_NUMBER_ALT_KINDS[self]
+
+    @property
+    def canonical_word(self) -> str:
+        """ 'amplification' is what the reports say; 'gain' is what we store """
+        return GENE_COPY_NUMBER_CANONICAL_WORDS[self]
+
+    @staticmethod
+    def from_alt_kind(alt_kind: str) -> Optional['GeneCopyNumberEventKind']:
+        return GENE_COPY_NUMBER_KINDS_BY_ALT.get(alt_kind)
+
+
+GENE_COPY_NUMBER_ALT_KINDS = {
+    GeneCopyNumberEventKind.GAIN: GeneLevelSymbolicAlt.GAIN,
+    GeneCopyNumberEventKind.LOSS: GeneLevelSymbolicAlt.LOSS,
+}
+GENE_COPY_NUMBER_KINDS_BY_ALT = {alt_kind: kind for kind, alt_kind in GENE_COPY_NUMBER_ALT_KINDS.items()}
+GENE_COPY_NUMBER_CANONICAL_WORDS = {
+    GeneCopyNumberEventKind.GAIN: "amplification",
+    GeneCopyNumberEventKind.LOSS: "loss",
+}

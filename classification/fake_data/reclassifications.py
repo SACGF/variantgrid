@@ -50,9 +50,9 @@ from classification.models.classification_grouping import (
     ClassificationGroupingEntry,
 )
 from library.fake_data import FakeData, FakeDataContext, in_preferred_order, register, zipf_weight
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.fake_data import GERMLINE, SOMATIC
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 
 LAB_RECORD_PREFIX = "fake-recl-"
 SOMATIC_LAB_RECORD_PREFIX = f"{LAB_RECORD_PREFIX}som-"

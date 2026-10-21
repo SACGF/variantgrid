@@ -5,8 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from annotation.fake_data import get_fake_annotation_version
+from genes.enums import HGNCStatus
 from genes.models import HGNC, GeneSymbol, HGNCImport
-from genes.models_enums import HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.gene_level_test_utils import create_splice_event_variant
 from snpdb.models import GenomeBuild

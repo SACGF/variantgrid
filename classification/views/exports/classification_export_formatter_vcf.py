@@ -30,8 +30,8 @@ from classification.views.exports.vcf_export_utils import (
 from library.django_utils import get_url_from_view_path
 from library.utils import local_date_str_no_dash
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele, Variant
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class VCFTargetSystem(str, Enum):

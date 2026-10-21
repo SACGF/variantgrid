@@ -2,8 +2,8 @@
 from django.test import TestCase
 from django.utils import timezone
 
+from genes.enums import GeneSymbolAliasSource, HGNCStatus
 from genes.models import HGNC, GeneSymbol, GeneSymbolAlias, HGNCImport
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
 
 

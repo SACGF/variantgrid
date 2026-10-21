@@ -50,15 +50,10 @@ from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.babelfish import get_genome_babelfish
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ProcessingStatus,
-    SequenceRole,
-)
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 # VCF spec's reference alt (our Variant.REFERENCE_ALT is "=")

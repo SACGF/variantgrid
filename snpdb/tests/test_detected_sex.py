@@ -6,8 +6,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_data import get_fake_annotation_version
+from patients.enums import Sex
 from patients.models import Patient
-from patients.models_enums import Sex
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     CohortGenotypeCollection,

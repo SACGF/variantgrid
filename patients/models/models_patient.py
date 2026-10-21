@@ -34,17 +34,18 @@ from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
-from patients.external_references import ResolvedReference, normalize_specimen_reference
-from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
-from patients.models_enums import (
+from patients.enums import (
     MatchStatus,
     NucleicAcid,
     PatientRecordMatchType,
+    PatientRecordOriginType,
     PopulationGroup,
     Sex,
     SpecimenMeasureType,
     TissueStatus,
 )
+from patients.external_references import ResolvedReference, normalize_specimen_reference
+from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 
 TEST_PATIENT_KWARGS = {"first_name": "PATIENT", "last_name": "TESTPATIENT"}
 
@@ -826,20 +827,6 @@ class PatientAttachment(TimeStampedModel):
             'deleteUrl': reverse('patient_file_delete', kwargs={'pk': self.pk}),
             'deleteType': 'POST',
         }
-
-
-class PatientRecordOriginType:
-    UPLOADED_CSV = 'C'
-    MANUAL_VG_GUI = 'G'
-    EXTERNAL_DATABASE = 'E'
-    INTERNAL_VG = 'I'
-
-    CHOICES = (
-        (UPLOADED_CSV, 'Uploaded CSV'),
-        (INTERNAL_VG, 'Internal change'),
-        (MANUAL_VG_GUI, 'Manual change by user'),
-        (EXTERNAL_DATABASE, 'External Database'),
-    )
 
 
 class PatientImport(TimeStampedModel):

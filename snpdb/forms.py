@@ -29,15 +29,20 @@ from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from patients.models import Extraction, Patient, Specimen
 from snpdb import models
-from snpdb.models import (
+from snpdb.enums import (
     DEFAULT_GRID_LOADING_ANIMATIONS,
+    AlleleOriginBucket,
+    GridLoadingAnimation,
+    ImportStatus,
+    SampleFileType,
+    VariantOrigin,
+)
+from snpdb.models import (
     TAG_ALLELE_ORIGIN_CHOICES,
     VCF,
     Cohort,
     CustomColumnsCollection,
     GenomicIntervalsCollection,
-    GridLoadingAnimation,
-    ImportStatus,
     LabUserSettingsOverride,
     OrganizationUserSettingsOverride,
     Project,
@@ -48,10 +53,8 @@ from snpdb.models import (
     UserContact,
     UserSettings,
     UserSettingsOverride,
-    VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import AlleleOriginBucket, SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision

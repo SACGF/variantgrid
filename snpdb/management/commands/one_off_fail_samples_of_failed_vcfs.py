@@ -7,7 +7,8 @@ import logging
 
 from django.core.management import BaseCommand
 
-from snpdb.models import ImportStatus, Sample
+from snpdb.enums import ImportStatus
+from snpdb.models import Sample
 
 
 def samples_of_failed_vcfs_qs():

@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-from snpdb.models.models_enums import SequenceRole
+from snpdb.enums import SequenceRole
 
 
 def _set_gene_level_svlen(apps, _schema_editor):

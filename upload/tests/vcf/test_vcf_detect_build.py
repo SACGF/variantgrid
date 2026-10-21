@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from snpdb.models import ImportSource
+from snpdb.enums import ImportSource
 from upload.models import FileUpload, UploadedFileTypes
 from upload.vcf.vcf_import import (
     GenomeBuildDetectionException,

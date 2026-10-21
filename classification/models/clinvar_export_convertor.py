@@ -19,8 +19,8 @@ from genes.hgvs import HGVSComponents
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
 from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 
 """

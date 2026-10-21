@@ -3,7 +3,7 @@ const ACTIVE_CLASS = "node-selected";
 const DELETING_CLASS = "node-deleting";  // fade out transition, see analysis_nodes.css
 const FLASH_CLASS = "node-flash";  // new node arrival animation, see analysis_nodes.css
 const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
-const NODE_COUNT_TOTAL = "T";  // snpdb.models.models_enums.BuiltInFilters.TOTAL
+const NODE_COUNT_TOTAL = "T";  // snpdb.enums.BuiltInFilters.TOTAL
 const SHOW_NODE_IDS_IN_TOOLTIPS = true;
 
 // Connector/endpoint look - shared between the instance defaults and the per-node endpoints below

@@ -13,8 +13,8 @@ from library.guardian_utils import (
     add_public_group_read_permission,
     admin_bot,
 )
+from snpdb.enums import ImportStatus
 from snpdb.models import Company
-from snpdb.models.models_enums import ImportStatus
 
 
 class PanelAppServer(models.Model):

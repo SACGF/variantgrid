@@ -20,8 +20,8 @@ from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.condition_resolved import ConditionResolved
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import JsonObjType, first, invalidate_cached_property
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
-from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JsonMessages, ValidatedJson
 
 

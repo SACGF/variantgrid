@@ -7,8 +7,8 @@ from django.utils.timezone import make_aware
 from annotation.enums import ClinVarOncogenicity
 from annotation.fake_data import create_fake_variants
 from annotation.models.models_clinvar import ClinVar, ClinVarVersion
+from snpdb.enums import SomaticClinicalSignificance
 from snpdb.models import GenomeBuild, Variant
-from snpdb.models.models_enums import SomaticClinicalSignificance
 
 
 def _utc(year: int) -> datetime:

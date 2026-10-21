@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from annotation.fake_data import get_fake_annotation_version
+from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_transcript_version
 from genes.models import (
     CanonicalTranscript,
@@ -19,11 +20,10 @@ from genes.models import (
     PanelAppPanel,
     PanelAppServer,
 )
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.enums import DataState, ImportStatus
 from snpdb.fake_data import create_fake_trio
-from snpdb.models import DataState, ImportStatus
 from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
 

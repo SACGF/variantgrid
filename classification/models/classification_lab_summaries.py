@@ -3,8 +3,8 @@ from typing import Optional
 
 from classification.enums import SpecialEKeys
 from classification.models.evidence_key import EvidenceKeyMap
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)

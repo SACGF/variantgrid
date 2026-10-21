@@ -19,7 +19,8 @@ from django.db.models.functions import Length
 from annotation.annotation_pipeline_routing import EXPLICIT_SYMBOLIC_ALTS, pipeline_type_for_variant
 from annotation.models import AnnotationRangeLock, VariantAnnotation
 from library.utils import sha256sum_str
-from snpdb.models import AlleleConversionTool, GenomeBuild, Locus, Sequence, Variant, VariantAllele
+from snpdb.enums import AlleleConversionTool
+from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VariantAllele
 
 
 @cache

@@ -35,7 +35,7 @@ from annotation.vep_annotation import (
     get_vep_version_from_vcf,
     vep_dict_to_variant_annotation_version_kwargs,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.grids import render_annotsv_pathogenic_overlaps
 from snpdb.models import Variant, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild

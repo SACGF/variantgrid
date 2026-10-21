@@ -25,8 +25,8 @@ from annotation.models import (
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
 )
+from snpdb.enums import ProcessingStatus
 from snpdb.models import SomalierVCFExtract
-from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (
     UploadedClassificationImport,
     UploadedLiftover,

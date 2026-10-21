@@ -24,9 +24,9 @@ from django.utils import timezone
 from library.genomics.vcf_enums import VCFConstant
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import get_single_element, invert_dict
+from patients.enums import MatchStatus
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction
-from patients.models_enums import MatchStatus
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     JointCalledVCF,
@@ -36,11 +36,11 @@ from seqauto.models import (
     VCFFromSequencingRun,
 )
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
+from snpdb.enums import ImportSource, ImportStatus, VariantOrigin, VCFInfoTypes
 from snpdb.models import (
     VCF,
     AbstractVCFField,
     Cohort,
-    ImportStatus,
     Sample,
     UserSettings,
     VCFFilter,
@@ -48,7 +48,6 @@ from snpdb.models import (
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, VariantOrigin, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (

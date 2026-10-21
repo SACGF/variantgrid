@@ -12,8 +12,8 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
+from patients.enums import SampleSourceLevel
 from patients.models import ExternalPK, Extraction, Patient, Specimen
-from patients.models_enums import SampleSourceLevel
 from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView, SampleAutocompleteView
 
 

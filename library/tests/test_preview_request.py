@@ -2,7 +2,7 @@ from datetime import datetime
 
 from django.test import TestCase
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.preview_request import PreviewData, PreviewKeyValue
 
 

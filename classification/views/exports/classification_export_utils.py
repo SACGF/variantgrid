@@ -12,7 +12,7 @@ from classification.views.exports.classification_export_filter import (
     ClassificationFilter,
 )
 from genes.hgvs import HGVSComponents
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 
 
 class CitationCounter:

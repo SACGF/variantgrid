@@ -32,10 +32,10 @@ from annotation.models.models_gene_annotation import (
 )
 from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig
+from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_partition import temporary_db_table
 from library.fake_data import FakeData, FakeDataContext, register
 from library.genomics.vcf_enums import VariantClass
