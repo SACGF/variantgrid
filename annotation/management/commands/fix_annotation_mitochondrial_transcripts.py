@@ -14,8 +14,8 @@ from django.db.models import Q
 
 from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from genes.enums import AnnotationConsortium
 from genes.models import TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_PREFIX, CDOT_FAKE_TRANSCRIPT_VERSION
 from snpdb.enums import AssemblyMoleculeType
 

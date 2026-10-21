@@ -1,8 +1,8 @@
 from django.core.management import BaseCommand
 
+from genes.enums import AnnotationConsortium
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GeneSymbol, GeneVersion
-from genes.models_enums import AnnotationConsortium
 
 """
 One off fix - can be deleted once all legacy environments migrate past genes.migrations.0015

@@ -16,7 +16,7 @@ from django.urls import get_resolver
 from django.utils.module_loading import import_string
 
 from classification.enums.classification_enums import ShareLevel
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from patients.models_enums import SampleSourceLevel
 from snpdb.enums import AlleleOriginBucket
 

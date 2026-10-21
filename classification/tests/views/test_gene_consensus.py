@@ -6,9 +6,9 @@ from django.urls import reverse
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.fake_data import create_fake_gene_version
 from genes.models import GeneSymbolAlias
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from snpdb.models import GenomeBuild
 
 GENE_SUMMARY = "RUNX1 is a transcription factor"

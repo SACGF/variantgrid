@@ -25,7 +25,7 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import sha256sum_str
 from snpdb.enums import ImportSource, ImportStatus
 from snpdb.models import (

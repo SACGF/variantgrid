@@ -6,10 +6,10 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from genes.enums import GeneCopyNumberEventKind, GeneSymbolAliasSource
 from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
-from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, GeneLevelId, GeneSymbolAlias
-from genes.models_enums import GeneSymbolAliasSource
+from genes.models import GeneCopyNumberEvent, GeneLevelId, GeneSymbolAlias
 from genes.tests.gene_level_test_utils import create_gene_copy_number_event
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
