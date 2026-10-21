@@ -1,11 +1,11 @@
-import gzip
 import logging
 from collections import Counter
-from io import TextIOWrapper
+from io import BytesIO
 
 import pandas as pd
-import requests
-from Bio import Entrez, SeqIO
+from Bio import Entrez
+from Bio.SeqIO.FastaIO import SimpleFastaParser
+from django.db import transaction
 from django.db.models.functions import Upper
 
 from annotation.models import GenePubMedCount
@@ -21,7 +21,8 @@ from genes.models import (
 )
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
-from library.utils import iter_http_lines, sha256sum_str
+from library.utils import sha256sum_str
+from library.utils.misc_utils import iter_http_lines, retrieve_http_content
 from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
@@ -36,13 +37,11 @@ def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):
 
 def store_refseq_gene_info_from_web(cached_web_resource: CachedWebResource):
     GENE_INFO_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/Homo_sapiens.gene_info.gz"
-    r = requests.get(GENE_INFO_URL, stream=True, timeout=MINUTE_SECS)
-    f = gzip.GzipFile(fileobj=r.raw)
-    gene_info_df = pd.read_csv(f, sep='\t')
+    gene_info_df = pd.read_csv(BytesIO(retrieve_http_content(GENE_INFO_URL, timeout=MINUTE_SECS)), sep='\t')
 
-    GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI).delete()
+    ncbi_aliases_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI)
     known_gene_symbols = GeneSymbol.get_upper_case_lookup()
-    uc_aliases = GeneSymbolAlias.objects.annotate(uc_alias=Upper("alias")).values_list("uc_alias", flat=True)
+    uc_aliases = GeneSymbolAlias.objects.exclude(source=GeneSymbolAliasSource.NCBI).annotate(uc_alias=Upper("alias")).values_list("uc_alias", flat=True)
     known_symbols = set(known_gene_symbols) | set(uc_aliases)
     symbols_synonyms = gene_info_df[["Symbol", "Synonyms"]]
     symbols_synonyms.loc[:, "Symbol"] = symbols_synonyms.loc[:, "Symbol"].str.upper()
@@ -69,10 +68,12 @@ def store_refseq_gene_info_from_web(cached_web_resource: CachedWebResource):
                                                            gene_symbol_id=gene_symbol_id,
                                                            source=GeneSymbolAliasSource.NCBI))
 
-    if gene_symbols:
-        GeneSymbol.objects.bulk_create(gene_symbols, ignore_conflicts=True)
-    if gene_symbol_aliases:
-        GeneSymbolAlias.objects.bulk_create(gene_symbol_aliases, ignore_conflicts=True)
+    with transaction.atomic():
+        ncbi_aliases_qs.delete()
+        if gene_symbols:
+            GeneSymbol.objects.bulk_create(gene_symbols, ignore_conflicts=True)
+        if gene_symbol_aliases:
+            GeneSymbolAlias.objects.bulk_create(gene_symbol_aliases, ignore_conflicts=True)
 
     cached_web_resource.description = f"{len(gene_symbol_aliases)} new gene symbol aliases"
     cached_web_resource.save()
@@ -128,26 +129,24 @@ REFSEQ_SEQUENCE_INFO_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annota
 REFSEQ_SUPPLEMENTARY_SEQUENCE_INFO_URL = "https://variantgrid.com/download/annotation/fasta/refseq_transcript_sequence_supplementary.fasta.gz"
 
 
-def store_transcript_sequence_info_fasta(text_handle, filename: str, annotation_consortium) -> int:
+def store_transcript_sequence_info_fasta(text_lines, filename: str, annotation_consortium) -> int:
     """ Parse a FASTA of transcript sequences (>accession, then sequence) and bulk-load
-        TranscriptVersionSequenceInfo. Re-loading the same filename replaces its prior import. """
+        TranscriptVersionSequenceInfo. Re-loading the same filename replaces its prior import, once
+        the whole file has been read. text_lines is a text file handle or any iterable of lines """
     known_transcripts = set(Transcript.objects.values_list("identifier", flat=True))
 
-    sha256_hash = sha256sum_str(filename)
-    if existing_import := TranscriptVersionSequenceInfoFastaFileImport.objects.filter(sha256_hash=sha256_hash).first():
-        logging.info("Deleting existing TranscriptVersionSequenceInfos for fasta import %s", filename)
-        existing_import.delete()
-
-    fasta_import = TranscriptVersionSequenceInfoFastaFileImport.objects.create(sha256_hash=sha256_hash,
-                                                                               annotation_consortium=annotation_consortium,
-                                                                               filename=filename)
+    fasta_import = TranscriptVersionSequenceInfoFastaFileImport(sha256_hash=sha256sum_str(filename),
+                                                                annotation_consortium=annotation_consortium,
+                                                                filename=filename)
     unknown_transcripts = []
     unknown_transcript_prefixes = Counter()
     records = []
-    for record in SeqIO.parse(text_handle, "fasta"):
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(record.id)
+    non_blank_lines = (line for line in text_lines if line.strip())
+    for title, sequence in SimpleFastaParser(non_blank_lines):
+        accession = title.split(maxsplit=1)[0]
+        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
         if version is None:
-            logging.warning("Skipping versionless accession %s", record.id)
+            logging.warning("Skipping versionless accession %s", accession)
             continue
         if transcript_id not in known_transcripts:
             if transcript_id.startswith("X"):
@@ -159,23 +158,27 @@ def store_transcript_sequence_info_fasta(text_handle, filename: str, annotation_
 
         records.append(TranscriptVersionSequenceInfo(transcript_id=transcript_id, version=version,
                                                      fasta_import=fasta_import,
-                                                     sequence=str(record.seq), length=len(record.seq)))
+                                                     sequence=sequence, length=len(sequence)))
 
-    if unknown_transcripts:
-        logging.info("Inserting %d unknown_transcripts (%s)", len(unknown_transcripts), unknown_transcript_prefixes)
-        Transcript.objects.bulk_create(unknown_transcripts, batch_size=2000, ignore_conflicts=True)
+    with transaction.atomic():
+        existing_qs = TranscriptVersionSequenceInfoFastaFileImport.objects.filter(sha256_hash=fasta_import.sha256_hash)
+        if existing_qs.exists():
+            logging.info("Deleting existing TranscriptVersionSequenceInfos for fasta import %s", filename)
+            existing_qs.delete()
+        fasta_import.save()
 
-    num_records = len(records)
-    if num_records:
-        TranscriptVersionSequenceInfo.objects.bulk_create(records, ignore_conflicts=True, batch_size=2000)
+        if unknown_transcripts:
+            logging.info("Inserting %d unknown_transcripts (%s)", len(unknown_transcripts), unknown_transcript_prefixes)
+            Transcript.objects.bulk_create(unknown_transcripts, batch_size=2000, ignore_conflicts=True)
+
+        num_records = len(records)
+        if num_records:
+            TranscriptVersionSequenceInfo.objects.bulk_create(records, ignore_conflicts=True, batch_size=2000)
     return num_records
 
 
 def _load_transcript_sequence_info_from_url(url: str, annotation_consortium) -> int:
-    r = requests.get(url, stream=True, timeout=MINUTE_SECS)
-    r.raise_for_status()
-    text_f = TextIOWrapper(gzip.GzipFile(fileobj=r.raw))
-    return store_transcript_sequence_info_fasta(text_f, url, annotation_consortium)
+    return store_transcript_sequence_info_fasta(iter_http_lines(url, timeout=MINUTE_SECS), url, annotation_consortium)
 
 
 def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
