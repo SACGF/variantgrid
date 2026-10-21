@@ -11,6 +11,20 @@
             $("div#new-gene-list-form-container").slideDown('slow');
         }
 
+        function showFormErrors($form, errors) {
+            $(".is-invalid", $form).removeClass("is-invalid");
+            $(".form-ajax-error", $form).remove();
+            for (const [field, fieldErrors] of Object.entries(errors)) {
+                let feedback = $("<div>", {"class": "invalid-feedback d-block form-ajax-error", text: fieldErrors.join(" ")});
+                let $input = $(`#id_${field}`, $form);
+                if ($input.length) {
+                    $input.addClass("is-invalid").after(feedback);
+                } else {
+                    $(".card-body", $form).prepend(feedback);
+                }
+            }
+        }
+
         $(document).ready(function() {
             $('#id_gene_list').change(function() {
                 let geneListId = $("#id_gene_list").val();
@@ -18,7 +32,7 @@
             });
 
             let options = {
-                target: '#new-gene-list-form-container',
+                dataType: 'json',
                 beforeSerialize: function($form) {
                     // Gene symbol matching is synchronous and can take a while - put the form into a
                     // read-only state with a loading overlay so it doesn't look like it's hanging, and
@@ -30,6 +44,13 @@
                 success: function(data) {
                     let geneListId = data['gene_list_id'];
                     window.location = Urls.view_gene_list(geneListId);
+                },
+                error: function(xhr) {
+                    let $form = $('form#new-gene-list-form');
+                    $form.LoadingOverlay('hide', true);
+                    $(":input", $form).prop("readonly", false);
+                    $(":submit", $form).prop("disabled", false);
+                    showFormErrors($form, xhr.responseJSON?.errors || {"__all__": ["Error creating gene list"]});
                 },
             };
             $('form#new-gene-list-form').ajaxForm(options);

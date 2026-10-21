@@ -436,13 +436,11 @@ def copy_gene_list(request, gene_list_id):
 @require_POST
 def create_custom_gene_list(request):
     form = NamedCustomGeneListForm(request.POST, username=request.user)
-    if form.is_valid():
-        custom_text_gene_list = form.save()
-        gene_list_id = custom_text_gene_list.gene_list.pk
-    else:
-        gene_list_id = None
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
 
-    return JsonResponse({"gene_list_id": gene_list_id})
+    custom_text_gene_list = form.save()
+    return JsonResponse({"gene_list_id": custom_text_gene_list.gene_list.pk})
 
 
 def view_canonical_transcript_collection(request, pk):
