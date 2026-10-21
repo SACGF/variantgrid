@@ -213,7 +213,7 @@ Gotchas:
   the `TSO500_*_CALL_BANDS` settings - the policy is on the form so a scientist who disagrees can ask for it to change.
   A case with no such measure falls back to `default`, and a draft's own answer wins over both. The keys are hand
   written in admin, so `validate_case_fields` fails the save on an unknown measure or rule.
-- A bool `case_field` carries `qc` (a `seqauto/models/models_enums.py:LIBRARY_QC_CONTEXT_KEYS` value) instead of `measure`
+- A bool `case_field` carries `qc` (a `seqauto/enums/seqauto_enums.py:LIBRARY_QC_CONTEXT_KEYS` value) instead of `measure`
   where the flag means "did the caller's library QC pass for that category" - the Amplifications / Variants / Fusions
   flags. Its `tick_when` rules are `{"passed": true|false}` and `{"completed": false}` against the category's
   `seqauto/models/models_seqauto.py:LibraryQC` row (`classification/models/classification_report_models.py:library_qc_tick`;

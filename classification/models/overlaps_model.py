@@ -11,7 +11,7 @@ from django.db.models import CASCADE, SET_NULL, JSONField, QuerySet
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.models.data_enums import EffectiveDate
+from annotation.enums import EffectiveDate
 from annotation.models.models_clinvar import ClinVarRecord
 from classification.enums import (
     OverlapOverrideStatus,
@@ -31,8 +31,8 @@ from classification.enums.overlaps_enums import (
     TriageComment,
     TriageDecision,
 )
-from classification.models.condition_resolved import ConditionResolved
 from classification.models.classification_grouping import ClassificationGrouping
+from classification.models.condition_resolved import ConditionResolved
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices

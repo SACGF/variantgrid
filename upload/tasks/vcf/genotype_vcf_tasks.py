@@ -21,6 +21,7 @@ from snpdb.variant_zygosity_count import (
     create_variant_zygosity_counts,
     update_all_variant_zygosity_counts_for_vcf,
 )
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     ModifiedImportedVariants,
     SimpleVCFImportInfo,
@@ -29,8 +30,6 @@ from upload.models import (
     UploadedVCFPendingAnnotation,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.signals.signals import vcf_import_success_signal
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask

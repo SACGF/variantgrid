@@ -43,7 +43,7 @@ from django.utils import timezone as django_timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
 
-from annotation.models.data_enums import (
+from annotation.enums import (
     ClassificationDate,
     ClassificationDateType,
     EffectiveDate,

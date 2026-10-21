@@ -24,6 +24,7 @@ from library.log_utils import log_traceback
 from patients.enums import NucleicAcid
 from patients.models import Extraction, Patient
 from seqauto import forms
+from seqauto.enums import QCCompareType
 from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, SequencingRunForm
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import (
@@ -46,12 +47,12 @@ from seqauto.models import (
     SingleSampleVCF,
     UnalignedReads,
 )
-from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from seqauto.qc.sequencing_run_utils import SEQUENCING_RUN_QC_COLUMNS
 from snpdb.enums import ProcessingStatus
 from snpdb.models import VCF, Sample, UserSettings
-from upload.models import UploadedFileTypes, UploadPipeline
+from upload.enums import UploadedFileTypes
+from upload.models import UploadPipeline
 from upload.tasks.retry_upload_pipelines_task import (
     fail_stuck_upload_pipelines,
     get_retryable_upload_pipelines,

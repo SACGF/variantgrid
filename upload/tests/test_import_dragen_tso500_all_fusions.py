@@ -20,12 +20,11 @@ from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import VCF, GenomeBuild, Variant, VCFSourceSettings
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
+from upload.enums import ModifiedImportedVariantOperation, UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
-    ModifiedImportedVariantOperation,
-    UploadedFileTypes,
     UploadPipeline,
     UploadStep,
 )

@@ -9,6 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models.query_utils import Q
 
+from analysis.enums import ALoFTPredictionOptions, StructuralFilter
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
 from annotation.enums import (
@@ -30,21 +31,6 @@ from annotation.pathogenicity_predictions import (
 )
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS, VariantClass
 from snpdb.models.models_variant import Variant
-
-
-class ALoFTPredictionOptions(models.TextChoices):
-    """ Slightly different options in dropdown from annotation values """
-    DAMAGING = "a", "Recessive / Dominant"
-    RECESSIVE = ALoFTPrediction.RECESSIVE, "Recessive"
-    DOMINANT = ALoFTPrediction.DOMINANT, "Dominant"
-
-
-class StructuralFilter(models.TextChoices):
-    """ Whether to keep only, or drop, the rows stored as a symbolic alt with an SVLEN - SVs, CNVs
-        and the gene-level events. @see Variant.get_symbolic_q """
-    ANY = 'A', "Any"
-    ONLY = 'O', "Structural only"
-    EXCLUDE = 'E', "Exclude structural"
 
 
 class _ColumnFilter(NamedTuple):

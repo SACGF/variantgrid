@@ -28,7 +28,7 @@ Patterns here:
 - Steps are rows. An UploadStep with pipeline_stage runs now; one with pipeline_stage_dependency is created inert and
   launched by upload/tasks/vcf/import_vcf_step_task.py:schedule_pipeline_stage_steps once the last step of that stage
   ends (ImportVCFStepTask.check_pipeline_stage). Stages: PRE_DATA_INSERTION → DATA_INSERTION → ANNOTATION_COMPLETE →
-  FINISH (upload/models/models_enums.py:VCFPipelineStage). Add a step by adding its class to the factory's
+  FINISH (upload/enums/upload_enums.py:VCFPipelineStage). Add a step by adding its class to the factory's
   get_post_vcf_header_classes / get_post_data_insertion_classes / get_finish_task_classes
   (upload/import_task_factories/abstract_vcf_import_task_factory.py:AbstractVCFImportTaskFactory), or create the
   UploadStep inside a running step and call upload/models/models.py:UploadStep.launch_task.

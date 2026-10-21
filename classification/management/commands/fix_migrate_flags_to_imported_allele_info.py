@@ -5,7 +5,8 @@ from functools import cached_property
 from typing import Optional
 
 from classification.models import Classification, ImportedAlleleInfo
-from flags.models import FlagComment, FlagStatus, FlagType
+from flags.enums import FlagStatus
+from flags.models import FlagComment, FlagType
 from genes.hgvs import HGVSComponents
 from library.guardian_utils import admin_bot
 from snpdb.models import Allele, GenomeBuild

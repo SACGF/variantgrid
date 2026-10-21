@@ -37,7 +37,8 @@ from patients.models import (
     Specimen,
 )
 from snpdb.enums import ImportSource
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 _TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
 _FAKE_CSV = os.path.join(_TEST_DATA_DIR, "fake_patient_records.csv")

@@ -21,12 +21,12 @@ from snpdb.vcf_utils import (
     cyvcf2_header_types,
     vcf_get_ref_alt_svlen_and_modification,
 )
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factory_from_extension
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
     SimpleVCFImportInfo,
-    UploadedFileTypes,
     UploadPipeline,
     UploadStep,
 )

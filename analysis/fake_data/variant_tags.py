@@ -23,8 +23,8 @@ from django.core.management.base import CommandError
 from django.utils.timezone import get_current_timezone, now
 from guardian.models import GroupObjectPermission
 
+from analysis.enums import TagLocation
 from analysis.models import VariantTag
-from analysis.models.enums import TagLocation
 from library.fake_data import FakeData, FakeDataContext, in_preferred_order, register, zipf_weight
 from library.guardian_utils import all_users_group
 from snpdb.fake_data import delete_unused_fake_alleles, fake_alleles_for_variants

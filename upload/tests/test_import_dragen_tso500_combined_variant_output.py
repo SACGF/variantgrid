@@ -20,11 +20,11 @@ from seqauto.models import (
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.enums import ImportSource
 from snpdb.models import VCF, GenomeBuild, Sample
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
     UploadedDragenTSO500CombinedVariantOutput,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
 )

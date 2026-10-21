@@ -12,8 +12,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import NodeStatus, TrioInheritance
 from analysis.models import Analysis, FilterNode, TrioNode
-from analysis.models.enums import NodeStatus, TrioInheritance
 from analysis.tasks.node_update_tasks import update_node_task
 from annotation.fake_data import get_fake_annotation_version
 from snpdb.enums import ImportStatus

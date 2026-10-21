@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from functools import cache, cached_property
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
+from annotation.enums import CitationSource
 from annotation.models import CitationFetchRequest
-from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
 from classification.enums import (
     ClinVarCitationsModes,

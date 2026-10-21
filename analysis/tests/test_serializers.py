@@ -11,11 +11,11 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from analysis.analysis_import_export import analysis_export_to_dict, analysis_import
+from analysis.enums import AnalysisTemplateType
 from analysis.forms.forms import CreateAnalysisTemplateForm
 from analysis.models import (
     Analysis,
     AnalysisEdge,
-    AnalysisTemplateType,
     AnalysisVariable,
     FilterNode,
     FilterNodeItem,

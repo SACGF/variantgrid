@@ -15,15 +15,14 @@ from library.log_utils import log_traceback
 from snpdb.enums import ImportStatus
 from snpdb.models import VCF
 from upload import upload_processing
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     ImportSource,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadPipeline,
     VCFImportInfo,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.upload_metadata import (
     UploadMetadataError,
     get_metadata_keys_for_file_type,

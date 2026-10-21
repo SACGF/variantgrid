@@ -22,18 +22,20 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
+from analysis.enums import (
+    AnalysisType,
+    CandidateSearchType,
+    CandidateStatus,
+    GroupOperation,
+    NodeStatus,
+)
 from analysis.forms.forms import AnalysisNodeIssuesFilterForm
 from analysis.models import (
     Analysis,
     AnalysisNode,
     AnalysisTemplate,
-    AnalysisType,
     Candidate,
     CandidateSearchRun,
-    CandidateSearchType,
-    CandidateStatus,
-    GroupOperation,
-    NodeStatus,
     VariantTag,
 )
 from analysis.models.nodes.node_counts import (

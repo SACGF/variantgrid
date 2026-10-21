@@ -5,7 +5,8 @@ from typing import Optional
 
 from django.db.models import Q
 
-from flags.models import Flag, FlagComment, FlagResolution, FlagStatus, FlagType
+from flags.enums import FlagStatus
+from flags.models import Flag, FlagComment, FlagResolution, FlagType
 
 
 class FlagDelta:

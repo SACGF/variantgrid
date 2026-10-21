@@ -2,10 +2,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
 )

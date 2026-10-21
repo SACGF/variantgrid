@@ -6,7 +6,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import DuoInheritance
+from analysis.enums import DuoInheritance
 from analysis.models.nodes.family_inheritance import (
     PROBAND,
     AbstractCompHetInheritance,

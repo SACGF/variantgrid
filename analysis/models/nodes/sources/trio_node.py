@@ -5,7 +5,7 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL
 
-from analysis.models.enums import TrioInheritance
+from analysis.enums import TrioInheritance
 from analysis.models.nodes.family_inheritance import (
     FATHER,
     MOTHER,

@@ -8,15 +8,14 @@ from django.test.client import Client
 from django.urls.base import reverse
 from django.utils import timezone
 
+from analysis.enums import AnalysisTemplateType, SNPMatrix
 from analysis.models import (
     Analysis,
     AnalysisTemplate,
-    AnalysisTemplateType,
     GeneListNode,
     GeneListNodeGeneList,
     SampleNode,
 )
-from analysis.models.enums import SNPMatrix
 from analysis.tasks.analysis_grid_export_tasks import (
     NODE_EXPORT_GENERATOR,
     export_node_to_downloadable_file,

@@ -32,6 +32,7 @@ from library.genomics.vcf_enums import (
 )
 from library.utils.file_utils import name_from_filename
 from snpdb.vcf_utils import write_cleaned_vcf_header
+from upload.enums import UploadStepTaskType, VCFImportInfoSeverity, VCFPipelineStage
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariants,
@@ -39,12 +40,9 @@ from upload.models import (
     ToolVersion,
     UploadStep,
     UploadStepMultiFileOutput,
-    UploadStepTaskType,
-    VCFPipelineStage,
     VCFSkippedContig,
     VCFSkippedContigs,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.unknown_variants_task import (
     AnnotateImportedVCFTask,
     SeparateUnknownVariantsTask,

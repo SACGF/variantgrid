@@ -27,6 +27,7 @@ from django.urls.base import reverse
 from django.utils import timezone
 
 from analysis.analysis_templates import run_analysis_template
+from analysis.enums import AnalysisTemplateType, NodeStatus, TagLocation
 from analysis.forms.forms_nodes import SampleFiltersMixin, SampleNodeForm, ZygosityNodeForm
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.grids import VariantGrid
@@ -34,7 +35,6 @@ from analysis.models import (
     AlleleFrequencyNode,
     Analysis,
     AnalysisTemplate,
-    AnalysisTemplateType,
     AnalysisTemplateVersion,
     AnalysisVariable,
     GeneListNode,
@@ -43,7 +43,6 @@ from analysis.models import (
     VariantTag,
     ZygosityNode,
 )
-from analysis.models.enums import NodeStatus, TagLocation
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode

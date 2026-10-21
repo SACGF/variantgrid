@@ -13,8 +13,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from analysis.enums import TrioInheritance
 from analysis.models import CohortNode, TrioNode
-from analysis.models.enums import TrioInheritance
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,

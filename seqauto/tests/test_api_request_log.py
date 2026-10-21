@@ -6,8 +6,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from eventlog.models import ApiRequestLog
+from seqauto.enums import DataGeneration
 from seqauto.models import EnrichmentKit, SampleSheet, Sequencer, SequencerModel, SequencingRun
-from seqauto.models.models_enums import DataGeneration
 
 
 @override_settings(INTEGRATION_API_TRACKING={"/seqauto/api/v1/": "Sequencing pipeline API"})

@@ -14,8 +14,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from flags.enums import FlagStatus
 from flags.models import Flag, FlagCollection, FlagComment, FlagPermissionLevel, FlagType
-from flags.models.enums import FlagStatus
 from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none

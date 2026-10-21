@@ -55,6 +55,7 @@ from snpdb.vcf_utils import (
     cyvcf2_header_get,
     cyvcf2_header_types,
 )
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     BackendVCF,
     FileUpload,
@@ -63,8 +64,6 @@ from upload.models import (
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.models.models import UploadUserError
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask

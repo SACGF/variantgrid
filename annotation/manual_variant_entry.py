@@ -14,17 +14,17 @@ from library.utils import full_class_name
 from snpdb.enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.vcf_utils import write_vcf_from_variant_coordinates
+from upload.enums import (
+    UploadedFileTypes,
+    UploadStepOrigin,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.models import (
     FileUpload,
     UploadedManualVariantEntryCollection,
     UploadPipeline,
     UploadStep,
-)
-from upload.models.models_enums import (
-    UploadedFileTypes,
-    UploadStepOrigin,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.upload_processing import process_upload_pipeline
 

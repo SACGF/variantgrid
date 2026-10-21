@@ -1,3 +1,9 @@
+"""
+Enums for the upload pipeline: UploadedFileTypes (which importer handles a FileUpload), UploadStepTaskType
+and UploadStepOrigin (how an UploadStep runs and who added it), VCFPipelineStage (the stage a step waits for),
+VCFImportInfoSeverity, and ModifiedImportedVariantOperation (why an imported VCF record changed on the way in).
+Stored codes: add values, never change one.
+"""
 from django.db import models
 
 

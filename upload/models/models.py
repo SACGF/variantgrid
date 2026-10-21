@@ -49,7 +49,7 @@ from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoor
 from snpdb.models.models import CodeVersionMixin
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
-from upload.models.models_enums import (
+from upload.enums import (
     ModifiedImportedVariantOperation,
     UploadedFileTypes,
     UploadStepOrigin,

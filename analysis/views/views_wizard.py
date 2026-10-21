@@ -8,8 +8,8 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.shortcuts import redirect
 from django.views.generic import FormView
 
+from analysis.enums import DuoSample, QuadSample, TrioSample
 from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
-from analysis.models.enums import DuoSample, QuadSample, TrioSample
 from patients.enums import Sex
 from snpdb.enums import ImportStatus
 from snpdb.models import Cohort, Duo, Quad, Sample, Trio

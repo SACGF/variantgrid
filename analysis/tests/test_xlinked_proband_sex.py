@@ -6,15 +6,15 @@ from django.test import TestCase
 from django.urls import reverse
 from guardian.shortcuts import assign_perm
 
-from analysis.forms.forms_nodes import TrioNodeForm
-from analysis.models import Analysis, QuadNode, TrioNode
-from analysis.models.enums import (
+from analysis.enums import (
     AnalysisTemplateType,
     NodeStatus,
     QuadInheritance,
     TrioInheritance,
     TrioSample,
 )
+from analysis.forms.forms_nodes import TrioNodeForm
+from analysis.models import Analysis, QuadNode, TrioNode
 from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.enums import Sex

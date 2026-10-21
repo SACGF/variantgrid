@@ -9,13 +9,14 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic.base import TemplateView, View
 
+from analysis.enums import CandidateSearchType, CandidateStatus
 from analysis.forms import (
     AnalysisFilterForm,
     CandidateStatusForm,
     SampleCandidatesSearchForm,
     get_mult_choice_form,
 )
-from analysis.models import Candidate, CandidateSearchRun, CandidateSearchType, CandidateStatus
+from analysis.models import Candidate, CandidateSearchRun
 from classification.views.views import (
     CreateClassificationForVariantView,
     create_classification_object,
