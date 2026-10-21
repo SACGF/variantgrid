@@ -11,8 +11,8 @@ plus records VEP said it skipped - so no VEP output needs to still be on disk.
 """
 from django.core.management.base import BaseCommand
 
+from annotation.enums import AnnotationStatus
 from annotation.models import AnnotationRun
-from annotation.models.models_enums import AnnotationStatus
 from annotation.vep_warnings import annotation_run_shortfall, parse_vep_warnings
 
 ERROR_EXCEPTION_FORMAT = (

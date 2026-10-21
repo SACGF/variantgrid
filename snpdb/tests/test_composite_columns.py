@@ -12,8 +12,8 @@ from django.test import TestCase
 from django.test.client import Client
 from django.urls.base import reverse
 
+from annotation.enums import Pathogenicity
 from annotation.fake_data import get_fake_annotation_version
-from annotation.models.models_enums import Pathogenicity
 from library.django_utils.composite_columns import collapse_into_composite
 from snpdb.grid_columns.custom_columns import (
     DBNSFP_NOTE,

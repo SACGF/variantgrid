@@ -17,8 +17,8 @@ from django.db.models import Q
 from django.utils import timezone
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import get_runner
 from annotation.tasks.annotation_scheduler_task import dispatch_annotation_runs

@@ -11,7 +11,7 @@ Start with:
   models/models_clinvar.py and models/models_gene_annotation.py
 - open_targets.py + vep_plugin_display.py — parsing '&'-joined VEP plugin columns for display; VariantAnnotation
   keeps same-named properties for templates
-- models/models_enums.py — AnnotationStatus, VariantAnnotationPipelineType, VEPPlugin / VEPCustom
+- enums/annotation_enums.py — AnnotationStatus, VariantAnnotationPipelineType, VEPPlugin / VEPCustom
 - annotation_version_querysets.py — how to query one version's partition
 - vep_columns.py — VEPColumnDef registry: VEP output field → VariantGridColumn, gated by columns/VEP version
 - vep_annotation.py + vep_config.py — the VEP command line and settings.ANNOTATION[build] as VEPConfig

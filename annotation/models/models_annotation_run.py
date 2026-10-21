@@ -20,14 +20,11 @@ from django_extensions.db.models import TimeStampedModel
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_variant
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models import (
     VariantAnnotation,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
-)
-from annotation.models.models_enums import (
-    AnnotationStatus,
-    VariantAnnotationPipelineType,
 )
 from annotation.models.models_version import VariantAnnotationVersion
 from library.django_utils.django_file_utils import remove_import_processing_dir

@@ -9,13 +9,13 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

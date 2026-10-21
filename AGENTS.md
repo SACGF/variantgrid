@@ -21,7 +21,7 @@ and an interactive DAG-based analysis filter. Deployments include Shariant (Aust
 Apps, in dependency order: `library/` (shared utilities, not a Django app) → `snpdb/` (Variant/Allele, builds, VCF/Sample/
 Cohort, Lab/Organization, the DataTables engine) → `genes/` → `annotation/` → `analysis/` → `classification/` (the largest).
 Supporting: `uicore/` (UI components), `upload/` (VCF import), `patients/`, `ontology/` (HPO/OMIM/MONDO), `flags/`,
-`seqauto/` (sequencing automation), `sync/` (Alissa and other VariantGrid instances), `variantopedia/` (variant pages),
+`seqauto/` (sequencing automation), `sync/` (other VariantGrid instances, e.g. Shariant), `variantopedia/` (variant pages),
 `eventlog/`, `manual/` (deploy-time steps), `pedigree/`, `pathtests/`, `vcauth/` / `oidc_auth/` (authentication).
 PostgreSQL through the `psqlextra` backend (partitioning, upserts), Redis for caching, RabbitMQ for Celery.
 
@@ -135,8 +135,11 @@ about to write `from … import …` anywhere except the top of the file, go bac
 Inside a package, import a name from the module that defines it (`from snpdb.models.models_vcf import VCF`), not
 through the package `__init__` that re-exports it - that is the usual cause of a cycle. Importing any submodule still
 runs its package `__init__` first, so a module that an app's models import can't import anything under that `models`
-package (enums used by both live outside it, as in `annotation/enums/`). `scripts/vg imports cycles` (which follows
-those `__init__` imports) and `lint-imports` (`.importlinter`: `library` never imports an app) both gate CI.
+package. The exception is an app's enums, which live in an `<app>/enums/` package outside `models/`
+(`classification/enums/`): its `__init__` star-imports each `<topic>_enums.py`, so callers write
+`from classification.enums import ShareLevel`. An enums module imports only `library`, Django and other enums packages,
+never an app's `models`. `scripts/vg imports cycles` (which follows those `__init__` imports) and `lint-imports`
+(`.importlinter`: `library` never imports an app) both gate CI.
 
 ### Code comments and docs
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't

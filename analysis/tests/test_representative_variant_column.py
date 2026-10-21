@@ -11,8 +11,8 @@ from django.utils.html import escape
 from analysis.grids import VariantGrid
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.tests.test_grid_export import GridExportTestCase
+from annotation.enums import ClinVarReviewStatus
 from annotation.models import ClinVar
-from annotation.models.models_enums import ClinVarReviewStatus
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
 from genes.models import GeneSymbol

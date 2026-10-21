@@ -959,7 +959,7 @@ SPECTACULAR_SETTINGS = {
     ],
     # Several predictors share the same Tolerated/Damaging choice set - use one canonical enum name
     'ENUM_NAME_OVERRIDES': {
-        'ToleratedDamagingPredictionEnum': 'annotation.models.damage_enums.ToleratedDamagingPrediction.CHOICES',
+        'ToleratedDamagingPredictionEnum': 'annotation.enums.ToleratedDamagingPrediction.CHOICES',
     },
 }
 

@@ -7,9 +7,10 @@ AlleleData - all the visible modifications for one allele - that a formatter
 the output.
 """
 import operator
+import re
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
@@ -18,6 +19,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
+from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
 
@@ -39,7 +41,12 @@ from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
-from library.utils import batch_iterator, http_header_date_now, local_date_string
+from library.utils import (
+    batch_iterator,
+    http_header_date_now,
+    local_date_string,
+    utc_from_timestamp,
+)
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (
     VARIANT_PATTERN,
@@ -204,14 +211,46 @@ def flag_ids_to(model: type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[Flag
     return set(model.objects.filter(flag_collection_id__in=qs).values_list('pk', flat=True))
 
 
-class TranscriptStrategy(str, Enum):
-    """
-    What transcripts are going to be included
-    :cvar ALL: Include all transcripts
-    :cvar REFSEQ: More accurately only include transcripts that Alissa supports NM/NR
-    """
-    ALL = "all"
-    REFSEQ = "refseq"
+class InvalidExportParameter(Exception):
+    pass
+
+
+def parse_since(since_str: str) -> datetime:
+    try:
+        since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
+        since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
+        return since_date
+    except BaseException:
+        pass
+
+    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
+        amount = int(m.group(1))
+        unit = m.group(2)
+        if unit:
+            unit = unit.strip().lower()
+
+        if amount > 100000 and not unit:
+            return utc_from_timestamp(float(since_str))
+
+        since = timezone.now()
+        if not unit or unit == 'd':
+            since -= timedelta(days=amount)
+        elif unit == 'm':
+            since -= timedelta(minutes=amount)
+        elif unit == 'w':
+            since -= timedelta(weeks=amount)
+        elif unit == 's':
+            since -= timedelta(seconds=amount)
+        else:
+            raise ValueError(f"Cannot parse {since_str} don't know time unit {unit}")
+        return since
+
+    try:
+        return utc_from_timestamp(float(since_str))
+    except BaseException:
+        pass
+
+    raise ValueError(f"Could not parse since string {since_str}")
 
 
 class DiscordanceReportStatus(str, Enum):
@@ -360,7 +399,6 @@ class ClassificationFilter:
         include_sources: If provided Labs/Orgs that should only be included
         since: Try to optimise data so we only include alleles that have been modified since this date
         min_share_level: Minimum share level of classifications to include
-        transcript_strategy: Which classification transcripts should be considered
         rows_per_file: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
         starting_query: If this is provided then instead of using all of the above filters, just this
         TODO rename row_limit to indicate that it's the max per file, not
@@ -375,7 +413,6 @@ class ClassificationFilter:
     include_sources: Optional[set[Lab]] = None
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.LAB
-    transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
     rows_per_file: Optional[int] = None
     allele: Optional[int] = None
     file_prefix: str = "classifications"
@@ -484,10 +521,8 @@ class ClassificationFilter:
 
         share_level = ShareLevel(share_level_str)
         genome_build = GenomeBuild.get_name_or_alias(build_name)
-        transcript_strategy = TranscriptStrategy(request.query_params.get('transcript_strategy', 'all'))
         since: Optional[datetime] = None
         if since_str := request.query_params.get('since'):
-            from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
         # just for debugging purposes allows us to download a single allele
@@ -531,7 +566,6 @@ class ClassificationFilter:
             genome_build=genome_build,
             allele_origin_filter=allele_origin_filter,
             min_share_level=share_level,
-            transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
             benchmarking=benchmarking,
@@ -729,13 +763,6 @@ class ClassificationFilter:
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
         # can't filter out transcript versions (due to 37!=38) easily here, do that later
-
-        if self.transcript_strategy == TranscriptStrategy.REFSEQ:
-            from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
-            acceptable_transcripts: list[Q] = [
-                Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
-            ]
-            cms = cms.filter(reduce(operator.or_, acceptable_transcripts))
 
         return cms
 

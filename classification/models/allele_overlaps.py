@@ -8,7 +8,6 @@ from typing import Optional
 
 from django.db.models import Count, QuerySet, Subquery
 
-from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
@@ -21,6 +20,11 @@ from classification.models import (
     classification_flag_types,
 )
 from classification.models.clinical_context_models import DiscordanceLevel, DiscordanceStatus
+from classification.models.criteria_strengths import (
+    AcmgPointScore,
+    CriteriaStrengths,
+    CriteriaSummarizer,
+)
 from flags.models import Flag, FlagStatus
 from genes.hgvs import HGVSDisplay
 from library.utils import first, group_by_key, segment

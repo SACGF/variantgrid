@@ -37,7 +37,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact
 from annotation.models.models import (
     VariantAnnotation,
     VariantGeneOverlap,
