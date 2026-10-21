@@ -11,7 +11,7 @@ from django.db.models.query_utils import Q
 from django.utils import timezone
 from django.utils.timezone import localtime
 
-from analysis.models.enums import TagNodeInput, TagNodeMode
+from analysis.enums import TagNodeInput, TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin

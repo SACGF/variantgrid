@@ -27,7 +27,7 @@ from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm
 
-from analysis.models.enums import AnalysisTemplateType, AnalysisType
+from analysis.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from classification.models import Classification
 from genes.models import CanonicalTranscriptCollection

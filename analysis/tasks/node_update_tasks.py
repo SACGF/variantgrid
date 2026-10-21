@@ -10,6 +10,7 @@ from django.db.models import F, OuterRef, Subquery
 from django.db.utils import IntegrityError, OperationalError
 from django.utils import timezone
 
+from analysis.enums import NodeStatus
 from analysis.exceptions import (
     CeleryTasksObsoleteException,
     NodeConfigurationException,
@@ -17,7 +18,6 @@ from analysis.exceptions import (
     NodeOutOfMemoryException,
     NodeParentErrorsException,
 )
-from analysis.models.enums import NodeStatus
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.models.nodes.node_utils import cancel_node_tasks

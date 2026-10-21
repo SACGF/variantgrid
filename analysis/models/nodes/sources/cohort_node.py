@@ -8,7 +8,7 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.expressions import F, Value
 from django.db.models.functions import Concat, Length, Replace, Substr
 
-from analysis.models.enums import GroupOperation
+from analysis.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
 from analysis.models.nodes.node_display import NodeIcon

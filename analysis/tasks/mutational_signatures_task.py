@@ -4,7 +4,7 @@ import celery
 import numpy as np
 from django.conf import settings
 
-from analysis.models.enums import MinimisationResultType
+from analysis.enums import MinimisationResultType
 from analysis.models.mutational_signatures import (
     MutationalSignature,
     MutationalSignatureCalculator,

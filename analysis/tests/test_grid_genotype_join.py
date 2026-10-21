@@ -8,9 +8,9 @@ than add a second one, or rows the node took from the common collection show bla
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import ZygosityNodeZygosity
 from analysis.grids import VariantGrid
 from analysis.models import Analysis
-from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.sources.sample_node import SampleNode

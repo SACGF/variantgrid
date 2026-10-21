@@ -2,9 +2,9 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls.base import resolve, reverse
 
+from analysis.enums import AnalysisType
 from analysis.grids import AnalysesListColumns
 from analysis.models import Analysis, VariantTag
-from analysis.models.enums import AnalysisType
 from snpdb.models import GenomeBuild, Tag
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from snpdb.views.datatable_view import DatabaseTableView
