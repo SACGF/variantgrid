@@ -6,8 +6,9 @@
         <a class="float-right" href="{% url 'trio_karyomapping' trio.pk %}">Per-gene karyomapping</a>
     </div>
     <div class="card-body">
-    {% if not genome_karyomapping_counts %}
-        <span class="text-muted">Karyomapping counts have not been calculated for this trio.</span>
+    {% if not calculated %}
+        <span class="text-muted">Karyomapping counts: {{ genome_karyomapping_counts.get_import_status_display }}
+            - reload the page once they have been calculated.</span>
     {% else %}
         <p>{{ genome_karyomapping_counts.relatedness_summary }}</p>
         <p class="text-muted small">

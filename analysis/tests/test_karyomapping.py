@@ -72,3 +72,14 @@ class TrioKaryomappingViewTest(TestCase):
 
         response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
         self.assertContains(response, "karyomapping-qc-graph")
+
+    def test_trio_page_queues_missing_counts(self):
+        GenomeKaryomappingCounts.objects.filter(trio=self.trio).delete()
+        with self.captureOnCommitCallbacks() as callbacks:
+            response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        self.assertContains(response, "reload the page once they have been calculated")
+        self.assertEqual(len(callbacks), 1)
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        self.assertEqual(callbacks, [])  # already queued

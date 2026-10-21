@@ -3,7 +3,6 @@ from django.db import migrations
 
 from manual.operations.manual_operations import ManualOperation
 
-_DOWNLOAD_ARGS = ["download_annotation_data"]
 _REBUILD_ARGS = ["somalier_existing_vcfs", "--clear"]
 
 
@@ -20,13 +19,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(args=_DOWNLOAD_ARGS,
-                                         note="Fetch the somalier build in settings.SOMALIER['annotation']['command'] "
-                                              "from variantgrid.com (#183)",
-                                         test=_has_somalier_extracts),
         ManualOperation.operation_manage(args=_REBUILD_ARGS,
                                          note="Rebuild somalier extracts without the allele order compensation, "
                                               "then relate and ancestry (#183)",
-                                         test=_has_somalier_extracts,
-                                         requires=[f"after:{ManualOperation.task_id_manage(_DOWNLOAD_ARGS)}"]),
+                                         test=_has_somalier_extracts),
     ]
