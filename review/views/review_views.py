@@ -8,15 +8,8 @@ from django.utils import timezone
 
 from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_admin_change
-from review.models import (
-    Review,
-    ReviewableModelMixin,
-    ReviewedObject,
-    ReviewMedium,
-    ReviewParticipants,
-    ReviewQuestion,
-    ReviewTopic,
-)
+from review.enums import ReviewMedium, ReviewParticipants
+from review.models import Review, ReviewableModelMixin, ReviewedObject, ReviewQuestion, ReviewTopic
 from review.widgets.multi_lab_selector import MultiChoiceLabField
 from snpdb.models import UserSettings
 from uicore.widgets.date_widget import NativeDateInput
