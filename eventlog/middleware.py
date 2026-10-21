@@ -8,13 +8,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
 
-from eventlog.models import (
-    API_KEY_PREFIX,
-    ApiRequestLog,
-    IntegrationActivity,
-    IntegrationActivityStatus,
-    ViewEvent,
-)
+from eventlog.enums import IntegrationActivityStatus
+from eventlog.models import API_KEY_PREFIX, ApiRequestLog, IntegrationActivity, ViewEvent
 from library.django_utils.change_tracking import ChangeCollector, collect_changes
 from library.integration_status import IntegrationDirection
 from oidc_auth.session_refresh import VariantGridSessionRefresh
