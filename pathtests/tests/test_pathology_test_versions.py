@@ -6,10 +6,10 @@ from django.utils import timezone
 from genes.models import GeneList, GeneListGeneSymbol, GeneSymbol
 from library.enums import ModificationOperation
 from library.guardian_utils import assign_permission_to_user_and_groups
+from pathtests.enums import PathologyTestGeneModificationOutcome
 from pathtests.models import (
     Case,
     PathologyTest,
-    PathologyTestGeneModificationOutcome,
     PathologyTestGeneModificationRequest,
     PathologyTestVersion,
 )
