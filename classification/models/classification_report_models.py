@@ -31,8 +31,8 @@ from patients.enums import (
     SampleSourceLevel,
 )
 from patients.models import Extraction, Patient, Specimen, measure_value_description
+from seqauto.enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from seqauto.models import LibraryQC
-from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab, Sample
 

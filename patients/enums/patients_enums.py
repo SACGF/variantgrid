@@ -50,7 +50,7 @@ class SpecimenMeasureType(models.TextChoices):
 
 # What each measure is called outside the database - the key a report context and a report template's
 # case_fields name it by, since a template's JSON is written by the lab rather than generated. A sequencing
-# analysis' keys are seqauto.models.models_enums.CVO_MEASURE_CONTEXT_KEYS
+# analysis' keys are seqauto.enums.CVO_MEASURE_CONTEXT_KEYS
 MEASURE_CONTEXT_KEYS = {
     SpecimenMeasureType.TUMOUR_FRACTION: "tumour_fraction",
 }

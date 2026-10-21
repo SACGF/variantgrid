@@ -41,8 +41,8 @@ from library.utils.file_utils import name_from_filename
 from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import ResolvedReference
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
+from seqauto.enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal

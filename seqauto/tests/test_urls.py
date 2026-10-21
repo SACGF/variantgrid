@@ -3,8 +3,8 @@ import unittest
 from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase
+from seqauto.enums import DataGeneration
 from seqauto.models import (
-    DataGeneration,
     EnrichmentKit,
     QCColumn,
     Sequencer,

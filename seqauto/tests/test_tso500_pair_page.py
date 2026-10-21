@@ -6,8 +6,8 @@ from library.django_utils.unittest_utils import URLTestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Patient, Specimen
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
-from seqauto.models.models_enums import LibraryQCCategory
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 
 SEQUENCING_RUN_NAME = "TSO500_PAIR_PAGE"

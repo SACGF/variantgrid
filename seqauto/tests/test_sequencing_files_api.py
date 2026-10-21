@@ -4,6 +4,7 @@ from django.test import RequestFactory, TestCase
 from django.urls.base import resolve, reverse
 from rest_framework.exceptions import ValidationError
 
+from seqauto.enums import DataGeneration
 from seqauto.grids.sequencing_data_grids import AlignmentFileColumns
 from seqauto.models import (
     QC,
@@ -20,7 +21,6 @@ from seqauto.models import (
     SingleSampleVCF,
     UnalignedReads,
 )
-from seqauto.models.models_enums import DataGeneration
 from seqauto.models.models_seqauto import SampleFromSequencingSample
 from seqauto.serializers.seqauto_qc_serializers import QCSerializer
 from seqauto.serializers.sequencing_serializers import (
