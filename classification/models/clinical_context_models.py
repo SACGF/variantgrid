@@ -21,6 +21,7 @@ from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.flag_types import ClassificationFlagTypes, classification_flag_types
 from flags.enums import FlagStatus
 from flags.models import Flag
 from flags.models.models import FlagsMixin, FlagTypeContext
@@ -146,7 +147,6 @@ class DiscordanceStatus:
 
             # we're discordant, check to see if there are pending changes AND if those pending changes would bring us into discordance
             # if so, just mark "pending_concordance" as true
-            from classification.models import ClassificationFlagTypes, classification_flag_types
             flag_collections = {mod.classification.flag_collection_id: mod for mod in modifications}
             if pending_flags := Flag.objects.filter(collection__in=flag_collections.keys(),
                                                     flag_type=classification_flag_types.classification_pending_changes,
