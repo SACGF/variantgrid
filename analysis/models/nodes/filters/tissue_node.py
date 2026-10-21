@@ -8,7 +8,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
-from annotation.enums.annotation_enums import DetectedHumanProteinAtlasAbundance
+from annotation.enums import DetectedHumanProteinAtlasAbundance
 from annotation.models.models import VariantTranscriptAnnotation
 from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotation,

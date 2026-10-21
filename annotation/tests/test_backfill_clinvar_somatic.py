@@ -4,7 +4,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils.timezone import make_aware
 
-from annotation.enums.annotation_enums import ClinVarOncogenicity
+from annotation.enums import ClinVarOncogenicity
 from annotation.fake_data import create_fake_variants
 from annotation.models.models_clinvar import ClinVar, ClinVarVersion
 from snpdb.models import GenomeBuild, Variant

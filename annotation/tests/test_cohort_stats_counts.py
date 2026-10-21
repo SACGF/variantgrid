@@ -10,8 +10,7 @@ or on their own when it's skipped as fresh (#2331).
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.enums.annotation_enums import VEPSkippedReason
-from annotation.enums.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact, VEPSkippedReason
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun

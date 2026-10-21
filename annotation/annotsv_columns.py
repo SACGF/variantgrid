@@ -7,7 +7,7 @@ page uses it to show which columns came from AnnotSV rather than VEP.
 from dataclasses import dataclass
 from typing import Optional
 
-from annotation.enums.annotation_enums import ColumnAnnotationCategory
+from annotation.enums import ColumnAnnotationCategory
 
 
 @dataclass(frozen=True)

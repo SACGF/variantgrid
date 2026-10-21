@@ -23,7 +23,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from annotation import vep_columns
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType, VEPCustom
+from annotation.enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig
 from annotation.vep_plugin_display import GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS

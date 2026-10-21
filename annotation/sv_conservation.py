@@ -21,7 +21,7 @@ import pyBigWig
 from django.conf import settings
 
 from annotation import vep_columns
-from annotation.enums.annotation_enums import VEPCustom
+from annotation.enums import VEPCustom
 from annotation.vep_config import VEPConfig
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild

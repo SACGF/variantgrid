@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.timesince import timesince
 
-from annotation.enums.annotation_enums import NMDEscapeStatus
+from annotation.enums import NMDEscapeStatus
 from annotation.models import AnnotationStatus, VEPSkippedReason
 from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
 from annotation.models.models_annotation_run import AnnotationRun

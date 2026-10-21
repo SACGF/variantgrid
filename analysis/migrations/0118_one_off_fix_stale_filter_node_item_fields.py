@@ -3,7 +3,7 @@ import logging
 from django.core.exceptions import FieldError
 from django.db import migrations
 
-from annotation.enums.annotation_enums import ClinVarReviewStatus
+from annotation.enums import ClinVarReviewStatus
 
 # FilterNodeItem.field stores a copy of VariantGridColumn.variant_column taken when the rule was
 # written. snpdb/migrations/0050_change_all_columns.py rewrote these paths but left the copies,

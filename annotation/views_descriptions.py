@@ -7,10 +7,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from annotation import annotsv_columns, vep_columns
-from annotation.enums.annotation_enums import (
-    ColumnAnnotationCategory,
-    VariantAnnotationPipelineType,
-)
+from annotation.enums import ColumnAnnotationCategory, VariantAnnotationPipelineType
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import VEPConfig
 from library.constants import WEEK_SECS

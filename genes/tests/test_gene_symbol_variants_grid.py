@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from analysis.models import VariantTag
-from annotation.enums.annotation_enums import ClinVarReviewStatus
+from annotation.enums import ClinVarReviewStatus
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from annotation.models.models import VariantGeneOverlap
 from annotation.models.models_annotation_run import AnnotationRun

@@ -3,14 +3,9 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from annotation import vep_field_formatters as fmt
-from annotation.enums.annotation_enums import (
-    ColumnAnnotationCategory,
-    VariantAnnotationPipelineType,
-    VEPCustom,
-    VEPPlugin,
-)
-from annotation.enums.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
+    ColumnAnnotationCategory,
     FATHMMPrediction,
     MetaRNNPrediction,
     MutationAssessorPrediction,
@@ -18,6 +13,9 @@ from annotation.enums.damage_enums import (
     PathogenicityImpact,
     Polyphen2Prediction,
     PrimateAIPrediction,
+    VariantAnnotationPipelineType,
+    VEPCustom,
+    VEPPlugin,
 )
 from annotation.vep_config import VEPConfig
 from library.genomics.vcf_enums import VariantClass

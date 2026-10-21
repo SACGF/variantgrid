@@ -5,7 +5,7 @@ from django.test import SimpleTestCase, TestCase
 
 from analysis.models.nodes.filters.damage_node import DamageNode, StructuralFilter
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.enums.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS, VariantClass
 from snpdb.models import Variant
 

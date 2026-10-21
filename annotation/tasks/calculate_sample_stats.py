@@ -11,7 +11,7 @@ from django.db import connection, transaction
 from django.db.models import F, Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.enums.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact
 from annotation.models import (
     AnnotationVersion,
     CohortGenotypeClinVarAnnotationStats,

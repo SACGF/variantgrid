@@ -12,7 +12,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.enums.annotation_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.external_annotation import (
     ANNOTATED_VCF_SUFFIX,
     DUMP_METADATA_SCHEMA_VERSION,

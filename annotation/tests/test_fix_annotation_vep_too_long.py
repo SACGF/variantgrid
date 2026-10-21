@@ -1,5 +1,5 @@
 """ One-off backfill of TOO_LONG rows (#2104) - delete along with fix_annotation_vep_too_long """
-from annotation.enums.annotation_enums import VEPSkippedReason
+from annotation.enums import VEPSkippedReason
 from annotation.management.commands.fix_annotation_vep_too_long import fix_annotation_vep_too_long
 from annotation.tests.test_vep_too_long import VEPTooLongTestBase
 

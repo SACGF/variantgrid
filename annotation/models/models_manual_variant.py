@@ -12,9 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models.deletion import CASCADE
 
-from annotation.enums.annotation_enums import (
-    ManualVariantEntryType,
-)
+from annotation.enums import ManualVariantEntryType
 from annotation.models.models_annotation_run import AnnotationRun
 from snpdb.models import (
     DBSNP_PATTERN,

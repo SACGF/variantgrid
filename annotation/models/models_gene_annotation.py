@@ -15,7 +15,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
-from annotation.enums.annotation_enums import (
+from annotation.enums import (
     EssentialGeneCRISPR,
     EssentialGeneCRISPR2,
     EssentialGeneGeneTrap,

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from django.test import TestCase
 
-from annotation.enums.annotation_enums import ClinVarReviewStatus
+from annotation.enums import ClinVarReviewStatus
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_clinvar import ClinVar
 from annotation.models.models_version import VariantAnnotationVersion

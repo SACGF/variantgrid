@@ -13,7 +13,7 @@ import re
 from typing import Any, Optional
 
 from annotation.annotsv_columns import FULL_COLUMN_MAP
-from annotation.enums.annotation_enums import Pathogenicity
+from annotation.enums import Pathogenicity
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_run import AnnotationRun
 

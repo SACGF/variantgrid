@@ -21,7 +21,7 @@ from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
-from annotation.enums.annotation_enums import ManualVariantEntryType
+from annotation.enums import ManualVariantEntryType
 from annotation.models import ManualVariantEntry
 from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple

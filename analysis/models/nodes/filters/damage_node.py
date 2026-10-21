@@ -11,13 +11,13 @@ from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
-from annotation.enums.annotation_enums import NMDEscapeStatus
-from annotation.enums.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
     ClinPredPrediction,
     EVEClass,
     MetaRNNPrediction,
+    NMDEscapeStatus,
     PathogenicityImpact,
     PrimateAIPrediction,
 )

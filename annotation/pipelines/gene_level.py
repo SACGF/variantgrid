@@ -1,4 +1,4 @@
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.pipelines.base import AnnotationPipelineRunner
 

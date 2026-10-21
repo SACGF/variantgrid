@@ -11,7 +11,7 @@ import os
 
 from django.core.management.base import BaseCommand, CommandError
 
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.external_annotation import (
     DEFAULT_MIN_EXTERNAL_VARIANTS,
     _require_sv_offload_supported,

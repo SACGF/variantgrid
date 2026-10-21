@@ -19,7 +19,7 @@ from typing import Optional
 from django.conf import settings
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_alt
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from library.genomics import format_bp
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import ClinGenAllele, VariantCoordinate

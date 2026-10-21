@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from library.utils.file_utils import mk_path_for_file
 from snpdb.models import Variant

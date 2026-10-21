@@ -7,7 +7,7 @@
 """
 from typing import Optional
 
-from annotation.enums.annotation_enums import ClinVarOncogenicity, Pathogenicity
+from annotation.enums import ClinVarOncogenicity, Pathogenicity
 from snpdb.models.models_enums import SomaticClinicalSignificance
 
 # Ordered low -> high, matched as substrings so combined forms ("Benign/Likely_benign") and

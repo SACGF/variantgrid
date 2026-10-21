@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from annotation.annotation_versions import _reset_run_counts_after_extend
-from annotation.enums.annotation_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_vep_version,
     retire_seeded_annotation_version,

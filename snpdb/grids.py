@@ -25,7 +25,7 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from annotation.enums.annotation_enums import ClinVarReviewStatus
+from annotation.enums import ClinVarReviewStatus
 from annotation.models import AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter

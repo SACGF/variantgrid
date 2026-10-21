@@ -20,11 +20,7 @@ from django.conf import settings
 from annotation import annotsv_columns as annotsv_columns_registry
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
-from annotation.enums.annotation_enums import (
-    NMDEscapeStatus,
-    VariantAnnotationPipelineType,
-    VEPCustom,
-)
+from annotation.enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
 from annotation.models.models import (
     VariantAnnotation,
     VariantGeneOverlap,

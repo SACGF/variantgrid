@@ -5,7 +5,7 @@ from annotation.abandoned_annotation_runs import (
     incomplete_annotation_runs_qs,
 )
 from annotation.annotation_versions import get_range_lock_gaps_with_variants
-from annotation.enums.annotation_enums import AnnotationStatus
+from annotation.enums import AnnotationStatus
 from annotation.models import (
     AnnotationRangeLock,
     AnnotationRun,

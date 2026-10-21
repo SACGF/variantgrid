@@ -8,11 +8,12 @@ from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     get_or_create_variant_annotation_version_from_current_vep,
 )
-from annotation.enums.annotation_enums import NMDEscapeStatus, VariantAnnotationPipelineType
-from annotation.enums.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
+    NMDEscapeStatus,
     PathogenicityImpact,
+    VariantAnnotationPipelineType,
 )
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation

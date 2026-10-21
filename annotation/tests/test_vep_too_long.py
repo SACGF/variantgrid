@@ -8,11 +8,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.enums.annotation_enums import (
-    AnnotationStatus,
-    VariantAnnotationPipelineType,
-    VEPSkippedReason,
-)
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType, VEPSkippedReason
 from annotation.fake_data import get_fake_vep_version, retire_seeded_annotation_version
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun

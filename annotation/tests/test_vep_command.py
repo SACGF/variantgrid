@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation import vep_columns
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import get_vep_command, get_vep_skipped_variants_filename

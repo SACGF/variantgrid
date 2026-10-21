@@ -20,15 +20,13 @@ from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
 
-from annotation.enums.annotation_enums import (
-    VariantAnnotationPipelineType,
-)
-from annotation.enums.damage_enums import (
+from annotation.enums import (
     FATHMMPrediction,
     MutationAssessorPrediction,
     MutationTasterPrediction,
     Polyphen2Prediction,
     SIFTPrediction,
+    VariantAnnotationPipelineType,
 )
 from annotation.gene_annotation_release_matching import (
     GeneAnnotationReleaseMatch,

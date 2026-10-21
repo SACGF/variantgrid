@@ -13,7 +13,7 @@ import logging
 
 from django.core.management.base import BaseCommand, CommandError
 
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.pipelines import PIPELINES, get_runner, versioned_pipeline_types
 from snpdb.models.models_genome import GenomeBuild
 

@@ -22,7 +22,7 @@ from annotation.abandoned_annotation_runs import (
     abandoned_annotation_runs_by_reason,
     incomplete_annotation_runs_qs,
 )
-from annotation.enums.annotation_enums import AnnotationStatus
+from annotation.enums import AnnotationStatus
 from annotation.models import VariantAnnotationVersion
 from eventlog.models import Event
 from library.django_utils.database_utils import get_table_row_estimates

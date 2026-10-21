@@ -7,7 +7,7 @@ from annotation.canonical_annotation import (
     get_canonical_c_hgvs,
     get_canonical_transcript_annotation,
 )
-from annotation.enums.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (

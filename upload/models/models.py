@@ -25,7 +25,7 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import (

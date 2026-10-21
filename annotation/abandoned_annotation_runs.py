@@ -11,7 +11,7 @@ from collections import Counter
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from annotation.enums.annotation_enums import AnnotationStatus
+from annotation.enums import AnnotationStatus
 from annotation.models.models import (
     VariantAnnotation,
     VariantGeneOverlap,

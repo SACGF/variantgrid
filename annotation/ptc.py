@@ -11,7 +11,7 @@
 import re
 from typing import Optional
 
-from annotation.enums.annotation_enums import NMDEscapeStatus
+from annotation.enums import NMDEscapeStatus
 
 # HGVS numbers the frameshift stop from the first changed residue, counting it as 1, eg
 # "NP_000242.1:p.Cys843ValfsTer49". "fsTer?" means VEP couldn't locate the new stop.

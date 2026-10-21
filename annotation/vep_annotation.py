@@ -17,7 +17,7 @@ from typing import Optional
 from django.conf import settings
 
 from annotation import vep_columns
-from annotation.enums.annotation_enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
+from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.fake_data import get_fake_vep_version
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import (

@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.enums.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationRun
