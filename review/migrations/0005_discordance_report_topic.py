@@ -1,14 +1,19 @@
 from django.db import migrations
 
 DISCORDANCE_REPORT_QUESTIONS = [
-    # (key, heading, label)
-    ("discordance_report_criteria", "Evidence", "Different application or weighting of ACMG criteria"),
-    ("discordance_report_population", "Evidence", "Population frequency data or thresholds"),
-    ("discordance_report_literature", "Evidence", "Published literature"),
-    ("discordance_report_internal_data", "Evidence", "Internal or unpublished case data"),
-    ("discordance_report_phenotype", "Clinical", "Patient phenotype or clinical information"),
-    ("discordance_report_out_of_date", "Other", "A classification was out of date"),
-    ("discordance_report_other", "Other", "Other"),
+    # (order, key, heading, label) - as configured on Shariant
+    (0, "curation_method_different", "Curation Method", "Different curation guideline used for interpretation"),
+    (1, "curation_method_same", "Curation Method", "Difference in the implementation of the same curation guideline"),
+    (2, "curation_method_terminology", "Curation Method", "Differences in use of classification terminology"),
+    (3, "curation_method_haplotype", "Curation Method", "Classification of variant as a haplotype"),
+    (4, "curation_method_error", "Curation Method", "Curation amended after internal review"),
+    (10, "evidence_public_new", "Evidence", "New and/or different publicly available evidence for curation"),
+    (11, "evidence_paywall", "Evidence", "Use of data behind a paywall"),
+    (12, "evidence_lab", "Evidence", "Use of internal laboratory data"),
+    (13, "evidence_weighting", "Evidence", "Difference in the interpretation and/or weighting of the same curation evidence"),
+    (19, "clinical_contexts_condition", "Clinical Contexts", "Interpreted against different conditions"),
+    (20, "clinical_contexts", "Clinical Contexts", "Interpreted in different clinical contexts"),
+    (40, "other", "Other", "Other"),
 ]
 
 
@@ -20,10 +25,11 @@ def _create_discordance_report_topic(apps, _schema_editor):
 
     topic, created = ReviewTopic.objects.get_or_create(
         key="discordance_report",
-        defaults={"name": "Discordance", "heading": "Reasons for the difference"},
+        defaults={"name": "Discordance Resolution Minutes",
+                  "heading": "What were the differences that caused the discordance"},
     )
     if created or not ReviewQuestion.objects.filter(topic=topic).exists():
-        for order, (key, heading, label) in enumerate(DISCORDANCE_REPORT_QUESTIONS):
+        for order, key, heading, label in DISCORDANCE_REPORT_QUESTIONS:
             ReviewQuestion.objects.get_or_create(
                 key=key,
                 defaults={"topic": topic, "heading": heading, "label": label, "order": order},

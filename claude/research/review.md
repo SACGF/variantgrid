@@ -60,7 +60,7 @@ happen on Overlaps). Covered by `classification/tests/views/test_overlap_review_
 ## Traps
 
 - `review/migrations/0005_discordance_report_topic.py` seeds the `discordance_report` topic both callers hard-code,
-  with a default question set; a deployment that had already created it in the admin keeps its own name and questions.
+  with the question set Shariant uses; a deployment that had already created it in the admin keeps its own name and questions.
   Without the row the "review" buttons 500 on `ReviewTopic.objects.get`.
 - Overlaps start a new Review each time (resume is commented out), DiscordanceReports resume the first existing one.
 - `Review.user` means "last actor", not author: `ReviewForm.save` sets it to the editor (and logs as them), and the
@@ -68,4 +68,5 @@ happen on Overlaps). Covered by `classification/tests/views/test_overlap_review_
 - Editing a review keeps its stored `review_date`; only a new review defaults to today.
 - `Review.answers` skips answers whose question was deleted in the admin; disabling (`enabled=False`) is still the
   way to retire a question, since a deleted one silently drops out of historical reviews.
-- Question `key` is the table-wide primary key, not per topic: prefix it with the topic when adding questions.
+- Question `key` is the table-wide primary key, not per topic: prefix it with the topic when adding questions (the
+  seeded `discordance_report` keys copy Shariant's, which are unprefixed).

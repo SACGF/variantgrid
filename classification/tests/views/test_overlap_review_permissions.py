@@ -1,6 +1,8 @@
 from datetime import date
+from importlib import import_module
 from unittest.mock import PropertyMock, patch
 
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -10,6 +12,8 @@ from classification.enums.overlaps_enums import ClassificationResultValue, Overl
 from classification.models.overlaps_model import Overlap
 from classification.tests.models.test_utils import ClassificationTestUtils
 from review.models import Review, ReviewQuestion, ReviewTopic
+
+create_discordance_report_topic = import_module("review.migrations.0005_discordance_report_topic")._create_discordance_report_topic
 
 
 class OverlapReviewPermissionTestCase(TestCase):
@@ -88,3 +92,21 @@ class OverlapReviewPermissionTestCase(TestCase):
         review.meeting_meta = {"answers": {q.key: {"resolution": "Y"} for q in (kept, deleted)}}
         ReviewQuestion.objects.filter(pk=deleted.pk).delete()
         self.assertEqual([a.question for a in review.answers], [kept])
+
+
+class DiscordanceReportTopicMigrationTestCase(TestCase):
+    """ Re-running the seed migration over an admin-configured topic must not change it """
+
+    def test_existing_topic_and_questions_are_kept(self):
+        topic = ReviewTopic.objects.get(pk="discordance_report")
+        ReviewQuestion.objects.filter(topic=topic).delete()
+        ReviewTopic.objects.filter(pk=topic.pk).update(name="Lab's own name", heading="Lab's own heading")
+        ReviewQuestion.objects.create(topic=topic, key="evidence_lab", heading="Custom", label="Edited label",
+                                      order=7, enabled=False)
+        before = list(ReviewQuestion.objects.values())
+
+        create_discordance_report_topic(apps, None)
+
+        topic.refresh_from_db()
+        self.assertEqual((topic.name, topic.heading), ("Lab's own name", "Lab's own heading"))
+        self.assertEqual(list(ReviewQuestion.objects.values()), before)
