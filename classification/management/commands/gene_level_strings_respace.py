@@ -115,7 +115,7 @@ def _rewrite_evidence(classification: Classification, replacements: dict[str, tu
     else:
         patch_meta = PatchMeta(patch=classification.evidence, existing={})
         patcher(patch_meta)
-        classification.save(update_fields=["evidence"])
+        Classification.objects.filter(pk=classification.pk).update(evidence=classification.evidence)
 
 
 def relabel_splice_variants(dry_run: bool) -> int:

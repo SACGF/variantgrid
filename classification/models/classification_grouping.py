@@ -23,8 +23,8 @@ from django.db.models import (
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
-from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
+from model_utils.models import TimeStampedModel
 from more_itertools import last
 
 from classification.enums import (
@@ -276,7 +276,7 @@ class ClassificationGrouping(TimeStampedModel):
     def dirty_up(self):
         # this method was more useful when we also dirtied up alleleOrigin
         self.dirty = True
-        self.save(update_fields=["dirty"])
+        ClassificationGrouping.objects.filter(pk=self.pk).update(dirty=True)
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):

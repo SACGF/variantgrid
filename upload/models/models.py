@@ -21,8 +21,8 @@ from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from annotation.enums import VariantAnnotationPipelineType

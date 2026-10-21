@@ -9,7 +9,7 @@ from django.db import models, transaction
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
 from django.utils.timezone import now
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from classification.enums import (
     ClinicalContextRecalcTrigger,

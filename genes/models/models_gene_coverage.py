@@ -9,7 +9,7 @@ from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.enums import AnnotationConsortium
 from genes.gene_coverage import load_gene_coverage_df

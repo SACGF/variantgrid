@@ -335,8 +335,7 @@ class FakeReclassifications(FakeData):
                 share_level=ShareLevel.ALL_USERS.key,
                 created=record.started, modified=latest.published_on))
 
-        with keeping_our_timestamps(Classification):
-            Classification.objects.bulk_create(classifications, batch_size=BATCH_SIZE)
+        Classification.objects.bulk_create(classifications, batch_size=BATCH_SIZE)  # keeps the created/modified we set
         for record, classification in zip(records, classifications):
             record.classification_id = classification.pk
         context.stdout.write(f"Created {len(classifications)} classifications")

@@ -11,7 +11,7 @@ from django.db import models, transaction
 from django.db.models.deletion import CASCADE, PROTECT
 from django.urls.base import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from classification.enums import (
     ClinicalContextRecalcTrigger,

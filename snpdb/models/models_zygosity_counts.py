@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import F, FilteredRelation, Q, QuerySet
 from django.db.models.deletion import CASCADE
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel

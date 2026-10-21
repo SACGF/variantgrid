@@ -117,7 +117,8 @@ def delete_fake_classifications(classifications_qs: QuerySet[Classification]) ->
 
 @contextmanager
 def keeping_our_timestamps(klass):
-    """ created/modified are auto_now_add/auto_now, which would stamp years of curation as happening now """
+    """ Django's auto_now_add/auto_now would stamp years of curation as happening now (a model_utils
+        TimeStampedModel keeps values set on insert without this) """
     created = klass._meta.get_field("created")
     modified = klass._meta.get_field("modified")
     created.auto_now_add = False

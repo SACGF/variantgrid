@@ -6,7 +6,7 @@ from django.db import models
 from django.db.models import Q, QuerySet
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.models import GeneList, GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin

@@ -22,8 +22,8 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin

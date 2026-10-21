@@ -2,7 +2,7 @@
 from django.db import models
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.enums import AnnotationConsortium
 from genes.models.models_gene import (

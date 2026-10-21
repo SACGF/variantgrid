@@ -18,7 +18,7 @@ from typing import Optional
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from patients.enums import Sex
 from snpdb.enums import ImportStatus

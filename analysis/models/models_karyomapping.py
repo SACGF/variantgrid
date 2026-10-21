@@ -15,7 +15,7 @@ from django.core.cache import cache
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,

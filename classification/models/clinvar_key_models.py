@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import QuerySet
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from classification.enums import ClinVarAssertionMethods, ClinVarCitationsModes
 from library.utils import JsonObjType

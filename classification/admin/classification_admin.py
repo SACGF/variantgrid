@@ -435,7 +435,7 @@ class ClassificationAdmin(ModelAdminBasics):
         changed_count = 0
         for vc in queryset:
             vc.summary = ClassificationSummaryCalculator(vc.last_published_version).cache_dict()
-            vc.save(update_fields=["summary"])
+            Classification.objects.filter(pk=vc.pk).update(summary=vc.summary)
             changed_group = ClassificationGrouping.assign_grouping_for_classification(vc)
             if changed_group:
                 changed_count += 1

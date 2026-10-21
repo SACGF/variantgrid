@@ -13,7 +13,6 @@ Tags are created with bulk_create, so none of the VariantTag signal handlers run
 liftover, and these tags have no analysis and get their allele assigned here.
 """
 import random
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -199,8 +198,7 @@ class FakeVariantTags(FakeData):
 
     @staticmethod
     def _save_variant_tags(context: FakeDataContext, variant_tags: list[VariantTag]):
-        with _keeping_our_timestamps():
-            VariantTag.objects.bulk_create(variant_tags, batch_size=BATCH_SIZE)
+        VariantTag.objects.bulk_create(variant_tags, batch_size=BATCH_SIZE)  # keeps the created/modified we set
         context.stdout.write(f"Created {len(variant_tags)} variant tags")
 
         # bulk_create skips GuardianPermissionsAutoInitialSaveMixin.save() - everyone can see (and clean up)
@@ -247,20 +245,6 @@ def _taggers(users: list[User], also_tag_as: str) -> list[tuple[User, FakeTagger
             raise CommandError(f"--also-tag-as: no such user '{username}'")
         taggers.append((user, FakeTagger(6)))
     return taggers
-
-
-@contextmanager
-def _keeping_our_timestamps():
-    """ created/modified are auto_now_add/auto_now, which would stamp all 5 years of tagging as happening now """
-    created = VariantTag._meta.get_field("created")
-    modified = VariantTag._meta.get_field("modified")
-    created.auto_now_add = False
-    modified.auto_now = False
-    try:
-        yield
-    finally:
-        created.auto_now_add = True
-        modified.auto_now = True
 
 
 def _fake_tag_config_collection() -> TagConfigCollection:

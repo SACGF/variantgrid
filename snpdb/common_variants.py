@@ -25,7 +25,8 @@ def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersio
             defaults={"additional_gnomad_versions": additional_gnomad_versions}, **kwargs)
         if not created and common_filter.additional_gnomad_versions != additional_gnomad_versions:
             common_filter.additional_gnomad_versions = additional_gnomad_versions
-            common_filter.save(update_fields=["additional_gnomad_versions"])
+            CohortGenotypeCommonFilterVersion.objects.filter(pk=common_filter.pk).update(
+                additional_gnomad_versions=additional_gnomad_versions)
         if created:
             # At this point - no VCFs have been imported, and all future ones will handle current classifications
             # So we can mark all as handled

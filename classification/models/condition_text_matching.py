@@ -1232,7 +1232,8 @@ def apply_condition_resolution(classification: Classification, new_condition_res
                 data=new_condition_resolution,
                 flag_type=classification_flag_types.condition_resolution,
             )
-            classification.save(update_fields=['condition_resolution'])
+            Classification.objects.filter(pk=classification.pk).update(
+                condition_resolution=classification.condition_resolution)
 
             condition_set_signal.send(sender=Classification, classification=classification,
                                       condition=new_condition)

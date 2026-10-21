@@ -10,6 +10,11 @@ Patterns here:
   needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
   are examples); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
   the check, so delete it when you remove the import.
+- Timestamped models inherit `model_utils.models.TimeStampedModel` (pylint bans the `django_extensions` one). Its
+  `save()` adds `modified` to any `update_fields`, so a write that must leave `modified` alone (an internal fix, an
+  import run with no data change) goes through `QuerySet.update()` / `bulk_update()` - `modified` drives exports and
+  dashboards. Inside a tracked API call, record that row with `ChangeCollector.record`
+  (`library/django_utils/change_tracking.py`).
 - Give a new user-owned model permissions by inheriting
   `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsAutoInitialSaveMixin` before `models.Model`;
   it needs a `user` field and calls `library/guardian_utils.py:assign_permission_to_user_and_groups` on first save,

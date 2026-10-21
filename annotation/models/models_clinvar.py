@@ -16,7 +16,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse

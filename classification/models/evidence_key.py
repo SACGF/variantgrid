@@ -19,7 +19,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import SET_NULL
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from classification.enums import (
     CriteriaEvaluation,

@@ -29,9 +29,9 @@ from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from hgvs.extras.babelfish import VCFCoordinate
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 from pydantic import field_validator
 
 from flags.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
