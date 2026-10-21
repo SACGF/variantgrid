@@ -56,7 +56,9 @@ the restart after the upgrade would fail; the manual step that installs them reg
 
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.
-`vg status` shows per-queue depth and consumer count from a passive declare.
+`vg status` shows per-queue depth and consumer count from a passive declare. A worker takes several seconds after a restart
+to load Django and register, so a queue whose unit is active but has no consumer is re-read for up to 30 s; one still at
+`0c NO CONSUMER` after that is a real fault - `celery -A variantgrid inspect active_queues` shows what each worker consumes.
 
 Logs: `/var/log/variantgrid/` (`gunicorn.log`, `celery*.log`, `celeryd_beat.log`). Application events are also rows in
 `eventlog/models.py:Event` (severity, app, name, details) - `vg status` lists the last ten ERRORs; `ViewEvent` records page views
