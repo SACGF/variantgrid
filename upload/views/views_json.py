@@ -12,8 +12,8 @@ from eventlog.models import create_event
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
+from snpdb.enums import ImportStatus
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus
 from upload import upload_processing
 from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (

@@ -21,13 +21,8 @@ from snpdb.bcftools_liftover import (
     bcftools_liftover_variant_coordinate,
     check_bcftools_can_liftover,
 )
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ImportSource, ProcessingStatus
 from snpdb.models.models_dbsnp import DbSNP
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ImportSource,
-    ProcessingStatus,
-)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import (
     Allele,

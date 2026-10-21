@@ -11,7 +11,7 @@ from typing import Optional
 from Bio import SeqIO
 from django.conf import settings
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript
 from genes.transcript_parts import get_transcript_id_and_version
 from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, TranscriptSequenceFetcher

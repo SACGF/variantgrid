@@ -18,8 +18,8 @@ from classification.models.evidence_key import (
 from genes.hgvs import HGVSComponents
 from library.log_utils import report_message
 from library.utils import empty_to_none
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)

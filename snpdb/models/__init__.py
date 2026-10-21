@@ -10,7 +10,6 @@ from .models_cohort import *
 from .models_family import *
 from .models_columns import *
 from .models_dbsnp import *
-from .models_enums import *
 from .models_genome import *
 from .models_genomic_interval import *
 from .models_somalier import *

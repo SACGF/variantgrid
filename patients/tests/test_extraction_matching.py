@@ -15,14 +15,15 @@ from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.health_check import health_check_overall_stats_signal
 from library.utils import sha256sum_str
+from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from patients.signals.extraction_match_health_check import extraction_match_health_check
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from seqauto.models import SampleFromSequencingSample
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import ImportSource, Sample, Sequence
+from snpdb.enums import ImportSource
+from snpdb.models import Sample, Sequence
 from snpdb.models.models_genome import GenomeBuild
 from upload.enums import UploadedFileTypes
 from upload.models import FileUpload, UploadPipeline, UploadStep

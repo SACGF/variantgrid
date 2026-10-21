@@ -1,6 +1,6 @@
 from genes.gene_matching import GeneSymbolMatcher, tokenize_gene_symbols
 from genes.models import GeneList
-from snpdb.models import ImportStatus
+from snpdb.enums import ImportStatus
 from upload.models import UploadedGeneList
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app

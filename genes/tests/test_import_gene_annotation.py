@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
+from genes.enums import AnnotationConsortium
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
 from genes.models import CdotDataVersion, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 
 

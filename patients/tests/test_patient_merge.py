@@ -5,8 +5,8 @@ from datetime import date
 
 from django.test import TestCase
 
-from patients.models import Patient, PatientModification, PatientRecordOriginType, Specimen
-from patients.models_enums import Sex
+from patients.enums import PatientRecordOriginType, Sex
+from patients.models import Patient, PatientModification, Specimen
 
 
 class PatientMergeTest(TestCase):

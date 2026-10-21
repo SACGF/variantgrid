@@ -18,8 +18,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from snpdb.models import VCF, GenomeBuild, ImportStatus
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource, ImportStatus
+from snpdb.models import VCF, GenomeBuild
 from upload.enums import UploadedFileTypes, UploadStepTaskType
 from upload.models import (
     FileUpload,

@@ -74,5 +74,5 @@ ignore_imports =
     library.guardian_utils -> snpdb.models
     library.utils.export_utils -> snpdb.user_settings_manager
     library.django_utils.django_partition -> snpdb.models.models_partition_archive
-    library.preview_request -> genes.models_enums
+    library.preview_request -> genes.enums
     library.preview_request -> variantgrid.perm_path

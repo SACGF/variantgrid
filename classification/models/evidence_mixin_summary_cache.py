@@ -8,7 +8,7 @@ from dataclasses_json import DataClassJsonMixin
 from classification.enums import ClassificationResultValue, SpecialEKeys, TestingContextBucket
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)

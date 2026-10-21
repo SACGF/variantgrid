@@ -9,19 +9,19 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls.base import reverse
 from django.utils import timezone
-
 from guardian.shortcuts import assign_perm
 
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, SampleSourceLevel
 from patients.models import (
-    Extraction,
     ExternalModelManager,
     ExternalPK,
+    Extraction,
     Patient,
     Specimen,
 )
-from patients.models_enums import NucleicAcid, SampleSourceLevel
 from patients.sample_grouping import get_patient_sample_tree, get_sample_group, sample_as_json
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -29,7 +29,6 @@ from snpdb.models import (
     CohortGenotypeStats,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Sample,
     SampleStatsCodeVersion,
     VCFFilter,

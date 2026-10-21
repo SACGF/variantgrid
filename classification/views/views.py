@@ -105,6 +105,7 @@ from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.file_utils import rm_if_exists
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
+from snpdb.enums import AlleleOriginBucket
 from snpdb.forms import (
     LabMultiSelectForm,
     LabSelectForm,
@@ -115,7 +116,6 @@ from snpdb.forms import (
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
 from sync.classification_sync_status import classification_sync_status

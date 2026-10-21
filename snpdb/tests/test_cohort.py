@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
 
 from annotation.fake_data import get_fake_annotation_version
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import (
     Cohort,
@@ -13,7 +14,6 @@ from snpdb.models import (
     CohortGenotypeStats,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     SampleStatsCodeVersion,
     Trio,
 )

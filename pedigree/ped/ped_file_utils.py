@@ -10,7 +10,7 @@
 # Phenotype        Phenotype                                    [A-Za-z0-9_]+                          -9
 import math
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 
 PED_COLUMNS = ['family', 'sample', 'father', 'mother', 'sex', 'affection']
 

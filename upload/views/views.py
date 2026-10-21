@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from annotation.views import get_build_contigs
 from library.django_utils.view_utils import render_ajax_view
 from library.guardian_utils import check_can_write
-from snpdb.models.models_enums import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 from upload import upload_stats
 from upload.enums import UploadedFileTypes
 from upload.grids import FileUploadColumns

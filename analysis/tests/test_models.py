@@ -21,13 +21,13 @@ from analysis.tests.test_node_editors_render import form_submit_data
 from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
     CohortGenotypeCollection,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Sample,
     TagConfigCollection,
     UserSettingsOverride,

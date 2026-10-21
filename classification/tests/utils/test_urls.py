@@ -10,9 +10,9 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.models import EvidenceKey
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from snpdb.enums import AlleleOrigin
 from snpdb.models import (
     Allele,
-    AlleleOrigin,
     ClinGenAllele,
     Country,
     GenomeBuild,

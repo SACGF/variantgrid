@@ -5,7 +5,8 @@ from django.test import RequestFactory, TestCase
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
-from snpdb.models import Cohort, GenomeBuild, ImportStatus
+from snpdb.enums import ImportStatus
+from snpdb.models import Cohort, GenomeBuild
 from snpdb.views.datatable_dataframe import (
     INDEX_COLUMN_KEY,
     DataFrameDatatableConfig,

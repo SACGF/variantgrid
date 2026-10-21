@@ -25,12 +25,12 @@ from library.django_utils.database_utils import pg_settings
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
 from library.log_utils import get_traceback
+from snpdb.enums import ImportStatus, SequenceRole
 from snpdb.models import (
     VCF,
     Cohort,
     CohortGenotypeCollection,
     CohortGenotypeStats,
-    ImportStatus,
     SampleStatsCodeVersion,
     Sequence,
     Variant,
@@ -39,7 +39,6 @@ from snpdb.models import (
     Zygosity,
 )
 from snpdb.models.models import CodeVersion
-from snpdb.models.models_enums import SequenceRole
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)

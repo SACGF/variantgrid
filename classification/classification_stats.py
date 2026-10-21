@@ -12,8 +12,8 @@ from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
 from library.django_utils import get_field_counts
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 
 
 def get_classification_counts(

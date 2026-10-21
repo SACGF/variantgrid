@@ -22,7 +22,7 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from requests import RequestException
 
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus
 
 # Re-exported: callers have long imported these from genes.models
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript

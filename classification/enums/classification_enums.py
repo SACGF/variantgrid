@@ -7,7 +7,7 @@ CriteriaEvaluation (ACMG strengths), SubmissionSource, ValidationCode, WithdrawR
 (how a classification's multiple condition terms combine). Buckets and option metadata come from
 EvidenceKey rows, not from these enums.
 AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification,
-so are defined in snpdb/models/models_enums.py and re-exported here.
+so are defined in snpdb/enums/snpdb_enums.py and re-exported here.
 """
 import typing
 from dataclasses import dataclass
@@ -21,12 +21,11 @@ from django.db.models.enums import IntegerChoices
 
 from library.guardian_utils import all_users_group, public_group
 from library.utils import ChoicesEnum
-from snpdb.models.models_enums import (  # noqa: F401 - re-exported, see module docstring
+from snpdb.enums.snpdb_enums import (  # noqa: F401 - re-exported, see module docstring
     AlleleOriginBucket,
     ClinicalSignificance,
     SomaticClinicalSignificance,
 )
-
 
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'

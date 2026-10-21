@@ -20,8 +20,8 @@ from django.utils.module_loading import import_string
 from library.constants import MINUTE_SECS
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.utils import iter_fixed_chunks
+from snpdb.enums import ClinGenAlleleExternalRecordType
 from snpdb.models import ClinGenAllele
-from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 
 
 class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):

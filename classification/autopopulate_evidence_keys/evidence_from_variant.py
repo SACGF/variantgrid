@@ -33,19 +33,19 @@ from annotation.vep_plugin_display import (
 )
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from genes.enums import AnnotationConsortium
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneCopyNumberEvent, GeneFusion, GnomADGeneConstraint, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_choices_formatter
 from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
 from seqauto.models import get_20x_gene_coverage
 from snpdb.clingen_allele import ClinGenAlleleAPIException, get_clingen_allele_for_variant
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
+from snpdb.enums import ColumnAnnotationLevel
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import ColumnAnnotationLevel
 from snpdb.models.models_genome import GenomeBuild
 
 AUTOPOPULATE_MERGE_KEYS = {SpecialEKeys.LITERATURE}

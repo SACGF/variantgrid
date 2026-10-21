@@ -36,8 +36,8 @@ from classification.views.exports.classification_export_formatter_redcap import 
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from library.log_utils import report_exc_info
+from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings

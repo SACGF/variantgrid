@@ -34,8 +34,8 @@ from library.utils import (
     export_column,
     first,
 )
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, VariantAllele
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ClinVarCompareValue(int, Enum):

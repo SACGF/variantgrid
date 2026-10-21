@@ -25,6 +25,7 @@ from annotation.vep_annotation import (
     get_vep_command,
     get_vep_variant_annotation_version_kwargs,
 )
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     CdotDataVersion,
     GeneAnnotationImport,
@@ -33,7 +34,6 @@ from genes.models import (
     GeneVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils import get_field_counts, require_superuser
 from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
 from snpdb.models import (

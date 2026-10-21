@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
 from annotation.fake_data import get_fake_annotation_version
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

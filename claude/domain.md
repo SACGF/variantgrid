@@ -196,7 +196,7 @@ analysis' collection when there is one, else the viewer's.
 is asking for it to be classified, and classifying resolves the tagging rather than deleting it. A lab flags its own on the
 tag settings page; `settings.TAG_REQUIRES_CLASSIFICATION` only names the one a fresh install is seeded with. A queue tag is
 *for a bucket* when its `allele_origin_bucket` is that bucket or "Both", the same rule
-`snpdb/models/models_enums.py:AlleleOriginFilterDefault` uses. Query with `snpdb/models/models.py:Tag.classify_queue_qs` /
+`snpdb/enums/snpdb_enums.py:AlleleOriginFilterDefault` uses. Query with `snpdb/models/models.py:Tag.classify_queue_qs` /
 `classify_queue_qs_for_bucket` rather than naming a tag.
 
 ## People, labs and permissions (snpdb, library)

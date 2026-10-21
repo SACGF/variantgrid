@@ -6,8 +6,8 @@ from analysis.models.models_variant_tag import VariantTagsImport
 from annotation.models.models_clinvar import ClinVarVersion
 from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from classification.models.classification import ClassificationImport
-from snpdb.models import VCF, ImportedWikiCollection, ImportSource
-from snpdb.models.models_enums import AlleleConversionTool
+from snpdb.enums import AlleleConversionTool, ImportSource
+from snpdb.models import VCF, ImportedWikiCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
 from upload.enums import UploadedFileTypes

@@ -16,9 +16,9 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
+from patients.enums import MatchStatus
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction, Specimen
-from patients.models_enums import MatchStatus
 from seqauto.models import (
     SAMPLE_SHEET_PAIR_ID_COLUMN,
     DragenTSO500CombinedVariantOutput,

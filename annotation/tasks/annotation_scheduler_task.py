@@ -30,7 +30,8 @@ from annotation.tasks.annotate_variants import annotate_variants, import_annotat
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.log_utils import log_traceback, report_message
 from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
-from snpdb.models import VCF, GenomeBuild, ImportStatus, JobsControl, Sample, Variant
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, JobsControl, Sample, Variant
 
 # #1646: batch size for the count lane - how many uncounted runs one count_annotation_runs task takes.
 # _dispatch_counts leases the batch, so a burst of dispatch cycles can't hand the same work out twice;

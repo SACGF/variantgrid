@@ -17,7 +17,7 @@ from library.django_utils.django_file_utils import (
     import_processing_dir_path,
 )
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 from upload.enums import UploadedFileTypes, UploadStepTaskType, VCFPipelineStage
 from upload.models import (

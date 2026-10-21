@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from snpdb.models import Cohort, ImportStatus
+from snpdb.enums import ImportStatus
+from snpdb.models import Cohort
 from snpdb.tasks.sub_cohort_tasks import build_sub_cohort_any_sample_called_vc_task
 
 

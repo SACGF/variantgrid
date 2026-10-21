@@ -3,7 +3,7 @@ import gzip
 from django.core.management.base import BaseCommand
 
 from genes.cached_web_resource.refseq import store_transcript_sequence_info_fasta
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 
 
 class Command(BaseCommand):

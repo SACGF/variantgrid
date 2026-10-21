@@ -22,8 +22,8 @@ from classification.models import (
 )
 from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, Lab, Organization, Variant, VariantAllele
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @dataclass

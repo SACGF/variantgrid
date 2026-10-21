@@ -18,7 +18,8 @@ from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.models.nodes.node_version import NodeVersion
 from library.django_utils.django_partition import temporary_db_table
-from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
+from snpdb.enums import ProcessingStatus
+from snpdb.models import VariantCollection, VariantCollectionRecord
 
 
 class VennNode(AnalysisNode):

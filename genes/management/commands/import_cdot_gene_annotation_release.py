@@ -11,6 +11,7 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from genes.cdot_data_release import download_cdot_json, find_latest_release_asset
+from genes.enums import AnnotationConsortium
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.management.commands.import_cdot_latest import (
     cdot_data_needs_update,
@@ -25,7 +26,6 @@ from genes.models import (
     ReleaseTranscriptVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import get_cdot_transcript_id_and_version
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models import GenomeBuild

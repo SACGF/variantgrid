@@ -16,7 +16,8 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from snpdb.models import ImportSource, Sex
+from snpdb.enums import ImportSource
+from snpdb.models import Sex
 from snpdb.models.models_genome import GenomeBuild
 from upload.enums import UploadedFileTypes
 from upload.models import FileUpload, UploadedPatientRecords

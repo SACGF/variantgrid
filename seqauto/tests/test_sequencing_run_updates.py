@@ -29,7 +29,8 @@ from seqauto.signals.signals_list import (
     sequencing_run_current_sample_sheet_changed_signal,
 )
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import VCF, DataState, GenomeBuild, Sample
+from snpdb.enums import DataState
+from snpdb.models import VCF, GenomeBuild, Sample
 
 SAMPLE_NAMES = ["sample_a", "sample_b"]
 

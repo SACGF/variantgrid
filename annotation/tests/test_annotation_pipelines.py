@@ -33,7 +33,7 @@ from annotation.tasks.annotation_scheduler_task import (
     _handle_variant_annotation_version,
     count_annotation_runs,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import execute_cmd
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

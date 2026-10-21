@@ -24,13 +24,13 @@ from annotation.models.models_version import SubVersionPartition
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.utils import first
+from snpdb.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from snpdb.models import (
     Allele,
     GenomeBuild,
     Variant,
 )
 from snpdb.models.models_cached_web_resource import CachedWebResource
-from snpdb.models.models_enums import AlleleOriginBucket, SomaticClinicalSignificance
 
 
 class ClinVarVersion(DataArchiveMixin, SubVersionPartition):
