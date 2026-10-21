@@ -6,7 +6,7 @@ from django.db.models.deletion import CASCADE
 from django.utils.timesince import timesince
 from django_extensions.db.models import TimeStampedModel
 
-from sync.models.enums import SyncStatus
+from sync.enums import SyncStatus
 
 
 class SyncDestination(models.Model):

@@ -1,3 +1,7 @@
+"""
+SyncStatus: the outcome of a SyncRun (in progress, success, no records, failed). Stored codes: add values, never
+change one.
+"""
 from django.db.models import TextChoices
 
 
