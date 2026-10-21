@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classification.enums import (
+    ClassificationGroupingSearchTermType,
     ClassificationResultValue,
     EvidenceCategory,
     LabExternalFilter,
@@ -27,7 +28,6 @@ from classification.models import (
     ClassificationGrouping,
     ClassificationGroupingEntry,
     ClassificationGroupingSearchTerm,
-    ClassificationGroupingSearchTermType,
     ClassificationModification,
     DiscordanceReport,
     EvidenceKeyMap,

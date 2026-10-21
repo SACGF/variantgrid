@@ -17,11 +17,10 @@ from django.urls import reverse
 from django.views import View
 from django.views.decorators.http import require_POST
 
-from classification.enums import SpecialEKeys
+from classification.enums import ClinVarExportBatchStatus, SpecialEKeys
 from classification.models import (
     ClinVarExport,
     ClinVarExportBatch,
-    ClinVarExportBatchStatus,
     ClinVarExportStatus,
     ClinVarExportSubmission,
     EvidenceKeyMap,

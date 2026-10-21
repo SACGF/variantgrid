@@ -1,8 +1,8 @@
 from django.core.management import BaseCommand
 
 from annotation.regexes import DbRegexes, db_ref_regexes
-from classification.enums import EvidenceKeyValueType
-from classification.models import Classification, EvidenceKeyMap, VCBlobKeys, VCDataDict
+from classification.enums import EvidenceKeyValueType, VCBlobKeys
+from classification.models import Classification, EvidenceKeyMap, VCDataDict
 from library.utils import JsonDiffs
 
 

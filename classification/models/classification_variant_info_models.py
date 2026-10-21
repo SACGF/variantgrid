@@ -28,7 +28,6 @@ from django.db.models import (
     ForeignKey,
     JSONField,
     OneToOneField,
-    TextChoices,
     TextField,
 )
 from django.urls import reverse
@@ -37,6 +36,7 @@ from model_utils.models import TimeStampedModel
 
 from annotation.models.models import VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from classification.enums import ImportedAlleleInfoStatus, PHGVSSource
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (
@@ -138,13 +138,6 @@ class HGVSResolution:
     """ cdot data version or ClinGen date used during this resolution """
     transcript_version: Optional[str]
     gene_symbol: Optional[str]
-
-
-class PHGVSSource(TextChoices):
-    VEP = "V", "VEP"  # VariantTranscriptAnnotation.hgvs_p, exact transcript version, latest VariantAnnotationVersion
-    COMPUTED = "C", "Computed"  # biocommons c_to_p from resolved_hgvs
-    CLINGEN = "G", "ClinGen"  # cached ClinGenAllele proteinEffect
-    EVIDENCE = "E", "Evidence"  # a classification's p_hgvs evidence value, parsed
 
 
 @dataclass(frozen=True)
@@ -454,19 +447,6 @@ class ResolvedVariantInfo(TimeStampedModel):
             variant_info.set_variant_and_save(variant)
 
         return variant_info
-
-
-class ImportedAlleleInfoStatus(TextChoices):
-    PROCESSING = "P", "Processing"
-    """ The initial status for an ImportedAlleleInfo """
-
-    MATCHED_IMPORTED_BUILD = "I", "Matched Imported Variant"
-    """ We have a variant for the imported build, but not yet lifted it over """
-
-    MATCHED_ALL_BUILDS = "M", "Complete"
-    """ There's a 37 and 38 variant linked (or at least there was an attempted liftover) """
-
-    FAILED = "F", "Failed"
 
 
 ALLELE_INFO_VALIDATION_SEVERITY = Literal["W", "E"]

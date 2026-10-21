@@ -13,17 +13,19 @@ from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from classification.enums import ClassificationResultValue, SpecialEKeys, TestingContextBucket
-from classification.enums.discordance_enums import (
+from classification.enums import (
+    ClassificationResultValue,
+    ClinicalContextRecalcTrigger,
     ContinuedDiscordanceReason,
     DiscordanceReportResolution,
+    SpecialEKeys,
+    TestingContextBucket,
 )
 from classification.models import (
     ClassificationFlagTypes,
     ClassificationModification,
     ClinicalContext,
     ClinicalContextChangeData,
-    ClinicalContextRecalcTrigger,
     DiscordanceReportClassification,
     EvidenceKeyMap,
     Overlap,

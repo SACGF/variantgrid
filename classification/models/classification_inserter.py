@@ -7,7 +7,12 @@ from django.db import transaction
 from django.utils.timezone import now
 
 # from classification.enums import ForceUpdate
-from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums import (
+    ClassificationPatchStatus,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+)
 from classification.models import (
     ClassificationImportRun,
     ClassificationJsonParams,
@@ -18,7 +23,6 @@ from classification.models import (
     EvidenceMixin,
     classification_flag_types,
 )
-from classification.models.classification_utils import ClassificationPatchStatus
 from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
 from library.log_utils import report_exc_info

@@ -4,13 +4,9 @@ from django.db.models.query_utils import Q
 from django.dispatch import receiver
 from django.utils import timezone as django_timezone
 
+from classification.enums import ImportedAlleleInfoStatus
 from classification.enums.classification_enums import ShareLevel
-from classification.models import (
-    Classification,
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
-    classification_flag_types,
-)
+from classification.models import Classification, ImportedAlleleInfo, classification_flag_types
 from flags.enums import FlagStatus
 from flags.models import Flag, FlagType
 from flags.models.flag_health_check import flag_chanced_since

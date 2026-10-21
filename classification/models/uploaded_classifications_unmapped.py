@@ -8,21 +8,10 @@ from django.urls import reverse
 from django.utils.safestring import SafeString
 from model_utils.models import TimeStampedModel
 
+from classification.enums import UploadedClassificationsUnmappedStatus
 from classification.models.uploaded_file_types import FileHandle, resolve_uploaded_url_to_handle
 from library.utils import ExportRow, export_column
 from snpdb.models import Lab
-
-
-class UploadedClassificationsUnmappedStatus(models.TextChoices):
-    Manual = "MA", "Manual Review Pending"
-    Pending = 'P', 'Pending'
-
-    Mapping = "M", "Mapping"
-    Importing = "I", "Importing"
-
-    Validated = 'V', 'Validated'
-    Error = 'E', 'Error'
-    Processed = 'MP', 'Processed'
 
 
 class UploadedClassificationsUnmappedValidationRow(ExportRow):

@@ -10,9 +10,9 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, OverlapContributionStatus, \
-    OverlapOverrideStatus
+    OverlapOverrideStatus, TriageNextStep
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionNextStep
+    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, OverlapContributionNextStep
 from classification.enums.overlaps_enums import TriageDecision, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails

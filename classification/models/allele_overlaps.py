@@ -8,7 +8,7 @@ from typing import Optional
 
 from django.db.models import Count, QuerySet, Subquery
 
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import DiscordanceLevel, ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
     ClassificationFlagTypes,
@@ -19,7 +19,7 @@ from classification.models import (
     DiscordanceReport,
     classification_flag_types,
 )
-from classification.models.clinical_context_models import DiscordanceLevel, DiscordanceStatus
+from classification.models.clinical_context_models import DiscordanceStatus
 from classification.models.criteria_strengths import (
     AcmgPointScore,
     CriteriaStrengths,

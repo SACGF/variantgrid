@@ -13,6 +13,8 @@ from annotation.enums import EffectiveDate
 from annotation.models import ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import (
+    DiscordanceReportResolution,
+    DiscordanceReportTriageStatus,
     OverlapEntrySourceTextChoices,
     OverlapStatus,
     OverlapType,
@@ -20,7 +22,6 @@ from classification.enums import (
     SpecialEKeys,
     TestingContextBucket,
 )
-from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.enums.overlaps_enums import (
     OverlapContributionStatus,
     TriageDecision,
@@ -34,7 +35,6 @@ from classification.models import (
     ClassificationModification,
     ClassificationResultValue,
     DiscordanceReport,
-    DiscordanceReportTriageStatus,
     Overlap,
     OverlapContribution,
     OverlapContributionNextStep,

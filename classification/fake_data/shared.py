@@ -12,6 +12,7 @@ from guardian.models import GroupObjectPermission
 
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from classification.enums import ImportedAlleleInfoStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_grouping import (
     AlleleOriginGrouping,
@@ -20,7 +21,6 @@ from classification.models.classification_grouping import (
 from classification.models.classification_reclassification_models import ReclassificationEvent
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     ResolvedVariantInfo,
 )
 from classification.models.overlaps_model import OverlapContribution

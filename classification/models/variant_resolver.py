@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 
-from classification.models import ClassificationImport, ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ClassificationImport, ImportedAlleleInfo
 from classification.tasks.classification_import_task import process_classification_import_task
 from snpdb.enums import ImportSource
 from snpdb.models import GenomeBuild

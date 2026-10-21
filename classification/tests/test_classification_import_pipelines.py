@@ -10,7 +10,8 @@ from classification.classification_import import (
     GENE_LEVEL_API_UPLOAD_NAME,
     _classification_upload_pipeline,
 )
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport
 from classification.tasks.classification_import_process_variants_task import (
     ClassificationImportProcessVariantsTask,

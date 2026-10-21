@@ -9,11 +9,8 @@ import ijson
 from celery import Task
 from django.conf import settings
 
-from classification.enums import SubmissionSource
-from classification.models import (
-    UploadedClassificationsUnmapped,
-    UploadedClassificationsUnmappedStatus,
-)
+from classification.enums import SubmissionSource, UploadedClassificationsUnmappedStatus
+from classification.models import UploadedClassificationsUnmapped
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.log_utils import NotificationBuilder, report_message

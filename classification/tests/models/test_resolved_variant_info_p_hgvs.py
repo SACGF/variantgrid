@@ -12,11 +12,10 @@ from hgvs.parsers import Parser
 
 from annotation.fake_data import create_fake_variant_annotation, get_fake_annotation_version
 from annotation.models import VariantTranscriptAnnotation
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import PHGVSSource, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import (
     HGVSResolution,
-    PHGVSSource,
     ResolvedVariantInfo,
 )
 from classification.tests.models.test_utils import ClassificationTestUtils

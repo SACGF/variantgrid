@@ -17,16 +17,14 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views import View
 
+from classification.enums import UploadedClassificationsUnmappedStatus
 from classification.models import (
     ClassificationImportRun,
     FileHandle,
     UploadedClassificationsUnmappedValidationRow,
     resolve_uploaded_url_to_handle,
 )
-from classification.models.uploaded_classifications_unmapped import (
-    UploadedClassificationsUnmapped,
-    UploadedClassificationsUnmappedStatus,
-)
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from classification.tasks.classification_import_map_and_insert_task import (
     ClassificationImportMapInsertTask,
 )

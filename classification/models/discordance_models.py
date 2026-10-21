@@ -8,23 +8,21 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import TextChoices
 from django.db.models.deletion import CASCADE, PROTECT
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums.classification_enums import SpecialEKeys
-from classification.enums.discordance_enums import (
+from classification.enums import (
+    ClinicalContextRecalcTrigger,
     ContinuedDiscordanceReason,
     DiscordanceReportResolution,
+    DiscordanceReportTriageStatus,
+    NotifyLevel,
 )
+from classification.enums.classification_enums import SpecialEKeys
 from classification.models.classification import Classification, ClassificationModification
-from classification.models.clinical_context_models import (
-    ClinicalContext,
-    ClinicalContextChangeData,
-    ClinicalContextRecalcTrigger,
-)
+from classification.models.clinical_context_models import ClinicalContext, ClinicalContextChangeData
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import HGVSDisplay
 from library.django_utils.model_utils import refresh_for_update
@@ -35,12 +33,6 @@ from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Lab
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
-
-
-class NotifyLevel(str, Enum):
-    NEVER_NOTIFY = "never-notify"
-    NOTIFY_IF_CHANGE = "notify-if-change"
-    ALWAYS_NOTIFY = "always-notify"
 
 
 class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
@@ -432,14 +424,6 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
 # TODO all the below classes are utilities, consider moving them out
 
-class DiscordanceReportNextStep(str, Enum):
-    UNANIMOUSLy_COMPLEX = "C"
-    AWAITING_YOUR_TRIAGE = "T"
-    AWAITING_YOUR_AMEND = "A"
-    AWAITING_OTHER_LAB = "O"
-    TO_DISCUSS = "D"
-
-
 class DiscordanceReportClassificationRelationManager(models.Manager):
 
     def get_queryset(self):
@@ -494,14 +478,6 @@ class DiscordanceReportClassification(TimeStampedModel):
         self.withdrawn_final = self.withdrawn_effective
         self.classification_final = self.classification_effective
         self.save()
-
-
-class DiscordanceReportTriageStatus(TextChoices):
-    PENDING = "P", "Pending Triage"
-    REVIEWED_WILL_FIX = "F", "Will Amend"
-    REVIEWED_WILL_DISCUSS = "D", "For Joint Discussion"
-    REVIEWED_SATISFACTORY = "R", "Confident in Classification"
-    COMPLEX = "X", "Low Penetrance/Risk Allele etc"
 
 
 class DiscordanceReportTriage(PreviewModelMixin, TimeStampedModel):

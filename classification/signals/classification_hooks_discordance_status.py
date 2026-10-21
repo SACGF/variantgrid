@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import ClinicalContextRecalcTrigger, ShareLevel, SpecialEKeys
 from classification.models import ImportedAlleleInfo
 from classification.models.classification import (
     Classification,
@@ -20,7 +20,6 @@ from classification.models.classification_variant_info_models import allele_info
 from classification.models.clinical_context_models import (
     ClinicalContext,
     ClinicalContextChangeData,
-    ClinicalContextRecalcTrigger,
     clinical_context_signal,
 )
 from classification.models.discordance_models import DiscordanceReport

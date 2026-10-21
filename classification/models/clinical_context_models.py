@@ -1,6 +1,5 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
 from functools import cached_property
 from typing import Optional
 
@@ -12,7 +11,12 @@ from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import (
+    ClinicalContextRecalcTrigger,
+    DiscordanceLevel,
+    ShareLevel,
+    SpecialEKeys,
+)
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun
@@ -40,43 +44,6 @@ SPECIAL_CS = {
     "O": "P",
     "LO": "LP"
 }
-
-
-class DiscordanceLevel(str, Enum):
-    """
-    Values are assigned based on how big the differences are considered when it comes to discordance
-    e.g. difference between Benign and Likely Benign isn't as important as the difference between Likely Benign and VUS etc
-    """
-
-    NO_ENTRIES = 'no_entries'
-    SINGLE_SUBMISSION = 'single_submission'  # single shared submission
-    CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
-    CONCORDANT_DIFF_VUS = 'concordant_agreement_diff_vus'  # VUS-A, VUS-B vs VUS-C
-    CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
-    MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED = 'multiple_records'  # Somatic before we support discordan
-    DISCORDANT = 'discordant'
-
-    @property
-    def label(self) -> str:
-        if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
-            return "Concordant (Agreement)"
-        if self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
-            return "Concordant (Agreement Differing VUS)"
-        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            return "Concordant (Confidence)"
-        if self == DiscordanceLevel.NO_ENTRIES:
-            return "No Shared Submissions"
-        if self == DiscordanceLevel.SINGLE_SUBMISSION:
-            return "Single Shared Submission"
-        if self == DiscordanceLevel.DISCORDANT:
-            return "Discordant"
-        if self == DiscordanceLevel.MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED:
-            return "Multiple Records"
-        return "Unknown"
-
-    @property
-    def css_class(self) -> str:
-        return f"overlap-{self.value}"
 
 
 @dataclass(frozen=True)
@@ -279,19 +246,6 @@ class DiscordanceNotification(TimeStampedModel):
 
     def __str__(self):
         return f"{self.lab} - {self.discordance_report}"
-
-
-class ClinicalContextRecalcTrigger(Enum):
-    ADMIN = "admin"
-    VARIANT_SET = "variant_set"
-    CLINICAL_GROUPING_SET = "clinical_grouping"
-    WITHDRAW_DELETE = "withdraw_delete"
-    SUBMISSION = "submission"
-    DELAYED = "delayed"
-    OTHER = "other"
-    PENDING_CS_CHANGE = "pending_cs_change"
-    RE_OPEN = "reopen"
-    CONTINUED_DISCORDANCE = "continued_discordance"
 
 
 @dataclass(frozen=True)

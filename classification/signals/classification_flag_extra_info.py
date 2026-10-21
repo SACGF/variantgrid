@@ -5,7 +5,7 @@ any ongoing discordance report), answering flag_collection_extra_info_signal for
 from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
-from classification.enums.discordance_enums import DiscordanceReportResolution
+from classification.enums import DiscordanceReportResolution
 from classification.models.classification import Classification
 from classification.models.discordance_models import DiscordanceReportClassification
 from flags.models.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal

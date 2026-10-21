@@ -16,10 +16,9 @@ from django.utils import timezone
 from analysis.classify_report import ClassifyReportCase, ReportCandidate
 from analysis.tests.test_classify_report import READY_EVIDENCE, ClassifyReportTestCase
 from analysis.views.views_classify_report import _case_values_for_form
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import CaseReportStatus, SpecialEKeys, SubmissionSource
 from classification.models import (
     CaseReport,
-    CaseReportStatus,
     Classification,
     ClassificationModification,
     ClassificationReportTemplate,

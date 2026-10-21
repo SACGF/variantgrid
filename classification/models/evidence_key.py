@@ -11,7 +11,6 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from datetime import date
-from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union, cast
 
@@ -22,7 +21,13 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import CriteriaEvaluation, ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums import (
+    CriteriaEvaluation,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+    WipeMode,
+)
 from classification.enums.classification_enums import (
     CopyAlleleOrigin,
     CopyScope,
@@ -756,16 +761,6 @@ class EvidenceKeyMap:
             return AlleleOriginBucket.GERMLINE
         else:
             return AlleleOriginBucket.UNKNOWN
-
-
-class WipeMode(Enum):
-    """
-    When wiping out a value from a patch... how do we wipe it
-    """
-    SET_NONE = 'set_none'  # None
-    SET_EMPTY = 'set_empty'  # {}
-    POP = 'pop'  # remove it from the patch dictionary all together
-    ATTRIBUTES_TO_NONE = 'atts_to_none'  # {"value": None, "note": None, "explain": None}
 
 
 class VCDataCell:
