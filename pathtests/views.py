@@ -12,6 +12,7 @@ from genes.models import GeneList, GeneListCategory, GeneSymbol
 from genes.views.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
 from library.enums import ModificationOperation
+from pathtests.enums import PathologyTestGeneModificationOutcome
 from pathtests.forms import (
     CaseForm,
     CreatePathologyTestForm,
@@ -23,7 +24,6 @@ from pathtests.forms import (
 from pathtests.models import (
     Case,
     PathologyTest,
-    PathologyTestGeneModificationOutcome,
     PathologyTestGeneModificationRequest,
     PathologyTestOrder,
     PathologyTestVersion,

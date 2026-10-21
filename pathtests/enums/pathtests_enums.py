@@ -1,3 +1,9 @@
+"""
+Enums for pathology tests and cases: CaseState (with the closed set), CaseWorkflowStatus (a case's progress
+from sample processing to reporting), InvestigationType, PathologyTestGeneModificationOutcome (a gene change
+request's review), and the ClinicalSetting / PathologyTestType test descriptors. Stored codes: add values,
+never change one.
+"""
 from django.db import models
 
 from library.utils import Constant

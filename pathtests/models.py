@@ -12,7 +12,7 @@ from genes.models import GeneList, GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums import ModificationOperation
 from library.preview_request import PreviewModelMixin
-from pathtests.models_enums import (
+from pathtests.enums import (
     CaseState,
     CaseWorkflowStatus,
     InvestigationType,
