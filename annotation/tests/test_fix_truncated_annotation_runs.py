@@ -29,17 +29,22 @@ class FixTruncatedAnnotationRunsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        # One variant per run: a version holds one lock per range, a lock one run per pipeline type
         cls.variants = [slowly_create_test_variant("1", 100000 + i * 10, 'A', 'T', cls.grch37)
-                        for i in range(2)]
+                        for i in range(6)]
         retire_seeded_annotation_version(cls.grch37)
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
 
+    def setUp(self):
+        self._unlocked_variants = iter(self.variants)
+
     def _finished_run(self, **kwargs) -> AnnotationRun:
         """ A run that reached FINISHED - upload_end with no error_exception is what get_status() needs """
-        lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[0],
-                                                  max_variant=self.variants[1], count=100)
+        variant = next(self._unlocked_variants)
+        lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=variant, max_variant=variant,
+                                                  count=100)
         kwargs.setdefault("pipeline_type", VariantAnnotationPipelineType.STANDARD)
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=lock,
                                                       upload_end=timezone.now(), **kwargs)

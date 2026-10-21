@@ -114,13 +114,17 @@ class AnnotationPipelineVersion(TimeStampedModel):
         return f"{self.get_pipeline_type_display()} {self.code_version}{data} ({self.genome_build})"
 
 
-class AnnotationRangeLock(models.Model):
+class AnnotationRangeLock(TimeStampedModel):
     MIN_SIZE_FOR_SUBDIVISION = 1000  # Do we need this?
 
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     min_variant = models.ForeignKey(Variant, related_name='min_variant', on_delete=PROTECT)
     max_variant = models.ForeignKey(Variant, related_name='max_variant', on_delete=PROTECT)
     count = models.IntegerField(null=True)
+
+    class Meta:
+        # #1124: a second lock over the same range would double-annotate it
+        unique_together = ("version", "min_variant", "max_variant")
 
     def __str__(self):
         min_v = self.min_variant_id

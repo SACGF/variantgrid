@@ -1,5 +1,3 @@
-from django.db.models import Count
-
 from annotation.abandoned_annotation_runs import (
     abandoned_annotation_runs_by_reason,
     incomplete_annotation_runs_qs,
@@ -74,27 +72,7 @@ def check_gene_annotation_versions() -> dict:
 
 
 def check_variant_annotation_runs_status() -> dict:
-    # I am going to make this a warning for a while - before making it an error
-    ARL_DUPE_ERROR = False
-    # see https://github.com/SACGF/variantgrid_shariant/issues/177
-    arl_qs = AnnotationRangeLock.objects.values('version_id', 'min_variant_id', 'max_variant_id')
-    arl_qs = arl_qs.annotate(id_count=Count('id')).filter(id_count__gt=1)
-    arl_message = "Remove duplicate AnnotationRangeLock objects"
-    has_dupes = arl_qs.exists()
-    if ARL_DUPE_ERROR:
-        arl_data = {
-            "valid": has_dupes,
-            "fix": arl_message,
-        }
-    else:
-        arl_data = {
-            "valid": True,  # Just a warning
-        }
-        if has_dupes:
-            arl_data["warning"] = arl_message + " (this is a just a warning but will become an error in the future)"
-    annotation_status = {
-        "AnnotationRangeLock duplicates": arl_data,
-    }
+    annotation_status = {}
 
     for reason, qs in abandoned_annotation_runs_by_reason(incomplete_annotation_runs_qs()).items():
         abandoned_data = {
