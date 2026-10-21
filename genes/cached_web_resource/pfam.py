@@ -13,6 +13,7 @@ from io import BytesIO
 
 import pandas as pd
 
+from genes.enums import AnnotationConsortium
 from genes.models import (
     Pfam,
     PfamSequence,
@@ -20,7 +21,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 
 BULK_INSERT_SIZE = 2000
 PFAM_SEQUENCE_PATTERN = re.compile(r"(.+?)-\d+$")

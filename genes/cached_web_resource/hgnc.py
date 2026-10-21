@@ -7,6 +7,7 @@ import logging
 import ijson
 import requests
 
+from genes.enums import GeneSymbolAliasSource, HGNCStatus
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import (
     HGNC,
@@ -16,7 +17,6 @@ from genes.models import (
     HGNCImport,
     UniProt,
 )
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, get_model_fields
 from snpdb.models.models_cached_web_resource import CachedWebResource

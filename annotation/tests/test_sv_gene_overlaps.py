@@ -7,10 +7,10 @@ from django.test import TestCase
 
 from annotation.fake_data import get_fake_annotation_version
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.models import ReleaseTranscriptVersion, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 

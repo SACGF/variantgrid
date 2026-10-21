@@ -45,6 +45,7 @@ from annotation.models.models import (
 )
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.signals.manual_signals import annotation_run_complete_signal
+from genes.enums import GeneCopyNumberEventKind
 from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
 from genes.gene_splice import splice_event_variants
@@ -52,7 +53,6 @@ from genes.models import (
     Gene,
     GeneAnnotationRelease,
     GeneCopyNumberEvent,
-    GeneCopyNumberEventKind,
     GeneFusion,
     GeneLevelId,
     TranscriptVersion,

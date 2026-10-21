@@ -5,6 +5,7 @@ drift from what a real import produces. Fusions build on this in gene_fusion_tes
 """
 from django.db import transaction
 
+from genes.enums import AnnotationConsortium, GeneCopyNumberEventKind
 from genes.fake_data import (
     create_fake_gene_version,
     create_gene_level_variant,
@@ -20,8 +21,7 @@ from genes.gene_splice import (
     SpliceEventVariant,
     canonical_splice_label,
 )
-from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, ReleaseTranscriptVersion
-from genes.models_enums import AnnotationConsortium
+from genes.models import GeneCopyNumberEvent, ReleaseTranscriptVersion
 from snpdb.models import Variant
 
 

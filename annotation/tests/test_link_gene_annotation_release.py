@@ -9,8 +9,8 @@ from django.test.utils import override_settings
 
 from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotationVersion
+from genes.enums import AnnotationConsortium
 from genes.models import GeneAnnotationImport, GeneAnnotationRelease
-from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
 RS_2025_08_URL = ("https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/"

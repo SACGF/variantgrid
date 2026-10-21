@@ -16,15 +16,8 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
 )
 from classification.enums import SpecialEKeys
 from classification.models import EvidenceKey
-from genes.models import (
-    HGNC,
-    GeneCopyNumberEventKind,
-    GeneSymbol,
-    GeneSymbolAlias,
-    HGNCImport,
-    SpliceEvent,
-)
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
+from genes.enums import GeneCopyNumberEventKind, GeneSymbolAliasSource, HGNCStatus
+from genes.models import HGNC, GeneSymbol, GeneSymbolAlias, HGNCImport, SpliceEvent
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,

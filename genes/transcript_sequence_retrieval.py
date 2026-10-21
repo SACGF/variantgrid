@@ -16,7 +16,7 @@ from Bio import Entrez, SeqIO
 from django.conf import settings
 from django.utils.module_loading import import_string
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript, NoTranscript
 from genes.transcript_parts import get_transcript_id_and_version
 from library.constants import MINUTE_SECS
