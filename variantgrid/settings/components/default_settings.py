@@ -1331,6 +1331,8 @@ VIEW_GENE_HOTSPOT_GRAPH = True
 VIEW_GENE_HOTSPOT_GRAPH_PREFER_CANONICAL_WITH_DIFF_VERSION = True
 VIEW_GENE_WIKI = True
 
+VIEW_DASHBOARD_TAG_STATS_GRAPH = True  # Tag events by month slide on the dashboard
+
 TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
 
 # User awards (#1819): admin-given kudos plus computed badges, shown on the profile pages.

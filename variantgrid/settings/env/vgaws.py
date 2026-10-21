@@ -92,6 +92,7 @@ SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = "/opt/annotation/somalier"
 
 UPLOAD_ENABLED = True
+VIEW_DASHBOARD_TAG_STATS_GRAPH = False
 
 USER_CREATE_ORG_LABS = {
     "unknown": "unknown",
