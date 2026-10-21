@@ -124,7 +124,7 @@ class ClinGenAllele(TimeStampedModel):
         return None
 
     def get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> tuple[Optional[str],
-                                                                                        Optional[dict]]:
+                                                                                       Optional[dict]]:
         if ta := self._get_transcript_allele(transcript_accession, match_version):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
             for t_hgvs in ta["hgvs"]:
@@ -173,7 +173,6 @@ class ClinGenAllele(TimeStampedModel):
     def get_variant_coordinate(self, genome_build: GenomeBuild, hgvs_matcher=None) -> 'VariantCoordinate':
         """ Optionally pass in hgvs_matcher to save re-instantiating it all the time
             (each one opens genome FASTA file handles) """
-        # genes.hgvs imports snpdb.models, so the g.HGVS conversion is imported here
         from genes.hgvs import get_hgvs_variant_coordinate
         g_hgvs = self.get_g_hgvs(genome_build)
         if hgvs_matcher:
