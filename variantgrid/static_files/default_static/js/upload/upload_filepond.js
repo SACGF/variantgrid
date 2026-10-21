@@ -1,6 +1,5 @@
 // @ts-check
 // upload/templates/upload/upload.html
-/* global getCookie */ // global.js
 /* global FilePond */ // lib/filepond
 /* global reloadUploadsGrid */ // upload/upload.js
 (function() {
@@ -8,7 +7,7 @@
     if (!inputElement) {
         return;
     }
-    const csrftoken = getCookie('csrftoken');
+    const csrftoken = Cookies.get('csrftoken');
 
     const pond = FilePond.create(inputElement, {
         allowMultiple: true,
@@ -20,6 +19,7 @@
                 url: Urls.upload_file(),
                 method: 'POST',
                 headers: {'X-CSRFToken': csrftoken},
+                onerror: (responseText) => responseText,
             },
             revert: (uniqueFileId, load, error) => {
                 fetch("/upload/upload_file_delete/" + uniqueFileId, {
@@ -59,11 +59,16 @@
     });
 
     pond.on('processfile', (error, file) => {
-        $('#' + progressRowId(file.id)).remove();
-        if (!error) {
-            pond.removeFile(file.id);
-            reloadUploadsGrid();
+        const tr = $('#' + progressRowId(file.id));
+        if (error) {
+            // FilePond's own UI is hidden, so the server's message (e.g. an empty file) is shown in the row
+            tr.find('td:first').html('<i class="fas fa-exclamation-triangle text-danger" title="Upload failed"></i>');
+            tr.find('.progress').replaceWith($('<div/>').addClass('text-danger').text(error.body || 'Upload failed'));
+            return;
         }
+        tr.remove();
+        pond.removeFile(file.id);
+        reloadUploadsGrid();
     });
 
     pond.on('processfileabort', (file) => {

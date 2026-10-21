@@ -38,6 +38,7 @@ from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.unit_percent import convert_from_percent_to_unit
 from library.utils import invert_dict
+from library.utils.json_utils import canonical_filter_key
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
@@ -311,6 +312,18 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     def is_sub_cohort(self):
         return self.parent_cohort is not None
 
+    @cached_property
+    def stats_filter_scope(self) -> dict:
+        """ A sub cohort's CohortGenotype*Stats aggregate rows live on its parent's CGC, so their filter keys
+            carry its samples - which also makes a changed sample set miss and recompute (#2311) """
+        if self.is_sub_cohort:
+            return {"sub_cohort_samples": list(self.get_sample_ids())}
+        return {}
+
+    def get_stats_filter_key(self) -> Optional[str]:
+        """ The key of this cohort's raw aggregate stats row - None for a base cohort """
+        return canonical_filter_key(self.stats_filter_scope)
+
     def get_base_cohort(self):
         """ Underlying cohort (ie deals with sub cohorts) """
         if self.is_sub_cohort:
@@ -461,6 +474,22 @@ def pre_delete_cohort(sender, instance, **kwargs):  # pylint: disable=unused-arg
         sub_cohort.set_sample_order_packed_indexes()
 
 
+@receiver(pre_delete, sender=Sample)
+def pre_delete_sample(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ The CASCADE from Sample deletes CohortSamples in bulk, skipping CohortSample.delete(), so the cohort
+        version (and everything keyed by it) would stay as it was. A VCF cohort keeps its version: its genotype
+        data is the VCF's and is only rebuilt by a reload, so a bump would orphan it. Its aggregate stats
+        counted the deleted sample, so they're cleared, to recompute on their next read """
+    for cohort_sample in instance.cohortsample_set.select_related("cohort"):
+        if cohort_sample.cohort.vcf_id:
+            for cgc in CohortGenotypeCollection.objects.filter(cohort=cohort_sample.cohort):
+                for stats in (cgc.genotype_stats, cgc.variant_annotation_stats,
+                              cgc.gene_annotation_stats, cgc.clinvar_annotation_stats):
+                    stats.filter(sample__isnull=True).delete()
+        else:
+            cohort_sample.delete()
+
+
 class CohortSample(models.Model):
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
@@ -522,8 +551,7 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
     # data on disk - fixed when the partition is built/migrated - not config, so it can't be derived from settings.
     additional_gnomad_versions = ArrayField(models.TextField(), default=list, blank=True)
     gnomad_af_min = models.FloatField()
-    # This value is from classification.enums.classification_enums.ClinicalSignificance
-    # but don't want to bring dependency in from classification
+    # A models_enums.ClinicalSignificance value
     clinical_significance_max = models.CharField(max_length=1, null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 

@@ -2,6 +2,9 @@
 // OVERALL LAYOUT
 ////////////////////////
 
+// nav.navbar.fixed-top: Bootstrap navbar padding + .navbar-brand (35px + its padding)
+$navbar-height: 57px;
+
 html,
 body {
 	font-size: 14px;
@@ -122,12 +125,14 @@ li {
 		overflow-y: hidden;
 	}
 
+	// The scroll container starts below the fixed navbar, so its scrollbar is not hidden behind it (#1518)
 	.main-content {
-		padding-top: 80px;
+		margin-top: $navbar-height;
+		padding-top: 80px - $navbar-height;
 		margin-left: 170px;
 		overflow: auto;
 		max-width: calc(100vw);
-		height: calc(100vh);
+		height: calc(100vh - #{$navbar-height});
 	}
 
 	.nav-side-bar {

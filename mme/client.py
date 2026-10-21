@@ -58,7 +58,7 @@ class MMEClient:
 
 def submit(submission) -> None:
     """ Build profile, POST, persist results. Notifies admins on failure
-        (mirrors the Alissa upload failure-reporting pattern, no sync dep). """
+        (mirrors the sync upload failure-reporting pattern, no sync dep). """
     try:
         # Re-asserts eligibility - the record may have been downgraded, withdrawn or
         # unshared between the curator clicking submit and this worker running.

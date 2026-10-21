@@ -13,6 +13,7 @@ const VariantGridFormat = (function() {
     VariantGridFormat.prototype = {};
     return VariantGridFormat;
 })();
+window.VariantGridFormat = VariantGridFormat;  // @see resolveFunctionName in datatable_definition.js
 
 
 // Filter children and variant selection only exist inside the analysis editor, and analysis-wide
@@ -61,6 +62,30 @@ VariantGridFormat.separated = (value, type, rowData, ctx) => {
         return '';
     }
     return escapeHtml(splitValues(value, _separator(ctx)).join(VALUE_JOIN));
+};
+
+// A ';' joined list of terms each qualified in brackets, the dbNSFP gene way: "BARD1[0.9];BARD1[NA]"
+// (ConsensusPathDB interactors and their confidence), "KLK5[26186194;28514442]" (BioGRID interactors
+// and PubMed IDs), "Urate levels[25811787]" (GWAS traits). The same term recurs under different
+// qualifiers, so the distinct terms in first-seen order are what the cell reads as
+function splitBracketedTerms(rawValue) {
+    const terms = [];
+    const seen = new Set();
+    for (const match of String(rawValue).matchAll(/([^;[]+)(?:\[[^\]]*\])?/g)) {
+        const term = match[1].trim();
+        if (term && !seen.has(term)) {
+            seen.add(term);
+            terms.push(term);
+        }
+    }
+    return terms;
+}
+
+VariantGridFormat.bracketedTerms = (value) => {
+    if (value == null || value === '') {
+        return '';
+    }
+    return escapeHtml(splitBracketedTerms(value).join(VALUE_JOIN));
 };
 
 // Keys are Classification.clinical_significance codes / somatic summary tiers - values give the box
@@ -271,7 +296,7 @@ function _compositeMemberHtml(member, value, type, rowData, ctx) {
     if (member.renderer) {
         // The member's own separator, not the composite's
         const memberCtx = {...ctx, kwargs: {...(ctx && ctx.kwargs), separator: member.separator}};
-        return eval(member.renderer)(value, type, rowData, memberCtx);
+        return resolveFunctionName(member.renderer)(value, type, rowData, memberCtx);
     }
     return escapeHtml(_memberText(member, value));
 }
@@ -1039,8 +1064,8 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
         const quickTags = aWin.variantQuickTags || [];
         for (let i=0 ; i<quickTags.length ; ++i) {
             const tag = quickTags[i];
-            tagHtml += `<a class='quick-tag' href='javascript:void(0)' variant_id='${variantId}' tag_id='${tag}' title='${escapeHtml(`Tag as ${tag}`)}'>`
-                     + `<span class='grid-tag tagged-${tag}'><span class='user-tag-colored quick-tag-button'></span></span></a>`;
+            tagHtml += `<a class='quick-tag' href='javascript:void(0)' variant_id='${variantId}' tag_id='${escapeHtml(tag)}' title='${escapeHtml(`Tag as ${tag}`)}'>`
+                     + `<span class='grid-tag tagged-${escapeHtml(tag)}'><span class='user-tag-colored quick-tag-button'></span></span></a>`;
         }
     }
 
@@ -1055,12 +1080,12 @@ VariantGridFormat.tags = (tagsCellValue, type, rowData) => {
             const tag = tagging.tag;
             const options = variantTaggingPillOptions(tagging, sampleNames, readOnly);
             options.variantTagId = tagging.id;
-            options.tagLabel = tag;
+            options.tagLabel = escapeHtml(tag);
             // A to-do tag a classification has satisfied stays on the row (it's how it gets untagged)
             // but reads as done
             if (tagging.resolved) {
                 options.extraClasses = ["grid-tag-resolved"];
-                options.tagLabel = `${tag} <i class='fas fa-check'></i>`;
+                options.tagLabel = `${escapeHtml(tag)} <i class='fas fa-check'></i>`;
                 options.title += ` - classified ${tagging.resolved}`;
             }
             tagHtml += getVariantTagHtml(variantId, tag, readOnly, options);
@@ -1118,9 +1143,9 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
     for (let i=0 ; i<sortedKeys.length ; ++i) {
         const tag = sortedKeys[i];
         const stats = tagStats[tag];
-        let tagLabel = tag;
+        let tagLabel = escapeHtml(tag);
         if (stats.total > 1) {
-            tagLabel = `${tag} x ${stats.total}`;
+            tagLabel = `${escapeHtml(tag)} x ${stats.total}`;
         }
         let title;
         const extraClasses = [];
@@ -1130,7 +1155,7 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
                 tagLabel += " <i class='fas fa-clock'></i>";
                 title = `Tagged as ${tag} - no events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
             } else if (stats.total > 1) {
-                tagLabel = `${tag} x ${stats.total} (${stats.fresh} fresh)`;
+                tagLabel = `${escapeHtml(tag)} x ${stats.total} (${stats.fresh} fresh)`;
                 title = `${stats.fresh} of ${stats.total} tag events within the last ${staleDays} days, most recent ${stats.mostRecent}`;
             }
         }
@@ -1152,10 +1177,17 @@ VariantGridFormat.tagsGlobal = (value, type, rowData) => {
 };
 
 
+// An annotation value as a link out - the value is data, so it goes in as text and URL-encoded
+function _externalLink(url, text, title) {
+    return $('<a>', {href: url, text: text, title: title, target: '_blank'}).prop('outerHTML');
+}
+
+
 VariantGridFormat.clinvarLink = (clinvar_variation_id) => {
     let clinvar_string = '';
     if (clinvar_variation_id) {
-        clinvar_string = "<a title='View ClinVar entry in new window' target='_blank' href='http://www.ncbi.nlm.nih.gov/clinvar/variation/" + clinvar_variation_id + "'>" + clinvar_variation_id + "</a>";
+        clinvar_string = _externalLink("http://www.ncbi.nlm.nih.gov/clinvar/variation/" + encodeURIComponent(clinvar_variation_id),
+                                       clinvar_variation_id, 'View ClinVar entry in new window');
     }
     return clinvar_string;
 };
@@ -1173,10 +1205,14 @@ VariantGridFormat.cosmicLink = (cosmic_ids, type, rowData, ctx) => {
             let cosmic_id = cosmic_ids_list[i];
             if (cosmic_id.startsWith(COSMIC_PREFIX)) {
                 // #2637 - COSMIC switched to using COSV in 2019, I can't find a direct link but search works then you select transcript
-                cosmic_id = "<a title='View COSMIC entry in new window' target='_blank' href=' https://cancer.sanger.ac.uk/cosmic/search?q=" + cosmic_id + "'>" + cosmic_id + "</a>";
+                cosmic_id = _externalLink("https://cancer.sanger.ac.uk/cosmic/search?q=" + encodeURIComponent(cosmic_id),
+                                          cosmic_id, 'View COSMIC entry in new window');
             } else if (cosmic_id.startsWith(COSMIC_LEGACY_PREFIX)) {
                 const cosmic_id_int = cosmic_id.replace("COSM", "");
-                cosmic_id = "<a title='View COSMIC entry in new window' target='_blank' href='http://cancer.sanger.ac.uk/cosmic/mutation/overview?id=" + cosmic_id_int + "'>" + cosmic_id + "</a>";
+                cosmic_id = _externalLink("http://cancer.sanger.ac.uk/cosmic/mutation/overview?id=" + encodeURIComponent(cosmic_id_int),
+                                          cosmic_id, 'View COSMIC entry in new window');
+            } else {
+                cosmic_id = escapeHtml(cosmic_id);
             }
             cosmic_links.push(cosmic_id);
         }
@@ -1190,7 +1226,7 @@ VariantGridFormat.cosmicLink = (cosmic_ids, type, rowData, ctx) => {
 VariantGridFormat.omimLink = (omim_id) => {
     let omim_string = '';
     if (omim_id) {
-        omim_string = "<a title='View OMIM entry in new window' target='_blank' href='https://www.omim.org/entry/" + omim_id + "'>" + omim_id + "</a>";
+        omim_string = _externalLink("https://www.omim.org/entry/" + encodeURIComponent(omim_id), omim_id, 'View OMIM entry in new window');
     }
     return omim_string;
 };
@@ -1204,15 +1240,18 @@ function _geneSymbolLink(geneSymbolColumn, filterChildLink) {
         for(let i=0 ; i<geneSymbolList.length ; ++i) {
             const geneSymbol = geneSymbolList[i];
             let geneLinkString = '';
+            const geneLink = $('<a>', {target: '_blank', title: 'View gene in new window',
+                                       href: Urls.view_gene_symbol(encodeURIComponent(geneSymbol)), text: geneSymbol});
             if (filterChildLink) {
-                const filterGeneLink = "javascript:createFilterChild(\"gene_symbol\", \"" + geneSymbol + "\");";
                 // The gene list node's own badge glyph - the child this makes is a GeneListNode
-                geneLinkString = "<a class='grid-link' title='Gene list node for " + geneSymbol + "' href='" + filterGeneLink + "'>"
-                               + "<svg class='gene-list-node-icon' width='14' height='14' viewBox='0 0 18 20'><use href='#node-icon-gene-list'></use></svg></a>";
-                geneLinkString += " <a class='left' target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
+                geneLinkString = $('<a>', {class: 'grid-link create-filter-child', href: 'javascript:void(0)',
+                                           title: `Gene list node for ${geneSymbol}`,
+                                           'data-column-name': 'gene_symbol', 'data-column-filter': geneSymbol,
+                                           html: "<svg class='gene-list-node-icon' width='14' height='14' viewBox='0 0 18 20'><use href='#node-icon-gene-list'></use></svg>"}).prop('outerHTML');
+                geneLinkString += " " + geneLink.addClass('left').prop('outerHTML') + " ";
             } else {
                 // not left
-                geneLinkString += " <a target='_blank' title='View gene in new window' href='" + Urls.view_gene_symbol(geneSymbol) + "'>" + geneSymbol + "</a> ";
+                geneLinkString += " " + geneLink.prop('outerHTML') + " ";
             }
             geneSymbolLinks.push(geneLinkString);
         }
@@ -1257,7 +1296,7 @@ String.prototype.rsplit = function(sep, maxsplit) {
 
 VariantGridFormat.mavedbUrn = (mavedbUrn) => {
     const urls = mavedbUrnToUrls(mavedbUrn);
-    return Object.entries(urls).map(([key, value]) => `<a target="_blank" href="${value}">${key}</a>`).join(" ");
+    return Object.entries(urls).map(([key, value]) => $('<a>', {target: '_blank', href: value, text: key}).prop('outerHTML')).join(" ");
 };
 
 
@@ -1374,14 +1413,14 @@ VariantGridFormat.clinGenAlleleId = (cellValue) => {
     if (!cellValue) {
         return "";
     }
-    const url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${cellValue}`;
-    return `<a href="${url}" target="_blank">${cellValue}</a>`;
+    const url = `http://reg.clinicalgenome.org/redmine/projects/registry/genboree_registry/by_caid?caid=${encodeURIComponent(cellValue)}`;
+    return _externalLink(url, cellValue);
 };
 
 
 VariantGridFormat.dbsnp = (dbsnp_rs_ids, type, rowData, ctx) => {
     function buildDBSNPLink(dbsnp_id) {
-        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>";
+        return _externalLink("https://www.ncbi.nlm.nih.gov/snp/" + encodeURIComponent(dbsnp_id), dbsnp_id, 'View dbSNP in new window');
     }
     return splitAndLink(dbsnp_rs_ids, _separator(ctx), buildDBSNPLink);
 };
@@ -1389,7 +1428,7 @@ VariantGridFormat.dbsnp = (dbsnp_rs_ids, type, rowData, ctx) => {
 
 VariantGridFormat.pubMed = (pubmed, type, rowData, ctx) => {
     function buildPubMedLink(pubmed_id) {
-        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>";
+        return _externalLink("https://pubmed.ncbi.nlm.nih.gov/" + encodeURIComponent(pubmed_id), pubmed_id, 'View PubMed article in new window');
     }
     return splitAndLink(pubmed, _separator(ctx), buildPubMedLink);
 };
@@ -1398,8 +1437,8 @@ VariantGridFormat.pubMed = (pubmed, type, rowData, ctx) => {
 VariantGridFormat.ontologyTerms = (ontology_terms) => {
     function buildOntologyTermLink(ontology_term) {
         const termSlug = ontology_term.split(" ")[0].replace(":", "_");
-        const url = Urls.ontology_term(termSlug);
-        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>";
+        const url = Urls.ontology_term(encodeURIComponent(termSlug));
+        return _externalLink(url, ontology_term, 'View Ontology Term in new window');
     }
     return splitAndLink(ontology_terms, " | ", buildOntologyTermLink);
 };
@@ -1407,7 +1446,7 @@ VariantGridFormat.ontologyTerms = (ontology_terms) => {
 
 VariantGridFormat.masterMind = (value, type, rowData, ctx) => {
     function buildMasterMindLink(mmid3) {
-        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>";
+        return _externalLink("https://mastermind.genomenon.com/detail?mutation=" + encodeURIComponent(mmid3), mmid3, 'View MasterMind in new window');
     }
     return splitAndLink(value, _separator(ctx), buildMasterMindLink);
 };

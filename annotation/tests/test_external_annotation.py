@@ -12,6 +12,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.external_annotation import (
     ANNOTATED_VCF_SUFFIX,
     DUMP_METADATA_SCHEMA_VERSION,
@@ -36,8 +37,7 @@ from annotation.fake_data import (
     get_fake_annotation_version,
 )
 from annotation.models import AnnotationRangeLock, AnnotationRun
-from annotation.models.models import VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.tasks.annotate_variants import annotate_variants
 from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant
@@ -131,7 +131,7 @@ class ExternalAnnotationMetadataTests(TestCase):
     def test_parse_dump_metadata_rejects_bad_schema(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             bad_filename = os.path.join(tmp_dir, "bad.meta.json")
-            with open(bad_filename, "w") as f:
+            with open(bad_filename, "w", encoding="utf-8") as f:
                 json.dump({"schema": 999}, f)
             with self.assertRaises(ValueError):
                 parse_dump_metadata(bad_filename)
@@ -405,7 +405,7 @@ class ExternalAnnotationSnakemakeTests(TestCase):
             self.assertTrue(os.path.exists(snakefile_path))
             self.assertTrue(os.path.exists(config_path))
 
-            with open(snakefile_path) as f:
+            with open(snakefile_path, encoding="utf-8") as f:
                 snakefile = f.read()
             self.assertIn('configfile: "config.yaml"', snakefile)
             self.assertIn("rule vep:", snakefile)
@@ -415,7 +415,7 @@ class ExternalAnnotationSnakemakeTests(TestCase):
             self.assertIn("{input}", snakefile)
             self.assertIn("{output}", snakefile)
 
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 config_yaml = f.read()
             for key in ("dump_dir", "output_dir", "annotation_base_dir", "vep_code_dir",
                         "vep_fork", "vep_buffer_size"):
@@ -461,7 +461,7 @@ class ExternalAnnotationImportTests(TestCase):
             meta_path = annotation_run.get_dump_metadata_filename(dump_dir=output_dir)
             stem = os.path.basename(meta_path)[:-len(".meta.json")]
             annotated = os.path.join(output_dir, stem + ANNOTATED_VCF_SUFFIX)
-            with open(annotated, "w") as f:
+            with open(annotated, "w", encoding="utf-8") as f:
                 f.write("##fileformat=VCFv4.1\n")
         return annotation_runs
 

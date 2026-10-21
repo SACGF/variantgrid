@@ -86,12 +86,19 @@ class FileUploadColumns(DatatableConfig[FileUpload]):
             qs = qs.filter(user=self.user)
         return qs
 
-    def filter_queryset(self, qs: QuerySet[FileUpload]) -> QuerySet[FileUpload]:
-        file_type = self.get_query_param("file_type")
+    @classmethod
+    def filter_file_type(cls, qs: QuerySet[FileUpload], file_type: Optional[str]) -> QuerySet[FileUpload]:
+        """ The page's file type select - also what its "Retry failed" button retries """
         if not file_type:
-            qs = qs.exclude(file_type__in=self.INTERNAL_FILE_TYPES)
-        elif file_type != self.ALL_FILE_TYPES:
+            qs = qs.exclude(file_type__in=cls.INTERNAL_FILE_TYPES)
+        elif file_type != cls.ALL_FILE_TYPES:
             qs = qs.filter(file_type=file_type)
+        return qs
+
+    def filter_queryset(self, qs: QuerySet[FileUpload]) -> QuerySet[FileUpload]:
+        qs = self.filter_file_type(qs, self.get_query_param("file_type"))
+        if status := self.get_query_param("status"):
+            qs = qs.filter(uploadpipeline__status=status)
         return qs
 
     def pre_render(self, qs: QuerySet[FileUpload], rows: list[dict]):
@@ -176,8 +183,7 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.scroll_x = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('upload_step_detail',
-                                                                       expected_height=120)
+        self.set_expand_ajax('upload_step_detail', expected_height=120)
         self.rich_columns = [
             RichColumn(key='sort_order', orderable=True),
             RichColumn(key='id', orderable=True),

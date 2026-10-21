@@ -35,7 +35,7 @@ def _parse_fixture(filename):
         CSQ record per variant and pulls out every *_max conservation field. """
     csq_format = None
     expected = {}
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         for line in f:
             if line.startswith("##INFO=<ID=CSQ"):
                 csq_format = re.search(r'Format: ([^"]+)', line).group(1).split("|")

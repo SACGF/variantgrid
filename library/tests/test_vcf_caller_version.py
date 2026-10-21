@@ -12,7 +12,7 @@ class TestVCFCallerAndVersion(TestCase):
     def _caller_and_version(self, *meta_lines):
         with tempfile.TemporaryDirectory() as tmp_dir:
             filename = os.path.join(tmp_dir, "test.vcf")
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 f.write("##fileformat=VCFv4.2\n")
                 f.writelines(line + "\n" for line in meta_lines)
                 f.write(COLUMN_HEADER)

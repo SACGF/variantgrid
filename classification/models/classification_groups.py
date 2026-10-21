@@ -8,7 +8,6 @@ from django.contrib.auth.models import User
 from more_itertools import first
 from typing_extensions import deprecated
 
-from classification.criteria_strengths import CriteriaStrength
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     ClassificationModification,
@@ -18,9 +17,10 @@ from classification.models import (
     ImportedAlleleInfo,
     classification_flag_types,
 )
+from classification.models.criteria_strengths import CriteriaStrength
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
-from genes.hgvs import PHGVS, HGVSDisplay
+from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
@@ -83,8 +83,8 @@ class ClassificationGroupEntry:
         return self.modification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @cached_property
-    def c_hgvs(self):
-        return ClassificationGroup.c_hgvs_for(self.modification, self.genome_build)
+    def hgvs(self):
+        return ClassificationGroup.hgvs_for(self.modification, self.genome_build)
 
     @property
     def condition_sorter(self) -> Optional[str]:
@@ -104,7 +104,7 @@ class ClassificationGroupEntry:
             self.somatic_clin_sig or "",
             self.modification.classification.lab.organization.name or "",
             self.modification.classification.lab.name or "",
-            self.c_hgvs,
+            self.hgvs,
             self.condition_sorter or ""
         )
 
@@ -313,9 +313,10 @@ class ClassificationGroup:
                 return cc.is_discordant
 
     @staticmethod
-    def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
+    def hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> HGVSDisplay:
         if c_str := cm.classification.get_resolved_hgvs(genome_build):
-            return HGVSDisplay.parse(c_str, genome_build=genome_build, is_normalised=True)
+            return HGVSDisplay.parse(dna_hgvs=c_str, genome_build=genome_build, is_normalised=True,
+                                     p_hgvs=cm.classification.get_resolved_p_hgvs(genome_build))
         if (allele_info := cm.classification.allele_info) and \
                 (matched := allele_info.matched_without_resolved_hgvs_display(genome_build)):
             return matched
@@ -328,15 +329,15 @@ class ClassificationGroup:
         except ValueError:
             pass
         imported_hgvs = cm.classification.get(SpecialEKeys.C_HGVS) or cm.classification.get(SpecialEKeys.G_HGVS)
-        return HGVSDisplay.parse(imported_hgvs or "", genome_build=imported_genome_build,
+        return HGVSDisplay.parse(dna_hgvs=imported_hgvs or "", genome_build=imported_genome_build,
                                  is_normalised=False, is_desired_build=is_desired_build)
 
     @cached_property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        unique_c = set()
+    def hgvses(self) -> list[HGVSDisplay]:
+        unique_hgvs = set()
         for ge in self.group_entries:
-            unique_c.add(ge.c_hgvs)
-        return sorted(unique_c)
+            unique_hgvs.add(ge.hgvs)
+        return sorted(unique_hgvs)
 
     @cached_property
     def variant_sort(self) -> str:
@@ -347,11 +348,11 @@ class ClassificationGroup:
                     if genomic_sort := variant_info.genomic_sort:
                         return prefix + genomic_sort
 
-        return prefix + self.c_hgvs.sort_str
+        return prefix + self.hgvs.sort_str
 
     @property
-    def c_hgvs(self) -> HGVSDisplay:
-        return self.c_hgvses[0]
+    def hgvs(self) -> HGVSDisplay:
+        return self.hgvses[0]
 
     @property
     def has_matching_error(self) -> bool:
@@ -361,15 +362,6 @@ class ClassificationGroup:
     @cached_property
     def variant_matching_issues(self) -> bool:
         return not self.most_recent.classification.allele_info.latest_validation.include
-
-    def p_hgvses(self) -> list[PHGVS]:
-        unique_p = set()
-        for cm in self.modifications:
-            if p_hgvs := cm.p_parts:
-                unique_p.add(p_hgvs.without_transcript)
-        p_list = list(unique_p)
-        p_list.sort()
-        return p_list
 
     def count(self) -> int:
         return len(self.modifications)

@@ -11,6 +11,7 @@
 {% load humanize %}
 {% load model_tags %}
 {% load ui_utils %}
+{% load import_status_tags %}
 
 {% block title %}{{ sample.name }}{% endblock %}
 {% block head %}
@@ -226,6 +227,7 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
+                {% labelled label="Import Status" %}{% import_status_icon sample.import_status %}{% endlabelled %}
                 {% labelled row_id="patient-phenotype-row" row_css="d-none" label="Patient Phenotype" %}
                     <div id="patient-phenotype-terms"></div>
                     <div id="patient-phenotype-text" class="text-muted"></div>

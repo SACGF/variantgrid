@@ -1,6 +1,10 @@
 table.diff {
     background-color:white;
     width: inherit;
+    // the copied-only toggle: fields a copy from a previous classification would not write
+    &.copied-only tbody tr.not-copied {
+        display: none;
+    }
     th, td {
         padding: 4px 6px 4px 6px;
     }

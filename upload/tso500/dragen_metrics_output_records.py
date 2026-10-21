@@ -128,6 +128,7 @@ def write_library_qc(libraries: list[LibraryQCMetrics], user: User, sequencing_r
             specimen_reference_from_sequencing_samples([ss for ss in arm_samples.values() if ss]) or \
             specimen_reference_from_run(sequencing_run, library.pair_id)
         parked_error = None
+        resolved = None
         if reference_id is None:
             parked_error = (f"'{library.pair_id}' carries no lab accession, and nothing on "
                             f"sequencing run '{sequencing_run_name}' is named for it")

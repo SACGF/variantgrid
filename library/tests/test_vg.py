@@ -215,6 +215,7 @@ class HealthTest(SimpleTestCase):
                   "Your code has been rated at 9.91/10 (previous run: 9.91/10, -0.00)\n")
         lint = lint_health(self._temp_file(report, ".txt"))
         self.assertEqual((lint.messages, lint.by_type, lint.score), (3, {"W": 2, "E": 1}, "9.91"))
+        self.assertEqual(lint.errors, ["snpdb/models.py:40:0: E1101: Instance has no member (no-member)"])
 
 
 class DeprecationsTest(SimpleTestCase):

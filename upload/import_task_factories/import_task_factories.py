@@ -3,6 +3,7 @@ import json
 
 import pandas as pd
 from django.conf import settings
+from pandas.errors import EmptyDataError
 
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.utils import full_class_name, import_class
@@ -88,6 +89,14 @@ from upload.tasks.vcf.import_vcf_tasks import (
     ProcessVCFSetMaxVariantTask,
 )
 from upload.upload_metadata import SEQUENCING_RUN, VCF_METADATA_KEYS
+
+
+def _csv_header_columns(filename) -> list[str]:
+    """ Column names from a CSV's header row, [] for an empty file (pandas raises rather than returning no columns) """
+    try:
+        return list(pd.read_csv(filename, nrows=1).columns)
+    except EmptyDataError:
+        return []
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -662,8 +671,8 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         old_tag_columns = ["variant_string", "view_genome_build", "tag__id"]
         new_tag_columns = ["Variant", "Genome Build", "Tag"]
 
-        df = pd.read_csv(filename, nrows=1)  # Just need header
-        if self._has_all_columns(df.columns, old_tag_columns) or self._has_all_columns(df.columns, new_tag_columns):
+        columns = _csv_header_columns(filename)
+        if self._has_all_columns(columns, old_tag_columns) or self._has_all_columns(columns, new_tag_columns):
             return 1000
         return 0
 
@@ -708,10 +717,10 @@ class GeneWikiCollectionImportTaskFactory(ImportTaskFactory):
         return [UploadedWikiCollection]
 
     def get_processing_ability(self, user, filename, file_extension):
-        df = pd.read_csv(filename, nrows=1)  # Just need header
+        columns = _csv_header_columns(filename)
         REQUIRED_COLUMNS = ["Gene Symbol", "Markdown", "User", "Created", "Modified"]
         for c in REQUIRED_COLUMNS:
-            if c not in df.columns:
+            if c not in columns:
                 return 0
         return 1000
 
@@ -733,10 +742,10 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
         return [UploadedWikiCollection, UploadedVCF]
 
     def get_processing_ability(self, user, filename, file_extension):
-        df = pd.read_csv(filename, nrows=1)  # Just need header
+        columns = _csv_header_columns(filename)
         REQUIRED_COLUMNS = ["Variant", "Genome Build", "Markdown", "User", "Created", "Modified"]
         for c in REQUIRED_COLUMNS:
-            if c not in df.columns:
+            if c not in columns:
                 return 0
         return 1000
 

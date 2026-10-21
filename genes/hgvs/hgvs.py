@@ -1,9 +1,13 @@
 import enum
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, Self, Union, Iterable
+
+from django.conf import settings
+
+from genes.hgvs.phgvs_canonical import short_p_hgvs
 from genes.transcript_parts import TranscriptParts, get_transcript_id_and_version
 from genes.transcripts_utils import clean_transcript_accession
 from snpdb.models.models_genome import GenomeBuild
@@ -212,92 +216,109 @@ class HGVSComponents:
         return f"HGVSComponents({self.full_hgvs!r})"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class HGVSDisplay:
     """
-    HGVSComponents plus the view state needed to render it - which build it came from, whether it's the build the
-    user asked for, and whether it's our normalised representation or exactly what the lab submitted.
+    A DNA-level HGVS and its resolved p.HGVS, plus the view state needed to render it - which build it came from,
+    whether it's the build the user asked for, and whether it's our normalised representation or exactly what the lab
+    submitted.
+    dna_hgvs: the HGVS against a DNA reference sequence - c. (coding DNA) or n. (non-coding DNA) against a transcript,
+    g. (genomic) or m. (mitochondrial) against a contig - as opposed to p. (protein).
+    See https://hgvs-nomenclature.org/stable/background/refseq/
     is_resolved_without_hgvs: matched a variant on genome_build, but we have no HGVS for it (gene-level event, or
     generating the HGVS failed) so this is the imported value
+    p_hgvs: the canonical p.HGVS resolved for dna_hgvs (ResolvedVariantInfo.p_hgvs), only set for resolved HGVS.
+    It follows from dna_hgvs so it takes no part in equality or sorting
     """
-    components: HGVSComponents
+    dna_hgvs: HGVSComponents
     genome_build: Optional[GenomeBuild] = None
     is_normalised: Optional[bool] = None
     is_desired_build: Optional[bool] = None
     is_resolved_without_hgvs: bool = False
+    p_hgvs: Optional[str] = field(default=None, compare=False)
 
     @staticmethod
-    def parse(full_hgvs: str, transcript: str = None, genome_build: Optional[GenomeBuild] = None,
+    def parse(*, dna_hgvs: str, transcript: str = None, genome_build: Optional[GenomeBuild] = None,
               is_normalised: Optional[bool] = None, is_desired_build: Optional[bool] = None,
-              is_resolved_without_hgvs: bool = False) -> 'HGVSDisplay':
-        return HGVSDisplay(HGVSComponents(full_hgvs, transcript), genome_build=genome_build,
+              is_resolved_without_hgvs: bool = False, p_hgvs: Optional[str] = None) -> 'HGVSDisplay':
+        return HGVSDisplay(dna_hgvs=HGVSComponents(dna_hgvs, transcript), p_hgvs=p_hgvs, genome_build=genome_build,
                            is_normalised=is_normalised, is_desired_build=is_desired_build,
                            is_resolved_without_hgvs=is_resolved_without_hgvs)
 
     @property
-    def full_hgvs(self) -> str:
-        return self.components.full_hgvs
+    def full_dna_hgvs(self) -> str:
+        return self.dna_hgvs.full_hgvs
 
     @property
     def transcript(self) -> Optional[str]:
-        return self.components.transcript
+        return self.dna_hgvs.transcript
 
     @property
     def gene_symbol(self) -> Optional[str]:
-        return self.components.gene_symbol
+        return self.dna_hgvs.gene_symbol
 
     @property
-    def nomen(self) -> Optional[str]:
-        return self.components.nomen
+    def dna_nomen(self) -> Optional[str]:
+        return self.dna_hgvs.nomen
+
+    @property
+    def p_hgvs_short(self) -> Optional[str]:
+        """ p.(G12D) - for a compact cell, with p_hgvs as its tooltip """
+        return short_p_hgvs(self.p_hgvs)
 
     def to_json(self):
-        """ The shape VCTable.format_hgvs in vc_form.js consumes """
+        """ The shape VCTable.format_hgvs in classification/vc_table.js consumes """
         return {
             "transcript": self.transcript,
             "gene_symbol": self.gene_symbol,
-            "c_nomen": self.nomen,
-            "full": self.full_hgvs,
+            "c_nomen": self.dna_nomen,
+            "full": self.full_dna_hgvs,
             "genome_build": self.genome_build.pk if self.genome_build else None,
             "desired": self.is_desired_build,
             "normalized": self.is_normalised,
             "resolved_without_hgvs": self.is_resolved_without_hgvs,
-        }
+        } | self.p_hgvs_json()
+
+    def p_hgvs_json(self) -> dict:
+        if not (self.p_hgvs and settings.CLASSIFICATION_GRID_SHOW_PHGVS):
+            return {}
+        return {"p_hgvs": self.p_hgvs_short, "p_hgvs_full": self.p_hgvs}
 
     @cached_property
     def sort_str(self) -> str:
         """ Normalised records sort ahead of imported ones, then by the HGVS itself.
             Callers that put this in a data-order attribute get exactly this string """
         normalised_prefix = "A" if self.is_normalised else "Z"
-        return normalised_prefix + self.components.sort_str
+        return normalised_prefix + self.dna_hgvs.sort_str
 
     @property
     def sort_key(self) -> tuple[str, str, str]:
         """ The build breaks ties only between otherwise identical HGVS - appending it to sort_str
             instead would let a longer key win wherever a shorter one is a prefix of it """
-        return self.sort_str, self.genome_build.pk if self.genome_build else "", self.full_hgvs
+        return self.sort_str, self.genome_build.pk if self.genome_build else "", self.full_dna_hgvs
 
     def diff(self, other: Union[Self, HGVSComponents]) -> HGVSDiff:
         if isinstance(other, HGVSDisplay):
-            other = other.components
-        return self.components.diff(other)
+            other = other.dna_hgvs
+        return self.dna_hgvs.diff(other)
 
     def __lt__(self, other):
         return self.sort_key < other.sort_key
 
     def __str__(self):
-        return self.full_hgvs
+        return self.full_dna_hgvs
 
     @staticmethod
     def select_distinct(hgvs_displays: Iterable['HGVSDisplay']) -> list['HGVSDisplay']:
-        # only return one CHGVS Display per c.HGVS where they only differ in transcript versions
+        # only return one HGVSDisplay per DNA HGVS where they only differ in transcript versions
         transcript_versions: dict[HGVSComponents, list[HGVSDisplay]] = defaultdict(list)
-        for c_hgvs_display in hgvs_displays:
+        for hgvs_display in hgvs_displays:
             transcript_versions[
-                c_hgvs_display.components.without_transcript_version.without_explicit_del_or_dup_nucleotides
-            ].append(c_hgvs_display)
+                hgvs_display.dna_hgvs.without_transcript_version.without_explicit_del_or_dup_nucleotides
+            ].append(hgvs_display)
 
         max_versions: list[HGVSDisplay] = []
         for versions in transcript_versions.values():
-            max_version = max(versions, key=lambda hgvs: hgvs.components.transcript_parts.version or 0)
+            max_version = max(versions, key=lambda hgvs: hgvs.dna_hgvs.transcript_parts.version or 0)
             max_versions.append(max_version)
         return list(sorted(max_versions))

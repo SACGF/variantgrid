@@ -28,7 +28,6 @@ from django.db.models import QuerySet
 from django.db.models.lookups import In
 from django.db.models.sql.where import NothingNode
 from django.db.models.enums import TextChoices, IntegerChoices
-from django_json_widget.widgets import JSONEditorWidget
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
@@ -312,7 +311,7 @@ def postgres_arrays(array):
 T1 = TypeVar('T1', bound=DataClassJsonMixin)
 
 
-class JSONDataclassField(models.JSONField, Generic[T1]):
+class JSONDataclassField(models.JSONField, Generic[T1]):  # pylint: disable=inconsistent-mro
     """
     DO NOT USE - doesn't work well with auditlog which double encodes, likely a problem with serialize as well
     """
@@ -363,16 +362,6 @@ class JSONDataclassField(models.JSONField, Generic[T1]):
         if isinstance(fallback_value, dict):
             fallback_value = self.dataclass_type.from_dict(fallback_value)
         return fallback_value
-
-    # def from_db_value(self, value, expression, connection) -> Optional[T1]:
-    #     if json_obj := super().from_db_value(value, expression, connection):
-    #         try:
-    #             return self.dataclass_type.from_dict(json_obj)
-    #         except Exception as ex:
-    #             # TODO raise warning
-    #             print(f"Found illegal value in database {value.__class__} \"{value}\"")
-    #             self.get_fallback_value()
-    #     return None
 
     def from_db_value(self, value, expression, connection):
         """Converts database JSON string/object to a dataclass instance."""
@@ -440,28 +429,8 @@ class TextFieldChoices(ChoicesMixin[T2], models.TextField):
     pass
 
 
-T3 = TypeVar('T3', bound=TextChoices)
-
-
-class CharFieldChoices(ChoicesMixin[T3], models.CharField):
-    pass
-
-
 T4 = TypeVar('T4', bound=IntegerChoices)
 
 
 class IntegerFieldChoices(ChoicesMixin[T4], models.IntegerField):
     pass
-
-
-class JSONDataClassAdminWidget(JSONEditorWidget):
-
-    def format_value(self, value):
-        if not isinstance(value, (dict, list)):
-            value = json.loads(value)
-            if isinstance(value, str):
-                # TODO, why would these values be double escaped anyway?
-                value = json.loads(value)
-            return value
-        else:
-            return value

@@ -2,6 +2,7 @@ import gzip
 import json
 import logging
 import os
+import uuid
 import zipfile
 from collections import defaultdict
 from datetime import timedelta
@@ -16,8 +17,9 @@ from django.utils import timezone
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import get_node_export_basename, node_grid_get_export_iterator
 from analysis.models import AnalysisTemplate, CohortNode, NodeStatus, SampleNode, VariantTag
-from analysis.models.nodes.analysis_node import node_query_planner_settings
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
+from annotation.models import AnnotationVersion
 from genes.models import CanonicalTranscriptCollection
 from library.constants import MINUTE_SECS
 from library.django_utils import FakeRequest
@@ -35,24 +37,26 @@ NODE_WAIT_TIME_BETWEEN_CHECKS = [5, 5, 10, 10, 30, 30, 60, MINUTE_SECS * 2]
 NODE_EXPORT_GENERATOR = "export_node_to_downloadable_file"
 
 
-def _get_usable_cgf(generator, pk, export_type) -> Optional[CachedGeneratedFile]:
+def _get_usable_cgf(generator, pk, export_type, annotation_version) -> Optional[CachedGeneratedFile]:
     """ A cached file that needs regenerating is no better than never having generated it - return None so
         the page offers the generate link, and get_or_create_and_launch drops the row when they click.
         A failed row is returned so the page shows the failure rather than a link that would fail again """
-    params_hash = get_grid_downloadable_file_params_hash(pk, export_type)
+    params_hash = get_grid_downloadable_file_params_hash(pk, export_type, annotation_version.pk)
     cgf = CachedGeneratedFile.objects.filter(generator=generator, params_hash=params_hash).first()
     if cgf and cgf.needs_regenerating:
         cgf = None
     return cgf
 
 
-def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[CachedGeneratedFile]]:
+def get_annotated_download_files_cgf(generator, obj: Sample | Cohort) -> dict[str, Optional[CachedGeneratedFile]]:
+    """ export type -> the file against the build's current annotation, where one has been generated """
     annotated_download_files = {}
     try:
         AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
+        annotation_version = get_export_annotation_version(obj)
         annotated_download_files = {
-            "vcf": _get_usable_cgf(generator, pk, "vcf"),
-            "csv": _get_usable_cgf(generator, pk, "csv"),
+            "vcf": _get_usable_cgf(generator, obj.pk, "vcf", annotation_version),
+            "csv": _get_usable_cgf(generator, obj.pk, "csv", annotation_version),
         }
     except ValueError:
         pass
@@ -60,8 +64,29 @@ def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[Cached
     return annotated_download_files
 
 
-def get_grid_downloadable_file_params_hash(pk, export_type):
-    return sha256sum_str(f"{pk}-{export_type}")
+def get_export_annotation_version(obj: Sample | Cohort) -> AnnotationVersion:
+    """ The annotation a sample/cohort export is generated against - the build's latest, validated when
+        the export's analysis is created rather than here, so a page offering the download never breaks """
+    annotation_version = AnnotationVersion.latest(obj.genome_build, validate=False)
+    if annotation_version is None:
+        raise ValueError(f"{obj.genome_build} has no active annotation version")
+    return annotation_version
+
+
+def get_grid_downloadable_file_params_hash(pk, export_type, annotation_version_id) -> str:
+    """ The annotation version is part of the key so the first request after an annotation upgrade
+        generates a new file against it (#2209) """
+    return sha256sum_str(f"{pk}-{export_type}-av{annotation_version_id}")
+
+
+def _delete_superseded_exports(generator, pk, export_type, annotation_version: AnnotationVersion):
+    """ The exports of this sample/cohort against the build's earlier annotation versions - the page only
+        offers the current one, so they would sit in GENERATED_DIR for ever (the pre_delete signal unlinks
+        each file) """
+    superseded_ids = AnnotationVersion.objects.filter(genome_build=annotation_version.genome_build) \
+                                              .exclude(pk=annotation_version.pk).values_list("pk", flat=True)
+    superseded_hashes = [get_grid_downloadable_file_params_hash(pk, export_type, av_id) for av_id in superseded_ids]
+    CachedGeneratedFile.objects.filter(generator=generator, params_hash__in=superseded_hashes).delete()
 
 
 def get_node_grid_downloadable_file_params_hash(node_id, node_version, user_id, export_type,
@@ -109,9 +134,20 @@ def _get_annotated_basename(analysis, name: str) -> str:
                      str(analysis.genome_build)])
 
 
-def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, zip_csv=True, **export_kwargs):
-    """ zip_csv: whole cohort/sample exports run to millions of rows so are zipped; a node export is what the
-        user filtered the grid down to, and they open it straight away, so it stays a plain .csv """
+def get_zipped_csv_filename(cgf: CachedGeneratedFile) -> str:
+    """ The CSV export zipped beside it, built on first request. Pages serve the plain CSV via /media/ (nginx
+        gzips it on the wire), but the API's FileResponse is uncompressed, so API clients get the zip by default
+        (#2368). Written under a temp name then renamed, so a concurrent request never serves a partial zip """
+    zip_filename = cgf.filename + ".zip"
+    if not os.path.exists(zip_filename):
+        partial_filename = f"{zip_filename}.{uuid.uuid4()}.partial"
+        with zipfile.ZipFile(partial_filename, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(cgf.filename, arcname=os.path.basename(cgf.filename))
+        os.replace(partial_filename, zip_filename)
+    return zip_filename
+
+
+def _write_node_to_cached_generated_file(cgf, request, node, basename, export_type, **export_kwargs):
     total_records = node.count
     update_size = max(1000, total_records / 100)  # 1% or every 1k records
 
@@ -133,22 +169,15 @@ def _write_node_to_cached_generated_file(cgf, request, node, basename, export_ty
             for chunk in file_iterator:
                 f.write(chunk)  # Already has newline
 
-        if export_type == 'csv' and zip_csv:
-            original_filename = media_root_filename
-            zip_file_path = media_root_filename + ".zip"
-            with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-                zipf.write(original_filename, arcname=os.path.basename(original_filename))
-            os.unlink(original_filename)
-            media_root_filename = zip_file_path
         cgf.filename = media_root_filename
         cgf.task_status = "SUCCESS"
         cgf.progress = 1  # row_wrapper updated the DB directly, so our copy is still at its starting value
         cgf.generate_end = timezone.now()
-        logging.info("Wrote %s", media_root_filename)  # lgtm[py/clear-text-logging-sensitive-data]
+        logging.info("Wrote %s", media_root_filename)
     except Exception as e:
         # The row stays failed until the cause is fixed (@see CachedGeneratedFile.needs_regenerating), so
         # admins hear about it now rather than from the user
-        logging.error("Failed to write %s: %s", media_root_filename, e)  # lgtm[py/clear-text-logging-sensitive-data]
+        logging.error("Failed to write %s: %s", media_root_filename, e)
         report_exc_info()
         cgf.exception = str(e)
         cgf.task_status = "FAILURE"
@@ -175,44 +204,47 @@ def _wait_for_output_node(self, node):
         raise ValueError(f"Node {node}/{node.version} - {node.status} count is None")
     return node
 
-@celery.shared_task(bind=True)
-def export_cohort_to_downloadable_file(self, cohort_id, export_type):
-    try:
-        params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
-        cgf = _get_cgf_for_task(self, "export_cohort_to_downloadable_file", params_hash)
-        if cgf is None:
-            return
+def _export_source_to_cached_generated_file(task, generator, obj: Sample | Cohort, export_type,
+                                            annotation_version_id, template_setting_name, get_analysis, node_klass):
+    """ The annotated sample/cohort export: the auto analysis' output node against the annotation version
+        the launch keyed the file on, with every column that version annotates (#2209).
+        get_analysis: get_sample_analysis / get_cohort_analysis, node_klass the output node's class """
+    params_hash = get_grid_downloadable_file_params_hash(obj.pk, export_type, annotation_version_id)
+    cgf = _get_cgf_for_task(task, generator, params_hash)
+    if cgf is None:
+        return
 
-        cohort = Cohort.objects.get(pk=cohort_id)
-        analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-        analysis = get_cohort_analysis(cohort, analysis_template)
-        node = CohortNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
-        node = _wait_for_output_node(self, node)
-        request = FakeRequest(user=admin_bot())
-        _write_node_to_cached_generated_file(cgf, request, node, _get_annotated_basename(analysis, cohort.name),
-                                             export_type)
+    analysis_template = AnalysisTemplate.get_template_from_setting(template_setting_name)
+    annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
+    analysis = get_analysis(obj, analysis_template, annotation_version=annotation_version)
+    node = node_klass.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
+    node = _wait_for_output_node(task, node)
+    request = FakeRequest(user=admin_bot())
+    _write_node_to_cached_generated_file(cgf, request, node, _get_annotated_basename(analysis, obj.name),
+                                         export_type, grid_kwargs={"all_columns": True})
+    if cgf.task_status == "SUCCESS":
+        _delete_superseded_exports(generator, obj.pk, export_type, annotation_version)
+
+
+@celery.shared_task(bind=True)
+def export_cohort_to_downloadable_file(self, cohort_id, export_type, annotation_version_id):
+    try:
+        _export_source_to_cached_generated_file(self, "export_cohort_to_downloadable_file",
+                                                Cohort.objects.get(pk=cohort_id), export_type, annotation_version_id,
+                                                "ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT", get_cohort_analysis, CohortNode)
     except Retry:
         raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:
         log_traceback()
         raise
 
-@celery.shared_task(bind=True)
-def export_sample_to_downloadable_file(self, sample_id, export_type):
-    try:
-        params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
-        cgf = _get_cgf_for_task(self, "export_sample_to_downloadable_file", params_hash)
-        if cgf is None:
-            return
 
-        sample = Sample.objects.get(pk=sample_id)
-        analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
-        analysis = get_sample_analysis(sample, analysis_template)
-        node = SampleNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
-        node = _wait_for_output_node(self, node)
-        request = FakeRequest(user=admin_bot())
-        _write_node_to_cached_generated_file(cgf, request, node, _get_annotated_basename(analysis, sample.name),
-                                             export_type)
+@celery.shared_task(bind=True)
+def export_sample_to_downloadable_file(self, sample_id, export_type, annotation_version_id):
+    try:
+        _export_source_to_cached_generated_file(self, "export_sample_to_downloadable_file",
+                                                Sample.objects.get(pk=sample_id), export_type, annotation_version_id,
+                                                "ANALYSIS_TEMPLATES_AUTO_SAMPLE", get_sample_analysis, SampleNode)
     except Retry:
         raise  # Output node not ready yet - export task re-queued, not an error
     except Exception:
@@ -256,7 +288,6 @@ def export_node_to_downloadable_file(self, node_id, node_version, user_id, expor
         request.GET = grid_params
         with node_query_planner_settings():
             _write_node_to_cached_generated_file(cgf, request, node, get_node_export_basename(node), export_type,
-                                                 zip_csv=False,
                                                  canonical_transcript_collection=canonical_transcript_collection,
                                                  variant_tags_dict=variant_tags_dict)
     except Retry:

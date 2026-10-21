@@ -3,11 +3,9 @@ from typing import Optional
 from rest_framework import serializers
 
 from annotation.models import AnnotationStatus
-from annotation.models.models import (
-    ManualVariantEntryCollection,
-    VariantAnnotation,
-    VariantAnnotationVersion,
-)
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
+from annotation.models.models_version import VariantAnnotationVersion
 from snpdb.serializers import TimestampField, VariantSerializer
 
 

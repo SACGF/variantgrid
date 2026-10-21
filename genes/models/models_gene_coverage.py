@@ -127,6 +127,7 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         genes_with_matched_canonical = set()
         unmatched_transcripts_by_gene = defaultdict(set)
 
+        gene_matcher.resolve_names(gene_coverage_df["original_gene_symbol"])
         for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["original_gene_symbol"]
             original_transcript = row["original_transcript"]
@@ -273,7 +274,7 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
 
     @staticmethod
     def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
-        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
+        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}

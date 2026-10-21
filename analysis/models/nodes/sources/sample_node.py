@@ -17,22 +17,21 @@ from django.db.models.lookups import (
 )
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import (
-    AnalysisNode,
-    NodeAlleleFrequencyFilter,
-    NodeAuditLogMixin,
-    NodeVCFFilter,
-)
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import (
     SampleMixin,
     get_sample_annotation_kwargs,
     get_samples_pk_q,
 )
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
 )
+from annotation.models.models import VariantTranscriptAnnotation
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
 from library.utils import remove_duplicates_from_list
@@ -364,7 +363,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             return {}
         if self.sample_gene_list:
             q_hash = f"gene_list_{self.sample_gene_list.gene_list_id}"
-            q = self.sample_gene_list.gene_list.get_q(self.analysis.annotation_version.variant_annotation_version)
+            vav = self.analysis.annotation_version.variant_annotation_version
+            genes_qs = self.sample_gene_list.gene_list.get_genes(vav.gene_annotation_release)
+            q = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, genes_qs)
         else:
             q = self.q_none()  # Safety - don't show anything if missing
             q_hash = str(q)

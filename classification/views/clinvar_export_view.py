@@ -29,13 +29,14 @@ from classification.models import (
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.utils.clinvar_matcher import (
     ClinVarLegacyExportMatchType,
     ClinVarLegacyMatches,
     ClinVarLegacyRow,
 )
 from classification.views.classification_dashboard_view import ClassificationDashboard
-from genes.hgvs import HGVSComponents
+from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.django_utils import (
     RequireSuperUserView,
     add_save_message,
@@ -53,7 +54,7 @@ from library.utils import (
 )
 from ontology.models import AncestorCalculator, OntologyTerm, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Allele, ClinVarKey, GenomeBuild, Lab
+from snpdb.models import Allele, GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -68,7 +69,7 @@ class ClinVarExportBatchColumns(DatatableConfig[ClinVarExportBatch]):
     def __init__(self, request):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
+        self.set_expand_ajax('clinvar_export_batch_detail', expected_height=120)
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, renderer=self.batch_id, client_renderer='batchId', default_sort=SortOrder.DESC, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
@@ -156,14 +157,11 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
     def batches(self, row: CellData) -> JsonDataType:
         return self.export_to_batches.get(row.get("id"))
 
-    def render_c_hgvs(self, row: CellData) -> JsonDataType:
+    def render_hgvs(self, row: CellData) -> JsonDataType:
         if row["classification_based_on__classification__allele_info__allele"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
-            c_hgvs_str: str
-            if "h37" in genome_build:
-                c_hgvs_str = row["classification_based_on__classification__allele_info__grch37__resolved_hgvs"]
-            else:
-                c_hgvs_str = row["classification_based_on__classification__allele_info__grch38__resolved_hgvs"]
+            build_prefix = "classification_based_on__classification__allele_info__" + ("grch37" if "h37" in genome_build else "grch38")
+            c_hgvs_str: str = row[f"{build_prefix}__resolved_hgvs"]
 
             data: dict[str, Any]
             c_hgvs = HGVSComponents(c_hgvs_str)
@@ -177,7 +175,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                     "always_show_genome_build": True
                     # below row makes this link to the variant, but probably not desired action
                     # "variantId": row["classification_based_on__classification__variant"]
-                }
+                } | HGVSDisplay(dna_hgvs=c_hgvs, p_hgvs=row[f"{build_prefix}__p_hgvs"]).p_hgvs_json()
             else:
                 data = {"full": c_hgvs_str}
 
@@ -199,7 +197,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         self.export_to_batches = {}
 
         self.search_box_enabled = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
+        self.set_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
             RichColumn("id",
                        label="ID",
@@ -218,8 +216,10 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                         "classification_based_on__published_evidence__genome_build__value",
                         "classification_based_on__classification__allele_info__grch37__resolved_hgvs",
                         "classification_based_on__classification__allele_info__grch38__resolved_hgvs",
+                        "classification_based_on__classification__allele_info__grch37__p_hgvs",
+                        "classification_based_on__classification__allele_info__grch38__p_hgvs",
                     ],
-                    renderer=self.render_c_hgvs, client_renderer='VCTable.hgvs',
+                    renderer=self.render_hgvs, client_renderer='VCTable.hgvs',
                     search=[
                         # "clinvar_allele__allele__clingen_allele__id",  # need a string
                         "classification_based_on__classification__allele_info__grch37__resolved_hgvs",
@@ -562,7 +562,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
     clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
 
-    labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
+    labs = clinvar_key.labs
     dashboard = ClassificationDashboard(LabPickerData.for_labs(labs, user=request.user))
 
     export_columns = ClinVarExportColumns(request)
@@ -702,3 +702,20 @@ def clinvar_match_detail(request, clinvar_key_id: str):
         'matches': matches,
         'action_required': action_required
     })
+
+
+def view_clinvar_key(request, pk: str):
+    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key.check_user_can_access(request.user)
+
+    return render(request, 'classification/clinvar_key.html', {
+        'clinvar_key': clinvar_key,
+        'labs': clinvar_key.labs,
+    })
+
+
+def lab_clinvar_key_tab(request, pk: int):
+    lab = get_object_or_404(Lab, pk=pk)
+    if clinvar_key := lab.classification_settings.clinvar_key:
+        return view_clinvar_key(request, clinvar_key.pk)
+    return HttpResponse("ClinVar is not configured for this lab. Contact a site administrator if you'd like to change that.")

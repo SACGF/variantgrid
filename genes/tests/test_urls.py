@@ -6,7 +6,6 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from annotation.fake_data import get_fake_annotation_version
-from annotation.models import CachedWebResource
 from genes.fake_data import create_fake_transcript_version
 from genes.models import (
     CanonicalTranscript,
@@ -25,6 +24,7 @@ from library.django_utils.unittest_utils import URLTestCase, prevent_request_war
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import DataState, ImportStatus
+from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -236,14 +236,6 @@ class Test(URLTestCase):
 # ('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_id>', views.gene_coverage_collection_graphs, name='gene_coverage_collection_graphs'),
 # ('qc_gene_list_coverage_graphs/<genome_build_name>/<int:gene_list_id>', views.qc_gene_list_coverage_graphs, name='qc_gene_list_coverage_graphs'),
 # ('gene_grid/<path:columns_from_url>', views.gene_grid, name='passed_gene_grid'),
-# ('hotspot_graph/gene/<genome_build_name>/<gene_id>',
-#               views.HotspotGraphView.as_view(), name='gene_hotspot_graph'),
-# ('hotspot_graph/transcript/<genome_build_name>/<transcript_id>',
-#               views.HotspotGraphView.as_view(), name='transcript_hotspot_graph'),
-# ('hotspot_graph/classifications/gene/<genome_build_name>/<gene_id>',
-#               views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_hotspot_graph'),
-# ('hotspot_graph/classifications/transcript/<genome_build_name>/<transcript_id>',
-#               views.ClassificationsHotspotGraphView.as_view(), name='classifications_transcript_hotspot_graph'),
 # ('hotspot_graph/cohort/<int:cohort_id>/<transcript_id>',
 #               views.CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
 # ('hotspot_graph/public', views.PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),

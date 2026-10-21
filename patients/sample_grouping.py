@@ -259,12 +259,7 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
         specimens and extractions has no hierarchy to draw, so the editor says so and shows the one
         row rather than inventing containers around it. """
     patient = get_patient_for_source(level, source)
-    tree = {
-        "selected": {"level": level, "id": source.pk, "label": str(source)} if source else None,
-        "patient": None,
-        "specimens": [],
-        "samples": [],
-    }
+    selected = {"level": level, "id": source.pk, "label": str(source)} if source else None
 
     # Everything the rows need, up front - this is per editor open, so a query per sample shows
     visible_samples = Sample.filter_for_user(user).select_related("vcf__cohort")
@@ -280,8 +275,8 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
     }
 
     if patient is None:
-        tree["samples"] = _tree_samples(samples, **row_kwargs)
-        return tree
+        return {"selected": selected, "patient": None, "specimens": [],
+                "samples": _tree_samples(samples, **row_kwargs)}
 
     by_extraction = defaultdict(list)
     unlinked = []
@@ -294,12 +289,7 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
     all_counts = dict(Sample.objects.filter(extraction__specimen__patient=patient)
                       .values_list("extraction_id").annotate(n=Count("pk")))
 
-    tree["patient"] = {
-        "level": SampleSourceLevel.PATIENT,
-        "id": patient.pk,
-        "label": str(patient),
-        "detail": patient.get_sex_display() if patient.sex else "",
-    }
+    specimens = []
     specimen_qs = patient.specimen_set.select_related("tissue").prefetch_related("extraction_set")
     for specimen in specimen_qs.order_by("pk"):
         specimen_data = {
@@ -321,10 +311,15 @@ def get_patient_sample_tree(user: User, level: str, source, genome_build: Option
                 "samples": _tree_samples(extraction_samples, **row_kwargs),
             })
         specimen_data["sample_count"] = sum(e["sample_count"] for e in specimen_data["extractions"])
-        tree["specimens"].append(specimen_data)
+        specimens.append(specimen_data)
 
     # Samples the patient CSV attached straight to the patient, with no extraction to sit under
-    tree["samples"] = _tree_samples(unlinked, **row_kwargs)
-    tree["patient"]["sample_count"] = (sum(sp["sample_count"] for sp in tree["specimens"])
-                                       + len(tree["samples"]))
-    return tree
+    patient_samples = _tree_samples(unlinked, **row_kwargs)
+    patient_data = {
+        "level": SampleSourceLevel.PATIENT,
+        "id": patient.pk,
+        "label": str(patient),
+        "detail": patient.get_sex_display() if patient.sex else "",
+        "sample_count": sum(sp["sample_count"] for sp in specimens) + len(patient_samples),
+    }
+    return {"selected": selected, "patient": patient_data, "specimens": specimens, "samples": patient_samples}

@@ -27,8 +27,8 @@ def bcftools_liftover_variant_coordinate(variant_coordinate: VariantCoordinate, 
     return variant_coordinate
 
 
-def bcftools_liftover_skip_reason(variant_coordinate: VariantCoordinate) -> Optional[str]:
-    """ The rules on the coordinate's form and size - those that need no reference """
+def check_bcftools_coordinate_limits(variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ Returns why the coordinate is outside the settings' symbolic/length limits, or None if bcftools can take it """
     if variant_coordinate.is_symbolic:
         if not settings.LIFTOVER_BCFTOOLS_SYMBOLIC:
             return f"Liftover of symbolic variants disabled via {settings.LIFTOVER_BCFTOOLS_SYMBOLIC=}"
@@ -38,10 +38,23 @@ def bcftools_liftover_skip_reason(variant_coordinate: VariantCoordinate) -> Opti
     return None
 
 
-def bcftools_pre_liftover_error_check(variant_coordinate: VariantCoordinate, source_genome_build) -> Optional[str]:
-    """ Return non-null (string reason) if you want to skip bcftools liftover """
-    if skip_reason := bcftools_liftover_skip_reason(variant_coordinate):
-        return skip_reason
+def check_bcftools_destination_has_chrom(variant_coordinate: VariantCoordinate,
+                                         dest_genome_build: GenomeBuild) -> Optional[str]:
+    """ Returns an error if the destination build has no standard contig for the chrom (T2T has no MT: CHM13's
+        own mitochondrion is a rotated, non-rCRS sequence). BCFTools would write the record with no header
+        contig, failing the entire run """
+    if variant_coordinate.chrom in dest_genome_build.chrom_standard_contig_mappings:
+        return None
+    return f"'{variant_coordinate.chrom}' has no standard contig in {dest_genome_build}"
+
+
+def check_bcftools_can_liftover(variant_coordinate: VariantCoordinate, source_genome_build: GenomeBuild,
+                                dest_genome_build: GenomeBuild) -> Optional[str]:
+    """ Returns why bcftools can't liftover the coordinate, or None if it can """
+    if error := check_bcftools_coordinate_limits(variant_coordinate):
+        return error
+    if error := check_bcftools_destination_has_chrom(variant_coordinate, dest_genome_build):
+        return error
     # BCFTools requires ref match. Symbolics will pull out reference from build so always match, no point testing
     if not variant_coordinate.is_symbolic:
         calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
@@ -129,7 +142,7 @@ def get_reject_vcf_filename(out_vcf_filename: str) -> str:
 
 def count_non_header_lines(filename) -> int:
     count = 0
-    with open(filename) as file:
+    with open(filename, encoding="utf-8") as file:
         for line in file:
             if not line.startswith('#'):
                 count += 1

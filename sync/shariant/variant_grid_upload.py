@@ -1,9 +1,8 @@
 import copy
+import functools
 import logging
 import socket
 import time
-
-import requests
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Union
 from urllib.parse import quote, urljoin
@@ -23,6 +22,7 @@ from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
 from sync.shariant.query_json_filter import SOMATIC_FILTER_KEY, QueryJsonFilter
+from sync.shariant.remote_response import request_json_with_retries
 from sync.sync_runner import ClassificationUploadSyncRunner, SyncRunInstance, register_sync_runner
 
 # add variant_type to private fields as the key has been deprecated
@@ -33,8 +33,6 @@ SHARIANT_PRIVATE_FIELDS = [
 
 # server-side processing of a 50 record batch can exceed the default minute
 UPLOAD_TIMEOUT_SECS = 5 * MINUTE_SECS
-UPLOAD_ATTEMPTS = 3
-UPLOAD_RETRY_DELAY_SECS = 30
 
 GENE_LEVEL_EXCLUSION_REASON = "Gene fusions and copy number events are not shared with {destination} until it is upgraded to accept them"
 
@@ -282,21 +280,15 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 post_start = time.time()
                 # records are upserts keyed by lab/lab_record_id, so re-sending a batch after a
                 # timeout/connection drop is safe even if the server processed the first attempt
-                for attempt in range(UPLOAD_ATTEMPTS):
-                    try:
-                        response = other_variant_grid.post(
-                            url_suffix='classification/api/classifications/v2/record/',
-                            json=json_to_send,
-                            timeout=UPLOAD_TIMEOUT_SECS,
-                        )
-                        response.raise_for_status()
-                        break
-                    except (requests.ConnectionError, requests.Timeout) as e:
-                        retries_left = UPLOAD_ATTEMPTS - attempt - 1
-                        if not retries_left:
-                            raise
-                        logging.warning("%s: %r - %d retries left", sync_run_instance.sync_destination, e, retries_left)
-                        time.sleep(UPLOAD_RETRY_DELAY_SECS)
+                response = request_json_with_retries(
+                    functools.partial(
+                        other_variant_grid.post,
+                        url_suffix='classification/api/classifications/v2/record/',
+                        json=json_to_send,
+                        timeout=UPLOAD_TIMEOUT_SECS,
+                    ),
+                    description=f"{sync_run_instance.sync_destination}: upload batch",
+                )
                 post_duration = time.time() - post_start
                 # results are sent back in an array in the same order they were sent up
                 results = response.json().get('results')

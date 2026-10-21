@@ -42,12 +42,6 @@
         data["show_resolved"] = showResolved;
     }
 
-    function downloadVariantTagsCSV() {
-        const params = {};
-        variantTagsDatatableFilter(params);
-        window.location = Urls.variant_tags_export("{{ genome_build.name }}") + "?" + EncodeQueryData(params);
-    }
-
     function showAll() {
         gridParams = {};
         clearTagCountsSummary(TAG_COUNTS_SUMMARY);
@@ -167,8 +161,5 @@
     <table id="variant-tags-datatable" class="sticky-header"
            data-datatable-url="{% url 'variant_tags_datatable' genome_build.name %}"
            data-datatable-data="variantTagsDatatableFilter"></table>
-    <div data-toolbar-bottom="#variant-tags-datatable">
-        <a class="btn btn-outline-secondary fas fa-download" href="javascript:downloadVariantTagsCSV()">CSV</a>
-    </div>
 
 {% endblock container_table_content %}

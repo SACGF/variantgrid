@@ -9,20 +9,28 @@ from django.contrib.sites.models import Site
 from analysis.models import VariantTag
 from annotation import vep_columns
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import Citation
-from annotation.models.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
+    ClinVarReviewStatus,
     FATHMMPrediction,
     MetaRNNPrediction,
     MutationAssessorPrediction,
     MutationTasterPrediction,
     Polyphen2Prediction,
     SIFTPrediction,
+    VEPCustom,
 )
-from annotation.models.models import AnnotationVersion, GenePubMedCount, VariantAnnotation
-from annotation.models.models_enums import ClinVarReviewStatus, VEPCustom
+from annotation.models import Citation
+from annotation.models.models import GenePubMedCount, VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
+from annotation.vep_plugin_display import (
+    GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS,
+    get_gnomad_sv_overlap,
+    get_mmid3_mastermind_urls,
+    mavedb_urn_to_urls,
+)
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
@@ -168,7 +176,7 @@ def pubmed_formatter(value):
 
 
 def mavedb_formatter(value):
-    return ", ".join(VariantAnnotation.mavedb_urn_to_urls(value).values())
+    return ", ".join(mavedb_urn_to_urls(value).values())
 
 
 def ekey_from_vg_column_formatters():
@@ -487,7 +495,7 @@ def _get_mastermind_summary(variant_values: dict) -> Optional[str]:
             value = variant_values.get(f"variantannotation__{field}")
             mastermind_fields.append(f"{label}: {value}")
         count_summary = ", ".join(mastermind_fields[:-1])
-        mmid3_mastermind_urls = VariantAnnotation.get_mmid3_mastermind_urls(mastermind_mmid3)
+        mmid3_mastermind_urls = get_mmid3_mastermind_urls(mastermind_mmid3)
         mastermind_summary = f"Mastermind: {' '.join(mmid3_mastermind_urls.values())}\n"
         mastermind_summary += f"Search results: {count_summary}\n"
         mastermind_summary += mastermind_fields[-1]  # MMID3
@@ -531,7 +539,7 @@ def _gnomad_sv_sourced_columns() -> frozenset[str]:
     """ VariantGrid columns whose gnomAD values come from an overlapping gnomAD-SV record """
     sv_columns = {vgc for c in vep_columns.filter_for(vep_custom=VEPCustom.GNOMAD_SV)
                   for vgc in c.variant_grid_columns}
-    return frozenset(sv_columns - set(VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS))
+    return frozenset(sv_columns - set(GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS))
 
 
 def _format_gnomad_sv_overlap(sv_overlap: dict) -> str:
@@ -547,12 +555,12 @@ def _get_gnomad_sv_overlap_note(variant_values: dict, annotation_version: Annota
     """ Structural variants have no exact gnomAD match - the values come from an overlapping gnomAD-SV record,
         so describe which one was used (and what else overlapped) """
     sv_data = {f: variant_values.get(f"variantannotation__{f}")
-               for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS}
+               for f in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS}
     if not sv_data.get("gnomad_sv_overlap_name"):
         return None
 
     gnomad_sv_version = annotation_version.variant_annotation_version.gnomad_sv
-    sv_overlaps = VariantAnnotation.get_gnomad_sv_overlap(sv_data, gnomad_sv_version)
+    sv_overlaps = get_gnomad_sv_overlap(sv_data, gnomad_sv_version)
 
     # The record chosen by SVOverlapProcessor is the one whose AF was copied onto the gnomAD columns
     gnomad_af = variant_values.get("variantannotation__gnomad_af")
@@ -597,7 +605,7 @@ def get_evidence_fields_from_variant_query(
     gnomad2_liftover_af = "variantannotation__gnomad2_liftover_af"
     columns.add(gnomad2_liftover_af)
     # Retrieve the gnomAD SV overlaps (and AF, to work out which one was used) to explain SV gnomAD values
-    columns.update(f"variantannotation__{f}" for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS)
+    columns.update(f"variantannotation__{f}" for f in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS)
     columns.add("variantannotation__gnomad_af")
     values = qs.values(*columns).get()
 

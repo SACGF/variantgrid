@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.utils import timezone
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from ontology.models import OntologyImport, OntologyService, OntologyTerm

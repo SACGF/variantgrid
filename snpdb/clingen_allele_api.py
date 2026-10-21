@@ -175,8 +175,12 @@ class ClinGenAlleleRegistryAPI:
             return requests.put(self._signed_url(url), data=data, timeout=timeout)
 
         try:
-            return self._json_with_retry(send_request, max_attempts=self.max_attempts,
-                                         retry_backoff_secs=self.retry_backoff_secs)
+            response_json = self._json_with_retry(send_request, max_attempts=self.max_attempts,
+                                                  retry_backoff_secs=self.retry_backoff_secs)
+            if isinstance(response_json, dict):
+                # Request-level errors are one dict (not a list per input line), sometimes with 200 OK
+                raise ClinGenAlleleServerException(url, "PUT", 200, response_json)
+            return response_json
         except Exception as e:
             api_failure = {
                 "request": url,
@@ -184,11 +188,11 @@ class ClinGenAlleleRegistryAPI:
                 "data": data,
             }
             api_failure_output_filename = self._get_api_failure_output_filename()
-            with open(api_failure_output_filename, "w") as f:
+            with open(api_failure_output_filename, "w", encoding="utf-8") as f:
                 json.dump(api_failure, f)
 
             msg = f"API call failed, debug info written to '{api_failure_output_filename}'"
-            if isinstance(e, ClinGenAlleleRegistryUnavailableException):
+            if isinstance(e, (ClinGenAlleleServerException, ClinGenAlleleRegistryUnavailableException)):
                 logging.error(msg)
                 raise
             raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e

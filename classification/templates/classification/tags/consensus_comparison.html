@@ -1,0 +1,119 @@
+{% load classification_tags %}
+{% load js_tags %}
+{% load ui_utils %}
+{# The allele's previous classifications side by side, one column per distinct set of copied values     #}
+{# (ConsensusComparison). What a pick writes comes first - the fields the choices differ in, then the     #}
+{# fields every choice carries, folded away - and the records it came from last. `mode` is "apply" (a    #}
+{# button per column, class `apply_class`, data-vcm-id) or "radio" (a `radio_name` radio per column,     #}
+{# `default_pk` ticked). Shared by the Classify & Report dialog and the create-from-variant page.          #}
+{% with uid=comparison.groups.0.representative.pk %}
+<div class="consensus-comparison">
+    <div class="table-responsive">
+    <table class="table table-sm consensus-compare">
+        <thead>
+            <tr>
+                <th class="consensus-label"></th>
+                {% for group in comparison.groups %}
+                    <th class="consensus-choice">
+                        <div class="d-flex align-items-start">
+                            {% if mode == "radio" %}
+                                <input class="mr-2 mt-1" type="radio" name="{{ radio_name }}" value="{{ group.representative.pk }}"
+                                       aria-label="Copy from {{ group.representative.cr_lab_id }}"
+                                       {% if default_pk == group.representative.pk %}data-default="1"{% endif %} />
+                            {% endif %}
+                            <div class="flex-grow-1">
+                                <div>{% clinical_significance_values group.representative %}</div>
+                                <div class="consensus-conditions mt-1">
+                                    {% for condition in group.conditions %}
+                                        <span class="badge badge-light border font-weight-normal mr-1 mb-1">{% condition condition limit=60 show_link=False %}</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="small text-muted font-weight-normal consensus-provenance">
+                                    {{ group.representative.classification.lab }}<br/>
+                                    {% if group.other_count %}{{ group.record_count }} records, latest curated{% else %}Curated{% endif %}
+                                    {% timestamp group.representative.curated_date_check.value time_ago=True tooltip=group.representative.curated_date_check.name %}
+                                    &middot; <a class="hover-link" href="{% url 'view_classification' group.representative.classification_id %}" target="_blank">{{ group.representative.cr_lab_id }}</a>
+                                    {% if group.other_count %}
+                                        <br/><a class="toggle-link collapsed" data-toggle="collapse" href="#consensus-others-{{ group.representative.pk }}">the other {{ group.other_count }} record{{ group.other_count|pluralize }} with this content</a>
+                                        <span class="collapse" id="consensus-others-{{ group.representative.pk }}">
+                                            {% for other in group.others %}<a class="hover-link mr-2" href="{% url 'view_classification' other.classification_id %}" target="_blank" title="curated {{ other.curated_date_check.value|date:'j M Y' }}">{{ other.cr_lab_id }}</a>{% endfor %}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                {% if mode == "apply" %}
+                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2 {{ apply_class }}"
+                                            data-vcm-id="{{ group.representative.pk }}">Apply to this sample</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% if comparison.differing %}
+                <tr class="consensus-section">
+                    <th colspan="{{ comparison.groups|length|add:1 }}">
+                        <i class="fas fa-not-equal mr-1"></i>Differs between the choices
+                    </th>
+                </tr>
+                {% for row in comparison.differing %}
+                    <tr class="differences">
+                        <th class="consensus-label">{{ row.label }}</th>
+                        {% for cell in row.cells %}
+                            <td>
+                                {% if cell %}
+                                    {% if cell.value %}
+                                        <div class="gene-content-text{% if cell.value|length > 300 %} clamp{% endif %}">{{ cell.value }}</div>
+                                        {% if cell.value|length > 300 %}<a class="hover-link small" href="javascript:void(0)" data-toggle="clamp">show more</a>{% endif %}
+                                    {% endif %}
+                                    {% if cell.note %}<div class="gene-content-text text-secondary small">{{ cell.note }}</div>{% endif %}
+                                {% else %}
+                                    <span class="no-value">-</span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            {% if comparison.shared %}
+                <tr class="consensus-section">
+                    <th colspan="{{ comparison.groups|length|add:1 }}">
+                        <a class="toggle-link collapsed" data-toggle="collapse" data-target=".consensus-shared-{{ uid }}" href="javascript:void(0)">
+                            {% if comparison.differing %}
+                                {{ comparison.shared|length }} field{{ comparison.shared|length|pluralize }} the same in every choice
+                            {% elif comparison.groups|length > 1 %}
+                                All {{ comparison.shared|length }} copied field{{ comparison.shared|length|pluralize }} are the same in every choice
+                            {% else %}
+                                {{ comparison.shared|length }} field{{ comparison.shared|length|pluralize }} will be copied
+                            {% endif %}
+                        </a>
+                    </th>
+                </tr>
+                {% for row in comparison.shared %}
+                    <tr class="collapse consensus-shared-{{ uid }}">
+                        <th class="consensus-label">{{ row.label }}</th>
+                        {% for cell in row.cells %}
+                            <td>
+                                {% if cell %}
+                                    {% if cell.value %}
+                                        <div class="gene-content-text{% if cell.value|length > 300 %} clamp{% endif %}">{{ cell.value }}</div>
+                                        {% if cell.value|length > 300 %}<a class="hover-link small" href="javascript:void(0)" data-toggle="clamp">show more</a>{% endif %}
+                                    {% endif %}
+                                    {% if cell.note %}<div class="gene-content-text text-secondary small">{{ cell.note }}</div>{% endif %}
+                                {% else %}
+                                    <span class="no-value">-</span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+    </div>
+    {% if compare_url %}
+        <div class="small text-muted"><a class="hover-link" href="{{ compare_url }}" target="_blank">Compare every field of these records</a></div>
+    {% endif %}
+</div>
+{% endwith %}

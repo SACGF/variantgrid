@@ -13,10 +13,13 @@ from upload.models import UploadedFileTypes
 API_FEATURES = (
     "patients",
     "link_extraction",
+    "link_extractions_bulk",
     "upload_status",
     "joint_called_vcf_cross_run",
     "upload_metadata",
     "cram_alignment_files",  # A sequencing file's 'bam_file' path can be a CRAM
+    "alignment_files",  # SequencingFile, SingleSampleVCF and QC take an 'alignment_files' list (BAM/CRAM)
+    "annotated_download_compression",  # Annotated CSV download takes ?compression=zip|none
 )
 
 # Import factories the server drives itself, rather than files a client uploads (UploadedFileTypes names, lower case)

@@ -14,8 +14,9 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from annotation.annotation_version_querysets import filter_vep_sv_max_size
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import insert_vep_too_long_skipped
 from library.django_utils.data_archive_mixin import DataArchivedError
 from snpdb.models import Variant

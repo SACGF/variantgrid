@@ -57,6 +57,22 @@ class ImportedAlleleInfoStatusTest(TestCase):
         self.assertEqual(allele_info.status, ImportedAlleleInfoStatus.FAILED)
 
 
+class ImportedAlleleInfoPreferredHGVSTest(TestCase):
+    """ preferred_hgvs_obj falling back to the imported HGVS when no build resolved - in memory only """
+
+    @patch.object(GenomeBuild, "builds_with_annotation_cached", lambda: [GenomeBuild.grch37(), GenomeBuild.grch38()])
+    def test_imported_build_last_in_fallback_is_not_the_desired_build(self):
+        gbpv = GenomeBuildPatchVersion.get_unspecified_patch_version_for(GenomeBuild.grch38())
+        allele_info = ImportedAlleleInfo(imported_genome_build_patch_version=gbpv,
+                                         imported_c_hgvs="NM_000059.4(BRCA2):c.1234A>G")
+        allele_info.grch37 = None
+        allele_info.grch38 = None
+
+        hgvs = allele_info.preferred_hgvs_obj(GenomeBuild.grch37())
+        self.assertEqual(hgvs.genome_build, GenomeBuild.grch38())
+        self.assertIs(hgvs.is_desired_build, False)
+
+
 class ImportedAlleleInfoValidationTest(TestCase):
     """ _calculate_validation keys off what was supplied on import - a g.HGVS only submission is accepted on its
         own terms, see https://github.com/SACGF/variantgrid/issues/1063 - these are in memory only """
@@ -150,7 +166,7 @@ class ImportedAlleleInfoValidationTest(TestCase):
         allele_info = self._gene_level_allele_info(
             "ARV7", "GENE_LEVEL:644-644 <SPLICE:HGNC:644:V7>", grch37=self._resolved(grch37))
         display = allele_info.matched_without_resolved_hgvs_display(grch38)
-        self.assertEqual("ARV7", display.full_hgvs)
+        self.assertEqual("ARV7", display.full_dna_hgvs)
         # the imported value is shown, so it carries the imported build rather than the one that matched
         self.assertEqual(grch38, display.genome_build)
         self.assertTrue(display.is_normalised)

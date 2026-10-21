@@ -65,15 +65,6 @@ def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[st
     })
 
 
-def discordance_reports_download(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
-    all_summaries = ClassificationDashboard(lab_picker=lab_picker).discordance_summaries.summaries
-    return DiscordanceReportRowData.streaming_csv(
-        all_summaries,
-        "discordance_reports"
-    )
-
-
 @dataclass
 class DiscordanceNoLongerConsiders:
     reason: str
@@ -241,8 +232,8 @@ class DiscordanceReportTemplateData:
         return self._effectives_and_not_considered[1]
 
     @property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        return self.report.all_c_hgvs(self.genome_build)
+    def hgvses(self) -> list[HGVSDisplay]:
+        return self.report.all_hgvs(self.genome_build)
 
     @property
     def lab_clin_sigs(self) -> list[_LabClinSig]:

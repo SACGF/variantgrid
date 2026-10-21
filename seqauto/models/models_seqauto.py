@@ -147,30 +147,6 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
         current_sample_sheet = self.get_current_sample_sheet()
         return SampleSheet.objects.filter(sequencing_run=self).exclude(pk=current_sample_sheet.pk)
 
-    @property
-    def is_data_out_of_date_from_current_sample_sheet(self):
-        try:
-            current_sample_sheet = self.get_current_sample_sheet()
-        except SequencingRunCurrentSampleSheet.DoesNotExist:
-            return False
-
-        for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
-            if joint_called_vcf.needs_to_be_linked():
-                return True
-
-        old_sample_sheets = self.get_old_sample_sheets()
-        illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet=current_sample_sheet)
-        old_illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-        old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
-        old_alignment_files = AlignmentFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-        return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
-                    old_joint_called_vcfs.exists(),
-                    old_unaligned_reads.exists(),
-                    old_alignment_files.exists(),
-                    old_sample_links.exists()])
-
     @staticmethod
     def get_external_links_for(name: str, date: Optional[datetime.date],
                                enrichment_kit_name: Optional[str]) -> list[tuple[str, str]]:
@@ -346,9 +322,8 @@ class SequencingSample(ExtractionMatchMixin, models.Model):
         return params
 
     def get_single_qc(self):
-        """ A sample can have several alignment files (eg BAM and recalibrated BAM), QC hangs off one of them """
         try:
-            return QC.objects.get(alignment_file__sequencing_sample=self)
+            return QC.objects.get(sequencing_sample=self)
         except (QC.DoesNotExist, QC.MultipleObjectsReturned):
             logging.error("Wasn't exactly 1 QC for sequencing sample %s", self)
         return None
@@ -490,11 +465,6 @@ class UnalignedReads(models.Model):
             params["read_2"] = self.fastq_r2.path
         return params
 
-    @staticmethod
-    def get_for_old_sample_sheets(sequencing_run):
-        old_sample_sheets = sequencing_run.get_old_sample_sheets()
-        return UnalignedReads.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-
     def __str__(self):
         return f"UnalignedReads from sample {self.sequencing_sample}"
 
@@ -515,10 +485,15 @@ class AlignmentFile(SeqAutoRecord):
         return SampleFileType.BAM
 
     def get_params(self):
-        params = self.sequencing_sample.get_params()
+        params = self.get_sequencing_sample_params(self.sequencing_sample)
         if self.unaligned_reads:
             params.update(self.unaligned_reads.get_params())
-        params['bam'] = self.get_path_from_sequencing_sample(self.sequencing_sample)
+        return params
+
+    @staticmethod
+    def get_sequencing_sample_params(sequencing_sample):
+        params = sequencing_sample.get_params()
+        params['bam'] = AlignmentFile.get_path_from_sequencing_sample(sequencing_sample)
         return params
 
     @staticmethod
@@ -589,20 +564,22 @@ def get_seqauto_user():
 
 
 class SingleSampleVCF(SeqAutoRecord):
-    """ Single-sample VCFs from the file system, called from one AlignmentFile """
-    alignment_file = models.ForeignKey(AlignmentFile, on_delete=CASCADE)
+    """ Single-sample VCF from the file system, one per sequencing sample and variant caller, called from the
+        sample's alignment files (all of the same sequencing sample) """
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
+    alignment_files = models.ManyToManyField(AlignmentFile)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
     def get_params(self):
-        return self.alignment_file.get_params()
+        return AlignmentFile.get_sequencing_sample_params(self.sequencing_sample)
 
     def get_sequencing_samples(self):
         """ The sequencing samples this VCF is allowed to link against """
-        return SequencingSample.objects.filter(pk=self.alignment_file.sequencing_sample_id)
+        return SequencingSample.objects.filter(pk=self.sequencing_sample_id)
 
     @property
     def enrichment_kit(self) -> Optional[EnrichmentKit]:
-        return self.alignment_file.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
+        return self.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
 
     @property
     def has_mixed_enrichment_kits(self) -> bool:
@@ -622,7 +599,7 @@ class SingleSampleVCF(SeqAutoRecord):
 
     @property
     def sample_sheet(self) -> SampleSheet:
-        return self.alignment_file.sequencing_sample.sample_sheet
+        return self.sequencing_sample.sample_sheet
 
     @property
     def vcf(self) -> Optional[VCF]:
@@ -743,7 +720,8 @@ class QC(SeqAutoRecord):
 
         TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
     """
-    alignment_file = models.ForeignKey(AlignmentFile, on_delete=CASCADE)
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
+    alignment_files = models.ManyToManyField(AlignmentFile)
     vcf_file = models.ForeignKey(SingleSampleVCF, on_delete=CASCADE)
 
     @property
@@ -756,14 +734,6 @@ class QC(SeqAutoRecord):
 
     def get_params(self):
         return self.vcf_file.get_params()
-
-    @property
-    def qc_dir_path(self):
-        return os.path.dirname(self.path)
-
-    @property
-    def sequencing_sample(self):
-        return self.alignment_file.sequencing_sample
 
     @staticmethod
     def get_path_from_vcf(vcf):
@@ -896,7 +866,7 @@ class QCExecSummary(SeqAutoRecord):
 
     @staticmethod
     def get_sequencing_run_path():
-        return "qc__alignment_file__sequencing_sample__sample_sheet__sequencing_run"
+        return "qc__sequencing_sample__sample_sheet__sequencing_run"
 
     def __str__(self):
         return f"QCExecSummary for {self.qc}"
@@ -966,7 +936,7 @@ class GoldGeneCoverageCollection(models.Model):
         If you wish to delete / replace a GeneCoverageCollection here, you must delete the
         old gold first (PROTECT) to stop Stored gold reference and current gold runs
         getting out of sync """
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__sequencing_sample"
 
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=PROTECT)
@@ -1541,7 +1511,7 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
         Cached per gene/threshold as (count, num collections, max collection pk) so a call only counts collections
         added since; the cache is dropped when a collection at or below the cached max disappears or stops being
         current """
-    current_sheet_filter = "qcgenecoverage__qc__alignment_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
+    current_sheet_filter = "qcgenecoverage__qc__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
     gcg_qs = GeneCoverageCollection.objects.filter(**{current_sheet_filter: False})
 
     existing_count = 0
@@ -1577,5 +1547,3 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     else:
         count = existing_count
     return count
-
-

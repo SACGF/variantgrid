@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -24,7 +25,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
 from snpdb.models import (

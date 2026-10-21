@@ -13,7 +13,7 @@ from django.urls import reverse
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.models import ClinVar, ClinVarRecord, ClinVarReviewStatus, ClinVarVersion
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
@@ -35,6 +35,7 @@ from library.utils import (
     first,
 )
 from snpdb.models import GenomeBuild, VariantAllele
+from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ClinVarCompareValue(int, Enum):
@@ -83,9 +84,9 @@ class ClinVarCompareRowAbstract(ExportRow):
     @cached_property
     def c_hgvs(self) -> str:
         for cm in self.allele_group.cms_regardless_of_issues:
-            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if full_hgvs := c_hgvs.full_hgvs:
-                    return full_hgvs
+            if c_hgvs := cm.hgvs_best(self.allele_group.genome_build):
+                if full_dna_hgvs := c_hgvs.full_dna_hgvs:
+                    return full_dna_hgvs
 
     @cached_property
     def clinvar_url(self) -> str:
@@ -96,7 +97,7 @@ class ClinVarCompareRowAbstract(ExportRow):
     @cached_property
     def gene_symbol(self) -> str:
         for cm in self.allele_group.cms_regardless_of_issues:
-            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
+            if c_hgvs := cm.hgvs_best(self.allele_group.genome_build):
                 if gene_symbol := c_hgvs.gene_symbol:
                     return gene_symbol
 

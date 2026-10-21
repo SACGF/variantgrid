@@ -1,13 +1,13 @@
 from django.test import TestCase
 
-from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
+from annotation.enums import ClinVarOncogenicity, Pathogenicity
 from annotation.vcf_files.clinvar_significance import (
     NO_CLASSIFICATION_FOR_THE_SINGLE_VARIANT,
     highest_oncogenicity,
     highest_pathogenicity,
     somatic_tier,
 )
-from classification.enums import SomaticClinicalSignificance
+from snpdb.models.models_enums import SomaticClinicalSignificance
 
 
 class SomaticTierTest(TestCase):

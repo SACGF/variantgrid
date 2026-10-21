@@ -22,21 +22,14 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import TagLocation, TagNodeMode
+from analysis.models.enums import NodeStatus, TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import (
-    AnalysisDag,
-    AnalysisEdge,
-    AnalysisNode,
-    NodeProband,
-    NodeStatus,
-    NodeTask,
-    NodeVersion,
-)
+from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
+from analysis.models.nodes.node_samples_mixin import NodeProband
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
     get_child_position,
@@ -45,6 +38,7 @@ from analysis.models.nodes.node_utils import (
     reload_analysis_nodes,
     update_analysis,
 )
+from analysis.models.nodes.node_version import NodeTask, NodeVersion
 from analysis.serializers import CandidateSearchRunSerializer, VariantTagSerializer
 from analysis.tasks.analysis_update_tasks import populate_clingen_alleles_from_analysis_node
 from analysis.views.analysis_permissions import (
@@ -211,7 +205,9 @@ def nodes_copy(request, analysis_id):
                 new_parent.add_child(clone_node)
                 edges.append(clone_node.get_connection_data(new_parent))
 
-            if not clone_node.is_valid:
+            # Connected via add_child, so the clone's save doesn't revalidate it
+            clone_node.valid = clone_node.is_valid
+            if not clone_node.valid:
                 clone_node.count = None
 
             clone_node.save()

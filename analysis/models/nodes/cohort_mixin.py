@@ -9,13 +9,13 @@ from django.db.models import Q, QuerySet
 
 from analysis.models.enums import GroupOperation
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.analysis_node import (
-    NodeAlleleFrequencyFilter,
-    NodeVCFFilter,
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_query_mixin import (
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
     querysets_to_pk_any_array_q,
 )
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_writer import percent_decode_info_value
 from patients.models import Patient
@@ -23,7 +23,6 @@ from patients.models_enums import SampleSourceLevel, Zygosity
 from patients.sample_grouping import get_patient_for_source
 from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter, VCFInfo
 from snpdb.views.datatable_view import CellData, NullOrder, RichColumn
-from upload.models.models import UploadedVCF
 from upload.tso500.dragen_all_fusions_parser import (
     FUSION_OBSERVATIONS_INFO,
     format_fusion_observations,
@@ -75,7 +74,7 @@ def get_sample_pk_in_q(node, sample: Sample, arg_q_dict: dict[Optional[str], dic
 
 def get_samples_pk_q(node, sample_arg_q_dicts: list[tuple[Sample, dict[Optional[str], dict[str, Q]]]]) -> Q:
     """ The variants of any of the samples - each (sample, arg_q_dict) is filtered in its own subquery
-        and the subqueries are UNIONed (@see analysis_node.querysets_to_pk_any_array_q) """
+        and the subqueries are UNIONed (@see node_query_mixin.querysets_to_pk_any_array_q) """
     if len(sample_arg_q_dicts) == 1:
         return get_sample_pk_in_q(node, *sample_arg_q_dicts[0])
     return querysets_to_pk_any_array_q([get_sample_queryset(node, sample, arg_q_dict)
@@ -463,15 +462,13 @@ class CohortMixin:
                 errors.append(str(e))
 
             if vcf := cohort.get_vcf():
-                try:
-                    uv: UploadedVCF = vcf.uploadedvcf
-                    if uv.max_variant_id:  # Very old VCFs may not have this set
-                        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-                        if not uv.is_fully_annotated(variant_annotation_version):
-                            errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
-                                          f" (in variant annotation version={variant_annotation_version})")
-                except UploadedVCF.DoesNotExist:
-                    pass
+                # Reverse accessor rather than importing upload.models, which imports analysis.models
+                uv = getattr(vcf, "uploadedvcf", None)
+                if uv and uv.max_variant_id:  # Very old VCFs may not have this set
+                    variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+                    if not uv.is_fully_annotated(variant_annotation_version):
+                        errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
+                                      f" (in variant annotation version={variant_annotation_version})")
         return errors
 
 
@@ -553,7 +550,7 @@ class AncestorSampleMixin(SampleMixin):
 
             Sample mode returns it as is. Patient mode wraps each sample's filters in a subquery
             annotated with only that sample's genotype join - a Q keyed on an alias runs as soon as
-            that alias is annotated (@see analysis_node.annotate_and_filter_queryset), so an OR across
+            that alias is annotated (@see node_query_mixin.annotate_and_filter_queryset), so an OR across
             two aliases has nowhere to hang until both are """
         samples = self.get_filter_samples()
         if not samples:

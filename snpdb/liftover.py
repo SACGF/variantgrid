@@ -13,16 +13,14 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Prefetch, QuerySet
 
-from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.hgvs import HGVSMatcher
 from genes.hgvs.hgvs_matcher import get_hgvs_variant_coordinate
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import (
     bcftools_liftover_variant_coordinate,
-    bcftools_pre_liftover_error_check,
+    check_bcftools_can_liftover,
 )
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_dbsnp import DbSNP
 from snpdb.models.models_enums import (
     AlleleConversionTool,
@@ -67,7 +65,10 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
 
 
 def _batch_alleles(alleles: Iterable[Allele]) -> Iterable[list[Allele]]:
-    """ QuerySets are paged by pk rather than iterated, so we don't hold a cursor open for the
+    """ The one batching inside create_liftover_pipelines, bounding what each pipeline batch holds in memory.
+        Splitting work across celery tasks is snpdb/tasks/liftover_tasks.py:_allele_id_batches
+
+        QuerySets are paged by pk rather than iterated, so we don't hold a cursor open for the
         (potentially hours) it takes to create the pipelines. Re-querying also skips alleles that
         earlier batches have since lifted over """
     batch_size = settings.LIFTOVER_BATCH_SIZE
@@ -122,7 +123,7 @@ def _create_liftover_pipelines_for_batch(user: User, alleles: list[Allele],
             variant_coordinates = []
             for allele, variant_coordinate, error_message in allele_variant_coordinate_error:
                 if variant_coordinate is not None:
-                    if contig_error := _non_standard_contig_error(vcf_genome_build, variant_coordinate):
+                    if contig_error := _check_vcf_contig_is_standard(vcf_genome_build, variant_coordinate):
                         variant_coordinate = None
                         error_message = contig_error
 
@@ -165,9 +166,10 @@ def _create_liftover_pipelines_for_batch(user: User, alleles: list[Allele],
                 logging.info("LiftoverRun %s doesn't need to be run", liftover)
 
 
-def _non_standard_contig_error(vcf_genome_build: GenomeBuild, variant_coordinate: VariantCoordinate) -> Optional[str]:
-    """ Liftover VCFs are written with standard contigs only (and tools like BCFTools look the chrom up in the
-        reference fasta) so an alt/unlocalized contig would fail the entire run - see issue #1197 """
+def _check_vcf_contig_is_standard(vcf_genome_build: GenomeBuild, variant_coordinate: VariantCoordinate) -> Optional[str]:
+    """ Returns an error if the chrom isn't a standard contig, or None. Liftover VCFs are written with standard
+        contigs only (and tools like BCFTools look the chrom up in the reference fasta) so an alt/unlocalized
+        contig would fail the entire run - see issue #1197 """
     if variant_coordinate.chrom in vcf_genome_build.chrom_standard_contig_mappings:
         return None
 
@@ -264,19 +266,6 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
                     break
 
     return build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error
-
-
-def liftover_alleles(allele_qs, user: User = None,
-                     retry_conversion_tools: Iterable[AlleleConversionTool] = ()):
-    """ Creates then runs (async) liftover pipelines for a queryset of alleles """
-    if user is None:
-        user = admin_bot()
-
-    for genome_build in GenomeBuild.builds_with_annotation():
-        variants_qs = Variant.objects.filter(variantallele__allele__in=allele_qs)
-        populate_clingen_alleles_for_variants(genome_build, variants_qs)
-        create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build,
-                                  retry_conversion_tools=retry_conversion_tools)
 
 
 def _run_liftover_using_same_contig(liftover, av_tuples: list[tuple[Allele, Variant]]):
@@ -423,7 +412,7 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
     options = [
         # Enabled, Tool Enum, form of the coordinate the tool takes, Requires reference to match genome build
         (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER,
-         bcftools_liftover_variant_coordinate, bcftools_pre_liftover_error_check),
+         bcftools_liftover_variant_coordinate, check_bcftools_can_liftover),
     ]
 
     for enabled, conversion_tool, tool_variant_coordinate, check_liftover_errors in options:
@@ -437,7 +426,7 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
 
             tool_vc = tool_variant_coordinate(variant_coordinate, source_genome_build)
             if check_liftover_errors is not None:
-                if error_message := check_liftover_errors(tool_vc, source_genome_build):
+                if error_message := check_liftover_errors(tool_vc, source_genome_build, dest_genome_build):
                     yield conversion_tool, None, error_message
                     continue
 

@@ -37,6 +37,10 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- upload/vcf/vcf_preprocess.py:run_pipe detects failure from a `${PIPESTATUS[*]}` status file, not pipefail, and gives
+  every stage its own stderr file. The stage blamed (upload/vcf/vcf_preprocess.py:_failed_stage) is the first non-zero
+  exit that is not SIGPIPE-shaped (141, or a Python `BrokenPipeError`) - those stages were killed because the one after
+  them died. Every stage is a sub step and its stderr is its `output_text`; the blamed one's is also its `error_message`.
 - Symbolic alts outside settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES (`<CNV>`/`<DEL>`/`<DUP>`/`<INV>`) never become
   Variants: management/commands/vcf_clean_alts.py:Command skips them into the upload's skipped-record stats. `<INS>` is
   one of them - the `<INS>` branches in snpdb, annotation and genes are written ahead of any `<INS>` Variant existing.
@@ -161,6 +165,17 @@ Gotchas:
   was before UploadPipeline.objects.create has only an orphan FileUpload to show for itself and nothing to reload;
   classification imports get back in through `manage.py classification_rematch_stuck`, which re-derives the coordinates
   and runs new pipelines.
+- Bulk retry (the upload page's "Retry failed", the sequencing run page's "Retry failed imports") goes through
+  upload/tasks/retry_upload_pipelines_task.py:retry_upload_pipelines: it claims each pipeline ERROR/TIMED_OUT ->
+  CREATED ("Retry queued") before queueing, so a double click can't queue it twice, and spaces the tasks
+  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it.
+- A step whose worker was killed from outside (OOM, restart) stays PROCESSING - the task_failure handler only sees a
+  child lost under a live master. A running step holds a lease (`UploadStep.lease_expires`) its worker renews on a
+  thread (`upload/tasks/upload_step_lease.py`, every UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS, guarded on its own task
+  id); `fail_stuck_upload_pipelines` marks a step with a lapsed lease TIMED_OUT, from the 5-minute beat task on
+  scheduling_single_worker and again before each retry. The admin's "Mark process as timed out" on an UploadStep is
+  the manual equivalent. Don't judge liveness by `celery_task`: launch_task sets it before any worker picks the task
+  up, and celery inspect misses a worker too loaded to answer.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
@@ -182,7 +197,8 @@ Tests:
 - Whole pipeline in-process: create a FileUpload, then process_uploaded_file(file_upload, run_async=False) under
   CELERY_TASK_ALWAYS_EAGER (library/django_utils/unittest_utils.py:URLTestCase sets it) —
   upload/tests/test_import_patient_records.py:TestPatientUploadImport is the pattern. The VCF pipeline needs bcftools
-  and a reference fasta, so tests stop short of preprocess_vcf (upload/tests/vcf/test_vcf_preprocess.py mocks run_pipe).
+  and a reference fasta, so tests stop short of preprocess_vcf (upload/tests/vcf/test_vcf_preprocess.py mocks run_pipe,
+  and runs the real run_pipe on toy stages in TestRunPipe).
 - Processors without celery: upload/tests/vcf/test_vcf_processors.py:TestVCFProcessors builds an UploadStep + VCF from
   a cyvcf2 reader via create_vcf_from_vcf and feeds process_entry directly (needs Sequence rows for GATC).
 - Test VCFs: upload/test_data/vcf (grch38_brca1.vcf, no_genotype.GRCh37.vcf, symbolic_alt/, detect_build_by_header/)

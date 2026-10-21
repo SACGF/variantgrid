@@ -3,9 +3,14 @@ Owns: Classification / ClassificationModification, EvidenceKey + EvidenceKeyMap,
 DiscordanceReport, ConditionText matching, ClassificationGrouping, ClinVarExport, the classification API and import pipeline.
 Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
+- models/classification_evidence_normalise.py — normalise_evidence_cell: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
+- models/condition_resolved.py (ConditionResolved), models/classification_consensus.py (copying content between records).
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
-- enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
+- enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/models/models_enums.py (re-exported by classification.enums; import them from snpdb).
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
+  Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
+  not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
+  Pages and grids show it, never the `p_hgvs` evidence, by passing it to `HGVSDisplay(p_hgvs=...)` from the same build as the c.HGVS (an imported c.HGVS takes the imported build's: `ImportedAlleleInfo.imported_hgvs_display`); `to_json` and the `p_hgvs` template tag put it inline after the c. nomen, short with the full form as tooltip, gated on `CLASSIFICATION_GRID_SHOW_PHGVS` (#19).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
 Patterns here:
@@ -48,7 +53,8 @@ Patterns here:
   classification_revalidate_signal, variants_classification_changed_signal). Receivers live in signals/ and are imported by
   apps.py:ClassificationConfig.ready; annotation/apps.py and snpdb/signals/common_variants_classification_changed.py subscribe
   from outside the app.
-- A lab's `classification_config` can give an evidence key a `default_value`, which a record created from the web
+- A lab's `classification_config` (`models/classification_settings_models.py:LabClassificationSettings`, applied over
+  its organization's) can give an evidence key a `default_value`, which a record created from the web
   form starts that key with (`models/classification.py:Classification.create_with_response` with
   `populate_with_defaults=True` - the API, file imports and sync never see one). `$user` and `$today` resolve at create
   time through `models/evidence_key.py:resolve_default_value`, so a lab that makes `curated_by` / `curation_date`
@@ -84,6 +90,9 @@ Gotchas:
 - In a template, `classification.sample_id` is the `sample_id` evidence value, not the FK: Django tries `obj[key]` before
   the attribute and models/evidence_mixin.py:EvidenceMixin.__getitem__ answers any evidence key. Resolve model fields in
   the view or tag (templatetags/classification_tags.py:classification_quick passes `sample` / `username`).
+- Legacy (VG3-era) records can hold a select key's option label or a comma separated string of labels ("Autosomal
+  recessive") instead of the list of option keys every write now stores (models/classification_evidence_normalise.py:evidence_option_value_parts).
+  management/commands/classification_normalise_option_values.py converts them; compare on normalised values until it has run.
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
   assuming every classification has a variant.
@@ -100,20 +109,26 @@ Gotchas:
   EvidenceKeyMap.instance caches for 60s. Tests that need a key create it with EvidenceKey.objects.create in setUp
   (tests/views/test_classification_view.py).
 - What copying from a previous classification brings across is EvidenceKey.copy_scope (NONE / ALLELE / GENE) filtered by
-  copy_allele_origin (models/classification.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
+  copy_allele_origin (models/classification_consensus.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
   a GENE key also copies at allele level; copy_allele_origin=GERMLINE keeps segregation and de novo data out of somatic records.
-  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification.py:ClassificationConsensus.apply_to to
+  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification_consensus.py:ClassificationConsensus.apply_to to
   write one into a record (fills empty fields only, as SubmissionSource.CONSENSUS).
 - The target allele origin bucket is decided before the candidates are listed, never after: nothing germline is ever offered
   as the source for a somatic record. The create page takes it from the user's allele_origin_focus (flippable), the Classify
   & Report dialog from Tag.allele_origin_bucket, the in-form box from the record's own bucket. External labs' records are
   shown for context with no copy control - their evidence was assembled under a config reviewed elsewhere.
-- Gene level candidates come from models/classification.py:ClassificationConsensus.gene_consensus_groups - one row per
-  distinct set of GENE-scope values, newest representative first, capped at ten. Most records in a gene carry identical gene
-  content because they were copied from each other. The pick is always a human's: AMP tiering and therapy content are gene
-  *and* tumour type, so the row's "and N other records" spread is the deciding information, not something to automate.
+- Gene level candidates come from models/classification_consensus.py:ClassificationConsensus.gene_consensus_groups - one row per
+  distinct set of GENE-scope values, most used first then newest, capped at ten, each later row naming the fields it
+  differs from the first in. Most records in a gene carry identical gene content because they were copied from each
+  other. The pick is always a human's: AMP tiering and therapy content are gene *and* tumour type, so the row leads with
+  the content and the spread of conditions it was used for (`ConsensusGroup.conditions`), not the record's tier.
   The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
-  views/views_gene_consensus.py) all call that one function.
+  views/views_gene_consensus.py) all call that one function and render templates/classification/tags/gene_consensus_group.html.
+- The allele level pick (create page "Copy values from", the Classify & Report dialog's previous classifications) is the
+  same grouping over every copied key (models/classification_consensus.py:ClassificationConsensus.consensus_groups): one column
+  per distinct set of copied values, rendered side by side by templates/classification/tags/consensus_comparison.html
+  with the fields the choices differ in first and the shared ones folded away (ConsensusComparison.of). Record
+  identity (lab id, curator) is provenance, not the choice - the diff page (`?cids=...&copied_only=1`) is the full view.
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.
@@ -123,6 +138,9 @@ Gotchas:
   dirty the groupings too, as `classification_groupings --summary` does, or the grid sorts on stale values.
 - Condition resolution flows from ConditionTextMatch to classifications via models/condition_text_matching.py:apply_condition_resolution
   (sends condition_set_signal); Classification.condition_resolution is a cache of that match, not the source.
+- models/condition_text_matching.py:search_suggestion swallows a Monarch search failure and falls back to local OMIM; the only
+  trace is `ConditionMatchingSuggestion.monarch_search_failed`, which `ConditionTextMatch.attempt_automatch` writes to
+  `ConditionText.monarch_search_failed` and the hourly `retry_failed_condition_text_automatch` task clears (#1744).
 - ClinVar export is one ClinVarExport per ClinVarKey + allele + condition (models/clinvar_export_models.py:ClinVarExport), built by
   models/clinvar_export_convertor.py:ClinVarExportConverter as ValidatedJson: embedded errors keep it out of a batch, no exception is raised.
 - Withdrawing is a soft delete (models/classification.py:Classification.set_withdrawn) that sends classification_withdraw_signal;
@@ -166,6 +184,14 @@ Gotchas:
   nothing has to be pre-registered beyond that. claude/research/classifications.md has the table of written forms.
 - With `VARIANT_GENE_LEVEL_ENABLED` off (Shariant), `genes/gene_level_strings.py:looks_gene_level` is always False, so
   'BCR::ABL1' takes the HGVS path and fails as an HGVS - `cant_resolve_to_variant_coordinate`, never `gene_level_unresolved`.
+- Shariant records arrive through the API (`models/classification_inserter.py:BulkClassificationInserter`), already curated
+  elsewhere: every lab there is external, and the curating system is the source of truth. A data fix (a one-off command,
+  a normalisation) runs on the curating deployment and reaches Shariant when its next upload re-sends the republished
+  record, which keeps the two in sync. Changing records on Shariant itself is the exception - correcting an error made
+  there, or a case decided explicitly. An unpublished edit there usually means an update the inserter saved but refused to share (`share_failure`:
+  the record has errors) or one sent without `publish`. A pending clinical significance only comes from discordance
+  resolution. A change to editing UI needs testing on a curation deployment; a change to the API, cross-lab visibility,
+  overlaps or the exports labs download (CSV column set included) needs testing on Shariant test.
 - A gene-level variant sits on no transcript, so `gene_symbol` is autopopulated from the event's GeneLevelId (a fusion's
   anchor first), which already holds the approved symbol the caller's MYCL1 resolved to
   (`autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_gene_level_event`) - the transcript path

@@ -48,3 +48,8 @@ def get_cdot_transcript_id_and_version(transcript_accession: str) -> TranscriptP
 def get_cdot_fake_transcript_id(gene_name: str) -> str:
     """ The cdot fake transcript for a gene with no RefSeq RNA accession, ie 'ND4' -> 'fake-rna-ND4' """
     return f"{CDOT_FAKE_TRANSCRIPT_PREFIX}{gene_name}"
+
+
+def is_cdot_fake_transcript(transcript_id_or_accession: str) -> bool:
+    """ A cdot stand-in ('fake-rna-ND4' / 'fake-rna-ND4.1'): no RefSeq accession, no sequence, not for c.HGVS """
+    return transcript_id_or_accession.startswith(CDOT_FAKE_TRANSCRIPT_PREFIX)

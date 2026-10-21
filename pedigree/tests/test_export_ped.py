@@ -9,6 +9,7 @@ Two complementary strategies:
 - Round-trip tests (TestWriteTrioPedRoundTrip): check end-to-end behaviour after import.
   Used for properties where the encoding is ambiguous ('M'/'F' vs '1'/'2' both import fine).
 """
+import io
 import os
 import tempfile
 
@@ -21,7 +22,7 @@ from pedigree.ped.import_ped import import_ped
 
 
 def _import_file(path, user):
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         return import_ped(f, "test.ped", user)
 
 
@@ -38,7 +39,7 @@ class _TmpPedFile(django.test.TestCase):
 
     def _read_rows(self):
         """Return dict of sample_name → list of PED columns."""
-        with open(self.fname) as f:
+        with open(self.fname, encoding='utf-8') as f:
             rows = [line.strip().split('\t') for line in f if line.strip()]
         return {row[1]: row for row in rows}
 
@@ -134,3 +135,31 @@ class TestWriteUnrelatedPed(_TmpPedFile):
         write_unrelated_ped(self.fname, [], family_code='FAM001')
         rows = self._read_rows()
         self.assertEqual(rows, {})
+
+
+class TestPedFileFamilyWritePedRoundTrip(_TmpPedFile):
+    """ PedFileFamily.write_ped → import_ped gives back that family's records, and only them """
+
+    PED = ("FAM1 proband father mother 1 2\n"
+           "FAM1 father 0 0 1 1\n"
+           "FAM1 mother 0 0 2 0\n"
+           "FAM2 child dad 0 2 2\n"
+           "FAM2 dad 0 0 1 2\n")
+
+    @staticmethod
+    def _records(family):
+        return {(family.name, r.sample): (r.father and r.father.sample, r.mother and r.mother.sample,
+                                          r.sex, r.affection)
+                for r in family.pedfilerecord_set.all()}
+
+    def test_round_trip(self):
+        user = User.objects.create_user('write_ped_test')
+        _, families = import_ped(io.StringIO(self.PED), "orig.ped", user)
+        for family in families:
+            family.write_ped(self.fname)
+            _, reimported_families = _import_file(self.fname, user)
+            self.assertEqual(len(reimported_families), 1)
+            self.assertEqual(self._records(family), self._records(reimported_families[0]))
+
+        fam1 = next(f for f in families if f.name == "FAM1")
+        self.assertEqual(self._records(fam1)[("FAM1", "mother")], (None, None, Sex.FEMALE, None))

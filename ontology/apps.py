@@ -10,8 +10,6 @@ class OntologyConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         # imported to activate receivers
 
-        from annotation.models import CachedWebResource
-
         # panel_app_ontology and ontology.signals register receivers on import - noqa: F401 keeps the
         # unused-import autofix from silently unregistering them
         from ontology import panel_app_ontology  # noqa: F401
@@ -24,6 +22,7 @@ class OntologyConfig(AppConfig):
         )
         from ontology.signals import ontology_health_check, ontology_preview  # noqa: F401
         from ontology.signals.signals import gencc_post_save_handler
+        from snpdb.models.models_cached_web_resource import CachedWebResource
         from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
 

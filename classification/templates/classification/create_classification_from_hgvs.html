@@ -28,6 +28,16 @@ function restrictSamples() {
 
 restrictSamples();
 
+$("#{{ sample_autocomplete_form.sample.auto_id }}").change(function() {
+    let sampleId = $(this).val();
+    $("input[name=sample_id]", ".classification-form").val(sampleId);
+    if (sampleId) {
+        createClassificationButton.prop("disabled", false);
+    } else {
+        restrictSamples();
+    }
+});
+
 {% endblock %}
 
 {% block container_table_content %}
@@ -67,7 +77,10 @@ restrictSamples();
                     </div>
                 {% endlabelled %}
                 {% labelled label="For lab" %}
-                    {% if lab %}{{ lab.name }}{% endif %}
+                    {% if lab_form %}
+                        {{ lab_form.lab }}
+                        {{ lab_form.media }}
+                    {% endif %}
                     {% if lab_error %}
                     <div class='error'>{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
                     {% endif %}

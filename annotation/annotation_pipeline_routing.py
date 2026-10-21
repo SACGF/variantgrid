@@ -17,7 +17,7 @@ from typing import Optional
 
 from django.db.models import Q
 
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models.models_variant import Sequence, Variant
 

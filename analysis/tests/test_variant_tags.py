@@ -1,9 +1,13 @@
 import json
+import os
+import tempfile
 from datetime import timedelta
+from unittest.mock import patch
 
+import requests
 from django.contrib.auth.models import User
 from django.template import Context, Template
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import localtime
@@ -11,18 +15,27 @@ from django.utils.timezone import localtime
 from analysis.grids import get_analysis_log_entry_summary
 from analysis.models import Analysis, TagNode, TagNodeInput, VariantTag
 from analysis.models.enums import TagNodeMode
-from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.filters.merge_node import MergeNode
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
+from analysis.tasks.variant_tag_tasks import _liftover_variant_tag
 from analysis.variant_tag_operations import resolve_requires_classification_tags
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from classification.enums import SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import GenomeBuild, Tag, TagConfigCollection, Variant
+from snpdb.models import (
+    ClinGenAllele,
+    GenomeBuild,
+    Tag,
+    TagConfigCollection,
+    Variant,
+    VariantAllele,
+)
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 
@@ -63,6 +76,50 @@ class TestVariantTagVisibility(TestCase):
     def test_hidden_in_other_build(self):
         grch38 = GenomeBuild.get_name_or_alias("GRCh38")
         self.assertNotIn(self.variant_tag, VariantTag.get_for_build(grch38))
+
+
+@override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN="login", CLINGEN_ALLELE_REGISTRY_PASSWORD="password",
+                   CLINGEN_ALLELE_REGISTRY_API_CLASS="snpdb.clingen_allele_api.ClinGenAlleleRegistryAPI")
+@patch("analysis.tasks.variant_tag_tasks.create_liftover_pipelines")
+@patch("snpdb.clingen_allele_api.requests.put")
+class TestVariantTagLiftoverClinGenError(TestCase):
+    """ ClinGen can return a request-level error with 200 OK (#2354) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        user = User.objects.get_or_create(username='testuser')[0]
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        create_fake_variants(cls.grch37)
+        variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").first()
+        tag = Tag.objects.get_or_create(pk="artefact")[0]
+        cls.variant_tag = VariantTag.objects.create(genome_build=cls.grch37, variant=variant, tag=tag, user=user)
+
+    def setUp(self):
+        failure_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(failure_dir.cleanup)
+        failure_filename = os.path.join(failure_dir.name, "failure.json")
+        patcher = patch.object(ClinGenAlleleRegistryAPI, "_get_api_failure_output_filename",
+                               return_value=failure_filename)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_request_level_error_still_assigns_allele(self, mock_put, mock_create_liftover_pipelines):
+        response = requests.Response()
+        response.status_code = 200
+        response._content = json.dumps({"description": "x", "errorType": "AuthorizationError", "message": "y"}).encode()
+        mock_put.return_value = response
+
+        _liftover_variant_tag(self.variant_tag)
+
+        variant_allele = VariantAllele.objects.get(variant=self.variant_tag.variant, genome_build=self.grch37)
+        self.assertEqual(variant_allele.clingen_error["errorType"], ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE)
+        self.assertTrue(variant_allele.needs_clingen_call())
+        self.variant_tag.refresh_from_db()
+        self.assertEqual(self.variant_tag.allele, variant_allele.allele)
+        mock_create_liftover_pipelines.assert_called_once()
 
 
 class TestTagNodeSnapshotWarning(TestCase):

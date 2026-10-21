@@ -7,8 +7,8 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from annotation import annotsv_columns, vep_columns
+from annotation.enums import ColumnAnnotationCategory, VariantAnnotationPipelineType
 from annotation.models import VariantAnnotationVersion
-from annotation.models.models_enums import ColumnAnnotationCategory, VariantAnnotationPipelineType
 from annotation.vep_annotation import VEPConfig
 from library.constants import WEEK_SECS
 from library.unit_percent import get_allele_frequency_formatter

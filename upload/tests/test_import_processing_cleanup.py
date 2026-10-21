@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 from upload.models import (
@@ -49,7 +49,7 @@ class ImportProcessingCleanupTest(TestCase):
         path = os.path.join(import_processing_dir, name)
         os.makedirs(path)
         if not empty:
-            with open(os.path.join(path, "scratch.txt"), "w") as f:
+            with open(os.path.join(path, "scratch.txt"), "w", encoding="utf-8") as f:
                 f.write("x")
         os.utime(path, (OLD_MTIME, OLD_MTIME))
         return path

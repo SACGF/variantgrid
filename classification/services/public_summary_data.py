@@ -1,11 +1,12 @@
 from functools import cached_property
+
 from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel, OverlapStatus, OverlapType
-from classification.models import DiscordanceReport, Classification, ClinVarExport, Overlap
-from snpdb.models import Lab, Allele, Organization
+from classification.enums import OverlapStatus, OverlapType, ShareLevel
+from classification.models import Classification, ClinVarExport, DiscordanceReport, Overlap
+from snpdb.models import Allele, Lab, Organization
 
 
 class ClassificationPublicSummaryData:
@@ -50,15 +51,11 @@ class ClassificationPublicSummaryData:
         return 100 * float(self.discordant_alleles) / float(self.overlapped_alleles)
 
     @cached_property
-    def classification_count(self) -> int:
-        return Classification.objects.filter(withdrawn=False).count()
-
-    @cached_property
     def unique_allele_count(self) -> int:
         return Classification.objects.filter(allele__isnull=False, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('allele').distinct('allele').count()
 
     @cached_property
-    def classification_count(self) -> int:
+    def shared_classification_count(self) -> int:
         return Classification.objects.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).count()
 
     @cached_property

@@ -20,7 +20,7 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
-from annotation.models.models import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.vep_field_formatters import format_pick_highest_int
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_partition import temporary_db_table
@@ -148,7 +148,7 @@ class BackfillColumnRoundTripTests(TestCase):
         """ Stand in for the operator's `bcftools annotate`: add a COSMIC count to the dumped records. """
         info_header = (f'##INFO=<ID={COSMIC_V101_SAMPLE_COUNT},Number=1,Type=Integer,'
                        f'Description="How many genome screens samples have this mutation">\n')
-        with open(dump_filename) as f_in, open(annotated_filename, "w") as f_out:
+        with open(dump_filename, encoding="utf-8") as f_in, open(annotated_filename, "w", encoding="utf-8") as f_out:
             for line in f_in:
                 if line.startswith("#CHROM"):
                     f_out.write(info_header)
@@ -240,7 +240,7 @@ class BackfillColumnRoundTripTests(TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             annotated_filename = self._dump_and_annotate(tmp_dir, {})
             stripped_filename = os.path.join(tmp_dir, "no_variant_id.vcf")
-            with open(annotated_filename) as f_in, open(stripped_filename, "w") as f_out:
+            with open(annotated_filename, encoding="utf-8") as f_in, open(stripped_filename, "w", encoding="utf-8") as f_out:
                 for line in f_in:
                     if not line.startswith("#"):
                         columns = line.rstrip("\n").split("\t")

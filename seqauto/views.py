@@ -1,14 +1,21 @@
 import os
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional, Union
 
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http import Http404
-from django.http.response import HttpResponse, JsonResponse
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import format_html
 from django.views.decorators.http import require_POST
 
 from eventlog.models import ApiRequestLog, create_event
@@ -42,11 +49,15 @@ from seqauto.models import (
 from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from seqauto.qc.sequencing_run_utils import SEQUENCING_RUN_QC_COLUMNS
-from seqauto.sequencing_files.sample_sheet import (
-    assign_old_sample_sheet_data_to_current_sample_sheet,
-)
 from snpdb.models import VCF, Sample, UserSettings
-from upload.models import UploadedFileTypes
+from snpdb.models.models_enums import ProcessingStatus
+from upload.models import UploadedFileTypes, UploadPipeline
+from upload.tasks.retry_upload_pipelines_task import (
+    fail_stuck_upload_pipelines,
+    get_retryable_upload_pipelines,
+    retry_message,
+    retry_upload_pipelines,
+)
 
 
 def sequencing_data(request):
@@ -152,7 +163,7 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
             multi_sample_vcfs.append(rv)
 
     single_sample_vcfs = {}
-    ss_vcf_qs = SingleSampleVCF.objects.filter(alignment_file__sequencing_sample__sample_sheet=sample_sheet)
+    ss_vcf_qs = SingleSampleVCF.objects.filter(sequencing_sample__sample_sheet=sample_sheet)
     for single_sample_vcf in ss_vcf_qs.select_related("backendvcf__uploaded_vcf__vcf"):
         single_sample_vcfs[single_sample_vcf.pk] = run_vcf(single_sample_vcf, single_sample_vcf.vcf)
 
@@ -161,6 +172,37 @@ def _get_sequencing_run_vcfs(sequencing_run: SequencingRun, sample_sheet, user) 
         "sequencing_sample_vcfs": dict(sequencing_sample_vcfs),
         "single_sample_vcfs": single_sample_vcfs,
     }
+
+
+def _get_run_upload_pipelines_qs(run_vcfs: dict) -> QuerySet[UploadPipeline]:
+    """ The import pipelines of the run's VCFs (from _get_sequencing_run_vcfs) """
+    all_run_vcfs = [*run_vcfs["multi_sample_vcfs"], *run_vcfs["single_sample_vcfs"].values()]
+    for sample_run_vcfs in run_vcfs["sequencing_sample_vcfs"].values():
+        all_run_vcfs.extend(sample_run_vcfs)
+    vcf_ids = {run_vcf.vcf.pk for run_vcf in all_run_vcfs if run_vcf.vcf}
+    return UploadPipeline.objects.filter(uploadedvcf__vcf__in=vcf_ids)
+
+
+def _get_run_import_counts(run_vcfs: dict, user) -> dict:
+    """ For the run page's retry form (#2188): failed imports the user may retry, and imports still processing -
+        the retry checks whether a worker is still running those """
+    upload_pipelines_qs = _get_run_upload_pipelines_qs(run_vcfs)
+    return {
+        "num_retryable_imports": len(get_retryable_upload_pipelines(upload_pipelines_qs, user)),
+        "num_processing_imports": upload_pipelines_qs.filter(status=ProcessingStatus.PROCESSING).count(),
+    }
+
+
+@require_POST
+def sequencing_run_retry_failed_imports(request, sequencing_run_id):
+    sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
+    sample_sheet = sequencing_run.get_current_sample_sheet()
+    run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+    upload_pipelines_qs = _get_run_upload_pipelines_qs(run_vcfs)
+    num_stuck = fail_stuck_upload_pipelines(upload_pipelines_qs)
+    num_queued = retry_upload_pipelines(get_retryable_upload_pipelines(upload_pipelines_qs, request.user))
+    messages.add_message(request, messages.INFO, retry_message(num_queued, num_stuck))
+    return HttpResponseRedirect(reverse("view_sequencing_run", kwargs={"sequencing_run_id": sequencing_run.pk}))
 
 
 @dataclass
@@ -246,6 +288,24 @@ def _tso500_pair_urls_by_sequencing_sample(sequencing_run) -> dict[int, dict[str
     return pair_urls
 
 
+API_LOG_NOTE_MESSAGE_DAYS = 7
+
+
+def _add_recent_api_log_note_message(request, sequencing_run):
+    """ Points an admin at the API Log tab when a recent call did something to the run worth knowing about,
+        eg moved its data onto a re-sent sample sheet (#2349) """
+    content_type = ContentType.objects.get_for_model(SequencingRun)
+    since = timezone.now() - timedelta(days=API_LOG_NOTE_MESSAGE_DAYS)
+    latest = ApiRequestLog.for_object(content_type, sequencing_run.pk).filter(created__gte=since) \
+        .exclude(notes=[]).order_by("-created").first()
+    if latest:
+        api_log_url = reverse("view_sequencing_run_tab", kwargs={"sequencing_run_id": sequencing_run.pk,
+                                                                 "tab": "api-log"})
+        message = format_html('API call {}: {} - see the <a href="{}">API Log</a>',
+                              naturaltime(latest.created), latest.notes[0], api_log_url)
+        messages.add_message(request, messages.INFO, message, extra_tags="html")
+
+
 def view_sequencing_run(request, sequencing_run_id, tab=None):
     sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
 
@@ -289,11 +349,16 @@ def view_sequencing_run(request, sequencing_run_id, tab=None):
         context["sequencing_samples"] = sample_sheet.sequencingsample_set.order_by("sample_number").select_related(
             "enrichment_kit",
         ).prefetch_related("samplefromsequencingsample_set__sample__patient", "sequencingsampledata_set")
-        context['data_out_of_date_from_current_sample_sheet'] = sequencing_run.is_data_out_of_date_from_current_sample_sheet
-        context.update(_get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user))
+        run_vcfs = _get_sequencing_run_vcfs(sequencing_run, sample_sheet, request.user)
+        context.update(run_vcfs)
+        if settings.UPLOAD_ENABLED:
+            context.update(_get_run_import_counts(run_vcfs, request.user))
         context.update(_get_sequencing_run_patients(sample_sheet, request.user))
     except Exception:
         log_traceback()
+
+    if request.user.is_superuser:
+        _add_recent_api_log_note_message(request, sequencing_run)
 
     if not tab:
         tab = "patients" if context.get("run_patients") else "data"
@@ -469,16 +534,6 @@ def reload_experiment_name(request, sequencing_run_id):
     create_event(request.user, "SequencingRun Experiment change", msg)
 
     return JsonResponse(str(experiment), safe=False)
-
-
-@require_POST
-def assign_data_to_current_sample_sheet(request, sequencing_run_id):
-    sequencing_run = get_object_or_404(SequencingRun, pk=sequencing_run_id)
-    if not request.user.is_superuser:
-        raise PermissionDenied()
-
-    assign_old_sample_sheet_data_to_current_sample_sheet(request.user, sequencing_run)
-    return HttpResponse()
 
 
 def view_unaligned_reads(request, unaligned_reads_id):

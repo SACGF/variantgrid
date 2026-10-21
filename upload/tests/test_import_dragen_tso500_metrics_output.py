@@ -81,7 +81,7 @@ def edited_metrics_file(tmp_dir: str, *replacements) -> str:
         assert old in contents, old
         contents = contents.replace(old, new)
     path = os.path.join(tmp_dir, "edited_MetricsOutput.tsv")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(contents)
     return path
 

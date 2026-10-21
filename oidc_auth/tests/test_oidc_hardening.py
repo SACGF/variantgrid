@@ -7,6 +7,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.test import RequestFactory, TestCase, override_settings
+from django.urls import ResolverMatch
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from mozilla_django_oidc.middleware import SessionRefresh
 from requests import HTTPError, Response
@@ -47,11 +48,31 @@ def _browser_login_backend():
 
 
 class HandleOIDC400MiddlewareTest(TestCase):
-    """ Only the provider rejecting a stale code (400) on /oidc/ is swallowed into a redirect """
+    """ Only a stale/replayed /oidc/ callback is swallowed into a redirect """
 
     def setUp(self):
         self.middleware = HandleOIDC400Middleware(get_response=lambda request: None)
         self.factory = RequestFactory()
+
+    def _callback_view(self, oidc_states=None, url_name="oidc_authentication_callback"):
+        """ process_view on a callback for state "abc", with the session's oidc_states (None = no key) """
+        request = self.factory.get("/oidc/callback/", {"state": "abc", "code": "abc"})
+        request.resolver_match = ResolverMatch(lambda r: None, (), {}, url_name=url_name)
+        SessionMiddleware(lambda r: None).process_request(request)
+        if oidc_states is not None:
+            request.session["oidc_states"] = oidc_states
+        return self.middleware.process_view(request, None, (), {})
+
+    def test_unknown_callback_state_redirects_to_root(self):
+        response = self._callback_view(oidc_states={"other": {}})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/")
+
+    def test_callback_left_to_view(self):
+        """ A known state, no oidc_states at all (the view's login_failure) or another URL isn't intercepted """
+        self.assertIsNone(self._callback_view(oidc_states={"abc": {}}))
+        self.assertIsNone(self._callback_view())
+        self.assertIsNone(self._callback_view(oidc_states={"other": {}}, url_name="index"))
 
     def test_rejected_token_on_oidc_path_redirects_to_root(self):
         request = self.factory.get("/oidc/callback/")

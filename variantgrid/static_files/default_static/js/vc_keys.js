@@ -131,7 +131,10 @@ const EKey = (function() {
         },
 
         asSafeHtml: function(val) {
-            const html = $('<div>' + val + '</div>');
+            // Parsed in a document with no browsing context, so nothing in val loads or runs before it's checked
+            const container = document.implementation.createHTMLDocument('').createElement('div');
+            container.innerHTML = val;
+            const html = $(container);
 
             const allTags = html.find('*');
             for (const tag of allTags) {

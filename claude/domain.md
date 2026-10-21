@@ -114,16 +114,16 @@ list nodes and coverage use them.
 
 ## Annotation (annotation)
 
-**AnnotationVersion** - `annotation/models/models.py:AnnotationVersion`. The bundle per build of sub-versions
+**AnnotationVersion** - `annotation/models/models_annotation_version.py:AnnotationVersion`. The bundle per build of sub-versions
 (VariantAnnotationVersion, GeneAnnotationVersion, ClinVarVersion, HPA…) that an analysis is pinned to.
 
-**VariantAnnotationVersion (VAV)** - `annotation/models/models.py:VariantAnnotationVersion`. One VEP configuration per build:
+**VariantAnnotationVersion (VAV)** - `annotation/models/models_version.py:VariantAnnotationVersion`. One VEP configuration per build:
 `vep` (code version), `columns_version` (which columns the pipeline writes), consortium, gene annotation release, and a
 lifecycle `status` NEW → ACTIVE → HISTORICAL. "The VAV" means the ACTIVE one (`VariantAnnotationVersion.latest`). Creating a
 new VAV re-annotates every variant - a shared, hours-long operation.
 
-**AnnotationRun** - `annotation/models/models.py:AnnotationRun`. One batch (an `AnnotationRangeLock` of variant pks) through
-dump → VEP → upload, with `AnnotationStatus` (`annotation/models/models_enums.py`); `vg status` counts the ones in flight, and
+**AnnotationRun** - `annotation/models/models_annotation_run.py:AnnotationRun`. One batch (an `AnnotationRangeLock` of variant pks) through
+dump → VEP → upload, with `AnnotationStatus` (`annotation/enums/annotation_enums.py`); `vg status` counts the ones in flight, and
 lists separately the abandoned ones nothing will dispatch (no range lock, or on a HISTORICAL version).
 
 **VariantAnnotation / VariantTranscriptAnnotation** - `annotation/models/models.py:VariantAnnotation`,
@@ -131,7 +131,7 @@ lists separately the abandoned ones nothing will dispatch (no range lock, or on 
 row the grids read; VariantTranscriptAnnotation has every transcript. `annotation_variantannotation` is the biggest table
 in every deployment.
 
-**ClinVar / ClinVarVersion** - `annotation/models/models.py:ClinVar`, `ClinVarVersion`. The imported ClinVar summary per
+**ClinVar / ClinVarVersion** - `annotation/models/models_clinvar.py:ClinVar`, `ClinVarVersion`. The imported ClinVar summary per
 version; ClinVarExport (below) is the other direction.
 
 ## Classification (classification)
@@ -174,7 +174,7 @@ An Analysis is a DAG of nodes over one build and AnnotationVersion; each node is
 down the graph into a queryset - not a stored result set. Source nodes (sample, cohort, trio, pedigree, all variants) start
 the graph; filter nodes narrow it.
 
-**NodeVersion / NodeCache / NodeTask** - `analysis/models/nodes/analysis_node.py:NodeVersion`. Each node edit bumps the
+**NodeVersion / NodeCache / NodeTask** - `analysis/models/nodes/node_version.py:NodeVersion`. Each node edit bumps the
 version; counts live on NodeVersion, caches hold materialised variant sets for slow nodes,
 and NodeTask is the lease the celery scheduler works from.
 
@@ -203,7 +203,11 @@ tag settings page; `settings.TAG_REQUIRES_CLASSIFICATION` only names the one a f
 
 **Organization / Lab** - `snpdb/models/models.py:Organization`, `Lab`. A Lab belongs to an Organization; each has a
 `group_name` (`org/lab`) that names its Django Group, and lab membership *is* group membership. Classifications are owned by a
-Lab; sharing levels map to these groups.
+Lab; sharing levels map to these groups. `Lab.external` marks a lab whose records are curated on another system: on a
+curation deployment, the labs pulled down from Shariant; on Shariant, every lab, so `lab__external=False` selects nothing there.
+A lab's classification settings (ClinVar key, `classification_config`, research, uploads) live in classification as
+`classification/models/classification_settings_models.py:LabClassificationSettings` (`lab.classification_settings`), with
+`OrganizationClassificationSettings` for the organization's `classification_config`; every Lab and Organization has one.
 
 **Guardian permissions** - object-level read/write via `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsMixin`
 (`can_view`, `check_can_write`, `filter_for_user`). Standard groups `all_users` and `public`

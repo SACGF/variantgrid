@@ -26,13 +26,14 @@ discordance or weekly updates, from `settings.DISCORDANCE_EMAIL`; the Monday `di
 `send_summary_email_to_user` per opted-in user and skips anyone without an active lab; `user_messages/signal_handlers.py:email_new_message_handler`
 emails a new inbox message; `variantgrid/views.py:keycloak_admin` sends the welcome email as the `pre_password_reset`
 callback of `snpdb/keycloak.py:Keycloak.add_user`; and MME match notifications go through the same path
-(`mme/apps.py:MMEConfig.ready` refuses to start with `MME_ENABLED` unless `MME_FROM_EMAIL` and `SEND_EMAILS` are both set,
-precisely because `send_mail` is silently a no-op otherwise). `library/email.py:Email` is the one sender that bypasses the
+(`snpdb/checks.py:check_feature_dependencies` is a system check that fails `MME_ENABLED` unless `MME_FROM_EMAIL` and
+`SEND_EMAILS` are both set, precisely because `send_mail` is silently a no-op otherwise, and
+`mme/notifications.py:notify_match` raises an admin notification when no channel accepted a match). `library/email.py:Email` is the one sender that bypasses the
 log - it wraps Django's `send_mail` with `fail_silently=False` and is only built (not sent) in `keycloak_admin`.
 
 Reading the log: `email_manager/views/email_manager_views.py:email_manager_view` mounts a DataTable whose config
 `EmailColumns` raises `PermissionDenied` for non-superusers, searches subject and recipients in `power_search`, sorts
-newest first and expands each row through `email_detail` (`DatatableConfig._row_expand_ajax`). `email_detail` splits
+newest first and expands each row through `email_detail` (`DatatableConfig.set_expand_ajax`). `email_detail` splits
 `recipient_list` back into addresses, matches them to `User.email` and lists the unrecognised remainder; `email_pure` renders
 only the body. Both are superuser-only, since a notification can carry another lab's details, and both templates put
 the stored HTML in a sandboxed `<iframe srcdoc>` rather than inlining it (#1521,
