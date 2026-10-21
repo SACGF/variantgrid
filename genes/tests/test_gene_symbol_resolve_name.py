@@ -1,9 +1,9 @@
 """GeneSymbol.resolve_name and GeneSymbol.resolve_names: which current symbol a name as written stands for."""
 from django.test import TestCase
 
+from genes.enums import GeneSymbolAliasSource, HGNCStatus
 from genes.models import HGNC, GeneSymbol, GeneSymbolAlias, HGNCImport
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 
 # name as written -> (gene symbol, HGNC pk), or the error
 EXPECTED = {

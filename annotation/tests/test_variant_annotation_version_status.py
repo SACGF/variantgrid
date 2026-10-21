@@ -20,8 +20,8 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
+from genes.enums import AnnotationConsortium
 from genes.models import GeneAnnotationImport, GeneAnnotationRelease
-from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

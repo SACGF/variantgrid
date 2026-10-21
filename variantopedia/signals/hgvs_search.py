@@ -15,6 +15,7 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.template.defaultfilters import pluralize
 
+from genes.enums import AnnotationConsortium, MANEStatus
 from genes.hgvs import (
     HGVSException,
     HGVSImplementationException,
@@ -26,7 +27,6 @@ from genes.hgvs import (
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele, HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import VariantCoordinateAndDetails
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
-from genes.models_enums import AnnotationConsortium, MANEStatus
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info
 from snpdb.models import (

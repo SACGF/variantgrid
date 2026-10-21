@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db.models.functions import Upper
 
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
+from genes.enums import AnnotationConsortium
 from genes.models import (
     HGNC,
     CdotDataVersion,
@@ -16,7 +17,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import get_cdot_transcript_id_and_version
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip

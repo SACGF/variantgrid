@@ -9,6 +9,7 @@ from Bio import Entrez, SeqIO
 from django.db.models.functions import Upper
 
 from annotation.models import GenePubMedCount
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     Gene,
     GeneSymbol,
@@ -18,7 +19,6 @@ from genes.models import (
     TranscriptVersionSequenceInfo,
     TranscriptVersionSequenceInfoFastaFileImport,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
 from library.utils import iter_http_lines, sha256sum_str

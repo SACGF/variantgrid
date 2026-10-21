@@ -5,9 +5,9 @@ from django.core.management import BaseCommand, CommandError
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSComponents
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
-from genes.models_enums import AnnotationConsortium
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild
 

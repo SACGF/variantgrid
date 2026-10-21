@@ -33,10 +33,10 @@ from annotation.vep_plugin_display import (
 )
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from genes.enums import AnnotationConsortium
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneCopyNumberEvent, GeneFusion, GnomADGeneConstraint, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_choices_formatter
 from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback

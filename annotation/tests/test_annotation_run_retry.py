@@ -28,7 +28,7 @@ from annotation.models import (
 )
 from annotation.tasks import annotate_variants as annotate_variants_module
 from annotation.tasks.annotate_variants import annotation_run_retry, reset_annotation_run_for_retry
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

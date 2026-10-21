@@ -17,7 +17,7 @@ from annotation.models import (
     VariantAnnotation,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

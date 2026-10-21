@@ -21,6 +21,7 @@ from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
+from genes.enums import PanelAppConfidence
 from genes.models import (
     ActiveSampleGeneList,
     CustomTextGeneList,
@@ -29,7 +30,6 @@ from genes.models import (
     PanelAppPanelLocalCache,
     SampleGeneList,
 )
-from genes.models_enums import PanelAppConfidence
 from genes.panel_app import get_panel_app_local_cache
 from pathtests.models import PathologyTestVersion
 from patients.models import Patient

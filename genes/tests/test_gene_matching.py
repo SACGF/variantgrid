@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
 
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from genes.gene_matching import (
     MAX_GENE_SYMBOL_LENGTH,
     GeneSymbolMatcher,
@@ -22,7 +23,6 @@ from genes.models import (
     ReleaseGeneSymbolGene,
     ReleaseGeneVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from snpdb.models import GenomeBuild
 
 

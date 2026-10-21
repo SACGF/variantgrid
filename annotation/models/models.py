@@ -45,6 +45,7 @@ from annotation.external_search_terms import (
 from annotation.models.models_citations import Citation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from genes.enums import AnnotationConsortium
 from genes.hgvs.hgvs_matcher import HGVSMatcher
 from genes.models import (
     Gene,
@@ -52,7 +53,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict
