@@ -21,7 +21,6 @@ django_cache_memoize
 django-compressor
 django_crispy_forms
 django_datetime_utc
-django-extensions
 django-guardian
 django-js-reverse
 django_json_widget

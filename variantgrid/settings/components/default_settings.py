@@ -1033,7 +1033,6 @@ INSTALLED_APPS = [
     'dal_select2',  # DAL Plugin
     'user_messages',
     'django_js_reverse',
-    'django_extensions',
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
