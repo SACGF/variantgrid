@@ -158,50 +158,15 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
         {% endif %}
         {% for cwr in cached_web_resources %}
             {% labelled label=cwr.name %}
-                <div class='cached-web-resource-container'>
-                {% if cwr.import_status == 'I' %}
-                    <i class="fa fa-spinner"></i> <b>Import started: </b>{{ cwr.import_date }}
-                {% else %}
-                    {% if user.is_superuser %}
-                        {% if cwr.import_status != 'S' and not cwr.disabled_url %}
-                        <b>Status:</b> {{ cwr.get_import_status_display }}
-                        <div class='install-instructions'>Click the button below to retrieve annotations</div>
-                        {% endif %}
-                        {% if cwr.disabled_url %}
-                            <span class="text-muted">Updates disabled - see <a href="{{ cwr.disabled_url }}" target="_blank">{{ cwr.disabled_url }}</a></span>
-                        {% else %}
-                            <button class='load-cached-web-resource btn btn-primary mr-2' cached-web-resource='{{ cwr.name }}' ><i class="fas fa-key" title="Admin only functionality"></i> Update from web</button>
-                        {% endif %}
-                    {% endif %}
-                    <b>Imported:</b>&nbsp;{% timestamp cwr.modified time_ago=True %}.
-                    {% if not cwr.disabled_url %}
-                        {% if cwr.import_status == 'S' or user.is_superuser %}
-                            <b>Details:</b>&nbsp;{{ cwr.description }}
-                        {% else %}
-                            <b>Status:</b> {{ cwr.get_import_status_display }}
-                        {% endif %}
-                    {% endif %}
-                {% endif %}
-                </div>
+                {% include "annotation/cached_web_resource.html" %}
             {% endlabelled %}
         {% endfor %}
     </div>
 </div>
 
+<script src="{% static 'js/annotation/cached_web_resource.js' %}"></script>
 <script>
-    $(".load-cached-web-resource").click(function() {
-        const cwr_name = $(this).attr("cached-web-resource");
-        const loadButton = $(this);
-
-        $.ajax({
-            type: "POST",
-            url: Urls.load_cached_web_resource(cwr_name),
-            success: function(data) {
-                const container = loadButton.parent(".cached-web-resource-container");
-                container.html('<i class="fa fa-spinner"></i>');
-            }
-        });
-    });
+    initCachedWebResources();
 
     {% if not annotations_all_imported %}
         $(document).ready(function() {
