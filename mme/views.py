@@ -10,8 +10,9 @@ from django.views.decorators.http import require_POST
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import Classification, ClassificationModification
 from mme.disclaimers import connected_nodes, effective_disclaimer, node_disclaimer
+from mme.enums import MMESubmissionStatus
 from mme.metrics import get_metrics
-from mme.models import MMEInboundMatch, MMEMatchResult, MMESubmission, MMESubmissionStatus
+from mme.models import MMEInboundMatch, MMEMatchResult, MMESubmission
 from mme.serializers.patient_profile import (
     build_patient_profile,
     classification_genomic_feature,
