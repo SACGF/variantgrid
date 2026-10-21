@@ -63,6 +63,26 @@ class TestSetGeneListFromText(TestCase):
         rows = dict(gene_list.genelistgenesymbol_set.values_list("original_name", "modification_info"))
         self.assertEqual({"KAL1": "original", "GATA2": "edit"}, rows)
 
+    def test_warning_follows_the_text(self):
+        """ The ambiguous alias warning goes once the name is replaced, and stays while the name is kept """
+        for symbol in ["SEPTIN2", "SEPTIN6", "RUNX1"]:
+            GeneSymbol.objects.create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        user = User.objects.get_or_create(username='test_user')[0]
+        gene_list = GeneList.objects.create(name="test_warning", user=user)
+        matcher = GeneSymbolMatcher()
+        matcher.create_gene_list_gene_symbols_from_text(gene_list, "SEPTX")
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias", gene_list.error_message)
+
+        matcher.set_gene_list_gene_symbols_from_text(gene_list, "SEPTX RUNX1")
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias", gene_list.error_message)
+
+        matcher.set_gene_list_gene_symbols_from_text(gene_list, "SEPTIN2 RUNX1")
+        gene_list.refresh_from_db()
+        self.assertFalse(gene_list.error_message)
+
 
 class TestOversizedTokens(TestCase):
     def test_tokenize_splits_oversized(self):
