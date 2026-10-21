@@ -12,24 +12,24 @@ from django.db import models, transaction
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
+from analysis.enums import (
+    AnalysisTemplateType,
+    AnalysisType,
+    CandidateStatus,
+    DuoSample,
+    NodeStatus,
+    QuadSample,
+    SNPMatrix,
+    TrioSample,
+)
 from analysis.models import (
     Analysis,
     AnalysisNode,
     AnalysisTemplate,
     AnalysisTemplateVersion,
     AutoLaunchAnalysisTemplate,
-    CandidateStatus,
     FilterNodeItem,
     NodeGraphType,
-)
-from analysis.models.enums import (
-    AnalysisTemplateType,
-    AnalysisType,
-    DuoSample,
-    NodeStatus,
-    QuadSample,
-    SNPMatrix,
-    TrioSample,
 )
 from analysis.models.nodes.node_types import (
     get_node_class_choices,

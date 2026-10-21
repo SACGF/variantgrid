@@ -1,9 +1,9 @@
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from analysis.enums import NodeMatchInput
 from analysis.forms.forms_nodes import ClassificationsNodeForm
 from analysis.models import Analysis
-from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
 from analysis.tests.utils import AnalysisSetupMixin

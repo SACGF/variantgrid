@@ -7,9 +7,9 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from analysis.enums import NodeStatus, TagNodeInput, TagNodeMode, ZygosityNodeZygosity
 from analysis.grids import VariantGrid
-from analysis.models import Analysis, NodeStatus, TagNode, VariantTag
-from analysis.models.enums import TagNodeInput, TagNodeMode, ZygosityNodeZygosity
+from analysis.models import Analysis, TagNode, VariantTag
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,

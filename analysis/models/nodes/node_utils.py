@@ -22,9 +22,9 @@ from django.db.models import F, QuerySet
 from django.db.models.query_utils import Q
 from django.utils import timezone
 
+from analysis.enums import NodeErrorSource, NodeStatus
 from analysis.exceptions import NonFatalNodeError
-from analysis.models import Analysis, NodeStatus
-from analysis.models.enums import NodeErrorSource
+from analysis.models import Analysis
 from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode
 from analysis.models.nodes.node_counts import (
     get_tag_node_counts_dict,

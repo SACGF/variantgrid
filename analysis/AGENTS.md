@@ -32,7 +32,7 @@ Patterns here:
   copying edges in a clone) sets `node.valid = node.is_valid` itself. Move/connect edits go through `analysis/views/views_json.py:NodeUpdate`.
 - Scheduling is state-driven, not a prebuilt chain: `analysis/tasks/analysis_update_tasks.py:create_and_launch_analysis_tasks`
   (on `scheduling_single_worker`) calls `analysis/tasks/analysis_update_tasks.py:lease_ready_nodes`, which claims DIRTY
-  nodes whose parents are all in `analysis/models/enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
+  nodes whose parents are all in `analysis/enums/analysis_enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
   fails fast with ERROR_WITH_PARENT); each `analysis/tasks/node_update_tasks.py:update_node_task` re-triggers the
   dispatcher when it finishes. `analysis/tasks/analysis_update_tasks.py:dispatch_analysis_backlog` is the periodic sweep.
 - `analysis/scheduler_status.py` is the operator's view of the lease state (the superuser Analysis Status page):

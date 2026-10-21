@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 from django.http.response import HttpResponse
 
+from analysis.enums import SetOperations
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import (
     AlleleFrequencyNodeForm,
@@ -31,7 +32,6 @@ from analysis.forms.forms_nodes import (
 )
 from analysis.grids import VariantGrid
 from analysis.models import MOINode, OntologyTerm, TagNode
-from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode

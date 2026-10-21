@@ -23,6 +23,7 @@ from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
 )
+from analysis.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.forms import (
     AnalysisChoiceForm,
     AnalysisNodeIssuesFilterForm,
@@ -43,7 +44,6 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.models.models_analysis import AnalysisClassification
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils

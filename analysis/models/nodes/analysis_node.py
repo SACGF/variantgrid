@@ -18,13 +18,13 @@ from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
+from analysis.enums import NodeErrorSource, NodeStatus
 from analysis.exceptions import (
     NodeNotFoundException,
     NodeOutOfDateException,
     NodeParentNotReadyException,
     NonFatalNodeError,
 )
-from analysis.models.enums import NodeErrorSource, NodeStatus
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin

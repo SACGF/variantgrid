@@ -4,8 +4,8 @@ from django.test import TestCase
 from django.urls import reverse
 from guardian.shortcuts import assign_perm
 
+from analysis.enums import TrioInheritance
 from analysis.models import Analysis, TrioNode
-from analysis.models.enums import TrioInheritance
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import prevent_request_warnings
 from library.guardian_utils import DjangoPermission

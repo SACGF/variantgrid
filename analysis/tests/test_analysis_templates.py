@@ -11,12 +11,12 @@ from django.utils import timezone
 from guardian.shortcuts import assign_perm
 
 from analysis.analysis_templates import get_sample_analysis, run_analysis_template
+from analysis.enums import AnalysisTemplateType
 from analysis.forms.forms_nodes import VCFLocusFiltersMixin
 from analysis.models import (
     Analysis,
     AnalysisTemplate,
     AnalysisTemplateRun,
-    AnalysisTemplateType,
     AnalysisTemplateVersion,
     AnalysisVariable,
 )

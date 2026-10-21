@@ -17,8 +17,8 @@ from django.db.utils import OperationalError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from analysis.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
 from analysis.models import AllVariantsNode, AnalysisNode, NodeTask
-from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.tag_node import TagNode

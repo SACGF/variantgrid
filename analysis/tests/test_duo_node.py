@@ -14,8 +14,8 @@ samples_zygosity encoding: E=HET, R=HOM_REF, O=HOM_ALT, U=UNKNOWN, .=MISSING
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import DuoInheritance
 from analysis.models import Analysis, DuoNode
-from analysis.models.enums import DuoInheritance
 from analysis.models.nodes.family_inheritance import MOSAIC_JOINT_CALL_WARNING
 from analysis.models.nodes.sources.duo_node import COMP_HET_SIBLING_UNPHASED
 from annotation.fake_data import get_fake_annotation_version

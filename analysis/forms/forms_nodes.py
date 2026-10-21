@@ -11,12 +11,12 @@ from django.http import Http404
 from django.utils.text import slugify
 
 from analysis import models
-from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
-from analysis.models.enums import NodeMatchInput
+from analysis.enums import AnalysisTemplateType, NodeMatchInput, StructuralFilter
+from analysis.models import Analysis, AnalysisNode, MOINode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
-from analysis.models.nodes.filters.damage_node import DamageNode, StructuralFilter
+from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.models.nodes.filters.merge_node import MergeNode

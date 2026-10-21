@@ -7,8 +7,8 @@ from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase, override_settings
 
+from analysis.enums import DuoInheritance, NodeStatus, QuadInheritance, TrioInheritance
 from analysis.models import Analysis, DuoNode, QuadNode, SampleNode, TrioNode
-from analysis.models.enums import DuoInheritance, NodeStatus, QuadInheritance, TrioInheritance
 from analysis.models.nodes.sources.duo_node import DuoCompHet
 from analysis.models.nodes.sources.quad_node import QuadCompHet
 from analysis.models.nodes.sources.trio_node import CompHet

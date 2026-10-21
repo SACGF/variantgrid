@@ -2,8 +2,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout
 from django.conf import settings
 
+from analysis.enums import CandidateSearchType
 from analysis.forms import SampleCandidatesSearchForm
-from analysis.models import CandidateSearchType
 from analysis.views.views_candidate_search import (
     AbstractCandidateSearchView,
     AbstractNewCandidateSearchView,

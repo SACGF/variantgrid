@@ -13,16 +13,15 @@ from django.utils.timezone import localtime
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from analysis.enums import CandidateStatus, NodeStatus, TagLocation, TagNodeMode
 from analysis.models import (
     AnalysisTemplate,
     AnalysisVariable,
     Candidate,
     CandidateSearchRun,
-    CandidateStatus,
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import NodeStatus, TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node

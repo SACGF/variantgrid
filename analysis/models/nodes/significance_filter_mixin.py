@@ -1,4 +1,4 @@
-from analysis.models.enums import NodeMatchInput
+from analysis.enums import NodeMatchInput
 from snpdb.models.models_enums import AlleleOriginFilterDefault
 
 

@@ -4,8 +4,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from analysis.enums import DuoSample, QuadSample, TrioSample
 from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
-from analysis.models.enums import DuoSample, QuadSample, TrioSample
 from analysis.views.views_wizard import _confident_sex
 from library.django_utils.unittest_utils import URLTestCase
 from patients.models_enums import Sex

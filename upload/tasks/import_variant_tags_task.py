@@ -5,7 +5,8 @@ import pandas as pd
 from dateutil import parser
 from django.utils.timezone import make_aware
 
-from analysis.models import ImportedVariantTag, TagLocation, VariantTag, VariantTagsImport
+from analysis.enums import TagLocation
+from analysis.models import ImportedVariantTag, VariantTag, VariantTagsImport
 from library.django_utils import UserMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none

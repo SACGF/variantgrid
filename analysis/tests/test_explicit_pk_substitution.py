@@ -19,8 +19,8 @@ They deliberately exercise the parts the substitution touches or risks:
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import ZygosityNodeZygosity
 from analysis.models import Analysis
-from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.filters.population_node import PopulationNode

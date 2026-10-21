@@ -25,6 +25,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls.base import resolve, reverse
 
 from analysis.analysis_templates import get_sample_analysis
+from analysis.enums import AnalysisTemplateType, NodeStatus
 from analysis.grid_export import (
     format_items_iterator,
     get_canonical_transcript_collection_filename_part,
@@ -32,8 +33,7 @@ from analysis.grid_export import (
     node_grid_get_export_iterator,
 )
 from analysis.grids import ExportVariantGrid, VariantGrid
-from analysis.models import Analysis, AnalysisTemplate, AnalysisTemplateType, AnalysisVariable
-from analysis.models.enums import NodeStatus
+from analysis.models import Analysis, AnalysisTemplate, AnalysisVariable
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode

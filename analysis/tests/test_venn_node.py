@@ -2,8 +2,8 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
+from analysis.enums import NodeStatus, SetOperations
 from analysis.models import AllVariantsNode, AnalysisNode
-from analysis.models.enums import NodeStatus, SetOperations
 from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
 from analysis.tests.utils import AnalysisSetupMixin
 from snpdb.models import ProcessingStatus, VariantCollection

@@ -1,7 +1,8 @@
 """
-Enums for analyses and nodes: NodeStatus (the load lifecycle, with LOADING / CLAIMABLE / ERROR
-sets the scheduler reads), the inheritance modes for Trio, Quad and Duo nodes, set and group
-operations, tag-node modes, node error sources and colours. Stored codes: add values, never
+analysis' enums: analysis and template types, NodeStatus (the load lifecycle, with LOADING / CLAIMABLE /
+ERROR sets the scheduler reads), the inheritance modes and sample roles for Trio, Quad and Duo nodes, set
+and group operations, tag-node modes and tag locations, node error sources, the candidate search types
+and statuses, and the damage node's ALoFT and structural filter options. Stored codes: add values, never
 renumber.
 """
 import operator
@@ -9,6 +10,7 @@ from functools import reduce
 
 from django.db import models
 
+from annotation.enums import ALoFTPrediction
 from library.utils import Constant
 from patients.models_enums import Zygosity
 
@@ -209,3 +211,52 @@ class TagLocation(models.TextChoices):
     EXTERNAL = 'E', 'External Import'
     GENE_PAGE = 'G', 'Gene Page'
     VARIANT_DETAILS = 'V', 'Variant Details'
+
+
+class CandidateSearchType(models.TextChoices):
+    REANALYSIS_NEW_ANNOTATION = 'R', 'Reanalysis - new annotation'
+    CROSS_SAMPLE_CLASSIFICATION = 'S', 'Cross Sample Classification'
+    CLASSIFICATION_EVIDENCE_UPDATE = 'E', 'Classification Evidence Update'
+
+    def get_methods(self) -> str:
+        """ This is the description of the latest methods, which will be saved to the DB at execution time
+            So you can update it over time and it'll keep historical methods """
+        if self is CandidateSearchType.REANALYSIS_NEW_ANNOTATION:
+            methods = """Find analyses for P/LP ClinVar variants in latest version that are not in analysis version."""
+        elif self is CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION:
+            methods = """Find samples that have a variant classified in another sample, but not themselves"""
+        elif self is CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE:
+            methods = """Find Classifications that have new annotation information (gnomAD and pathogenicity predictions)"""
+        else:
+            raise ValueError(f"Method not defined for {self}")
+        return methods
+
+    @property
+    def is_analysis_type(self):
+        return self in (CandidateSearchType.REANALYSIS_NEW_ANNOTATION, )
+
+    @property
+    def is_classification_type(self):
+        return self in (CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION, CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE)
+
+
+class CandidateStatus(models.TextChoices):
+    OPEN = 'O', 'OPEN'
+    RESOLVED = 'R', 'RESOLVED'
+    HIDDEN = 'D', 'HIDDEN'
+    HIGHLIGHTED = 'L', 'HIGHLIGHTED'
+
+
+class ALoFTPredictionOptions(models.TextChoices):
+    """ Slightly different options in dropdown from annotation values """
+    DAMAGING = "a", "Recessive / Dominant"
+    RECESSIVE = ALoFTPrediction.RECESSIVE, "Recessive"
+    DOMINANT = ALoFTPrediction.DOMINANT, "Dominant"
+
+
+class StructuralFilter(models.TextChoices):
+    """ Whether to keep only, or drop, the rows stored as a symbolic alt with an SVLEN - SVs, CNVs
+        and the gene-level events. @see Variant.get_symbolic_q """
+    ANY = 'A', "Any"
+    ONLY = 'O', "Structural only"
+    EXCLUDE = 'E', "Exclude structural"

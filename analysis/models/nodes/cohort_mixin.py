@@ -7,7 +7,7 @@ from typing import Optional
 
 from django.db.models import Q, QuerySet
 
-from analysis.models.enums import GroupOperation
+from analysis.enums import GroupOperation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.models.nodes.node_query_mixin import (

@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.fields import FloatField
 
-from analysis.models.enums import MinimisationResultType, MinimisationStrategy
+from analysis.enums import MinimisationResultType, MinimisationStrategy
 from snpdb.models import Sample, SoftwareVersion
 from snpdb.models.models_enums import ImportStatus
 

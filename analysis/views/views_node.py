@@ -16,12 +16,12 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis import forms
+from analysis.enums import NodeStatus, SNPMatrix
 from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
 from analysis.forms import VCFLocusFilterForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType
-from analysis.models.enums import NodeStatus, SNPMatrix
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
