@@ -9,7 +9,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import CASCADE, SET_NULL, JSONField, QuerySet
 from django.urls import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.enums import EffectiveDate
 from annotation.models.models_clinvar import ClinVarRecord

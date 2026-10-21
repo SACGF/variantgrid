@@ -6,7 +6,7 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from classification.models.classification import Classification, ClassificationModification
 from sync.models.models import SyncDestination, SyncRun

@@ -12,7 +12,7 @@ from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from analysis.models.nodes.node_counts import get_node_extra_filters_q
 from library.django_utils import thread_safe_unique_together_get_or_create

@@ -13,8 +13,8 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timezone import localtime
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from genes.models.models_gene import Gene, GeneSymbol, GeneSymbolAlias
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease, ReleaseGeneSymbol

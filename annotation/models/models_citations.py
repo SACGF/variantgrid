@@ -13,7 +13,7 @@ from django.db import models
 from django.db.models import TextField
 from django.urls import reverse
 from django.utils.timezone import now
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.enums import CitationSource, EntrezDbType
 from library.log_utils import report_exc_info

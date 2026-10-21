@@ -15,8 +15,8 @@ from django.db.models import CASCADE, Count, Q, QuerySet
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd

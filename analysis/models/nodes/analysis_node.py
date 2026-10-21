@@ -15,8 +15,8 @@ from django.db import connection, models, transaction
 from django.db.models import QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from analysis.enums import NodeErrorSource, NodeStatus
 from analysis.exceptions import (
@@ -552,10 +552,9 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
                 # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
                 # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
                 Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
-            result = self._save(*args, **kwargs)
+            self._save(*args, **kwargs)
             if not self._saved_by_parent:
                 Analysis.objects.filter(pk=self.analysis_id).update(modified=timezone.now())
-            return result
 
     def _validity_inputs_changed(self) -> bool:
         """ valid is stored at save time - recomputing it (get_errors) costs queries for the node, its

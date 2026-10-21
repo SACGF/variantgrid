@@ -23,8 +23,10 @@ from classification.models import (
     EvidenceMixin,
     classification_flag_types,
 )
+from classification.models.classification import Classification
 from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
+from library.django_utils.change_tracking import active_collector
 from library.log_utils import report_exc_info
 from library.utils import DebugTimer, reset_timer
 
@@ -360,8 +362,12 @@ class BulkClassificationInserter:
                     # we would be here if no data was patched
                     # update the classification with the new import_run, but don't update the modified date
                     # since nothing has otherwise changed
-                    record.update_modified = False
-                    record.save()
+                    Classification.objects.filter(pk=record.pk).update(
+                        last_import_run=record.last_import_run,
+                        last_source_id=record.last_source_id,
+                    )
+                    if collector := active_collector():
+                        collector.record(Classification, updated=1, fields={"last_import_run", "last_source_id"})
 
             json_data = record.as_json(ClassificationJsonParams(
                 version=record_ref.version,

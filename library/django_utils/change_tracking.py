@@ -26,6 +26,7 @@ from typing import Any, Optional
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models, router, transaction
 from django.db.models.signals import post_delete, post_save
+from model_utils.fields import AutoLastModifiedField
 
 IGNORED_APP_LABELS = {"eventlog"}  # the API log never counts its own rows
 
@@ -108,7 +109,9 @@ def _tracked_collector(model: type[models.Model]) -> Optional[ChangeCollector]:
 
 
 def _auto_now_field_names(model: type[models.Model]) -> set[str]:
-    return {f.name for f in model._meta.concrete_fields if getattr(f, "auto_now", False)}
+    """ model_utils' TimeStampedModel.modified is an AutoLastModifiedField, which stamps without auto_now """
+    return {f.name for f in model._meta.concrete_fields
+            if getattr(f, "auto_now", False) or isinstance(f, AutoLastModifiedField)}
 
 
 def _record_save(sender, instance, created, update_fields=None, raw=False, **kwargs):  # pylint: disable=unused-argument

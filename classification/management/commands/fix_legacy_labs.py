@@ -37,7 +37,7 @@ class Command(BaseCommand):
             if count % 100 == 0:
                 print(f"Processed {count} classifications")
             legacy_class.lab = legacy
-            legacy_class.save(update_fields=["lab"])
+            Classification.objects.filter(pk=legacy_class.pk).update(lab=legacy)
             legacy_class.fix_permissions()
             count += 1
         print(f"Processed {count} classifications")

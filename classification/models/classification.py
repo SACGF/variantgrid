@@ -40,8 +40,8 @@ from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone as django_timezone
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from annotation.enums import (
     ClassificationDate,
@@ -917,7 +917,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             modification.save(update_fields=['delta', 'published_evidence'])
 
         self.evidence = self.last_edited_version.evidence
-        self.save(update_fields=['evidence'])
+        Classification.objects.filter(pk=self.pk).update(evidence=self.evidence)
 
     @transaction.atomic()
     def patch_value(self,

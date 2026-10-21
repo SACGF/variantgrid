@@ -25,8 +25,8 @@ from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin

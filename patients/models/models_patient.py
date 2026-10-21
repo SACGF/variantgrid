@@ -21,8 +21,8 @@ from django.db.models.functions import Concat
 from django.dispatch.dispatcher import Signal, receiver
 from django.urls.base import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from easy_thumbnails.files import get_thumbnailer
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import (
     ensure_mutally_exclusive_fields_not_set,

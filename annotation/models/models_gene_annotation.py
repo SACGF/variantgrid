@@ -11,7 +11,7 @@ from django.db import connection, models
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 

@@ -11,7 +11,7 @@ from re import RegexFlag
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.deletion import CASCADE
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from classification.enums import ClinVarKeyExcludePatternMode
 from classification.models.clinvar_key_models import ClinVarKey

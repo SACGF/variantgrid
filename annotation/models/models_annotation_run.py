@@ -16,7 +16,7 @@ from django.db.models.deletion import CASCADE, PROTECT
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_variant
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX

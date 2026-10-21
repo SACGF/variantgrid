@@ -19,7 +19,7 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Collate, Upper
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 from requests import RequestException
 
 from genes.enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus

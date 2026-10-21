@@ -51,7 +51,7 @@ class Command(BaseCommand):
             has_changes = fix_evidence(c.evidence)
             if has_changes:
                 if should_update:
-                    c.save(update_fields=['evidence'])
+                    Classification.objects.filter(pk=c.pk).update(evidence=c.evidence)
                 change_count += 1
 
             for cm in c.classificationmodification_set.filter(published=True).all():

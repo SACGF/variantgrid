@@ -24,8 +24,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm
+from model_utils.models import TimeStampedModel
 
 from analysis.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
