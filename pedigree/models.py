@@ -207,11 +207,6 @@ class SomalierPedigreeRelate(SomalierRelate):
         pass
 
 
-class PedigreeInheritance(models.TextChoices):
-    AUTOSOMAL_RECESSIVE = 'R', 'Auto. Recessive'
-    AUTOSOMAL_DOMINANT = 'D', 'Auto. Dominant'
-
-
 def create_automatch_pedigree(user, ped_file_family, cohort):
     """ Returns the existing pedigree over this family and cohort if there is one """
     if pedigree := Pedigree.objects.filter(cohort=cohort, ped_file_family=ped_file_family).first():

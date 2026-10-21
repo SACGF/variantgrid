@@ -9,7 +9,8 @@ from analysis.models.nodes.family_inheritance import AbstractFamilyInheritance
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.enums import Zygosity
-from pedigree.models import CohortSamplePedFileRecord, Pedigree, PedigreeInheritance
+from pedigree.enums import PedigreeInheritance
+from pedigree.models import CohortSamplePedFileRecord, Pedigree
 
 
 class PedigreeNode(AbstractCohortBasedNode):
