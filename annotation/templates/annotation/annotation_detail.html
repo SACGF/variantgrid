@@ -158,49 +158,45 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
         {% endif %}
         {% for cwr in cached_web_resources %}
             {% labelled label=cwr.name %}
-                <div class='cached-web-resource-container'>
-                {% if cwr.import_status == 'I' %}
-                    <i class="fa fa-spinner"></i> <b>Import started: </b>{{ cwr.import_date }}
-                {% else %}
-                    {% if user.is_superuser %}
-                        {% if cwr.import_status != 'S' and not cwr.disabled_url %}
-                        <b>Status:</b> {{ cwr.get_import_status_display }}
-                        <div class='install-instructions'>Click the button below to retrieve annotations</div>
-                        {% endif %}
-                        {% if cwr.disabled_url %}
-                            <span class="text-muted">Updates disabled - see <a href="{{ cwr.disabled_url }}" target="_blank">{{ cwr.disabled_url }}</a></span>
-                        {% else %}
-                            <button class='load-cached-web-resource btn btn-primary mr-2' cached-web-resource='{{ cwr.name }}' ><i class="fas fa-key" title="Admin only functionality"></i> Update from web</button>
-                        {% endif %}
-                    {% endif %}
-                    <b>Imported:</b>&nbsp;{% timestamp cwr.modified time_ago=True %}.
-                    {% if not cwr.disabled_url %}
-                        {% if cwr.import_status == 'S' or user.is_superuser %}
-                            <b>Details:</b>&nbsp;{{ cwr.description }}
-                        {% else %}
-                            <b>Status:</b> {{ cwr.get_import_status_display }}
-                        {% endif %}
-                    {% endif %}
-                {% endif %}
-                </div>
+                {% include "annotation/cached_web_resource.html" %}
             {% endlabelled %}
         {% endfor %}
     </div>
 </div>
 
 <script>
-    $(".load-cached-web-resource").click(function() {
-        const cwr_name = $(this).attr("cached-web-resource");
-        const loadButton = $(this);
+    const CACHED_WEB_RESOURCE_POLL_MS = 5000;
+
+    function pollCachedWebResource(cwrName) {
+        const container = $(`.cached-web-resource-container[cached-web-resource="${cwrName}"]`);
+        $.get(Urls.view_cached_web_resource(cwrName), function(html) {
+            const newContainer = $($.parseHTML(html)).filter(".cached-web-resource-container");
+            container.replaceWith(newContainer);
+            // 'C' is the brief window between the resource being re-created and its task starting
+            const importStatus = newContainer.attr("import-status");
+            if (importStatus === "C" || importStatus === "I") {
+                setTimeout(() => pollCachedWebResource(cwrName), CACHED_WEB_RESOURCE_POLL_MS);
+            }
+        });
+    }
+
+    $(document).on("click", ".load-cached-web-resource", function() {
+        const cwrName = $(this).attr("cached-web-resource");
+        const container = $(this).closest(".cached-web-resource-container");
 
         $.ajax({
             type: "POST",
-            url: Urls.load_cached_web_resource(cwr_name),
-            success: function(data) {
-                const container = loadButton.parent(".cached-web-resource-container");
+            url: Urls.load_cached_web_resource(cwrName),
+            success: function() {
                 container.html('<i class="fa fa-spinner"></i>');
+                setTimeout(() => pollCachedWebResource(cwrName), CACHED_WEB_RESOURCE_POLL_MS);
             }
         });
+    });
+
+    $('.cached-web-resource-container[import-status="I"]').each(function() {
+        const cwrName = $(this).attr("cached-web-resource");
+        setTimeout(() => pollCachedWebResource(cwrName), CACHED_WEB_RESOURCE_POLL_MS);
     });
 
     {% if not annotations_all_imported %}
