@@ -1,6 +1,6 @@
 from django.db import migrations
 
-from upload.models.models_enums import UploadedFileTypes
+from upload.enums import UploadedFileTypes
 
 
 def _add_all_fusions_file_type(apps, _schema_editor):

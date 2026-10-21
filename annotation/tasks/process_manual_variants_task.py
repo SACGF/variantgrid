@@ -11,8 +11,8 @@ from snpdb.clingen_allele import (
 )
 from snpdb.enums import ClinGenAlleleExternalRecordType, ImportStatus
 from snpdb.models import Variant, VariantCoordinate
+from upload.enums import VCFImportInfoSeverity
 from upload.models import SimpleVCFImportInfo
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 

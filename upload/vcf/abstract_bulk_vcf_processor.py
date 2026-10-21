@@ -15,14 +15,8 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
-from upload.models import (
-    ModifiedImportedVariant,
-    ModifiedImportedVariantOperation,
-    SimpleVCFImportInfo,
-    UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
-)
+from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, VCFPipelineStage
+from upload.models import ModifiedImportedVariant, SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.sql_copy_files import write_sql_copy_csv
 

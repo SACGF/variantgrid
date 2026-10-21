@@ -18,13 +18,13 @@ from snpdb.models import Variant
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantHash, VariantPKLookup
 from snpdb.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
-from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
-from upload.models.models_enums import (
+from upload.enums import (
     UploadedFileTypes,
     UploadStepOrigin,
     UploadStepTaskType,
     VCFPipelineStage,
 )
+from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
 from upload.upload_processing import process_upload_pipeline
 
 # MAX_VCF_FIELD_LENGTH = 131072

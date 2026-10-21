@@ -41,10 +41,10 @@ from snpdb.models import (
     Variant,
 )
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadPipeline,

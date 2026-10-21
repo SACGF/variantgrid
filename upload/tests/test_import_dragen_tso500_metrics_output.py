@@ -19,8 +19,9 @@ from seqauto.models import (
 )
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline
+from upload.models import FileUpload, UploadPipeline
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
