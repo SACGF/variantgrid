@@ -332,7 +332,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def summary_obj(self) -> ClassificationSummaryCacheObj:
-        from classification.models import ClassificationSummaryCacheObj
         return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
     last_source_id = models.TextField(blank=True, null=True)

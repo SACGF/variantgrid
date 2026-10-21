@@ -45,6 +45,7 @@ from annotation.external_search_terms import (
 from annotation.models.models_citations import Citation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from genes.hgvs.hgvs_matcher import HGVSMatcher
 from genes.models import (
     Gene,
     GeneSymbol,
@@ -208,7 +209,6 @@ class AbstractVariantAnnotation(models.Model):
             # parse, and nothing to graft a symbol onto. @see genes.models.fusion_canonical_str
             return hgvs_c
         if self.has_hgvs_c and self.symbol:
-            from genes.hgvs import HGVSMatcher
             hgvs_matcher = HGVSMatcher.instance(self.version.genome_build)
             hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)
             hgvs_variant.gene = self.symbol
@@ -797,7 +797,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
             None for what has no g.HGVS to write - <CNV>/<INS> and gene-level """
         if not variant.can_make_g_hgvs:
             return None
-        from genes.hgvs import HGVSMatcher
         matcher = HGVSMatcher.instance(variant.any_genome_build)
         return matcher.variant_to_g_hgvs(variant)
 
