@@ -231,7 +231,6 @@ class Test(URLTestCase):
 
 # TODO: Still to test
 # commented out PRIVATE_GRID_LIST_URLS
-# ('gene_lists/create_custom', views.create_custom_gene_list, name='create_custom_gene_list'),
 # ('view_canonical_transcript_collection/<pk>', views.view_canonical_transcript_collection, name='view_canonical_transcript_collection'),
 # ('qc_coverage/<genome_build_name>', views.qc_coverage, name='genome_build_qc_coverage'),
 # ('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_id>', views.gene_coverage_collection_graphs, name='gene_coverage_collection_graphs'),
