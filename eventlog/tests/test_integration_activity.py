@@ -3,7 +3,8 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils.timezone import now
 
-from eventlog.models import IntegrationActivity, IntegrationActivityStatus
+from eventlog.enums import IntegrationActivityStatus
+from eventlog.models import IntegrationActivity
 from eventlog.signals.integration_activity_status import integration_activity_status
 
 
