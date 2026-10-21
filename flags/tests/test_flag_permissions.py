@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from flags.models.enums import FlagStatus
+from flags.enums import FlagStatus
 from flags.models.models import (
     FlagCollection,
     FlagResolution,

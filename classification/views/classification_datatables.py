@@ -17,7 +17,8 @@ from classification.models import (
     ImportedAlleleInfo,
 )
 from classification.models.classification_utils import classification_gene_symbol_filter
-from flags.models import FlagCollection, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import FlagCollection
 from genes.hgvs import HGVSDisplay
 from genes.models import TranscriptVersion
 from library.utils import JsonDataType

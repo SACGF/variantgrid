@@ -11,7 +11,8 @@ from classification.models import (
     ImportedAlleleInfoStatus,
     classification_flag_types,
 )
-from flags.models import Flag, FlagStatus, FlagType
+from flags.enums import FlagStatus
+from flags.models import Flag, FlagType
 from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import (
     HealthCheckRecentActivity,

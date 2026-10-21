@@ -19,7 +19,8 @@ from classification.models import (
 )
 from classification.models.criteria_strengths import CriteriaStrength
 from classification.models.flag_types import ClassificationFlagTypes
-from flags.models import Flag, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import Flag
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager

@@ -42,7 +42,8 @@ from classification.models import (
 )
 from classification.services.overlap_calculator import overlap_calculator_for_value_type
 from classification.services.overlaps_services import OverlapPageDetails, OverlapServices
-from flags.models import Flag, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import Flag
 from library.django_utils import chunked_queryset
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
