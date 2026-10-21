@@ -6,6 +6,7 @@ bleach
 biopython>=1.81
 cdot>=0.2.31
 celery
+certifi>=2026.10.19  # transitive (requests): drops the compromised eMudhra emSign roots
 dataclasses-json==0.6.7  # pinned for omniimporter
 crispy-bootstrap4
 cryptography>=50.0.0
@@ -49,11 +50,11 @@ mozilla_django_oidc
 nameparser
 nltk>=3.10.0
 numpy
-oauthlib
+oauthlib>=4.0.0
 openpyxl  # pandas read_excel (SA Pathology somatic xlsx import)
 pandas
 ped_parser
-pillow>=12.3.0
+pillow>=13.0.0
 pronto>=2.4.7
 psycopg[binary]
 pyBigWig>=0.3.22
