@@ -27,6 +27,7 @@ from annotation.models import (
 )
 from genes.enums import AnnotationConsortium
 from library.utils import sha256sum_str
+from snpdb.enums import ImportSource, ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -34,13 +35,11 @@ from snpdb.models import (
     CohortGenotypeCollection,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Locus,
     Sample,
     Sequence,
     Variant,
 )
-from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.models import (
     FileUpload,

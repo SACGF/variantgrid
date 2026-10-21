@@ -29,7 +29,8 @@ from analysis.models.nodes.family_inheritance import (
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from patients.models_enums import Zygosity
-from snpdb.models import Duo, DuoRelationship
+from snpdb.enums import DuoRelationship
+from snpdb.models import Duo
 
 RELATIVE = "relative"
 

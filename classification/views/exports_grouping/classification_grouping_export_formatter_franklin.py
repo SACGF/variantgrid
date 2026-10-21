@@ -24,8 +24,8 @@ from genes.hgvs import HGVSComponents
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, delimited_row, export_column
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class TestingContextMode(StrEnum):

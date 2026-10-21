@@ -17,7 +17,7 @@ from annotation.models.models_version import VariantAnnotationVersion
 from genes.enums import AnnotationConsortium
 from genes.models import TranscriptVersion
 from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_PREFIX, CDOT_FAKE_TRANSCRIPT_VERSION
-from snpdb.models.models_enums import AssemblyMoleculeType
+from snpdb.enums import AssemblyMoleculeType
 
 BATCH_SIZE = 2000
 HGVS_PLACEHOLDERS = {VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE, VariantAnnotation.SV_HGVS_ERROR_MESSAGE}

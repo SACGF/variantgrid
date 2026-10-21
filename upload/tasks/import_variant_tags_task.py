@@ -10,8 +10,9 @@ from library.django_utils import UserMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.utils import invert_dict
+from snpdb.enums import ImportSource
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, GenomeBuild, ImportSource, Tag, VariantAllele, VariantCoordinate
+from snpdb.models import Allele, GenomeBuild, Tag, VariantAllele, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import write_vcf_from_variant_coordinates
 from upload.models import (

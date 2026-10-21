@@ -6,7 +6,7 @@ from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
-from snpdb.models.models_enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
+from snpdb.enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
 
 
 class ClinVarNodeInputTest(AnalysisSetupMixin, TestCase):

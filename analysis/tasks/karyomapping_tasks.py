@@ -7,8 +7,8 @@ from analysis.models.models_karyomapping import (
     GenomeKaryomappingCounts,
     KaryotypeBins,
 )
+from snpdb.enums import ImportStatus
 from snpdb.models import Trio
-from snpdb.models.models_enums import ImportStatus
 
 
 @celery.shared_task

@@ -14,6 +14,7 @@ from django.db.models.deletion import CASCADE
 
 from annotation.enums import ManualVariantEntryType
 from annotation.models.models_annotation_run import AnnotationRun
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     DBSNP_PATTERN,
     HGVS_UNCLEANED_PATTERN,
@@ -22,7 +23,6 @@ from snpdb.models import (
     GenomeBuild,
     Variant,
 )
-from snpdb.models.models_enums import ImportStatus
 
 
 class ManualVariantEntryCollection(models.Model):

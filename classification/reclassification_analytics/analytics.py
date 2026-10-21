@@ -47,8 +47,8 @@ from classification.reclassification_analytics.survival import (
     life_table,
     withdrawal_dates,
 )
+from snpdb.enums import ClinicalSignificance
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import ClinicalSignificance
 
 TOP_GENE_COUNT = 30
 SURVIVAL_ORIGIN_YEARS_BACK = 5

@@ -22,7 +22,8 @@ from patients.signals.extraction_match_health_check import extraction_match_heal
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from seqauto.models import SampleFromSequencingSample
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import ImportSource, Sample, Sequence
+from snpdb.enums import ImportSource
+from snpdb.models import Sample, Sequence
 from snpdb.models.models_genome import GenomeBuild
 from upload.models import FileUpload, UploadedFileTypes, UploadPipeline, UploadStep
 from upload.vcf.vcf_import import (

@@ -30,7 +30,7 @@ from pathtests.models import (
     get_external_order_system_last_checked,
 )
 from patients.forms import external_pk_autocomplete_form_factory
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 
 
 def pathology_tests(request):

@@ -46,8 +46,8 @@ from seqauto.models.models_enums import DataGeneration, LibraryQCCategory, Paire
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
+from snpdb.enums import ImportStatus, SampleFileType
 from snpdb.models import VCF, GenomeBuild, InheritanceManager, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus, SampleFileType
 from snpdb.models.models_vcf import SampleFilePath
 
 

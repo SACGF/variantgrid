@@ -58,6 +58,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Extraction, Patient, Specimen
 from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.sample_grouping import get_sample_group
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -65,7 +66,6 @@ from snpdb.models import (
     CohortGenotypeCollection,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Sample,
     Tag,
     VCFFilter,

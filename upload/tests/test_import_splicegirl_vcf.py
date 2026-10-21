@@ -13,8 +13,9 @@ from genes.fake_data import get_sequence
 from genes.models import HGNC, GeneSymbol, HGNCImport
 from genes.tests.gene_level_test_utils import make_release_gene
 from library.genomics.vcf_writer import percent_decode_info_value
+from snpdb.enums import ImportSource
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
-from snpdb.models import GenomeBuild, ImportSource
+from snpdb.models import GenomeBuild
 from upload.import_task_factories.import_task_factory import get_import_task_factory_from_extension
 from upload.models import (
     FileUpload,

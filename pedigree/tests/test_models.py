@@ -14,8 +14,8 @@ from pedigree.models import (
     create_automatch_pedigree,
     validate,
 )
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 
 

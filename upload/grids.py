@@ -8,8 +8,9 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
+from snpdb.enums import ProcessingStatus
 from snpdb.grids import AbstractSkippedAnnotationColumns
-from snpdb.models import GenomeBuild, ProcessingStatus
+from snpdb.models import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 from upload.file_type_icons import file_type_icon_html

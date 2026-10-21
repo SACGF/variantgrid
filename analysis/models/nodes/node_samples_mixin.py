@@ -13,8 +13,8 @@ from library.constants import DAY_SECS
 from patients.models import Patient
 from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
+from snpdb.enums import SampleFileType
 from snpdb.models import Cohort, Sample, SampleFilePath
-from snpdb.models.models_enums import SampleFileType
 
 
 @dataclass(frozen=True)

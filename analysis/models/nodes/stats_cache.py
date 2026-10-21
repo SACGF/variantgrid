@@ -20,8 +20,8 @@ from annotation.models import (
     CohortGenotypeVariantAnnotationStats,
 )
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from snpdb.enums import BuiltInFilters
 from snpdb.models import CohortGenotypeStats
-from snpdb.models.models_enums import BuiltInFilters
 
 LABEL_TO_MODEL = {
     BuiltInFilters.TOTAL: CohortGenotypeStats,

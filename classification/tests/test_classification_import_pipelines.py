@@ -15,8 +15,9 @@ from classification.models.classification import ClassificationImport
 from classification.tasks.classification_import_process_variants_task import (
     ClassificationImportProcessVariantsTask,
 )
+from snpdb.enums import ImportSource
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
-from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, ImportSource, VariantCoordinate
+from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, VariantCoordinate
 from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
 from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, UploadStepTaskType
 

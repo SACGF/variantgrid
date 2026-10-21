@@ -37,14 +37,14 @@ from classification.enums import (
     TestingContextFull,
 )
 from classification.models.classification import Classification, ClassificationModification
-from classification.models.condition_resolved import ConditionReference, ConditionResolved
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from classification.models.condition_resolved import ConditionReference, ConditionResolved
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObj
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele, Lab
-from snpdb.models.models_enums import AlleleOriginBucket
 
 if TYPE_CHECKING:
     from classification.models.overlaps_model import OverlapContribution

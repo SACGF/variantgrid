@@ -31,10 +31,10 @@ from library.django_utils.unittest_utils import frozen_cache_expiry
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.request_context import set_thread_variable
 from patients.models import Patient
+from snpdb.enums import AlleleOrigin
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     Allele,
-    AlleleOrigin,
     GenomeBuild,
     Tag,
     TagConfig,

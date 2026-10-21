@@ -16,7 +16,8 @@ from genes.models import (
     PanelAppServer,
 )
 from pathtests.models import PathologyTest, PathologyTestVersion
-from snpdb.models import ImportStatus, Variant
+from snpdb.enums import ImportStatus
+from snpdb.models import Variant
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

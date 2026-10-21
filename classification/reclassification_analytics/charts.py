@@ -29,7 +29,7 @@ from classification.reclassification_analytics.results import (
     EvidenceMovement,
     significance_label,
 )
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 # the days axis is logarithmic - most records move within a few months, and a year either side of the
 # two year mark is not a distinction anybody reads off a chart

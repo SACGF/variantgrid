@@ -19,7 +19,7 @@ import celery
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from snpdb.models.models_enums import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 from upload.models import UploadPipeline, UploadStep
 from upload.uploaded_file_type import retry_upload_pipeline
 

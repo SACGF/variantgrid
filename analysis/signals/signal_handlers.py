@@ -16,7 +16,7 @@ from analysis.tasks.variant_tag_tasks import (
     variant_tag_created_task,
     variant_tag_deleted_in_analysis_task,
 )
-from snpdb.models import ImportStatus
+from snpdb.enums import ImportStatus
 
 
 def variant_tag_create(sender, instance, created=False, **kwargs):

@@ -19,7 +19,7 @@ from mme.serializers.patient_profile import (
     mme_eligible_classifications,
 )
 from mme.tasks import submit_mme_submission_task
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 # Card states - which layer of the node/lab/record opt-in a classification fails.
