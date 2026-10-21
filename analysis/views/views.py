@@ -67,8 +67,8 @@ from classification.views.views import (
 )
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
+from patients.enums import SampleSourceLevel
 from patients.models import Patient
-from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm

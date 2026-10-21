@@ -27,7 +27,7 @@ from library.constants import MINUTE_SECS
 from library.django_utils.database_utils import query_was_cancelled
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
-from snpdb.models import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 

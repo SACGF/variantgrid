@@ -9,7 +9,7 @@ from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.matching import find_matches
 from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import FakeClassification, make_classification
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 TOKEN = "inbound-secret"
 QUERY_PATIENT = {"id": "q1", "features": [{"id": "HP:0001250"}],

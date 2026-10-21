@@ -14,8 +14,8 @@ from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasTissueSample,
 )
+from genes.enums import AnnotationConsortium
 from genes.models import Gene, GeneSymbol
-from genes.models_enums import AnnotationConsortium
 
 
 class TissueNode(AnalysisNode):

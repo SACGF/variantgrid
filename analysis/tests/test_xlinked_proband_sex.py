@@ -17,8 +17,8 @@ from analysis.forms.forms_nodes import TrioNodeForm
 from analysis.models import Analysis, QuadNode, TrioNode
 from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import Sex
 from patients.models import Patient
-from patients.models_enums import Sex
 from snpdb.fake_data import create_fake_cohort, create_fake_quad, create_fake_trio
 from snpdb.models import (
     CohortGenotypeCollection,

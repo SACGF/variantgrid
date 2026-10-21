@@ -9,7 +9,7 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 

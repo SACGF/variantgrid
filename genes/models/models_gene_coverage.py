@@ -11,9 +11,9 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
+from genes.enums import AnnotationConsortium
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models.models_gene import GeneSymbol, Transcript, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_file_utils import (
     get_import_processing_dir,
@@ -21,7 +21,7 @@ from library.django_utils.django_file_utils import (
 )
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.log_utils import log_traceback
-from snpdb.models import DataState
+from snpdb.enums import DataState
 from snpdb.models.models_genome import GenomeBuild
 from upload.vcf.sql_copy_files import (
     GENE_COVERAGE_HEADER,

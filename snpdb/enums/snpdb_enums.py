@@ -1,13 +1,13 @@
 """
-Enums shared across snpdb and the apps built on it: import and processing lifecycles (ImportStatus,
-ProcessingStatus, DataState), where uploads came from (ImportSource), allele linking
+snpdb's enums, and the classification enums that apps below classification also use. Owns import and processing
+lifecycles (ImportStatus, ProcessingStatus, DataState), where uploads came from (ImportSource), allele linking
 (AlleleOrigin, AlleleConversionTool, AlleleOriginFilterDefault), contig roles (SequenceRole - including the
 gene-level fake contig), sample and file kinds, the grid's built-in and per-tag filter keys
-(BuiltInFilters, TagFilter) and the user award scale. Codes are stored in the database: add values,
-never renumber. Zygosity lives in patients/models_enums.py.
+(BuiltInFilters, TagFilter), lab membership roles (LabUserRole), grid loading animations, and the user award scale.
+Codes are stored in the database: add values, never renumber. Zygosity lives in patients/enums/patients_enums.py.
 
-The classification enums that apps below classification also use live here too - AlleleOriginBucket and the
-ClinicalSignificance / SomaticClinicalSignificance value helpers. classification.enums re-exports them.
+AlleleOriginBucket and the ClinicalSignificance / SomaticClinicalSignificance value helpers live here so apps
+below classification can use them; classification.enums re-exports them.
 """
 from enum import Enum
 from typing import Optional
@@ -420,3 +420,23 @@ class DuoRelationship(models.TextChoices):
     MOTHER = 'M', 'Mother'
     FATHER = 'F', 'Father'
     SIBLING = 'S', 'Sibling'
+
+
+class LabUserRole(TextChoices):
+    HEAD = "head", "Lab Head"
+    USER = "user", "User"
+
+
+class GridLoadingAnimation(models.TextChoices):
+    """ DNA "reading" animations shown (randomly) while a node's variant grid loads.
+        Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """
+    FLOWCELL = "flowcell", "Flowcell"
+    RIPPLE = "ripple", "Ripple"
+    PILEUP = "pileup", "Pileup"
+    MATRIX = "matrix", "Matrix"
+
+
+# Shown when a user hasn't chosen (loading_animations is null/empty)
+DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
+                                   GridLoadingAnimation.RIPPLE.value,
+                                   GridLoadingAnimation.PILEUP.value]

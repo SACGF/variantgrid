@@ -58,7 +58,7 @@ from analysis.views.nodes.node_view import NodeView
 from analysis.views.views_json import get_patient_gene_disease_data
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk, resolve_field_path
-from patients.models_enums import SampleSourceLevel
+from patients.enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant

@@ -26,13 +26,13 @@ from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationVersion
 from library.django_utils.unittest_utils import prevent_request_warnings
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
     CohortGenotypeCollection,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Sample,
     VCFFilter,
 )

@@ -7,7 +7,7 @@ from annotation.vcf_files.clinvar_significance import (
     highest_pathogenicity,
     somatic_tier,
 )
-from snpdb.models.models_enums import SomaticClinicalSignificance
+from snpdb.enums import SomaticClinicalSignificance
 
 
 class SomaticTierTest(TestCase):

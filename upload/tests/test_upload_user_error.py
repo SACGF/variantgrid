@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
 from snpdb.views.datatable_view import datatable_response
 from upload.grids import FileUploadColumns
 from upload.models import (

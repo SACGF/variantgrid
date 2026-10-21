@@ -1,5 +1,5 @@
 from analysis.enums import NodeMatchInput
-from snpdb.models.models_enums import AlleleOriginFilterDefault
+from snpdb.enums import AlleleOriginFilterDefault
 
 
 class SignificanceFilterNodeMixin:

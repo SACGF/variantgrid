@@ -29,7 +29,7 @@ from seqauto.models import (
     GoldReference,
     SequencingRun,
 )
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 
 
 @celery.shared_task

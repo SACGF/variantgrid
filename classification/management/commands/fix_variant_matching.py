@@ -14,9 +14,9 @@ from classification.models.classification_variant_info_models import ResolvedVar
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from library.guardian_utils import admin_bot
 from library.utils import md5sum_str
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cached_web_resource import CachedWebResource
-from snpdb.models.models_enums import ImportStatus
 
 
 class Command(BaseCommand):

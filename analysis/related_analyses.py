@@ -6,7 +6,7 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.sources import CohortNode, PedigreeNode, SampleNode, TrioNode
 from analysis.models.nodes.sources.duo_node import DuoNode
 from analysis.models.nodes.sources.quad_node import QuadNode
-from patients.models_enums import SampleSourceLevel
+from patients.enums import SampleSourceLevel
 from snpdb.models import Sample
 
 

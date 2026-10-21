@@ -18,8 +18,8 @@ from annotation.models.models_clinvar import ClinVar
 from annotation.models.models_gene_annotation import GeneAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.tasks import calculate_sample_stats, calculate_trio_stats
+from genes.enums import AnnotationConsortium
 from genes.models.models_gene import Gene, Transcript
-from genes.models_enums import AnnotationConsortium
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils.django_partition import temporary_db_table
 from library.genomics.vcf_enums import VariantClass

@@ -1,7 +1,7 @@
 from django.test import TestCase
 
+from patients.enums import PatientRecordMatchType
 from patients.models import Patient, Sex
-from patients.models_enums import PatientRecordMatchType
 
 
 class TestPatientMatching(TestCase):

@@ -14,9 +14,9 @@ from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotat
 from annotation.models.models_annotation_run import AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_version import InvalidAnnotationVersionError
+from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSException, HGVSMatcher
 from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from library.genomics import format_bp
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

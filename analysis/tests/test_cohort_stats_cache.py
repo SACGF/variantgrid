@@ -27,13 +27,13 @@ from annotation.tasks.calculate_sample_stats import (
     get_sample_stats_code_version,
 )
 from library.utils.json_utils import canonical_filter_key
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
     CodeVersion,
     Cohort,
     CohortGenotypeStats,
     GenomeBuild,
-    ImportStatus,
     SampleStatsCodeVersion,
     Trio,
 )

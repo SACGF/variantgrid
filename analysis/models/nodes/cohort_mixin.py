@@ -18,10 +18,11 @@ from analysis.models.nodes.node_query_mixin import (
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_writer import percent_decode_info_value
+from patients.enums import SampleSourceLevel, Zygosity
 from patients.models import Patient
-from patients.models_enums import SampleSourceLevel, Zygosity
 from patients.sample_grouping import get_patient_for_source
-from snpdb.models import Cohort, CohortGenotypeCollection, ImportStatus, Sample, VCFFilter, VCFInfo
+from snpdb.enums import ImportStatus
+from snpdb.models import Cohort, CohortGenotypeCollection, Sample, VCFFilter, VCFInfo
 from snpdb.views.datatable_view import CellData, NullOrder, RichColumn
 from upload.tso500.dragen_all_fusions_parser import (
     FUSION_OBSERVATIONS_INFO,

@@ -8,8 +8,8 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import link_combined_variant_outputs
 from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from seqauto.models import (
@@ -18,7 +18,8 @@ from seqauto.models import (
     band_call,
 )
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import VCF, GenomeBuild, ImportSource, Sample
+from snpdb.enums import ImportSource
+from snpdb.models import VCF, GenomeBuild, Sample
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,

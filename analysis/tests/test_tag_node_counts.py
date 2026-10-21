@@ -21,8 +21,8 @@ from analysis.models.nodes.node_utils import update_analysis_tag_node_counts
 from analysis.models.nodes.node_version import NodeVersion
 from analysis.tests.test_grid_export import GridExportTestCase
 from library.django_utils import FakeRequest
+from snpdb.enums import BuiltInFilters, TagFilter
 from snpdb.models import Tag, Variant
-from snpdb.models.models_enums import BuiltInFilters, TagFilter
 from snpdb.models.models_user_settings import AbstractNodeCountSettings
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 

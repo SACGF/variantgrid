@@ -13,8 +13,9 @@ from analysis.models import Analysis, AnalysisLock, VariantTag
 from annotation.fake_data import create_fake_variants
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import ExternalModelManager, ExternalPK, Patient
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_trio
-from snpdb.models import VCF, Cohort, GenomeBuild, ImportStatus, Sample, Tag, Trio, Variant
+from snpdb.models import VCF, Cohort, GenomeBuild, Sample, Tag, Trio, Variant
 
 
 class FilterWritableForUserTest(TestCase):

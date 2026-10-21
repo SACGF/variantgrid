@@ -16,6 +16,7 @@ from django.test import TestCase, override_settings
 from analysis.models import Analysis, CohortNode
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.enums import ProcessingStatus
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild, Variant, VariantCollection
 from snpdb.models.models_cohort import (
@@ -24,7 +25,6 @@ from snpdb.models.models_cohort import (
     CohortVersion,
     SubCohortVariantCollection,
 )
-from snpdb.models.models_enums import ProcessingStatus
 from snpdb.tasks.sub_cohort_tasks import (
     build_sub_cohort_any_sample_called_vc_task,
     delete_old_cohort_versions,

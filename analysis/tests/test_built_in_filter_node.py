@@ -4,7 +4,8 @@ from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.enums import PathogenicityImpact
 from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
-from snpdb.models import BuiltInFilters, Variant
+from snpdb.enums import BuiltInFilters
+from snpdb.models import Variant
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

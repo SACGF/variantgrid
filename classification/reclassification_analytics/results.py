@@ -13,7 +13,7 @@ from classification.reclassification_analytics.palette import (
     PATHOGENIC_DIRECTION_COLOUR,
 )
 from classification.reclassification_analytics.survival import SURVIVAL_INTERVAL_YEARS
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 # top to bottom / left to right on every chart and table
 SIGNIFICANCE_ORDER = [

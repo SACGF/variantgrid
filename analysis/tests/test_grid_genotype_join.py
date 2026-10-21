@@ -20,6 +20,7 @@ from annotation.models.models import VariantAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import (
@@ -27,7 +28,6 @@ from snpdb.models.models_cohort import (
     CohortGenotypeCollection,
     CohortGenotypeCommonFilterVersion,
 )
-from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

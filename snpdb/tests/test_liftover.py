@@ -8,6 +8,7 @@ from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import check_bcftools_destination_has_chrom
 from snpdb.clingen_allele import get_clingen_allele
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.liftover import (
     _batch_alleles,
     _check_vcf_contig_is_standard,
@@ -20,12 +21,9 @@ from snpdb.liftover import (
 )
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
-    AlleleOrigin,
     GenomeBuild,
     LiftoverRun,
-    ProcessingStatus,
     VariantAllele,
     VariantCoordinate,
 )

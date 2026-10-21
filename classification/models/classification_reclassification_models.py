@@ -18,8 +18,8 @@ from classification.models.classification import (
 )
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.models import GeneSymbol
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 
 
 class ReclassificationEvent(models.Model):

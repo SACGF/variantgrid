@@ -23,10 +23,10 @@ from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
     ImportedAlleleInfoStatus,
 )
+from genes.enums import AnnotationConsortium, GeneCopyNumberEventKind, HGNCStatus
 from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.models import (
     HGNC,
-    GeneCopyNumberEventKind,
     GeneFusion,
     GeneLevelId,
     GeneSymbol,
@@ -37,7 +37,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
 from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,

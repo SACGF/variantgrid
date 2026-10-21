@@ -1,10 +1,9 @@
 import cyvcf2
 
 from library.utils import sha256sum_str
+from snpdb.enums import AlleleConversionTool, AlleleOrigin
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
-    AlleleOrigin,
     GenomeBuild,
     Locus,
     Sequence,

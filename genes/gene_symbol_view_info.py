@@ -19,6 +19,7 @@ from annotation.models.models_gene_annotation import (
 )
 from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
+from genes.enums import AnnotationConsortium
 from genes.models import (
     HGNC,
     Gene,
@@ -30,7 +31,6 @@ from genes.models import (
     GnomADGeneConstraint,
     PanelAppServer,
 )
-from genes.models_enums import AnnotationConsortium
 from library.utils import defaultdict_to_dict
 from ontology.models import OntologyService, OntologySnake, OntologyTerm
 from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection

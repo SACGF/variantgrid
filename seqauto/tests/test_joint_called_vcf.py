@@ -31,7 +31,8 @@ from seqauto.models import (
 from seqauto.models.models_enums import DataGeneration, PairedEnd
 from seqauto.sequencing_files.sample_sheet import current_sample_sheet_changed
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
-from snpdb.models import VCF, ImportStatus, ProcessingStatus, Sample
+from snpdb.enums import ImportStatus, ProcessingStatus
+from snpdb.models import VCF, Sample
 from upload.models import (
     BackendVCF,
     FileUpload,

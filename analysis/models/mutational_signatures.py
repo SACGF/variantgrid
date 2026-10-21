@@ -4,8 +4,8 @@ from django.db.models.deletion import CASCADE
 from django.db.models.fields import FloatField
 
 from analysis.enums import MinimisationResultType, MinimisationStrategy
+from snpdb.enums import ImportStatus
 from snpdb.models import Sample, SoftwareVersion
-from snpdb.models.models_enums import ImportStatus
 
 
 class MutationalSignatureCalculator(SoftwareVersion):

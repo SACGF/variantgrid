@@ -42,6 +42,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid, PatientRecordOriginType
 from patients.external_references import (
     ExternalReference,
     ResolvedReference,
@@ -51,10 +52,8 @@ from patients.models import (
     Extraction,
     Patient,
     PatientModification,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     SequencingRun,

@@ -18,7 +18,7 @@ from classification.models.classification import Classification, ClassificationM
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.models.evidence_key import EvidenceKeyMap, VCPatch
 from library.utils import nest_dict
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 from snpdb.user_settings_manager import UserSettingsManager
 
 if TYPE_CHECKING:

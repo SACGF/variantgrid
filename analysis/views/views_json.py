@@ -50,8 +50,8 @@ from library.django_utils import require_superuser
 from ontology.models import OntologyTerm, OntologyVersion
 from ontology.serializers import OntologyTermSerializer
 from patients.models import Patient
-from snpdb.models import BuiltInFilters, GenomeBuild, Tag
-from snpdb.models.models_enums import TagFilter
+from snpdb.enums import BuiltInFilters, TagFilter
+from snpdb.models import GenomeBuild, Tag
 from variantgrid.celery import app
 
 

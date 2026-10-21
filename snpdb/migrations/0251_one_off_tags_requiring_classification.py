@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import migrations
 
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 
 SOMATIC_REPORTABLE = "SomaticReportable"
 

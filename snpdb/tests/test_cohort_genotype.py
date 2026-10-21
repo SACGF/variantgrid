@@ -7,11 +7,11 @@ from django.test.utils import CaptureQueriesContext
 
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
     CohortGenotype,
     CohortGenotypeCollection,
-    CohortGenotypeCollectionType,
     CohortGenotypeCommonFilterVersion,
     CommonVariantClassified,
     GenomeBuild,

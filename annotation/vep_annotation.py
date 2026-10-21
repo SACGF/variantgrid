@@ -26,7 +26,7 @@ from annotation.vep_config import (
     parse_gnomad_version_from_filename,
     vep_component_version_kwargs,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild

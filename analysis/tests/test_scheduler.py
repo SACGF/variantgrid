@@ -43,7 +43,8 @@ from analysis.tasks.node_update_tasks import (
     update_node_task,
 )
 from analysis.tests.utils import AnalysisSetupMixin
-from snpdb.models import ProcessingStatus, VariantCollection
+from snpdb.enums import ProcessingStatus
+from snpdb.models import VariantCollection
 from variantgrid.celery import app
 
 

@@ -11,14 +11,14 @@ from annotation.fake_data import get_fake_annotation_version
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification, ClassificationModification
 from classification.tests.models.test_utils import ClassificationTestUtils
-from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
-from snpdb.models import GenomeBuild, Variant
-from snpdb.models.models_enums import (
+from snpdb.enums import (
     AlleleOriginFilterDefault,
     BuiltInFilters,
     ClinicalSignificance,
     SomaticClinicalSignificance,
 )
+from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
+from snpdb.models import GenomeBuild, Variant
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 

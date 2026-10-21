@@ -22,9 +22,9 @@ from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from genes.models import TranscriptVersion
 from manual.models import ManualGateSatisfied, ManualMigrationOutstanding, ManualMigrationTask
 from ontology.models import OntologyVersion
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cached_web_resource import CachedWebResource
-from snpdb.models.models_enums import ImportStatus
 
 AFTER_PREFIX = "after:"
 

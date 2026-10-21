@@ -31,8 +31,8 @@ from classification.enums.classification_enums import (
 )
 from library.cache import timed_cache
 from library.utils import empty_to_none, first, pretty_label, strip_json
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import VariantGridColumn
-from snpdb.models.models_enums import AlleleOriginBucket
 
 if TYPE_CHECKING:
     from classification.models.evidence_mixin import EvidenceMixin

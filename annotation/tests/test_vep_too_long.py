@@ -16,7 +16,7 @@ from annotation.tasks.annotation_scheduler_task import COUNT_LEASE_PREFIX, count
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import handle_vep_skipped
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import GenomeBuild, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import (

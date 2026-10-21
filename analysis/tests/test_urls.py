@@ -24,6 +24,7 @@ from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.enums import ImportStatus
 from snpdb.models import CachedGeneratedFile, Variant
 from snpdb.models.models_cohort import (
     Cohort,
@@ -31,7 +32,6 @@ from snpdb.models.models_cohort import (
     CohortGenotypeCollection,
     CohortSample,
 )
-from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample

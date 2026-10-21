@@ -12,7 +12,7 @@ from django.db import models
 
 from annotation.enums import ALoFTPrediction
 from library.utils import Constant
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 
 
 class AnalysisType(models.TextChoices):

@@ -38,7 +38,8 @@ from analysis.models.nodes.node_version import NodeCache, NodeTask, NodeVersion
 from library.constants import MINUTE_SECS
 from library.django_utils.django_postgres import get_backend_pid
 from library.django_utils.model_utils import get_model_content_type_dict
-from snpdb.models import AlleleSource, BuiltInFilters, Variant, Wiki
+from snpdb.enums import BuiltInFilters
+from snpdb.models import AlleleSource, Variant, Wiki
 from snpdb.views.datatable_view import RichColumn
 
 # How long a node's lease is good for. The window is (re)started when a worker claims the node for

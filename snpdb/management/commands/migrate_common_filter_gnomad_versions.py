@@ -23,12 +23,8 @@ from library.django_utils.database_utils import run_sql
 from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.django_postgres import model_to_insert_sql
 from snpdb.common_variants import get_common_filter
-from snpdb.models import (
-    CohortGenotype,
-    CohortGenotypeCollection,
-    CohortGenotypeCollectionType,
-    GenomeBuild,
-)
+from snpdb.enums import CohortGenotypeCollectionType
+from snpdb.models import CohortGenotype, CohortGenotypeCollection, GenomeBuild
 
 BATCH_SIZE = 1000
 
