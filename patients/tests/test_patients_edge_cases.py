@@ -14,6 +14,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import Sex, TissueStatus
 from patients.forms import PatientForm
 from patients.import_records import (
     InvalidPatientRecord,
@@ -35,7 +36,6 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import Sex, TissueStatus
 from snpdb.models import ImportSource
 from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 

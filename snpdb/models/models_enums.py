@@ -4,7 +4,7 @@ ProcessingStatus, DataState), where uploads came from (ImportSource), allele lin
 (AlleleOrigin, AlleleConversionTool, AlleleOriginFilterDefault), contig roles (SequenceRole - including the
 gene-level fake contig), sample and file kinds, the grid's built-in and per-tag filter keys
 (BuiltInFilters, TagFilter) and the user award scale. Codes are stored in the database: add values,
-never renumber. Zygosity lives in patients/models_enums.py.
+never renumber. Zygosity lives in patients/enums/patients_enums.py.
 
 The classification enums that apps below classification also use live here too - AlleleOriginBucket and the
 ClinicalSignificance / SomaticClinicalSignificance value helpers. classification.enums re-exports them.

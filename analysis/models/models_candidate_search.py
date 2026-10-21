@@ -23,7 +23,7 @@ from annotation.models import AnnotationVersion, ClinVar
 from classification.models import Classification
 from library.django_utils import count_values_qs
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import ProcessingStatus, Sample, Variant
 
 

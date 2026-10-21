@@ -4,7 +4,7 @@ from django.template.library import Library
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Duo, Quad, Trio
 
 register = Library()

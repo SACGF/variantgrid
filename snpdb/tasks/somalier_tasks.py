@@ -29,8 +29,8 @@ from django.utils import timezone
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.log_utils import get_traceback
 from library.utils import execute_cmd
+from patients.enums import Zygosity
 from patients.models import Patient
-from patients.models_enums import Zygosity
 from snpdb.models import (
     VCF,
     AbstractSomalierModel,

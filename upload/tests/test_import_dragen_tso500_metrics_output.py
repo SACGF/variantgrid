@@ -7,8 +7,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from seqauto.models import (
     SAMPLE_SHEET_PAIR_ID_COLUMN,

@@ -10,8 +10,8 @@ from typing import Optional
 from cache_memoize import cache_memoize
 
 from library.constants import DAY_SECS
+from patients.enums import SampleSourceLevel
 from patients.models import Patient
-from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 from snpdb.models import Cohort, Sample, SampleFilePath
 from snpdb.models.models_enums import SampleFileType

@@ -24,8 +24,8 @@ from annotation.fake_data import create_fake_variants, get_fake_annotation_versi
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationReportTemplate, ReportNames
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
+from patients.enums import SampleSourceLevel
 from patients.models import Patient
-from patients.models_enums import SampleSourceLevel
 from snpdb.fake_data import create_fake_cohort, create_fake_trio, make_cohort_genotype
 from snpdb.models import Country, GenomeBuild, Lab, Organization, Sample, Tag, Variant
 from snpdb.models.models_enums import AlleleOriginBucket

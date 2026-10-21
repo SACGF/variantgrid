@@ -19,7 +19,7 @@ from library.django_utils.guardian_permissions_mixin import (
     GuardianPermissionsMixin,
 )
 from library.preview_request import PreviewModelMixin, SvgSymbolPreviewIconMixin
-from patients.models_enums import Sex
+from patients.enums import Sex
 from snpdb.models import Cohort, CohortSample, GenomeBuild, ImportStatus, Sample, SomalierRelate
 
 

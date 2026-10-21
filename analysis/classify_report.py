@@ -39,8 +39,8 @@ from classification.models import (
     Classification,
     ClassificationModification,
 )
+from patients.enums import SampleSourceLevel, Zygosity
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import SampleSourceLevel, Zygosity
 from patients.sample_grouping import get_patient_for_source, get_sample_group
 from snpdb.models import Lab, Sample, SampleGenotype, Tag
 from snpdb.models.models_enums import AlleleOriginBucket

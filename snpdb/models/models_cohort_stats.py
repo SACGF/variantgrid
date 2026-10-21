@@ -20,7 +20,7 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 from django_extensions.db.models import TimeStampedModel
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_vcf import SampleStatsCodeVersion
 

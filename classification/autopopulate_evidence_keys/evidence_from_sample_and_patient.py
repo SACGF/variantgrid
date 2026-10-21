@@ -4,7 +4,7 @@ from typing import Optional
 from classification.autopopulate_evidence_keys.evidence_from_variant import AutopopulateData
 from classification.enums import SpecialEKeys
 from library.genomics.vcf_enums import VCFConstant
-from patients.models_enums import Sex, TissueStatus, Zygosity
+from patients.enums import Sex, TissueStatus, Zygosity
 from patients.models import Extraction
 from snpdb.models import Sample, SampleGenotype
 from snpdb.models.models_enums import VariantOrigin

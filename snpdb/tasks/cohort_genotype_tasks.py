@@ -13,7 +13,7 @@ from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.django_postgres import model_to_insert_sql, pg_sql_array
 from library.log_utils import log_traceback
 from library.utils import single_quote
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.common_variants import get_common_filter
 from snpdb.models import (
     Cohort,

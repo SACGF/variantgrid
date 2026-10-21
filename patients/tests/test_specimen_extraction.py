@@ -14,6 +14,7 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
 )
 from classification.enums import SpecialEKeys
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, PatientRecordMatchType, TissueStatus
 from patients.forms import ExtractionForm
 from patients.import_records import process_record
 from patients.models import (
@@ -29,7 +30,6 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import NucleicAcid, PatientRecordMatchType, TissueStatus
 from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from patients.views import CREATE_EXTRACTION
 from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAutocompleteView

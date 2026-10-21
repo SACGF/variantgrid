@@ -38,9 +38,9 @@ from library.constants import DAY_SECS
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
+from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import ResolvedReference
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models.models_enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer

@@ -17,7 +17,7 @@ from django.utils.module_loading import import_string
 
 from classification.enums.classification_enums import ShareLevel
 from genes.models_enums import AnnotationConsortium
-from patients.models_enums import SampleSourceLevel
+from patients.enums import SampleSourceLevel
 from snpdb.models.models_enums import AlleleOriginBucket
 
 OIDC_BACKEND = 'oidc_auth.backend.VariantGridOIDCAuthenticationBackend'

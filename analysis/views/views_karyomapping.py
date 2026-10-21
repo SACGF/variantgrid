@@ -14,7 +14,7 @@ from django.shortcuts import render
 from analysis.forms import TrioKaryomappingGeneForm
 from analysis.models.models_karyomapping import KaryotypeBins, TrioKaryomappingGeneRegion
 from library.utils import StashFile
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import Trio
 from snpdb.models.models_variant import Variant
 
