@@ -1,7 +1,8 @@
-from django.core.exceptions import ObjectDoesNotExist
 from django.template import Library
 
 from analysis.models.models_karyomapping import KaryotypeBins
+from analysis.tasks.karyomapping_tasks import get_or_queue_genome_karyomapping_counts
+from snpdb.enums import ImportStatus
 from snpdb.models import Trio
 
 register = Library()
@@ -11,13 +12,11 @@ register = Library()
 def trio_karyomapping_qc(trio: Trio):
     """ Relatedness summary and per-chromosome phase graph from the trio's stored karyomapping counts - a parent
         well off 50% genome-wide suggests a sample swap, on one chromosome UPD or a deletion (#1754) """
-    try:
-        genome_karyomapping_counts = trio.genomekaryomappingcounts
-    except ObjectDoesNotExist:
-        genome_karyomapping_counts = None
+    genome_karyomapping_counts = get_or_queue_genome_karyomapping_counts(trio)
+    calculated = genome_karyomapping_counts.import_status == ImportStatus.SUCCESS
 
     contig_qc = []
-    if genome_karyomapping_counts:
+    if calculated:
         for contig_counts in genome_karyomapping_counts.get_contig_counts():
             collapsed_counts = contig_counts.get_collapsed_counts()
             father_percent, mother_percent = contig_counts.get_phase_percents()
@@ -32,5 +31,6 @@ def trio_karyomapping_qc(trio: Trio):
             })
     return {"trio": trio,
             "genome_karyomapping_counts": genome_karyomapping_counts,
-            "collapsed_counts": genome_karyomapping_counts.get_collapsed_counts() if genome_karyomapping_counts else None,
+            "calculated": calculated,
+            "collapsed_counts": genome_karyomapping_counts.get_collapsed_counts() if calculated else None,
             "contig_qc": contig_qc}
