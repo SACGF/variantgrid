@@ -10,7 +10,7 @@ from django.dispatch import receiver
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from classification.models.classification_utils import ClassificationPatchStatus
+from classification.enums import ClassificationImportRunStatus, ClassificationPatchStatus
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.log_utils import NotificationBuilder
 
@@ -28,12 +28,6 @@ skip it while ClassificationImportRun.ongoing_imports(), then do it in one batch
 Note the deferred state has to live in the DB (a dirty flag, a pending column, or something the batch step can
 re-derive) as an import run spans processes - whichever process closes the run is the one that gets this signal.
 """
-
-
-class ClassificationImportRunStatus(models.TextChoices):
-    ONGOING = "O", 'Ongoing'
-    COMPLETED = "C", 'Completed'
-    UNFINISHED = "U", 'Unfinished'
 
 
 MAX_IMPORT_AGE = timedelta(minutes=5)

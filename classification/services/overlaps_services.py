@@ -18,10 +18,10 @@ from django.db.models.aggregates import Max
 from django.utils.timezone import now
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord
-from classification.enums import TestingContextBucket, OverlapStatus, OverlapSnapshot
+from classification.enums import TestingContextBucket, OverlapStatus, OverlapSnapshot, TriageNextStep
 from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
-    TriageNextStep, TriageDecision, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
+    TriageDecision, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
 from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED

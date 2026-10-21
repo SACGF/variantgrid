@@ -4,11 +4,8 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
 
-from classification.models import (
-    ClinVarExportBatch,
-    ClinVarExportBatchStatus,
-    DiscordanceReportTriage,
-)
+from classification.enums import ClinVarExportBatchStatus
+from classification.models import ClinVarExportBatch, DiscordanceReportTriage
 from email_manager.models.email_model import EmailLog
 from eventlog.models import Event, ViewEvent
 from library.guardian_utils import bot_group

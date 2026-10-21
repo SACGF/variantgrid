@@ -5,7 +5,8 @@ from time import sleep
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import (

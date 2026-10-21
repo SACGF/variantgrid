@@ -12,9 +12,9 @@ from django.utils import html
 from django.utils.safestring import SafeString
 from django.utils.timezone import now
 
-from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
+from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus, TriageNextStep
 from classification.models import ClassificationGrouping, Overlap, OverlapType, \
-    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, TriageNextStep, EvidenceKey, \
+    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, EvidenceKey, \
     EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from snpdb.genome_build_manager import GenomeBuildManager

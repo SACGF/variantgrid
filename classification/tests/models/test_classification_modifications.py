@@ -2,12 +2,8 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
-from classification.models.classification import (
-    Classification,
-    ClassificationModification,
-    VCBlobKeys,
-)
+from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource, VCBlobKeys
+from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
 from classification.tests.models.test_utils import ClassificationTestUtils

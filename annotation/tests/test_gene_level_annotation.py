@@ -19,10 +19,8 @@ from annotation.models import (
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from classification.models.classification_variant_info_models import (
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
-)
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from genes.enums import AnnotationConsortium, GeneCopyNumberEventKind, HGNCStatus
 from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.models import (

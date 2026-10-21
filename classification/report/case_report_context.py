@@ -28,10 +28,10 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from annotation.models import VariantAnnotationVersion
-from classification.enums import SpecialEKeys
+from classification.enums import CaseReportStatus, SpecialEKeys
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_json import ClassificationJsonParams
-from classification.models.classification_report_models import CaseReportStatus, Measure
+from classification.models.classification_report_models import Measure
 from classification.models.evidence_key import EvidenceKeyMap
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass
 from patients.enums import (

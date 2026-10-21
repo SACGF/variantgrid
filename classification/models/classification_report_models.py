@@ -23,6 +23,7 @@ from django.db import models
 from django.db.models import CASCADE, PROTECT, SET_NULL, Prefetch, Q, QuerySet
 from model_utils.models import TimeStampedModel
 
+from classification.enums import CaseReportStatus
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
@@ -316,12 +317,6 @@ class ClassificationReportTemplate(TimeStampedModel):
 
     def __str__(self):
         return self.name
-
-
-class CaseReportStatus(models.TextChoices):
-    DRAFT = 'D', 'Draft'
-    FINAL = 'F', 'Final'
-    SUPERSEDED = 'S', 'Superseded'
 
 
 def case_report_upload_path(instance: 'CaseReport', filename: str) -> str:

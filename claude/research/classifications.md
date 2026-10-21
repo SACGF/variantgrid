@@ -179,7 +179,7 @@ differences below the line, tier-1-vs-tier-2, major and medically significant ab
 `classification/services/overlaps_services.py:OverlapServices.send_prepared_discordance_notifications`.
 
 Each lab's position on an overlap is the `triage_state` on its `OverlapContribution` (pending, will fix, confident, with
-an optional amend value), and `classification/models/overlaps_model.py:TriageNextStep` turns the set of triages into the
+an optional amend value), and `classification/enums/overlaps_enums.py:TriageNextStep` turns the set of triages into the
 "waiting on you / waiting on them / to discuss" prompt the overlap page shows. The discussion is a `review` (see
 `claude/research/review.md`) - `Overlap` is a `ReviewableModelMixin`.
 `classification/signals/classification_hooks_significant_change.py:clinical_significance_change_check` closes the loop

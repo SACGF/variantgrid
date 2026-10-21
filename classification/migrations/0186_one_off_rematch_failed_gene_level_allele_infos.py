@@ -1,6 +1,6 @@
 from django.db import migrations
 
-from classification.models import ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
 from manual.operations.manual_operations import ManualOperation
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 

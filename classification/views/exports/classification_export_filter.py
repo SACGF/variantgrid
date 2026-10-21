@@ -26,8 +26,7 @@ from rest_framework.exceptions import ParseError
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
-from classification.enums import ClinicalContextStatus, ShareLevel
-from classification.enums.discordance_enums import DiscordanceReportResolution
+from classification.enums import ClinicalContextStatus, DiscordanceReportResolution, ShareLevel
 from classification.models import (
     Classification,
     ClassificationModification,

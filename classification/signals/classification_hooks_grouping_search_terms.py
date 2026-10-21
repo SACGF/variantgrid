@@ -7,11 +7,11 @@ from typing import Optional
 from django.dispatch import receiver
 
 from annotation.models import AnnotationVersion, VariantAnnotation
+from classification.enums import ClassificationGroupingSearchTermType
 from classification.models import (
     ClassificationGrouping,
     ClassificationGroupingSearchTermBuilder,
     ClassificationGroupingSearchTermStub,
-    ClassificationGroupingSearchTermType,
     ClinVarExport,
     ImportedAlleleInfo,
     ResolvedVariantInfo,

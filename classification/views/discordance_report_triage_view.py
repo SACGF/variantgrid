@@ -5,7 +5,8 @@ from django import forms
 from django.contrib import messages
 from django.shortcuts import get_object_or_404
 
-from classification.models import DiscordanceReportTriage, DiscordanceReportTriageStatus
+from classification.enums import DiscordanceReportTriageStatus
+from classification.models import DiscordanceReportTriage
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from library.log_utils import log_saved_form
 from snpdb.lab_picker import LabPickerData

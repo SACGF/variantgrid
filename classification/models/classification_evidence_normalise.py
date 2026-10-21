@@ -18,14 +18,15 @@ from django.contrib.auth.models import User
 from django.db.models.query_utils import Q
 
 from annotation.regexes import DbRegexes, db_ref_regexes
-from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource, ValidationCode
-from classification.models.classification_patcher import patch_fuzzy_age
-from classification.models.evidence_key import (
-    EvidenceKey,
-    EvidenceKeyValueType,
-    VCDataCell,
+from classification.enums import (
+    CriteriaEvaluation,
+    SpecialEKeys,
+    SubmissionSource,
+    ValidationCode,
     WipeMode,
 )
+from classification.models.classification_patcher import patch_fuzzy_age
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType, VCDataCell
 from library.utils import cautious_attempt_html_to_text, empty_to_none
 from snpdb.models import Sample
 

@@ -23,7 +23,13 @@ from classification.classification_import import (
     reattempt_variant_matching,
     variant_matching_dry_run,
 )
-from classification.enums import ShareLevel, WithdrawReason
+from classification.enums import (
+    ClassificationImportRunStatus,
+    DiscordanceReportTriageStatus,
+    ImportedAlleleInfoStatus,
+    ShareLevel,
+    WithdrawReason,
+)
 from classification.enums.classification_enums import (
     EvidenceCategory,
     SpecialEKeys,
@@ -44,11 +50,9 @@ from classification.models import (
     DiscordanceReport,
     DiscordanceReportClassification,
     DiscordanceReportTriage,
-    DiscordanceReportTriageStatus,
     EvidenceKey,
     EvidenceKeyMap,
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     OverlapDiscordanceNotification,
     ReclassificationEvent,
     ReclassificationEventBuildState,
@@ -57,10 +61,7 @@ from classification.models import (
     ensure_discordance_report_triages_bulk,
 )
 from classification.models.classification import Classification
-from classification.models.classification_import_run import (
-    ClassificationImportRun,
-    ClassificationImportRunStatus,
-)
+from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfoValidation,
     ResolvedVariantInfo,

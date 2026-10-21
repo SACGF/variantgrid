@@ -6,10 +6,8 @@ from django.db.models import Q
 from hgvs.exceptions import HGVSInvalidVariantError
 
 from classification.classification_import import reattempt_variant_matching
-from classification.models.classification_variant_info_models import (
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
-)
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher
 from library.guardian_utils import admin_bot
 

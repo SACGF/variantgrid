@@ -44,6 +44,8 @@ from classification.classification_stats import (
     get_grouped_classification_counts,
 )
 from classification.enums import (
+    ClassificationImportRunStatus,
+    ImportedAlleleInfoStatus,
     LabExternalFilter,
     OverlapStatus,
     OverlapType,
@@ -65,7 +67,6 @@ from classification.models import (
     ConditionResolvedDict,
     DiscordanceReport,
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     Overlap,
     OverlapContribution,
     OverlapContributionNextStep,
@@ -79,7 +80,6 @@ from classification.models.classification_consensus import (
     ConsensusComparison,
     ConsensusGroup,
 )
-from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types

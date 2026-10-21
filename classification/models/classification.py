@@ -17,7 +17,6 @@ import uuid
 from collections import Counter, namedtuple
 from collections.abc import Callable, Iterable, Mapping
 from datetime import date, datetime, timedelta
-from enum import Enum
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -56,10 +55,12 @@ from annotation.models.models_version import VariantAnnotationVersion
 from classification.enums import (
     CRITERIA_NOT_MET,
     CriteriaEvaluation,
+    ImportedAlleleInfoStatus,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
     TestingContextBucket,
+    WipeMode,
     WithdrawReason,
 )
 from classification.models.classification_evidence_normalise import (
@@ -75,7 +76,6 @@ from classification.models.classification_utils import (
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     tidy_hgvs_whitespace,
 )
 from classification.models.condition_resolved import ConditionResolved, ConditionResolvedDict
@@ -85,7 +85,6 @@ from classification.models.evidence_key import (
     EvidenceKeyValueType,
     VCDataDict,
     VCPatch,
-    WipeMode,
     resolve_default_value,
 )
 from classification.models.evidence_mixin import EvidenceMixin
@@ -133,13 +132,6 @@ classification_variant_set_signal = django.dispatch.Signal()  # args: "classific
 classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
 # This signal is called if a classification is assigned to a variant (or liftover), or the classification changes
 variants_classification_changed_signal = django.dispatch.Signal()  # args: "classification", "variant"
-
-
-class VCBlobKeys(Enum):
-    VALUE = "value"
-    NOTE = "note"
-    DB_REFS = "db_refs"
-    EXPLAIN = "explain"
 
 
 class ClassificationProcessError(Exception):

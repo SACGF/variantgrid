@@ -3,14 +3,19 @@ from unittest import mock
 
 from django.test import TestCase, override_settings
 
-from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums import (
+    ClinVarExportBatchStatus,
+    ClinVarExportRequestType,
+    ClinVarResponseOutcome,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+)
 from classification.models import (
     Classification,
     ClinVarExport,
     ClinVarExportBatch,
-    ClinVarExportBatchStatus,
     ClinVarExportRequest,
-    ClinVarExportRequestType,
     ClinVarExportStatus,
     ImportedAlleleInfo,
 )
@@ -20,7 +25,7 @@ from classification.models.classification_variant_info_models import (
 )
 from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from classification.models.clinvar_export_sync import ClinVarResponseOutcome, clinvar_export_sync
+from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.models.clinvar_key_models import ClinVarKey
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.enums import GeneSymbolAliasSource
