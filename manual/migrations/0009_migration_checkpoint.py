@@ -33,7 +33,7 @@ FINAL_MIGRATIONS = [
     ('user_messages', '0002_migrate_legacy_django_messages'),
 ]
 if "sapath" in {app.split(".")[0] for app in settings.INSTALLED_APPS}:
-    FINAL_MIGRATIONS.append(('sapath', '0024_one_off_merge_tso500_enrichment_kits'))
+    FINAL_MIGRATIONS.append(('sapath', '0025_merge_tso500_kits_timestamps'))
 
 
 def _refuse_while_manual_tasks_outstanding(_apps, _schema_editor):
