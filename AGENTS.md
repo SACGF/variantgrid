@@ -202,6 +202,9 @@ restates a field declaration, drop it.
 
 ### Verifying pages
 Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
+For layout - what a CSS or template change actually looks like - `scripts/browser/README.md` has a headless
+chromium harness (screenshots, element boxes, quirks-vs-standards diff, try-a-fix patches) that runs against a
+working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than guessing at a render.
 
 ### Background shells
 Wait for a background job on its PID (`while kill -0 <pid>; do sleep 5; done`), never on `pgrep -f <pattern>`: the
