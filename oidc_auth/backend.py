@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from urllib.parse import urlencode
 
 import jwt
@@ -22,6 +23,40 @@ _CONTROL_CHAR_RE = re.compile(r'[\x00-\x1f\x7f]')
 def _sanitize_claim_str(value, max_length):
     """Strip control characters and enforce max length on a claim string."""
     return _CONTROL_CHAR_RE.sub('', value)[:max_length]
+
+
+@dataclass(frozen=True)
+class ClaimGroups:
+    groups: frozenset[str]
+    is_superuser: bool
+    is_bot: bool
+    is_tester: bool
+    has_lab_or_role: bool  # any group under /associations/ or /variantgrid/
+
+
+def groups_from_claims(claim_groups: list[str]) -> ClaimGroups:
+    """
+    Maps Keycloak group paths to Django groups and admin flags.
+    '/associations/<org>/<lab>' adds each level of nesting as its own group ('org', 'org/lab'), matching
+    Lab.group_name / Organization.group_name. '/variantgrid/admin' is superuser, '/variantgrid/bot' and
+    '/variantgrid/tester' become the 'variantgrid/bot' and 'variantgrid/tester' groups. Anything else is ignored.
+    """
+    oauth_groups = [g.split('/')[1:] for g in claim_groups]
+    associations = [g[1:] for g in oauth_groups if len(g) > 1 and g[0] == 'associations']
+    # Should make 'variantgrid' configurable at some point in case there are 2 installations on the same OAuth instance
+    variant_grid_roles = {'/'.join(g[1:]) for g in oauth_groups if len(g) > 1 and g[0] == 'variantgrid'}
+
+    groups = {'/'.join(assoc[:i]) for assoc in associations for i in range(1, len(assoc) + 1)}
+    is_bot = 'bot' in variant_grid_roles
+    is_tester = 'tester' in variant_grid_roles
+    if is_bot:
+        groups.add('variantgrid/bot')
+    if is_tester:
+        groups.add('variantgrid/tester')
+
+    return ClaimGroups(groups=frozenset(groups), is_superuser='admin' in variant_grid_roles,
+                       is_bot=is_bot, is_tester=is_tester,
+                       has_lab_or_role=bool(associations or variant_grid_roles))
 
 
 class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
@@ -156,34 +191,15 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
             return self._refuse_login(user, message, deactivate=True, extra_tags="html")
 
-        oauth_groups = [g.split('/')[1:] for g in all_claim_groups]
-
-        associations = [g[1:] for g in oauth_groups if len(g) > 1 and g[0] == 'associations']
-        # Should make 'variantgrid' setting configurable at some point in case there are 2 variantgrid installations on the same OAuth instance
-        variant_grid_groups = [g[1:] for g in oauth_groups if len(g) > 1 and g[0] == 'variantgrid']
-
-        if not associations and not variant_grid_groups:
+        claim_groups = groups_from_claims(all_claim_groups)
+        if not claim_groups.has_lab_or_role:
             return self._refuse_login(user, "This account doesn't belong to any labs.", deactivate=True)
 
         # everyone with a login is considered part of the public group
-        groups: set[str] = set()
-        groups.add(settings.PUBLIC_GROUP_NAME)
-        groups.add(settings.LOGGED_IN_USERS_GROUP_NAME)
-
-        # currently only variantgrid permission
-        is_super_user = False
-        is_bot = False
-        is_tester = False
-        for vg in variant_grid_groups:
-            permission = '/'.join(vg)
-            if permission == 'admin':
-                is_super_user = True
-            elif permission == 'bot':
-                groups.add('variantgrid/bot')
-                is_bot = True
-            elif permission == 'tester':
-                groups.add('variantgrid/tester')
-                is_tester = True
+        groups = claim_groups.groups | {settings.PUBLIC_GROUP_NAME, settings.LOGGED_IN_USERS_GROUP_NAME}
+        is_super_user = claim_groups.is_superuser
+        is_bot = claim_groups.is_bot
+        is_tester = claim_groups.is_tester
 
         if settings.MAINTENANCE_MODE:
             if is_tester:
@@ -200,18 +216,6 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         user_settings_override, _ = UserSettingsOverride.objects.get_or_create(user=user)
         user_settings_override.oauth_sub = sub
-
-        # for nested groups, adds each level of nesting as its own group
-        # e.g. association/fake_pathology/lab_1 will be added as
-        # "fake_pathology/lab_1"
-        # "fake_pathology"
-        # (remember that the 'association' prefix is removed)
-        for assoc in associations:
-            assoc_groups = set()
-            for i in range(len(assoc) + 1):
-                parts = assoc[0:i]
-                assoc_groups.add('/'.join(parts))
-                groups.update(assoc_groups)
 
         removed_groups = django_groups.difference(groups)
         added_groups = groups.difference(django_groups)
