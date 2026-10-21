@@ -5,8 +5,9 @@ from django.utils.timezone import now
 
 from analysis.grids import AnalysesListColumns
 from analysis.models import Analysis
+from seqauto.enums import DataGeneration
 from seqauto.grids.sequencing_data_grids import SequencingRunColumns
-from seqauto.models import DataGeneration, Sequencer, SequencerModel, SequencingRun
+from seqauto.models import Sequencer, SequencerModel, SequencingRun
 from snpdb.grids import SamplesListColumns, VCFListColumns
 from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
 from snpdb.views.datatable_view import DatabaseTableView

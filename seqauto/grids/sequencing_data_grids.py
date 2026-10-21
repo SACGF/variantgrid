@@ -8,11 +8,11 @@ from django.http import HttpRequest
 from django.urls.base import reverse
 
 from library.utils import JsonDataType
+from seqauto.enums import EnrichmentKitType
 from seqauto.models import (
     QC,
     AlignmentFile,
     EnrichmentKit,
-    EnrichmentKitType,
     Experiment,
     SequencingRun,
     SingleSampleVCF,

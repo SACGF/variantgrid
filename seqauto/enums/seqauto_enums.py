@@ -1,4 +1,9 @@
-# Using own file to stop circular dependencies in illuminate_report
+"""
+Enums for sequencing data: DataGeneration (sequencer platform), EnrichmentKitType, PairedEnd /
+SequencerRead (which read a FASTQ holds), the QC graph choices (QCGraphTypes2, QCCompareType) and
+LibraryQCCategory, plus the report-context keys for library QC sections and DragenTSO500CombinedVariantOutput
+measures (LIBRARY_QC_CONTEXT_KEYS, CVO_MEASURE_CONTEXT_KEYS). Stored codes: add values, never change one.
+"""
 from django.db import models
 
 from library.utils import Constant

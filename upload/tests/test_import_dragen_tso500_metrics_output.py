@@ -10,13 +10,13 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient, Specimen
 from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import (
     SAMPLE_SHEET_PAIR_ID_COLUMN,
     SAMPLE_SHEET_SAMPLE_TYPE_COLUMN,
     LibraryQC,
     SequencingSampleData,
 )
-from seqauto.models.models_enums import LibraryQCCategory
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from snpdb.models import ImportSource
 from upload.import_task_factories.import_task_factory import get_import_task_factories

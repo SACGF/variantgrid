@@ -48,8 +48,8 @@ from patients.models_enums import (
     SpecimenMeasureType,
 )
 from patients.sample_grouping import get_sample_group
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
-from seqauto.models.models_enums import LibraryQCCategory
 from snpdb.models import Sample
 
 
