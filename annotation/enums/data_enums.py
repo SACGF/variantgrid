@@ -1,3 +1,7 @@
+"""
+Dates a classification or overlap carries: EffectiveDate (date plus EffectiveDateType, stored as JSON on
+OverlapContribution) and the deprecated ClassificationDate / ClassificationDateType it replaces.
+"""
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum

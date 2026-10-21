@@ -1,4 +1,7 @@
-
+"""
+MolecularConsequenceColors: buckets VEP consequences into the oncoplot / hotspot variant types and the colour each
+is drawn in, ranked most important first.
+"""
 class MolecularConsequenceColors:
     STOPGAIN = "Stopgain"
     FRAMESHIFT = "Frameshift"

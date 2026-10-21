@@ -1,7 +1,8 @@
 import re
 
+from annotation.enums import CitationSource
 from annotation.models import Citation, CitationFetchRequest
-from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from annotation.models.models_citations import CitationIdNormalized
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 

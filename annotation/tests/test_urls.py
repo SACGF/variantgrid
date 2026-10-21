@@ -2,13 +2,13 @@ import unittest
 
 from django.contrib.auth.models import User
 
+from annotation.enums import CitationSource
 from annotation.fake_data import (
     create_fake_clinvar_data,
     create_fake_variant_annotation,
     get_fake_annotation_version,
 )
 from annotation.models import AnnotationRun, Citation, ClinVar, HumanProteinAtlasTissueSample
-from annotation.models.models_citations import CitationSource
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

@@ -1,7 +1,8 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.models.models_citations import Citation, CitationSource
+from annotation.enums import CitationSource
+from annotation.models.models_citations import Citation
 from genes.models import GeneSymbol, GeneSymbolWiki
 
 
