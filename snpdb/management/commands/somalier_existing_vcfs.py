@@ -13,7 +13,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
-from snpdb.models.models_enums import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_somalier import (
     SomalierAllSamplesRelate,

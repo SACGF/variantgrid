@@ -52,7 +52,7 @@ computed, for overlap queries.
 ### Linking a Variant to an Allele
 
 `Allele` is the build-independent hub; `VariantAllele` is the per-build link with an `origin`
-(`snpdb/models/models_enums.py:AlleleOrigin`: imported, imported-normalised, liftover) and the `allele_linking_tool`
+(`snpdb/enums/snpdb_enums.py:AlleleOrigin`: imported, imported-normalised, liftover) and the `allele_linking_tool`
 that made it (`AlleleConversionTool`). `snpdb/clingen_allele.py:populate_clingen_alleles_for_variants` is the batch
 path: variants that fail `Variant.can_have_clingen_allele` (gene-level, an alt that cannot form g.HGVS, or larger than
 `ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE`, with `<DUP>` counted double for a registry bug) get a bare `Allele`
@@ -103,7 +103,7 @@ which sets each `AlleleLiftover.status` and merges alleles into the lowest pk wh
 linked elsewhere (`BulkAlleleLinkingVCFProcessor.merge_alleles`), so `merge(a, b)` and `merge(b, a)` racing agree.
 
 `LiftoverRun` has no status of its own; status is per allele on `snpdb/models/models_variant.py:AlleleLiftover` using
-`snpdb/models/models_enums.py:ProcessingStatus`. `AlleleLiftover.get_failed_conversion_tools` is read once per batch
+`snpdb/enums/snpdb_enums.py:ProcessingStatus`. `AlleleLiftover.get_failed_conversion_tools` is read once per batch
 so a tool that already failed an allele is not retried, and `LiftoverRun.get_clingen_auto_fail_liftover_run` collects the
 "known to fail before we start" cases into one run per build so the failure is still recorded.
 
@@ -141,7 +141,7 @@ faster for one sample and regex faster for wide cohorts (#1494). `Cohort.get_any
 
 ### VCF and Sample lifecycle
 
-`snpdb/models/models_vcf.py:VCF.import_status` and `Sample.import_status` share `snpdb/models/models_enums.py:ImportStatus`.
+`snpdb/models/models_vcf.py:VCF.import_status` and `Sample.import_status` share `snpdb/enums/snpdb_enums.py:ImportStatus`.
 Permissions cascade from the VCF: `Sample.can_view` is the VCF's answer or a sample-level guardian grant, and
 `Sample.filter_for_user` ORs both; `VCF.filter_for_user` also hides `ImportStatus.DELETION_STATES` and, by default,
 archived VCFs. Deleting from the UI is `snpdb/tasks/soft_delete_tasks.py:soft_delete_vcfs`, which marks rows and queues

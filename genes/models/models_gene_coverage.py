@@ -21,7 +21,7 @@ from library.django_utils.django_file_utils import (
 )
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.log_utils import log_traceback
-from snpdb.models import DataState
+from snpdb.enums import DataState
 from snpdb.models.models_genome import GenomeBuild
 from upload.vcf.sql_copy_files import (
     GENE_COVERAGE_HEADER,

@@ -38,7 +38,8 @@ from django.utils.timezone import localtime, now
 from analysis.models import VariantTag
 from annotation.models import VariantAnnotationVersion
 from library.constants import DAY_SECS
-from snpdb.models import AlleleOriginFilterDefault, GenomeBuild, Lab, Tag, UserSettings, Variant, VariantAllele
+from snpdb.enums import AlleleOriginFilterDefault
+from snpdb.models import GenomeBuild, Lab, Tag, UserSettings, Variant, VariantAllele
 from variantopedia.forms import TagStatsGenesForm, TagStatsTagForm, TagStatsTagsForm
 
 TAG_STATS_CACHE_TIMEOUT = DAY_SECS

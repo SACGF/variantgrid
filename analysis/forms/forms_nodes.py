@@ -52,9 +52,9 @@ from ontology.models import OntologyTerm
 from patients.models import Patient
 from patients.models_enums import GnomADPopulation, SampleSourceLevel
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_for_source
+from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Cohort, Lab, Sample, Tag, VCFFilter
-from snpdb.models.models_enums import AlleleOriginFilterDefault
 from snpdb.models.models_genome import Contig
 from uicore.widgets.date_widget import NativeDateInput
 

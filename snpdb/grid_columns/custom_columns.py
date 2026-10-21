@@ -15,8 +15,8 @@ from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
 from library.django_utils import resolve_field_path
 from library.utils import JsonDataType, add_exception_note
+from snpdb.enums import ColumnAnnotationLevel
 from snpdb.models import CustomColumn, CustomColumnsCollection, Variant, VariantGridColumn
-from snpdb.models.models_enums import ColumnAnnotationLevel
 from snpdb.views.datatable_view import CellData, FilterField, NullOrder, RichColumn
 
 # These come from get_variantgrid_extra_annotate rather than the model

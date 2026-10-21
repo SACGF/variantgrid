@@ -14,7 +14,7 @@ from pathtests.models import (
     PathologyTestVersion,
 )
 from patients.models import Patient
-from snpdb.models import ImportStatus
+from snpdb.enums import ImportStatus
 
 
 def _gene_list(user, name, *symbols) -> GeneList:

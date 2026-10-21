@@ -15,15 +15,14 @@ from library.log_utils import log_traceback
 from library.utils import single_quote
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_common_filter
+from snpdb.enums import CohortGenotypeCollectionType, ImportStatus
 from snpdb.models import (
     Cohort,
     CohortGenotype,
     CohortGenotypeCollection,
-    CohortGenotypeCollectionType,
     CohortGenotypeCommonFilterVersion,
     CohortGenotypeTaskVersion,
     CommonVariantClassified,
-    ImportStatus,
     Variant,
 )
 from snpdb.tasks.sub_cohort_tasks import enqueue_sub_cohort_any_sample_called_vc

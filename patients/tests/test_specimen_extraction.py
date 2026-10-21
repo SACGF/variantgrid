@@ -33,8 +33,8 @@ from patients.models_enums import NucleicAcid, PatientRecordMatchType, TissueSta
 from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from patients.views import CREATE_EXTRACTION
 from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAutocompleteView
-from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, Sample
-from snpdb.models.models_enums import VariantOrigin
+from snpdb.enums import ImportSource, ImportStatus, VariantOrigin
+from snpdb.models import VCF, GenomeBuild, Sample
 from snpdb.search import SearchResultMatchStrength, search_data
 from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
 

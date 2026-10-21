@@ -8,7 +8,7 @@ from django.urls.base import reverse
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.genomics.bed_file import BedFileReader
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 
 

@@ -48,11 +48,11 @@ from library.utils import (
     utc_from_timestamp,
 )
 from snpdb.clingen_allele import get_clingen_allele
+from snpdb.enums import AlleleOriginBucket, AlleleOriginFilterDefault
 from snpdb.models import (
     VARIANT_PATTERN,
     VARIANT_SYMBOLIC_PATTERN,
     Allele,
-    AlleleOriginFilterDefault,
     ClinGenAllele,
     GenomeBuild,
     Lab,
@@ -60,7 +60,6 @@ from snpdb.models import (
     Variant,
     VariantCoordinate,
 )
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
 
 

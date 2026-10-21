@@ -56,8 +56,8 @@ from library.django_utils.django_file_utils import (
 from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
 from library.utils import split_dict_multi_values
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import VariantCoordinate
-from snpdb.models.models_enums import AssemblyMoleculeType
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 DELIMITER = '\t'

@@ -21,7 +21,7 @@ from django.db.models.query_utils import Q
 from django_extensions.db.models import TimeStampedModel
 
 from patients.models_enums import Sex
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 # Targeted panels can have too few chrX calls for the hom/het ratio to mean anything

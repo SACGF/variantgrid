@@ -5,8 +5,8 @@ from model_utils.managers import InheritanceManager
 from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import Gene
 from library.utils import rgb_invert
+from snpdb.enums import ProcessingStatus
 from snpdb.models import Cohort, Sample
-from snpdb.models.models_enums import ProcessingStatus
 from variantgrid.celery import app
 
 

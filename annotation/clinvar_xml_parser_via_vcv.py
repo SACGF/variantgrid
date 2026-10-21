@@ -12,7 +12,7 @@ from annotation.clinvar_xml_parser import (
 )
 from annotation.models import ClinVarRecord
 from library.utils.xml_utils import PP, parser_path
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 
 
 class ConditionList:

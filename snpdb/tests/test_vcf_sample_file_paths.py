@@ -5,8 +5,8 @@ from guardian.shortcuts import assign_perm
 
 from library.django_utils.unittest_utils import prevent_request_warnings
 from patients.models import Patient
+from snpdb.enums import SampleFileType
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, SampleFilePath
 from snpdb.sample_file_path import (

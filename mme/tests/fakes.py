@@ -10,8 +10,8 @@ from classification.models.classification import Classification, ClassificationM
 from classification.models.condition_resolved import ConditionResolved
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
 from ontology.models import OntologyService, OntologyTerm
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import ClinicalSignificance
 
 
 def make_classification(lab, user, gene_symbol: str = "BRCA1",

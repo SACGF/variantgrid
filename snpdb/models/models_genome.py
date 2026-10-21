@@ -30,9 +30,9 @@ from library.django_utils.django_object_managers import ObjectManagerCachingImmu
 from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
+from snpdb.enums import AssemblyMoleculeType, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_REFSEQ_ACCESSION
 from snpdb.genome.fasta_index import load_genome_fasta_index
-from snpdb.models.models_enums import AssemblyMoleculeType, SequenceRole
 
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):

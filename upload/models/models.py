@@ -43,10 +43,10 @@ from seqauto.models import (
     VariantCaller,
     get_samples_by_sequencing_sample,
 )
+from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
 from snpdb.models.models import CodeVersionMixin
-from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
 from upload.models.models_enums import (

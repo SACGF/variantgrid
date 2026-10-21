@@ -13,8 +13,8 @@ from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_fake_transcript_version
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, Tag, Variant, VariantZygosityCountCollection
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 from variantopedia.interesting_nearby import (
     get_transcript_and_domains,

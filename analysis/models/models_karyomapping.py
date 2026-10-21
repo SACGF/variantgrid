@@ -24,8 +24,8 @@ from genes.models import GeneSymbol
 from library.constants import HOUR_SECS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomicInterval, Trio, Variant
-from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import Contig, GenomeBuildContig
 
 

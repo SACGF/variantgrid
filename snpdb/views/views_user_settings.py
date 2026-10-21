@@ -21,6 +21,7 @@ from library.django_utils import (
     add_save_message,
 )
 from snpdb import forms
+from snpdb.enums import BuiltInFilters
 from snpdb.forms import (
     SettingsInitialGroupPermissionForm,
     UserContactForm,
@@ -48,9 +49,6 @@ from snpdb.models import (
     UserSettings,
     UserSettingsOverride,
     VariantGridColumn,
-)
-from snpdb.models.models_enums import (
-    BuiltInFilters,
 )
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.views.views_lab import _add_read_only_settings_message

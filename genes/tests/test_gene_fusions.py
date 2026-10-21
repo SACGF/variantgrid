@@ -22,7 +22,8 @@ from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.gene_level_test_utils import make_release_gene
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
-from snpdb.models import Contig, GenomeBuild, SequenceRole
+from snpdb.enums import SequenceRole
+from snpdb.models import Contig, GenomeBuild
 
 
 class GeneFusionTestCase(TestCase):

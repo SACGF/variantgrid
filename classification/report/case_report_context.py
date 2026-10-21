@@ -42,8 +42,8 @@ from patients.models_enums import (
 from patients.sample_grouping import get_patient_for_source, get_sample_group
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
 from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
+from snpdb.enums import SomaticClinicalSignificance
 from snpdb.models import GenomeBuild, Lab, Sample
-from snpdb.models.models_enums import SomaticClinicalSignificance
 
 
 class ReportVariantKind:

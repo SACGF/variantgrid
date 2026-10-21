@@ -22,8 +22,8 @@ from genes.models import (
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.enums import DataState, ImportStatus
 from snpdb.fake_data import create_fake_trio
-from snpdb.models import DataState, ImportStatus
 from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
 

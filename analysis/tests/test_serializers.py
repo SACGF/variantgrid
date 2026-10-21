@@ -32,8 +32,9 @@ from genes.fake_data import create_fake_transcript_version
 from genes.models import GeneList, GeneListGeneSymbol, ImportStatus
 from library.utils import get_all_subclasses
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.enums import BuiltInFilters
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import BuiltInFilters, GenomeBuild, UserSettings
+from snpdb.models import GenomeBuild, UserSettings
 
 
 def _round_trip(user, genome_build, annotation_version, analysis):

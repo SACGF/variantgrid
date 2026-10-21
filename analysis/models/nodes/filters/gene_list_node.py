@@ -33,8 +33,8 @@ from genes.models_enums import PanelAppConfidence
 from genes.panel_app import get_panel_app_local_cache
 from pathtests.models import PathologyTestVersion
 from patients.models import Patient
+from snpdb.enums import ImportStatus
 from snpdb.models import Contig, Sample
-from snpdb.models.models_enums import ImportStatus
 
 
 class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):

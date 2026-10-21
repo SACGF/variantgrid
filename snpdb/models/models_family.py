@@ -19,8 +19,8 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.preview_request import PreviewData, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from library.utils.json_utils import canonical_filter_key
 from patients.models_enums import Sex
+from snpdb.enums import DuoRelationship
 from snpdb.models.models_cohort import Cohort, CohortSample
-from snpdb.models.models_enums import DuoRelationship
 from snpdb.models.models_vcf import Sample
 
 

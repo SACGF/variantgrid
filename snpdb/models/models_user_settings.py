@@ -29,9 +29,15 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text
+from snpdb.enums import (
+    DEFAULT_GRID_LOADING_ANIMATIONS,
+    AlleleOriginFilterDefault,
+    BuiltInFilters,
+    GridLoadingAnimation,
+    TagFilter,
+)
 from snpdb.models.models import AvatarDetails, Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -227,21 +233,6 @@ class AllVariantsFilter(models.Model):
 
     def __str__(self):
         return f"{self.user}/{self.genome_build}: {self.filters}"
-
-
-class GridLoadingAnimation(models.TextChoices):
-    """ DNA "reading" animations shown (randomly) while a node's variant grid loads.
-        Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """
-    FLOWCELL = "flowcell", "Flowcell"
-    RIPPLE = "ripple", "Ripple"
-    PILEUP = "pileup", "Pileup"
-    MATRIX = "matrix", "Matrix"
-
-
-# Shown when a user hasn't chosen (loading_animations is null/empty)
-DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
-                                   GridLoadingAnimation.RIPPLE.value,
-                                   GridLoadingAnimation.PILEUP.value]
 
 
 class SettingsOverride(models.Model):

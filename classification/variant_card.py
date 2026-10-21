@@ -8,13 +8,12 @@ from annotation.manual_variant_entry import CreateManualVariantForbidden, check_
 from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
+from snpdb.enums import AlleleConversionTool, AlleleOrigin
 from snpdb.liftover import allele_can_attempt_liftover
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
     AlleleMergeLog,
-    AlleleOrigin,
     GenomeBuild,
     LiftoverRun,
     Variant,

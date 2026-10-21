@@ -17,8 +17,8 @@ from classification.models import ClassificationJsonParams, ClassificationRef
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.utils import empty_to_none, force_json
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import Lab
-from snpdb.models.models_enums import ClinicalSignificance
 
 
 class ClassificationView(APIView):

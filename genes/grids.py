@@ -36,8 +36,9 @@ from genes.models import (
 )
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.utils import pretty_label
+from snpdb.enums import ImportStatus
 from snpdb.grids import AbstractVariantGrid, get_standard_overrides
-from snpdb.models import ImportStatus, Q, VariantGridColumn
+from snpdb.models import Q, VariantGridColumn
 from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,

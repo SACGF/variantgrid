@@ -26,6 +26,7 @@ from library.django_utils import (
     add_save_message,
 )
 from snpdb import forms
+from snpdb.enums import ImportStatus, ProcessingStatus
 from snpdb.models import (
     Cohort,
     Duo,
@@ -33,10 +34,6 @@ from snpdb.models import (
     Sample,
     Trio,
     UserSettings,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
-    ProcessingStatus,
 )
 from snpdb.views.vcf_cohort_page import sample_membership_rows, vcf_cohort_page_context
 from snpdb.views.views_json import cohort_genotype_json_response

@@ -1,8 +1,8 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from snpdb.enums import UserAwardKind, UserAwardLevel
 from snpdb.models import AvatarDetails, UserAward
-from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_award_updates import update_badge, update_user_awards
 from snpdb.user_awards import AwardDefinition
 

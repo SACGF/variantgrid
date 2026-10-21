@@ -13,7 +13,8 @@ from genes.fake_data import create_fake_transcript_version
 from genes.grids import GeneSymbolVariantsGrid
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
-from snpdb.models import Allele, AlleleOrigin, GenomeBuild, Tag, Variant, VariantAllele
+from snpdb.enums import AlleleOrigin
+from snpdb.models import Allele, GenomeBuild, Tag, Variant, VariantAllele
 
 
 class GeneSymbolVariantsGridTest(TestCase):

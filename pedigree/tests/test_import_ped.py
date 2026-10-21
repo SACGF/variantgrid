@@ -9,8 +9,8 @@ from django.contrib.auth.models import User
 from patients.models_enums import Sex
 from pedigree.models import PedFile, PedFileFamily, Pedigree
 from pedigree.ped.import_ped import automatch_pedigree_samples, import_ped
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 
 

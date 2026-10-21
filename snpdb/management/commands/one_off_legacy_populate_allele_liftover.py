@@ -5,15 +5,14 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count, F, Min
 
 from library.guardian_utils import admin_bot
+from snpdb.enums import AlleleConversionTool, ProcessingStatus
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
     ClinGenAllele,
     Contig,
     GenomeBuild,
     LiftoverRun,
-    ProcessingStatus,
     VariantAllele,
 )
 

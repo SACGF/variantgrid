@@ -24,9 +24,9 @@ from library.utils import double_quote, json_default_converter
 from library.utils.json_utils import json_dumps_nan_as_null
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
+from snpdb.enums import ProcessingStatus
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models import CodeVersion
-from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariantOperation,

@@ -7,8 +7,8 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
 
+from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.forms import GenomicIntervalsCollectionForm
-from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import datatable_response
 from upload.grids import FileUploadColumns
