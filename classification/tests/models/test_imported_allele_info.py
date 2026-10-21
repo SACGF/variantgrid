@@ -72,6 +72,28 @@ class ImportedAlleleInfoPreferredHGVSTest(TestCase):
         self.assertEqual(hgvs.genome_build, GenomeBuild.grch38())
         self.assertIs(hgvs.is_desired_build, False)
 
+    @patch.object(GenomeBuild, "builds_with_annotation_cached", lambda: [GenomeBuild.grch37(), GenomeBuild.grch38()])
+    def test_desired_build_matched_without_hgvs_uses_another_build(self):
+        """ a <CNV> matches a variant HGVS can't write - that must not become an HGVSDisplay with no HGVS """
+        gbpv = GenomeBuildPatchVersion.get_unspecified_patch_version_for(GenomeBuild.grch37())
+        allele_info = ImportedAlleleInfo(imported_genome_build_patch_version=gbpv,
+                                         imported_c_hgvs="NM_001145661.1(GATA2):c.1018-213_1304del")
+        allele_info.grch37 = ResolvedVariantInfo(genome_build=GenomeBuild.grch37(), variant_id=1)
+        allele_info.grch38 = ResolvedVariantInfo(genome_build=GenomeBuild.grch38(), variant_id=2,
+                                                 resolved_hgvs="NM_001145661.2(GATA2):c.1018-213_1304del")
+
+        hgvs = allele_info.preferred_hgvs_obj(GenomeBuild.grch37())
+        self.assertEqual("NM_001145661.2(GATA2):c.1018-213_1304del", hgvs.full_dna_hgvs)
+        self.assertEqual(hgvs.genome_build, GenomeBuild.grch38())
+        self.assertIs(hgvs.is_desired_build, False)
+
+    def test_no_hgvs_at_all(self):
+        gbpv = GenomeBuildPatchVersion.get_unspecified_patch_version_for(GenomeBuild.grch37())
+        allele_info = ImportedAlleleInfo(imported_genome_build_patch_version=gbpv)
+        allele_info.grch37 = None
+        allele_info.grch38 = None
+        self.assertIsNone(allele_info.preferred_hgvs_obj(GenomeBuild.grch37()))
+
 
 class ImportedAlleleInfoValidationTest(TestCase):
     """ _calculate_validation keys off what was supplied on import - a g.HGVS only submission is accepted on its
