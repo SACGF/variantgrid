@@ -9,10 +9,11 @@ import time
 from collections.abc import Callable, Iterable
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
+from library.vg.status import broker_queue_depths, task_queue_name
 from snpdb.enums import ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_somalier import (
@@ -81,6 +82,9 @@ class Command(BaseCommand):
             vcf_qs = vcf_qs.filter(genome_build=GenomeBuild.get_name_or_alias(build_name))
 
         vcf_ids = list(vcf_qs.filter(somaliervcfextract__isnull=True).order_by("pk").values_list("pk", flat=True))
+        if not options.get("no_wait"):
+            self._require_worker(somalier_vcf_extract)
+            self._require_worker(somalier_ancestry_batch)
         logging.info("Dispatching somalier extract for %d VCFs", len(vcf_ids))
         for vcf_id in vcf_ids:
             somalier_vcf_extract.delay(vcf_id)
@@ -109,6 +113,15 @@ class Command(BaseCommand):
 
         somalier_all_samples.delay(force=True)
         logging.info("Dispatched the all samples relate")
+
+    @staticmethod
+    def _require_worker(task):
+        """ Waiting on a queue nobody consumes never ends, so stop before dispatching. --no-wait skips this
+            as it exists to queue work ahead of a worker. """
+        queue_name = task_queue_name(task.name)
+        if broker_queue_depths([queue_name])[queue_name].get("consumers") == 0:
+            raise CommandError(f"No celery worker is consuming queue '{queue_name}' ({task.name}) - start one "
+                               f"(scripts/celery_start.sh on a dev box) and re-run, or use --no-wait")
 
     @staticmethod
     def _wait(stage: str, total: int, get_pending_qs: Callable[[], QuerySet]):
