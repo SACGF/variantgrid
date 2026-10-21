@@ -160,6 +160,8 @@ class DbRefRegexes:
                 prefix = prefix.lower()
                 self.prefix_map[prefix] = regex
                 prefixes.append(prefix)
+        # Longest first, so "PubMedCentral" isn't matched as "PubMed"
+        prefixes.sort(key=len, reverse=True)
         self.prefix_regex = re.compile('(' + '|'.join(prefixes) + ')', RegexFlag.IGNORECASE)
 
     def link_html(self, text: str) -> str:

@@ -19,9 +19,9 @@ class GeneSymbolWikiCitationsTest(TestCase):
         return set(self.gene_symbol.genesymbolcitation_set.values_list("citation_id", flat=True))
 
     def test_citations_in_markdown_are_linked(self):
-        """ References are found in the text (a lone digit is not a legacy old_id), and one not yet in the database
-            gets a Citation stub """
-        markdown = "Loss of function, see PMID: 12345678 and 1 other (PMCID: PMC1234567)."
+        """ References are found in the text through its markdown formatting (a lone digit is not a legacy old_id),
+            and one not yet in the database gets a Citation stub """
+        markdown = "Loss of function, see PMID: **12345678** and 1 other (PMCID:&nbsp;*PMC1234567*)."
         wiki = GeneSymbolWiki.objects.create(gene_symbol=self.gene_symbol, last_edited_by=self.user, markdown=markdown)
         self.assertEqual(self._linked_citation_ids(), {"PMID:12345678", "PMCID:PMC1234567"})
 
