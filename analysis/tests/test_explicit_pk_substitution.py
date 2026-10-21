@@ -31,7 +31,7 @@ from annotation.models import AnnotationRun
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from library.django_utils.django_partition import temporary_db_table
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild, Variant

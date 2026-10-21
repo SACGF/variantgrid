@@ -24,7 +24,7 @@ from django.core.management import BaseCommand
 
 from analysis.models import Analysis, VariantTag
 from analysis.variant_tag_operations import get_proband_by_node_id
-from patients.models_enums import SampleSourceLevel
+from patients.enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 
 BATCH_SIZE = 1000

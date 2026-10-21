@@ -39,8 +39,8 @@ from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.unit_percent import convert_from_percent_to_unit
 from library.utils import invert_dict
 from library.utils.json_utils import canonical_filter_key
+from patients.enums import Zygosity
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
-from patients.models_enums import Zygosity
 from snpdb.enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant, VariantCollection

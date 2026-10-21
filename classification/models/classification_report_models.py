@@ -26,11 +26,11 @@ from model_utils.models import TimeStampedModel
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
-from patients.models import Extraction, Patient, Specimen, measure_value_description
-from patients.models_enums import (
+from patients.enums import (
     MEASURE_CONTEXT_KEYS,
     SampleSourceLevel,
 )
+from patients.models import Extraction, Patient, Specimen, measure_value_description
 from seqauto.models import LibraryQC
 from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from snpdb.enums import AlleleOriginBucket

@@ -15,7 +15,7 @@ from analysis.models.nodes.node_display import NodeIcon
 from annotation.models.models import VariantAnnotation
 from classification.models.classification import Classification
 from library.constants import MINUTE_SECS
-from patients.models_enums import GnomADPopulation, SimpleZygosity
+from patients.enums import GnomADPopulation, SimpleZygosity
 from snpdb.enums import ClinicalSignificance
 from snpdb.models import VariantZygosityCountCollection
 

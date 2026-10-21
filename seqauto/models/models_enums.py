@@ -67,7 +67,7 @@ LIBRARY_QC_CONTEXT_KEYS = {
 
 # What each of a DragenTSO500CombinedVariantOutput's numbers is called outside the database - the key a report
 # context and a report template's case_fields name it by - with its column and unit. 'tumour_fraction' is the
-# pathologist's estimate (patients.models_enums.MEASURE_CONTEXT_KEYS), so the caller's is its own key
+# pathologist's estimate (patients.enums.MEASURE_CONTEXT_KEYS), so the caller's is its own key
 CVO_MEASURE_CONTEXT_KEYS = {
     "tmb": ("total_tmb", "mut/Mb"),
     "msi": ("percent_unstable_msi_sites", "%"),

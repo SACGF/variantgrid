@@ -21,7 +21,7 @@ from django.db.models.query_utils import Q
 
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
-from patients.models_enums import Sex, Zygosity
+from patients.enums import Sex, Zygosity
 from snpdb.models import Contig
 
 MOTHER = "mother"

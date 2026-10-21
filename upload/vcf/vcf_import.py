@@ -24,9 +24,9 @@ from django.utils import timezone
 from library.genomics.vcf_enums import VCFConstant
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import get_single_element, invert_dict
+from patients.enums import MatchStatus
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction
-from patients.models_enums import MatchStatus
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     JointCalledVCF,

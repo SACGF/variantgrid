@@ -58,7 +58,7 @@ from library.utils import (
 )
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.enums import ProcessingStatus, SequenceRole
 from snpdb.grid_columns.custom_columns import (
     get_all_variant_grid_columns,

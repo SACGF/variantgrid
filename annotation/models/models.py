@@ -56,7 +56,7 @@ from genes.models import (
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict
-from patients.models_enums import GnomADPopulation
+from patients.enums import GnomADPopulation
 from snpdb.models import Variant
 from snpdb.models.models_cached_web_resource import CachedWebResource
 

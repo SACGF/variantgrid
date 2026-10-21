@@ -8,8 +8,8 @@ from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, TissueStatus, Zygosity
 from patients.models import Extraction, Patient, Specimen, Tissue
-from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     CohortGenotype,

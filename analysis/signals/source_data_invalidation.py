@@ -20,7 +20,7 @@ from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.tasks.analysis_update_tasks import create_and_launch_analysis_tasks
-from patients.models_enums import SampleSourceLevel
+from patients.enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 
 

@@ -2,7 +2,7 @@ from django.test import TestCase, override_settings
 
 from analysis.models import MOINode
 from analysis.tests.utils import AnalysisSetupMixin
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

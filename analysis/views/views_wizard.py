@@ -10,7 +10,7 @@ from django.views.generic import FormView
 
 from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
 from analysis.models.enums import DuoSample, QuadSample, TrioSample
-from patients.models_enums import Sex
+from patients.enums import Sex
 from snpdb.enums import ImportStatus
 from snpdb.models import Cohort, Duo, Quad, Sample, Trio
 

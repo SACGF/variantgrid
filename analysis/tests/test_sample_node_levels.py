@@ -55,8 +55,8 @@ from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.sample_grouping import get_sample_group
 from snpdb.enums import ImportStatus
 from snpdb.models import (

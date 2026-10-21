@@ -18,13 +18,13 @@ from pathtests.models_enums import (
     InvestigationType,
     PathologyTestGeneModificationOutcome,
 )
+from patients.enums import PopulationGroup
 from patients.models import (
     TEST_PATIENT_KWARGS,
     Clinician,
     ExternallyManagedModel,
     Patient,
 )
-from patients.models_enums import PopulationGroup
 from seqauto.models import EnrichmentKit, Experiment, SequencingRun
 from snpdb.enums import ImportStatus
 from snpdb.models import Sample, Wiki

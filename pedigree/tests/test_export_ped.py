@@ -16,7 +16,7 @@ import tempfile
 import django.test
 from django.contrib.auth.models import User
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
 from pedigree.ped.import_ped import import_ped
 

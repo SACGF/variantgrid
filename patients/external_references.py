@@ -20,7 +20,7 @@ from django.contrib.auth.models import User
 from django.db.models import Model, Q, QuerySet
 from django.utils.module_loading import import_string
 
-from patients.models_enums import MatchStatus
+from patients.enums import MatchStatus
 
 REFERENCE_KEYS = frozenset({"code", "external_type", "external_manager", "reference_id"})
 # Not a reference key - it says how the reference was arrived at, and only VG ever sets it

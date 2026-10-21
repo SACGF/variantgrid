@@ -21,8 +21,8 @@ from django.views.decorators.http import require_POST
 from eventlog.models import ApiRequestLog, create_event
 from genes.models import CanonicalTranscriptCollection
 from library.log_utils import log_traceback
+from patients.enums import NucleicAcid
 from patients.models import Extraction, Patient
-from patients.models_enums import NucleicAcid
 from seqauto import forms
 from seqauto.forms import AllEnrichmentKitForm, AutocompleteSequencingRunForm, SequencingRunForm
 from seqauto.illumina.run_parameters import get_run_parameters
