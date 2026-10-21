@@ -8,11 +8,11 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.enums import AlleleOriginBucket, ClinicalSignificance
 from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
 from library.django_utils import get_field_counts
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models import Lab
 
 

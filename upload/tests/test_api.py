@@ -1,6 +1,8 @@
 import gzip
+import io
 import os
 import tempfile
+import zipfile
 from hashlib import sha256
 from unittest.mock import patch
 from urllib.parse import quote
@@ -8,6 +10,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -15,18 +18,17 @@ from rest_framework.test import APITestCase
 
 from analysis.models import AnalysisTemplate
 from annotation.fake_data import get_fake_annotation_version
+from snpdb.enums import ImportSource, ProcessingStatus
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CachedGeneratedFile, GenomeBuild
-from snpdb.models.models_enums import ImportSource, ProcessingStatus
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     SimpleVCFImportInfo,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 
 METRICS_OUTPUT_ORIG = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
                                    "MetricsOutput_orig.tsv")
@@ -102,6 +104,26 @@ class UploadFileAPITest(UploadAPITestBase):
         self._temp_upload_paths.append(file_upload.get_filename())
         self.assertEqual(file_upload.sha256_hash, expected_hash)
         self.assertEqual(data["sha256_hash"], expected_hash)
+
+    def test_empty_file_rejected(self):
+        """ A 0-byte file is a 400 with no FileUpload left behind - CSV type sniffing can't read one """
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            reverse("api_file_upload"),
+            {"file": SimpleUploadedFile("empty.csv", b"")},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("empty", response.json()["error"])
+        self.assertFalse(FileUpload.objects.filter(user=self.owner, name="empty.csv").exists())
+
+    def test_empty_file_rejected_web(self):
+        """ FilePond endpoint returns the message as text so the upload page can show it """
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse("upload_file"), {"filepond": SimpleUploadedFile("empty.csv", b"")})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("empty", response.content.decode())
+        self.assertFalse(FileUpload.objects.filter(user=self.owner, name="empty.csv").exists())
 
     def test_deprecated_uploaded_file_id_alias(self):
         """ file_upload_id is the identifier - uploaded_file_id is a retained alias for older clients.
@@ -403,3 +425,42 @@ class AnnotatedDownloadAPITest(UploadAPITestBase):
         self.assertIn("attachment", response["Content-Disposition"])
         streamed = b"".join(response.streaming_content)
         self.assertEqual(gzip.decompress(streamed), payload)
+
+    def _download_ready_csv(self, **params):
+        """ The export as written, in its own dir under a temp GENERATED_DIR as the task writes it """
+        file_upload = self._create_vcf_upload("dl_csv")
+        self._make_export_template()
+        self.client.force_authenticate(user=self.owner)
+        cgf = CachedGeneratedFile.objects.create(generator="export_cohort_to_downloadable_file",
+                                                 params_hash="fake", progress=1.0)
+        url = reverse("api_annotated_download", kwargs={"file_upload_id": file_upload.pk, "export_type": "csv"})
+        with tempfile.TemporaryDirectory() as generated_dir, override_settings(GENERATED_DIR=generated_dir), \
+                patch.object(CachedGeneratedFile, "get_or_create_and_launch", return_value=cgf):
+            csv_filename = os.path.join(generated_dir, cgf.generator, str(cgf.pk), "annotated.csv")
+            os.makedirs(os.path.dirname(csv_filename))
+            with open(csv_filename, "w", encoding="utf-8") as f:
+                f.write("chrom,pos\n1,100\n")
+            cgf.filename = csv_filename
+            cgf.save()
+            response = self.client.get(url, params)
+            streamed = b"".join(response.streaming_content) if response.status_code == status.HTTP_200_OK else None
+            cgf.delete()
+            self.assertFalse(os.path.exists(os.path.dirname(csv_filename)), "zip removed with the export")
+        return response, streamed
+
+    def test_download_csv_zipped_by_default(self):
+        """ Clients up to variantgrid_api 1.10 expect the .csv.zip #2368 """
+        response, streamed = self._download_ready_csv()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        with zipfile.ZipFile(io.BytesIO(streamed)) as zipf:
+            self.assertEqual(zipf.read("annotated.csv"), b"chrom,pos\n1,100\n")
+
+    def test_download_csv_uncompressed(self):
+        response, streamed = self._download_ready_csv(compression="none")
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertEqual(streamed, b"chrom,pos\n1,100\n")
+
+    def test_download_invalid_compression(self):
+        response, _ = self._download_ready_csv(compression="bz2")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

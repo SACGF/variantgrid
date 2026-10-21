@@ -10,7 +10,7 @@ from django.conf import settings
 
 from library.utils.date_utils import get_months_since, month_range, parse_yymm
 from seqauto.models import SequencingRun, SequencingSample
-from snpdb.models import VariantOrigin
+from snpdb.enums import VariantOrigin
 
 SEQUENCING_RUN_DATE_PATTERN = re.compile(r"^(\d{4})\d{2}[_-]")
 

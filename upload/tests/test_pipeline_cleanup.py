@@ -11,23 +11,21 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from library.django_utils.django_file_utils import (
     get_import_processing_dir,
     import_processing_dir_path,
 )
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
+from upload.enums import UploadedFileTypes, UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedManualVariantEntryCollection,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.tasks.vcf.import_vcf_step_task import pipeline_success_task
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -67,7 +65,7 @@ class PipelineCleanupTest(TestCase):
             path = os.path.join(working_dir, "manual_variant_entry.vcf")
         else:
             path = os.path.join(tempfile.gettempdir(), "somebody_elses.vcf")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write("##fileformat=VCFv4.2\n")
 
         file_upload = FileUpload.objects.create(user=self.user, name="manual_variant_entry", path=path,
@@ -77,7 +75,7 @@ class PipelineCleanupTest(TestCase):
         upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING,
                                                         file_upload=file_upload)
         # Something in the pipeline's own dir, so we can see it go
-        with open(os.path.join(upload_pipeline.get_pipeline_processing_dir(), "split_1.vcf"), "w") as f:
+        with open(os.path.join(upload_pipeline.get_pipeline_processing_dir(), "split_1.vcf"), "w", encoding="utf-8") as f:
             f.write("")
         return upload_pipeline
 

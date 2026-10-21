@@ -12,13 +12,14 @@ from django.db.models.query_utils import Q
 
 from analysis.models import VariantTag
 from annotation.models import Citation
-from annotation.models.models import (
-    AnnotationVersion,
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_gene_annotation import (
     DBNSFPGeneAnnotation,
     DBNSFPGeneAnnotationVersion,
 )
 from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
+from genes.enums import AnnotationConsortium
 from genes.models import (
     HGNC,
     Gene,
@@ -30,9 +31,9 @@ from genes.models import (
     GnomADGeneConstraint,
     PanelAppServer,
 )
-from genes.models_enums import AnnotationConsortium
 from library.utils import defaultdict_to_dict
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm
 from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings

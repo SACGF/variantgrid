@@ -20,6 +20,7 @@ from library.vg.deprecations import (
 from library.vg.health import UNDECLARED, _command_category, lint_health
 from library.vg.import_graph import (
     ImportGraph,
+    _add_parent_package_edges,
     import_cycles,
     iter_import_statements,
     iter_module_load_imports,
@@ -81,6 +82,20 @@ class ImportGraphTest(SimpleTestCase):
             "app.forms": ["app.models"],
         })
         self.assertEqual(import_cycles(graph), [["app.models", "app.models.models_a"]])
+
+    def test_import_cycles_follow_the_package_init_a_submodule_import_runs(self):
+        edges = {
+            "app.models": ["app.models.models_a"],  # re-exporting __init__
+            "app.models.models_a": ["app.helper", "app.models.models_b"],
+            "app.helper": ["app.models.models_b"],  # never names app.models, but importing it runs app.models first
+        }
+        graph = _graph(edges)
+        graph.modules = {module: None for module in ["app.models", "app.models.models_a", "app.models.models_b", "app.helper"]}
+        self.assertEqual(import_cycles(graph), [])
+        _add_parent_package_edges(graph)
+        self.assertEqual(import_cycles(graph), [["app.helper", "app.models", "app.models.models_a"]])
+        # models_a's import of a sibling adds no edge to the package it is already inside
+        self.assertNotIn("app.models", graph.imports["app.models.models_a"])
 
     def test_dependents_are_transitive(self):
         graph = _graph({"app.tests.test_x": ["app.views"], "app.views": ["app.models"], "other": ["app.views"]})
@@ -215,6 +230,7 @@ class HealthTest(SimpleTestCase):
                   "Your code has been rated at 9.91/10 (previous run: 9.91/10, -0.00)\n")
         lint = lint_health(self._temp_file(report, ".txt"))
         self.assertEqual((lint.messages, lint.by_type, lint.score), (3, {"W": 2, "E": 1}, "9.91"))
+        self.assertEqual(lint.errors, ["snpdb/models.py:40:0: E1101: Instance has no member (no-member)"])
 
 
 class DeprecationsTest(SimpleTestCase):

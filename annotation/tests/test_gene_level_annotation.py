@@ -3,6 +3,11 @@ from django.test import TestCase
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.annotation_version_querysets import get_queryset_for_annotation_version
+from annotation.canonical_annotation import (
+    get_canonical_c_hgvs,
+    get_canonical_transcript_annotation,
+)
+from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
@@ -14,15 +19,12 @@ from annotation.models import (
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.damage_enums import PathogenicityImpact
-from classification.models.classification_variant_info_models import (
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
-)
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from genes.enums import AnnotationConsortium, GeneCopyNumberEventKind, HGNCStatus
 from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.models import (
     HGNC,
-    GeneCopyNumberEventKind,
     GeneFusion,
     GeneLevelId,
     GeneSymbol,
@@ -33,7 +35,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
 from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,
@@ -137,8 +138,8 @@ class GeneLevelAnnotationTest(TestCase):
             from the representative annotation rather than a transcript row """
         self._run_annotation()
         variant = self.gene_fusion.variant
-        self.assertIsNone(variant.get_canonical_transcript_annotation(self.genome_build))
-        self.assertEqual("CD74::ROS1", variant.get_canonical_c_hgvs(self.genome_build))
+        self.assertIsNone(get_canonical_transcript_annotation(variant, self.genome_build))
+        self.assertEqual("CD74::ROS1", get_canonical_c_hgvs(variant, self.genome_build))
 
     def test_hgvs_g_is_not_regenerated(self):
         """ The matcher fallback has no coordinate to work from, so it must not be reached """

@@ -9,16 +9,16 @@ from django.conf import settings
 from django.utils import timezone
 
 from library.guardian_utils import admin_bot
+from snpdb.enums import UserAwardKind, UserAwardLevel
 from snpdb.models import UserAward
-from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_awards import AwardDefinition, get_award_definitions
 
 BADGE_LEVELS = (UserAwardLevel.BRONZE, UserAwardLevel.SILVER, UserAwardLevel.GOLD)
 
 
 def update_user_awards(definitions: Optional[list[AwardDefinition]] = None) -> bool:
-    """ Returns False when awards are off for the deployment. definitions defaults to the registry """
-    if not settings.USER_AWARDS_ENABLED:
+    """ Returns False when awards or badges are off for the deployment. definitions defaults to the registry """
+    if not (settings.USER_AWARDS_ENABLED and settings.USER_AWARDS_BADGES_ENABLED):
         return False
     if definitions is None:
         definitions = get_award_definitions()

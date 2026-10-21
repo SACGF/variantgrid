@@ -12,10 +12,10 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
-from classification.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.enums import (
     ClassificationResultValue,
     OverlapStatus,
@@ -24,7 +24,6 @@ from classification.enums import (
     TestingContextFull,
     TriageStatus,
 )
-from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
 from classification.models import (
     IN_REVIEW_VALUE,
     ClassificationGrouping,
@@ -46,6 +45,7 @@ from classification.models.classification_groups import (
 )
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
+from classification.models.criteria_strengths import AcmgPointScore, CriteriaStrength
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import (
     DiscordanceReportRowData,
@@ -55,10 +55,12 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap, VCDb
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from eventlog.models import ViewEvent
 from genes.hgvs import HGVSComponents, HGVSDisplay
+from genes.hgvs.phgvs_canonical import short_p_hgvs
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
 from ontology.models import OntologyTerm
 from review.models import Review
+from snpdb.enums import ClinicalSignificance
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, LabLike
 from snpdb.models.models_genome import GenomeBuild
@@ -253,9 +255,6 @@ def clinical_significance_values(vcm: ClassificationModification, show_pending: 
     germline_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     pending_from = None
     value = summary_obj.pathogenicity.classification
-    # if pending_classification_value := pathogenicity.get("pending"):  # FIXME pending values will be in OverlapContribution now not "pending"
-    #     pending_from = germline_key.pretty_value(value, value) or "No Data"
-    #     value = pending_classification_value
     grouping: Optional[ClassificationGrouping] = None
 
     if show_pending:
@@ -366,16 +365,6 @@ def lab(lab: LabLike, is_your_lab: Optional[bool] = None, lab_css: Optional[str]
     }
 
 
-@register.inclusion_tag("classification/tags/clinical_significance_select.html")
-def clinical_significance_select(name, value):
-    key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-    return {
-        "name": name,
-        "options": key.virtual_options,
-        "value": value
-    }
-
-
 @register.inclusion_tag("classification/tags/clinical_context.html")
 def clinical_context(cc: ClinicalContext, orientation: str = 'horizontal'):
     return {"cc": cc, "orientation": orientation}
@@ -457,129 +446,42 @@ def classification_quick(context,
     }
 
 
-class ClinicalGrouping:
-
-    def __init__(self, cc: Optional[ClinicalContext]):
-        self.cc = cc
-        self.latest_report = DiscordanceReport.latest_report(cc) if cc else None
-        self.vcms = []
-
-    @property
-    def has_multiple(self):
-        return len(self.vcms) > 1
-
-
-@register.inclusion_tag("classification/tags/classification_table.html", takes_context=True)
-def classification_table(
-        context,
-        records,
-        genome_build=None,
-        user=None,
-        show_variant_link=False,
-        show_clinical_context=False,
-        variant: Variant = None,
-        allele: Allele = None,
-        edit_clinical_groupings=False):
-    if user is None:
-        user = context.request.user
-    if not genome_build:
-        if not user:
-            raise ValueError('Must provide genome build or user')
-        else:
-            genome_build = UserSettings.get_for_user(user).default_genome_build
-
-    if isinstance(records, QuerySet):
-        records = list(records.all())
-    mods = []
-    for r in records:
-        if isinstance(r, Classification):
-            r = r.last_published_version
-        if r:
-            mods.append(r)
-
-    # group by cc if we're doing clinical context
-    if show_clinical_context:
-        groupings = {}
-        no_cc_grouping = ClinicalGrouping(cc=None)
-        for vcm in mods:
-            cc = vcm.classification.clinical_context
-            if cc and vcm.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
-                grouping = groupings.get(cc.id)
-                if not grouping:
-                    grouping = ClinicalGrouping(cc=cc)
-                    groupings[cc.id] = grouping
-                grouping.vcms.append(vcm)
-            else:
-                no_cc_grouping.vcms.append(vcm)
-
-        records = list(groupings.values())
-        if no_cc_grouping.vcms:
-            records.append(no_cc_grouping)
-    else:
-        not_grouped = ClinicalGrouping(cc=None)
-        not_grouped.vcms = mods
-        records = [not_grouped]
-
-    # now to sort groups, and then sort vcms inside groups
-    def clinical_group_sort_score(cg: ClinicalGrouping):
-        cc = cg.cc
-        if not cc:
-            return 'zzzz'
-        else:
-            return cc.name
-
-    cs_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-    def classification_modification_sort_score(vcm: ClassificationModification):
-        cs = vcm.evidence.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        options = cs_key.matched_options(cs)
-        if options:
-            return options[0].get('index', 0), vcm.id_str
-        else:
-            return None, vcm.id_str
-
-    records.sort(key=clinical_group_sort_score)
-    for record in records:
-        record.vcms.sort(key=classification_modification_sort_score)
-
-    return {
-        "records": records,
-        "variant": variant,
-        "allele": allele,
-        "genome_build": genome_build,
-        "show_variant_link": show_variant_link,
-        "show_clinical_context": show_clinical_context,
-        "edit_clinical_groupings": edit_clinical_groupings,
-        "user": user,
-        "discordance_enabled": settings.DISCORDANCE_ENABLED
-    }
-
-
-def _to_c_hgvs(c_hgvs: Any) -> HGVSDisplay:
-    if isinstance(c_hgvs, ClassificationModification):
+def _to_hgvs(hgvs: Any) -> HGVSDisplay:
+    if isinstance(hgvs, ClassificationModification):
         genome_build = GenomeBuildManager.get_current_genome_build()
-        if c_hgvs_str := c_hgvs.classification.get_resolved_hgvs(genome_build):
-            return HGVSDisplay.parse(c_hgvs_str, genome_build=genome_build)
+        if c_hgvs_str := hgvs.classification.get_resolved_hgvs(genome_build):
+            return HGVSDisplay.parse(dna_hgvs=c_hgvs_str, genome_build=genome_build,
+                                     p_hgvs=hgvs.classification.get_resolved_p_hgvs(genome_build))
         # might have got a none c.hgvs from the ClassificationModification
-        return HGVSDisplay.parse("")
-    if isinstance(c_hgvs, str):
-        return HGVSDisplay.parse(c_hgvs)
-    if isinstance(c_hgvs, HGVSComponents):
-        return HGVSDisplay(c_hgvs)
-    if c_hgvs is None:
-        return HGVSDisplay.parse("")
+        return HGVSDisplay.parse(dna_hgvs="")
+    if isinstance(hgvs, str):
+        return HGVSDisplay.parse(dna_hgvs=hgvs)
+    if isinstance(hgvs, HGVSComponents):
+        return HGVSDisplay(dna_hgvs=hgvs)
+    if hgvs is None:
+        return HGVSDisplay.parse(dna_hgvs="")
 
-    return c_hgvs
+    return hgvs
 
 
-@register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
-    c_hgvs = _to_c_hgvs(c_hgvs)
+@register.inclusion_tag("classification/tags/hgvs.html")
+def hgvs(hgvs: Union[HGVSDisplay, HGVSComponents, ClassificationModification, str], show_genome_build: Optional[bool] = None, inline: bool = False):
+    hgvs = _to_hgvs(hgvs)
 
     if show_genome_build is None:
-        show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
+        show_genome_build = hgvs.is_desired_build is False or hgvs.is_normalised is False
 
-    return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None, "inline": inline}
+    return {"hgvs": hgvs, "show_genome_build": show_genome_build and hgvs.genome_build is not None, "inline": inline}
+
+
+@register.simple_tag
+def p_hgvs(canonical: Optional[str]) -> str:
+    """ A resolved p.HGVS to sit inline after its c.HGVS: short form, the canonical one as tooltip.
+        Styles are inline (matching .p-hgvs) as c_hgvs.html is also used in emails """
+    if not (canonical and settings.CLASSIFICATION_GRID_SHOW_PHGVS):
+        return ""
+    return format_html('<span class="p-hgvs" style="margin-left:0.4em; color:#6c757d; font-size:0.9em; '
+                       'white-space:nowrap" title="{}">{}</span>', canonical, short_p_hgvs(canonical))
 
 
 @register.inclusion_tag("classification/tags/allele.html")
@@ -605,63 +507,6 @@ def allele_origin_toggle(context, style: str = "", show_label: bool = True, pref
 @register.inclusion_tag("classification/tags/gene_symbol.html")
 def gene_symbol(gene_symbol: GeneSymbol):
     return {"gene_symbol": gene_symbol}
-
-
-@register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)
-def classification_row(
-        context,
-        record: Union[Classification, ClassificationModification],
-        genome_build: GenomeBuild,
-        user: User = None,
-        show_variant_link=False,
-        show_clinical_context=False,
-        edit_clinical_context=False):
-    if user is None:
-        user = context.request.user
-
-    vc = record
-    vcm = None
-    if isinstance(record, ClassificationModification):
-        vc = record.classification
-        vcm = record
-    else:
-        vcm = record.last_published_version
-    icon = 'icons/share_level/' + vc.share_level_enum.key + '.png'
-
-    try:
-        curated = Classification.to_date(record.get(SpecialEKeys.CURATION_DATE, None))
-    except ValueError:
-        curated = None
-
-    can_write = False
-    if user:
-        can_write = vc.can_write(user_or_group=user)
-
-    c_hgvs = vc.c_hgvs_best(preferred_genome_build=genome_build)
-    p_hgvs = None
-    if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-        p_hgvs = record.get(SpecialEKeys.P_HGVS)
-        if p_hgvs:
-            p_dot = p_hgvs.find('p.')
-            if p_dot != -1:
-                p_hgvs = p_hgvs[p_dot::]
-
-    return {
-        "evidence": record.evidence,
-        "condition_obj": vc.condition_resolution_obj,
-        "curated": curated,
-        "c_hgvs": c_hgvs,
-        "gene_symbol": vcm.get(SpecialEKeys.GENE_SYMBOL),
-        "vc": vc,
-        "vcm": vcm,
-        "icon": icon,
-        "p_hgvs": p_hgvs,
-        "can_write": can_write,
-        "show_variant_link": show_variant_link,
-        "show_clinical_context": show_clinical_context,
-        "edit_clinical_context": edit_clinical_context,
-        "show_specimen_id": settings.CLASSIFICATION_SHOW_SPECIMEN_ID
-    }
 
 
 @register.inclusion_tag("classification/tags/classification.html")
@@ -718,9 +563,11 @@ def discordance_report(discordance_report: DiscordanceReport):
     return {"discordance_report": discordance_report}
 
 
-@register.inclusion_tag("classification/tags/review.html")
-def review(review: Review, edit: bool=False):
-    return {"review": review, edit:edit}
+@register.inclusion_tag("classification/tags/review.html", takes_context=True)
+def review(context, review: Review, edit: bool=False):
+    user = context.request.user
+    can_write = review.can_write(user)
+    return {"review": review, "can_write": can_write, edit:edit}
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")
@@ -769,11 +616,6 @@ def discordance_triage_embed(lab_summary: ClassificationLabSummary) -> Optional[
     if triage := lab_summary.triage:
         return DiscordanceReportTriageView.lazy_render(triage)
     return None
-
-
-@register.inclusion_tag("classification/tags/criteria_strength.html")
-def criteria_strength(strength: CriteriaStrength):
-    return {"strength": strength}
 
 
 @register.inclusion_tag("classification/tags/criteria_strength_td.html")
@@ -950,5 +792,5 @@ def overlap_row_email(overlap: Overlap, lab: Lab, genome_build: GenomeBuild):
     return {
         "date_str": date_str,
         "overlap": overlap,
-        "c_hgvs": overlap.c_hgvs(lab=lab, genome_build=genome_build)
+        "hgvs": overlap.hgvs(lab=lab, genome_build=genome_build)
     }

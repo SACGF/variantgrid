@@ -1,7 +1,8 @@
 from django.test import TestCase
 
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification, EvidenceMixin, ValidationMerger
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 
 
 class ClassificationTestCaseUtils(TestCase):
@@ -37,7 +38,7 @@ class ClassificationTestCaseUtils(TestCase):
         self.assertEqual(patch['d']['validation'][0]['code'], 'z_untested')  # but z_untested left alone
 
         self.assertEqual(patch['a'].get('value', None), None)  # remade entry with None value
-        self.assertEqual(patch['a']['validation'][0]['code'], 'bad')  # and new bad validation
+        self.assertEqual(patch['a']['validation'][0]['code'], 'bad')  # and new bad validation  # pylint: disable=unsubscriptable-object
 
         self.assertEqual(len(patch['b']['validation']), 2)  # has z_untested and new bad
 
@@ -87,8 +88,8 @@ class ClassificationTestCaseUtils(TestCase):
         self.assertEqual(tidy_once, tidy_twice)
 
     def test_is_valid_transcript(self):
-        self.assertTrue(Classification.is_supported_transcript("NM_002739.5(PRKCG):c.1397T>C"))
-        self.assertFalse(Classification.is_supported_transcript("NX_023343.1(RNU4ATAC):n.50G>A"))
+        self.assertTrue(ImportedAlleleInfo.is_supported_transcript("NM_002739.5(PRKCG):c.1397T>C"))
+        self.assertFalse(ImportedAlleleInfo.is_supported_transcript("NX_023343.1(RNU4ATAC):n.50G>A"))
 
 
 class ShareLevelTest(TestCase):

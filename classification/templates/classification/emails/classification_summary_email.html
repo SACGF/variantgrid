@@ -210,8 +210,8 @@ Hello Shariant User,
                                             <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
                                             <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
                                             <td>
-                                                {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
-                                                <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
+                                                {% for hgvs in discordance_report_summary.hgvses %}
+                                                <div>{% hgvs hgvs show_genome_build=False %}</div>
                                                 {% endfor %}
                                             </td>
                                             <td>

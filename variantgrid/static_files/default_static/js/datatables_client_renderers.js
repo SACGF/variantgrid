@@ -16,20 +16,24 @@ function renderGeneSymbol(geneSymbol, type, row) {
 function renderAnalysisAuditLogSummary(summary, type, row) {
     const summaryText = summary['summary_text'];
     if (summaryText) {
-        return "<span>" + summaryText + "</span>";
+        if (summary['url']) {
+            return $('<a>', {href: summary['url'], text: summaryText});
+        }
+        return $('<span>', {text: summaryText});
     }
     const changes = summary['changes'];
     if (changes) {
         const hideValues = new Set(['valid', 'status', 'version', 'appearance_version']);
-        let changesSummary = "<table class='table'>";
-        changesSummary += "<tr><th>field</th><th>old</th><th>new</th></tr>";
+        const table = $('<table>', {class: 'table'});
+        table.append($('<tr>', {html: [$('<th>', {text: 'field'}), $('<th>', {text: 'old'}), $('<th>', {text: 'new'})]}));
         for (const [key, value] of Object.entries(changes)) {
             if (!hideValues.has(key)) {
-                changesSummary += `<tr><td>${key}</td><td>${value[0]}</td><td>${value[1]}</td>`;
+                table.append($('<tr>', {html: [
+                    $('<td>', {text: key}), $('<td>', {text: value[0]}), $('<td>', {text: value[1]})
+                ]}));
             }
         }
-        changesSummary += "</table>";
-        return changesSummary;
+        return table;
     }
 
 }
@@ -149,12 +153,12 @@ $(window).on('resize', closeRowActionsMenus);
 document.addEventListener('scroll', closeRowActionsMenus, true);
 
 
-// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse
-function renderIconFlag(settings, data, type, row) {
+// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse. kwargs: {cssClass, title}
+function renderIconFlag(data, type, row, ctx) {
     if (!data) {
         return '';
     }
-    return $('<div>', {class: settings.cssClass, title: settings.title}).prop('outerHTML');
+    return $('<div>', {class: ctx.kwargs.cssClass, title: ctx.kwargs.title}).prop('outerHTML');
 }
 
 
@@ -230,23 +234,32 @@ $(document).on('click', '.sequencing-run-vcfs-toggle', function(e) {
 });
 
 
-// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter
+// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter.
+// The variant is named the way the variant grid's Variant cell names it - the data carries the same keys
 function renderVariantTagVariant(data, type, row) {
     if (!data || !data.variant_string) {
         return '';
     }
     const dom = $('<div>');
+    const label = VariantGridFormat.representativeVariantLabel(data.variant_id, data);
+    const labelAttrs = {class: 'rv-label', title: label.title, html: label.html};
     if (data.url) {
-        $('<a>', {href: data.url, target: '_blank', text: data.variant_string}).appendTo(dom);
+        $('<a>', {...labelAttrs, href: data.url, target: '_blank'}).appendTo(dom);
     } else {
-        $('<span>', {text: data.variant_string}).appendTo(dom);
+        $('<span>', labelAttrs).appendTo(dom);
+    }
+    const badge = VariantGridFormat.variantKindBadge(data["alt__seq"], data["svlen"],
+                                                     data["locus__contig__name"], data["locus__position"]);
+    if (badge) {
+        dom.append(' ').append(badge);
     }
     if (data.classify_url) {
         $('<a>', {
             href: data.classify_url,
             target: '_blank',
-            class: 'btn btn-primary btn-sm new-classification-button',
-            text: 'New Classification'
+            class: 'btn btn-outline-primary new-classification-button',
+            title: 'New Classification',
+            html: '<i class="fas fa-plus-circle"></i> Classify'
         }).appendTo(dom);
     }
     return dom.prop('outerHTML');
@@ -300,28 +313,27 @@ function renderGeneSymbolNewWindow(data, type, row) {
 }
 
 
-// Cohort page sample pickers - the checkbox is what add/remove to cohort reads
-function renderCohortSampleCheckbox(data, type, row) {
-    if (!data || !data.text) {
-        return '<span class="no-value">-</span>';
-    }
-    const dom = $('<span>');
-    $('<input>', {type: 'checkbox', class: 'sample-checkbox', sample_id: data.text}).appendTo(dom);
-    $('<a>', {href: data.url, class: 'hover-link ml-1', text: data.text}).appendTo(dom);
-    return dom.prop('outerHTML');
-}
-
-
 // Node editor column summary - each value links to a FilterNode on it, where the column supports one
 function renderColumnSummaryFilterChildLink(data, type, row, renderContext) {
     const extra = renderContext.extra;
     if (!extra.createFilterChildLinks) {
-        return data;
+        return $('<span>', {text: data}).prop('outerHTML');
     }
     // A missing value goes back as the string "null" - that's what the column filter matches on
-    const value = JSON.stringify(String(row.c0));
     return $('<a>', {
-        href: `javascript:createFilterChild(${JSON.stringify(extra.variantColumn)}, ${value});`,
-        html: data
+        class: 'create-filter-child',
+        href: 'javascript:void(0)',
+        'data-column-name': extra.variantColumn,
+        'data-column-filter': String(row.c0),
+        text: data
     }).prop('outerHTML');
+}
+
+
+// eventlog/grids.py:ApiRequestLogColumns - rows logged before #1413 have nothing recorded
+function renderApiRequestLogChanges(data, type, row) {
+    if (!data.recorded) {
+        return $('<span>', {class: 'no-value', text: '-'}).prop('outerHTML');
+    }
+    return $('<span>', {class: 'hover-detail', text: data.num_changes, title: data.summary}).prop('outerHTML');
 }

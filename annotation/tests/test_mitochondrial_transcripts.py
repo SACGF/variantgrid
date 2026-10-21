@@ -17,6 +17,11 @@ class MitochondrialTranscriptLinkTest(SimpleTestCase):
         self.assertEqual(("fake-rna-ND4", 202),
                          self.inserter._get_transcript_id_and_transcript_version_id("ND4.1", refseq_mitochondrial=True))
 
+    def test_mitochondrial_feature_prefers_cdot_fake_over_legacy_gene_named_row(self):
+        self.inserter.__dict__["transcript_versions_by_id"]["ND4"] = {1: 303}
+        self.assertEqual(("fake-rna-ND4", 202),
+                         self.inserter._get_transcript_id_and_transcript_version_id("ND4.1", refseq_mitochondrial=True))
+
     def test_mitochondrial_trna_stays_unlinked(self):
         self.assertEqual((None, None),
                          self.inserter._get_transcript_id_and_transcript_version_id("TRNP.1", refseq_mitochondrial=True))

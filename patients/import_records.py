@@ -7,10 +7,15 @@ The patient records CSV import (PatientColumns are the columns):
         - A value that won't parse is a validation message on the row's PatientRecord; a row that can't be
           imported at all raises InvalidPatientRecord and becomes an invalid PatientRecord
         - Patients whose phenotype text changed are matched in bulk at the end
+        - One pass: each row is parsed, matched and written straight away - there is no review step
+        - When any row created an extraction, reconcile_pending_extractions runs so VCF samples parked on an
+          extraction reference (eg 2600000001C) can find it
 
     process_record:
         - Match or create the patient, update its deceased state and the fields not used to match,
           then the specimen (a blank column leaves the stored value alone), its extraction and the sample
+        - One row per extraction: the EXTRACTION_* columns name the arm (Specimen.get_or_create_extraction
+          has the matching order), so the DNA and RNA arms of one block are two rows repeating the specimen
 """
 
 import logging
@@ -24,19 +29,29 @@ from django.utils import timezone
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import report_exc_info
 from library.pandas_utils import df_nan_to_none
+from patients.enums import (
+    NucleicAcid,
+    PatientRecordMatchType,
+    PatientRecordOriginType,
+    Sex,
+    TissueStatus,
+)
 from patients.models import (
+    AmbiguousExtraction,
+    Extraction,
     Patient,
     PatientColumns,
     PatientModification,
     PatientRecord,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import NucleicAcid, PatientRecordMatchType, Sex, TissueStatus
 from patients.phenotype_matching import bulk_patient_phenotype_matching
+from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from snpdb.models import Sample
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
+LEGACY_COLUMNS = {'Specimen Nucleic acid source (DNA/RNA)': PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE}
+OPTIONAL_COLUMNS = [PatientColumns.EXTRACTION_REFERENCE_ID, PatientColumns.EXTRACTION_DATE]
 
 
 class InvalidPatientRecord(ValueError):
@@ -290,14 +305,16 @@ def process_record(patient_records, record_id, row):
     else:
         patient_deceased = None
 
-    specimen_reference_id = row[PatientColumns.SPECIMEN_REFERENCE_ID]
+    specimen_reference_id = Specimen.normalize_reference_id(row[PatientColumns.SPECIMEN_REFERENCE_ID])
     specimen_description = row[PatientColumns.SPECIMEN_DESCRIPTION]
     specimen_collected_by = row[PatientColumns.SPECIMEN_COLLECTED_BY]
     specimen_collection_date = parse_date(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
     specimen_received_date = parse_date(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
     specimen_tissue_status = parse_choice(TissueStatus.choices, row, PatientColumns.SPECIMEN_TISSUE_STATUS, validation_messages)
-    specimen_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE, validation_messages)
     specimen_age_at_collection = parse_int(row, PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE, validation_messages)
+    extraction_reference_id = Extraction.normalize_reference_id(row[PatientColumns.EXTRACTION_REFERENCE_ID])
+    extraction_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE, validation_messages)
+    extraction_date = parse_date(row, PatientColumns.EXTRACTION_DATE, validation_messages)
 
     sample_id = parse_int(row, PatientColumns.SAMPLE_ID, validation_messages)
     sample_name = row[PatientColumns.SAMPLE_NAME]
@@ -398,6 +415,7 @@ def process_record(patient_records, record_id, row):
 
     specimen = None
     extraction = None
+    extraction_match_type = None
     if specimen_reference_id:
         specimen = Specimen.objects.filter(patient=patient, reference_id=specimen_reference_id).first()
         if specimen:
@@ -422,11 +440,23 @@ def process_record(patient_records, record_id, row):
         if set_fields_from_row(specimen, field_values):
             specimen.save()
 
-        # The CSV has one nucleic acid source column, so it describes a single extraction per specimen
-        # - the sample says which one, so re-importing a row corrects it rather than adding another
-        extraction = specimen.get_or_create_extraction(specimen_nucleic_acid_source, sample=sample)
+        existing_extraction_ids = set(specimen.extraction_set.values_list("pk", flat=True))
+        try:
+            extraction = specimen.get_or_create_extraction(extraction_nucleic_acid_source, sample=sample,
+                                                           reference_id=extraction_reference_id,
+                                                           extraction_date=extraction_date)
+        except AmbiguousExtraction as e:
+            validation_messages.append(str(e))
+        else:
+            if extraction.pk in existing_extraction_ids:
+                extraction_match_type = PatientRecordMatchType.EXACT
+            else:
+                extraction_match_type = PatientRecordMatchType.CREATED
     else:
         specimen_match_type = None
+        if extraction_reference_id:
+            validation_messages.append(f"{PatientColumns.EXTRACTION_REFERENCE_ID} '{extraction_reference_id}' "
+                                       f"needs a {PatientColumns.SPECIMEN_REFERENCE_ID}")
 
     if sample:
         origin = PatientRecordOriginType.UPLOADED_CSV
@@ -446,6 +476,8 @@ def process_record(patient_records, record_id, row):
                                  patient_match=patient_match_type,
                                  specimen=specimen,
                                  specimen_match=specimen_match_type,
+                                 extraction=extraction,
+                                 extraction_match=extraction_match_type,
                                  sample_identifier=sample_id,
                                  sample_name=sample_name,
                                  patient_family_code=family_code,
@@ -465,10 +497,12 @@ def process_record(patient_records, record_id, row):
                                  specimen_collection_date=specimen_collection_date,
                                  specimen_received_date=specimen_received_date,
                                  specimen_tissue_status=specimen_tissue_status,
-                                 specimen_nucleic_acid_source=specimen_nucleic_acid_source,
-                                 specimen_age_at_collection_date=specimen_age_at_collection)
+                                 specimen_age_at_collection_date=specimen_age_at_collection,
+                                 extraction_reference_id=extraction_reference_id,
+                                 extraction_nucleic_acid_source=extraction_nucleic_acid_source,
+                                 extraction_date=row[PatientColumns.EXTRACTION_DATE])
 
-    return patient_to_check_for_phenotype_match
+    return patient_to_check_for_phenotype_match, extraction_match_type == PatientRecordMatchType.CREATED
 
 
 def create_failed_patient_record(patient_records, record_id, row, exception):
@@ -485,7 +519,8 @@ def create_failed_patient_record(patient_records, record_id, row, exception):
                                  patient_phenotype=row[PatientColumns.PATIENT_PHENOTYPE],
                                  specimen_reference_id=row[PatientColumns.SPECIMEN_REFERENCE_ID],
                                  specimen_description=row[PatientColumns.SPECIMEN_DESCRIPTION],
-                                 specimen_collected_by=row[PatientColumns.SPECIMEN_COLLECTED_BY])
+                                 specimen_collected_by=row[PatientColumns.SPECIMEN_COLLECTED_BY],
+                                 extraction_reference_id=row[PatientColumns.EXTRACTION_REFERENCE_ID])
 
 
 def pandas_read_encoded_csv(*args, **kwargs):
@@ -507,8 +542,14 @@ def pandas_read_encoded_csv(*args, **kwargs):
 
 
 def get_patient_record_imports_dataframe(f):
+    """ A file written before #1870 (one extraction per specimen) has the nucleic acid column under its old
+        Specimen name and no extraction reference / date - blank ones match the sample's extraction as before """
     df = pandas_read_encoded_csv(f, index_col=None, dtype=str)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.rename(columns=LEGACY_COLUMNS)
+    for column in OPTIONAL_COLUMNS:
+        if column not in df.columns:
+            df[column] = None
     return df_nan_to_none(df)
 
 
@@ -526,6 +567,7 @@ def import_patient_records(patient_records):
         raise ValueError(msg)
 
     items_processed = 0
+    created_extraction = False
     patients_to_check_for_phenotype_matches = []
     # iterrows() would build each row as a str Series, turning df_nan_to_none's None back into NaN
     for i, row in enumerate(df.to_dict("records")):
@@ -533,7 +575,8 @@ def import_patient_records(patient_records):
         # A row that fails leaves nothing behind but its invalid PatientRecord, and the other rows still import
         try:
             with transaction.atomic():
-                patient_with_phenotype = process_record(patient_records, i, row)
+                patient_with_phenotype, row_created_extraction = process_record(patient_records, i, row)
+            created_extraction |= row_created_extraction
         except Exception as e:
             if not isinstance(e, InvalidPatientRecord):
                 report_exc_info(extra_data={"patient_records": patient_records.pk, "record_id": i})
@@ -545,5 +588,9 @@ def import_patient_records(patient_records):
 
     if patients_to_check_for_phenotype_matches:
         bulk_patient_phenotype_matching(patients_to_check_for_phenotype_matches)
+
+    if created_extraction:
+        # A VCF imported before this file may have parked a claim on one of the new extractions
+        reconcile_pending_extractions.delay()
 
     return items_processed

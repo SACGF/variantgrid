@@ -48,20 +48,6 @@
 
         {% tip_box %}
 
-    {% if sapath_enabled %}
-        {% if user_has_cases %}
-            <script>
-            $(document).ready(function() {
-                var myCases = $("#my-cases");
-                myCases.html('<i class="fa fa-spinner"></i> Loading cases...');
-                myCases.load("{% url 'my_cases_tab' %}");
-            });
-            </script>
-            <div id='my-cases'>
-            </div>      
-        {% endif %}
-    {% endif %}
-
     {% comment %}
     One slide per graph, each with its own link to the fuller stats page. The indicators are built from the
     slides' data-title so the conditional slides don't need hand numbered data-slide-to attributes.

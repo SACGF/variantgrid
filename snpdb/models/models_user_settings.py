@@ -22,17 +22,22 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
-from flags.models.models import FlagCollection
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text
+from snpdb.enums import (
+    DEFAULT_GRID_LOADING_ANIMATIONS,
+    AlleleOriginFilterDefault,
+    BuiltInFilters,
+    GridLoadingAnimation,
+    TagFilter,
+)
 from snpdb.models.models import AvatarDetails, Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -228,21 +233,6 @@ class AllVariantsFilter(models.Model):
 
     def __str__(self):
         return f"{self.user}/{self.genome_build}: {self.filters}"
-
-
-class GridLoadingAnimation(models.TextChoices):
-    """ DNA "reading" animations shown (randomly) while a node's variant grid loads.
-        Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """
-    FLOWCELL = "flowcell", "Flowcell"
-    RIPPLE = "ripple", "Ripple"
-    PILEUP = "pileup", "Pileup"
-    MATRIX = "matrix", "Matrix"
-
-
-# Shown when a user hasn't chosen (loading_animations is null/empty)
-DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
-                                   GridLoadingAnimation.RIPPLE.value,
-                                   GridLoadingAnimation.PILEUP.value]
 
 
 class SettingsOverride(models.Model):
@@ -646,13 +636,6 @@ class UserSettings:
         except ValueError as ve:
             lab_error = str(ve)
         return lab, lab_error
-
-    @property
-    def classification_issue_count(self) -> int:
-        from classification.models import Classification
-        return FlagCollection.filter_for_open_flags(
-            Classification.filter_for_user(user=self.user)
-        ).order_by('-created').exclude(withdrawn=True).count()
 
     def __str__(self):
         return f"UserSettings for {self.user}"

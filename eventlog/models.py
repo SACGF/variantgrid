@@ -4,7 +4,9 @@ ViewEvent (one row per page view), IntegrationActivity (a rolling last-seen per 
 updated in place through `IntegrationActivity.track`) and ApiRequestLog (one row per call to an
 INTEGRATION_API_TRACKING endpoint, written by IntegrationApiMiddleware). Write events with create_event /
 create_login_event; the logging handler and middleware in this app fill the rest. An API view links its
-ApiRequestLog row to the objects it worked on with log_api_request_objects.
+ApiRequestLog row to the objects it worked on with log_api_request_objects; what the call wrote is
+collected by library/django_utils/change_tracking.py, and any code the call runs can add a line saying
+what it did with api_request_note.
 """
 import inspect
 import json
@@ -13,6 +15,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional, Union
 
+from django.apps import apps
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.contenttypes.models import ContentType
@@ -24,6 +27,8 @@ from django.db.models.deletion import SET_NULL
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
 
+from eventlog.enums import IntegrationActivityStatus
+from library.django_utils.change_tracking import active_collector
 from library.enums.log_level import LogLevel
 from library.integration_status import IntegrationDirection
 
@@ -67,12 +72,6 @@ class Event(models.Model):
 
 
 API_KEY_PREFIX = "api:"  # IntegrationActivity.key of an API endpoint, before its view name
-
-
-class IntegrationActivityStatus(models.TextChoices):
-    SUCCESS = "S", "Success"
-    NO_CHANGE = "N", "No change"
-    ERROR = "E", "Error"
 
 
 @dataclass
@@ -209,6 +208,13 @@ class ApiRequestLog(models.Model):
     # the view's api_log_model, and the pks of those it worked on - empty when it failed before finding one
     content_type = models.ForeignKey(ContentType, null=True, on_delete=SET_NULL)
     object_pks = ArrayField(models.TextField(), default=list)
+    # {"app_label.model": {"created": n, "updated": n, "unchanged": n, "deleted": n, "fields": [names]}}
+    # - fields are the ones found different on an update, sorted, across the request. {} on rows from before #1413
+    changes = models.JSONField(default=dict)
+    # created + updated + deleted across all models - the grid's sortable "Changes" column and its "wrote data" filter
+    num_changes = models.IntegerField(default=0)
+    # what the call did beyond the rows it wrote, from api_request_note - eg data moved onto a re-sent sample sheet
+    notes = ArrayField(models.TextField(), default=list)
 
     class Meta:
         indexes = [models.Index(fields=["view_name", "created"])]
@@ -219,6 +225,33 @@ class ApiRequestLog(models.Model):
     @property
     def is_error(self) -> bool:
         return self.status_code >= 400
+
+    @property
+    def change_rows(self) -> list[dict]:
+        """ changes as one dict per model, with its verbose name, for the detail page """
+        rows = []
+        for label, model_changes in self.changes.items():
+            try:
+                model_name = apps.get_model(label)._meta.verbose_name
+            except (LookupError, ValueError):
+                model_name = label  # model since removed
+            rows.append({"label": label, "model_name": model_name, **model_changes})
+        return rows
+
+    @staticmethod
+    def changes_summary(changes: dict) -> str:
+        """ One line per model with the counts it has, eg "seqauto.samplesheet: 1 updated (path), 2 unchanged" """
+        lines = []
+        for label, model_changes in changes.items():
+            counts = []
+            for outcome in ("created", "updated", "unchanged", "deleted"):
+                if count := model_changes.get(outcome):
+                    text = f"{count} {outcome}"
+                    if outcome == "updated" and (fields := model_changes.get("fields")):
+                        text += f" ({', '.join(fields)})"
+                    counts.append(text)
+            lines.append(f"{label}: {', '.join(counts)}")
+        return "\n".join(lines)
 
     @staticmethod
     def for_object(content_type: ContentType, object_pk: str):
@@ -240,6 +273,14 @@ def log_api_request_objects(request, *object_pks):
     django_request = getattr(request, "_request", request)
     logged_pks = django_request.__dict__.setdefault("api_log_object_pks", set())
     logged_pks.update(str(pk) for pk in object_pks if pk is not None)
+
+
+def api_request_note(text: str):
+    """ Adds a line to the ApiRequestLog row of the tracked API call this runs inside. Code with no request in
+        hand (a signal handler) can call it too, as the call's notes live with its change collector """
+    logging.info("API request note: %s", text)
+    if collector := active_collector():
+        collector.notes.append(text)
 
 
 def create_login_event(sender, user, request, **kwargs):  # pylint: disable=unused-argument

@@ -7,20 +7,21 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import (
     SAMPLE_SHEET_PAIR_ID_COLUMN,
     SAMPLE_SHEET_SAMPLE_TYPE_COLUMN,
     LibraryQC,
     SequencingSampleData,
 )
-from seqauto.models.models_enums import LibraryQCCategory
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import ImportSource
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline
+from upload.models import FileUpload, UploadPipeline
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
@@ -81,7 +82,7 @@ def edited_metrics_file(tmp_dir: str, *replacements) -> str:
         assert old in contents, old
         contents = contents.replace(old, new)
     path = os.path.join(tmp_dir, "edited_MetricsOutput.tsv")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(contents)
     return path
 

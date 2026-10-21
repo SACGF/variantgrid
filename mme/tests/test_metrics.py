@@ -3,11 +3,12 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from classification.enums.classification_enums import ClinicalSignificance, ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.metrics import MME_METRICS_CACHE_KEY, build_metrics, get_metrics
 from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import make_classification
+from snpdb.enums import ClinicalSignificance
 
 TOKEN = "inbound-secret"
 

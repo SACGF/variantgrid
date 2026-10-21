@@ -57,9 +57,13 @@ function openIgvLink(locus, alignmentFiles) {
     });
 }
 
+// The locus goes into a javascript: URL, which is percent-decoded before it runs - only contig:position(-end)
+// or gene symbols, space separated for a fusion's partners (@see GeneFusion.igv_locus), can go in
+const IGV_LOCUS_REGEX = /^[\w.-]+(:\d+(-\d+)?)?( [\w.-]+(:\d+(-\d+)?)?)*$/;
+
 // getAlignmentFilesFuncString names a page function returning the BAMs/CRAMs, called on click so it sees the page as it is then
 function createIgvUrl(locus, getAlignmentFilesFuncString) {
-    if (getIgvSettings().show_igv_links) {
+    if (getIgvSettings().show_igv_links && IGV_LOCUS_REGEX.test(locus)) {
         const alignmentFiles = getAlignmentFilesFuncString ? `${getAlignmentFilesFuncString}()` : '[]';
         return `javascript:openIgvLink("${locus}", ${alignmentFiles})`;
     }

@@ -9,7 +9,8 @@ from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm, OntologyVersion
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,

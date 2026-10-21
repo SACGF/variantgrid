@@ -1,32 +1,33 @@
+from unittest.mock import patch
+
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import admin_bot
+from snpdb.bcftools_liftover import check_bcftools_destination_has_chrom
 from snpdb.clingen_allele import get_clingen_allele
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.liftover import (
     _batch_alleles,
+    _check_vcf_contig_is_standard,
     _get_build_liftover_dicts,
     _liftover_using_dest_variant_coordinate,
     _liftover_using_existing_contig,
     _liftover_using_source_variant_coordinate,
-    _non_standard_contig_error,
     _run_liftover_using_same_contig,
     allele_can_attempt_liftover,
 )
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
-    AlleleOrigin,
     GenomeBuild,
     LiftoverRun,
-    ProcessingStatus,
     VariantAllele,
     VariantCoordinate,
 )
-from snpdb.tasks.liftover_tasks import _allele_id_batches
+from snpdb.tasks.liftover_tasks import _allele_id_batches, queue_liftover_selected_alleles
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
@@ -128,15 +129,21 @@ class TestLiftover(TestCase):
                                                     retry_conversion_tools=list(AlleleConversionTool)))
 
     def test_standard_contig_written_to_vcf(self):
-        self.assertIsNone(_non_standard_contig_error(GenomeBuild.grch37(), self.expected_vc_37))
+        self.assertIsNone(_check_vcf_contig_is_standard(GenomeBuild.grch37(), self.expected_vc_37))
 
     def test_unlocalized_scaffold_rejected_before_vcf(self):
         # issue #1197 - these aren't in the reference fasta, and killed the whole liftover run
         grch37 = GenomeBuild.grch37()
         scaffold = grch37.contigs.get(name='HSCHR1_RANDOM_CTG5')
         scaffold_vc = VariantCoordinate(chrom=scaffold.name, position=1000, ref='A', alt='T')
-        error = _non_standard_contig_error(grch37, scaffold_vc)
+        error = _check_vcf_contig_is_standard(grch37, scaffold_vc)
         self.assertIn(scaffold.get_role_display(), error)
+
+    def test_mitochondrial_rejected_before_t2t_vcf(self):
+        # T2T has no MT contig - one MT record in a bcftools VCF killed the whole liftover run
+        mt_vc = VariantCoordinate(chrom='MT', position=3796, ref='A', alt='G')
+        self.assertIsNone(check_bcftools_destination_has_chrom(mt_vc, GenomeBuild.grch37()))
+        self.assertIsNotNone(check_bcftools_destination_has_chrom(mt_vc, GenomeBuild.t2tv2()))
 
 
 class TestLiftoverBatching(TestCase):
@@ -166,6 +173,17 @@ class TestLiftoverBatching(TestCase):
         pks = sorted(a.pk for a in self.alleles)
         expected = [(pks[0], pks[1]), (pks[2], pks[3]), (pks[4], pks[4])]
         self.assertEqual(list(_allele_id_batches(allele_qs)), expected)
+
+    @override_settings(LIFTOVER_BATCH_SIZE=2)
+    def test_queue_liftover_selected_alleles_sends_ids(self):
+        # A selection isn't contiguous, so each task gets ids - a pk range would pick up the unselected alleles
+        selected_pks = sorted(a.pk for a in self.alleles)[::2]
+        allele_qs = Allele.objects.filter(pk__in=selected_pks)
+        with patch("snpdb.tasks.liftover_tasks.liftover_selected_allele_batch.si") as mock_si:
+            num_batches = queue_liftover_selected_alleles(admin_bot(), allele_qs)
+        self.assertEqual(num_batches, 2)
+        sent_ids = [call.args[1] for call in mock_si.call_args_list]
+        self.assertEqual(sent_ids, [selected_pks[:2], selected_pks[2:]])
 
 
 class TestFailedLiftoverAlleles(TestCase):

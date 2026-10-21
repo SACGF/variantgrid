@@ -5,9 +5,9 @@ from django.conf import settings
 from django.db.models import Q, QuerySet
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import VariantAnnotationVersion
-from classification.enums.classification_enums import ClinicalSignificance
+from annotation.models.models_version import VariantAnnotationVersion
 from classification.models import Classification
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import Allele, CohortGenotypeCommonFilterVersion, CommonVariantClassified, Variant
 
 
@@ -25,7 +25,8 @@ def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersio
             defaults={"additional_gnomad_versions": additional_gnomad_versions}, **kwargs)
         if not created and common_filter.additional_gnomad_versions != additional_gnomad_versions:
             common_filter.additional_gnomad_versions = additional_gnomad_versions
-            common_filter.save(update_fields=["additional_gnomad_versions"])
+            CohortGenotypeCommonFilterVersion.objects.filter(pk=common_filter.pk).update(
+                additional_gnomad_versions=additional_gnomad_versions)
         if created:
             # At this point - no VCFs have been imported, and all future ones will handle current classifications
             # So we can mark all as handled
@@ -60,7 +61,7 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
     if alleles is not None:
         classification_kwargs["allele__in"] = alleles
     vc_qs = Classification.objects.filter(**classification_kwargs)
-    q_classification = Classification.get_variant_q_from_classification_qs(vc_qs, cgcfv.genome_build)
+    q_classification = vc_qs.variant_q(cgcfv.genome_build)
     if vav is None:
         # Without AF for this gnomAD version we can't tell which classified variants sit in the common partition.
         # Moving a variant to uncommon is always safe (common is only a skip optimisation), so treat every

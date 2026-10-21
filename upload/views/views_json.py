@@ -12,24 +12,26 @@ from eventlog.models import create_event
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
+from snpdb.enums import ImportStatus
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus
 from upload import upload_processing
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     ImportSource,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadPipeline,
     VCFImportInfo,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.upload_metadata import (
     UploadMetadataError,
     get_metadata_keys_for_file_type,
     validate_upload_metadata,
 )
-from upload.uploaded_file_type import get_uploaded_file_type, get_url_and_data_for_uploaded_file_data
+from upload.uploaded_file_type import (
+    get_uploaded_file_type,
+    get_url_and_data_for_uploaded_file_data,
+)
 
 
 def _get_basic_uploaded_file_context(file_upload) -> dict:
@@ -64,8 +66,14 @@ def get_remaining_annotation_runs(uploaded_vcf, genome_build) -> int:
     return ar_qs.filter(annotation_range_lock__max_variant_id__lte=max_variant_id).count()
 
 
+class EmptyUploadError(ValueError):
+    """ A 0-byte file - rejected before a FileUpload is created, as no importer can read it """
+
+
 def handle_file_upload(user, django_uploaded_file, path=None, metadata=None) -> FileUpload:
     original_filename = django_uploaded_file._name
+    if not django_uploaded_file.size:
+        raise EmptyUploadError(f"'{original_filename}' is empty")
     kwargs = {
         "name": original_filename,
         "file_field": django_uploaded_file,
@@ -181,6 +189,8 @@ def upload_file(request):
             raise
 
         file_upload = handle_file_upload(request.user, django_uploaded_file)
+    except EmptyUploadError as e:
+        return HttpResponse(str(e), status=400)
     except Exception as e:
         logging.error(e)
         log_traceback()

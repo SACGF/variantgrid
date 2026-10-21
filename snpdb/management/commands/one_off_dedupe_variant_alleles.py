@@ -125,7 +125,7 @@ def dedupe_variant_alleles(apps) -> list:
             for cc in ClinicalContext.objects.filter(allele=other):
                 if (cc.allele_origin_bucket, cc.name) not in keeper_cc_keys:
                     cc.allele = keeper
-                    cc.save(update_fields=["allele"])
+                    ClinicalContext.objects.filter(pk=cc.pk).update(allele=keeper)
 
             # The surplus Allele's links in other builds come across too (mirrors Allele.merge)
             keeper_build_ids = set(VariantAllele.objects.filter(allele=keeper)
@@ -135,7 +135,7 @@ def dedupe_variant_alleles(apps) -> list:
                     _delete_variant_allele(apps, other_va)
                 else:
                     other_va.allele = keeper
-                    other_va.save(update_fields=["allele"])
+                    VariantAllele.objects.filter(pk=other_va.pk).update(allele=keeper)
                     keeper_build_ids.add(other_va.genome_build_id)
 
             _delete_variant_allele(apps, va)

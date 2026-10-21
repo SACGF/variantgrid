@@ -4,11 +4,6 @@ from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
 urlpatterns = [
-    path('my_cases_tab', views.my_cases_tab, name='my_cases_tab'),
-    path('my_cases', views.my_cases, name='my_cases'),
-    path('scientist_cases/<int:user_id>', views.scientist_cases, name='scientist_cases'),
-    path('follow_scientist/<int:follow_user_id>', views.follow_scientist, name='follow_scientist'),
-
     # Pathology Tests
     path('', views.pathology_tests, name='pathology_tests'),
     path('cases', views.cases, name='cases'),

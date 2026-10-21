@@ -23,7 +23,8 @@ from library.genomics.vcf_writer import (
     symbolic_alt_info,
 )
 from library.utils import open_file_or_filename, open_handle_gzip
-from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
+from snpdb.enums import SequenceRole
+from snpdb.models import GenomeFasta, Sequence, Variant, VariantCoordinate
 
 VCF_HEADER_FILTER_ID_PATTERN = re.compile(r'^##FILTER=<ID=([^,>]+)')
 VCF_HEADER_SOURCE_PATTERN = re.compile(r'^##source=(.*)$')
@@ -292,7 +293,7 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
     contig_lengths = dict(genome_build.contigs.values_list("pk", "length"))
     contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
 
-    with open(output_filename, "w") as f:
+    with open(output_filename, "w", encoding="utf-8") as f:
         found_column_names_line = False
         for line in header_lines:
             if line.startswith("#CHROM"):

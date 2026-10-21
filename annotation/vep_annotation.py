@@ -17,8 +17,8 @@ from typing import Optional
 from django.conf import settings
 
 from annotation import vep_columns
+from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.fake_data import get_fake_vep_version
-from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import (
     VEPConfig,
@@ -26,7 +26,7 @@ from annotation.vep_config import (
     parse_gnomad_version_from_filename,
     vep_component_version_kwargs,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild

@@ -3,14 +3,14 @@ from django.http.response import JsonResponse
 from django.utils.safestring import mark_safe
 from django.views.generic.edit import UpdateView
 
+from analysis.enums import AnalysisTemplateType
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms import ColumnSummaryForm, GraphTypeChoiceForm, SNPMatrixForm
 from analysis.grids import VariantGrid
-from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
 from library.django_utils.data_archive_mixin import DataArchivedError
-from snpdb.models.models_enums import TagFilter
+from snpdb.enums import TagFilter
 from snpdb.models.models_user_settings import AbstractNodeCountSettings, UserSettings
 from snpdb.utils import get_all_tags_and_user_colors
 

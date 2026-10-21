@@ -7,7 +7,8 @@ from library.health_check import (
     HealthCheckRequest,
     health_check_overall_stats_signal,
 )
-from sync.models import SyncDestination, SyncRun, SyncStatus
+from sync.enums import SyncStatus
+from sync.models import SyncDestination, SyncRun
 
 
 @receiver(signal=health_check_overall_stats_signal)

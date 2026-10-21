@@ -1,23 +1,24 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
 
 from django.conf import settings
 
-from annotation.models.models_citations import CitationFetchRequest, CitationFetchResponse
-from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
-from classification.enums import AlleleOriginBucket, CriteriaEvaluation, SpecialEKeys
+from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
+from classification.enums import CriteriaEvaluation, SpecialEKeys
+from classification.models.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.models.evidence_key import (
     EvidenceKeyMap,
     VCDbRefDict,
     VCPatch,
     VCStore,
 )
-from genes.hgvs import PHGVS, HGVSComponents
+from genes.hgvs import HGVSComponents
 from library.log_utils import report_message
 from library.utils import empty_to_none
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 
 
@@ -75,7 +76,6 @@ class SomaticClinicalSignificanceValue:
             return SomaticClinicalSignificanceValue(parts[0])
 
 
-# FIXME redundant now, remove
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
     SomaticClinicalSignificanceValue("tier_1", "A"): 9,
     SomaticClinicalSignificanceValue("tier_1", "B"): 8,
@@ -177,6 +177,18 @@ class EvidenceMixin:
     def loaded_citations(self) -> CitationFetchResponse:
         return CitationFetchRequest.fetch_all_now(self.db_refs)
 
+    def stored_citations(self) -> list[Citation]:
+        """ Citations as already in the database, without calling Entrez. Populated by
+            classification.tasks.classification_citation_tasks.prefetch_classification_citations (nightly and after
+            imports) and by prefetch_citations over each batch an export is about to write """
+        return CitationFetchRequest.get_unfetched_citations(self.db_refs)
+
+    @staticmethod
+    def prefetch_citations(records: Iterable['EvidenceMixin']) -> None:
+        """ Loads the citations of several records in one go: one Entrez request per source for those not yet in
+            the database (or errored / stale), so stored_citations() on each record is then database-only """
+        CitationFetchRequest.fetch_all_now([db_ref for record in records for db_ref in record.db_refs])
+
     @property
     def is_likely_acmg(self) -> bool:
         if non_standard_res := settings.CLASSIFICATION_NON_ACMG_ASSERTION_METHOD:
@@ -235,10 +247,6 @@ class EvidenceMixin:
     @cached_property
     def c_parts(self) -> HGVSComponents:
         return HGVSComponents(self.get(SpecialEKeys.C_HGVS) or "")
-
-    @cached_property
-    def p_parts(self) -> PHGVS:
-        return PHGVS.parse(self.get(SpecialEKeys.P_HGVS), override_is_confirmed_to=False)
 
     @property
     def transcript(self) -> Optional[str]:

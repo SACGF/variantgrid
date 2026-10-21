@@ -22,14 +22,16 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationVersion
-from annotation.signals.manual_signals import annotation_run_discarded_signal
+from annotation.models.models_annotation_run import AnnotationPipelineVersion, AnnotationRangeLock
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
+from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.log_utils import log_traceback, report_message
 from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
-from snpdb.models import VCF, GenomeBuild, ImportStatus, JobsControl, Sample, Variant
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, JobsControl, Sample, Variant
 
 # #1646: batch size for the count lane - how many uncounted runs one count_annotation_runs task takes.
 # _dispatch_counts leases the batch, so a burst of dispatch cycles can't hand the same work out twice;
@@ -123,10 +125,15 @@ def annotation_scheduler(status: str = None):
                     if annotation_version is None:
                         continue
                     variant_annotation_version = annotation_version.variant_annotation_version
-                    while True:
-                        range_lock = _handle_variant_annotation_version(variant_annotation_version)
-                        if range_lock is None:
-                            break
+                    if blocker := variant_annotation_version.get_annotation_run_blocker():
+                        # #1679: runs would only fail - make no range locks. Still kick the dispatcher
+                        # below so the import lane drains.
+                        logging.warning("annotation_scheduler: skipping %s - %s", variant_annotation_version, blocker)
+                    else:
+                        while True:
+                            range_lock = _handle_variant_annotation_version(variant_annotation_version)
+                            if range_lock is None:
+                                break
                     # #2667: scheduler only creates pending state - the dispatcher decides what launches
                     # (capacity-limited, merging the backlog first). Kick it for this VAV. The dispatcher
                     # also fires the #1646 count tasks, so it is the single place that keeps counts moving.
@@ -397,7 +404,21 @@ def _dispatch_sweep(priority_vav: Optional[VariantAnnotationVersion] = None):
     # #1670: checked after the import lane has been dispatched, so a low-disk pause still lets the
     # already-annotated backlog drain (and free its dumps).
     if vep_capacity > 0 and has_free_disk_for_annotation():
-        _lease_across_vavs(vavs, AnnotationStatus.CREATED, vep_capacity, worker_id, now)
+        _lease_across_vavs(_unblocked_variant_annotation_versions(vavs), AnnotationStatus.CREATED,
+                           vep_capacity, worker_id, now)
+
+
+def _unblocked_variant_annotation_versions(vavs) -> list[VariantAnnotationVersion]:
+    """ #1679: the VEP lane skips a version whose runs would only fail (a latched VEP mismatch or a missing
+        GeneAnnotationRelease). The import lane, reclaim and counts keep running for it: an annotated VCF
+        produced before the mismatch still matches the version (its header is checked on import). """
+    unblocked = []
+    for vav in vavs:
+        if blocker := vav.get_annotation_run_blocker():
+            logging.warning("dispatch sweep: VEP lane skipping %s - %s", vav, blocker)
+        else:
+            unblocked.append(vav)
+    return unblocked
 
 
 def _lease_across_vavs(vavs, status, capacity, worker_id, now) -> int:

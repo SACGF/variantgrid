@@ -6,17 +6,22 @@ from django.db import transaction
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import SpecialEKeys, ShareLevel
+from classification.enums import ClinicalContextRecalcTrigger, ShareLevel, SpecialEKeys
 from classification.models import ImportedAlleleInfo
-from classification.models.classification import Classification, \
-    classification_current_state_signal, \
-    classification_post_publish_signal, \
-    ClassificationModification, \
-    classification_withdraw_signal
+from classification.models.classification import (
+    Classification,
+    ClassificationModification,
+    classification_current_state_signal,
+    classification_post_publish_signal,
+    classification_withdraw_signal,
+)
 from classification.models.classification_utils import ValidationMerger
 from classification.models.classification_variant_info_models import allele_info_changed_signal
-from classification.models.clinical_context_models import ClinicalContext, \
-    clinical_context_signal, ClinicalContextRecalcTrigger, ClinicalContextChangeData
+from classification.models.clinical_context_models import (
+    ClinicalContext,
+    ClinicalContextChangeData,
+    clinical_context_signal,
+)
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types

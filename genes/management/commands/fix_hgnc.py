@@ -1,8 +1,8 @@
 from django.core.management import BaseCommand
 
-from genes.gene_matching import HGNCMatcher, ReleaseGeneMatcher
-from genes.models import GeneAnnotationRelease, GeneVersion
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
+from genes.gene_matching import ReleaseGeneMatcher
+from genes.models import GeneAnnotationRelease, GeneSymbol, GeneVersion
 
 """
 One off fix - can be deleted once all legacy environments migrate past genes.migrations.0015
@@ -23,12 +23,14 @@ class Command(BaseCommand):
             gm = ReleaseGeneMatcher(release)
             gm.match_unmatched_in_hgnc_and_gene_lists()
 
-        hgnc_matcher = HGNCMatcher()
         for annotation_consortium in [AnnotationConsortium.REFSEQ, AnnotationConsortium.ENSEMBL]:
             modified_records = []
             num_unmatched_hgnc = 0
-            for gv in GeneVersion.objects.filter(gene__annotation_consortium=annotation_consortium):
-                if hgnc := hgnc_matcher.match_hgnc(gv.gene_symbol_id):
+            gene_versions = list(GeneVersion.objects.filter(gene__annotation_consortium=annotation_consortium))
+            resolutions = GeneSymbol.resolve_names(gv.gene_symbol_id for gv in gene_versions)
+            for gv in gene_versions:
+                resolution, _ambiguous = resolutions[gv.gene_symbol_id]
+                if hgnc := resolution.hgnc:
                     gv.hgnc = hgnc
                     modified_records.append(gv)
                 else:

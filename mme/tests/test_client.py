@@ -5,7 +5,8 @@ from django.test import TestCase, override_settings
 
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.client import submit
-from mme.models import MMEMatchResult, MMESubmission, MMESubmissionStatus
+from mme.enums import MMESubmissionStatus
+from mme.models import MMEMatchResult, MMESubmission
 from mme.tests.fakes import make_classification
 from user_messages.models import Message
 

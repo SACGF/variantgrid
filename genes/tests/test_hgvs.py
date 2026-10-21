@@ -11,6 +11,7 @@ from hgvs.parsers import Parser
 
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import (
+    create_col18a1_transcript_version,
     create_fake_transcript_version,
     create_gata2_as1_transcript_version,
     create_gata2_transcript_version,
@@ -24,10 +25,14 @@ from genes.hgvs import (
     HGVSNoRepresentationException,
     HGVSVariant,
 )
+from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
+from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
+    HgvsMatchTranscriptAndGenomeRefAllele,
+)
 from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
-from snpdb.signals.variant_search import _get_non_coding_c_hgvs_as_n_details
+from variantopedia.signals.hgvs_search import _get_non_coding_c_hgvs_as_n_details
 
 
 @override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
@@ -171,6 +176,18 @@ class TestHGVS(TestCase):
     def test_hgvs_biocommons(self):
         self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
 
+    def test_transcript_ref_strand_and_intronic(self):
+        """ GATA2 is on the minus strand, which drives the reverse complement of the transcript ref (#1266);
+            an intronic ref is read from the genome, so can't be compared with it """
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+        exonic = matcher.get_variant_coordinate_and_details("NM_001145661.2(GATA2):c.1121G>A").matches_reference
+        self.assertEqual("-", exonic.strand)
+        intronic = matcher.get_variant_coordinate_and_details("NM_001145661.2(GATA2):c.1017+572C>T").matches_reference
+        self.assertFalse(intronic.transcript_ref_from_sequence)
+        self.assertIsNone(intronic.transcript_and_genome_ref_differ)
+
     def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType):
         # GATA2 ClinVar
         HGVS_EXAMPLES = [
@@ -243,6 +260,46 @@ class TestHGVS(TestCase):
             self.assertEqual(vcd.variant_coordinate, expected_vc)
             self.assertEqual(vcd.matches_reference, expected_matches_ref)
 
+    def test_intronic_offset_must_anchor_exon_boundary(self):
+        """ NM_130444.2 has a 9 base alignment gap, so gap-unaware numbering (ClinVar's for this transcript,
+            eg VCV003384928 'c.5054+4G>A') anchors offsets 9 bases inside the next exon. biocommons would
+            just add the offset and return an exonic variant with the wrong reference """
+        genome_build = GenomeBuild.grch37()
+        create_col18a1_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+
+        CORRECT = [
+            # ClinVar VCV003384928 / VCV004455297 at their true boundaries (last base of exon 40, first of 41)
+            ("NM_130444.2(COL18A1):c.5045+4G>A", VariantCoordinate(chrom='21', position=46931144, ref='G', alt='A')),
+            ("NM_130444.2(COL18A1):c.5046-3C>A", VariantCoordinate(chrom='21', position=46932099, ref='C', alt='A')),
+        ]
+        for hgvs_string, expected_vc in CORRECT:
+            vcd = matcher.get_variant_coordinate_and_details(hgvs_string)
+            self.assertEqual(vcd.variant_coordinate, expected_vc, hgvs_string)
+            self.assertTrue(vcd.matches_reference, hgvs_string)
+
+        GAP_UNAWARE = {
+            "NM_130444.2(COL18A1):c.5054+4G>A": "c.5045",
+            "NM_130444.2(COL18A1):c.5055-3C>A": "c.5046",
+            "NM_130444.2(COL18A1):c.5054+1_5055-1del": "c.5045",
+        }
+        for hgvs_string, nearest_boundary in GAP_UNAWARE.items():
+            with self.assertRaises(HGVSNomenclatureException, msg=hgvs_string) as cm:
+                matcher.get_variant_coordinate_and_details(hgvs_string)
+            self.assertIn(nearest_boundary, str(cm.exception))
+
+    def test_intronic_reference_checked_against_genome(self):
+        """ An intronic position has no transcript sequence, so the reference has to be read from the genome
+            (VCV003384928 with its ref base swapped) """
+        genome_build = GenomeBuild.grch37()
+        create_col18a1_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+
+        vcd = matcher.get_variant_coordinate_and_details("NM_130444.2(COL18A1):c.5045+4C>A")
+        self.assertEqual(vcd.variant_coordinate, VariantCoordinate(chrom='21', position=46931144, ref='G', alt='A'))
+        self.assertFalse(vcd.matches_reference)
+        self.assertIn('"G"', vcd.matches_reference.get_message())
+
     def test_biocommons_c_hgvs_on_non_coding_transcript(self):
         """ c. on a non-coding transcript may be numbered from a coding model, so isn't resolved - except by search,
             which resolves it as n. with a warning if the provided ref matches - SACGF/variantgrid_private#3497 """
@@ -304,6 +361,12 @@ class TestHGVS(TestCase):
         # NC_000001.10 is GRCh37 chr1 (nuclear), so 'm.' is invalid against it
         hgvs_string = "NC_000001.10:m.100000A>G"
         self.assertRaises(HGVSException, lambda: matcher.get_variant_coordinate(hgvs_string))
+
+    def test_mitochondria_hgvs_contig_not_in_build(self):
+        """ 'm.' on a contig from another build (e.g. NC_012920.1 on T2T) is left to ContigNotInBuildError
+            so search can skip it, rather than a nomenclature error (#2365) """
+        matcher = HGVSMatcher(GenomeBuild.grch37())
+        self.assertRaises(Contig.ContigNotInBuildError, lambda: matcher.get_variant_coordinate("NC_999999.1:m.100A>G"))
 
     def test_biocommons_invalid_trailing_int(self):
         return self._test_invalid_trailing_int(HGVSConverterType.BIOCOMMONS_HGVS)
@@ -453,3 +516,53 @@ class TestSymbolicHGVS(TestCase):
         mock_report.assert_not_called()
         with self.assertRaises(HGVSNoRepresentationException):
             matcher.variant_to_c_hgvs_parts(variant, "NM_001145661.2", throw_on_issue=True)
+
+
+class HgvsMatchTranscriptAndGenomeRefAlleleTest(TestCase):
+    """ #1266 - the genome ref is on the forward strand, the transcript ref on the transcript's """
+
+    @staticmethod
+    def _mapped(strand: str, transcript_ref: str, genome_ref: str) -> HgvsMatchTranscriptAndGenomeRefAllele:
+        matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, transcript_ref, transcript_ref)
+        matches_reference.transcript_ref_from_sequence = True
+        matches_reference.mapped_transcript_ref = transcript_ref
+        matches_reference.genome_ref = genome_ref
+        return matches_reference
+
+    def test_minus_strand_same(self):
+        self.assertFalse(self._mapped("-", "G", "C").transcript_and_genome_ref_differ)
+
+    def test_minus_strand_differ(self):
+        # F5 Leiden NM_000130.5:c.1601G>A in GRCh37 - the genome carries the alt
+        matches_reference = self._mapped("-", "G", "T")
+        self.assertTrue(matches_reference.transcript_and_genome_ref_differ)
+        self.assertIn('genome reference "A"', matches_reference.get_transcript_and_genome_ref_message())
+
+    def test_plus_strand_differ(self):
+        self.assertTrue(self._mapped("+", "T", "A").transcript_and_genome_ref_differ)
+
+    def test_not_mapped(self):
+        self.assertIsNone(HgvsMatchTranscriptAndGenomeRefAllele("+", "T", "T").transcript_and_genome_ref_differ)
+
+    def test_transcript_ref_from_genome(self):
+        # Intronic, or stitched from the genome - the refs match by construction, so unchecked rather than same
+        matches_reference = self._mapped("+", "T", "T")
+        matches_reference.transcript_ref_from_sequence = False
+        self.assertIsNone(matches_reference.transcript_and_genome_ref_differ)
+        self.assertEqual("", matches_reference.get_transcript_and_genome_ref_message())
+
+
+class DjangoTranscriptDataProviderCacheTest(TestCase):
+
+    def test_get_transcript_cached_and_bounded(self):
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        create_gata2_as1_transcript_version(genome_build)
+        data_provider = DjangoTranscriptDataProvider(genome_build)
+        data_provider._get_transcript("NM_001145661.2")
+        with self.assertNumQueries(0):
+            data_provider._get_transcript("NM_001145661.2")
+
+        with patch.object(DjangoTranscriptDataProvider, "TRANSCRIPT_CACHE_SIZE", 1):
+            data_provider._get_transcript("NR_125398.1")
+            self.assertEqual(["NR_125398.1"], list(data_provider._transcript_cache))

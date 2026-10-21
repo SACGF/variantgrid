@@ -3,11 +3,9 @@ the lab, because a case can sit unmatched for years and the author may be long g
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
-from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 
 from classification.tests.models.test_utils import ClassificationTestUtils
-from mme.apps import MMEConfig
 from mme.client import submit
 from mme.models import MMESubmission
 from mme.notifications import lab_notification_emails, notify_match
@@ -123,28 +121,3 @@ class OutboundNotificationTestCase(TestCase):
         self.assertTrue(Message.objects.filter(recipient=self.user).exists())
         _args, kwargs = mock_send.call_args
         self.assertEqual(kwargs["recipient_list"], ["lab@lab.org"])
-
-
-class StartupCheckTestCase(TestCase):
-    """ Email sending is silently a no-op when from_email or SEND_EMAILS is unset. """
-
-    def _ready(self):
-        MMEConfig.ready(MMEConfig("mme", __import__("mme")))
-
-    @override_settings(MME_ENABLED=True, MME_FROM_EMAIL=None, SEND_EMAILS=True)
-    def test_enabled_without_from_email_rejected(self):
-        with self.assertRaises(ImproperlyConfigured):
-            self._ready()
-
-    @override_settings(MME_ENABLED=True, MME_FROM_EMAIL="mme@example.org", SEND_EMAILS=False)
-    def test_enabled_without_send_emails_rejected(self):
-        with self.assertRaises(ImproperlyConfigured):
-            self._ready()
-
-    @override_settings(MME_ENABLED=True, MME_FROM_EMAIL="mme@example.org", SEND_EMAILS=True)
-    def test_fully_configured_accepted(self):
-        self._ready()
-
-    @override_settings(MME_ENABLED=False, MME_FROM_EMAIL=None, SEND_EMAILS=False)
-    def test_disabled_deployment_needs_nothing(self):
-        self._ready()

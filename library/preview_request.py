@@ -18,7 +18,7 @@ from django.urls import NoReverseMatch
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.log_utils import report_message
 from library.request_context import get_current_user
 from library.utils import pretty_label
@@ -138,6 +138,14 @@ class PreviewModelMixin:
         return None
 
     @classmethod
+    def preview_can_liftover(cls) -> bool:
+        """
+        True if liftover may later add this object to another genome build (Variant, Allele). Search won't
+        auto-open such an object outside the user's preferred build, as the liftover may be pending or failed
+        """
+        return False
+
+    @classmethod
     def preview_enabled(cls) -> bool:
         """
         If this returns false, pretend like the model doesn't exist, don't search for it
@@ -246,6 +254,7 @@ class PreviewData:
     genome_builds: Optional[set['GenomeBuild']] = None
     annotation_consortia: Optional[set['AnnotationConsortium']] = None
     obj: Optional[Any] = None
+    can_liftover: bool = False  # liftover may add this object to another genome build, see PreviewModelMixin.preview_can_liftover
     is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
     is_error: bool = False
     # If you add any fields, be sure to modify __hash__ below...
@@ -320,6 +329,7 @@ class PreviewData:
             external_url=external_url,
             genome_builds=genome_builds,
             annotation_consortia=annotation_consortia,
+            can_liftover=isinstance(obj, PreviewModelMixin) and obj.preview_can_liftover(),
             is_operation=is_operation,
             is_error=is_error,
         )
@@ -391,6 +401,7 @@ class PreviewData:
             genome_builds,
             annotation_consortia,
             self.obj,
+            self.can_liftover,
             self.is_operation,
         )
         return hash(tuple(f for f in fields if f is not None))

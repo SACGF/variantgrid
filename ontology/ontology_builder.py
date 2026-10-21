@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -10,7 +11,11 @@ from django.db.models import Model
 from django.utils import timezone
 from model_utils.models import now
 
-from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation, OntologyTermStatus
+from library.utils.hash_utils import file_sha256sum
+from ontology.enums import OntologyTermStatus
+from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation
+
+MD5_HEX_LENGTH = 32
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -118,6 +123,19 @@ class OntologyBuilder:
             self.previous_import.processed_date = now
             self.previous_import.save()
             raise OntologyBuilderDataUpToDateException()
+
+    def ensure_file_hash_changed(self, filename: str):
+        """ ensure_hash_changed on the file's sha256. An import stored before #2273 holds the file's md5 instead: a
+            match on that also counts as unchanged, and the stored hash moves to the sha256 so later runs compare it
+            directly. The md5 branch can go once no completed OntologyImport has a 32 character hash. """
+        file_hash = file_sha256sum(filename)
+        previous_hash = self.previous_import.hash if self.previous_import else None
+        if not self.force_update and previous_hash and len(previous_hash) == MD5_HEX_LENGTH:
+            with open(filename, "rb") as f:
+                if hashlib.file_digest(f, "md5").hexdigest() == previous_hash:
+                    self.previous_import.hash = file_hash
+                    self.previous_import.save(update_fields=["hash"])
+        self.ensure_hash_changed(file_hash)
 
     def cache_everything(self):
         """

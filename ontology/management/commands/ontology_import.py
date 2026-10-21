@@ -13,19 +13,17 @@ import pronto
 from django.core.management import BaseCommand
 from django.utils import timezone
 
+from annotation.enums import HPOSynonymScope
 from annotation.models import InvalidAnnotationVersionError
-from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
-from library.utils import file_md5sum
+from ontology.enums import OntologyService, OntologyTermStatus
 from ontology.gencc import load_gencc
 from ontology.models import (
     OntologyImport,
     OntologyImportSource,
     OntologyRelation,
-    OntologyService,
     OntologyTerm,
     OntologyTermRelation,
-    OntologyTermStatus,
     OntologyVersion,
 )
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
@@ -90,8 +88,6 @@ class TermId:
 
 
 def load_mondo(filename: str, force: bool):
-    file_hash = file_md5sum(filename)
-
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="mondo_file",
@@ -99,7 +95,7 @@ def load_mondo(filename: str, force: bool):
         force_update=force,
         processor_version=17)
 
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.ensure_file_hash_changed(filename)
     ontology_builder.cache_everything()
 
     data_file: dict
@@ -299,8 +295,7 @@ def load_hpo(filename: str, force: bool):
         processor_version=2,
         force_update=force)
 
-    file_hash = file_md5sum(filename)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.ensure_file_hash_changed(filename)
     ontology_builder.cache_everything()
     logging.info("About to pronto the file")
     ot = pronto.Ontology(filename)
@@ -390,8 +385,7 @@ def load_phenotype_to_genes(filename: str, force: bool, existing_import: Optiona
         processor_version=2,
         force_update=force,
         existing_import=existing_import)
-    file_hash = file_md5sum(filename)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.ensure_file_hash_changed(filename)
     ontology_builder.cache_everything()
     df = _read_phenotype_to_genes(filename)
 
@@ -451,8 +445,7 @@ def load_biomart(filename: str, force: bool):
         import_source="biomart",
         processor_version=3,
         force_update=force)
-    file_hash = file_md5sum(filename)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)
+    ontology_builder.ensure_file_hash_changed(filename)
     ontology_builder.cache_everything()
     # Create MIMMorbid from BioMart file
     mim_biomart_df = pd.read_csv(filename, sep='\t').dropna().astype({"MIM morbid accession": int})
@@ -489,8 +482,7 @@ def load_omim(filename: str, force: bool):
         processor_version=7,
         force_update=force)
 
-    file_hash = file_md5sum(filename)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.ensure_file_hash_changed(filename)
     ontology_builder.cache_everything()
 
     with open(filename) as csv_file:
@@ -627,8 +619,7 @@ class Command(BaseCommand):
 
         if filename := options.get("gencc"):
             try:
-                file_hash = file_md5sum(filename)
-                load_gencc(filename, file_hash, force=force)
+                load_gencc(filename, force=force)
             except OntologyBuilderDataUpToDateException:
                 print("GenCC File hash is the same as last import")
 

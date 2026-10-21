@@ -10,10 +10,11 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
+from annotation.enums import VEPSkippedReason
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import VEPSkippedReason
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import (
     VEPConfig,
@@ -48,7 +49,7 @@ class TruncatedVEPOutputTests(TestCase):
         cls.vav, _ = VariantAnnotationVersion.objects.get_or_create(**kwargs)
         slowly_create_loci_and_variants_for_vcf(cls.genome_build, TEST_ANNOTATION_VCF,
                                                 get_variant_id_from_info=True)
-        with open(TEST_ANNOTATION_VCF) as f:
+        with open(TEST_ANNOTATION_VCF, encoding="utf-8") as f:
             cls.num_records = sum(1 for line in f if not line.startswith("#"))
 
     def _annotation_run(self, **kwargs) -> AnnotationRun:
@@ -96,7 +97,7 @@ class TruncatedVEPOutputTests(TestCase):
     def test_skipped_variants_file_preferred_over_warnings(self):
         skipped_variants_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, "skipped_variants.tsv")
         os.makedirs(settings.ANNOTATION_VCF_DUMP_DIR, exist_ok=True)
-        with open(skipped_variants_filename, "w") as f:
+        with open(skipped_variants_filename, "w", encoding="utf-8") as f:
             f.write("[VEP skipped the following variants from dump.vcf]\n")
             f.write("Line 5    \t1 200 . GG A . . variant_id=1  \tsomething VEP dropped\n")
         self.addCleanup(os.remove, skipped_variants_filename)

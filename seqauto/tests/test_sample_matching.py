@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
+from seqauto.enums import DataGeneration
 from seqauto.models import (
     SampleSheet,
     Sequencer,
@@ -10,7 +11,6 @@ from seqauto.models import (
     SequencingRun,
     SequencingSample,
 )
-from seqauto.models.models_enums import DataGeneration
 from seqauto.models.models_seqauto import get_samples_by_sequencing_sample
 from snpdb.models import VCF, Sample
 

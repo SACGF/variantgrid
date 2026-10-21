@@ -16,7 +16,7 @@ from Bio import Entrez, SeqIO
 from django.conf import settings
 from django.utils.module_loading import import_string
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript, NoTranscript
 from genes.transcript_parts import get_transcript_id_and_version
 from library.constants import MINUTE_SECS
@@ -101,6 +101,9 @@ class TranscriptSequenceFetcher:
             raise NoTranscript(f"Unable to understand Ensembl API response: {r.text[:200]}") from e
 
         if r.ok:
+            # An unversioned accession resolves to the latest version, as Entrez does for RefSeq
+            if requested_version is None:
+                requested_version = data["version"]
             return FetchedTranscriptSequence(transcript_id=data["id"],
                                              annotation_consortium=AnnotationConsortium.ENSEMBL,
                                              version=requested_version,

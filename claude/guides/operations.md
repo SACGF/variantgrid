@@ -10,7 +10,7 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 |---|---|---|
 | vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; per-host rules are the "This box" table in `AGENTS.md` |
 | variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
-| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only) |
+| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only). Labs curate on their own systems (e.g. SA Pathology's VariantGrid) and send classifications in through the API, so Shariant is almost all published records from other labs: manual testing there covers API import, cross-lab viewing, discordance/overlaps and the exports labs download, not local curation |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
 | runx1db | `variantgrid/settings/env/runx1db2.py` | Gene-specific public database |
 | CI | `variantgrid/settings/env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |
@@ -41,9 +41,24 @@ systemd units, all restarted by `scripts/restart_services.sh` (`stop_services.sh
 | `scheduling_single_worker` | one process: schedulers that must not race (annotation, node tasks) |
 | `heavy_workers` | two processes: memory-hungry subprocesses (somalier), so a burst of imports can't OOM the box |
 
+Memory: `db_workers`, `web_workers` and `analysis_workers` default to one process per CPU (~200 MB each idle), which a
+many-core box with little RAM can't afford - pass `--concurrency` in its `config/celery/*.env`. Install the redis drop-in
+(`config/systemd/redis-server.service.d/variantgrid.conf`) and some swap: without them a sequencing run's imports can
+OOM-kill Redis, failing every in-flight task with `BusyLoadingError` (#2187). `deployment_check` warns about both
+(`variantgrid/deployment_validation/memory_check.py`). The gunicorn unit (`config/systemd/gunicorn.service`) caps itself at a percentage of the box's
+RAM with `OOMPolicy=continue`: a request that materialises a whole table (an unstreamed admin export was the case) gets its
+one worker OOM-killed and respawned rather than swapping the box out; Postgres cannot bound a result set, and
+`statement_timeout` never fires because the query itself is quick. `deployment_check` warns while the installed unit lacks it.
+The units are one file per service for every install location: `/etc/variantgrid/variantgrid.env` sets `VG_INSTALL_DIR` and each
+unit's own `.env` is relative to it (`config/systemd/README.txt`). `variantgrid/deployment_validation/systemd_check.py` makes
+`deployment_check` invalid when an installed unit reads an env file that is missing or `VG_INSTALL_DIR` is another checkout, since
+the restart after the upgrade would fail; the manual step that installs them registers only on such a box.
+
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.
-`vg status` shows per-queue depth and consumer count from a passive declare.
+`vg status` shows per-queue depth and consumer count from a passive declare. A worker takes several seconds after a restart
+to load Django and register, so a queue whose unit is active but has no consumer is re-read for up to 30 s; one still at
+`0c NO CONSUMER` after that is a real fault - `celery -A variantgrid inspect active_queues` shows what each worker consumes.
 
 Logs: `/var/log/variantgrid/` (`gunicorn.log`, `celery*.log`, `celeryd_beat.log`). Application events are also rows in
 `eventlog/models.py:Event` (severity, app, name, details) - `vg status` lists the last ten ERRORs; `ViewEvent` records page views
@@ -57,7 +72,12 @@ Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and
 dev tools in `requirements-dev.txt`; needs uv 0.9.25+ for `uv.toml`), then it execs `manage.py upgrade`
 (`manual/upgrader.py:Upgrader`), which runs everything in one process. Its standard steps (`manual/upgrader.py:Upgrader.standard_steps`)
 are git pull (re-execing on new code), `migrate`, `collectstatic_js_reverse`, `collectstatic_clean_compressor --clear`, `deployment_check`
-and `deployed` (records the deploy in Rollbar). It also surfaces the deploy-time steps migrations registered with
+and `deployed` (records the deploy in Rollbar). `deployment_check` (`variantopedia/management/commands/deployment_check.py`)
+verifies the box against the settings - annotation files, VEP and tool versions, celery routes, memory - and reruns the Django
+system checks on the settings themselves (`snpdb/checks.py`: a feature on without what it needs, OIDC against local account
+management, thresholds out of order, dotted paths and URL names that don't resolve) plus the rows settings name
+(`variantgrid/deployment_validation/settings_check.py`). An Error from either stops `--quick`; a check a deployment trips on
+purpose is listed in its env file's `SILENCED_SYSTEM_CHECKS`. It also surfaces the deploy-time steps migrations registered with
 `manual/operations/manual_operations.py:ManualOperation` (`manual/__manual_readme.md`).
 `manage` steps auto-run once their `requires` gates (`manual/gates.py`) clear and the command still exists; `other` steps are
 printed for a human. Completion is a `ManualMigrationAttempt`. `scripts/deployed.sh` records the deploy in Rollbar and runs

@@ -1,5 +1,4 @@
 import re
-from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import unquote_plus
 
@@ -16,14 +15,16 @@ from drf_spectacular.utils import extend_schema
 from requests.models import Response
 from rest_framework.views import APIView
 
-from classification.enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
 from classification.views.exports.classification_export_filter import (
     ClassificationFilter,
+    InvalidExportParameter,
     classification_export_user_strings_to_q,
+    parse_since,
 )
 from classification.views.exports.classification_export_formatter_csv import (
     ClassificationExportFormatterCSV,
@@ -35,56 +36,11 @@ from classification.views.exports.classification_export_formatter_redcap import 
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from library.log_utils import report_exc_info
-from library.utils import utc_from_timestamp
+from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
-
-ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
-
-
-class InvalidExportParameter(Exception):
-    pass
-
-
-def parse_since(since_str: str) -> datetime:
-    try:
-        since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
-        since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
-        return since_date
-    except BaseException:
-        pass
-
-    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
-        amount = int(m.group(1))
-        unit = m.group(2)
-        if unit:
-            unit = unit.strip().lower()
-
-        if amount > 100000 and not unit:
-            return utc_from_timestamp(float(since_str))
-
-        since = timezone.now()
-        if not unit or unit == 'd':
-            since -= timedelta(days=amount)
-        elif unit == 'm':
-            since -= timedelta(minutes=amount)
-        elif unit == 'w':
-            since -= timedelta(weeks=amount)
-        elif unit == 's':
-            since -= timedelta(seconds=amount)
-        else:
-            raise ValueError(f"Cannot parse {since_str} don't know time unit {unit}")
-        return since
-
-    try:
-        return utc_from_timestamp(float(since_str))
-    except BaseException:
-        pass
-
-    raise ValueError(f"Could not parse since string {since_str}")
 
 
 def _export_view_context(request: HttpRequest) -> dict:

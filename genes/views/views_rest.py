@@ -42,8 +42,8 @@ from genes.serializers import (
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils.django_rest_utils import MultipleFieldLookupMixin
 from library.guardian_utils import DjangoPermission
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import ImportStatus
 
 log = logging.getLogger(__name__)
 

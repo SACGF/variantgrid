@@ -66,6 +66,12 @@ app.conf.beat_schedule['reclassification-events-update'] = {
     'schedule': crontab(hour=3, minute=30),
 }
 
+# Exports read citations from the database rather than calling Entrez mid-download (#1687)
+app.conf.beat_schedule['prefetch-classification-citations'] = {
+    'task': 'classification.tasks.classification_citation_tasks.prefetch_classification_citations',
+    'schedule': crontab(hour=2, minute=30),
+}
+
 app.conf.beat_schedule['notify-server-status'] = {
     'task': 'variantopedia.tasks.server_status_tasks.notify_server_status',
     'schedule': crontab(hour=19, minute=0),
@@ -94,6 +100,19 @@ app.conf.beat_schedule['reconcile-pending-extractions'] = {
     'schedule': HOUR_SECS,
 }
 
+# Condition texts whose automatch fell back to local terms because the Monarch search failed (#1744)
+app.conf.beat_schedule['retry-failed-condition-text-automatch'] = {
+    'task': 'classification.tasks.condition_text_automatch_task.retry_failed_condition_text_automatch',
+    'schedule': HOUR_SECS,
+}
+
+# Imports whose worker was killed from outside stay PROCESSING with a lapsed lease (#2188); time them out so
+# the retry buttons offer them. Cheap: one indexed query when nothing has lapsed.
+app.conf.beat_schedule['fail-stuck-upload-pipelines'] = {
+    'task': 'upload.tasks.retry_upload_pipelines_task.fail_stuck_upload_pipelines_task',
+    'schedule': MINUTE_SECS * 5,
+}
+
 if settings.API_REQUEST_LOG_DAYS:
     app.conf.beat_schedule['prune-api-request-log'] = {
         'task': 'eventlog.tasks.prune_api_request_log',
@@ -106,7 +125,7 @@ app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
 }
 
 # User awards (#1819). Raw seconds rather than crontab - see the timezone note above.
-if settings.USER_AWARDS_ENABLED:
+if settings.USER_AWARDS_ENABLED and settings.USER_AWARDS_BADGES_ENABLED:
     app.conf.beat_schedule['user-awards-nightly'] = {
         'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
         'schedule': HOUR_SECS * 24,

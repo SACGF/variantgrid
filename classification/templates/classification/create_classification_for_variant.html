@@ -310,22 +310,14 @@
                 {% labelled label="Copy values from" %}
                     {% for option in copy_options %}
                         <div class="copy-bucket-options" data-bucket="{{ option.allele_origin_bucket.value }}">
-                            {% if option.consensuses %}
+                            {% if option.comparison %}
                                 <div class="my-2">
                                     <label class="form-check-label">
                                         <input class='mr-2' type="radio" name="copy_from_vcm_id" value="0" {% if not option.default_consensus_pk %}data-default="1"{% endif %} />
                                         <span class="no-value">Do not copy any values from previous classification records</span>
                                     </label>
                                 </div>
-                                {% for candidate in option.consensuses %}
-                                    <div class="my-2">
-                                        <label class="form-check-label">
-                                            <input class='mr-2' type="radio" name="copy_from_vcm_id" value="{{ candidate.modification.pk }}" {% if option.default_consensus_pk == candidate.modification.pk %}data-default="1"{% endif %}/>
-                                            <span style="display:inline-block; width:110px">{{ candidate.label }} </span>
-                                        </label>
-                                        <span class="text-bold text-secondary">:</span> {% classification_quick candidate.modification %}
-                                    </div>
-                                {% endfor %}
+                                {% include "classification/tags/consensus_comparison.html" with comparison=option.comparison mode="radio" radio_name="copy_from_vcm_id" default_pk=option.default_consensus_pk compare_url=option.compare_url %}
                             {% else %}
                                 <input type="radio" name="copy_from_vcm_id" value="0" data-default="1" class="d-none" />
                                 <div class="no-value">No {{ option.allele_origin_bucket.label|lower }} classification records for this allele to copy from</div>
@@ -346,11 +338,13 @@
                                 </label>
                             </div>
                             {% for group in option.gene_groups %}
-                                <div class="my-2 border-top pt-2">
-                                    <label class="form-check-label">
+                                <div class="my-2 border-top pt-2 d-flex align-items-start">
+                                    <label class="form-check-label pt-1">
                                         <input class='mr-2' type="radio" name="copy_gene_from_vcm_id" value="{{ group.representative.pk }}" />
                                     </label>
-                                    {% include "classification/tags/gene_consensus_group.html" %}
+                                    <div class="flex-grow-1">
+                                        {% include "classification/tags/gene_consensus_group.html" %}
+                                    </div>
                                 </div>
                             {% endfor %}
                         </div>

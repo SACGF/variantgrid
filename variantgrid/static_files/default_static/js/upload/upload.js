@@ -8,6 +8,7 @@ let reloadTimer = null;
 
 function fileUploadDatatableFilter(data) {
     data.file_type = $("#file-type-select").val();
+    data.status = $("#status-select").val();
 }
 
 function reloadUploadsGrid() {
@@ -61,7 +62,11 @@ $(document).ready(function() {
             scheduleReloadWhileRunning(json);
         }
     });
-    $("#file-type-select").change(reloadUploadsGrid);
+    $("#file-type-select, #status-select").change(reloadUploadsGrid);
+    $("#retry-failed-imports-form").submit(function() {
+        $(this).find("input[name=file_type]").val($("#file-type-select").val());
+        return window.confirm($(this).find("button").attr("title") + "?");
+    });
 
     const userAgent = navigator.userAgent.toLowerCase();
     const isFirefox = userAgent.indexOf('firefox') > -1;

@@ -47,7 +47,7 @@ class SearchRegistryCompletenessTest(SimpleTestCase):
                     if not filename.endswith(".py"):
                         continue
                     path = os.path.join(dir_path, filename)
-                    with open(path) as f:
+                    with open(path, encoding="utf-8") as f:
                         names = _declared_search_receivers(f.read())
                     if not names:
                         continue

@@ -47,7 +47,7 @@
                     <td>{% clinvar_stars record.stars record.review_status %} <a class="subtle-link" href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ record.org_id }}">{{ record.submitter }}</a>
                         <br/><span class="text-secondary">{{ record.record_id }}</span>
                     </td>
-                    <td class="dt-c_hgvs">{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    <td class="dt-c_hgvs">{% if record.c_hgvs %}{% hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
                     <td class="dt-clinical_significance text-center">
                         {% if record.clinical_significance %}
                             <span class="c-pill cs cs-{{ record.clinical_significance }}">{{ record.clinical_significance | ekey:"clinical_significance" }}</span>

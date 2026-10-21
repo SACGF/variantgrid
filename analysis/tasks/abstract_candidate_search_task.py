@@ -4,7 +4,7 @@ from celery import Task
 
 from analysis.models import Candidate, CandidateSearchRun
 from library.log_utils import get_traceback, log_traceback
-from snpdb.models import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 
 
 class AbstractCandidateSearchTask(Task):

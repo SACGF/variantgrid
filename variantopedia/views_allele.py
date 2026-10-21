@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -10,7 +9,9 @@ from annotation.models import (
 )
 from classification.enums import OverlapType
 from classification.models import (
-    OverlapStatus, Classification, Overlap,
+    Classification,
+    Overlap,
+    OverlapStatus,
 )
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -18,18 +19,13 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import link_allele_to_existing_variants
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ImportSource
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, AlleleConversionTool, AlleleOrigin, ImportSource
+from snpdb.models import Allele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.utils import get_genome_build_or_404
-
-
-@dataclass
-class ShareLevelRecordCounts:
-    lab_count: int
-    # record_count: int
 
 
 def get_allele_short_label(allele: Allele, preferred_genome_build: GenomeBuild) -> str:
@@ -66,7 +62,6 @@ def view_allele(request, allele_id: int):
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "allele_short_label": get_allele_short_label(allele, user_settings.default_genome_build),
-        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
     }
     if request.user.is_superuser:
         withdrawn_count = Classification.objects.filter(allele_info__allele=allele, withdrawn=True).count()

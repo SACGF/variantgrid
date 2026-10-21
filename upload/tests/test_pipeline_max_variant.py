@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -24,9 +25,9 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import sha256sum_str
+from snpdb.enums import ImportSource, ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -34,18 +35,16 @@ from snpdb.models import (
     CohortGenotypeCollection,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Locus,
     Sample,
     Sequence,
     Variant,
 )
-from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadPipeline,

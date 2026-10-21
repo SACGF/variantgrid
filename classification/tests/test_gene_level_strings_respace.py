@@ -14,8 +14,8 @@ from annotation.models import (
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import Classification, ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.enums import HGNCStatus
 from genes.models import HGNC, GeneSymbol, HGNCImport
-from genes.models_enums import HGNCStatus
 from genes.tests.gene_level_test_utils import create_splice_event_variant
 from library.utils import md5sum_str
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion

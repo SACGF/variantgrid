@@ -1,8 +1,8 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from snpdb.enums import UserAwardKind, UserAwardLevel
 from snpdb.models import AvatarDetails, UserAward
-from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_award_updates import update_badge, update_user_awards
 from snpdb.user_awards import AwardDefinition
 
@@ -73,6 +73,26 @@ class UserAwardUpdateTest(TestCase):
 
     @override_settings(USER_AWARDS_ENABLED=False)
     def test_disabled_deployment_short_circuits(self):
+        counter = _Counts()
+        counter.counts = {self.alice.pk: 5}
+        self.assertFalse(update_user_awards(definitions=[_badge(counter)]))
+        self.assertFalse(UserAward.objects.filter(definition_key="test_badge").exists())
+
+    def test_kudos_html_is_highest_kudos_only(self):
+        UserAward.objects.create(user=self.alice, kind=UserAwardKind.BADGE, definition_key="test_badge",
+                                 award_text="Test badge", award_level=UserAwardLevel.GOLD)
+        UserAward.objects.create(user=self.alice, kind=UserAwardKind.KUDOS, award_text="Bronze kudos",
+                                 award_level=UserAwardLevel.BRONZE)
+        UserAward.objects.create(user=self.alice, kind=UserAwardKind.KUDOS, award_text="Silver kudos",
+                                 award_level=UserAwardLevel.SILVER)
+        html = AvatarDetails.avatar_for(self.alice).awards.kudos_html
+        self.assertIn("user-award-silver", html)
+        self.assertNotIn("user-award-gold", html)
+        self.assertIn("Bronze kudos", html)
+        self.assertEqual(AvatarDetails.avatar_for(User.objects.create(username="award_bob")).awards.kudos_html, "")
+
+    @override_settings(USER_AWARDS_BADGES_ENABLED=False)
+    def test_badges_disabled_short_circuits(self):
         counter = _Counts()
         counter.counts = {self.alice.pk: 5}
         self.assertFalse(update_user_awards(definitions=[_badge(counter)]))

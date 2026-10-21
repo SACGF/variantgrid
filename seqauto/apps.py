@@ -2,6 +2,8 @@
 
 from django.apps import AppConfig
 
+from library.django_utils.change_tracking import track_deletes
+
 
 class SeqautoConfig(AppConfig):
     name = 'seqauto'
@@ -20,3 +22,5 @@ class SeqautoConfig(AppConfig):
         # pylint: enable=import-outside-toplevel,unused-import
 
         search_registry.register(enrichment_kit_search, experiment_search, sequencing_run_search, tso500_pair_search)
+        # The API Log counts deletes from the seqauto API (#1413)
+        track_deletes(*self.get_models())

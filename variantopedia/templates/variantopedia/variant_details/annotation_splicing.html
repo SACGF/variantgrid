@@ -1,0 +1,47 @@
+{% load ui_utils %}
+<div class="col-md-6 mt-4">
+    <div class="card">
+        <div class="card-header">Splicing</div>
+        <div class="card-body">
+            {% labelled id="splice_region" label="Splice Region" help=annotation_description.splice_region hint="tiny" %}{% endlabelled %}
+
+            {% labelled id="maxentscan" label="MaxEntScan" help=annotation_description.maxentscan hint="tiny" %}
+                <span id="maxentscan_values">
+                    <span id="maxentscan_ref"></span>&nbsp;<span class="text-secondary">Ref</span>,
+                    <span id="maxentscan_alt"></span>&nbsp;<span class="text-secondary">Alt</span>,
+                    <span id="maxentscan_diff"></span>&nbsp;<span class="text-secondary">Diff</span>
+                </span>
+                <span id="maxentscan_none" class="no-value">-</span>
+            {% endlabelled %}
+            {% labelled label="MaxEnt %Diff/Ref" help=annotation_description.maxentscan_percent_diff_ref hint="tiny" %}<span id="maxentscan_percent_diff_ref" data-suffix="%"></span>{% endlabelled %}
+            {% labelled id="dbscsnv_ada_score" label="dbscSNV (Ada)" help=annotation_description.dbscsnv_ada_score hint="tiny" %}{{ variant_annotation.dbscsnv_ada_score|floatformat:2 }}{% endlabelled %}
+            {% labelled id="dbscsnv_rf_score" label="dbscSNV (RF)" help=annotation_description.dbscsnv_rf_score hint="tiny" %}{{ variant_annotation.dbscsnv_rf_score|floatformat:2 }}{% endlabelled %}
+
+            {% if variant_annotation.has_spliceai %}
+                {% labelled label="SpliceAI Acceptor Gain" help=annotation_description.spliceai_pred_dp_ag hint="tiny" %}
+                    <span id="spliceai_pred_ds_ag" class="text-monospace text-right"></span>
+                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                    <span id="spliceai_pred_dp_ag" class="d-inline-block text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_ag }}</span>
+                {% endlabelled %}
+                {% labelled label="SpliceAI Acceptor Loss" help=annotation_description.spliceai_pred_dp_al hint="tiny" %}
+                    <span id="spliceai_pred_ds_al" class="text-monospace text-right"></span>
+                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                    <span id="spliceai_pred_dp_al" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_al }}</span>
+                {% endlabelled %}
+                {% labelled label="SpliceAI Donor Gain" help=annotation_description.spliceai_pred_dp_dg hint="tiny" %}
+                    <span id="spliceai_pred_ds_dg" class="text-monospace text-right"></span>
+                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                    <span id="spliceai_pred_dp_dg" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_dg }}</span>
+                {% endlabelled %}
+                {% labelled label="SpliceAI Donor Loss" help=annotation_description.spliceai_pred_dp_dl hint="tiny" %}
+                    <span id="spliceai_pred_ds_dl" class="text-monospace text-right"></span>
+                    <span class="text-secondary">&nbsp;position&nbsp;</span>
+                    <span id="spliceai_pred_dp_dl" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_dl }}</span>
+                {% endlabelled %}
+                {% labelled id="spliceai_gene_symbol" label="SpliceAI Gene Symbol" help=annotation_description.spliceai_gene_symbol hint="tiny" %}{{ variant_annotation.spliceai_gene_symbol }}{% endlabelled %}
+            {% else %}
+                {% labelled id='spliceai_none' label='SpliceAI' help=annotation_description.spliceai hint="tiny" value_css="no-value" %}No SpliceAI Data{% endlabelled %}
+            {% endif %}
+        </div>
+    </div>
+</div>

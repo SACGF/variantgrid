@@ -4,7 +4,7 @@ from re import Match, RegexFlag
 from typing import Optional, Union
 
 from annotation.models.models_citations import CitationIdNormalized
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
 
 
 class MatchType(Enum):
@@ -160,6 +160,8 @@ class DbRefRegexes:
                 prefix = prefix.lower()
                 self.prefix_map[prefix] = regex
                 prefixes.append(prefix)
+        # Longest first, so "PubMedCentral" isn't matched as "PubMed"
+        prefixes.sort(key=len, reverse=True)
         self.prefix_regex = re.compile('(' + '|'.join(prefixes) + ')', RegexFlag.IGNORECASE)
 
     def link_html(self, text: str) -> str:

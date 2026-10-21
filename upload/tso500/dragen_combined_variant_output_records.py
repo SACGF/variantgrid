@@ -42,6 +42,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid, PatientRecordOriginType
 from patients.external_references import (
     ExternalReference,
     ResolvedReference,
@@ -51,10 +52,8 @@ from patients.models import (
     Extraction,
     Patient,
     PatientModification,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     SequencingRun,
@@ -125,11 +124,6 @@ class ResolvedPair:
     specimen: Specimen
     extractions: dict[str, Extraction]  # by sample id, so a Sample is reached by name alone
 
-    def arm_extraction(self, arm: Optional[ArmIdentifiers]) -> Optional[Extraction]:
-        if arm:
-            return self.extractions.get(arm.sample_id)
-        return None
-
 
 def parse_patient_code(pair_id: str) -> str:
     """ The patient's code out of the pair's sample name, as the lab's naming writes it (@see the
@@ -160,8 +154,9 @@ def parse_pair_identifiers(analysis_details: dict) -> Optional[PairIdentifiers]:
         if m is None:
             logging.info("'%s' carries no lab accession - no extraction named for it", sample_id)
             continue
-        specimen_references.add(m.group("specimen"))
-        arms[nucleic_acid] = ArmIdentifiers(sample_id=sample_id, extraction_reference=m.group(0),
+        specimen_references.add(Specimen.normalize_reference_id(m.group("specimen")))
+        arms[nucleic_acid] = ArmIdentifiers(sample_id=sample_id,
+                                            extraction_reference=Extraction.normalize_reference_id(m.group(0)),
                                             nucleic_acid=nucleic_acid)
 
     if not (pair_id and specimen_references):
@@ -235,6 +230,10 @@ def resolve_pair(identifiers: PairIdentifiers, user: User) -> ResolvedPair:
             raise CombinedVariantOutputIdentityError(
                 f"Extraction '{arm.extraction_reference}' belongs to specimen "
                 f"{extraction.specimen}, not {specimen}")
+        elif not extraction.nucleic_acid_source:
+            # Accessioned by a system that doesn't know the arm - the file does
+            extraction.nucleic_acid_source = arm.nucleic_acid
+            extraction.save(update_fields=["nucleic_acid_source"])
         extractions[arm.sample_id] = extraction
 
     return ResolvedPair(patient=patient, specimen=specimen, extractions=extractions)

@@ -5,18 +5,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from library.git import Git
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadedFileTypes
 
 # The client contract: each name is a fact about this codebase a client may rely on. Append one in the same
 # change as a client-visible feature, and keep it while this endpoint exists.
 API_FEATURES = (
     "patients",
     "link_extraction",
+    "link_extractions_bulk",
     "upload_status",
     "joint_called_vcf_cross_run",
     "upload_metadata",
     "cram_alignment_files",  # A sequencing file's 'bam_file' path can be a CRAM
+    "alignment_files",  # SequencingFile, SingleSampleVCF and QC take an 'alignment_files' list (BAM/CRAM)
+    "annotated_download_compression",  # Annotated CSV download takes ?compression=zip|none
 )
 
 # Import factories the server drives itself, rather than files a client uploads (UploadedFileTypes names, lower case)

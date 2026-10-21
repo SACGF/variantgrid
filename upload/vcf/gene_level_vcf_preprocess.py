@@ -51,11 +51,10 @@ def preprocess_gene_level_vcf(upload_step):
         REMOVE_HEADER_SUB_STEP: ["sed", "/^#/d"],
         SPLIT_VCF_SUB_STEP: get_split_vcf_command(vcf_name, split_file_rows),
     }
-    # A sub step so a failed split reports on the pipeline the way the bcftools stages do. No tool
-    # version - coreutils split is the only tool in this pipe
-    sub_steps = {SPLIT_VCF_SUB_STEP: create_sub_step(upload_step, SPLIT_VCF_SUB_STEP,
-                                                     pipe_commands[SPLIT_VCF_SUB_STEP],
-                                                     tool_version=None)}
+    # Sub steps so a failed stage reports on the pipeline the way the full preprocess does. No tool
+    # version - only coreutils/sed run in this pipe
+    sub_steps = {name: create_sub_step(upload_step, name, command, tool_version=None)
+                 for name, command in pipe_commands.items()}
     run_pipe(pipe_commands, sub_steps, split_env, upload_pipeline)
     schedule_split_file_steps(upload_step, split_vcf_dir)
 

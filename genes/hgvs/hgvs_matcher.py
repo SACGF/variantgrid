@@ -37,6 +37,7 @@ from genes.models import (
     Transcript,
     TranscriptParts,
     TranscriptVersion,
+    TranscriptVersionSequenceInfo,
 )
 from genes.transcripts_utils import transcript_is_lrg
 from library.cache import timed_cache
@@ -53,8 +54,8 @@ from snpdb.clingen_allele_api import (
     ClinGenAlleleRegistryAPI,
     ClinGenAlleleRegistryUnavailableException,
 )
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import ClinGenAllele, Variant
-from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
 
@@ -151,10 +152,64 @@ class VariantResolvingError(ValueError):
         super().__init__(message)
 
 
+def clingen_allele_c_hgvs_variant(clingen_allele: ClinGenAllele, hgvs_converter, transcript_accession) -> Optional[HGVSVariant]:
+    """ ClinGen's c.HGVS for this transcript, with reference bases from our transcript sequence (ClinGen's are wrong, #493) """
+    hgvs_variant = None
+    raw_hgvs_string, t_data = clingen_allele.get_raw_hgvs_and_data(transcript_accession)
+    if raw_hgvs_string:  # Has for this transcript version
+        hgvs_variant = hgvs_converter.create_hgvs_variant(raw_hgvs_string)
+        # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
+        if hgvs_variant.kind == "n":
+            if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:
+                hgvs_variant.kind = 'c'
+
+        if not hgvs_variant.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
+            hgvs_variant.gene = t_data.get("geneSymbol")
+
+        if hgvs_variant.mutation_type in {"dup", "del", "delins"}:
+            # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
+            coord = t_data["coordinates"][0]
+            if "startIntronOffset" in coord:
+                # We have to accept these - as we get so many but we can't add on the bases
+                msg = "A coding DNA reference sequence does not contain intron or 5' and 3' gene "\
+                      "flanking sequences and can therefore not be used as a reference to describe " \
+                      "variants in these regions"
+                if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                    raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                else:
+                    logging.warning(msg)
+            elif transcript_accession.startswith("LRG_"):
+                logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
+                                "bases which may be wrong")
+            else:
+                try:
+                    if tvsi := TranscriptVersionSequenceInfo.get(transcript_accession):
+                        if hgvs_variant.mutation_type == "dup":
+                            ref_end = coord["end"]
+                            ref_start = ref_end - len(coord["allele"])
+                        else:
+                            ref_start = coord["start"]
+                            ref_end = coord["end"]
+                        hgvs_variant.ref_allele = tvsi.sequence[ref_start:ref_end]
+                    else:
+                        msg = f"Could not retrieve reference allele for '{transcript_accession}'"
+                        if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                            raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                        else:
+                            logging.warning(msg)
+                except NoTranscript as e_no_transcript:
+                    if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                        raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
+                    else:
+                        logging.warning(e_no_transcript)
+
+    return hgvs_variant
+
+
 class HGVSMatcher:
     # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
 
-    # Lenient pattern used by variant_search.py to extract the c./g. allele from an
+    # Lenient pattern used by hgvs_search.py to extract the c./g. allele from an
     # unparseable HGVS string for error reporting. The transcript is optional.
     HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT = re.compile(
         r"^((?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
@@ -204,7 +259,7 @@ class HGVSMatcher:
                 match_ref_allele = True
 
             transcript_accession = self.get_transcript_accession(cleaned_hgvs)
-            normalized_hgvs = ca.get_c_hgvs_variant(self.hgvs_converter, transcript_accession)
+            normalized_hgvs = clingen_allele_c_hgvs_variant(ca, self.hgvs_converter, transcript_accession)
             no_gene_generated = self.hgvs_converter.c_hgvs_remove_gene_symbol(str(normalized_hgvs))
             originally_normalized = HgvsOriginallyNormalized(original_hgvs=self.create_hgvs_variant(cleaned_hgvs),
                                                              normalized_hgvs=self.create_hgvs_variant(no_gene_generated))
@@ -496,12 +551,13 @@ class HGVSMatcher:
 
             biocommons treats the 'm' kind like 'g' (coordinates resolved against
             whichever reference the accession names), so without this an m. on a nuclear
-            contig is silently resolved as g. - see SACGF/variantgrid#1632. """
+            contig is silently resolved as g. - see SACGF/variantgrid#1632.
+            A contig not in this build is left to Contig.ContigNotInBuildError like any g. (#2365) """
         if hgvs_variant.kind != 'm':
             return
         contig_accession = hgvs_variant.contig_accession
         contig = self.genome_build.chrom_contig_mappings.get(contig_accession)
-        if contig is None or contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
+        if contig is not None and contig.molecule_type != AssemblyMoleculeType.MITOCHONDRION:
             raise HGVSNomenclatureException(
                 f"'m.' (mitochondrial) HGVS requires the mitochondrial reference, "
                 f"but '{contig_accession}' is not the mitochondrion for {self.genome_build}")
@@ -530,7 +586,7 @@ class HGVSMatcher:
 
         # Use ClinGen - will raise exception if it can't get it
         if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
-            if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, lrg_identifier):
+            if hgvs_variant := clingen_allele_c_hgvs_variant(ca, self.hgvs_converter, lrg_identifier):
                 return HGVSConverterResult(hgvs_variant=hgvs_variant,
                                            converter_info=HGVSConverterInfo(
                                                used_converter_type=HGVSConverterType.CLINGEN_ALLELE_REGISTRY,
@@ -585,7 +641,7 @@ class HGVSMatcher:
                             if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self,
                                                                                require_allele_id=False,
                                                                                clingen_api=clingen_api):
-                                if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, transcript_version.accession):
+                                if hgvs_variant := clingen_allele_c_hgvs_variant(ca, self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use biocommons or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
@@ -659,6 +715,23 @@ class HGVSMatcher:
         if variant_coordinate.symbolic_hgvs_interval is None:
             variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_name).hgvs_variant
+
+    def variant_coordinate_to_hgvs_variant_for_transcript_version(self, variant_coordinate: VariantCoordinate,
+                                                                  transcript_version: TranscriptVersion) -> HGVSVariant:
+        """ For callers already holding the TranscriptVersion: the local conversion it would rank first anyway,
+            without the queries spent finding the best version of its accession. A transcript local
+            resolution can't use goes the long way, to other versions and ClinGen """
+        if not (self.hgvs_converter.local_resolution and transcript_version.hgvs_ok):
+            return self.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_version.accession)
+
+        self._check_has_hgvs_representation(variant_coordinate)
+        if variant_coordinate.symbolic_hgvs_interval is None:
+            variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
+        vc_contig = self.genome_build.chrom_contig_mappings[variant_coordinate.chrom]
+        if vc_contig != transcript_version.contig:
+            raise self.TranscriptContigMismatchError(f"Variant contig={vc_contig} while Transcript "
+                                                     f"{transcript_version.accession} contig={transcript_version.contig}")
+        return self.hgvs_converter.variant_coordinate_to_c_hgvs(variant_coordinate, transcript_version)
 
     def _fast_variant_coordinate_to_g_hgvs(self, refseq_accession, offset, ref, alt) -> str:
         """ This only works for SNPs (ie not indels etc) """

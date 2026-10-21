@@ -11,9 +11,9 @@ from annotation.fake_data import (
 )
 from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
+from snpdb.enums import AlleleOrigin
 from snpdb.models import (
     Allele,
-    AlleleOrigin,
     AllVariantsFilter,
     ClinGenAllele,
     Tag,

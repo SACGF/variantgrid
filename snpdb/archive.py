@@ -13,10 +13,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils import timezone
 
+from analysis.tasks.auto_analysis_tasks import reload_auto_analyses_for_vcf
 from eventlog.models import create_event
+from snpdb.enums import ImportStatus
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf
+from upload.uploaded_file_type import retry_upload_pipeline
 
 
 class ArchivePreconditionError(Exception):
@@ -116,7 +118,6 @@ def archive_vcf(vcf: VCF, user: User, reason: str = "", force: bool = False) -> 
     # Refresh existing analyses so cached q-objects/node statuses reflect the archive.
     # reload_analysis_nodes (called per-analysis inside) bumps node.version → invalidates
     # the cache key and re-evaluates errors (which now include archive checks).
-    from analysis.tasks.auto_analysis_tasks import reload_auto_analyses_for_vcf
     reload_auto_analyses_for_vcf.delay(vcf.pk)
 
     create_event(user, "vcf_archived",
@@ -129,8 +130,6 @@ def restore_vcf(vcf: VCF, user: User):
         The success path (ImportGenotypeVCFSuccessTask) clears the mixin
         fields and emits the vcf_restored event.
     """
-    from upload.uploaded_file_type import retry_upload_pipeline
-
     if not vcf.data_archived:
         raise ValueError("VCF is not archived")
     if not vcf.data_restorable_from:

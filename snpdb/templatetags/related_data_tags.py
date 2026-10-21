@@ -8,8 +8,8 @@ from django.template import Library
 from classification.models import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from pedigree.models import CohortSamplePedFileRecord, Pedigree
+from snpdb.enums import ImportStatus
 from snpdb.models import CohortSample, Duo, Quad, Trio
-from snpdb.models.models_enums import ImportStatus
 
 register = Library()
 

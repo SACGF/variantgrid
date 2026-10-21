@@ -12,6 +12,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -20,7 +21,6 @@ from snpdb.models import (
     Duo,
     GenomeBuild,
     GenomicIntervalsCollection,
-    ImportStatus,
     Lab,
     Project,
     Quad,

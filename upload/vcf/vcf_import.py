@@ -24,9 +24,9 @@ from django.utils import timezone
 from library.genomics.vcf_enums import VCFConstant
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import get_single_element, invert_dict
+from patients.enums import MatchStatus
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction
-from patients.models_enums import MatchStatus
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     JointCalledVCF,
@@ -36,11 +36,11 @@ from seqauto.models import (
     VCFFromSequencingRun,
 )
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
+from snpdb.enums import ImportSource, ImportStatus, VariantOrigin, VCFInfoTypes
 from snpdb.models import (
     VCF,
     AbstractVCFField,
     Cohort,
-    ImportStatus,
     Sample,
     UserSettings,
     VCFFilter,
@@ -48,7 +48,6 @@ from snpdb.models import (
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, VariantOrigin, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (
@@ -56,6 +55,7 @@ from snpdb.vcf_utils import (
     cyvcf2_header_get,
     cyvcf2_header_types,
 )
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     BackendVCF,
     FileUpload,
@@ -64,8 +64,6 @@ from upload.models import (
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.models.models import UploadUserError
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
@@ -629,7 +627,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upl
             DragenTSO500CombinedVariantOutput.link_arm_sample(sample, sequencing_run)
 
             # Link any QCGeneLists
-            for qcgl in QCGeneList.objects.filter(qc__alignment_file__sequencing_sample=sequencing_sample,
+            for qcgl in QCGeneList.objects.filter(qc__sequencing_sample=sequencing_sample,
                                                   custom_text_gene_list__gene_list__isnull=False,
                                                   sample_gene_list__isnull=True).distinct():
                 qcgl.create_and_assign_sample_gene_list(sample)

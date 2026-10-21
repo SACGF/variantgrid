@@ -49,7 +49,7 @@
                         {% labelled label="Source Classification Record" %}<a href="{% url 'view_classification' clinvar_export.classification_based_on.id_str %}" target="_blank">
                                 {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
                         {% endlabelled %}
-                        {% labelled label="Source c.HGVS" %}{% c_hgvs clinvar_export.classification_based_on show_genome_build=True %}{% endlabelled %}
+                        {% labelled label="Source c.HGVS" %}{% hgvs clinvar_export.classification_based_on show_genome_build=True %}{% endlabelled %}
                         {% labelled label="Source Condition" %}{% condition clinvar_export.classification_based_on.classification.condition_resolution_obj %}{% endlabelled %}
                     {% else %}
                         {% labelled label="Source Classification Record" %}<div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>{% endlabelled %}

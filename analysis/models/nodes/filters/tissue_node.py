@@ -5,17 +5,17 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import GroupOperation
+from analysis.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
-from annotation.models.models import (
+from annotation.enums import DetectedHumanProteinAtlasAbundance
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasTissueSample,
-    VariantTranscriptAnnotation,
 )
-from annotation.models.models_enums import DetectedHumanProteinAtlasAbundance
+from genes.enums import AnnotationConsortium
 from genes.models import Gene, GeneSymbol
-from genes.models_enums import AnnotationConsortium
 
 
 class TissueNode(AnalysisNode):

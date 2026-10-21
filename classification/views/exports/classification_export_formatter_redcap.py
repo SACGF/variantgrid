@@ -2,6 +2,7 @@ import csv
 import io
 import re
 from collections.abc import Iterable
+from typing import Optional
 
 from django.db.models import OrderBy
 from django.db.models.expressions import RawSQL
@@ -15,6 +16,7 @@ from classification.models import (
     EvidenceKey,
     EvidenceKeyMap,
 )
+from classification.models.classification_evidence_normalise import evidence_option_export_value
 from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
@@ -31,6 +33,19 @@ from library.utils import delimited_row
 
 # WARNING: REDCap export ignores the since parameter
 # WARNING: REDCap export ignores variant warnings
+
+def redcap_choices(options: Optional[list[dict]]) -> str:
+    """
+    REDCap data dictionary choices: "index, label | index, label". REDCap has no escape for the "|" delimiter,
+    so a "|" in a label becomes "/", which still reads as "or"
+    """
+    choices = []
+    for option in options or []:
+        if (index := option.get('index')) is not None:
+            label = option.get('label') or EvidenceKey.pretty_label_from_string(option.get('key'))
+            choices.append(f"{index}, {label.replace('|', '/')}")
+    return ' | '.join(choices)
+
 
 class RedcapGroup:
     """
@@ -293,22 +308,8 @@ def export_redcap_definition(output):
 
             row.field_type = redcap_type
 
-            option_text = ''
             if value_type == EvidenceKeyValueType.SELECT or value_type == EvidenceKeyValueType.CRITERIA:
-                options = key_entry.virtual_options
-                if options:
-                    for option in options:
-                        if option.get('index') is not None:
-                            if option_text:
-                                option_text += ' | '
-                            option_text += str(option.get('index')) + ', '
-                            if option.get('label'):
-                                # FIXME escape any | in the label
-                                option_text += option.get('label')
-                            else:
-                                option_text += EvidenceKey.pretty_label_from_string(option.get('key'))
-
-            row.choices = option_text
+                row.choices = redcap_choices(key_entry.virtual_options)
             row.text_validation = validation
 
             if key_entry.mandatory:
@@ -331,7 +332,7 @@ class RedcapKeyValueFormatter(KeyValueFormatter):
     def value_for(self, ekey: EvidenceKey, value, pretty=False):
         if ekey.value_type in {EvidenceKeyValueType.SELECT, EvidenceKeyValueType.CRITERIA}:
             if value:
-                return Classification._export_value(value, key_data=ekey, export_key='index')
+                return evidence_option_export_value(value, key_data=ekey, export_key='index')
 
         elif ekey.value_type == EvidenceKeyValueType.MULTISELECT:
             return ekey.pretty_value(value)

@@ -7,8 +7,8 @@
 """
 from typing import Optional
 
-from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
-from classification.enums import SomaticClinicalSignificance
+from annotation.enums import ClinVarOncogenicity, Pathogenicity
+from snpdb.enums import SomaticClinicalSignificance
 
 # Ordered low -> high, matched as substrings so combined forms ("Benign/Likely_benign") and
 # count-suffixed conflicting values ("Pathogenic(2)|Uncertain_significance(1)") resolve.

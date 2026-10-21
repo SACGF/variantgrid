@@ -3,10 +3,13 @@
     cache passes the filter_key for its config: None for the raw aggregate row, or an inheritance
     bucket.
 
-    The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats) and the readers
-    both build inheritance keys through Trio.get_stats_filter_key. A silent mismatch between the two
-    would produce cache misses forever.
+    The writer side (annotation/tasks/calculate_sample_stats.calculate_cohort_stats, and
+    annotation/tasks/calculate_trio_stats.calculate_trio_stats for inheritance buckets) and the readers
+    both build keys through Cohort.get_stats_filter_key and Trio.get_stats_filter_key. A silent mismatch
+    between the two would produce cache misses forever. A sub cohort reads its parent's CGC: its
+    per-sample rows are the parent's, its aggregate rows are keyed by its samples.
 """
+from collections.abc import Callable
 from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -17,8 +20,8 @@ from annotation.models import (
     CohortGenotypeVariantAnnotationStats,
 )
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from snpdb.enums import BuiltInFilters
 from snpdb.models import CohortGenotypeStats
-from snpdb.models.models_enums import BuiltInFilters
 
 LABEL_TO_MODEL = {
     BuiltInFilters.TOTAL: CohortGenotypeStats,
@@ -30,11 +33,12 @@ LABEL_TO_MODEL = {
 
 def get_cached_label_count_for_cohort(cohort, sample, filter_key: Optional[str],
                                       annotation_version, passing_filter,
-                                      zygosities, label) -> Optional[int]:
+                                      zygosities, label,
+                                      enqueue_recompute: Optional[Callable[[], None]] = None) -> Optional[int]:
     """ sample=None → aggregate row; sample=Sample(...) → per-sample row.
         filter_key=None → raw count; canonical-JSON string → filter-keyed row.
         Returns None on cache miss (caller falls back to live count); on miss
-        also fires a lazy recompute task. """
+        also fires a lazy recompute task - enqueue_recompute, or the cohort's. """
     model = LABEL_TO_MODEL.get(label)
     if model is None:
         return None
@@ -57,11 +61,9 @@ def get_cached_label_count_for_cohort(cohort, sample, filter_key: Optional[str],
     try:
         obj = model.objects.get(**lookup)
     except ObjectDoesNotExist:
-        _enqueue_lazy_recompute(cohort, annotation_version)
+        if enqueue_recompute:
+            enqueue_recompute()
+        else:
+            enqueue_cohort_stats_recompute(cohort, annotation_version)
         return None
     return obj.count_for_zygosity(*zygosities, label=label)
-
-
-def _enqueue_lazy_recompute(cohort, annotation_version) -> None:
-    """ Fire-and-forget. Idempotent — task no-ops if the row now exists. """
-    enqueue_cohort_stats_recompute(cohort, annotation_version)

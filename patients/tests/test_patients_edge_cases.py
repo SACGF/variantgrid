@@ -14,6 +14,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import Sex, TissueStatus
 from patients.forms import PatientForm
 from patients.import_records import (
     InvalidPatientRecord,
@@ -35,9 +36,9 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import Sex, TissueStatus
-from snpdb.models import ImportSource
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 _TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
 _FAKE_CSV = os.path.join(_TEST_DATA_DIR, "fake_patient_records.csv")
@@ -449,6 +450,21 @@ class TestImportPatientRecordsFailedRows(TestCase):
         messages = set(PatientRecord.objects.filter(patient_records=patient_records, valid=False)
                        .values_list("validation_message", flat=True))
         self.assertEqual({"a bug of ours"}, messages)
+
+
+class TestFakePatientRecordsFile(TestCase):
+    """ test_data/fake_patient_records.csv is also the example to upload by hand, so it must stay importable """
+
+    @mock.patch("patients.import_records.reconcile_pending_extractions")
+    @mock.patch("patients.import_records.bulk_patient_phenotype_matching")
+    def test_every_row_imports(self, _phenotype_matching, _reconcile):
+        user = User.objects.create_user("fake_csv_user", password="x")
+        patient_records = _make_patient_records(user)
+        self.assertEqual(3, import_patient_records(patient_records))
+        invalid = PatientRecord.objects.filter(patient_records=patient_records, valid=False)
+        self.assertEqual([], list(invalid.values_list("validation_message", flat=True)))
+        specimen = Specimen.objects.get(reference_id="FAKESPEC001")
+        self.assertEqual(2, specimen.extraction_set.count())
 
 
 # ---------------------------------------------------------------------------

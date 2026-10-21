@@ -12,7 +12,7 @@ import logging
 import re
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from typing import Any, Optional, Union
 
@@ -21,7 +21,7 @@ import pydantic
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError, models, transaction
-from django.db.models import Exists, F, OuterRef, QuerySet, Value
+from django.db.models import Exists, OuterRef, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
@@ -29,9 +29,9 @@ from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from hgvs.extras.babelfish import VCFCoordinate
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 from pydantic import field_validator
 
 from flags.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
@@ -50,26 +50,16 @@ from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.babelfish import get_genome_babelfish
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ProcessingStatus,
-    SequenceRole,
-)
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 # VCF spec's reference alt (our Variant.REFERENCE_ALT is "=")
 VCF_REFERENCE_ALT = "."
 # The symbolic alts hgvs's VCFCoordinate represents
 VCF_COORDINATE_SYMBOLIC_ALTS = {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
-
-
-def internal_vcf_version() -> str:
-    """ The VCF version whose SVLEN sign we store - negative <DEL> up to 4.3, positive from 4.4 (#1344) """
-    return "4.4" if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE else "4.3"
 
 
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
@@ -103,6 +93,10 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-a p-1 text-light border rounded bg-dark"
+
+    @classmethod
+    def preview_can_liftover(cls) -> bool:
+        return True
 
     @property
     def preview(self) -> 'PreviewData':
@@ -572,14 +566,15 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return self
 
     def as_vcf_coordinate(self, genome_build: GenomeBuild) -> VCFCoordinate:
-        """ hgvs's VCF-spec form, for Babelfish. We store an <INV> from its first inverted base, so it gains
-            the VCF padding base, and our reference alt '=' becomes '.'. <CNV>, <INS> and gene-level alts
-            have no VCFCoordinate form, so raise ValueError """
+        """ hgvs's VCF-spec form, for Babelfish, on the contig's RefSeq accession rather than our chrom name.
+            We store an <INV> from its first inverted base, so it gains the VCF padding base, and our reference
+            alt '=' becomes '.'. <CNV>, <INS> and gene-level alts have no VCFCoordinate form, so raise ValueError """
         if self.is_gene_level:
             raise ValueError(f"{self} is gene-level - it has no VCF coordinate")
+        ac = genome_build.convert_chrom_to_contig_accession(self.chrom)
         if not self.is_symbolic:
             alt = VCF_REFERENCE_ALT if self.alt == Variant.REFERENCE_ALT else self.alt
-            return VCFCoordinate(self.chrom, self.position, self.ref, alt)
+            return VCFCoordinate(ac, self.position, self.ref, alt)
 
         if self.alt not in VCF_COORDINATE_SYMBOLIC_ALTS:
             raise ValueError(f"{self}: symbolic alt '{self.alt}' has no VCF coordinate")
@@ -590,13 +585,15 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         if self.alt == VCFSymbolicAllele.INV:
             position -= 1
             ref = genome_build.genome_fasta.fasta[self.chrom][position - 1:position].upper()
-        return VCFCoordinate(self.chrom, position, ref, self.alt, end=self.end, vcf_version=internal_vcf_version())
+        return VCFCoordinate(ac, position, ref, self.alt, end=self.end)
 
     @staticmethod
     def from_vcf_coordinate(vcf_coordinate: VCFCoordinate, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ The inverse of as_vcf_coordinate. We store an <INV> symbolically only when strictly longer than
-            VARIANT_SYMBOLIC_ALT_SIZE (Babelfish's threshold is >=), so a shorter one is expanded """
-        chrom = vcf_coordinate.chrom
+            VARIANT_SYMBOLIC_ALT_SIZE (Babelfish's threshold is >=), so a shorter one is expanded. VCFCoordinate's
+            svlen is always positive; a <DEL>'s is stored negative unless VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE
+            (VCF 4.4's sign, #1344) """
+        chrom = genome_build.chrom_contig_mappings[vcf_coordinate.ac].name
         alt = vcf_coordinate.alt.upper()
         if not vcf_coordinate.is_symbolic:
             if alt == VCF_REFERENCE_ALT:
@@ -616,7 +613,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         else:
             position = vcf_coordinate.position
             ref = vcf_coordinate.ref
-            svlen = replace(vcf_coordinate, vcf_version=internal_vcf_version()).svlen
+            svlen = vcf_coordinate.svlen
+            if alt == VCFSymbolicAllele.DEL and not settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+                svlen = -svlen
         return VariantCoordinate(chrom=chrom, position=position, ref=ref.upper(), alt=alt, svlen=svlen)
 
     def as_contig_accession(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
@@ -753,6 +752,10 @@ class Variant(PreviewModelMixin, models.Model):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-v p-1 text-light border rounded bg-dark"
+
+    @classmethod
+    def preview_can_liftover(cls) -> bool:
+        return True
 
     @staticmethod
     def get_chrom_q(chrom):
@@ -897,8 +900,20 @@ class Variant(PreviewModelMixin, models.Model):
         return self.genome_builds
 
     @property
+    def ordered_genome_builds(self) -> list['GenomeBuild']:
+        """ genome_builds by name - iterating the set itself gives a different order in each process """
+        return sorted(self.genome_builds, key=lambda gb: gb.name)
+
+    @property
     def any_genome_build(self) -> GenomeBuild:
-        return next(iter(self.genome_builds))
+        """ Variants on a contig builds share (MT) are in several builds - the same one every time """
+        return self.ordered_genome_builds[0]
+
+    def preferred_genome_build(self, genome_build: Optional[GenomeBuild]) -> GenomeBuild:
+        """ genome_build (e.g. the user's) if this variant is in it, otherwise any_genome_build """
+        if genome_build in self.genome_builds:
+            return genome_build
+        return self.any_genome_build
 
     @cached_property
     def coordinate(self) -> VariantCoordinate:
@@ -915,13 +930,6 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
-
-    @cached_property
-    def vcf_alt(self) -> str:
-        """ Return the base as a string (not as our special REFERENCE_ALT) """
-        if self.is_reference:
-            return self.locus.ref.seq
-        return self.alt.seq
 
     @property
     def is_standard_variant(self) -> bool:
@@ -1034,33 +1042,6 @@ class Variant(PreviewModelMixin, models.Model):
             return [self]
         return Variant.objects.filter(variantallele__allele=allele)
 
-    def get_canonical_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        from annotation.models import VariantAnnotationVersion
-        vav = VariantAnnotationVersion.latest(genome_build)
-        return self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first()
-
-    def get_best_variant_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        from annotation.models import VariantAnnotationVersion
-        vav = VariantAnnotationVersion.latest(genome_build)
-        # canonical is nullable, so nulls_last keeps a canonical=True row ahead of the rest
-        canonical_first = F("canonical").desc(nulls_last=True)
-        if version := self.varianttranscriptannotation_set.filter(version=vav).order_by(canonical_first).first():
-            return version
-        if any_at_all := self.varianttranscriptannotation_set.first():
-            return any_at_all
-
-    def get_canonical_c_hgvs(self, genome_build):
-        from annotation.models import VariantAnnotationVersion
-        if cta := self.get_canonical_transcript_annotation(genome_build):
-            return cta.get_hgvs_c_with_symbol()
-        if self.is_gene_level:
-            # Sits on no transcript, so the representative annotation is the only one there is - it
-            # carries the VICC gene-level nomenclature. @see snpdb.gene_level_variants
-            vav = VariantAnnotationVersion.latest(genome_build)
-            if va := self.variantannotation_set.filter(version=vav).first():
-                return va.get_hgvs_c_with_symbol()
-        return None
-
     @property
     def start(self):
         return self.locus.position
@@ -1106,10 +1087,6 @@ class VariantAllele(TimeStampedModel):
 
     class Meta:
         unique_together = ("variant", "genome_build")
-
-    @property
-    def canonical_c_hgvs(self):
-        return self.variant.get_canonical_c_hgvs(self.genome_build)
 
     def needs_clingen_call(self):
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:
@@ -1268,8 +1245,9 @@ class LiftoverRun(TimeStampedModel):
         liftover_run_complete_signal.send_robust(sender=self.__class__, instance=self)
 
     def error(self):
-        self.alleleliftover_set.update(status=ProcessingStatus.ERROR,
-                                       error={"message": f"{self} failed"})
+        """ The run's pipeline failed - alleles it already finished keep their result """
+        self.alleleliftover_set.filter(status__in=ProcessingStatus.RUNNING_STATES).update(
+            status=ProcessingStatus.ERROR, error={AlleleLiftover.ERROR_JSON_MESSAGE_KEY: f"{self} failed"})
 
     def __str__(self):
         source = ""

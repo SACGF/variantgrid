@@ -3,6 +3,7 @@ import celery
 from analysis.analysis_templates import auto_launch_analysis_templates_for_sample
 from analysis.models.models_analysis import CohortAnalysisTemplateRun, SampleAnalysisTemplateRun
 from analysis.models.nodes.node_utils import reload_analysis_nodes
+from annotation.models import AnnotationVersion
 from snpdb.models import VCF, Sample
 
 
@@ -31,12 +32,15 @@ def auto_run_analyses_for_vcf(vcf_id: int, analysis_description: str, skip_alrea
 
 @celery.shared_task
 def reload_auto_analyses_for_vcf(vcf_id: int):
-    """ On VCF re-import, reload nodes in any existing auto-analyses so node counts stay fresh. """
+    """ On VCF re-import, reload nodes in any existing auto-analyses so node counts stay fresh. A run left
+        on a superseded annotation version is never looked up again (@see get_sample_analysis), so it stays """
     vcf = VCF.objects.get(pk=vcf_id)
+    current = {"analysis_template_run__analysis__annotation_version": AnnotationVersion.latest(vcf.genome_build,
+                                                                                               validate=False)}
 
-    for satr in SampleAnalysisTemplateRun.objects.filter(sample__vcf=vcf):
+    for satr in SampleAnalysisTemplateRun.objects.filter(sample__vcf=vcf, **current):
         reload_analysis_nodes(satr.analysis_template_run.analysis_id)
 
     # The VCF's cohort auto-analysis may also have stale node counts
-    for catr in CohortAnalysisTemplateRun.objects.filter(cohort=vcf.cohort):
+    for catr in CohortAnalysisTemplateRun.objects.filter(cohort=vcf.cohort, **current):
         reload_analysis_nodes(catr.analysis_template_run.analysis_id)

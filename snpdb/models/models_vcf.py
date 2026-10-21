@@ -18,8 +18,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
@@ -27,15 +27,10 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass, VCFConstant
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
+from patients.enums import Sex
 from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
-from patients.models_enums import Sex
+from snpdb.enums import ImportStatus, SampleFileType, VariantOrigin, VCFInfoTypes
 from snpdb.models.models import CodeVersionMixin, LabProject
-from snpdb.models.models_enums import (
-    ImportStatus,
-    SampleFileType,
-    VariantOrigin,
-    VCFInfoTypes,
-)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Variant
 
@@ -566,7 +561,7 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         """ An extraction names its patient, so every route that links one (import, seqauto, CVO,
             reconcile) fills an empty patient here. A different patient already set is left for
             SampleForm.clean to report rather than silently replaced """
-        if self.extraction_id and not self.patient_id:
+        if self.extraction_id and not self.patient_id:  # pylint: disable=access-member-before-definition
             self.patient_id = self.extraction.specimen.patient_id
         super().save(*args, **kwargs)
 

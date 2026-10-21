@@ -6,7 +6,6 @@ from django.conf import settings
 from django.core.management import BaseCommand, CommandError
 from django.db.models import Q
 
-from annotation.models import CachedWebResource
 from classification.management.commands.fix_migrate_flags_to_imported_allele_info import (
     FlagDatabase,
 )
@@ -15,8 +14,9 @@ from classification.models.classification_variant_info_models import ResolvedVar
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from library.guardian_utils import admin_bot
 from library.utils import md5sum_str
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 class Command(BaseCommand):
@@ -248,10 +248,10 @@ class Command(BaseCommand):
                     # use force_update so we can be sure that the validation objects have been made
                     if not c.allele_info:
                         c.ensure_allele_info()
-                        c.save(update_modified=False)
+                        Classification.objects.filter(pk=c.pk).update(allele_info=c.allele_info)
 
                     if c.update_allele_info_from_classification(force_update=False):
-                        c.save(update_modified=False)
+                        Classification.objects.filter(pk=c.pk).update(allele_info=c.allele_info)
                 except Exception as e:
                     skipped += 1
                     logging.warning("fix_variant_matching --extra: skipping classification %s: %s", pk, e)

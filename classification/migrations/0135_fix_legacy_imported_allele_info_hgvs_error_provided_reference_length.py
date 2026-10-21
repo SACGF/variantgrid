@@ -5,7 +5,7 @@ from functools import reduce
 from django.db import migrations
 from django.db.models import Q
 
-from classification.models import ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
 from manual.operations.manual_operations import ManualOperation
 
 

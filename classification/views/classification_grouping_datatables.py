@@ -6,33 +6,40 @@ from typing import Optional, Tuple
 from django.conf import settings
 from django.db.models import Count, F, Q, QuerySet
 from django.http import HttpRequest
+from django.utils.safestring import mark_safe
 from more_itertools import first
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classification.enums import (
-    AlleleOriginBucket,
+    ClassificationGroupingSearchTermType,
+    ClassificationResultValue,
     EvidenceCategory,
     LabExternalFilter,
     ShareLevel,
-    TriageDecision, TriageStatus, TestingContextBucket, ClassificationResultValue,
+    TestingContextBucket,
+    TriageDecision,
+    TriageStatus,
 )
 from classification.models import (
+    IN_REVIEW_VALUE,
     Classification,
     ClassificationGrouping,
     ClassificationGroupingEntry,
     ClassificationGroupingSearchTerm,
-    ClassificationGroupingSearchTermType,
     ClassificationModification,
     DiscordanceReport,
     EvidenceKeyMap,
-    ImportedAlleleInfo, OverlapContribution, IN_REVIEW_VALUE,
+    ImportedAlleleInfo,
+    OverlapContribution,
 )
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
+from snpdb.enums import AlleleOriginBucket
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
@@ -82,7 +89,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "classification_count": row.get('classification_count'),
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
-            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__research')),
+            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__classification_settings__research')),
             "research_icon": settings.RESEARCH_ICON,
             "share_level": row.get('share_level'),
             "allele_origin_bucket": row.get('allele_origin_grouping__allele_origin_bucket'),
@@ -141,14 +148,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         builds = GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
         return [gb for gb in builds if gb in ImportedAlleleInfo.supported_genome_builds()]
 
-    def render_c_hgvs(self, row: CellData) -> JsonDataType:
-        def get_preferred_chgvs_json() -> dict:
+    def render_hgvs(self, row: CellData) -> JsonDataType:
+        def get_preferred_hgvs_json() -> dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
-                    c_hgvs = HGVSDisplay.parse(c_hgvs_string, genome_build=genome_build,
-                                               is_desired_build=index == 0)
-                    return c_hgvs.to_json()
+                    p_hgvs = row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "p_hgvs"))
+                    hgvs = HGVSDisplay.parse(dna_hgvs=c_hgvs_string, genome_build=genome_build,
+                                             is_desired_build=index == 0, p_hgvs=p_hgvs)
+                    return hgvs.to_json()
 
             imported_hgvs = row["latest_allele_info__imported_c_hgvs"] or row["latest_allele_info__imported_g_hgvs"]
             imported_genome_build = None
@@ -160,27 +168,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             for genome_build in self.genome_build_prefs:
                 if row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info", "variant_id")):
                     display_genome_build = imported_genome_build or genome_build
-                    c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=display_genome_build,
-                                               is_normalised=True,
-                                               is_desired_build=display_genome_build == first(self.genome_build_prefs),
-                                               is_resolved_without_hgvs=True)
-                    return c_hgvs.to_json()
+                    hgvs = HGVSDisplay.parse(dna_hgvs=imported_hgvs, genome_build=display_genome_build,
+                                             is_normalised=True,
+                                             is_desired_build=display_genome_build == first(self.genome_build_prefs),
+                                             is_resolved_without_hgvs=True)
+                    return hgvs.to_json()
 
             # could be dirty and not have a latest_allele_info
             if imported_genome_build:
-                c_hgvs = HGVSDisplay.parse(imported_hgvs, genome_build=imported_genome_build, is_normalised=False)
-                return c_hgvs.to_json()
+                hgvs = HGVSDisplay.parse(dna_hgvs=imported_hgvs, genome_build=imported_genome_build, is_normalised=False)
+                return hgvs.to_json()
             else:
                 return {}
 
-        response = get_preferred_chgvs_json()
-        if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-            if p_hgvs := row['latest_classification_modification__published_evidence__p_hgvs__value']:
-                p_dot = p_hgvs.find('p.')
-                if p_dot != -1:
-                    p_hgvs = p_hgvs[p_dot::]
-                response['p_hgvs'] = p_hgvs
-
+        response = get_preferred_hgvs_json()
         response['allele_id'] = row.get('latest_allele_info__allele_id')
         response['allele_info_id'] = row.get('latest_allele_info__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
@@ -363,12 +364,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         )
 
     def gene_symbol_filter(self, gene_symbol: str) -> Optional[Q]:
-        if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
-            all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
-            all_strs = [gs.upper() for gs in all_strs]
-            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
+        """ An old name or alias filters on the gene it names, an alias of several genes on each of them """
+        try:
+            gene_symbol_id, _hgnc = GeneSymbol.resolve_name(gene_symbol)
+            gene_symbol_ids = [gene_symbol_id] if gene_symbol_id else []
+        except AmbiguousGeneSymbolAlias as ambiguous:
+            gene_symbol_ids = ambiguous.gene_symbol_ids
+
+        all_strs = []
+        for gene_symbol_obj in GeneSymbol.objects.filter(pk__in=gene_symbol_ids):
+            all_strs += [gene_symbol_obj.symbol, *gene_symbol_obj.alias_meta.alias_symbol_strs]
+        if all_strs:
+            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL,
+                                                             [gs.upper() for gs in all_strs])
         return None
-        # FIXME add support for gene symbol alias
 
     @staticmethod
     def get_ontology_q(ontology_terms: str) -> Q | None:
@@ -427,8 +436,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classificationGroupingDetailUrl',
-                                                                       expected_height=108)
+        self.set_expand_ajax('classificationGroupingDetailUrl', expected_height=108)
         self.rich_columns = [
             RichColumn(
                 key='lab',
@@ -454,7 +462,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
-                    'lab__research',
+                    'lab__classification_settings__research',
 					'allele_origin_grouping__allele_origin_bucket',
                     'share_level',
                     'dirty'
@@ -466,8 +474,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info",
                                                                     "genomic_sort")],
                 name='c_hgvs',
-                label=f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>',
-                renderer=self.render_c_hgvs,
+                label=mark_safe(f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>'),
+                renderer=self.render_hgvs,
                 client_renderer='VCTable.hgvs',
                 order_sequence=[SortOrder.ASC, SortOrder.DESC],
                 extra_columns=[
@@ -475,6 +483,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     "latest_allele_info__pk",
                     "latest_allele_info__grch37__resolved_hgvs",
                     "latest_allele_info__grch38__resolved_hgvs",
+                    "latest_allele_info__grch37__p_hgvs",
+                    "latest_allele_info__grch38__p_hgvs",
                     "latest_allele_info__grch37__variant_id",
                     "latest_allele_info__grch38__variant_id",
                     'latest_allele_info__id',
@@ -484,7 +494,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'latest_allele_info__imported_c_hgvs',
                     'latest_allele_info__imported_g_hgvs',
                     'latest_allele_info__imported_genome_build_patch_version__genome_build',
-                    'latest_classification_modification__published_evidence__p_hgvs__value'  # TODO move this to allele info
                 ]
             ),
             RichColumn(
@@ -503,7 +512,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ),
             RichColumn(
                 name='somatic_clinical_significances',
-                label='Somatic Clinical<br/>Significance',
+                label=mark_safe('Somatic Clinical<br/>Significance'),
                 client_renderer="VCTable.somatic_clinical_significance",
                 sort_keys=["latest_somatic_sort", "latest_pathogenicity_sort"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
@@ -520,7 +529,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key="latest_classification_modification__classification__summary__criteria_labels",
                 name="latest_criteria",
-                label='<span class="text-secondary">Latest</span><br/>Criteria',
+                label=mark_safe('<span class="text-secondary">Latest</span><br/>Criteria'),
                 client_renderer='TableFormat.list_codes'
             ),
             RichColumn(
@@ -534,7 +543,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
-                label='<span class="text-secondary">Latest</span><br/>Curated',
+                label=mark_safe('<span class="text-secondary">Latest</span><br/>Curated'),
                 sort_keys=["latest_curated_date"],
                 client_renderer="VCTable.latest_curation_and_link",
                 renderer=self._render_date,

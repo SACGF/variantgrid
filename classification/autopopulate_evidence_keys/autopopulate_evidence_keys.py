@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import (
     get_evidence_fields_for_sample_and_patient,
 )
@@ -20,12 +20,15 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import (
     Classification,
-    ClassificationConsensus,
     ClassificationImport,
     ClassificationModification,
     EvidenceKey,
 )
-from classification.models.classification import COPY_SCOPES_ALL, COPY_SCOPES_GENE
+from classification.models.classification_consensus import (
+    COPY_SCOPES_ALL,
+    COPY_SCOPES_GENE,
+    ClassificationConsensus,
+)
 from classification.models.classification_variant_fields_validation import (
     apply_somatic_tier_from_amp_level,
 )
@@ -34,7 +37,8 @@ from classification.tasks.classification_import_process_variants_task import (
 )
 from library.git import Git
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
-from snpdb.models import GenomeBuild, ImportSource, Lab, Sample, Variant
+from snpdb.enums import ImportSource
+from snpdb.models import GenomeBuild, Lab, Sample, Variant
 
 
 def create_classification_for_sample_and_variant_objects(
@@ -77,6 +81,10 @@ def classification_populate_from_variant(
                                         ensembl_transcript_accession=ensembl_transcript_accession,
                                         annotation_version=annotation_version,
                                         clingen_api=clingen_api)
+
+    # Classified from HGVS we couldn't resolve - deliberately not linked to a variant (#810)
+    if classification.variant is None:
+        return
 
     allele_info, allele_info_created = classification.ensure_allele_info_with_created()
     if allele_info and allele_info_created:

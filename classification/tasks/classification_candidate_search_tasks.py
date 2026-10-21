@@ -9,10 +9,10 @@ from django.db.models import Q, QuerySet
 from analysis.models import Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from annotation.models import AnnotationVersion, ClinVar, ClinVarReviewStatus, VariantAnnotation
-from classification.enums import AlleleOriginBucket, ClinicalSignificance
 from classification.models import Classification, ClassificationModification, EvidenceKey
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.classification_datatables import ClassificationColumns
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models import GenomeBuild, Sample
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from variantgrid.celery import app
@@ -53,9 +53,6 @@ class ClassificationCandidateSearchMixin:
 
         if config.get("internal_requires_sample"):
             cm_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
-
-        # TODO
-        config.get("user")
 
         # Classifications must be local (not external) and matched to a variant
         cm_qs = ClassificationModification.latest_for_user(
@@ -124,7 +121,7 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
         classification_qs = Classification.objects.filter(classificationmodification__in=cm_qs)
 
         for genome_build in GenomeBuild.builds_with_annotation():
-            variant_q = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
+            variant_q = classification_qs.variant_q(genome_build)
             # variant_qs = Variant.objects.filter(variant_q)
             # variants_qs = Variant.objects.filter(variantallele__allele__in=classifications_by_allele,
             #                                     variantallele__genome_build=genome_build)

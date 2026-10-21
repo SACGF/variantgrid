@@ -144,6 +144,6 @@ class FastaRecordingRunner(VariantGridTestRunner):
 
     @classmethod
     def _dump(cls, regions):
-        with open(cls.REGIONS_FILE, "w") as f:
+        with open(cls.REGIONS_FILE, "w", encoding="utf-8") as f:
             for region in regions:
                 f.write(json.dumps(region) + "\n")

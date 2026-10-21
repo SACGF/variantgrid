@@ -6,29 +6,28 @@ from django.db import models
 from django.db.models import Q, QuerySet
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.models import GeneList, GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums import ModificationOperation
 from library.preview_request import PreviewModelMixin
-from pathtests.models_enums import (
+from pathtests.enums import (
     CaseState,
     CaseWorkflowStatus,
     InvestigationType,
     PathologyTestGeneModificationOutcome,
 )
+from patients.enums import PopulationGroup
 from patients.models import (
     TEST_PATIENT_KWARGS,
     Clinician,
     ExternallyManagedModel,
     Patient,
-    get_lead_scientist_users_for_user,
 )
-from patients.models_enums import PopulationGroup
 from seqauto.models import EnrichmentKit, Experiment, SequencingRun
+from snpdb.enums import ImportStatus
 from snpdb.models import Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
 
 
 class PathologyTest(TimeStampedModel):
@@ -247,12 +246,6 @@ def get_cases_qs(user):
     return cases_qs
 
 
-def cases_for_user(user):
-    """ The cases the "My cases" page shows: led by the user or a lead scientist they follow """
-    users_list = get_lead_scientist_users_for_user(user)
-    return get_cases_qs(user).filter(lead_scientist__in=users_list)
-
-
 class PathologyTestOrder(PreviewModelMixin, ExternallyManagedModel):
     """ external_pk = usually comes from LIMS
         custom_gene_list = override of pathology_test_version
@@ -310,7 +303,7 @@ class PathologyTestOrderPopulation(models.Model):
 def get_external_order_system_last_checked():
     # TODO: Make this more general - e.g. register somewhere in settings?
     try:
-        from sapath.models.sapath_helix import HelixNGSOrdersImport
+        from sapath.models.sapath_helix import HelixNGSOrdersImport  # pylint: disable=import-error
         return HelixNGSOrdersImport.get_last_checked()
     except Exception:  # App not registered?
         return None

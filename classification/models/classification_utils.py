@@ -3,13 +3,13 @@ import operator
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import Q
 
+from classification.enums import ClassificationPatchStatus
 from classification.models.evidence_key import VCPatch, VCStore
 from genes.models import GeneSymbol, Transcript
 from library.log_utils import NotificationBuilder
@@ -28,19 +28,6 @@ class PatchMessage(VarsDict):
         if self.key:
             json_blob["key"] = self.key
         return json_blob
-
-
-class ClassificationPatchStatus(str, Enum):
-    # doesn't capture super subtle actions like publishing when there were outstanding changes
-    # but will capture everything we want to know about for a multi-record import
-    UNKNOWN = "unknown"
-    NEW = "new"
-    UPDATE = "update"
-    NO_CHANGE = "no-change"
-    WITHDRAWN = "withdrawn"
-    DELETED = "deleted"
-    UN_WITHDRAWN = "un-withdrawn"
-    ALREADY_WITHDRAWN = "already-withdrawn"
 
 
 class ClassificationPatchResponse(VarsDict):

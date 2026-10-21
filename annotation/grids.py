@@ -1,4 +1,3 @@
-import json
 from datetime import timedelta
 from typing import Any
 
@@ -10,7 +9,7 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
@@ -77,7 +76,8 @@ class AnnotationRunColumns(DatatableConfig[AnnotationRun]):
 
             RichColumn(key=None, name='preview', label='Data',
                        renderer=lambda x: {key: x[key] for key in preview_columns},
-                       client_renderer=f'TableFormat.preview.bind(null, {json.dumps(preview_columns)})',
+                       client_renderer='TableFormat.preview',
+                       client_renderer_kwargs={"columns": preview_columns},
                        extra_columns=preview_columns)
         ]
 

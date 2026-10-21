@@ -10,6 +10,7 @@ from django.db.models import F, OuterRef, Subquery
 from django.db.utils import IntegrityError, OperationalError
 from django.utils import timezone
 
+from analysis.enums import NodeStatus
 from analysis.exceptions import (
     CeleryTasksObsoleteException,
     NodeConfigurationException,
@@ -17,21 +18,16 @@ from analysis.exceptions import (
     NodeOutOfMemoryException,
     NodeParentErrorsException,
 )
-from analysis.models.nodes.analysis_node import (
-    AnalysisNode,
-    NodeCache,
-    NodeStatus,
-    NodeTask,
-    NodeVersion,
-    node_query_planner_settings,
-)
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.models.nodes.node_utils import cancel_node_tasks
+from analysis.models.nodes.node_version import NodeCache, NodeTask, NodeVersion
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.django_utils.database_utils import query_was_cancelled
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
-from snpdb.models import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 

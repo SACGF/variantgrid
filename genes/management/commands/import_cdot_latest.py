@@ -9,9 +9,9 @@ from cdot.data_release import (
 from django.core.management import BaseCommand
 
 from genes.cdot_data_release import download_cdot_json
+from genes.enums import AnnotationConsortium
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
 from genes.models import CdotDataVersion
-from genes.models_enums import AnnotationConsortium
 from library.utils import get_single_element, invert_dict
 from snpdb.models import GenomeBuild
 

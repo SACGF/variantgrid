@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from functools import cached_property
 from typing import Optional, Set
@@ -9,10 +10,11 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.utils import html
 from django.utils.safestring import SafeString
+from django.utils.timezone import now
 
-from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
+from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus, TriageNextStep
 from classification.models import ClassificationGrouping, Overlap, OverlapType, \
-    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, TriageNextStep, EvidenceKey, \
+    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, EvidenceKey, \
     EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -143,6 +145,16 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
         # only display single context overlaps, but later we merge with cross context data
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
 
+        if since_days_str := self.get_query_param("since"):
+            try:
+                since_days = int(since_days_str)
+                modified_since = now() - timedelta(days=since_days)
+                qs = qs.filter(overlap_status_change_timestamp__gte=modified_since)
+            except ValueError:
+                pass
+
+
+
         next_step = self.get_query_param("skew_status")
 
         # only ONC PATH for now
@@ -214,8 +226,8 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
     def cross_context_overlap_for(self, overlap: Overlap) -> Optional[Overlap]:
         return self.cross_cotext_allele_to_overlap.get((overlap.allele_id, overlap.value_type))
 
-    def render_c_hgvs(self, cell: CellData[Overlap]):
-        return list(c_hgvs.to_json() for c_hgvs in cell.obj_sure().c_hgvs_all(lab_picker=self.lab_picker,
+    def render_hgvs(self, cell: CellData[Overlap]):
+        return list(c_hgvs.to_json() for c_hgvs in cell.obj_sure().all_hgvs(lab_picker=self.lab_picker,
                                                                               genome_build=GenomeBuildManager.get_current_genome_build(
                                                                                   self.user)))
 
@@ -313,15 +325,15 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         self.csv_name = "overlaps"
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlap', expected_height=108)
+        self.set_expand_ajax('overlap', expected_height=108)
         self.rich_columns = [
 
             RichColumn(
                 name="classification",
                 label="c.HGVS",
                 # sort_keys=["latest_allele_info__grch38__genomic_sort"],
-                renderer=self.render_c_hgvs,
-                client_renderer=RichColumn.client_renderer_repeat({'formatter': 'VCTable.hgvs', 'groupCSS': 'd-inline'})
+                renderer=self.render_hgvs,
+                **RichColumn.client_renderer_repeat('VCTable.hgvs', group_css='d-inline')
             ),
 
             RichColumn(

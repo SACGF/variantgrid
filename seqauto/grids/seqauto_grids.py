@@ -119,7 +119,7 @@ class EnrichmentKitGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTran
     # the "(filtered from N total)" text
     count_unfiltered = False
 
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__sequencing_sample"
     SEQUENCING_RUN_PATH = SEQUENCING_SAMPLE_PATH + "__sample_sheet__sequencing_run"
     GOLD_PATH = SEQUENCING_RUN_PATH + "__gold_standard"
     SAMPLE_NAME_PATH = SEQUENCING_SAMPLE_PATH + "__sample_name"
@@ -130,7 +130,7 @@ class EnrichmentKitGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTran
             RichColumn(key=self.SEQUENCING_RUN_PATH, name="sequencing_run", label="Sequencing Run", orderable=True,
                        renderer=self._render_sequencing_run, client_renderer='renderOptionalLink'),
             RichColumn(key=self.GOLD_PATH, name="gold", label="Gold", orderable=True,
-                       client_renderer='TableFormat.boolean.bind(null, null)'),
+                       client_renderer='TableFormat.boolean'),
             RichColumn(key=self.SAMPLE_NAME_PATH, name="sample_name", label="Sample", orderable=True,
                        default_sort=SortOrder.DESC),
             RichColumn(key="min", label="Min", orderable=True, css_class="num"),

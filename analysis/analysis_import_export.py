@@ -6,11 +6,11 @@ from django.contrib.auth.models import User
 from django.core.serializers import serialize
 from django.db import transaction
 
+from analysis.enums import AnalysisTemplateType
 from analysis.models import (
     Analysis,
     AnalysisEdge,
     AnalysisNodeCountConfiguration,
-    AnalysisTemplateType,
     AnnotationVersion,
     GenomeBuild,
     VennNode,

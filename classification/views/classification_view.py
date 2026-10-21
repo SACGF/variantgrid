@@ -13,11 +13,11 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_IN
 from rest_framework.views import APIView
 
 from classification.classification_stats import get_lab_gene_counts
-from classification.enums import ClinicalSignificance
 from classification.models import ClassificationJsonParams, ClassificationRef
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.utils import empty_to_none, force_json
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import Lab
 
 

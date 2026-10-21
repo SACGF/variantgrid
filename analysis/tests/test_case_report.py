@@ -16,10 +16,9 @@ from django.utils import timezone
 from analysis.classify_report import ClassifyReportCase, ReportCandidate
 from analysis.tests.test_classify_report import READY_EVIDENCE, ClassifyReportTestCase
 from analysis.views.views_classify_report import _case_values_for_form
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import CaseReportStatus, SpecialEKeys, SubmissionSource
 from classification.models import (
     CaseReport,
-    CaseReportStatus,
     Classification,
     ClassificationModification,
     ClassificationReportTemplate,
@@ -41,15 +40,15 @@ from classification.report.case_report_context import (
 from classification.report.default_templates import generic_case_template
 from library.case_report_delivery import CaseReportDelivery
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import (
+from patients.enums import (
     NucleicAcid,
     SampleSourceLevel,
     SpecimenMeasureType,
 )
+from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
 from patients.sample_grouping import get_sample_group
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
-from seqauto.models.models_enums import LibraryQCCategory
 from snpdb.models import Sample
 
 

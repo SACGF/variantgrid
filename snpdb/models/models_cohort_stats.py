@@ -7,6 +7,8 @@
       filter_key IS NULL → no extra filter beyond cohort/sample identity
       filter_key IS NOT NULL → canonical-JSON string identifying a node-side filter
                                config the calc function pre-populated (e.g. trio inheritance)
+    A sub cohort has no CGC of its own: its per-sample rows are its parent's, and its aggregate rows sit
+    on the parent's CGC under a filter_key carrying its samples (Cohort.get_stats_filter_key).
 
     See annotation/models/models_cohort_stats.py for the annotation-version-keyed
     counterparts.
@@ -16,10 +18,10 @@ from typing import Optional
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from patients.models_enums import Sex
-from snpdb.models.models_enums import ImportStatus
+from patients.enums import Sex
+from snpdb.enums import ImportStatus
 from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 # Targeted panels can have too few chrX calls for the hom/het ratio to mean anything
@@ -83,29 +85,6 @@ class CohortGenotypeStats(TimeStampedModel):
     @property
     def total_count(self):
         return self.variant_count
-
-    @staticmethod
-    def percent(a, b):
-        percent = float('NaN')
-        if b:
-            percent = 100.0 * a / b
-        return percent
-
-    @property
-    def variant_percent(self):
-        return self.percent(self.variant_count, self.total_count)
-
-    @property
-    def snp_percent(self):
-        return self.percent(self.snp_count, self.total_count)
-
-    @property
-    def insertions_percent(self):
-        return self.percent(self.insertions_count, self.total_count)
-
-    @property
-    def deletions_percent(self):
-        return self.percent(self.deletions_count, self.total_count)
 
     def count_for_zygosity(self, zygosity_ref, zygosity_het, zygosity_hom, zygosity_unk, label=None):
         count = 0

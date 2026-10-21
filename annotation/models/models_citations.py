@@ -5,7 +5,6 @@ import typing
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
-from enum import Enum
 from functools import cached_property
 from typing import Any, Optional, Union
 
@@ -14,8 +13,9 @@ from django.db import models
 from django.db.models import TextField
 from django.urls import reverse
 from django.utils.timezone import now
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
+from annotation.enums import CitationSource, EntrezDbType
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import JsonObjType, first
@@ -44,41 +44,6 @@ def get_year_from_date(date_published: str) -> str:
     if year_match := DATE_PUBLISHED_RE.match(date_published):
         year = year_match.group(1)
     return year
-
-
-class CitationSource(models.TextChoices):
-    PUBMED = 'PMID', 'PubMed'
-    NCBI_BOOKSHELF = 'Bookshelf ID', 'NCBI Bookshelf'
-    PUBMED_CENTRAL = 'PMCID', 'PubMedCentral'
-
-    @staticmethod
-    def from_legacy_code(code: str) -> Optional['CitationSource']:
-        """
-        Turns any kind of possible citation prefix into a CitationSource
-        :param code: String representing PubMed, PubMedCentral or NCBI's Bookshelf
-        :return: A CitationSource if valid, None otherwise
-        """
-        return {
-            "P": CitationSource.PUBMED,
-            "PMID": CitationSource.PUBMED,
-            "PUBMED": CitationSource.PUBMED,
-
-            "C": CitationSource.PUBMED_CENTRAL,
-            "PMCID": CitationSource.PUBMED_CENTRAL,
-            "PUBMEDCENTRAL": CitationSource.PUBMED_CENTRAL,
-
-            "N": CitationSource.NCBI_BOOKSHELF,
-            "NBK": CitationSource.NCBI_BOOKSHELF,
-            "NCBIBOOKSHELF": CitationSource.NCBI_BOOKSHELF,
-            "BOOKSHELF": CitationSource.NCBI_BOOKSHELF,
-            "BOOKSHELF ID": CitationSource.NCBI_BOOKSHELF
-        }.get(code.upper())
-
-
-class EntrezDbType(str, Enum):
-    PUBMED = "pubmed"
-    PUBMED_CENTRAL = "pmc"
-    BOOKSHELF = "books"
 
 
 class Citation(TimeStampedModel, PreviewModelMixin):
@@ -317,10 +282,6 @@ class CitationIdNormalized:
         elif use_source == CitationSource.NCBI_BOOKSHELF:
             index = f"NBK{index}"
         return CitationIdNormalized(use_source, index)
-
-    @staticmethod
-    def from_citation(citation: Citation):
-        return CitationIdNormalized.from_parts(source=citation.source, index=citation.index)
 
     @staticmethod
     def normalize_id(citation_id: Union[str, 'CitationIdNormalized']) -> 'CitationIdNormalized':

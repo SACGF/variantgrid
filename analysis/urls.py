@@ -1,3 +1,6 @@
+from django.urls.conf import path as path_standard
+from django.views.generic import RedirectView
+
 from analysis.grids import (
     AnalysesColumns,
     AnalysesListColumns,
@@ -96,6 +99,8 @@ urlpatterns = [
     path('<int:analysis_id>/node_populate_clingen_alleles/<int:node_id>/', views_json.node_populate_clingen_alleles,
          name='node_populate_clingen_alleles'),
     path('<int:analysis_id>/settings/lock', views_analysis_settings.analysis_settings_lock, name='analysis_settings_lock'),
+    path('<int:analysis_id>/settings/take_ownership', views_analysis_settings.analysis_take_ownership,
+         name='analysis_take_ownership'),
     path('<int:analysis_id>/export/', views.analysis_export, name='analysis_export'),
     path('<int:analysis_id>/settings/', views_analysis_settings.view_analysis_settings, name='analysis_settings'),
     path('<int:analysis_id>/settings_details_tab/', views_analysis_settings.analysis_settings_details_tab, name='analysis_settings_details_tab'),
@@ -188,7 +193,8 @@ urlpatterns = [
          DatabaseTableView.as_view(column_class=NodeGeneListGenesColumns),
          name='analysis_node_gene_list_genes_datatable'),
 
-    path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
+    path('analysis_status', views.view_analysis_status, name='analysis_status'),
+    path_standard('analysis_issues', RedirectView.as_view(pattern_name='analysis_status', permanent=True, query_string=True)),
     path('analysis_log_entry/datatable',
          DatabaseTableView.as_view(column_class=AnalysisLogEntryColumns),
          name='analysis_log_entry_datatable'),

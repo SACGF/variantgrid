@@ -1,17 +1,29 @@
 """
 #1707 - how a client names a Patient / Specimen / Extraction (patients.external_references)
 """
+import re
+
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import (
     ExternalReference,
     ExternalReferenceError,
     resolve_reference,
 )
-from patients.models import Extraction, ExternalModelManager, ExternalPK, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
+from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
+
+
+def dashed_accession(reference_id: str) -> str:
+    """ A PATIENT_SPECIMEN_REFERENCE_NORMALIZER for tests: '2600000001C' -> '26-000-00001C' """
+    if m := re.fullmatch(r"(\d{2})(\d{3})(\d{5})([A-Z]?)", reference_id):
+        return "-".join(m.groups()[:3]) + m.group(4)
+    return reference_id
+
+
+DASHED_ACCESSION_NORMALIZER = f"{__name__}.dashed_accession"
 
 
 def _external_pk(code, external_type, manager_name="test_lims") -> ExternalPK:
@@ -170,3 +182,35 @@ class TestResolveReference(TestCase):
         hidden = self._resolve(Extraction, "2600000001C", other_user)
         self.assertEqual(hidden.status, MatchStatus.PENDING,
                          "An extraction a user can't see reads the same as one not created yet")
+
+
+@override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
+class TestSpecimenReferenceNormalizer(TestCase):
+    """ Two systems writing one accession differently land on, and find, the same row """
+
+    def setUp(self):
+        self.patient = Patient.objects.create(patient_code="PATIENT-N")
+        self.specimen = Specimen.objects.create(reference_id="2600000001", patient=self.patient)
+        self.extraction = Extraction.objects.create(specimen=self.specimen, reference_id="2600000001C")
+
+    def test_stored_in_the_canonical_form(self):
+        self.assertEqual("26-000-00001", self.specimen.reference_id)
+        self.assertEqual("26-000-00001C", self.extraction.reference_id)
+
+    def test_either_form_resolves(self):
+        for reference_id in ("2600000001C", "26-000-00001C"):
+            resolved = resolve_reference(Extraction, ExternalReference(reference_id=reference_id))
+            self.assertEqual(self.extraction, resolved.obj, reference_id)
+
+    def test_bulk_writes_store_the_canonical_form(self):
+        """ bulk_create and update skip save(), so the queryset normalises for them """
+        rna, = Extraction.objects.bulk_create([Extraction(specimen=self.specimen, reference_id="2600000001B")])
+        rna.refresh_from_db()
+        self.assertEqual("26-000-00001B", rna.reference_id)
+        Specimen.objects.filter(pk=self.specimen.pk).update(reference_id="2600000002")
+        self.specimen.refresh_from_db()
+        self.assertEqual("26-000-00002", self.specimen.reference_id)
+
+    def test_patient_codes_are_left_alone(self):
+        resolved = resolve_reference(Patient, ExternalReference(reference_id="PATIENT-N"))
+        self.assertEqual(self.patient, resolved.obj)

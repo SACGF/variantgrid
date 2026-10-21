@@ -3,7 +3,8 @@ import logging
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
 
 
 class Command(BaseCommand):

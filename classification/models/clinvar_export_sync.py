@@ -1,5 +1,4 @@
 import json
-from enum import Enum, auto
 from functools import cached_property
 from typing import Optional, TypedDict
 
@@ -8,18 +7,18 @@ from django.conf import settings
 from django.db import transaction
 from requests import Response
 
-from classification.enums import AlleleOriginBucket
-from classification.models import (
-    ClinVarExportBatch,
+from classification.enums import (
     ClinVarExportBatchStatus,
-    ClinVarExportRequest,
     ClinVarExportRequestType,
-    ClinVarExportSubmission,
     ClinVarExportSubmissionStatus,
+    ClinVarRequestExceptionType,
+    ClinVarResponseOutcome,
 )
+from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportSubmission
 from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import JsonObjType
+from snpdb.enums import AlleleOriginBucket
 
 """
 This code is responsible for sending our data to ClinVar API (after everything else has run to work out what
@@ -34,15 +33,6 @@ class _ClinVarExportConfigDic(TypedDict):
     mode: str
     api_key: str
     org_id: str
-
-
-class ClinVarRequestExceptionType(Enum):
-    OUR_DATA_ISSUE = auto()
-    API_KEY_ISSUE = auto()
-    TOO_MANY_REQUESTS = auto()
-    CLINVAR_SERVER_ISSUE = auto()
-    RESPONSE_MISSING_KEY_DATA = auto()
-    NOT_SUPPORTED_YET = auto()
 
 
 class ClinVarRequestException(Exception):
@@ -80,12 +70,6 @@ class ClinVarRequestException(Exception):
             raise ClinVarRequestException(exception_type=ClinVarRequestExceptionType.CLINVAR_SERVER_ISSUE)
         # all good
         return True
-
-
-class ClinVarResponseOutcome(Enum):
-    ASK_AGAIN_NOW = auto()  # if we can immediately do the next thing in the queue for this batch
-    ASK_AGAIN_LATER = auto()
-    COMPLETE = auto()
 
 
 class ClinVarExportSync:

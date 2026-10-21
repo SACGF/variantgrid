@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         org = Organization.objects.get(group_name="sa_pathology")
-        legacy, _ = Lab.objects.get_or_create(group_name="sa_pathology/legacy", defaults={
+        legacy, created = Lab.objects.get_or_create(group_name="sa_pathology/legacy", defaults={
             "name": "LEGACY",
             "organization": org,
             "city": "Adelaide",
@@ -23,8 +23,10 @@ class Command(BaseCommand):
             "long": 138.600349,
             "url": "http://www.sapathology.sa.gov.au",
             "css_class": "sa-pathology",
-            "classification_config": {"zygosity": {"mandatory": False}, "condition": {"mandatory": False}, "clinical_significance": {"mandatory": False}}
         })
+        if created:
+            legacy.classification_settings.classification_config = {"zygosity": {"mandatory": False}, "condition": {"mandatory": False}, "clinical_significance": {"mandatory": False}}
+            legacy.classification_settings.save()
 
         old_legacy_labs = Lab.objects.filter(group_name__startswith="sa_pathology/legacy_")
         old_classifications = Classification.objects.filter(lab__in=old_legacy_labs)
@@ -35,7 +37,7 @@ class Command(BaseCommand):
             if count % 100 == 0:
                 print(f"Processed {count} classifications")
             legacy_class.lab = legacy
-            legacy_class.save(update_fields=["lab"])
+            Classification.objects.filter(pk=legacy_class.pk).update(lab=legacy)
             legacy_class.fix_permissions()
             count += 1
         print(f"Processed {count} classifications")

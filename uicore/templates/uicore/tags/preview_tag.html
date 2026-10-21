@@ -12,7 +12,7 @@
                     {% if kv.link %}<a href="{{ kv.link }}" class="hover-link" target="_blank">{% endif %}
                         <span class="preview-value">
                             {% if "c.HGVS" in kv.key %}
-                                {% c_hgvs kv.value %}
+                                {% hgvs kv.value %}
                             {% else %}
                                 {{ kv.value }}
                             {% endif %}

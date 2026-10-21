@@ -9,17 +9,15 @@ from collections import defaultdict
 from typing import Protocol, Union
 
 from genes.models import GeneSymbol
+from ontology.enums import GeneDiseaseClassification, OntologyService, PanelAppClassification
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
-    GeneDiseaseClassification,
     OntologyImportSource,
     OntologyRelation,
     OntologyRelationshipQualityFilter,
-    OntologyService,
     OntologyTerm,
     OntologyTermRelation,
     OntologyVersion,
-    PanelAppClassification,
 )
 from ontology.models.models_ontology import (
     EXCLUDED_SNAKE_RELATIONS,

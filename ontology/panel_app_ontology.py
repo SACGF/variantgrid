@@ -22,16 +22,14 @@ from genes.panel_app import (
 from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
+from ontology.enums import OntologyService, OntologyTermStatus, PanelAppClassification
 from ontology.models import (
     OntologyIdNormalized,
     OntologyImport,
     OntologyImportSource,
     OntologyRelation,
-    OntologyService,
     OntologyTerm,
     OntologyTermRelation,
-    OntologyTermStatus,
-    PanelAppClassification,
 )
 from ontology.models.models_ontology import gene_relations_read_signal
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException

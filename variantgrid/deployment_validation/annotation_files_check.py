@@ -7,6 +7,7 @@ from django.conf import settings
 from annotation.vep_annotation import VEPConfig
 from genes.models import CdotDataVersion, TranscriptVersion
 from snpdb.models import GenomeBuild
+from snpdb.models.models_somalier import SomalierConfig
 
 _VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
 
@@ -48,6 +49,10 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
                 if dest_genome_build in active_build_names:
                     key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
                     check_files[key] = chain_filename
+
+        if settings.SOMALIER["enabled"]:
+            # Not build specific - unique_filenames reports it under the first build only
+            check_files["somalier"] = SomalierConfig().get_annotation("command")
 
         vep_config = VEPConfig(genome_build)
         for key, rel_path in vep_config.vep_data.items():

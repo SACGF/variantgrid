@@ -11,7 +11,7 @@ from model_utils.models import TimeStampedModel
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import public_group
-from snpdb.models.models_enums import ColumnAnnotationLevel
+from snpdb.enums import ColumnAnnotationLevel
 
 
 class VariantGridColumn(models.Model):

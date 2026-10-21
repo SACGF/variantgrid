@@ -4,8 +4,8 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase, override_settings
 
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import UploadedFileTypes
 from upload.upload_processing import get_vcf_file_type
 
 TSO500_PAIR_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500", "ExampleSample_2600000001")

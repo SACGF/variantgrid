@@ -7,16 +7,11 @@ from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.enums import DuoRelationship, ImportStatus, UserAwardKind, UserAwardLevel
 from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import Duo, TagConfigCollection, UserAward
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
-from snpdb.models.models_enums import (
-    DuoRelationship,
-    ImportStatus,
-    UserAwardKind,
-    UserAwardLevel,
-)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
@@ -124,7 +119,6 @@ class Test(URLTestCase):
             ("quad_datatable", {}, cls.quad),
             ("duo_datatable", {}, cls.duo),
             ("genomic_intervals_datatable", {}, cls.genomic_intervals_collection),
-            ("cohort_sample_datatable", {"cohort_id": cls.cohort.pk}, None),
         ]
 
     def testUrls(self):

@@ -9,22 +9,23 @@ from django.core.exceptions import EmptyResultSet
 from django.db.models import Count
 from django.forms.models import inlineformset_factory
 from django.http.response import HttpResponse, HttpResponseRedirect
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis import forms
+from analysis.enums import NodeStatus, SNPMatrix
 from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
 from analysis.forms import VCFLocusFilterForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType
-from analysis.models.enums import NodeStatus, SNPMatrix
-from analysis.models.nodes.analysis_node import NodeTask, NodeVCFFilter
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
 from analysis.models.nodes.node_utils import cancel_node_tasks
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
+from analysis.models.nodes.node_version import NodeTask
 from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
@@ -470,28 +471,30 @@ def _render_vcf_locus_filters(request, node, vcf):
 
 def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    vcf = VCF.get_for_user(node.analysis.user, vcf_id) if vcf_id else None
+    vcf = _get_node_or_analysis_vcf(node, vcf_id) if vcf_id else None
     return _render_vcf_locus_filters(request, node, vcf)
 
 
-def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):
-    cohort = Cohort.get_for_user(request.user, cohort_id)
-    if cohort.vcf:
-        vcf_id = cohort.vcf.pk
-    else:
-        vcf_id = None
+def _get_node_or_analysis_vcf(node, vcf_id: int) -> VCF:
+    """ The node's own input VCF comes with the node, which was permission-checked for the request user.
+        Any other VCF (eg picked in the editor, not yet saved) is checked as the analysis owner, like
+        everything else inside an analysis (#916) """
+    for vcf in node.get_vcf_locus_filter_vcfs():
+        if vcf.pk == vcf_id:
+            return vcf
+    return VCF.get_for_user(node.analysis.user, vcf_id)
 
-    return vcf_locus_filters(request, analysis_id, node_id, vcf_id)
+
+def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):
+    # Permission is on the cohort's VCF - checked by vcf_locus_filters
+    cohort = get_object_or_404(Cohort, pk=cohort_id)
+    return vcf_locus_filters(request, analysis_id, node_id, cohort.vcf_id)
 
 
 def pedigree_vcf_locus_filters(request, analysis_id, node_id, pedigree_id):
-    pedigree = Pedigree.get_for_user(request.user, pedigree_id)
-    if pedigree.cohort.vcf:
-        vcf_id = pedigree.cohort.vcf.pk
-    else:
-        vcf_id = None
-
-    return vcf_locus_filters(request, analysis_id, node_id, vcf_id)
+    # Permission is on the cohort's VCF - checked by vcf_locus_filters
+    pedigree = get_object_or_404(Pedigree, pk=pedigree_id)
+    return vcf_locus_filters(request, analysis_id, node_id, pedigree.cohort.vcf_id)
 
 
 def node_method_description(request, analysis_id, node_id, node_version):

@@ -66,7 +66,7 @@ MENUS: tuple[Menu, ...] = (
                  pages=('view_pathology_test', 'view_pathology_test_version')),
     )),
     Menu('analysis', 'Analysis', 'analyses', items=(
-        MenuItem('analysis_issues', title="Analysis Issues", admin_only=True),
+        MenuItem('analysis_status', title="Analysis Status", admin_only=True),
         MenuItem('analyses'),
         MenuItem('analysis_templates', title="Templates",
                  pages=('analysis_templates_auto_launch', 'analysis_template_settings')),

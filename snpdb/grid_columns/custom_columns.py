@@ -1,3 +1,4 @@
+from collections.abc import Callable, Iterable
 from typing import Optional
 
 from django.contrib.auth.models import User
@@ -9,13 +10,13 @@ from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
 from annotation import vep_columns
+from annotation.enums import VEPPlugin
 from annotation.models import AnnotationVersion
-from annotation.models.models_enums import VEPPlugin
 from classification.models import ClassificationModification
 from library.django_utils import resolve_field_path
 from library.utils import JsonDataType, add_exception_note
-from snpdb.models import CustomColumn, CustomColumnsCollection, Variant
-from snpdb.models.models_enums import ColumnAnnotationLevel
+from snpdb.enums import ColumnAnnotationLevel
+from snpdb.models import CustomColumn, CustomColumnsCollection, Variant, VariantGridColumn
 from snpdb.views.datatable_view import CellData, FilterField, NullOrder, RichColumn
 
 # These come from get_variantgrid_extra_annotate rather than the model
@@ -166,8 +167,10 @@ def _composite_column_kwargs(column, members: list, column_overrides: dict[str, 
         "orderable": True,
     }
     if not column.queryset_field:
-        # Display only - nothing of its own to sort on, so it sorts on the value the cell reads as
+        # Display only - nothing of its own to sort on, so it sorts on the value the cell reads as, and
+        # nothing to export: the members ride along hidden and export under their own labels (#2209)
         kwargs["sort_keys"] = [members[0].column.variant_column]
+        kwargs["include_in_csv"] = False
     return kwargs
 
 
@@ -180,32 +183,81 @@ def composite_rich_column(column, members: list, column_overrides: dict[str, dic
     return variant_column_rich_column(column.variant_column, **kwargs)
 
 
-def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
-                             annotation_version: AnnotationVersion,
-                             column_overrides: dict[str, dict],
-                             analysis_tags=False) -> tuple[list[RichColumn], Optional[int]]:
-    """ (the collection's columns plus the hidden ones the renderers read, where sample columns go) """
+def _annotated_for_version(annotation_version: AnnotationVersion) -> Callable[[VariantGridColumn], bool]:
+    """ Whether this build's annotation version annotates a catalogue column. A column only annotated
+        for other builds (eg the gnomAD 4 FAFs, GRCh38 only) would always be empty here, so it drops
+        out of the grid (and its exports) for this build """
     variant_annotation_version = annotation_version.variant_annotation_version
-    # A column only annotated for other builds (eg the gnomAD 4 FAFs, GRCh38 only) would always be
-    # empty here, so it drops out of the grid (and its exports) for this build
     in_version_vgcs = {
         vgc for c in vep_columns.filter_for(columns_version=variant_annotation_version.columns_version,
                                             genome_build_name=variant_annotation_version.genome_build.name)
         for vgc in c.variant_grid_columns
     }
     ever_referenced = vep_columns.all_variant_grid_column_ids()
-    q_columns_this_version = ~Q(column__in=ever_referenced) | Q(column__in=in_version_vgcs)
-    columns_queryset = CustomColumn.objects.filter(q_columns_this_version,
-                                                   custom_columns_collection=custom_columns_collection)
-    columns_queryset = columns_queryset.select_related("column").order_by("sort_order").distinct()
-    columns_queryset = columns_queryset.prefetch_related("column__composite_members__column")
 
-    def annotated_for_this_version(column) -> bool:
+    def annotated(column: VariantGridColumn) -> bool:
         return column.pk not in ever_referenced or column.pk in in_version_vgcs
+    return annotated
+
+
+def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
+                             annotation_version: AnnotationVersion,
+                             column_overrides: dict[str, dict],
+                             analysis_tags=False) -> tuple[list[RichColumn], Optional[int]]:
+    """ (the collection's columns plus the hidden ones the renderers read, where sample columns go) """
+    columns_queryset = CustomColumn.objects.filter(custom_columns_collection=custom_columns_collection)
+    columns_queryset = columns_queryset.select_related("column").order_by("sort_order")
+    columns_queryset = columns_queryset.prefetch_related("column__composite_members__column")
+    return build_variant_grid_columns([c.column for c in columns_queryset], annotation_version,
+                                      column_overrides, analysis_tags=analysis_tags)
+
+
+# The annotated export lists columns by what they describe, closest to the variant first
+_EXPORT_ANNOTATION_LEVEL_ORDER = [
+    None,  # the variant's own coordinates
+    ColumnAnnotationLevel.VARIANT_LEVEL,
+    ColumnAnnotationLevel.TRANSCRIPT_LEVEL,
+    ColumnAnnotationLevel.GENE_LEVEL,
+    ColumnAnnotationLevel.HGNC_LEVEL,
+    ColumnAnnotationLevel.UNIPROT_LEVEL,
+    ColumnAnnotationLevel.CLINVAR_LEVEL,
+    ColumnAnnotationLevel.DATABASE_LEVEL,
+    ColumnAnnotationLevel.SAMPLE_LEVEL,
+]
+
+
+def get_all_variant_grid_columns(annotation_version: AnnotationVersion,
+                                 column_overrides: dict[str, dict]) -> tuple[list[RichColumn], Optional[int]]:
+    """ Every catalogue column this version annotates, for the annotated sample/cohort exports a machine
+        reads rather than a collection someone arranged (#2209): the Variant column, the Sample marker so
+        the genotypes follow it, then the rest grouped by annotation level. A column drawn inside a
+        composite comes in with its composite, so the members export together. No analysis tags: the
+        export's analysis is an invisible auto one """
+    first = [CustomColumnsCollection.ROW_ID_COLUMN, "Sample"]
+    columns_queryset = VariantGridColumn.objects.filter(composite_membership__isnull=True) \
+                                                .prefetch_related("composite_members__column")
+
+    def sort_key(column: VariantGridColumn) -> tuple:
+        if column.pk in first:
+            return 0, first.index(column.pk), ""
+        return 1, _EXPORT_ANNOTATION_LEVEL_ORDER.index(column.annotation_level), column.pk
+
+    return build_variant_grid_columns(sorted(columns_queryset, key=sort_key), annotation_version,
+                                      column_overrides, analysis_tags=False)
+
+
+def build_variant_grid_columns(columns: Iterable[VariantGridColumn],
+                               annotation_version: AnnotationVersion,
+                               column_overrides: dict[str, dict],
+                               analysis_tags=False) -> tuple[list[RichColumn], Optional[int]]:
+    """ (the grid columns for `columns` plus the hidden ones the renderers read, where sample columns go).
+        `columns` are read with composite_members__column prefetched, in grid order """
+    annotated_for_this_version = _annotated_for_version(annotation_version)
 
     shown_columns = []  # (column, the members it draws that this version annotates)
-    for c in columns_queryset:
-        column = c.column
+    for column in columns:
+        if not annotated_for_this_version(column):
+            continue
         if not column.variant_column:
             if column.annotation_level == ColumnAnnotationLevel.SAMPLE_LEVEL:
                 shown_columns.append((column, []))  # marks where the per-sample columns go
@@ -221,6 +273,7 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
 
     fields_kwargs: dict[str, dict] = {}  # field path -> RichColumn kwargs, in column order
     composites: dict[str, tuple] = {}  # field path -> (column, the members its cell draws)
+    member_paths: set[str] = set()
     sample_columns_position = None
 
     for column, members in shown_columns:
@@ -237,6 +290,7 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
         # The members the cell draws ride along hidden, right after it - unless the collection shows
         # one standalone, where it is simply visible, once, in its own place
         for member in members:
+            member_paths.add(member.column.variant_column)
             if member.column.variant_column in shown_paths:
                 continue
             fields_kwargs[member.column.variant_column] = {**_catalogue_column_kwargs(member.column),
@@ -247,7 +301,12 @@ def get_variant_grid_columns(custom_columns_collection: CustomColumnsCollection,
         if composite := composites.get(path):
             rich_columns.append(composite_rich_column(*composite, column_overrides))
         else:
-            rich_columns.append(variant_column_rich_column(path, **{**kwargs, **column_overrides.get(path, {})}))
+            rich_column = variant_column_rich_column(path, **{**kwargs, **column_overrides.get(path, {})})
+            if path in member_paths and not (rich_column.renderer or rich_column.client_renderer):
+                # The composite's renderer reads the raw value off the row and escapes it itself, so the
+                # server mustn't escape it too (escape_cell) - a standalone column escapes on the client
+                rich_column.client_renderer = "TableFormat.plain"
+            rich_columns.append(rich_column)
     return rich_columns, sample_columns_position
 
 

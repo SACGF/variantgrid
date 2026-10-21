@@ -2,6 +2,7 @@ import os
 import unittest
 
 from django.contrib.auth.models import User
+from django.urls import reverse
 
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
@@ -15,9 +16,11 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from snpdb.models import ImportSource, Sex
+from snpdb.enums import ImportSource
+from snpdb.models import Sex
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 
 class Test(URLTestCase):
@@ -133,6 +136,21 @@ class Test(URLTestCase):
     def testPatientImportWithoutUploadedFileNoPermission(self):
         self._test_urls(self._no_uploaded_file_url_names_and_kwargs(),
                         self.user_non_owner, expected_code_override=403)
+
+    def testPatientImportUploadedFileMissingFromDisk(self):
+        """ #2323 - the FileUpload row remains but its file has gone """
+        file_upload = FileUpload.objects.create(user=self.user_owner,
+                                                name="deleted file",
+                                                path="/nonexistent/fake_patient_records.csv",
+                                                file_type=UploadedFileTypes.PATIENT_RECORDS,
+                                                import_source=ImportSource.COMMAND_LINE)
+        patient_import = PatientImport.objects.create(name="file missing from disk")
+        patient_records = PatientRecords.objects.create(patient_import=patient_import)
+        UploadedPatientRecords.objects.create(file_upload=file_upload, patient_records=patient_records)
+
+        self.client.force_login(User.objects.create_superuser("admin_user"))
+        response = self.client.get(reverse('view_patient_import', kwargs={"patient_records_id": patient_records.pk}))
+        self.assertContains(response, "The uploaded file is no longer available")
 
     @staticmethod
     def _no_uploaded_file_url_names_and_kwargs():

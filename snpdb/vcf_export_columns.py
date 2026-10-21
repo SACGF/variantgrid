@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from snpdb.models.models_enums import VCFInfoTypes
+from snpdb.enums import VCFInfoTypes
 
 
 @dataclass(frozen=True)

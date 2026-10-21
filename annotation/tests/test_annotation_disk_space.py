@@ -17,9 +17,11 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotsv_dir
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
+    link_fake_gene_annotation_release,
     retire_seeded_annotation_version,
 )
 from annotation.models import (
@@ -28,7 +30,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import get_runner
 from annotation.pipelines.vep import VEPRunner
 from annotation.signals.annotation_run_cleanup import remove_annotation_run_output
@@ -45,7 +46,7 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     has_free_disk_for_annotation,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils.file_utils import DiskUsage
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -96,11 +97,11 @@ class AnnotationRunCleanupTestCase(TestCase):
             annotsv_dir = get_annotsv_dir(run)
             os.makedirs(annotsv_dir, exist_ok=True)
             # AnnotSV writes more than just the TSV into its directory
-            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w").close()
+            open(os.path.join(annotsv_dir, "AnnotSV.log"), "w", encoding="utf-8").close()
 
         paths = runner.get_output_paths(run, run.vcf_dump_filename)
         for path in paths:
-            open(path, "w").close()
+            open(path, "w", encoding="utf-8").close()
         runner.record_resume_state(run, run.vcf_dump_filename)
         for k, v in run_kwargs.items():
             setattr(run, k, v)
@@ -217,6 +218,7 @@ class AnnotationDiskGateTestCase(TestCase):
         kwargs = get_fake_vep_version(cls.grch37, AnnotationConsortium.ENSEMBL, 2)
         kwargs["status"] = VariantAnnotationVersion.Status.ACTIVE
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+        link_fake_gene_annotation_release(cls.vav)
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
     def _make_run(self, lo_idx, hi_idx, status=AnnotationStatus.CREATED):
