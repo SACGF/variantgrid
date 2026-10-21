@@ -11,51 +11,23 @@
             $("div#new-gene-list-form-container").slideDown('slow');
         }
 
-        function showFormErrors($form, errors) {
-            $(".is-invalid", $form).removeClass("is-invalid");
-            $(".form-ajax-error", $form).remove();
-            for (const [field, fieldErrors] of Object.entries(errors)) {
-                let feedback = $("<div>", {"class": "invalid-feedback d-block form-ajax-error", text: fieldErrors.join(" ")});
-                let $input = $(`#id_${field}`, $form);
-                if ($input.length) {
-                    $input.addClass("is-invalid").after(feedback);
-                } else {
-                    $(".card-body", $form).prepend(feedback);
-                }
-            }
-        }
-
         $(document).ready(function() {
             $('#id_gene_list').change(function() {
                 let geneListId = $("#id_gene_list").val();
                 window.location = Urls.view_gene_list(geneListId);
             });
 
-            let options = {
-                dataType: 'json',
-                beforeSerialize: function($form) {
-                    // Gene symbol matching is synchronous and can take a while - put the form into a
-                    // read-only state with a loading overlay so it doesn't look like it's hanging, and
-                    // to stop the user submitting it multiple times.
-                    $(":input", $form).prop("readonly", true);
-                    $(":submit", $form).prop("disabled", true);
-                    $form.LoadingOverlay('show', {fade: false});
-                },
-                success: function(data) {
-                    let geneListId = data['gene_list_id'];
-                    window.location = Urls.view_gene_list(geneListId);
-                },
-                error: function(xhr) {
-                    let $form = $('form#new-gene-list-form');
-                    $form.LoadingOverlay('hide', true);
-                    $(":input", $form).prop("readonly", false);
-                    $(":submit", $form).prop("disabled", false);
-                    showFormErrors($form, xhr.responseJSON?.errors || {"__all__": ["Error creating gene list"]});
-                },
-            };
-            $('form#new-gene-list-form').ajaxForm(options);
+            $('form#new-gene-list-form').submit(function() {
+                // Gene symbol matching is synchronous and can take a while - put the form into a
+                // read-only state with a loading overlay so it doesn't look like it's hanging, and
+                // to stop the user submitting it multiple times.
+                let $form = $(this);
+                $(":input", $form).prop("readonly", true);
+                $(":submit", $form).prop("disabled", true);
+                $form.LoadingOverlay('show', {fade: false});
+            });
 
-            {% if not form.errors %}
+            {% if not create_gene_list_form.errors %}
                 $("div#new-gene-list-form-container").hide();
             {% endif %}
         });
@@ -75,7 +47,7 @@
         <a class='hover-link' id="show-form-link" href="javascript:showForm()">New GeneList</a>
     </div>
     <div id="new-gene-list-form-container">
-      <form id="new-gene-list-form" method="post" action="{% url 'create_custom_gene_list' %}">
+      <form id="new-gene-list-form" method="post" action="{% url 'gene_lists' %}">
         {% csrf_token %}
           <div class="card">
               <div class="card-header">Create</div>
