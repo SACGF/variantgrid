@@ -18,7 +18,7 @@ from django.urls import NoReverseMatch
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.log_utils import report_message
 from library.request_context import get_current_user
 from library.utils import pretty_label

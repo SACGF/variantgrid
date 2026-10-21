@@ -23,7 +23,7 @@ from django.db.models.query_utils import Q
 from django.urls import reverse
 from django.utils.text import slugify
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.cache import timed_cache
 from library.django_utils import SortMetaOrderingMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable

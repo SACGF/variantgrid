@@ -18,6 +18,7 @@ from annotation.models import (
     GeneAnnotationVersion,
 )
 from annotation.models.models_version import SubVersionPartition
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.fake_data import create_fake_gene_version
 from genes.models import (
     GeneAnnotationImport,
@@ -31,7 +32,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from snpdb.models import GenomeBuild
 
 

@@ -23,8 +23,8 @@ from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import ClinVarResponseOutcome, clinvar_export_sync
 from classification.models.clinvar_key_models import ClinVarKey
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.enums import GeneSymbolAliasSource
 from genes.models import GeneSymbol, GeneSymbolAlias
-from genes.models_enums import GeneSymbolAliasSource
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion

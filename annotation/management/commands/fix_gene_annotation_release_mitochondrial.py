@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand
 
 from annotation.management.commands.gene_annotation import Command as GeneAnnotationCommand
 from annotation.models import GeneAnnotation, GeneAnnotationVersion
+from genes.enums import AnnotationConsortium
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import (
     GeneAnnotationRelease,
@@ -24,7 +25,6 @@ from genes.models import (
     ReleaseTranscriptVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_PREFIX
 
 

@@ -16,8 +16,8 @@ from classification.models.classification_variant_fields_validation import (
 )
 from classification.models.evidence_key import resolve_default_value
 from classification.tests.models.test_utils import ClassificationTestUtils
+from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_gene_version
-from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.models.models_enums import AlleleOriginBucket
 

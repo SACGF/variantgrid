@@ -30,7 +30,7 @@ from annotation.vep_annotation import (
     vep_parse_version_line,
 )
 from annotation.vep_field_formatters import EMPTY_VALUES, get_clean_and_pick_single_value_func
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 

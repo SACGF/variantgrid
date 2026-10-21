@@ -17,7 +17,7 @@ from django.utils import timezone
 from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotationVersion
 from eventlog.models import Event
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.models.models_partition_archive import PartitionArchive
 from snpdb.partition_archive import (

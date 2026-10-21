@@ -40,10 +40,10 @@ from annotation.pathogenicity_predictions import (
 )
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
+from genes.enums import AnnotationConsortium
 from genes.models import (
     GeneAnnotationRelease,
 )
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from snpdb.models import (
