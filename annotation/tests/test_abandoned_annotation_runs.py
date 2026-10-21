@@ -27,8 +27,9 @@ class CleanUpAbandonedAnnotationRunsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        cls.variant = slowly_create_test_variant("1", 100000, 'A', 'T', grch37)
-        cls.other_variant = slowly_create_test_variant("1", 100001, 'C', 'G', grch37)
+        # One variant per lock: a version can hold only one lock over a given range
+        cls.variants = [slowly_create_test_variant("1", 100000 + i, 'A', 'T', grch37) for i in range(8)]
+        cls.variant, cls.other_variant = cls.variants[:2]
         retire_seeded_annotation_version(grch37)
         cls.vavs = {}
         for vep, status in enumerate(VariantAnnotationVersion.Status, start=2):
@@ -36,9 +37,13 @@ class CleanUpAbandonedAnnotationRunsTestCase(TestCase):
             kwargs.update(status=status, vep=vep)
             cls.vavs[status] = VariantAnnotationVersion.objects.create(**kwargs)
 
+    def setUp(self):
+        self._unlocked_variants = iter(self.variants)
+
     def _lock(self, status):
-        return AnnotationRangeLock.objects.create(version=self.vavs[status], min_variant=self.variant,
-                                                  max_variant=self.variant, count=1)
+        variant = next(self._unlocked_variants)
+        return AnnotationRangeLock.objects.create(version=self.vavs[status], min_variant=variant,
+                                                  max_variant=variant, count=1)
 
     @staticmethod
     def _run(lock=None, pipeline_type=VariantAnnotationPipelineType.STANDARD, **kwargs):
