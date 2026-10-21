@@ -11,8 +11,8 @@ from snpdb.search import (
     SearchResult,
     SearchResultMatchStrength,
 )
-from snpdb.signals.variant_search import _alt_description, _alt_mismatch_message
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from variantopedia.signals.variant_search import _alt_description, _alt_mismatch_message
 
 
 class VariantSearchAltDescriptionTestCase(TestCase):

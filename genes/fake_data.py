@@ -27,7 +27,7 @@ from library.utils import sha256sum_str
 from snpdb.gene_level_variants import GENE_LEVEL_SVLEN
 from snpdb.models import Contig, GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
 
-# The examples on the search page's gene-level receivers (snpdb/signals/variant_search.py)
+# The examples on the search page's gene-level receivers (variantopedia/signals/variant_search.py)
 GENE_LEVEL_EXAMPLES = ["BCR::ABL1", "CD74--ROS1", "EGFR amplification", "PTEN loss", "AR V7", "MET exon 14 skipping"]
 
 
