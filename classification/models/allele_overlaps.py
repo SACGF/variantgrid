@@ -25,7 +25,8 @@ from classification.models.criteria_strengths import (
     CriteriaStrengths,
     CriteriaSummarizer,
 )
-from flags.models import Flag, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import Flag
 from genes.hgvs import HGVSDisplay
 from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData

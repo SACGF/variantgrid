@@ -20,7 +20,7 @@ new development does not build on flags, but existing uses stay. Fields and URLs
 `FlagTypeContext` (classification, allele, clinical_context), `FlagType`, `FlagResolution` and the
 `FlagTypeResolution` join that says which resolutions a type allows are reference data created by data migrations -
 `flags/migrations/0002_initial_data.py` for the bulk, later ones (and some in classification's migrations) for types
-added since. A resolution carries a `flags/models/enums.py:FlagStatus` (open, closed, rejected); a flag is "open"
+added since. A resolution carries a `flags/enums/flags_enums.py:FlagStatus` (open, closed, rejected); a flag is "open"
 when its resolution's status is OPEN (`FlagCollection.Q_OPEN_FLAGS`). `flags/models/models.py:FlagType.default_resolution`
 picks the type's OPEN resolution, falling back to CLOSED. Each consuming app wraps the type ids in a helper object
 (`classification/models/flag_types.py:ClassificationFlagTypes`, `snpdb/models/flag_types.py:AlleleFlagTypes`, whose

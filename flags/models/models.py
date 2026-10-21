@@ -14,7 +14,7 @@ from django.db.models.expressions import Subquery
 from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
 
-from flags.models.enums import FlagStatus
+from flags.enums import FlagStatus
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.model_utils import ModelUtilsMixin

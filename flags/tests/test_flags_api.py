@@ -3,8 +3,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from flags.enums import FlagStatus
 from flags.models import FlagCollection
-from flags.models.enums import FlagStatus
 from flags.models.models import Flag, FlagResolution, FlagType, FlagTypeContext, FlagTypeResolution
 from snpdb.models.models_variant import Allele
 
