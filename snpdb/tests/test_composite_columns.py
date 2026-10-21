@@ -15,6 +15,7 @@ from django.urls.base import reverse
 from annotation.enums import Pathogenicity
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.composite_columns import collapse_into_composite
+from snpdb.enums import ColumnAnnotationLevel
 from snpdb.grid_columns.custom_columns import (
     DBNSFP_NOTE,
     get_all_variant_grid_columns,
@@ -28,7 +29,6 @@ from snpdb.models import (
     CustomColumnsCollection,
     VariantGridColumn,
 )
-from snpdb.models.models_enums import ColumnAnnotationLevel
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData
 

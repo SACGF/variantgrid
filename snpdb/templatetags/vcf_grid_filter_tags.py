@@ -1,7 +1,7 @@
 from django.template import Library
 
+from snpdb.enums import VariantOrigin
 from snpdb.forms import ProjectChoiceForm, VariantsTypeMultipleChoiceForm
-from snpdb.models import VariantOrigin
 
 register = Library()
 

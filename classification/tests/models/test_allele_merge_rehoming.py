@@ -10,8 +10,8 @@ from classification.models import (
     ClinicalContext,
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
-from snpdb.models import Allele, AlleleConversionTool
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleConversionTool, AlleleOriginBucket
+from snpdb.models import Allele
 
 
 class AlleleMergeRehomingTestCase(TestCase):

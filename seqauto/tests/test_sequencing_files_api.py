@@ -28,8 +28,8 @@ from seqauto.serializers.sequencing_serializers import (
     SequencingFilesBulkCreateSerializer,
     SingleSampleVCFSerializer,
 )
+from snpdb.enums import SampleFileType
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import SampleFilePath
 

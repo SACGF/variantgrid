@@ -44,7 +44,7 @@ from annotation.tasks.annotate_variants import (
     annotate_variants,
     import_annotation_run,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import execute_cmd
 from library.utils.file_utils import name_from_filename
 from snpdb.models import GenomeBuild

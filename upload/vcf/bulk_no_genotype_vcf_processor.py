@@ -7,7 +7,7 @@ No point complicating BulkGenotypeVCFProcessor with lots of if statements etc
 import cyvcf2
 from django.conf import settings
 
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import VariantCoordinate
 from snpdb.models.models import CodeVersion
 from upload.models import VCFImporter

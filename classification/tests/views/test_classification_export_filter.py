@@ -4,8 +4,8 @@ from django.test import TestCase
 from classification.views.exports.classification_export_filter import (
     classification_export_user_strings_to_q,
 )
+from genes.enums import GeneSymbolAliasSource
 from genes.models import GeneSymbol, GeneSymbolAlias
-from genes.models_enums import GeneSymbolAliasSource
 from snpdb.models import GenomeBuild
 
 

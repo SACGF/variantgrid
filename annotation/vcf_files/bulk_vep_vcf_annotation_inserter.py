@@ -43,10 +43,10 @@ from annotation.vep_plugin_display import (
     GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS,
     vep_multi_fields_to_list_of_dicts,
 )
+from genes.enums import AnnotationConsortium
 from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneVersion, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_VERSION, get_cdot_fake_transcript_id
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import (
@@ -56,8 +56,8 @@ from library.django_utils.django_file_utils import (
 from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
 from library.utils import split_dict_multi_values
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import VariantCoordinate
-from snpdb.models.models_enums import AssemblyMoleculeType
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 DELIMITER = '\t'

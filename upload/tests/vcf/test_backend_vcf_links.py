@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
 from upload.models import (
     FileUpload,
     ProcessingStatus,

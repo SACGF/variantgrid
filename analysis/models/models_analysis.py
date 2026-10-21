@@ -35,6 +35,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.guardian_utils import DjangoPermission, admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
 from seqauto.models import EnrichmentKit
+from snpdb.enums import BuiltInFilters
 from snpdb.models import (
     AbstractNodeCountSettings,
     Cohort,
@@ -44,7 +45,6 @@ from snpdb.models import (
     TagConfigCollection,
     UserSettings,
 )
-from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
 

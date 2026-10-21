@@ -3,7 +3,8 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from snpdb.models import VCF, GenomeBuild, ImportStatus, Sample
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, Sample
 
 
 class FailSamplesOfFailedVCFsTest(TestCase):

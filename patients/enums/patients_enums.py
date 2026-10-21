@@ -1,9 +1,9 @@
 """
 Enums for patients, specimens and samples that other apps also read: Zygosity (the one-character
 codes packed into CohortGenotype.samples_zygosity, with the regex helpers), Sex, the specimen /
-extraction hierarchy levels and tissue status, population groups extending gnomAD, and matching
-statuses for externally managed records. Codes are stored in the database - add values, never
-renumber.
+extraction hierarchy levels and tissue status, population groups extending gnomAD, matching
+statuses for externally managed records, and where a patient modification came from
+(PatientRecordOriginType). Codes are stored in the database - add values, never renumber.
 """
 from django.db import models
 from django.db.models import Q
@@ -189,3 +189,17 @@ class PatientRecordMatchType(models.TextChoices):
     # Matched existing
     EXACT = 'E', 'MATCHED EXACT'
     PARTIAL = 'P', 'MATCHED PARTIAL'
+
+
+class PatientRecordOriginType:
+    UPLOADED_CSV = 'C'
+    MANUAL_VG_GUI = 'G'
+    EXTERNAL_DATABASE = 'E'
+    INTERNAL_VG = 'I'
+
+    CHOICES = (
+        (UPLOADED_CSV, 'Uploaded CSV'),
+        (INTERNAL_VG, 'Internal change'),
+        (MANUAL_VG_GUI, 'Manual change by user'),
+        (EXTERNAL_DATABASE, 'External Database'),
+    )

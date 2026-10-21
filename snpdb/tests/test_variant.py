@@ -4,7 +4,8 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import AlleleOrigin, GenomeBuild, Variant, VariantAllele, VariantCoordinate
+from snpdb.enums import AlleleOrigin
+from snpdb.models import GenomeBuild, Variant, VariantAllele, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.variant_filters import GENE_LEVEL_VARIANT_TYPES, get_all_variant_types
 

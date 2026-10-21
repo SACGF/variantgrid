@@ -189,7 +189,7 @@ allele-frequency Qs under that alias so `annotate_and_filter_queryset` joins the
 folds in the collection pk (and the sub-cohort any-sample-called VariantCollection of #1551, which turns a regex
 exclusion into a hash join) so a reloaded VCF invalidates the cached Q.
 `analysis/models/nodes/sources/sample_node.py:SampleNode` is one sample or, at extraction/specimen/patient level
-(`patients/models_enums.py:SampleSourceLevel`, offered per `ANALYSIS_SAMPLE_NODE_LEVELS`), every sample of a grouping object: a single sample degenerates to the alias path, a group
+(`patients/enums/patients_enums.py:SampleSourceLevel`, offered per `ANALYSIS_SAMPLE_NODE_LEVELS`), every sample of a grouping object: a single sample degenerates to the alias path, a group
 UNIONs one subquery per sample via `analysis/models/nodes/cohort_mixin.py:get_samples_pk_q`,
 each annotated with only its own VCF's join. Per-sample overrides live in
 `analysis/models/nodes/sources/sample_node.py:SampleNodeSampleFilter`. Downstream nodes that need "the sample" get it

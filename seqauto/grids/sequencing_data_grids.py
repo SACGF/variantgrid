@@ -18,8 +18,8 @@ from seqauto.models import (
     SingleSampleVCF,
     UnalignedReads,
 )
+from snpdb.enums import SampleFileType
 from snpdb.models import UserGridConfig
-from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_vcf import VCF
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 

@@ -5,7 +5,7 @@ import celery
 from classification.classification_import import process_classification_import
 from classification.models import ClassificationImport
 from library.log_utils import log_traceback
-from snpdb.models import ImportSource
+from snpdb.enums import ImportSource
 
 
 @celery.shared_task

@@ -54,8 +54,8 @@ from snpdb.clingen_allele_api import (
     ClinGenAlleleRegistryAPI,
     ClinGenAlleleRegistryUnavailableException,
 )
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import ClinGenAllele, Variant
-from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
 

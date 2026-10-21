@@ -16,8 +16,8 @@ from classification.models import (
 from classification.models.classification_grouping import ClassificationGroupingPathogenicDifference
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.utils import strip_json
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ClassificationGroupingCountsTestCase(TestCase):

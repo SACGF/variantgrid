@@ -13,7 +13,8 @@ from classification.tasks.classification_import_process_variants_task import (
 )
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
-from snpdb.models import ImportSource, Variant
+from snpdb.enums import ImportSource
+from snpdb.models import Variant
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantHash, VariantPKLookup
 from snpdb.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates

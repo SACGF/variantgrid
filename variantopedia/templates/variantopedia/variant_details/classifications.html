@@ -1,16 +1,14 @@
 {% load classification_tags %}
-{% if variant.allele %}
-    <script>
-        function classificationGroupingFilterExtra(data) {
-            data.allele_id = {{ variant.allele.pk }};
-        }
-    </script>
-    <div class="container mt-4">
-        <h4>Classifications</h4>
-        {% if has_classifications %}
-            {% classification_groupings show_summary_counts=True %}
-        {% else %}
-            <p class="no-value">No classifications</p>
-        {% endif %}
-    </div>
-{% endif %}
+<div class="container mt-4">
+    <h4>Classifications</h4>
+    {% if has_classifications %}
+        <script>
+            function classificationGroupingFilterExtra(data) {
+                data.allele_id = {{ variant.allele.pk }};
+            }
+        </script>
+        {% classification_groupings show_summary_counts=True %}
+    {% else %}
+        <p class="no-value">No classifications</p>
+    {% endif %}
+</div>

@@ -28,7 +28,7 @@ from analysis.models.nodes.family_inheritance import (
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from annotation.tasks.calculate_trio_stats import enqueue_trio_stats_recompute
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import Trio
 
 

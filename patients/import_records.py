@@ -29,6 +29,13 @@ from django.utils import timezone
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import report_exc_info
 from library.pandas_utils import df_nan_to_none
+from patients.enums import (
+    NucleicAcid,
+    PatientRecordMatchType,
+    PatientRecordOriginType,
+    Sex,
+    TissueStatus,
+)
 from patients.models import (
     AmbiguousExtraction,
     Extraction,
@@ -36,10 +43,8 @@ from patients.models import (
     PatientColumns,
     PatientModification,
     PatientRecord,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import NucleicAcid, PatientRecordMatchType, Sex, TissueStatus
 from patients.phenotype_matching import bulk_patient_phenotype_matching
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from snpdb.models import Sample

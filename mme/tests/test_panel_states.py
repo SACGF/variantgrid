@@ -10,7 +10,7 @@ from classification.tests.models.test_utils import ClassificationTestUtils
 from library.django_utils.unittest_utils import URLTestCase
 from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import make_classification
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}
 

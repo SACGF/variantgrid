@@ -35,8 +35,8 @@ from annotation.models.models import VariantTranscriptAnnotation
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
 from library.utils import remove_duplicates_from_list
+from patients.enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.sample_grouping import (
     SampleGroup,
     get_extraction_label,

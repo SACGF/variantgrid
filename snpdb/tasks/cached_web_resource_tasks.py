@@ -8,8 +8,8 @@ import logging
 from celery.app.task import Task
 
 from library.log_utils import get_traceback
+from snpdb.enums import ImportStatus
 from snpdb.models.models_cached_web_resource import CachedWebResource
-from snpdb.models.models_enums import ImportStatus
 
 
 class CachedWebResourceTask(Task):

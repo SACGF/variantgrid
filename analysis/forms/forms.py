@@ -43,7 +43,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2, Select2Multiple
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models_enums import SampleSourceLevel, Sex
+from patients.enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import UserSettingsGenomeBuildMixin
 from snpdb.models import (

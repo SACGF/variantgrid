@@ -13,7 +13,7 @@ from annotation.fake_data import (
 )
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_config import parse_cosmic_version_from_filename, vep_component_version_kwargs
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
 # Package-default GRCh38 config, trimmed to the keys this derivation reads. Spelled out rather than read

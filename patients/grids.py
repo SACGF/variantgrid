@@ -13,6 +13,12 @@ from django.urls import reverse
 from library.utils import JsonDataType
 from ontology.grids import AbstractOntologyGenesConfig
 from ontology.models import OntologyService, OntologyTerm
+from patients.enums import (
+    MatchStatus,
+    NucleicAcid,
+    PatientRecordMatchType,
+    TissueStatus,
+)
 from patients.external_references import ExternalReference
 from patients.models import (
     Extraction,
@@ -23,12 +29,6 @@ from patients.models import (
     SpecimenMeasure,
 )
 from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
-from patients.models_enums import (
-    MatchStatus,
-    NucleicAcid,
-    PatientRecordMatchType,
-    TissueStatus,
-)
 from seqauto.models import SequencingSample
 from snpdb.models import Sample
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder

@@ -41,12 +41,12 @@ from classification.report.case_report_context import (
 from classification.report.default_templates import generic_case_template
 from library.case_report_delivery import CaseReportDelivery
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
-from patients.models_enums import (
+from patients.enums import (
     NucleicAcid,
     SampleSourceLevel,
     SpecimenMeasureType,
 )
+from patients.models import Extraction, Patient, Specimen, SpecimenMeasure
 from patients.sample_grouping import get_sample_group
 from seqauto.enums import LibraryQCCategory
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC

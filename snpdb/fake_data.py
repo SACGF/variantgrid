@@ -16,18 +16,15 @@ from django.utils import timezone
 from library.fake_data import FakeData, FakeDataContext, register
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
 from pedigree.models import PedFile, PedFileFamily, Pedigree
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, DuoRelationship, ImportStatus
 from snpdb.models import (
     VCF,
     Allele,
-    AlleleConversionTool,
-    AlleleOrigin,
     Cohort,
     CohortGenotypeCollection,
     CohortSample,
     Duo,
-    DuoRelationship,
     GenomeBuild,
-    ImportStatus,
     Organization,
     Quad,
     Sample,

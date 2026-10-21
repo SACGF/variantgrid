@@ -17,7 +17,8 @@ from seqauto.models import (
     VariantCaller,
     VCFFromSequencingRun,
 )
-from snpdb.models import VCF, GenomeBuild, ImportStatus, UserGridConfig
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, UserGridConfig
 from snpdb.views.datatable_view import DatabaseTableView
 
 

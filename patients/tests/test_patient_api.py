@@ -10,8 +10,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, TissueStatus
 from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, TissueStatus
 from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 
 RECONCILE_TASK = "patients.views_rest.reconcile_pending_extractions.delay"

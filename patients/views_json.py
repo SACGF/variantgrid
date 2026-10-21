@@ -5,11 +5,11 @@ from django.views.decorators.http import require_POST
 
 from library.utils import invert_dict
 from patients import forms
+from patients.enums import PatientRecordOriginType
 from patients.models import (
     Patient,
     PatientColumns,
     PatientModification,
-    PatientRecordOriginType,
 )
 from patients.models.models_phenotype import PatientPhenotypeTerms
 from patients.models.models_phenotype import patient_phenotype_terms as bulk_patient_phenotype_terms
