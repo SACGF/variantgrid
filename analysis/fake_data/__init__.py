@@ -11,7 +11,7 @@ from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_utils import update_analysis
 from analysis.models.nodes.sources.trio_node import TrioNode
-from annotation.models.damage_enums import PathogenicityImpact
+from annotation.enums import PathogenicityImpact
 from library.fake_data import FakeData, FakeDataContext, register
 from snpdb.fake_data import FAKE_USERS
 

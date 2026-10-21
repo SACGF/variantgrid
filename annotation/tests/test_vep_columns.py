@@ -1,13 +1,11 @@
 from django.test import TestCase
 
-from annotation.models.damage_enums import (
+from annotation.enums import (
     AlphaMissensePrediction,
+    ColumnAnnotationCategory,
     MetaRNNPrediction,
     PathogenicityImpact,
     SIFTPrediction,
-)
-from annotation.models.models_enums import (
-    ColumnAnnotationCategory,
     VariantAnnotationPipelineType,
     VEPCustom,
     VEPPlugin,

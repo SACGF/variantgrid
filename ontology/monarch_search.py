@@ -1,3 +1,7 @@
+"""
+Monarch Initiative's search API for condition text, returning OntologyTerms: monarch_condition_text_search.
+Used by ontology_matching and classification's condition text automatch, which falls back to local terms when it fails.
+"""
 from requests import Session
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry

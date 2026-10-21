@@ -12,6 +12,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.external_annotation import (
     ANNOTATED_VCF_SUFFIX,
     DUMP_METADATA_SCHEMA_VERSION,
@@ -36,7 +37,6 @@ from annotation.fake_data import (
     get_fake_annotation_version,
 )
 from annotation.models import AnnotationRangeLock, AnnotationRun
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.tasks.annotate_variants import annotate_variants
 from library.utils import sha256sum_str

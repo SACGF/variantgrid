@@ -9,19 +9,20 @@ from django.contrib.sites.models import Site
 from analysis.models import VariantTag
 from annotation import vep_columns
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import Citation
-from annotation.models.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
+    ClinVarReviewStatus,
     FATHMMPrediction,
     MetaRNNPrediction,
     MutationAssessorPrediction,
     MutationTasterPrediction,
     Polyphen2Prediction,
     SIFTPrediction,
+    VEPCustom,
 )
+from annotation.models import Citation
 from annotation.models.models import GenePubMedCount, VariantAnnotation
 from annotation.models.models_annotation_version import AnnotationVersion
-from annotation.models.models_enums import ClinVarReviewStatus, VEPCustom
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
 from annotation.vep_plugin_display import (

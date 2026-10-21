@@ -1,7 +1,7 @@
 import django.dispatch
 from django.conf import settings
 
-from annotation.models import GeneCountType
+from annotation.gene_count_variants import handle_gene_count_classification_change
 from annotation.tasks.cached_web_resource_tasks import ClinVarCitationsWebResourceTask
 from snpdb.models.models_cached_web_resource import CachedWebResource
 
@@ -19,8 +19,8 @@ clinvar_citations_post_save_handler = CachedWebResource.named_handler_factory(se
 
 
 def gene_counts_classification_publish_handler(sender, classification, **kwargs):  # pylint: disable=unused-argument
-    GeneCountType.handle_classification_change(classification)
+    handle_gene_count_classification_change(classification)
 
 
 def gene_counts_classification_withdraw_handler(sender, classification, **kwargs):  # pylint: disable=unused-argument
-    GeneCountType.handle_classification_change(classification)
+    handle_gene_count_classification_change(classification)

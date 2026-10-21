@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from annotation import vep_field_formatters as fmt
-from annotation.models.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
+    ColumnAnnotationCategory,
     FATHMMPrediction,
     MetaRNNPrediction,
     MutationAssessorPrediction,
@@ -12,9 +13,6 @@ from annotation.models.damage_enums import (
     PathogenicityImpact,
     Polyphen2Prediction,
     PrimateAIPrediction,
-)
-from annotation.models.models_enums import (
-    ColumnAnnotationCategory,
     VariantAnnotationPipelineType,
     VEPCustom,
     VEPPlugin,

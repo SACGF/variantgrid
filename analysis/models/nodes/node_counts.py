@@ -5,9 +5,8 @@ from django.db.models import Count
 from django.db.models.query_utils import Q
 
 from analysis.exceptions import NonFatalNodeError
+from annotation.enums import ClinVarOncogenicity, Pathogenicity, PathogenicityImpact
 from annotation.models import AnnotationVersion, GeneAnnotation
-from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
 from classification.models import Classification
 from snpdb.models import Tag, Variant
 from snpdb.models.models_enums import (

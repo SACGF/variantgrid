@@ -7,8 +7,8 @@ from typing import Any, Optional
 from django.conf import settings
 
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
-from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import CriteriaEvaluation, SpecialEKeys
+from classification.models.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.models.evidence_key import (
     EvidenceKeyMap,
     VCDbRefDict,

@@ -14,6 +14,7 @@ from unittest import mock
 from django.test import TestCase
 from django.test.utils import override_settings
 
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -25,7 +26,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks import annotate_variants as annotate_variants_module
 from annotation.tasks.annotate_variants import annotation_run_retry, reset_annotation_run_for_retry
 from genes.models_enums import AnnotationConsortium

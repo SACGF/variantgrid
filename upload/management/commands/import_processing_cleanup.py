@@ -19,12 +19,12 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from annotation.enums import AnnotationStatus
 from annotation.models import (
     AnnotationRun,
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus
 from snpdb.models import SomalierVCFExtract
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (

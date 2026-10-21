@@ -33,7 +33,6 @@ from classification.models.condition_resolved import (
     ConditionResolved,
     ConditionResolvedDict,
 )
-from classification.models.condition_text_search import monarch_condition_text_search
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
@@ -52,6 +51,7 @@ from ontology.models import (
     OntologyTerm,
     OntologyTermRelation,
 )
+from ontology.monarch_search import monarch_condition_text_search
 from ontology.ontology_matching import (
     IGNORE_TERMS,
     NON_PR_TERMS,

@@ -21,11 +21,7 @@ from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.functions import Coalesce, Greatest
 
 from annotation import open_targets, vep_plugin_display
-from annotation.external_search_terms import (
-    get_variant_pubmed_search_terms,
-    get_variant_search_terms,
-)
-from annotation.models.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
     ClinPredPrediction,
@@ -33,18 +29,20 @@ from annotation.models.damage_enums import (
     MetaRNNPrediction,
     MutationAssessorPrediction,
     MutationTasterPrediction,
+    NMDEscapeStatus,
+    Pathogenicity,
     PathogenicityImpact,
     Polyphen2Prediction,
     PrimateAIPrediction,
     SIFTPrediction,
-)
-from annotation.models.models_citations import Citation
-from annotation.models.models_enums import (
-    NMDEscapeStatus,
-    Pathogenicity,
     VariantAnnotationPipelineType,
     VEPSkippedReason,
 )
+from annotation.external_search_terms import (
+    get_variant_pubmed_search_terms,
+    get_variant_search_terms,
+)
+from annotation.models.models_citations import Citation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.repeat_masker import RepeatMaskerSummary
 from genes.models import (

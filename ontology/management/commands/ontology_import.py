@@ -13,8 +13,8 @@ import pronto
 from django.core.management import BaseCommand
 from django.utils import timezone
 
+from annotation.enums import HPOSynonymScope
 from annotation.models import InvalidAnnotationVersionError
-from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
 from ontology.gencc import load_gencc
 from ontology.models import (
