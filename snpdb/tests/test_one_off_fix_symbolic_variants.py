@@ -5,14 +5,18 @@ from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.bcftools_liftover import bcftools_liftover_variant_coordinate
 from snpdb.models import AlleleMergeLog, GenomeBuild, Variant, VariantAllele, VariantCoordinate
-from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import (
+    create_mock_allele,
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 
 _POSITION = 128200125
 _DEL_LENGTH = 60
 
 
 class OneOffFixSymbolicVariantsTest(TestCase):
-    """ #1358 / #2109 - stored variants brought into line with VARIANT_SYMBOLIC_ALT_SIZE """
+    """ #1358 / #2109 - stored variants brought into line with VARIANT_SYMBOLIC_ALT_SIZE, #1340 - <DEL> svlen sign """
 
     @classmethod
     def setUpTestData(cls):
@@ -45,6 +49,17 @@ class OneOffFixSymbolicVariantsTest(TestCase):
         self.assertEqual(symbolic_allele, VariantAllele.objects.get(variant=symbolic).allele)
         self.assertTrue(AlleleMergeLog.objects.filter(old_allele=explicit_allele, new_allele=symbolic_allele,
                                                       success=True).exists())
+
+    def test_positive_del_svlen_made_negative(self):
+        """ As a <DEL> with END but no SVLEN was stored before #1340 """
+        long_del = VariantCoordinate(chrom="3", position=_POSITION, ref=self.del_ref[0],
+                                     alt=VCFSymbolicAllele.DEL, svlen=-5000)
+        v = slowly_create_test_variant_from_coordinate(long_del, self.grch37)
+        Variant.objects.filter(pk=v.pk).update(svlen=5000)
+
+        call_command("one_off_fix_symbolic_variants")
+        v.refresh_from_db()
+        self.assertEqual(-5000, v.svlen)
 
     def test_bcftools_lifts_short_symbolic_as_explicit(self):
         short_del = VariantCoordinate(chrom="3", position=_POSITION, ref=self.del_ref[0],
