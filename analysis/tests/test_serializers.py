@@ -31,7 +31,8 @@ from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_fake_transcript_version
 from genes.models import GeneList, GeneListGeneSymbol, ImportStatus
 from library.utils import get_all_subclasses
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
 from snpdb.enums import BuiltInFilters
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild, UserSettings

@@ -18,7 +18,8 @@ from flags.models.models import FlagType
 from genes.hgvs import HGVSComponents
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
-from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
+from ontology.enums import OntologyService, OntologyTermStatus
+from ontology.models import OntologyTerm
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild
 from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson

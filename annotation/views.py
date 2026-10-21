@@ -35,7 +35,8 @@ from genes.models import (
     TranscriptVersion,
 )
 from library.django_utils import get_field_counts, require_superuser
-from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm, OntologyVersion
 from snpdb.models import (
     VCF,
     GenomeBuild,

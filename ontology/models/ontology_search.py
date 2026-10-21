@@ -5,7 +5,8 @@ from typing import Optional
 from django.db.models.functions import Lower
 
 from library.preview_request import PreviewProxyModel
-from ontology.models.models_ontology import OntologyService, OntologyTerm, OntologyTermStatus
+from ontology.enums import OntologyService, OntologyTermStatus
+from ontology.models.models_ontology import OntologyTerm
 from snpdb.search import (
     HAS_3_ALPHA_MIN,
     SearchExample,

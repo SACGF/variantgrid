@@ -21,7 +21,8 @@ from genes.models import (
     PanelAppServer,
 )
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
 from snpdb.enums import DataState, ImportStatus
 from snpdb.fake_data import create_fake_trio
 from snpdb.models.models_cached_web_resource import CachedWebResource

@@ -32,7 +32,8 @@ from genes.models import (
     PanelAppServer,
 )
 from library.utils import defaultdict_to_dict
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm
 from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings

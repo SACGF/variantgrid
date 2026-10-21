@@ -9,7 +9,8 @@ from classification.enums.classification_enums import SpecialEKeys
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.condition_resolved import ConditionResolved
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
-from ontology.models import OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyTerm
 from snpdb.enums import ClinicalSignificance
 from snpdb.models import GenomeBuild
 

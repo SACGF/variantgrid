@@ -10,7 +10,8 @@ from pandas import DataFrame, isna, read_csv
 from library.constants import MINUTE_SECS
 from library.pandas_utils import df_nan_to_none
 from library.utils import md5sum_str
-from ontology.models import GeneDiseaseClassification, OntologyRelation
+from ontology.enums import GeneDiseaseClassification
+from ontology.models import OntologyRelation
 from ontology.ontology_builder import OntologyBuilder
 from snpdb.models.models_cached_web_resource import CachedWebResource
 

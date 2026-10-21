@@ -12,7 +12,8 @@ from django.utils import timezone
 from model_utils.models import now
 
 from library.utils.hash_utils import file_sha256sum
-from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation, OntologyTermStatus
+from ontology.enums import OntologyTermStatus
+from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation
 
 MD5_HEX_LENGTH = 32
 

@@ -1,6 +1,7 @@
 from django.test import TestCase
 
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm
 from ontology.tests.test_data_ontology import (
     create_ontology_test_data,
     create_test_ontology_version,
