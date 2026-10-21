@@ -155,6 +155,8 @@ for something specific it holds, and name `vg` only where it calls the code.
 ### Frontend
 Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and
 the compile rules are in `variantgrid/static_files/AGENTS.md`.
+JS goes in a static file under `default_static/js/<app>/`, not inline in a template: the template keeps only a `<script src>`
+and a short init call passing page values. A JS block in a template you are editing moves out with the change.
 
 ### Editing a pushed migration
 By default, express a change of mind about a pushed migration (a field removed, a default changed) as a new migration on
