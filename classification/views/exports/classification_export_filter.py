@@ -22,6 +22,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
+from typing_extensions import deprecated
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
@@ -606,6 +607,7 @@ class ClassificationFilter:
 
         return discordance_status
 
+    @deprecated("Need to get status from an overlap")
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
         if settings.DISCORDANCE_ENABLED:
             return self._discordant_classification_ids.get(cm.classification_id)

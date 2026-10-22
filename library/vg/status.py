@@ -142,6 +142,12 @@ def broker_queue_depths(queue_names) -> dict[str, dict]:
     return queues
 
 
+def task_queue_name(task_name: str) -> str:
+    """ The queue a task is routed to: its CELERY_TASK_ROUTES entry, else the default queue """
+    route = settings.CELERY_TASK_ROUTES.get(task_name) or {}
+    return route.get("queue", settings.CELERY_TASK_DEFAULT_QUEUE)
+
+
 def _queues(services: dict[str, str]) -> dict[str, dict]:
     """ A worker restarted moments ago is still loading Django and has not registered as a consumer yet, so a queue
         whose unit is active but shows none is re-read for up to QUEUE_CONSUMER_WAIT_SECONDS before it is reported. """
