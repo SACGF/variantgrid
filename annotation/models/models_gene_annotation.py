@@ -1,19 +1,16 @@
 """
 Gene-level annotation: GeneAnnotationVersion (partitioned GeneAnnotation rows per GeneAnnotationRelease, built by
-`manage.py gene_annotation`), the dbNSFP gene table it links (DBNSFPGeneAnnotationVersion, list-partitioned
-DBNSFPGeneAnnotation) and Human Protein Atlas tissue expression (HumanProteinAtlasAnnotationVersion).
+`manage.py gene_annotation`), the dbNSFP gene table it links (DBNSFPGeneAnnotationVersion,
+DBNSFPGeneAnnotation rows per version) and Human Protein Atlas tissue expression (HumanProteinAtlasAnnotationVersion).
 """
 
-import logging
 from typing import Optional
 
-from django.db import connection, models
+from django.db import models
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from model_utils.models import TimeStampedModel
-from psqlextra.models import PostgresPartitionedModel
-from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.enums import (
     EssentialGeneCRISPR,
@@ -41,24 +38,12 @@ class DBNSFPGeneAnnotationVersion(TimeStampedModel):
     class Meta:
         unique_together = ('version', 'sha256_hash')
 
-    def save(self, *args, **kwargs):
-        created = not self.pk
-        super().save(*args, **kwargs)
-        if created:
-            logging.info("Creating new DBNSFPGeneAnnotation partition")
-            version = self.pk
-            connection.schema_editor().add_list_partition(
-                model=DBNSFPGeneAnnotation,
-                name=f"version_{version}",
-                values=[version],
-            )
-
     @staticmethod
     def latest() -> Optional['DBNSFPGeneAnnotationVersion']:
         return DBNSFPGeneAnnotationVersion.objects.order_by("created").last()
 
 
-class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
+class DBNSFPGeneAnnotation(TimeStampedModel):
     """ @see https://sites.google.com/site/jpopgen/dbNSFP """
     version = models.ForeignKey(DBNSFPGeneAnnotationVersion, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
@@ -104,10 +89,6 @@ class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
         elif self.gene_indispensability_pred:
             return "Essential"
         return "LoF tolerant"
-
-    class PartitioningMeta:
-        method = PostgresPartitioningMethod.LIST
-        key = ["version_id"]
 
 
 class GeneAnnotationVersion(DataArchiveMixin, SubVersionPartition):

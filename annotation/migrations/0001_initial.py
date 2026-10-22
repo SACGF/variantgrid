@@ -4,7 +4,6 @@ import django.contrib.postgres.fields
 import django.utils.timezone
 import library.preview_request
 import model_utils.fields
-import psqlextra.manager.manager
 from django.db import migrations, models
 
 
@@ -313,13 +312,6 @@ class Migration(migrations.Migration):
                 ('essential_gene_crispr', models.CharField(blank=True, choices=[('E', 'Essential'), ('N', 'Non-essential phenotype-changing')], max_length=1, null=True)),
                 ('essential_gene_crispr2', models.CharField(blank=True, choices=[('E', 'Essential'), ('N', 'Non-essential phenotype-changing'), ('S', 'Context-Specific essential')], max_length=1, null=True)),
                 ('essential_gene_gene_trap', models.CharField(blank=True, choices=[('E', 'Essential'), ('N', 'Non-essential phenotype-changing'), ('H', 'HAP1-Specific essential'), ('K', 'KBM7-Specific essential')], max_length=1, null=True)),
-            ],
-            options={
-                'abstract': False,
-                'base_manager_name': 'objects',
-            },
-            managers=[
-                ('objects', psqlextra.manager.manager.PostgresManager()),
             ],
         ),
         migrations.CreateModel(
