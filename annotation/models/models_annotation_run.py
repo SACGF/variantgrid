@@ -434,7 +434,10 @@ class AnnotationRun(TimeStampedModel):
             return  # no version to name a partition by - delete()'s cascade over the base tables covers it
         annotation_version = self.variant_annotation_version.get_any_annotation_version()
         for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
-            qs = get_queryset_for_annotation_version(klass, annotation_version)
+            if annotation_version:
+                qs = get_queryset_for_annotation_version(klass, annotation_version)
+            else:  # a HISTORICAL version can have no AnnotationVersion - the parent table spans every partition
+                qs = klass.objects.all()
             qs.filter(annotation_run=self).delete()
 
     PIPELINE_TYPE_DESC = {

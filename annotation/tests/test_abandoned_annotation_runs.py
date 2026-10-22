@@ -92,6 +92,14 @@ class CleanUpAbandonedAnnotationRunsTestCase(TestCase):
         self.assertEqual(outcomes["historical version: deleted"], 2)
         self.assertEqual(outcomes["range locks deleted"], 1)
 
+    def test_clean_up_historical_version_without_annotation_version(self):
+        historical_vav = self.vavs[VariantAnnotationVersion.Status.HISTORICAL]
+        historical_vav.annotationversion_set.all().delete()
+        run = self._run(self._lock(VariantAnnotationVersion.Status.HISTORICAL))
+        outcomes = clean_up_abandoned_annotation_runs()
+        self.assertEqual(outcomes["historical version: deleted"], 1)
+        self.assertFalse(AnnotationRun.objects.filter(pk=run.pk).exists())
+
     def test_dry_run_changes_nothing(self):
         run = self._run(self._lock(VariantAnnotationVersion.Status.HISTORICAL))
         outcomes = clean_up_abandoned_annotation_runs(dry_run=True)
