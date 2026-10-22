@@ -75,6 +75,10 @@ class CSVNonEvidence(ExportRow):
     def record_count(self):
         return self.classification_grouping.classification_count
 
+    @export_column(label="All Records Agree")
+    def all_records_agree(self):
+        return not (bool(self.classification_grouping.somatic_difference) or bool(self.classification_grouping.pathogenic_difference))
+
     @export_column(label="Onco-Path Discordance")
     def oncopath_discordance(self):
         if overlap_status := self.overlap_status_summary.oncopath_status:
