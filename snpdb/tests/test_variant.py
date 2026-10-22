@@ -116,6 +116,13 @@ class VariantTestCase(TestCase):
         vc_one_longer = VariantCoordinate(chrom='3', position=37047542, ref='A', alt=alt + next_base)
         self.assertEqual(VCFSymbolicAllele.DUP, vc_one_longer.as_internal_symbolic(self.grch37).alt)
 
+    def test_insertion_longer_than_its_position_stays_explicit(self):
+        """ The dup check looks for a copy preceding the insertion - there is no room for one this close to the
+            start of the contig, and the FASTA must not be asked for a negative start (davmlaw/dave-admin#247) """
+        alt = 'T' + 'ACGT' * 2_600  # Longer than position
+        vc = VariantCoordinate(chrom='1', position=10_001, ref='T', alt=alt)
+        self.assertEqual(vc, vc.as_internal_canonical_form(self.grch37))
+
     def test_short_symbolic_alt(self):
         vc = VariantCoordinate(chrom='3', position=37047542, ref='A', alt="<DUP>",
                                svlen=settings.VARIANT_SYMBOLIC_ALT_SIZE-1)
