@@ -26,6 +26,7 @@ from dateutil import parser
 from django.db import transaction
 from django.utils import timezone
 
+from library.django_utils import ensure_timezone_aware
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import report_exc_info
 from library.pandas_utils import df_nan_to_none
@@ -432,8 +433,8 @@ def process_record(patient_records, record_id, row):
         field_values = {
             "description": specimen_description,
             "collected_by": specimen_collected_by,
-            "collection_date": specimen_collection_date,
-            "received_date": specimen_received_date,
+            "collection_date": ensure_timezone_aware(specimen_collection_date),
+            "received_date": ensure_timezone_aware(specimen_received_date),
             "tissue_status": specimen_tissue_status,
             "_age_at_collection_date": specimen_age_at_collection
         }
@@ -444,7 +445,7 @@ def process_record(patient_records, record_id, row):
         try:
             extraction = specimen.get_or_create_extraction(extraction_nucleic_acid_source, sample=sample,
                                                            reference_id=extraction_reference_id,
-                                                           extraction_date=extraction_date)
+                                                           extraction_date=ensure_timezone_aware(extraction_date))
         except AmbiguousExtraction as e:
             validation_messages.append(str(e))
         else:

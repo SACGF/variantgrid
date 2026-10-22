@@ -1,4 +1,7 @@
 """Re-pointing splice Variants loaded before labels were canonical - @see splice_labels_canonicalise."""
+from contextlib import redirect_stdout
+from io import StringIO
+
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -9,6 +12,13 @@ from genes.gene_level_resolver import GeneLevelNameResolver
 from genes.gene_splice import ResolvedSpliceEvent, get_splice_event_variant
 from genes.models import HGNC, GeneSymbol, HGNCImport
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, Variant
+
+
+def _call_command(*args, **kwargs):
+    """ The command prints a line per change """
+    with redirect_stdout(StringIO()):
+        call_command("splice_labels_canonicalise", *args, **kwargs)
+
 
 AR_HGNC_ID = 644
 
@@ -37,7 +47,7 @@ class SpliceLabelsCanonicaliseTest(TestCase):
                 GenomeBuild.grch37()),
             variant_coordinate=f"GENE_LEVEL:{AR_HGNC_ID}-{AR_HGNC_ID} <SPLICE:HGNC:{AR_HGNC_ID}:V7>")
 
-        call_command("splice_labels_canonicalise")
+        _call_command()
 
         variant.refresh_from_db()
         self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:V_7>", variant.alt.seq)
@@ -48,21 +58,21 @@ class SpliceLabelsCanonicaliseTest(TestCase):
 
     def test_a_dry_run_changes_nothing(self):
         variant = self._variant_with_label("EX14SKIP")
-        call_command("splice_labels_canonicalise", "--dry-run")
+        _call_command("--dry-run")
         variant.refresh_from_db()
         self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:EX14SKIP>", variant.alt.seq)
 
     def test_breakpoints_with_no_vcf_to_take_a_build_from_are_left(self):
         """ The build is part of what breakpoints name, and only the VCF says which one """
         variant = self._variant_with_label("X_66905968_66914514")
-        call_command("splice_labels_canonicalise")
+        _call_command()
         variant.refresh_from_db()
         self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:X_66905968_66914514>", variant.alt.seq)
 
     def test_a_canonical_variant_is_left_alone(self):
         variant = self._variant_with_label("v_7")
         alt_id = variant.alt_id
-        call_command("splice_labels_canonicalise")
+        _call_command()
         variant.refresh_from_db()
         self.assertEqual(alt_id, variant.alt_id)
         self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:V_7>", variant.alt.seq)
@@ -70,7 +80,7 @@ class SpliceLabelsCanonicaliseTest(TestCase):
     def test_a_canonical_variant_already_there_is_reported_rather_than_merged(self):
         old = self._variant_with_label("V7")
         canonical = self._variant_with_label("v_7")
-        call_command("splice_labels_canonicalise")
+        _call_command()
         old.refresh_from_db()
         canonical.refresh_from_db()
         self.assertEqual(f"<SPLICE:HGNC:{AR_HGNC_ID}:V7>", old.alt.seq, "left for the user to merge")

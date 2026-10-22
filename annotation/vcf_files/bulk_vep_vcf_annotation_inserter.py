@@ -300,6 +300,9 @@ class BulkVEPVCFAnnotationInserter:
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
+        # Reported once in finish() - a gene/transcript set behind VEP's misses on most records
+        self._missing_gene_ids: set[str] = set()
+        self._missing_transcript_ids: set[str] = set()
         self.transcript_geometry_cache = TranscriptGeometryCache()
         # RefSeq MT transcripts are VEP gene-name Features ('ND4.1') with no real accession (#2139)
         self.refseq_mitochondrial_chroms: set[str] = set()
@@ -646,7 +649,7 @@ class BulkVEPVCFAnnotationInserter:
             if vep_gene in self.gene_identifiers:
                 gene_id = vep_gene
             else:
-                logging.warning(f"Could not find gene_id: '{vep_gene}'")
+                self._missing_gene_ids.add(vep_gene)
         return gene_id
 
     def _get_transcript_accession(self, vep_transcript_data: TranscriptData) -> Optional[str]:
@@ -677,7 +680,7 @@ class BulkVEPVCFAnnotationInserter:
                 if transcript_version_id is None:
                     logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
             else:
-                logging.warning(f"Could not find transcript: '{t_id}'")
+                self._missing_transcript_ids.add(t_id)
         return transcript_id, transcript_version_id
 
     def _fix_multiple_values(self, transcript_data: TranscriptData):
@@ -958,6 +961,10 @@ class BulkVEPVCFAnnotationInserter:
         self.bulk_insert()
         if self._generated_hgvs_c:
             logging.info("Generated HGVS C results: %s" % self._generated_hgvs_c)
+        for kind, missing in [("gene_ids", self._missing_gene_ids), ("transcripts", self._missing_transcript_ids)]:
+            if missing:
+                examples = ", ".join(sorted(missing)[:5])
+                logging.warning("%s: %d VEP %s not in the database, eg %s", self.description, len(missing), kind, examples)
 
     def bulk_insert(self):
         ANNOTATION_TYPE = {

@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from io import StringIO
 from unittest.mock import patch
 
 from django.conf import settings
@@ -226,7 +227,7 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
                         "phylop_46_way_mammalian": 2.894, "phastcons_46_way_mammalian": 1.0}}
         with patch("annotation.management.commands.backfill_sv_conservation.score_sv_variants",
                    return_value=scored) as mock_score:
-            call_command("backfill_sv_conservation", "--genome-build", "GRCh37")
+            call_command("backfill_sv_conservation", "--genome-build", "GRCh37", stdout=StringIO())
 
         va.refresh_from_db()
         self.assertAlmostEqual(va.phylop_100_way_vertebrate, 9.873, places=3)
@@ -241,5 +242,5 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
         annotation_run.save()
         with patch("annotation.management.commands.backfill_sv_conservation.score_sv_variants",
                    return_value=scored) as mock_score:
-            call_command("backfill_sv_conservation", "--genome-build", "GRCh37")
+            call_command("backfill_sv_conservation", "--genome-build", "GRCh37", stdout=StringIO())
         mock_score.assert_not_called()

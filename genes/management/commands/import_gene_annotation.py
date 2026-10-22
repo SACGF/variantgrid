@@ -131,7 +131,7 @@ class Command(BaseCommand):
     @classmethod
     def _import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_version,
                           genes_iter, transcripts_iter):
-        print(f"importing {genome_build}/{annotation_consortium}")
+        logging.info("Importing %s/%s", genome_build, annotation_consortium)
 
         start = time.time()
         known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))

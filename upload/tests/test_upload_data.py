@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.utils.timezone import localdate
+from django.utils.timezone import now
 
 from analysis.models.models_variant_tag import VariantTagsImport
 from annotation.models.models_clinvar import ClinVarVersion
@@ -44,7 +44,7 @@ class UploadDataTestCase(TestCase):
         UploadedVCF.objects.create(file_upload=pipeline.file_upload, upload_pipeline=pipeline)
 
     def _vcf(self, name: str) -> VCF:
-        return VCF.objects.create(name=name, date=localdate(), user=self.user,
+        return VCF.objects.create(name=name, date=now(), user=self.user,
                                   genotype_samples=0, genome_build=self.grch37)
 
 

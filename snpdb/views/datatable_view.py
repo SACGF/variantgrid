@@ -25,7 +25,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Value
 from django.db.models.functions import Concat
-from django.http import HttpRequest, QueryDict, StreamingHttpResponse
+from django.http import Http404, HttpRequest, QueryDict, StreamingHttpResponse
 from django.urls import reverse
 from django.utils.html import conditional_escape, escape
 from kombu.utils import json
@@ -1057,8 +1057,9 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
         return self.config.prepare_results(qs)
 
     def handle_exception(self, e: BaseException):
-        report_exc_info()
-        logger.exception(str(e))
+        if not isinstance(e, (PermissionDenied, Http404)):  # Django logs these as 4xx responses
+            report_exc_info()
+            logger.exception(str(e))
         raise e
 
     def _download_url(self) -> Optional[str]:

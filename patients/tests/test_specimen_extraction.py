@@ -594,13 +594,15 @@ class TestGetOrCreateExtraction(TestCase):
         with self.assertRaises(AmbiguousExtraction):
             self.specimen.get_or_create_extraction(NucleicAcid.DNA)
 
-        picked = self.specimen.get_or_create_extraction(NucleicAcid.DNA, extraction_date=datetime(2026, 1, 20))
+        picked = self.specimen.get_or_create_extraction(NucleicAcid.DNA,
+                                                        extraction_date=timezone.make_aware(datetime(2026, 1, 20)))
         self.assertEqual(picked, first)
 
     def test_a_different_date_is_a_re_extraction(self):
         first = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA,
                                           extraction_date=timezone.make_aware(datetime(2026, 1, 20)))
-        redo = self.specimen.get_or_create_extraction(NucleicAcid.DNA, extraction_date=datetime(2026, 3, 14))
+        redo = self.specimen.get_or_create_extraction(NucleicAcid.DNA,
+                                                      extraction_date=timezone.make_aware(datetime(2026, 3, 14)))
         self.assertNotEqual(redo, first)
         self.assertEqual(self.specimen.extraction_set.count(), 2)
 

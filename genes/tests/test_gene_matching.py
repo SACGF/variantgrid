@@ -1,3 +1,6 @@
+from contextlib import redirect_stdout
+from io import StringIO
+
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
@@ -24,6 +27,12 @@ from genes.models import (
     ReleaseGeneVersion,
 )
 from snpdb.models import GenomeBuild
+
+
+def _call_command(*args, **kwargs):
+    """ The command prints a line per change """
+    with redirect_stdout(StringIO()):
+        call_command("fix_rematch_release_symbols_to_genes", *args, **kwargs)
 
 
 class TestGeneSymbolMatcherGeneList(TestCase):
@@ -218,12 +227,12 @@ class TestFixRematchReleaseSymbolsToGenes(ReleaseGeneMatcherTestCase):
                    .values_list("gene_id", flat=True))
 
     def test_resync_deletes_chained_inserts_missing_and_keeps_direct(self):
-        call_command("fix_rematch_release_symbols_to_genes")
+        _call_command()
         self.assertEqual(set(), self._matched_genes("MT-TS2"))
         self.assertEqual({"5134"}, self._matched_genes("PDCD2"))
         self.assertEqual({"3730"}, self._matched_genes("KAL1"))
 
     def test_dry_run_writes_nothing(self):
-        call_command("fix_rematch_release_symbols_to_genes", dry_run=True)
+        _call_command(dry_run=True)
         self.assertEqual({"5134"}, self._matched_genes("MT-TS2"))
         self.assertEqual(set(), self._matched_genes("KAL1"))
