@@ -15,7 +15,8 @@ python3 manage.py test --keepdb snpdb.tests.test_variant.VariantTest.test_x # on
 python3 manage.py vg tests --changed                                        # only the modules a change puts at risk
 ```
 
-- `--keepdb` skips re-running hundreds of migrations; always use it. Drop it only when a migration you wrote changes.
+- `--keepdb` skips re-running the migrations; always use it. Drop it only when a migration you wrote changes. A kept DB
+  holding migrations that aren't on disk (another branch's) is recreated automatically.
 - `vg tests --changed` maps changed files to test labels through the
   first-party import graph and prints `manage.py test` args: a changed module selects every test module that
   transitively imports it, templates / JS / `urls.py` select the app's `tests.test_urls`, a migration selects the

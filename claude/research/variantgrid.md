@@ -78,7 +78,8 @@ so the suite needs no network (`claude/guides/testing.md#external-services-in-te
 `parallel=1`, seeds the fake GRCh37/GRCh38 annotation versions once
 (`variantgrid/test_runner.py:VariantGridTestRunner._seed_fake_annotation_versions`),
 then clones it per worker, so the 240-odd test classes asking for it in `setUpTestData` find it there. Under `--keepdb` it drops
-the stale per-worker clones first and refuses to run if the kept DB has migrations applied that are not on disk.
+the stale per-worker clones first, and recreates the kept DB instead of migrating it when it has migrations applied that
+are not on disk (another branch's, or the pre-squash history).
 `variantgrid/test_runner.py:FastaRecordingRunner` records the fasta regions a full run touches, to regenerate the sparse
 CI fastas under `variantgrid/data/reference/`. Base classes and fixtures: `claude/guides/testing.md`.
 
