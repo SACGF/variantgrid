@@ -78,7 +78,7 @@ class CSVNonEvidence(ExportRow):
     @export_column(label="Onco-Path Discordance")
     def oncopath_discordance(self):
         if overlap_status := self.overlap_status_summary.oncopath_status:
-            if self.classification_grouping.allele_origin_grouping.allele_origin_bucket_obj.should_have_subdivide:
+            if self.classification_grouping.allele_origin_grouping.testing_context_bucket_obj.should_have_subdivide:
                 return overlap_status.label_with_difference
             else:
                 return overlap_status.label
