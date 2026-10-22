@@ -27,7 +27,7 @@ FINAL_MIGRATIONS = [
     ('pedigree', '0004_alter_somalierpedigreerelate_created_and_more'),
     ('review', '0005_discordance_report_topic'),
     ('seqauto', '0055_alter_alignmentfile_options_alter_fastq_options_and_more'),
-    ('snpdb', '0297_retire_somalier_download_manual_task'),
+    ('snpdb', '0298_gate_migrate_common_filter_gnomad_versions'),
     ('sync', '0008_alter_classificationmodificationsyncrecord_options_and_more'),
     ('upload', '0058_alter_fileupload_options_alter_fileupload_created_and_more'),
     ('user_messages', '0002_migrate_legacy_django_messages'),
