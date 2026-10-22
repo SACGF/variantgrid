@@ -12,12 +12,15 @@ A database is in one of three states, judged on the django_migrations rows of ou
   migrations as applied (every one with `initial = True`, which the squash's seed migrations also set)
 
 Entry points: history_state, reset_squashed_history (`manage.py reset_squashed_migration_history`, run by hand
-once per deployment so the rewrite of django_migrations is seen), check_squashed_history (a database system check, so migrate and
-`check --database default` run it) and refuse_migrate_on_old_history (pre_migrate).
+once per deployment so the rewrite of django_migrations is seen), check_squashed_history (a database system check, so
+migrate, `check --database default` and deployment_check run it), refuse_migrate_on_old_history (pre_migrate) and
+refuse_to_serve_old_history (gunicorn's wsgi.py and celery's worker_init), so a server left on master that pulls the
+squash without going through the checkpoint stops rather than serving the new code on the old schema.
 """
 import os
 from enum import Enum
 
+from celery.signals import worker_init
 from django.apps import apps
 from django.core.checks import Error, Tags, register
 from django.db import DatabaseError, connections, transaction
@@ -101,3 +104,22 @@ def refuse_migrate_on_old_history(sender, using="default", **kwargs):
     state = history_state(using)
     if state != HistoryState.CURRENT:
         raise RuntimeError(history_state_message(state))
+
+
+def refuse_to_serve_old_history(using: str = "default"):
+    try:
+        state = history_state(using)
+    except DatabaseError:
+        return  # Database down - the services fail on their own, as before
+    finally:
+        connections[using].close()  # Opened in the parent: gunicorn and celery fork workers from it
+    if state != HistoryState.CURRENT:
+        raise RuntimeError(history_state_message(state))
+
+
+@worker_init.connect
+def refuse_celery_worker_on_old_history(**kwargs):
+    try:
+        refuse_to_serve_old_history()
+    except RuntimeError as e:
+        raise SystemExit(str(e)) from e  # celery logs and carries on past an Exception from a signal handler

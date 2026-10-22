@@ -109,7 +109,8 @@ Every app's migrations start from fresh initials plus a `seed_data` migration (t
 with no `replaces`, so a database from before the squash first upgrades through the dead-end branch
 `migration_checkpoint`: its last migration (`manual 0009_migration_checkpoint`) depends on every app's final old
 migration and refuses while manual tasks are outstanding, since their one-off commands are gone here. Back on this
-branch, `manual/squashed_history.py` refuses to run (system check, and `pre_migrate`) against an old history until the
+branch, `manual/squashed_history.py` refuses an old history - `migrate` (`pre_migrate`), the database system check
+(`deployment_check` runs it), and gunicorn and celery workers, which won't start - until the
 one-off `manage.py reset_squashed_migration_history`, run by hand before `scripts/upgrade.sh`, swaps the old
 django_migrations rows for the new initials.
 A seed migration is `initial = True` so that reset records it; nothing added after the squash may be. Annotation upgrades (new VEP, new columns) are their own procedure: a new
