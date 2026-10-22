@@ -2,11 +2,13 @@ from unittest.mock import patch
 
 from django.core.management import CommandError, call_command
 from django.db import connection
+from django.db.migrations.exceptions import NodeNotFoundError
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TestCase
 
 from manual.squashed_history import (
     CHECKPOINT_MIGRATION,
+    CheckoutBeforeSquashError,
     HistoryState,
     history_state,
     refuse_celery_worker_on_old_history,
@@ -49,3 +51,15 @@ class SquashedHistoryTest(TestCase):
         with patch("manual.squashed_history.refuse_to_serve_old_history", side_effect=RuntimeError("old history")):
             with self.assertRaises(SystemExit):
                 refuse_celery_worker_on_old_history()
+
+    def test_checkout_from_before_squash_names_it(self):
+        """ Only a missing migration of one of our apps means another checkout predates the squash """
+        def node_not_found(node):
+            return NodeNotFoundError("missing", node, origin=type("Migration", (), {"app_label": "sapath"})())
+
+        with patch("manual.squashed_history.MigrationLoader", side_effect=node_not_found(("annotation", "0002_old"))):
+            with self.assertRaisesMessage(CheckoutBeforeSquashError, "'sapath' migrations depend on"):
+                history_state()
+        with patch("manual.squashed_history.MigrationLoader", side_effect=node_not_found(("auth", "0099_old"))):
+            with self.assertRaises(NodeNotFoundError):
+                history_state()

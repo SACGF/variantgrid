@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from manual.squashed_history import (
+    CheckoutBeforeSquashError,
     HistoryState,
     history_state,
     history_state_message,
@@ -15,7 +16,10 @@ class Command(BaseCommand):
     requires_system_checks = []  # check_squashed_history errors on exactly the database this command fixes
 
     def handle(self, *args, **options):
-        state = history_state()
+        try:
+            state = history_state()
+        except CheckoutBeforeSquashError as e:
+            raise CommandError(str(e)) from e
         if state == HistoryState.CURRENT:
             self.stdout.write(history_state_message(state))
         elif state == HistoryState.NEEDS_CHECKPOINT:

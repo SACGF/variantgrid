@@ -16,6 +16,8 @@ once per deployment so the rewrite of django_migrations is seen), check_squashed
 migrate, `check --database default` and deployment_check run it), refuse_migrate_on_old_history (pre_migrate) and
 refuse_to_serve_old_history (gunicorn's wsgi.py and celery's worker_init), so a server left on master that pulls the
 squash without going through the checkpoint stops rather than serving the new code on the old schema.
+A core checkout whose sapath checkout is still pre-squash can't even build the migration graph: each of those entry
+points reports CheckoutBeforeSquashError (manual.E003 as a check) naming the stale checkout.
 """
 import os
 from enum import Enum
@@ -24,6 +26,7 @@ from celery.signals import worker_init
 from django.apps import apps
 from django.core.checks import Error, Tags, register
 from django.db import DatabaseError, connections, transaction
+from django.db.migrations.exceptions import NodeNotFoundError
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
 
@@ -42,6 +45,25 @@ def _local_app_labels() -> set[str]:
             if "site-packages" not in os.path.realpath(app_config.path)}
 
 
+class CheckoutBeforeSquashError(RuntimeError):
+    """ Another checkout (sapath) still has its pre-squash migrations, which name ones the squash removed, so the
+        migration graph can't be built at all - before any database state can be judged """
+
+
+def _migration_loader(using: str) -> MigrationLoader:
+    try:
+        return MigrationLoader(connections[using], ignore_no_migrations=True)
+    except NodeNotFoundError as e:
+        missing_app = e.node[0]
+        if missing_app not in _local_app_labels():
+            raise
+        origin_app = getattr(e.origin, "app_label", e.origin)
+        raise CheckoutBeforeSquashError(
+            f"'{origin_app}' migrations depend on {e.node}, which the migration squash (#736) removed: the checkout "
+            f"holding '{origin_app}' is from before the squash. Update it too (core and sapath move together), "
+            "then rerun.") from e
+
+
 def _stale_migrations(loader: MigrationLoader) -> set[tuple[str, str]]:
     local_apps = _local_app_labels()
     return {key for key in loader.applied_migrations
@@ -49,7 +71,7 @@ def _stale_migrations(loader: MigrationLoader) -> set[tuple[str, str]]:
 
 
 def history_state(using: str = "default") -> HistoryState:
-    loader = MigrationLoader(connections[using], ignore_no_migrations=True)
+    loader = _migration_loader(using)
     if not _stale_migrations(loader):
         return HistoryState.CURRENT
     if CHECKPOINT_MIGRATION in loader.applied_migrations:
@@ -73,7 +95,7 @@ def reset_squashed_history(using: str = "default") -> int:
     if (state := history_state(using)) != HistoryState.NEEDS_RESET:
         raise ValueError(f"Only a database that has passed the checkpoint can be reset: {history_state_message(state)}")
     connection = connections[using]
-    loader = MigrationLoader(connection, ignore_no_migrations=True)
+    loader = _migration_loader(using)
     local_apps = _local_app_labels()
     initial_migrations = [key for key, migration in loader.disk_migrations.items()
                           if key[0] in local_apps and migration.initial]
@@ -93,6 +115,8 @@ def check_squashed_history(app_configs, databases=None, **kwargs):
         state = history_state()
     except DatabaseError:
         return []  # No database (a build step, or before it is created) - migrate will say so
+    except CheckoutBeforeSquashError as e:
+        return [Error(str(e), id="manual.E003")]
     if state == HistoryState.CURRENT:
         return []
     return [Error(history_state_message(state), id="manual.E001")]
