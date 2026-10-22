@@ -15,7 +15,6 @@ from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
 
-from deprecation import deprecated
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
@@ -23,6 +22,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
+from typing_extensions import deprecated
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
