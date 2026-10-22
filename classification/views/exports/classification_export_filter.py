@@ -15,6 +15,7 @@ from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
 
+from deprecation import deprecated
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
@@ -606,6 +607,7 @@ class ClassificationFilter:
 
         return discordance_status
 
+    @deprecated("Need to get status from an overlap")
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
         if settings.DISCORDANCE_ENABLED:
             return self._discordant_classification_ids.get(cm.classification_id)

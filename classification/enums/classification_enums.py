@@ -60,6 +60,15 @@ class OverlapStatus(IntegerChoices):
     MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS or lower vs Pathogenic as will require re-reporting
 
     @property
+    def label_with_difference(self):
+        if self == OverlapStatus.MAJOR_DIFFERENCES:
+            return "Difference"
+        elif self == OverlapStatus.MEDICALLY_SIGNIFICANT:
+            return "Medically significant difference"
+        else:
+            return self.label
+
+    @property
     def is_dull(self) -> bool:
         return self <= OverlapStatus.SINGLE_SUBMITTER
 
