@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.contrib.sites.models import Site
 from django.core.checks import run_checks
+from django.db import connections
 
 from genes.models.models_gene_coverage import CanonicalTranscriptCollection
 from genes.models.models_gene_list import GeneList
@@ -19,7 +20,7 @@ def check_system_checks() -> dict:
     """ Each unsilenced system check Error is an invalid result keyed by its id; a Warning is a warning on
         an otherwise valid one. An Error here stops `upgrade.sh --quick` the way any other invalid check does """
     results = {}
-    for message in run_checks():
+    for message in run_checks(databases=list(connections)):  # database-tagged checks too, e.g. manual.E001
         if message.is_silenced():
             continue
         key = message.id or message.msg

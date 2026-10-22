@@ -2,7 +2,7 @@
 Composite grid columns - the cell, the members riding along hidden, and the migration helper that
 collapses a collection onto them.
 
-@see snpdb.models.models_columns.CompositeColumnMember, snpdb/migrations/0238_composite_columns.py
+@see snpdb.models.models_columns.CompositeColumnMember
 """
 import re
 

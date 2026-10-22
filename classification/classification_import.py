@@ -33,7 +33,6 @@ MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indica
 
 # FileUpload.name - what the upload listing shows for a classification import. The two pipelines an
 # import can run need different names or the listing shows the same row twice
-# (upload/migrations/0045_rename_gene_level_api_uploads.py renamed historical records)
 API_UPLOAD_NAME = 'Variants from API'
 GENE_LEVEL_API_UPLOAD_NAME = 'Gene-level Variants from API'
 

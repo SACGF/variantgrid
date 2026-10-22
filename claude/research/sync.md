@@ -19,8 +19,7 @@ generated maps ([models](../maps/models.md#sync), [tasks](../maps/tasks.md#sync)
 A destination is a name, an `enabled` flag and a free-form `config` JSON edited in the admin. Credentials are never in
 the row: `config["sync_details"]` is a key into `settings.SYNC_DETAILS`, which
 `variantgrid/settings/components/default_settings.py:get_shariant_sync_secrets` builds from the `SYNC.<key>` secrets
-(host, OAuth client, username/password) and refuses a single unkeyed `SYNC` secret
-(`sync/migrations/0006_one_off_manual_modify_config.py` is the deploy step that rewrites a destination's config to keys). `sync/models/models.py:SyncDestination.sync_details` resolves it and
+(host, OAuth client, username/password) and refuses a single unkeyed `SYNC` secret. `sync/models/models.py:SyncDestination.sync_details` resolves it and
 `library/oauth.py:ServerAuth.for_sync_details` turns it into an authenticated `requests` wrapper. The admin's
 "Validate configuration" action (`sync/admin.py:SyncDestinationAdmin.validate_configuration`) checks the key resolves.
 

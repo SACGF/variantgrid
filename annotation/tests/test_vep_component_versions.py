@@ -1,6 +1,4 @@
-import importlib
 
-from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
@@ -9,10 +7,12 @@ from django.test.utils import override_settings
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
-    retire_seeded_annotation_version,
 )
 from annotation.models import VariantAnnotationVersion
-from annotation.vep_config import parse_cosmic_version_from_filename, vep_component_version_kwargs
+from annotation.vep_config import (
+    parse_cosmic_version_from_filename,
+    vep_component_version_kwargs,
+)
 from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -153,62 +153,6 @@ class ParseCosmicVersionTests(TestCase):
     def test_unversioned_name_is_none(self):
         self.assertIsNone(
             parse_cosmic_version_from_filename("annotation_data/GRCh37/CosmicCodingMuts.normal.grch37.vcf.gz"))
-
-
-@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
-class VEPComponentVersionBackfillTests(TestCase):
-    """ #462 - migration 0161 stamps the versions the scheduler can still match, so a deployment whose
-        annotation config hasn't changed keeps matching its existing VariantAnnotationVersion rather than
-        creating a new one and reannotating. """
-
-    MIGRATION = "annotation.migrations.0161_vep_command_line_component_versions"
-    PIN_FIELDS = ("mastermind", "dbscsnv", "topmed", "uk10k", "gnomad_sv", "conservation",
-                  "repeat_masker", "maxentscan", "protvar", "eve", "promoter_ai", "fasta",
-                  "transcript_blocklist", "pick_order", "sift_enabled", "sv_max_size",
-                  "sv_overlap_min_fraction", "vep_args")
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        retire_seeded_annotation_version(cls.grch37)
-
-    def _make_unpinned_vav(self, status) -> VariantAnnotationVersion:
-        kwargs = get_fake_vep_version(self.grch37, AnnotationConsortium.ENSEMBL, 2)
-        kwargs["status"] = status
-        kwargs.update(dict.fromkeys(self.PIN_FIELDS))
-        return VariantAnnotationVersion.objects.create(**kwargs)
-
-    def _run_backfill(self):
-        migration = importlib.import_module(self.MIGRATION)
-
-        class _Apps:
-            @staticmethod
-            def get_model(_app_label, _model_name):
-                return VariantAnnotationVersion
-
-        migration._backfill_vep_components(_Apps(), None)
-
-    def test_active_version_stamped_with_current_settings(self):
-        vav = self._make_unpinned_vav(VariantAnnotationVersion.Status.ACTIVE)
-        self._run_backfill()
-        vav.refresh_from_db()
-
-        expected = vep_component_version_kwargs(settings.ANNOTATION[self.grch37.name])
-        for field, value in expected.items():
-            self.assertEqual(value, getattr(vav, field), field)
-
-    def test_new_version_stamped(self):
-        vav = self._make_unpinned_vav(VariantAnnotationVersion.Status.NEW)
-        self._run_backfill()
-        vav.refresh_from_db()
-        self.assertEqual(settings.ANNOTATION_VEP_SV_MAX_SIZE, vav.sv_max_size)
-
-    def test_historical_version_left_unknown(self):
-        vav = self._make_unpinned_vav(VariantAnnotationVersion.Status.HISTORICAL)
-        self._run_backfill()
-        vav.refresh_from_db()
-        for field in self.PIN_FIELDS:
-            self.assertIsNone(getattr(vav, field), field)
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))

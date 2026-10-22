@@ -576,7 +576,7 @@ class Command(BaseCommand):
 
 
 def bad_gene_annotation():
-    """ This is used as a test in annotation/migrations/0068_one_off_manual_fix_bad_gene_annotation """
+    """ Gene annotation versions whose dbNSFP gene data never loaded """
     bad_gene_annotation = []
     for gav in GeneAnnotationVersion.objects.all():
         if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():

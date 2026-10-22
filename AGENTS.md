@@ -169,7 +169,8 @@ stays identical: migrations never freeze the names of the code they import.
 
 ### Manual migrations (management commands on deploy)
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
-(`manual/operations/manual_operations.py`, example `snpdb/migrations/0188_one_off_migrate_common_filter_gnomad_versions.py`).
+(`manual/operations/manual_operations.py`, example the `ManualOperation.operation_manage` calls in
+`snpdb/migrations/0002_seed_data.py`).
 
 ### Celery
 A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks. Route

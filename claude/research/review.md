@@ -59,8 +59,8 @@ happen on Overlaps). Covered by `classification/tests/views/test_overlap_review_
 
 ## Traps
 
-- `review/migrations/0005_discordance_report_topic.py` seeds the `discordance_report` topic both callers hard-code,
-  with the question set Shariant uses; a deployment that had already created it in the admin keeps its own name and questions.
+- `review/migrations/0003_seed_data.py` seeds the `discordance_report` topic both callers hard-code,
+  with the question set Shariant uses.
   Without the row the "review" buttons 500 on `ReviewTopic.objects.get`.
 - Overlaps start a new Review each time (resume is commented out), DiscordanceReports resume the first existing one.
 - `Review.user` means "last actor", not author: `ReviewForm.save` sets it to the editor (and logs as them), and the
