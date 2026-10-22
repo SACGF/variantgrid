@@ -53,6 +53,7 @@ from snpdb.clingen_allele import (
 from snpdb.clingen_allele_api import (
     ClinGenAlleleRegistryAPI,
     ClinGenAlleleRegistryUnavailableException,
+    ClinGenAlleleTooLargeException,
 )
 from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import ClinGenAllele, Variant
@@ -658,6 +659,8 @@ class HGVSMatcher:
                             clingen_unavailable = True
                             logging.error(error_message, cgaue)
                             hgvs_methods[hgvs_method] = str(cgaue)
+                        except ClinGenAlleleTooLargeException as cgatle:
+                            hgvs_methods[hgvs_method] = str(cgatle)  # Expected for large SVs, so not logged
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)

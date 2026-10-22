@@ -1,5 +1,8 @@
 """Putting the space back in gene-level classification targets, and the 'splice' suffix onto
 splice annotation and evidence - @see gene_level_strings_respace."""
+from contextlib import redirect_stdout
+from io import StringIO
+
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -19,6 +22,13 @@ from genes.models import HGNC, GeneSymbol, HGNCImport
 from genes.tests.gene_level_test_utils import create_splice_event_variant
 from library.utils import md5sum_str
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
+
+
+def _call_command(*args, **kwargs):
+    """ The command prints a line per change """
+    with redirect_stdout(StringIO()):
+        call_command("gene_level_strings_respace", *args, **kwargs)
+
 
 AR_HGNC_ID = 644
 FGF4_HGNC_ID = 3682
@@ -55,7 +65,7 @@ class GeneLevelStringsRespaceTest(TestCase):
         allele_info = classification.allele_info
         self.assertEqual("FGF4amplification", allele_info.imported_c_hgvs)
 
-        call_command("gene_level_strings_respace")
+        _call_command()
 
         allele_info.refresh_from_db()
         self.assertEqual("FGF4 amplification", allele_info.imported_c_hgvs)
@@ -72,7 +82,7 @@ class GeneLevelStringsRespaceTest(TestCase):
             imported_c_hgvs="ARV7", imported_md5_hash=md5sum_str("ARV7"),
             imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
                 self.genome_build))
-        call_command("gene_level_strings_respace")
+        _call_command()
         allele_info.refresh_from_db()
         self.assertEqual("ARV7", allele_info.imported_c_hgvs)
 
@@ -84,7 +94,7 @@ class GeneLevelStringsRespaceTest(TestCase):
         stripped = ImportedAlleleInfo.objects.create(imported_c_hgvs="FGF4amplification",
                                                      imported_md5_hash=md5sum_str("FGF4amplification"),
                                                      imported_genome_build_patch_version=patch_version)
-        call_command("gene_level_strings_respace")
+        _call_command()
         stripped.refresh_from_db()
         self.assertEqual("FGF4amplification", stripped.imported_c_hgvs, "left for the user to merge")
 
@@ -104,7 +114,7 @@ class GeneLevelStringsRespaceTest(TestCase):
                                                SpecialEKeys.GENOME_BUILD: {"value": "GRCh38"}})
         classification.allele_info.set_variant_and_save(matched_variant=splice_variant)
 
-        call_command("gene_level_strings_respace")
+        _call_command()
 
         variant_annotation = VariantAnnotation.objects.get(version=vav, variant=splice_variant)
         self.assertEqual("AR-V7 splice", variant_annotation.hgvs_c)

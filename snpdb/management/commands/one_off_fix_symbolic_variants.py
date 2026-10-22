@@ -58,8 +58,9 @@ class Command(BaseCommand):
                     self._canonicalise(dry_run, genome_build, v, stats)
                 num_candidates = stats.total()
                 num_changed = num_candidates - stats[self.ALREADY_CANONICAL]
-                print(f"{genome_build}: pk {end - 1:,} / {max_pk:,} ({100 * end / (max_pk + 1):.0f}%) - "
-                      f"{num_candidates:,} candidates, {num_changed:,} {changed_label}", flush=True)
+                self.stdout.write(f"{genome_build}: pk {end - 1:,} / {max_pk:,} ({100 * end / (max_pk + 1):.0f}%) - "
+                                  f"{num_candidates:,} candidates, {num_changed:,} {changed_label}")
+                self.stdout.flush()
             self._print_stats(f"{genome_build} variants around VARIANT_SYMBOLIC_ALT_SIZE="
                               f"{settings.VARIANT_SYMBOLIC_ALT_SIZE}", stats)
 
@@ -181,10 +182,9 @@ class Command(BaseCommand):
         dupe.variantcollectionrecord_set.update(variant=keep)
         dupe.candidate_set.update(variant=keep)
 
-    @staticmethod
-    def _print_stats(label: str, stats: Counter):
-        print(f"{label}:")
+    def _print_stats(self, label: str, stats: Counter):
+        self.stdout.write(f"{label}:")
         if not stats:
-            print("  (nothing)")
+            self.stdout.write("  (nothing)")
         for reason, count in stats.most_common():
-            print(f"  {count}\t{reason}")
+            self.stdout.write(f"  {count}\t{reason}")

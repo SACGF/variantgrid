@@ -1170,6 +1170,9 @@ LOGGING = {
         },
     }
 }
+if UNIT_TEST:
+    # Tests asserting a 4xx would each print the request's traceback - 5xx are logged at ERROR so still show
+    LOGGING['loggers']['django.request'] = {'level': 'ERROR'}
 
 # Instead of @login_required, LoginRequiredMiddleware requires login everywhere. A view opts out with
 # @login_not_required (django.contrib.auth.decorators); DRF views are already marked, and check auth at view time.

@@ -2,12 +2,14 @@
 The settings system checks (snpdb/checks.py). Each check is called directly under override_settings; the
 suite's own settings must pass them all, which Django verifies before any test runs.
 """
+import runpy
 from copy import deepcopy
 
 from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 
 from snpdb import checks
+from variantgrid.settings.components import annotation_settings
 from variantgrid.settings.components.annotation_settings import (
     BUILD_GRCH37,
     BUILD_GRCH38,
@@ -22,6 +24,14 @@ OIDC_CONFIGURED = {
     "OIDC_REQUIRED_GROUP": "/variantgrid/shariant_test",
     "LAB_HEAD_MANAGE_MEMBERS": False, "USER_CREATE_ORG_LABS": {}, "REGISTRATION_OPEN": False,
 }
+
+
+# Re-run rather than imported: an env settings file edits the ANNOTATION dict it star-imports in place
+PACKAGE_ANNOTATION_SETTINGS = runpy.run_path(annotation_settings.__file__)
+PACKAGE_VEP_SETTINGS = {name: PACKAGE_ANNOTATION_SETTINGS[name] for name in (
+    "ANNOTATION_VEP_VERSION", "ANNOTATION_VEP_ENSEMBL_GENCODE", "ANNOTATION_VEP_FORK", "ANNOTATION_VEP_BUFFER_SIZE",
+    "ANNOTATION_VEP_BATCH_MIN", "ANNOTATION_VEP_BATCH_MAX", "ANNOTATION_MAX_BENIGN_RANKSCORE",
+    "ANNOTATION_MIN_PATHOGENIC_RANKSCORE")}
 
 
 def ids(messages) -> set[str]:
@@ -92,11 +102,13 @@ class FeatureDependencyCheckTest(SimpleTestCase):
             self.assertEqual(ids(checks.check_feature_dependencies(None)), {"variantgrid.E010"})
 
 
+@override_settings(**PACKAGE_VEP_SETTINGS)
 class AnnotationCheckTest(SimpleTestCase):
+    """ Checked against the package default (latest) annotation settings, not the host's env file """
 
     @staticmethod
     def _annotation(**build_overrides):
-        annotation = deepcopy(settings.ANNOTATION)
+        annotation = deepcopy(PACKAGE_ANNOTATION_SETTINGS["ANNOTATION"])
         annotation[BUILD_GRCH37]["enabled"] = True
         annotation[BUILD_GRCH38]["enabled"] = True
         for build, overrides in build_overrides.items():

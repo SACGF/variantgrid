@@ -132,7 +132,7 @@ def write_library_qc(libraries: list[LibraryQCMetrics], user: User, sequencing_r
         if reference_id is None:
             parked_error = (f"'{library.pair_id}' carries no lab accession, and nothing on "
                             f"sequencing run '{sequencing_run_name}' is named for it")
-            logging.warning("%s - its library QC is parked", parked_error)
+            logging.info("%s - its library QC is parked", parked_error)
         else:
             resolved = resolve_reference(Specimen, ExternalReference(reference_id=reference_id), user)
         for category, metrics in library.categories.items():

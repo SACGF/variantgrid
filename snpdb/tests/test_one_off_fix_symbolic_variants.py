@@ -1,3 +1,5 @@
+from io import StringIO
+
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
@@ -32,7 +34,7 @@ class OneOffFixSymbolicVariantsTest(TestCase):
 
     def test_explicit_converted_in_place(self):
         v = self._create_legacy_explicit_del()
-        call_command("one_off_fix_symbolic_variants")
+        call_command("one_off_fix_symbolic_variants", stdout=StringIO())
         v.refresh_from_db()
         self.assertEqual((VCFSymbolicAllele.DEL, -_DEL_LENGTH, _POSITION, self.del_ref[0]),
                          (v.alt.seq, v.svlen, v.locus.position, v.locus.ref.seq))
@@ -44,7 +46,7 @@ class OneOffFixSymbolicVariantsTest(TestCase):
         self.assertEqual(VCFSymbolicAllele.DEL, symbolic.alt.seq)
         symbolic_allele = create_mock_allele(symbolic, self.grch37)
 
-        call_command("one_off_fix_symbolic_variants")
+        call_command("one_off_fix_symbolic_variants", stdout=StringIO())
         self.assertFalse(Variant.objects.filter(pk=explicit.pk).exists())
         self.assertEqual(symbolic_allele, VariantAllele.objects.get(variant=symbolic).allele)
         self.assertTrue(AlleleMergeLog.objects.filter(old_allele=explicit_allele, new_allele=symbolic_allele,
@@ -57,7 +59,7 @@ class OneOffFixSymbolicVariantsTest(TestCase):
         v = slowly_create_test_variant_from_coordinate(long_del, self.grch37)
         Variant.objects.filter(pk=v.pk).update(svlen=5000)
 
-        call_command("one_off_fix_symbolic_variants")
+        call_command("one_off_fix_symbolic_variants", stdout=StringIO())
         v.refresh_from_db()
         self.assertEqual(-5000, v.svlen)
 

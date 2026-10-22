@@ -3,7 +3,7 @@ import unittest
 from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
-from django.utils.timezone import localdate
+from django.utils.timezone import now
 
 from annotation.fake_data import get_fake_annotation_version
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
@@ -32,7 +32,7 @@ class Test(URLTestCase):
         upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING,
                                                         file_upload=file_upload)
         _upload_step = upload_pipeline.uploadstep_set.create(name="fake step", sort_order=0)
-        vcf = VCF.objects.create(name="fake_vcf.vcf", date=localdate(), user=cls.user_owner,
+        vcf = VCF.objects.create(name="fake_vcf.vcf", date=now(), user=cls.user_owner,
                                  genotype_samples=0, genome_build=cls.grch37)
         UploadedVCF.objects.create(file_upload=file_upload,
                                    vcf=vcf,
