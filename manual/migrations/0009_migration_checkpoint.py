@@ -7,6 +7,7 @@ manual.checkpoint stops this branch running - switch to master / the release bra
 from django.conf import settings
 from django.db import migrations
 
+from manual.checkpoint import SAPATH_CHECKPOINT_MIGRATION
 from manual.upgrader import outstanding_tasks_json
 
 FINAL_MIGRATIONS = [
@@ -33,7 +34,7 @@ FINAL_MIGRATIONS = [
     ('user_messages', '0002_migrate_legacy_django_messages'),
 ]
 if "sapath" in {app.split(".")[0] for app in settings.INSTALLED_APPS}:
-    FINAL_MIGRATIONS.append(('sapath', '0025_merge_tso500_kits_timestamps'))
+    FINAL_MIGRATIONS.append(SAPATH_CHECKPOINT_MIGRATION)
 
 
 def _refuse_while_manual_tasks_outstanding(_apps, _schema_editor):
