@@ -260,7 +260,7 @@ uses to split germline from somatic contexts.
 
 **Allele resolution is shared and asynchronous.** Thousands of records cite the same HGVS; resolving once per distinct
 input (`ImportedAlleleInfo`) rather than per classification makes re-matching after a transcript or cdot upgrade tractable
-(`classification_re_matching`, `fix_variant_matching` in `claude/maps/commands.md`). Matching goes through
+(`classification_re_matching` in `claude/maps/commands.md`). Matching goes through
 the VCF pipeline because that is the only path allowed to create Variants, and liftover is a separate task chain because
 it can take hours on a big import - so a classification has a nullable `variant` and `allele` for as long as that takes.
 
@@ -278,7 +278,7 @@ tumour type category + value type (the unique constraint on `Overlap`).
 - `Classification.variant` and `.allele` are nullable and are being retired in favour of `allele_object` (which reads
   `allele_info.allele`). Queries such as `ClassificationModification.latest_for_user(allele=...)` still go through
   `classification__variant__in`, so a record whose allele info resolved but whose `variant` column was never copied is
-  invisible to them; `fix_allele_info` and `classification_ensure_alleles_and_liftover` repair that.
+  invisible to them; `classification_ensure_alleles_and_liftover` repairs that.
 - `latest_for_user` without `published=True` and without a single `classification` filters on `is_last_edited`, which
   drops records that have an unpublished edit the caller could not see anyway; the FIXME in the method is real.
 - `ClinicalContext.classifications_qs` excludes research labs unless `settings.DISCORDANCE_RESEARCH_ENABLED`, so a

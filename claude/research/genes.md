@@ -253,9 +253,7 @@ release - it inserts, updates `match_info` and deletes matches the current rules
 never does (`match_symbols_to_genes` only inserts), so rows left behind by an alias re-import or an older matcher need
 it. Run it `--dry-run` first.
 
-Genes prefixed `unknown_` are legacy placeholders from pre-GFF imports; `genes/management/commands/fix_fake_genes.py:Command`
-re-points their transcripts where another version names the gene and `Gene.delete_orphaned_fake_genes` removes the
-rest. `LRGRefSeqGene.get_transcript_version` requires the `t` part (`LRG_199t1`); a bare `LRG_199` raises.
+`LRGRefSeqGene.get_transcript_version` requires the `t` part (`LRG_199t1`); a bare `LRG_199` raises.
 genes models don't import annotation (annotation.models imports genes.models at module level): code needing both
 lives in annotation or at the call site. `PanelAppPanel.cache_valid` is time-based, so a test that touches a stale panel makes a
 network call; `MANE` is GRCh38-only and `MANE.get_mane_and_aliases_list_from_symbol` raises when the table is empty,

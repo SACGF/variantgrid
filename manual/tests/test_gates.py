@@ -190,7 +190,7 @@ class SchedulerTest(TestCase):
         self.assertEqual(failed, ["X"])
 
     def test_after_chain_runs_in_insertion_order_end_to_end(self):
-        # Backfilled after-gates (see 0005) must make the fix_variant_matching-style chain run strictly
+        # Backfilled after-gates (see 0005) must make a chain of manage steps run strictly
         # in order. Uses the real run_scheduler + outstanding_tasks_json + gate resolution; no gates besides
         # the after-chain, so nothing external blocks it.
         a = ManualMigrationTask.objects.create(id="manage*migrate")

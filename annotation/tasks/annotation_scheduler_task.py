@@ -216,7 +216,7 @@ def count_annotation_runs(annotation_run_ids, lease_token):
                 try:
                     runner.handle_empty_dump(annotation_run)
                 except Exception:
-                    # Not worth stalling the count lane over - fix_annotation_vep_too_long writes what's missing
+                    # Not worth stalling the count lane over
                     log_traceback()
                     report_message(f"AnnotationRun {annotation_run_id}: handle_empty_dump failed", level="error")
                 # Empty - finish without a dump. dump_count=0 keeps get_status() consistent (-> FINISHED).

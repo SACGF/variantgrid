@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 from collections import Counter, defaultdict
@@ -589,14 +588,6 @@ class Gene(PreviewModelMixin, models.Model):
         if annotation_consortium:
             qs = qs.filter(annotation_consortium=annotation_consortium)
         return set(qs.values_list("identifier", flat=True))
-
-    @staticmethod
-    def delete_orphaned_fake_genes():
-        used_genes = TranscriptVersion.objects.filter(gene_version__gene__identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).values_list("gene_version__gene")
-        qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
-        ret = qs.delete()
-        if ret:
-            logging.info("Deleted orphaned %s records: %s", Gene.FAKE_GENE_ID_PREFIX, ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
