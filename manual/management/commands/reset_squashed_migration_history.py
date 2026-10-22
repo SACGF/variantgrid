@@ -10,7 +10,7 @@ from manual.squashed_history import (
 
 class Command(BaseCommand):
     """ Once per deployment, after branch migration_checkpoint: swaps the pre-squash migration rows for the new
-        initials (#736). The upgrader runs it before migrate; a no-op on a current database """
+        initials (#736). Run by hand, before scripts/upgrade.sh; a no-op on a current database """
     category = "ops"
     requires_system_checks = []  # check_squashed_history errors on exactly the database this command fixes
 

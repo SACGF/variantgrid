@@ -11,8 +11,8 @@ A database is in one of three states, judged on the django_migrations rows of ou
 - needs_reset: rows from the old history and the checkpoint row - delete them and record the new initial
   migrations as applied (every one with `initial = True`, which the squash's seed migrations also set)
 
-Entry points: history_state, reset_squashed_history (`manage.py reset_squashed_migration_history`, the
-upgrader's step before migrate), check_squashed_history (a database system check, so migrate and
+Entry points: history_state, reset_squashed_history (`manage.py reset_squashed_migration_history`, run by hand
+once per deployment so the rewrite of django_migrations is seen), check_squashed_history (a database system check, so migrate and
 `check --database default` run it) and refuse_migrate_on_old_history (pre_migrate).
 """
 import os
@@ -58,10 +58,10 @@ def history_state_message(state: HistoryState) -> str:
     if state == HistoryState.NEEDS_CHECKPOINT:
         return (f"This database has migrations from before the squash (#736). Check out branch '{CHECKPOINT_BRANCH}', "
                 "run scripts/upgrade.sh there (migrate, then every outstanding manual task), then come back to this "
-                "branch.")
+                "branch and run 'python3 manage.py reset_squashed_migration_history'.")
     if state == HistoryState.NEEDS_RESET:
         return ("This database has passed the migration checkpoint but still holds the old migration history: run "
-                "scripts/upgrade.sh, or 'python3 manage.py reset_squashed_migration_history' then migrate.")
+                "'python3 manage.py reset_squashed_migration_history', then scripts/upgrade.sh.")
     return "Migration history is current."
 
 

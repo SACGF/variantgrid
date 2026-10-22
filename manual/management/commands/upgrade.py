@@ -10,7 +10,6 @@ from manual.upgrader import Upgrader
 class Command(BaseCommand):
     """ The deploy upgrader - run it through ./scripts/upgrade.sh, which installs requirements first """
     category = "ops"
-    requires_system_checks = []  # resets a pre-squash migration history (#736), which check_squashed_history errors on
     help = "Deploy upgrader: standard steps (git pull, migrate, collectstatic, deployment_check, deployed) " \
            "and the outstanding manual steps migrations registered, all in this one process. " \
            "With no option, an interactive menu. Set VG_INSTALL_REQUIREMENTS=0 to skip installing requirements."

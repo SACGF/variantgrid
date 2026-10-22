@@ -110,7 +110,8 @@ with no `replaces`, so a database from before the squash first upgrades through 
 `migration_checkpoint`: its last migration (`manual 0009_migration_checkpoint`) depends on every app's final old
 migration and refuses while manual tasks are outstanding, since their one-off commands are gone here. Back on this
 branch, `manual/squashed_history.py` refuses to run (system check, and `pre_migrate`) against an old history until the
-upgrader's `s` step (`reset_squashed_migration_history`) swaps the old django_migrations rows for the new initials.
+one-off `manage.py reset_squashed_migration_history`, run by hand before `scripts/upgrade.sh`, swaps the old
+django_migrations rows for the new initials.
 A seed migration is `initial = True` so that reset records it; nothing added after the squash may be. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.

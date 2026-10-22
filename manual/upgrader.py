@@ -303,7 +303,7 @@ def parse_selection(selection: str, steps: list[UpgradeStep]) -> list[UpgradeSte
 
 
 class Upgrader:
-    STANDARD_KEYS = "g, s, m, r, c, k, d"
+    STANDARD_KEYS = "g, m, r, c, k, d"
 
     def __init__(self):
         self.git_version = Git(settings.BASE_DIR).hash
@@ -312,8 +312,6 @@ class Upgrader:
     def standard_steps(self) -> list[UpgradeStep]:
         return [
             GitPullStep().using(key="g", task_id="git*pull"),
-            ManageStep(["reset_squashed_migration_history"]).using(
-                key="s", task_id="manage*reset_squashed_migration_history"),
             ManageStep(["migrate"]).using(key="m", task_id="manage*migrate"),
             ManageStep(["collectstatic_js_reverse"]).using(key="r", task_id="manage*collectstatic_js_reverse"),
             # collectstatic without warning for conflicting files has been an issue for 6 years
