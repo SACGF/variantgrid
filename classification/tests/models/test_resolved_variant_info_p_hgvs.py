@@ -1,8 +1,9 @@
 """
 ResolvedVariantInfo's canonical p.HGVS: source order (VEP, computed, ClinGen, evidence), the guards that reject a
-bad value from a source, and the set_variant_and_save hook (#1383)
+bad value from a source, the set_variant_and_save hook (#1383) and the refresh when an annotation run completes (#2421)
 """
 from io import StringIO
+from typing import Optional
 from unittest.mock import patch
 
 from django.core.management import call_command
@@ -10,13 +11,19 @@ from django.test import TestCase
 from hgvs.exceptions import HGVSDataNotAvailableError
 from hgvs.parsers import Parser
 
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.fake_data import create_fake_variant_annotation, get_fake_annotation_version
 from annotation.models import VariantTranscriptAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.signals.manual_signals import annotation_run_complete_signal
 from classification.enums import PHGVSSource, SpecialEKeys, SubmissionSource
 from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import (
     HGVSResolution,
     ResolvedVariantInfo,
+)
+from classification.tasks.resolved_variant_info_p_hgvs_task import (
+    recalc_p_hgvs_for_annotated_variants,
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_gata2_transcript_version
@@ -53,11 +60,23 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
                                                       variant=self.variant, resolved_hgvs=C_HGVS,
                                                       transcript_version=self.transcript_version)
 
-    def _vep(self, hgvs_p: str):
+    def _vep(self, hgvs_p: str) -> AnnotationRun:
         vav = self.annotation_version.variant_annotation_version
         va = create_fake_variant_annotation(self.variant, vav)
         VariantTranscriptAnnotation.objects.create(version=vav, variant=self.variant, annotation_run=va.annotation_run,
                                                    transcript_version=self.transcript_version, hgvs_p=hgvs_p)
+        return va.annotation_run
+
+    def _annotation_run_complete(self, annotation_run: AnnotationRun, pipeline_type) -> Optional[int]:
+        """ Sends the signal, runs the task it queued in process; returns rows written, None if nothing queued """
+        with patch("classification.signals.classification_hooks_p_hgvs.recalc_p_hgvs_for_annotated_variants_task") \
+                as task, self.captureOnCommitCallbacks(execute=True):
+            annotation_run_complete_signal.send(
+                sender="test", variant_annotation_version=self.annotation_version.variant_annotation_version,
+                pipeline_type=pipeline_type, annotation_run=annotation_run)
+        if not task.si.called:
+            return None
+        return recalc_p_hgvs_for_annotated_variants(*task.si.call_args.args)
 
     def _clingen(self, p_hgvs: str):
         api_response = {"@id": "http://reg.genome.network/allele/CA1383",
@@ -152,7 +171,28 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
         self.assertEqual((None, None, None), (self.rvi.p_hgvs, self.rvi.p_hgvs_source, self.rvi.p_hgvs_error))
 
     def test_backfill_command(self):
-        call_command("one_off_backfill_resolved_variant_info_p_hgvs", "--genome-build", "GRCh37", "--sync",
+        call_command("recalc_resolved_variant_info_p_hgvs", "--genome-build", "GRCh37", "--sync",
                      stdout=StringIO())
         self.rvi.refresh_from_db()
         self.assertEqual((COMPUTED_P_HGVS, PHGVSSource.COMPUTED), (self.rvi.p_hgvs, self.rvi.p_hgvs_source))
+
+    def test_annotation_run_complete_replaces_computed_with_vep(self):
+        self.rvi.set_p_hgvs()
+        self.rvi.save()
+        self.assertEqual(PHGVSSource.COMPUTED, self.rvi.p_hgvs_source)
+        annotation_run = self._vep("NP_001139133.1:p.Glu2Ter")
+        self.assertEqual(1, self._annotation_run_complete(annotation_run, VariantAnnotationPipelineType.STANDARD))
+        self.rvi.refresh_from_db()
+        self.assertEqual(("NP_001139133.1:p.(Glu2Ter)", PHGVSSource.VEP), (self.rvi.p_hgvs, self.rvi.p_hgvs_source))
+
+    def test_annotation_run_complete_skips_vep_sourced(self):
+        ResolvedVariantInfo.objects.filter(pk=self.rvi.pk).update(p_hgvs="NP_001139133.1:p.(Glu2Gly)",
+                                                                  p_hgvs_source=PHGVSSource.VEP)
+        annotation_run = self._vep("NP_001139133.1:p.Glu2Ter")
+        self.assertEqual(0, self._annotation_run_complete(annotation_run, VariantAnnotationPipelineType.STANDARD))
+        self.rvi.refresh_from_db()
+        self.assertEqual("NP_001139133.1:p.(Glu2Gly)", self.rvi.p_hgvs)
+
+    def test_annotation_run_complete_ignores_non_vep_pipeline(self):
+        annotation_run = self._vep("NP_001139133.1:p.Glu2Ter")
+        self.assertIsNone(self._annotation_run_complete(annotation_run, VariantAnnotationPipelineType.GENE_LEVEL))

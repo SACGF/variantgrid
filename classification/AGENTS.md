@@ -9,7 +9,8 @@ Start with:
 - enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/enums/snpdb_enums.py (re-exported by classification.enums; import them from snpdb).
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
   Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
-  not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
+  not tied to an annotation version: rerun `recalc_resolved_variant_info_p_hgvs` after a new VEP version becomes the latest or transcript sequences land.
+  Matching runs before VEP annotates a new variant, so a completed VEP annotation run of the latest version recomputes the non-VEP rows on its range lock's variants (`classification/signals/classification_hooks_p_hgvs.py`, #2421).
   Pages and grids show it, never the `p_hgvs` evidence, by passing it to `HGVSDisplay(p_hgvs=...)` from the same build as the c.HGVS (an imported c.HGVS takes the imported build's: `ImportedAlleleInfo.imported_hgvs_display`); `to_json` and the `p_hgvs` template tag put it inline after the c. nomen, short with the full form as tooltip, gated on `CLASSIFICATION_GRID_SHOW_PHGVS` (#19).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.

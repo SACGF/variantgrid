@@ -1,6 +1,10 @@
 """
-Backfill ResolvedVariantInfo.p_hgvs / p_hgvs_source / p_hgvs_error (#1383). Only those three columns are written,
-so it is cheap and safe to rerun - eg after a new VEP version lands or transcript sequences have been cached.
+Recalculate ResolvedVariantInfo.p_hgvs / p_hgvs_source / p_hgvs_error (#1383). Only those three columns are written,
+so it is cheap and safe to rerun.
+
+A completed annotation run already refreshes the rows on its variants that aren't VEP-sourced (#2421). Run this after
+a new VEP version becomes the latest (VEP-sourced rows still hold the old version's hgvs_p) or once transcript
+sequences have been cached.
 
 Rows are split into pk ranges of --batch-size and queued as celery tasks on db_workers, so batches run in parallel
 (--sync runs them in this process instead).
