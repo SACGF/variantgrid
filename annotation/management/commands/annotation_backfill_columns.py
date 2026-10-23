@@ -4,7 +4,8 @@ Backfill VariantAnnotation columns from an annotated VCF (#1675).
 
 --dump writes the variants already annotated in a version to a VCF carrying variant_id in INFO; the
 operator annotates that file however suits the column (bcftools annotate against a COSMIC VCF, or VEP);
---import reads it back and updates the named columns.
+--import reads it back and updates the named columns, and --mark-backfilled then sets the version's
+backfilled_* flag so readers stop treating the column's nulls as "not backfilled yet".
 """
 import os
 
@@ -15,7 +16,9 @@ from annotation.backfill_columns import (
     BackfillColumnError,
     dump_annotated_variants,
     import_backfill_vcf,
+    mark_backfilled,
     resolve_backfill_columns,
+    validate_backfill_flag,
 )
 from annotation.models.models_version import VariantAnnotationVersion
 from snpdb.models.models_genome import GenomeBuild
@@ -50,6 +53,10 @@ class Command(BaseCommand):
                             help="--dump: only variants that already have a value for these comma "
                                  "separated columns, eg a sibling column the same source writes - "
                                  "keeps the dump to the variants that source can say anything about")
+        parser.add_argument("--consequence", metavar="SO_TERM",
+                            help="--dump: only variants whose representative transcript has this "
+                                 "consequence, eg '5_prime_UTR_variant' for a plugin that annotates only "
+                                 "those - the PICK'd entry a --csq import reads")
         parser.add_argument("--min-variant-id", type=int,
                             help="--dump: split a large dump into pieces that can be annotated in parallel")
         parser.add_argument("--max-variant-id", type=int, help="--dump: see --min-variant-id")
@@ -61,6 +68,10 @@ class Command(BaseCommand):
                                  "authoritative for the dumped variants (default: leave it alone)")
         parser.add_argument("--dry-run", action="store_true",
                             help="--import: report how many rows would change, changing nothing")
+        parser.add_argument("--mark-backfilled", metavar="FLAG",
+                            help="--import: once the import finishes, set this VariantAnnotationVersion "
+                                 "flag True, eg 'backfilled_utr_avi_splicevault'. Only on the import of the "
+                                 "last (or only) piece of a split dump")
 
     def handle(self, *args, **options):
         genome_build = GenomeBuild.get_name_or_alias(options["genome_build"])
@@ -68,6 +79,13 @@ class Command(BaseCommand):
         column_ids = [c.strip() for c in options["columns"].split(",") if c.strip()]
         if not column_ids:
             raise CommandError("--columns needs at least one VariantGrid column id")
+        if flag := options["mark_backfilled"]:
+            if options["dump"]:
+                raise CommandError("--mark-backfilled is an --import option")
+            try:
+                validate_backfill_flag(flag)
+            except BackfillColumnError as e:
+                raise CommandError(str(e)) from e
 
         try:
             targets = resolve_backfill_columns(variant_annotation_version, column_ids,
@@ -122,6 +140,7 @@ class Command(BaseCommand):
             count = dump_annotated_variants(variant_annotation_version, output_filename, targets=targets,
                                             only_missing=options["only_missing"],
                                             not_null_columns=not_null_columns,
+                                            consequence=options["consequence"],
                                             min_variant_id=options["min_variant_id"],
                                             max_variant_id=options["max_variant_id"])
         except BackfillColumnError as e:
@@ -151,3 +170,10 @@ class Command(BaseCommand):
         verb = "would change" if options["dry_run"] else "changed"
         self.stdout.write(f"{variant_annotation_version}: read {report['records_read']} records, "
                           f"{verb} {report['rows_changed']} rows")
+
+        if flag := options["mark_backfilled"]:
+            if options["dry_run"]:
+                self.stdout.write(f"Would set {flag} on {variant_annotation_version}")
+            else:
+                mark_backfilled(variant_annotation_version, flag)
+                self.stdout.write(f"Set {flag} on {variant_annotation_version}")

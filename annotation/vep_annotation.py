@@ -11,6 +11,7 @@ import os
 import re
 import uuid
 from functools import lru_cache
+from itertools import pairwise
 from shlex import shlex
 from typing import Optional
 
@@ -261,7 +262,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 # the variant isn't the credible set lead - ie most of a variant's GWAS L2G scores (#1822)
                 VEPPlugin.OPEN_TARGETS: lambda: f"OpenTargets,file={vc['open_targets']},cols=all,lead_variants_only=0",
             })
-            # EVE and PromoterAI are only available in VEP >= 116
+            if vc.vep_version >= 112:
+                plugin_data_func.update({
+                    # Effects come from the transcript sequence - the file only adds uORF evidence
+                    VEPPlugin.UTR_ANNOTATOR: lambda: f"UTRAnnotator,file={vc['utr_annotator']}",
+                    VEPPlugin.SPLICEVAULT: lambda: f"SpliceVault,file={vc['splicevault']}",
+                })
+            # EVE, PromoterAI and AVI are only available in VEP >= 116
             if vc.vep_version >= 116:
                 plugin_data_func.update({
                     VEPPlugin.EVE: lambda: f"EVE,file={vc['eve']},popeve_file={vc['popeve']}",
@@ -271,6 +278,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                     # + alt allele only. The file is pre-filtered to TSS±500 promoter variants, so every hit
                     # is a genuine promoter prediction.
                     VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']},match_to=any",
+                    # AVI.pm is on VEP_plugins release/116 from 2026-08-27 - older 116 checkouts lack it
+                    VEPPlugin.AVI: lambda: f"AVI,file={vc['avi']},raw=1",
                 })
 
     else:
@@ -306,6 +315,26 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             logging.warning("No annotation set for plugin: %s", vep_plugin)
 
     return cmd
+
+
+def get_missing_vep_files(genome_build: GenomeBuild) -> dict[str, str]:
+    """ What a STANDARD VEP run on this build needs and can't find: key (a vep_config key, or
+        'plugin <name>') -> path. A plugin can be newer than the VEP_plugins checkout (AVI.pm, #2426),
+        which VEP only reports once a run fails """
+    check_files = {key: genome_build.settings[key] for key in ("reference_fasta", "cytoband")}
+    vep_config = VEPConfig(genome_build)
+    for key, rel_path in vep_config.vep_data.items():
+        if rel_path is not None:
+            check_files[key] = vep_config[key]
+
+    vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium,
+                                  VariantAnnotationPipelineType.STANDARD)
+    for flag, plugin_arg in pairwise(vep_command):
+        if flag == "--plugin":
+            plugin_name = plugin_arg.split(",")[0]
+            check_files[f"plugin {plugin_name}"] = os.path.join(settings.ANNOTATION_VEP_PLUGINS_DIR,
+                                                                f"{plugin_name}.pm")
+    return {key: filename for key, filename in check_files.items() if not os.path.exists(filename)}
 
 
 def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,

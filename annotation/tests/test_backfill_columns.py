@@ -1,9 +1,11 @@
 """
 Backfilling VariantAnnotation columns from an annotated VCF (#1675).
 """
+import io
 import os
 import tempfile
 
+from django.core.management import CommandError, call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 
@@ -219,6 +221,46 @@ class BackfillColumnRoundTripTests(TestCase):
             count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
                                             only_missing=True, not_null_columns=["cosmic_legacy_id"])
         self.assertEqual(count, 1)
+
+    def test_consequence_dumps_matching_representative_transcripts(self):
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[0]) \
+                                 .update(consequence="intron_variant&5_prime_UTR_variant")
+        # Not the SO term itself - consequence is matched term by term
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[1]) \
+                                 .update(consequence="5_prime_UTR_variant_lookalike")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                            consequence="5_prime_UTR_variant")
+        self.assertEqual(count, 1)
+
+    def _import_command(self, annotated_filename: str, *args):
+        call_command("annotation_backfill_columns", "--import", "--genome-build", "GRCh37",
+                     "--variant-annotation-version", str(self.vav.pk), "--columns", "cosmic_count",
+                     "--info", f"cosmic_count={COSMIC_V101_SAMPLE_COUNT}", "--vcf", annotated_filename, *args,
+                     stdout=io.StringIO())
+
+    def test_mark_backfilled_sets_flag_after_import(self):
+        VariantAnnotationVersion.objects.filter(pk=self.vav.pk).update(backfilled_utr_avi_splicevault=False)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._dump_and_annotate(tmp_dir, {self.variants[0].pk: "12"})
+            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_avi_splicevault", "--dry-run")
+            self.vav.refresh_from_db()
+            self.assertFalse(self.vav.backfilled_utr_avi_splicevault)
+
+            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_avi_splicevault")
+        self.vav.refresh_from_db()
+        self.assertTrue(self.vav.backfilled_utr_avi_splicevault)
+        self.assertEqual(self._cosmic_counts(), [12, None, 3])
+
+    def test_mark_backfilled_refuses_a_field_that_is_not_a_backfill_flag(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._dump_and_annotate(tmp_dir, {self.variants[0].pk: "12"})
+            for field in ("columns_version", "backfilled_nothing"):
+                with self.subTest(field), self.assertRaises(CommandError):
+                    self._import_command(annotated_filename, "--mark-backfilled", field)
+        # Refused before anything was imported
+        self.assertEqual(self._cosmic_counts(), [None, None, 3])
 
     def test_not_null_rejects_a_column_that_is_not_a_field(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

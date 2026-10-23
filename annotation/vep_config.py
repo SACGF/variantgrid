@@ -29,12 +29,15 @@ def parse_cosmic_version_from_filename(path: str) -> Optional[int]:
 # vep_config data files whose name carries no version - we pin the basename, so swapping the installed
 # file registers as a change, as does removing it (which drops that data's columns via has_data_files)
 _BASENAME_PIN_FIELDS = {
+    "avi": "avi",
     "eve": "eve",
     "maxentscan": "maxentscan",
     "promoter_ai": "promoter_ai",
     "protvar": "protvar",
     "repeatmasker": "repeat_masker",
+    "splicevault": "splicevault",
     "transcript_blocklist": "transcript_blocklist",
+    "utr_annotator": "utr_annotator",
 }
 
 # Data files with a version in the name that don't already have a VariantAnnotationVersion field.

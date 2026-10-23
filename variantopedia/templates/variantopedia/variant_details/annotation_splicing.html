@@ -42,6 +42,9 @@
             {% else %}
                 {% labelled id='spliceai_none' label='SpliceAI' help=annotation_description.spliceai hint="tiny" value_css="no-value" %}No SpliceAI Data{% endlabelled %}
             {% endif %}
+            {# Representative transcript values, under ids transcriptFunc doesn't overwrite: a backfill fills VariantAnnotation only (#2426) #}
+            {% labelled id='splicevault_site' show_if='splicevault_site_pos' visible_fields=visible_fields label='SpliceVault site' help=annotation_description.splicevault_site_pos hint="tiny" %}{% if variant_annotation.splicevault_not_backfilled %}<span class="text-muted">Not backfilled yet for this annotation version</span>{% elif variant_annotation.splicevault_site_pos %}<span class="text-monospace">{{ variant_annotation.splicevault_site_type }}</span> <span class="text-secondary">at</span> <span class="text-monospace">{{ variant_annotation.splicevault_site_pos }}</span><div class="text-muted small mt-1">SpliceAI delta {{ variant_annotation.splicevault_spliceai_delta }} &middot; samples {{ variant_annotation.splicevault_site_sample_count }} &middot; max depth {{ variant_annotation.splicevault_site_max_depth }} &middot; {{ variant_annotation.splicevault_out_of_frame_events }}</div>{% endif %}{% endlabelled %}
+            {% labelled id='splicevault_events' show_if='splicevault_top_events' visible_fields=visible_fields label='SpliceVault top events' help=annotation_description.splicevault_top_events hint="tiny" %}{% for event in variant_annotation.splicevault_top_events_list %}<div class="text-monospace">{{ event }}</div>{% endfor %}{% endlabelled %}
         </div>
     </div>
 </div>

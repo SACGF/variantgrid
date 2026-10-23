@@ -190,6 +190,13 @@ ANNOTATION = {
             "eve": None,  # n/a for GRCh37 (GRCh38 only)
             "popeve": None,  # n/a for GRCh37 (GRCh38 only)
             "promoter_ai": None,  # n/a for GRCh37 (GRCh38 only)
+            # Off until a deployment sets them and runs manage.py enable_vep_plugin_backfill, which stamps the
+            # columns_version 5 annotation already in use and prints its backfill (#2426)
+            "utr_annotator": None,  # annotation_data/GRCh37/uORF_5UTR_GRCh37_PUBLIC.txt (VEP >= 112)
+            # annotation_data/GRCh37/SpliceVault_data_hg19.refseq_mane.tsv.gz (VEP >= 112), from
+            # manage.py splicevault_to_refseq
+            "splicevault": None,
+            "avi": None,  # n/a for GRCh37 (GRCh38 only)
         }
     },
     BUILD_GRCH38: {
@@ -244,6 +251,14 @@ ANNOTATION = {
             "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",  # VEP >= 116
             "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",  # VEP >= 116
             "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",  # VEP >= 116
+            # Off until a deployment sets them and runs manage.py enable_vep_plugin_backfill, which stamps the
+            # columns_version 5 annotation already in use and prints its backfill (#2426)
+            "utr_annotator": None,  # annotation_data/GRCh38/uORF_5UTR_GRCh38_PUBLIC.txt (VEP >= 112)
+            # annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz (VEP >= 112), from
+            # manage.py splicevault_to_refseq
+            "splicevault": None,
+            # annotation_data/GRCh38/<the .tsv.gz extracted from avi_scores_snvs_tabix.zip> (VEP >= 116)
+            "avi": None,
         }
     },
     BUILD_T2TV2: {
@@ -292,21 +307,26 @@ ANNOTATION = {
             "eve": None,  # n/a (GRCh38 only)
             "popeve": None,  # n/a (GRCh38 only)
             "promoter_ai": None,  # n/a (GRCh38 only)
+            "utr_annotator": None,  # n/a (no T2T uORF data)
+            "splicevault": None,  # n/a (GRCh37/38 only)
+            "avi": None,  # n/a (GRCh38 only)
         }
     },
 }
 
 def _disable_columns_version_5_plugins(annotation):
-    """Clear the columns_version 5 VEP plugin data keys (#1638) to None across all builds.
+    """Clear the columns_version 5 VEP plugin data keys (#1638, #2426) to None across all builds.
 
     The package default points these at real data files (ProtVar on all builds; OpenTargets / EVE /
-    popEVE / PromoterAI on GRCh38). Deployments pinned below columns_version 5 haven't installed that
-    plugin data (or VEP 116), so clear the keys - vep_columns.has_data_files then drops the plugin
-    columns and get_vep_command skips the matching --plugin invocations.
+    popEVE / PromoterAI on GRCh38), and a deployment may set UTRAnnotator / SpliceVault / AVI. Deployments
+    pinned below columns_version 5 haven't installed that plugin data (or VEP 116), so clear the keys -
+    vep_columns.has_data_files then drops the plugin columns and get_vep_command skips the matching
+    --plugin invocations.
     """
     for build_settings in annotation.values():
         vep_config = build_settings["vep_config"]
-        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai"):
+        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai", "utr_annotator",
+                           "splicevault", "avi"):
             if plugin_key in vep_config:
                 vep_config[plugin_key] = None
 

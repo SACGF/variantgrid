@@ -241,6 +241,56 @@ def _gnomad2_grch37(source_field: str, vgc, *, desc: Optional[str] = None,
     })
 
 
+def _utr_annotator(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    """ UTRAnnotator plugin, GRCh37/38 (no T2T uORF data). Added to versions already in use rather than
+        with a columns_version bump (see VariantAnnotationVersion.backfilled_utr_avi_splicevault), so it is
+        gated at the columns_version they hold. VEP 112 renamed its uORF stop codon consequences. """
+    return VEPColumnDef(**{
+        "source_field": source_field,
+        "variant_grid_columns": _to_vgc_tuple(vgc),
+        "category": ColumnAnnotationCategory.SEQUENCE,
+        "vep_plugin": VEPPlugin.UTR_ANNOTATOR,
+        "genome_builds": GRCH37_38,
+        "pipeline_types": STANDARD,
+        "min_columns_version": 5,
+        "min_vep_version": 112,
+        **overrides,
+    })
+
+
+def _splicevault(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    """ SpliceVault plugin, GRCh37/38, added to versions in use like _utr_annotator. The plugin only
+        matches a transcript whose stable_id is in the data file, so RefSeq builds need the file
+        converted to MANE RefSeq ids (annotation/splicevault.py). """
+    return VEPColumnDef(**{
+        "source_field": source_field,
+        "variant_grid_columns": _to_vgc_tuple(vgc),
+        "category": ColumnAnnotationCategory.SPLICING_PREDICTIONS,
+        "vep_plugin": VEPPlugin.SPLICEVAULT,
+        "genome_builds": GRCH37_38,
+        "pipeline_types": STANDARD,
+        "min_columns_version": 5,
+        "min_vep_version": 112,
+        **overrides,
+    })
+
+
+def _avi(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    """ AVI (AlphaGenome Variant Impact) plugin: GRCh38 SNVs, added to versions in use like
+        _utr_annotator. Matched on position and allele, so it works with --refseq. """
+    return VEPColumnDef(**{
+        "source_field": source_field,
+        "variant_grid_columns": _to_vgc_tuple(vgc),
+        "category": ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS,
+        "vep_plugin": VEPPlugin.AVI,
+        "genome_builds": GRCH38,
+        "pipeline_types": STANDARD,
+        "min_columns_version": 5,
+        "min_vep_version": 116,
+        **overrides,
+    })
+
+
 def _gnomad_sv(source_field: str, vgc, **overrides) -> VEPColumnDef:
     """ gnomAD SV, custom prefix, structural-variant pipeline. genome_builds varies. """
     return VEPColumnDef(**{
@@ -1235,7 +1285,31 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_columns_version=5,
         min_vep_version=116,
     ),
+
+    # ---------- UTRAnnotator (GRCh37/38, VEP >= 112, columns_version >= 5) - #2426 ----
+    _utr_annotator('5UTR_consequence', 'utr_annotator_consequence', formatter=fmt.format_dash_as_none),
+    _utr_annotator('5UTR_annotation', 'utr_annotator_annotation', formatter=fmt.format_dash_as_none,
+                   separator=fmt.VEP_SEPARATOR),
+    _utr_annotator('Existing_uORFs', 'utr_annotator_existing_uorfs'),
+    _utr_annotator('Existing_OutOfFrame_oORFs', 'utr_annotator_existing_out_of_frame_oorfs'),
+    _utr_annotator('Existing_InFrame_oORFs', 'utr_annotator_existing_inframe_oorfs'),
+
+    # ---------- SpliceVault (GRCh37/38, VEP >= 112, columns_version >= 5) - #2426 ----
+    _splicevault('SpliceVault_top_events', 'splicevault_top_events', separator=fmt.VEP_SEPARATOR),
+    _splicevault('SpliceVault_site_sample_count', 'splicevault_site_sample_count'),
+    _splicevault('SpliceVault_site_max_depth', 'splicevault_site_max_depth'),
+    _splicevault('SpliceVault_out_of_frame_events', 'splicevault_out_of_frame_events'),
+    _splicevault('SpliceVault_site_pos', 'splicevault_site_pos'),
+    _splicevault('SpliceVault_site_type', 'splicevault_site_type'),
+    _splicevault('SpliceVault_SpliceAI_delta', 'splicevault_spliceai_delta'),
+
+    # ---------- AVI (GRCh38, VEP >= 116, columns_version >= 5) - #2426 ----
+    _avi('AVI_PHRED', 'avi_phred'),
+    _avi('AVI_RAW', 'avi_raw'),
 )
+
+# UTRAnnotator only annotates transcripts with this consequence
+FIVE_PRIME_UTR_VARIANT = "5_prime_UTR_variant"
 
 
 # vep_config setting keys (under settings.ANNOTATION[<build>]["vep_config"]) that must be
@@ -1253,6 +1327,9 @@ _VEP_PLUGIN_SETTING_KEYS: dict[VEPPlugin, tuple[str, ...]] = {
     VEPPlugin.OPEN_TARGETS: ("open_targets",),
     VEPPlugin.EVE: ("eve", "popeve"),
     VEPPlugin.PROMOTER_AI: ("promoter_ai",),
+    VEPPlugin.UTR_ANNOTATOR: ("utr_annotator",),
+    VEPPlugin.SPLICEVAULT: ("splicevault",),
+    VEPPlugin.AVI: ("avi",),
     VEPPlugin.GRANTHAM: (),
     VEPPlugin.LOFTOOL: (),
     VEPPlugin.NMD: (),
