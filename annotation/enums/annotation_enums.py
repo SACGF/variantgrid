@@ -116,6 +116,7 @@ class ColumnAnnotationCategory(models.TextChoices):
 
 
 class VEPPlugin(models.TextChoices):
+    AVI = 'i', 'AVI'
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
     EVE = 'E', 'EVE'
@@ -130,6 +131,7 @@ class VEPPlugin(models.TextChoices):
     PROTVAR = 'p', 'ProtVar'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
+    SPLICEVAULT = 't', 'SpliceVault'
     UTR_ANNOTATOR = 'u', 'UTRAnnotator'
 
 

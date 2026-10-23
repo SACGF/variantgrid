@@ -70,7 +70,7 @@ class Command(BaseCommand):
                             help="--import: report how many rows would change, changing nothing")
         parser.add_argument("--mark-backfilled", metavar="FLAG",
                             help="--import: once the import finishes, set this VariantAnnotationVersion "
-                                 "flag True, eg 'backfilled_utr_annotator'. Only on the import of the "
+                                 "flag True, eg 'backfilled_utr_avi_splicevault'. Only on the import of the "
                                  "last (or only) piece of a split dump")
 
     def handle(self, *args, **options):

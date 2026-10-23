@@ -182,34 +182,72 @@ order and flags as the pipeline so the PICK'd transcript matches, then `--import
 - `--mark-backfilled <flag>` sets the VAV's `backfilled_*` flag once the import finishes. With a split dump, pass it
   on the last import only.
 
-**UTRAnnotator (#2426)** is this recipe applied: five `utr_annotator_*` columns on both annotation tables, gated at
-`min_columns_version=5` / `min_vep_version=112` (VEP 112 renamed its uORF stop codon terms) for GRCh37/38, the
-`utr_annotator` basename pin, and `backfilled_utr_annotator`. `annotation/migrations/0004_utr_annotator.py` stamps
-the pin and sets the flag False on NEW/ACTIVE versions with range locks that the columns cover; the ManualOperation
-in `annotation/migrations/0005_utr_annotator_manual_backfill.py` writes these steps into its note with each
-version's pk and `--max-variant-id` filled in:
+**UTRAnnotator, AVI and SpliceVault (#2426)** are this recipe applied to three plugins at once, so a deployment runs
+one backfill VEP pass and one import:
 
-1. Download uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator
-   into `annotation_data/<build>/` under ANNOTATION_VEP_BASE_DIR (`vep_data_check` reports it missing). The plugin
-   computes the effects from the transcript sequence, so it runs - with every `Evidence` NA - when the file is missing.
-2. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns
-   utr_annotator_consequence,utr_annotator_annotation,utr_annotator_existing_uorfs,utr_annotator_existing_out_of_frame_oorfs,utr_annotator_existing_inframe_oorfs
-   --consequence 5_prime_UTR_variant --max-variant-id <max> --output utr_annotator_<build>.vcf.gz`, splitting by
-   `--min/max-variant-id` to run VEP in parallel.
-3. VEP: copy the `pipeline_command` of one of the version's STANDARD AnnotationRuns, swap `-i` / `-o`, replace every
-   `--plugin` / `--custom` with `--plugin UTRAnnotator,file=<file>` and add
-   `--fields Feature,PICK,5UTR_consequence,5UTR_annotation,Existing_uORFs,Existing_OutOfFrame_oORFs,Existing_InFrame_oORFs`.
-   Everything else stays, so the PICK'd transcript is the representative one.
-4. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` / `--columns`,
-   `--csq utr_annotator_consequence=5UTR_consequence --csq utr_annotator_annotation=5UTR_annotation
-   --csq utr_annotator_existing_uorfs=Existing_uORFs --csq utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs
-   --csq utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs --vcf <annotated>`, `--dry-run` first, then
-   with `--mark-backfilled backfilled_utr_annotator` (last piece only).
+- UTRAnnotator: five `utr_annotator_*` columns on both annotation tables, GRCh37/38, `min_vep_version=112` (VEP 112
+  renamed its uORF stop codon terms).
+- SpliceVault: seven `splicevault_*` columns on both tables, GRCh37/38, `min_vep_version=112` (the first VEP_plugins
+  release with `SpliceVault.pm`). Its data file is keyed by unversioned ENST and the plugin only returns a row whose
+  transcript equals the annotated transcript's `stable_id`, which on a `--refseq` run is a versioned NM - so a
+  RefSeq build points `vep_config["splicevault"]` at a copy rewritten to MANE RefSeq ids
+  (`annotation/splicevault.py`, `manage.py splicevault_to_refseq`). Rows for non-MANE transcripts are dropped: on
+  the start of chr1 that is about 83% of rows (10% of transcripts are MANE). The MANE v1.3 NM versions match the
+  VEP RefSeq caches' (215/215 chr21 MANE transcripts in the GRCh38 cache, 214/215 in GRCh37). An Ensembl build uses
+  the download as it is.
+- AVI (AlphaGenome Variant Impact): `avi_phred` / `avi_raw` on `VariantAnnotation` only (fields declared there
+  rather than on `AbstractVariantAnnotation` never reach the transcript rows), GRCh38 SNVs (DeepMind only publishes
+  hg38), `min_vep_version=116`. It matches on position and allele, so `--refseq` is fine. `AVI.pm` was added to
+  VEP_plugins `release/116` on 2026-08-27, so a VEP 116 plugins checkout made before then lacks it - `vep_data_check`
+  reports a configured plugin with no `.pm` in ANNOTATION_VEP_PLUGINS_DIR.
 
-The plugin reports one `5UTR_consequence` per transcript even when it finds several effects (the last flagged, in
-Perl hash order); `5UTR_annotation` keeps every effect. Variants whose VEP ran before the deploy and import after it
-fail with VEPMissingColumnsError (the inserter expects the new CSQ fields) and need re-running, so deploy with the
-import lane drained. A deployment that configures `utr_annotator` after the migration stamps it from `manage.py shell`:
+All are gated `min_columns_version=5` with the `utr_annotator`, `splicevault` and `avi` basename pins and one flag,
+`backfilled_utr_avi_splicevault`. `annotation/migrations/0004_utr_annotator_avi_splicevault.py` stamps the pins and
+sets the flag False on NEW/ACTIVE versions with range locks that any configured plugin's columns cover; the
+ManualOperation in `annotation/migrations/0005_utr_annotator_avi_splicevault_manual_backfill.py` writes these steps
+into its note with each version's pk, columns and `--max-variant-id` filled in. Per build, under
+ANNOTATION_VEP_BASE_DIR:
+
+1. Data files, which must be in place before the deploy - VEP dies on a missing AVI or SpliceVault file, and
+   `vep_data_check` lists what is missing:
+   - uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator into
+     `annotation_data/<build>/` (the plugin computes effects from the transcript sequence and runs with every
+     `Evidence` NA without it).
+   - SpliceVault_data_hg19.tsv.gz / SpliceVault_data_GRCh38.tsv.gz (+ .tbi, ~880 MB each) from
+     https://ftp.ensembl.org/pub/current_variation/SpliceVault/, then for a RefSeq build
+     `manage.py splicevault_to_refseq --genome-build <build> --input SpliceVault_data_<hg19|GRCh38>.tsv.gz`, which
+     needs MANE loaded and writes `SpliceVault_data_<hg19|GRCh38>.refseq_mane.tsv.gz` + .tbi alongside.
+   - GRCh38: "AVI SNV scores" from https://deepmind.google.com/science/alphagenome/downloads (Google sign-in; commercial
+     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB: extract the .tsv.gz and .tbi into
+     `annotation_data/GRCh38/` (allow ~90 GB free) and match `vep_config["avi"]` to the extracted name.
+   - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or
+     update that checkout.
+2. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns <every
+   configured plugin column> --max-variant-id <max> --output vep_plugins_<build>.vcf.gz` - every annotated variant,
+   as AVI scores every SNV. Split by `--min/max-variant-id` to run VEP in parallel.
+3. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
+   current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
+   every `--plugin` / `--custom` except UTRAnnotator, SpliceVault and AVI removed, and
+   `--fields Feature,PICK,<the CSQ fields>`.
+4. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
+   `--columns`, one `--csq <column>=<CSQ field>` per column (`utr_annotator_consequence=5UTR_consequence`,
+   `utr_annotator_annotation=5UTR_annotation`, `utr_annotator_existing_uorfs=Existing_uORFs`,
+   `utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs`,
+   `utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs`, `splicevault_<field>=SpliceVault_<field>` with
+   `splicevault_spliceai_delta=SpliceVault_SpliceAI_delta`, `avi_phred=AVI_PHRED`, `avi_raw=AVI_RAW`) and
+   `--vcf <annotated>`, `--dry-run` first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (last piece
+   only).
+
+The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
+SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the
+representative transcript is the MANE one (VEP's default pick order puts MANE Select first). The variant page reads
+them from `VariantAnnotation` and shows "not backfilled" from
+`annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled`, `avi_not_backfilled` and
+`splicevault_not_backfilled`. UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds several
+effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect. Variants whose VEP ran before
+the deploy and import after it fail with VEPMissingColumnsError (the inserter expects the new CSQ fields) and need
+re-running, so deploy with the import lane drained. A deployment that configures a plugin's file after the migration
+stamps it from `manage.py shell`:
 
 ```python
 from django.conf import settings
@@ -217,12 +255,14 @@ from annotation.models import VariantAnnotationVersion
 from annotation.vep_config import vep_component_version_kwargs
 for vav in VariantAnnotationVersion.objects.filter(status__in=["NEW", "ACTIVE"]):
     if build_settings := settings.ANNOTATION.get(vav.genome_build_id):
-        vav.utr_annotator = vep_component_version_kwargs(build_settings)["utr_annotator"]
-        vav.save(update_fields=["utr_annotator"])
+        pins = vep_component_version_kwargs(build_settings)
+        for field in ("utr_annotator", "avi", "splicevault"):
+            setattr(vav, field, pins[field])
+        vav.save(update_fields=["utr_annotator", "avi", "splicevault"])
 ```
 
-then sets `backfilled_utr_annotator=False` on the versions that had already annotated variants and follows the steps
-above (no manual task is registered for it).
+then sets `backfilled_utr_avi_splicevault=False` on the versions that had already annotated variants and follows the
+steps above (no manual task is registered for it).
 
 ### ClinVar
 

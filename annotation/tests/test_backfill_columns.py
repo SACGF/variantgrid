@@ -241,16 +241,16 @@ class BackfillColumnRoundTripTests(TestCase):
                      stdout=io.StringIO())
 
     def test_mark_backfilled_sets_flag_after_import(self):
-        VariantAnnotationVersion.objects.filter(pk=self.vav.pk).update(backfilled_utr_annotator=False)
+        VariantAnnotationVersion.objects.filter(pk=self.vav.pk).update(backfilled_utr_avi_splicevault=False)
         with tempfile.TemporaryDirectory() as tmp_dir:
             annotated_filename = self._dump_and_annotate(tmp_dir, {self.variants[0].pk: "12"})
-            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_annotator", "--dry-run")
+            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_avi_splicevault", "--dry-run")
             self.vav.refresh_from_db()
-            self.assertFalse(self.vav.backfilled_utr_annotator)
+            self.assertFalse(self.vav.backfilled_utr_avi_splicevault)
 
-            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_annotator")
+            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_avi_splicevault")
         self.vav.refresh_from_db()
-        self.assertTrue(self.vav.backfilled_utr_annotator)
+        self.assertTrue(self.vav.backfilled_utr_avi_splicevault)
         self.assertEqual(self._cosmic_counts(), [12, None, 3])
 
     def test_mark_backfilled_refuses_a_field_that_is_not_a_backfill_flag(self):

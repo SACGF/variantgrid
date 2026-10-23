@@ -4,7 +4,10 @@ from django.db.models import Max
 from library.django_utils.seed_data import insert_seed_data
 
 _TRANSCRIPT = 'T'
+_VARIANT = 'V'
 _UTR_ANNOTATOR = 'https://github.com/Ensembl/UTRannotator'
+_SPLICEVAULT = 'https://pubmed.ncbi.nlm.nih.gov/36747048'
+_AVI = 'https://deepmind.google.com/science/alphagenome'
 
 _NEW_COLUMNS = [
     {'grid_column_name': 'utr_annotator_consequence',
@@ -36,6 +39,58 @@ _NEW_COLUMNS = [
      'annotation_level': _TRANSCRIPT,
      'label': "5' UTR existing in-frame oORFs",
      'description': f"UTRAnnotator count of in-frame ORFs in the 5' UTR that overlap the CDS. {_UTR_ANNOTATOR}"},
+    {'grid_column_name': 'splicevault_top_events',
+     'variant_column': 'variantannotation__splicevault_top_events',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault top events',
+     'description': ("SpliceVault's most common mis-splicing events in RNA-seq (GTEx) at the splice site SpliceAI "
+                     "predicts lost, &-joined, each rank:type:transcript_impact:percent_of_samples:frame. Type is "
+                     "exon skipping (ES), cryptic donor (CD) or cryptic acceptor (CA). MANE transcripts only. "
+                     f"{_SPLICEVAULT}")},
+    {'grid_column_name': 'splicevault_site_sample_count',
+     'variant_column': 'variantannotation__splicevault_site_sample_count',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault site sample count',
+     'description': f"SpliceVault count of samples with annotated splicing at this splice site. {_SPLICEVAULT}"},
+    {'grid_column_name': 'splicevault_site_max_depth',
+     'variant_column': 'variantannotation__splicevault_site_max_depth',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault site max depth',
+     'description': ("SpliceVault maximum reads in any one GTEx sample representing annotated splicing at this "
+                     f"splice site. {_SPLICEVAULT}")},
+    {'grid_column_name': 'splicevault_out_of_frame_events',
+     'variant_column': 'variantannotation__splicevault_out_of_frame_events',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault out-of-frame events',
+     'description': ("SpliceVault fraction of the top events that cause a frameshift, eg Frameshift:2/4. Sites with "
+                     f"3 or more of 4 in-frame events are likely splice-rescued, not loss of function. {_SPLICEVAULT}")},
+    {'grid_column_name': 'splicevault_site_pos',
+     'variant_column': 'variantannotation__splicevault_site_pos',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault site position',
+     'description': f"Genomic position of the splice site SpliceAI predicts lost. {_SPLICEVAULT}"},
+    {'grid_column_name': 'splicevault_site_type',
+     'variant_column': 'variantannotation__splicevault_site_type',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault site type',
+     'description': f"Type of the splice site SpliceAI predicts lost (Donor_loss / Acceptor_loss). {_SPLICEVAULT}"},
+    {'grid_column_name': 'splicevault_spliceai_delta',
+     'variant_column': 'variantannotation__splicevault_spliceai_delta',
+     'annotation_level': _TRANSCRIPT,
+     'label': 'SpliceVault SpliceAI delta',
+     'description': f"SpliceAI delta score for the lost splice site, as SpliceVault provides it. {_SPLICEVAULT}"},
+    {'grid_column_name': 'avi_phred',
+     'variant_column': 'variantannotation__avi_phred',
+     'annotation_level': _VARIANT,
+     'label': 'AVI (phred)',
+     'description': ("AlphaGenome Variant Impact (Google DeepMind) PHRED-scaled quantile, 0 to ~80: 20 is the top "
+                     f"1% most deleterious substitutions genome-wide. Higher is more deleterious. SNVs only. {_AVI}")},
+    {'grid_column_name': 'avi_raw',
+     'variant_column': 'variantannotation__avi_raw',
+     'annotation_level': _VARIANT,
+     'label': 'AVI (raw)',
+     'description': ("AlphaGenome Variant Impact (Google DeepMind) raw score, about -1.3 to +4.0. Higher is more "
+                     f"deleterious. SNVs only. {_AVI}")},
 ]
 
 
@@ -76,7 +131,7 @@ def _reverse_append_to_all_columns(apps, _schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('annotation', '0004_utr_annotator'),
+        ('annotation', '0004_utr_annotator_avi_splicevault'),
         ('snpdb', '0002_seed_data'),
     ]
 

@@ -157,6 +157,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # basename, so installing different data registers as a change - as does removing it, which
     # drops that data's columns. All derived by vep_config.vep_component_version_kwargs().
     # NULL on versions created before #462 other than the ones migration 0161 backfilled.
+    avi = models.TextField(null=True, blank=True)  # AlphaGenome Variant Impact scores - GRCh38 + VEP >= 116 only
     conservation = models.TextField(null=True, blank=True)  # phastCons/phyloP bigwig basenames
     dbscsnv = models.TextField(null=True, blank=True)
     eve = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
@@ -167,6 +168,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     promoter_ai = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
     protvar = models.TextField(null=True, blank=True)
     repeat_masker = models.TextField(null=True, blank=True)
+    splicevault = models.TextField(null=True, blank=True)  # converted to RefSeq for RefSeq builds - GRCh37/38 only
     topmed = models.TextField(null=True, blank=True)
     transcript_blocklist = models.TextField(null=True, blank=True)  # --transcript_filter
     uk10k = models.TextField(null=True, blank=True)
@@ -219,10 +221,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/sv_conservation.py:sv_conservation_window
     backfilled_sv_conservation = models.BooleanField(default=True)
 
-    # #2426 - UTRAnnotator was added to versions already in use: the utr_annotator_* columns of variants
-    # annotated before then stay null until `annotation_backfill_columns --mark-backfilled` imports them.
-    # The migration set it False only on the NEW/ACTIVE versions the plugin applies to.
-    backfilled_utr_annotator = models.BooleanField(default=True)
+    # #2426 - UTRAnnotator, AVI and SpliceVault were added to versions already in use: their columns on
+    # variants annotated before then stay null until `annotation_backfill_columns --mark-backfilled`
+    # imports them, one VEP run with all three. The migration set it False only on the NEW/ACTIVE
+    # versions one of the plugins applies to.
+    backfilled_utr_avi_splicevault = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

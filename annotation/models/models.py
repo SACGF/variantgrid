@@ -147,15 +147,28 @@ class AbstractVariantAnnotation(models.Model):
     mavedb_score = models.FloatField(null=True, blank=True)
     mavedb_urn = models.TextField(null=True, blank=True)
 
-    # UTRAnnotator (#2426) - 5' UTR variants only. Rows annotated before the plugin was switched on are
-    # null until backfilled (VariantAnnotationVersion.backfilled_utr_annotator), and the backfill only
+    # UTRAnnotator and SpliceVault (#2426). Rows annotated before the plugins were switched on are null
+    # until backfilled (VariantAnnotationVersion.backfilled_utr_avi_splicevault), and the backfill only
     # reaches VariantAnnotation, never VariantTranscriptAnnotation.
+
+    # UTRAnnotator - 5' UTR variants only
     utr_annotator_consequence = models.TextField(null=True, blank=True)  # eg 5_prime_UTR_premature_start_codon_gain_variant
     # One record per uORF effect, '&'-joined, each 'key=value:key=value' (KozakStrength, DistanceToCDS, type, ...)
     utr_annotator_annotation = models.TextField(null=True, blank=True)
     utr_annotator_existing_uorfs = models.IntegerField(null=True, blank=True)
     utr_annotator_existing_out_of_frame_oorfs = models.IntegerField(null=True, blank=True)
     utr_annotator_existing_inframe_oorfs = models.IntegerField(null=True, blank=True)
+
+    # SpliceVault - RNA-seq mis-splicing events at a splice site SpliceAI predicts lost. Keyed by MANE
+    # transcript, so only that transcript's entry has values (annotation/splicevault.py)
+    # One record per event, '&'-joined, each 'rank:type:transcript_impact:percent_of_samples:frame'
+    splicevault_top_events = models.TextField(null=True, blank=True)
+    splicevault_site_sample_count = models.IntegerField(null=True, blank=True)
+    splicevault_site_max_depth = models.IntegerField(null=True, blank=True)
+    splicevault_out_of_frame_events = models.TextField(null=True, blank=True)  # eg Frameshift:2/4
+    splicevault_site_pos = models.TextField(null=True, blank=True)  # eg chr1:925801
+    splicevault_site_type = models.TextField(null=True, blank=True)  # Donor_loss / Acceptor_loss
+    splicevault_spliceai_delta = models.FloatField(null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -370,6 +383,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # PromoterAI (columns_version >= 5, GRCh38, VEP >= 116)
     promoter_ai_score = models.FloatField(null=True, blank=True)
     promoter_ai_tss_pos = models.IntegerField(null=True, blank=True)
+    # AlphaGenome Variant Impact (#2426) - GRCh38 SNVs, VEP >= 116. Null before the backfill as above
+    avi_phred = models.FloatField(null=True, blank=True)
+    avi_raw = models.FloatField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)
@@ -648,7 +664,26 @@ class VariantAnnotation(AbstractVariantAnnotation):
             them predates the plugin on a version that hasn't been backfilled yet """
         return (self.utr_annotator_existing_uorfs is None
                 and FIVE_PRIME_UTR_VARIANT in (self.consequence or "")
-                and not self.version.backfilled_utr_annotator)
+                and not self.version.backfilled_utr_avi_splicevault)
+
+    @property
+    def avi_not_backfilled(self) -> bool:
+        """ AVI scores every GRCh38 SNV """
+        return (self.avi_phred is None
+                and self.variant_class == VariantClass.SNV
+                and not self.version.backfilled_utr_avi_splicevault)
+
+    @property
+    def splicevault_top_events_list(self) -> list[str]:
+        return [e for e in (self.splicevault_top_events or "").split("&") if e]
+
+    @property
+    def splicevault_not_backfilled(self) -> bool:
+        """ SpliceVault only covers variants SpliceAI scores as a splice site loss, so one without
+            SpliceAI can't be missing it """
+        return (self.splicevault_site_pos is None
+                and self.has_spliceai()
+                and not self.version.backfilled_utr_avi_splicevault)
 
     @property
     def gnomad4_or_later(self) -> bool:

@@ -265,8 +265,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 plugin_data_func.update({
                     # Effects come from the transcript sequence - the file only adds uORF evidence
                     VEPPlugin.UTR_ANNOTATOR: lambda: f"UTRAnnotator,file={vc['utr_annotator']}",
+                    VEPPlugin.SPLICEVAULT: lambda: f"SpliceVault,file={vc['splicevault']}",
                 })
-            # EVE and PromoterAI are only available in VEP >= 116
+            # EVE, PromoterAI and AVI are only available in VEP >= 116
             if vc.vep_version >= 116:
                 plugin_data_func.update({
                     VEPPlugin.EVE: lambda: f"EVE,file={vc['eve']},popeve_file={vc['popeve']}",
@@ -276,6 +277,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                     # + alt allele only. The file is pre-filtered to TSS±500 promoter variants, so every hit
                     # is a genuine promoter prediction.
                     VEPPlugin.PROMOTER_AI: lambda: f"PromoterAI,file={vc['promoter_ai']},match_to=any",
+                    # AVI.pm is on VEP_plugins release/116 from 2026-08-27 - older 116 checkouts lack it
+                    VEPPlugin.AVI: lambda: f"AVI,file={vc['avi']},raw=1",
                 })
 
     else:
