@@ -63,6 +63,8 @@ a fusion is, and comp-het reaches them through the same `VariantGeneOverlap` row
     `(locus, alt, svlen)` unique constraint does the work with no new uniqueness machinery.
   * `svlen` is 0 rather than null, because Postgres treats nulls as distinct, so a null `svlen` would
     mean that constraint enforced nothing at all.
+  * No size: position, ref, alt and svlen are all placeholders, so ref/alt length, `end - position` and
+    `svlen` measure nothing. A rule that branches on size decides gene-level first and never measures one.
 
 
 ## What it costs, and where that is paid

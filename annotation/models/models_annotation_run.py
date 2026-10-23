@@ -257,8 +257,10 @@ class AnnotationRun(TimeStampedModel):
                                           annotation_range_lock__min_variant__lte=variant.pk,
                                           annotation_range_lock__max_variant__gte=variant.pk)
         for ar in qs.select_related("annotation_range_lock__version").order_by("pk"):
-            sv_min_size = ar.annotation_range_lock.version.structural_variant_min_size
-            if ar.pipeline_type == pipeline_type_for_variant(variant, sv_min_size):
+            vav = ar.annotation_range_lock.version
+            pipeline_type = pipeline_type_for_variant(variant, vav.structural_variant_min_size,
+                                                      vav.explicit_structural_variant_min_size)
+            if ar.pipeline_type == pipeline_type:
                 return ar
         return None
 

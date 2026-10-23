@@ -26,9 +26,11 @@ locus); exclude them with `Variant.get_no_reference_q` when you mean real calls.
 `Variant.qs_from_variant_coordinate` applies it for you. Symbolic is a storage form, not "a structural variant" for
 annotation: one under the annotation version's `structural_variant_min_size` (pinned from
 `settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE`) goes through the STANDARD pipeline
-(`annotation/annotation_pipeline_routing.py`), and the Variant Types page (`variantopedia/variant_types.py`) tabulates
+(`annotation/annotation_pipeline_routing.py`); the other way round, a long variant stored as its sequence (a delins, an
+insertion that isn't a dup) goes to the STRUCTURAL_VARIANT pipeline from the version's
+`explicit_structural_variant_min_size` (null on versions made before #1708). The Variant Types page (`variantopedia/variant_types.py`) tabulates
 every such rule by size. Gene-level events are Variants on a fake contig - guard
-coordinate code with `Variant.get_gene_level_q`.
+coordinate and size code with `Variant.get_gene_level_q`.
 
 **Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its
 `Locus.position` and inside its alt. The HGNC id where the gene has one, otherwise a local id above 1,000,000; anything

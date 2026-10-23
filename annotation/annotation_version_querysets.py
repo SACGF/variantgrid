@@ -95,8 +95,9 @@ def get_variants_qs_for_annotation(
         q_filters.append(Q(variantannotation__isnull=True))
 
     if pipeline_type:
-        sv_min_size = annotation_version.variant_annotation_version.structural_variant_min_size
-        q_filters.append(pipeline_type_variant_q(pipeline_type, sv_min_size))
+        vav = annotation_version.variant_annotation_version
+        q_filters.append(pipeline_type_variant_q(pipeline_type, vav.structural_variant_min_size,
+                                                 vav.explicit_structural_variant_min_size))
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))

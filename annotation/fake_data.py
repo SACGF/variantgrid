@@ -174,8 +174,8 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in fake_version or f.name == "vep_version_mismatch_reason":
-            continue  # already set, or not a VEP pin (#1679 latch)
+        if f.name in fake_version or f.name in ("vep_version_mismatch_reason", "explicit_structural_variant_min_size"):
+            continue  # already set, or not a VEP pin (#1679 latch, #1708 set on creation)
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
@@ -233,6 +233,7 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
         vav_kwargs["gene_annotation_release"] = gene_annotation_release
         vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
         vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
+        vav_defaults["explicit_structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
         variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
             genome_build=genome_build,
             status=VariantAnnotationVersion.Status.ACTIVE,
