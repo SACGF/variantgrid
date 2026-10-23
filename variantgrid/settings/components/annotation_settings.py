@@ -128,6 +128,11 @@ ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
 # regardless of this flag.
 ANNOTATION_SHOW_LEGACY_RANKSCORES = False
 
+# Some annotation data is licensed for non-commercial use only (vep_config.NON_COMMERCIAL_VEP_CONFIG_KEYS, eg
+# AlphaGenome merged splicing scores). A commercial deployment sets this False: that data is then never passed to
+# VEP, pinned or shown, even when its file is configured (#2433)
+ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED = True
+
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
@@ -197,6 +202,7 @@ ANNOTATION = {
             # manage.py splicevault_to_refseq
             "splicevault": None,
             "avi": None,  # n/a for GRCh37 (GRCh38 only)
+            "alphagenome_splicing": None,  # n/a for GRCh37 (GRCh38 only)
         }
     },
     BUILD_GRCH38: {
@@ -259,6 +265,10 @@ ANNOTATION = {
             "splicevault": None,
             # annotation_data/GRCh38/<the .tsv.gz extracted from avi_scores_snvs_tabix.zip> (VEP >= 116)
             "avi": None,
+            # Non-commercial (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED): annotation_data/GRCh38/
+            # alphagenome_splicing_snvs.GRCh38.vcf.gz (VEP >= 116), from combined_splicing_snvs_tabix.zip by
+            # annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh
+            "alphagenome_splicing": None,
         }
     },
     BUILD_T2TV2: {
@@ -310,6 +320,7 @@ ANNOTATION = {
             "utr_annotator": None,  # n/a (no T2T uORF data)
             "splicevault": None,  # n/a (GRCh37/38 only)
             "avi": None,  # n/a (GRCh38 only)
+            "alphagenome_splicing": None,  # n/a (GRCh38 only)
         }
     },
 }
@@ -318,15 +329,15 @@ def _disable_columns_version_5_plugins(annotation):
     """Clear the columns_version 5 VEP plugin data keys (#1638, #2426) to None across all builds.
 
     The package default points these at real data files (ProtVar on all builds; OpenTargets / EVE /
-    popEVE / PromoterAI on GRCh38), and a deployment may set UTRAnnotator / SpliceVault / AVI. Deployments
-    pinned below columns_version 5 haven't installed that plugin data (or VEP 116), so clear the keys -
-    vep_columns.has_data_files then drops the plugin columns and get_vep_command skips the matching
-    --plugin invocations.
+    popEVE / PromoterAI on GRCh38), and a deployment may set UTRAnnotator / SpliceVault / AVI / AlphaGenome
+    splicing. Deployments pinned below columns_version 5 haven't installed that plugin data (or VEP 116), so
+    clear the keys - vep_columns.has_data_files then drops the plugin columns and get_vep_command skips the
+    matching --plugin / --custom invocations.
     """
     for build_settings in annotation.values():
         vep_config = build_settings["vep_config"]
         for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai", "utr_annotator",
-                           "splicevault", "avi"):
+                           "splicevault", "avi", "alphagenome_splicing"):
             if plugin_key in vep_config:
                 vep_config[plugin_key] = None
 

@@ -142,9 +142,11 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
             "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
         })
 
-    # The fixtures were generated without UTRAnnotator, AVI or SpliceVault, so their CSQ fields would be missing (#2426)
+    # The fixtures were generated without UTRAnnotator, AVI, SpliceVault or AlphaGenome splicing, so their CSQ fields
+    # would be missing (#2426, #2433)
     for build_name in (settings.BUILD_GRCH37, settings.BUILD_GRCH38):
-        TEST_ANNOTATION[build_name]["vep_config"].update({"utr_annotator": None, "avi": None, "splicevault": None})
+        TEST_ANNOTATION[build_name]["vep_config"].update({"utr_annotator": None, "avi": None, "splicevault": None,
+                                                          "alphagenome_splicing": None})
 
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
     ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version

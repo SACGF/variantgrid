@@ -1,7 +1,7 @@
 """
-UTRAnnotator, AVI and SpliceVault (#2426), added to VariantAnnotationVersions already in use: the VEP command,
-enable_vep_plugin_backfill / the migration stamping their pins and flagging versions for the backfill, and the
-display parsing.
+UTRAnnotator, AVI and SpliceVault (#2426) and the AlphaGenome splicing custom VCF (#2433), added to
+VariantAnnotationVersions already in use: the VEP command, enable_vep_plugin_backfill / the migration stamping their
+pins and flagging versions for the backfill, the non-commercial data setting, and the display parsing.
 """
 import io
 from importlib import import_module
@@ -10,6 +10,8 @@ from unittest.mock import patch
 from django.apps import apps
 from django.conf import settings
 from django.core.management import CommandError, call_command
+from django.db import connection
+from django.db.migrations.loader import MigrationLoader
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
@@ -23,6 +25,7 @@ from annotation.fake_data import (
 from annotation.models import VariantAnnotationVersion
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.vep_annotation import get_vep_command
+from annotation.vep_config import vep_component_version_kwargs
 from annotation.vep_plugin_display import utr_annotator_effects
 from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
@@ -34,6 +37,7 @@ SPLICEVAULT_FILES = {
     settings.BUILD_GRCH38: "annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz",
 }
 AVI_FILE = "annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz"
+ALPHAGENOME_SPLICING_FILE = "annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz"
 
 _stamp_pins_and_flag_backfill = import_module(
     "annotation.migrations.0004_utr_annotator_avi_splicevault")._stamp_pins_and_flag_backfill
@@ -47,8 +51,9 @@ def _settings_with_plugins(vep_version: str = "116") -> dict:
     d["ANNOTATION"][settings.BUILD_GRCH37]["vep_config"]["utr_annotator"] = UTR_ANNOTATOR_FILE
     for build_name, splicevault_file in SPLICEVAULT_FILES.items():
         d["ANNOTATION"][build_name]["vep_config"]["splicevault"] = splicevault_file
-        # AVI only has GRCh38 data - configured on both to show the build gate drops it
+        # AVI and AlphaGenome splicing only have GRCh38 data - configured on both to show the build gate drops them
         d["ANNOTATION"][build_name]["vep_config"]["avi"] = AVI_FILE
+        d["ANNOTATION"][build_name]["vep_config"]["alphagenome_splicing"] = ALPHAGENOME_SPLICING_FILE
     return d
 
 
@@ -69,6 +74,30 @@ class PluginVepCommandTests(TestCase):
         self.assertIn(f"SpliceVault,file={base_dir}/{SPLICEVAULT_FILES['GRCh37']}", grch37_plugins)
         self.assertFalse(any(p.startswith("AVI") for p in grch37_plugins))
         self.assertIn(f"AVI,file={base_dir}/{AVI_FILE},raw=1", grch38_plugins)
+
+    def _customs(self, build_name: str) -> list[str]:
+        genome_build = GenomeBuild.get_name_or_alias(build_name)
+        cmd = get_vep_command("in.vcf", "out.vcf", genome_build, AnnotationConsortium.REFSEQ,
+                              VariantAnnotationPipelineType.STANDARD)
+        return [cmd[i + 1] for i, x in enumerate(cmd) if x == "--custom"]
+
+    def test_alphagenome_splicing_custom_matches_alleles_on_grch38(self):
+        with override_settings(**_settings_with_plugins()):
+            grch37_customs = self._customs("GRCh37")
+            grch38_customs = self._customs("GRCh38")
+        base_dir = settings.ANNOTATION_VEP_BASE_DIR
+        self.assertIn(f"file={base_dir}/{ALPHAGENOME_SPLICING_FILE},type=exact,num_records=all,"
+                      f"short_name=AlphaGenome_splicing,fields=score,format=vcf", grch38_customs)
+        self.assertFalse(any("AlphaGenome" in c for c in grch37_customs))
+
+    def test_non_commercial_data_left_out_when_not_allowed(self):
+        settings_dict = _settings_with_plugins()
+        with override_settings(**settings_dict, ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=False):
+            customs = self._customs("GRCh38")
+            pins = vep_component_version_kwargs(settings.ANNOTATION["GRCh38"])
+        self.assertFalse(any("AlphaGenome" in c for c in customs))
+        self.assertIsNone(pins["alphagenome_splicing"])
+        self.assertEqual(pins["avi"], "alphagenome_variant_impact_score_snvs.tsv.gz")
 
     def test_avi_needs_vep_116(self):
         with override_settings(**_settings_with_plugins(vep_version="115")):
@@ -93,7 +122,8 @@ class PluginPinStampTests(TestCase):
 
     def _vav(self, genome_build, status, columns_version=5, vep=116, annotated=True) -> VariantAnnotationVersion:
         kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.REFSEQ, columns_version)
-        kwargs.update(vep=vep, utr_annotator=None, avi=None, splicevault=None, status=status)
+        kwargs.update(vep=vep, utr_annotator=None, avi=None, splicevault=None, alphagenome_splicing=None,
+                      status=status)
         vav = VariantAnnotationVersion.objects.create(**kwargs)
         if annotated:
             variant = slowly_create_test_variant("1", 1000 + vav.pk, "A", "G", genome_build)
@@ -121,6 +151,16 @@ class PluginPinStampTests(TestCase):
         self.assertEqual(grch38.avi, "alphagenome_variant_impact_score_snvs.tsv.gz")
         self.assertFalse(grch37.backfilled_utr_avi_splicevault)
         self.assertFalse(grch38.backfilled_utr_avi_splicevault)
+
+    def test_earlier_migration_stamps_only_the_pins_its_model_has(self):
+        """ 0004's historical VariantAnnotationVersion has no alphagenome_splicing (added by 0007) """
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        state = MigrationLoader(connection).project_state(("annotation", "0004_utr_annotator_avi_splicevault"))
+        with override_settings(**_settings_with_plugins()):
+            _stamp_pins_and_flag_backfill(state.apps, None)
+        vav.refresh_from_db()
+        self.assertEqual(vav.avi, "alphagenome_variant_impact_score_snvs.tsv.gz")
+        self.assertIsNone(vav.alphagenome_splicing)
 
     def test_command_refuses_missing_files(self):
         """ The test settings' data files aren't installed """
@@ -156,6 +196,8 @@ class PluginPinStampTests(TestCase):
         self.assertIn("Start annotation_workers", output)
         self.assertIn(f"--variant-annotation-version {active.pk} ", output)
         self.assertIn("--csq avi_phred=AVI_PHRED", output)
+        self.assertEqual(active.alphagenome_splicing, "alphagenome_splicing_snvs.GRCh38.vcf.gz")
+        self.assertIn("--csq alphagenome_splicing=AlphaGenome_splicing_score", output)
 
     def test_command_rerun_after_backfill_changes_nothing(self):
         vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
@@ -185,6 +227,16 @@ class PluginPinStampTests(TestCase):
         vav.refresh_from_db()
         self.assertIsNone(vav.splicevault)
         self.assertFalse(vav.backfilled_utr_avi_splicevault)
+
+    def test_command_does_not_stamp_non_commercial_data_when_not_allowed(self):
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        settings_dict = {**_settings_with_plugins(), "ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED": False}
+        output = self._enable("--genome-build", "GRCh38", settings_dict=settings_dict)
+        vav.refresh_from_db()
+        self.assertIsNone(vav.alphagenome_splicing)
+        self.assertIsNotNone(vav.avi)
+        self.assertIn("not stamping alphagenome_splicing", output)
+        self.assertNotIn("AlphaGenome_splicing_score", output)
 
     def test_older_columns_version_stamped_but_not_flagged(self):
         vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE, columns_version=4)

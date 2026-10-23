@@ -386,6 +386,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # AlphaGenome Variant Impact (#2426) - GRCh38 SNVs, VEP >= 116. Null before the backfill as above
     avi_phred = models.FloatField(null=True, blank=True)
     avi_raw = models.FloatField(null=True, blank=True)
+    # AlphaGenome merged splicing score (#2433) - GRCh38 SNVs, non-commercial data
+    # (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED). Null before the backfill as above
+    alphagenome_splicing = models.FloatField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)
@@ -670,6 +673,13 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def avi_not_backfilled(self) -> bool:
         """ AVI scores every GRCh38 SNV """
         return (self.avi_phred is None
+                and self.variant_class == VariantClass.SNV
+                and not self.version.backfilled_utr_avi_splicevault)
+
+    @property
+    def alphagenome_splicing_not_backfilled(self) -> bool:
+        """ AlphaGenome splicing scores every GRCh38 SNV """
+        return (self.alphagenome_splicing is None
                 and self.variant_class == VariantClass.SNV
                 and not self.version.backfilled_utr_avi_splicevault)
 
