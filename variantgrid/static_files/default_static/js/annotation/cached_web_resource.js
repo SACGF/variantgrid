@@ -19,13 +19,19 @@ function initCachedWebResources() {
     $(document).on("click", ".load-cached-web-resource", function() {
         const cwrName = $(this).attr("cached-web-resource");
         const container = $(this).closest(".cached-web-resource-container");
+        const previousHtml = container.html();
+        // The POST deletes the old resource (and everything it cascades to) before returning
+        container.html('<i class="fa fa-spinner"></i> Removing previous import...');
 
         $.ajax({
             type: "POST",
             url: Urls.load_cached_web_resource(cwrName),
             success: function() {
-                container.html('<i class="fa fa-spinner"></i>');
                 setTimeout(() => pollCachedWebResource(cwrName), CACHED_WEB_RESOURCE_POLL_MS);
+            },
+            error: function() {
+                container.html(previousHtml);
+                container.append('<div class="text-danger">Update from web failed</div>');
             }
         });
     });
