@@ -118,24 +118,6 @@ def _condition_terms(grouping: ClassificationGrouping, **kwargs) -> Optional[Ite
     return all_stubs
 
 
-# @receiver(classification_grouping_search_term_signal)
-# def _patient_sample_ids(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterable[ClassificationGroupingSearchTermStub]]:
-#     # TODO consider only checking this if we've got
-#     stubs = []
-#     for cm in grouping.classification_modifications:
-#         if patient_id := cm.get(SpecialEKeys.PATIENT_ID):
-#             stubs.append(ClassificationGroupingSearchTermStub(
-#                 term_type=ClassificationGroupingSearchTermType.PATIENT_ID,
-#                 term=patient_id
-#             ))
-#         if sample_id := cm.get(SpecialEKeys.SAMPLE_ID):
-#             stubs.append(ClassificationGroupingSearchTermStub(
-#                 term_type=ClassificationGroupingSearchTermType.PATIENT_ID,
-#                 term=sample_id
-#             ))
-#     return stubs
-
-
 @receiver(classification_grouping_search_term_signal)
 def _clinvar_scv(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterable[ClassificationGroupingSearchTermStub]]:
     stubs = []

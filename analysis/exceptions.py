@@ -1,11 +1,5 @@
 from rest_framework.status import HTTP_200_OK
 
-from library.django_utils.rollbar_middleware import RollbarIgnoreException
-
-
-class CeleryTasksObsoleteException(RollbarIgnoreException):
-    """ Throw this in a celery task to kill dependent jobs, but not report to rollbar """
-
 
 class NonFatalNodeError(Exception):
     status = HTTP_200_OK

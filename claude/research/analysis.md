@@ -257,7 +257,7 @@ two paths to the same answer.
 
 Scheduling is single-worker and state-driven (#346) so that no task waits on another: a celery chord built from a
 toposort at edit time deadlocks, its waiting tasks occupying every worker while the parents they wait for cannot get
-one. `analysis/tasks/node_update_tasks.py:wait_for_node` and `wait_for_cache_task` are not part of dispatch. The only
+one. `analysis/tasks/node_update_tasks.py:wait_for_node` is not part of dispatch. The only
 cross-node dependency is "parents settled", read from the database by the one
 dispatcher on `scheduling_single_worker`, so leases are written by one process and need no row-lock gymnastics, and a
 finished node kicks the dispatcher rather than its children. The lease (`NodeTask.lease_expires`, restarted at claim)

@@ -103,7 +103,6 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
 
     UPDATE_TASK = "analysis.tasks.node_update_tasks.update_node_task"
     NODE_CACHE_TASK = "analysis.tasks.node_update_tasks.node_cache_task"
-    WAIT_FOR_CACHE_TASK = "analysis.tasks.node_update_tasks.wait_for_cache_task"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -160,10 +159,9 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
             node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
                 task_args_set.add((self.NODE_CACHE_TASK, (self.pk, self.version)))
-            # else: cache is already being built by another node - do NOT add WAIT_FOR_CACHE_TASK.
-            #       The scheduler's dependency gate (_node_ready_to_lease) holds this node back while
-            #       that cache is actively building (PROCESSING); node_cache_task re-triggers the
-            #       dispatcher on completion (issue #346).
+            # else: cache is already being built by another node. The scheduler's dependency gate
+            #       (_node_ready_to_lease) holds this node back while that cache is actively building
+            #       (PROCESSING); node_cache_task re-triggers the dispatcher on completion (issue #346).
         return task_args_set
 
     def get_parent_subclasses_and_errors(self):

@@ -278,7 +278,7 @@ class TestNodeReadyToLease(AnalysisSetupMixin, TestCase):
         nodes_by_id, parents_by_child = self._graph()
         self.assertTrue(_node_ready_to_lease(nodes_by_id[child.pk], parents_by_child, nodes_by_id))
 
-    # --- cache dependency gate (replaces WAIT_FOR_CACHE_TASK) ---
+    # --- cache dependency gate ---
 
     def _make_cache_owner(self, status):
         """A node owning a NodeCache whose variant_collection has the given ProcessingStatus."""

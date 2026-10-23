@@ -402,7 +402,6 @@ BEACON_QUERY_NODES = {
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
-VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
 # Uploaded VCFs have their first SNVs' REF bases checked against the build they're imported as (#2030). A wrong
@@ -532,7 +531,6 @@ PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = None  # Sample gene matrix of these gen
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = False  # True = show all samples
 PUBLIC_SAMPLE_GENE_MATRIX_TYPE = 'Damage'
 PUBLIC_SAMPLE_GENE_MATRIX_HIGHLIGHT_GENE_SYMBOLS = []
-PUBLIC_LAB_LOCATION_PAGE_VISIBLE = False
 
 PROCESSED_BED_FILES_DIR = os.path.join(PRIVATE_DATA_ROOT, 'processed_bed_files')
 INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_upload_variant_collection.sh')
@@ -657,7 +655,6 @@ CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during
 CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
 CLASSIFICATION_AUTOFUZZ_AGE = False
 
-CLASSIFICATION_DASHBOARD_SIZE = 50
 CLASSIFICATION_RECLASSIFICATION_EMAIL = True
 CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY = False  # Reclassification analytics only counts internal labs (Lab.external=False)
 CLASSIFICATION_RECLASSIFICATION_ANALYTICS_NON_ADMIN = False  # Every user can view reclassification analytics, not only admins
@@ -718,7 +715,6 @@ ISSUE_TRACKER_TEXT = "GitHub issue tracker"
 USER_SETTINGS_SHOW_GROUPS = True
 
 SQL_BATCH_INSERT_SIZE = 50000
-SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
 # Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
 VARIANTGRID_MAJOR_VERSION = 4
@@ -837,9 +833,6 @@ STORAGES = {
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)
 
-# Seed data only: the classify queue tag a fresh install is created with (tags can't have spaces).
-# What behaves as a queue tag is Tag.requires_classification, set per tag on the tag settings page
-TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"
 
 TEMPLATES = [
     {
