@@ -9,6 +9,7 @@ reports them).
 import logging
 import sys
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F, Value, Window
 from django.db.models.aggregates import Count, Max, Min
@@ -31,9 +32,13 @@ from snpdb.models.models_variant import Variant
 
 def get_or_create_variant_annotation_version_from_current_vep(genome_build: GenomeBuild) -> tuple[VariantAnnotationVersion, bool]:
     kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
-    # New rows start as NEW; promotion to ACTIVE happens once tables are populated
-    variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(
-        **kwargs, defaults={"status": VariantAnnotationVersion.Status.NEW})
+    # New rows start as NEW; promotion to ACTIVE happens once tables are populated.
+    # explicit_structural_variant_min_size is a default rather than a lookup so a version made before it
+    # existed (null) still matches: it comes from the same setting as structural_variant_min_size, which is
+    # in the lookup, so changing that setting still makes a new version
+    defaults = {"status": VariantAnnotationVersion.Status.NEW,
+                "explicit_structural_variant_min_size": settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE}
+    variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(**kwargs, defaults=defaults)
     now = timezone.now()
     if created:
         logging.info("New Variant Annotation version created!")

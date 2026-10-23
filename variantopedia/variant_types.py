@@ -111,10 +111,8 @@ class Outcome:
 
     @property
     def name(self) -> str:
-        if not self.symbolic:
-            return "Short"
         if self.pipeline == VariantAnnotationPipelineType.STANDARD:
-            return "Small SV"
+            return "Small SV" if self.symbolic else "Short"
         if self.vep_too_long:
             return "Large SV"
         return "SV"
@@ -130,7 +128,8 @@ class Band:
 
 
 def _outcome(vc: VariantCoordinate) -> Outcome:
-    pipeline_type = pipeline_type_for_alt(vc.alt, vc.svlen, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE)
+    sv_min_size = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+    pipeline_type = pipeline_type_for_alt(vc.ref, vc.alt, vc.svlen, sv_min_size, sv_min_size)
     # As annotation_version_querysets.filter_vep_sv_max_size - VEP is never given these
     sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
     vep_too_long = (pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
@@ -207,7 +206,10 @@ def _annotation_cells(outcome: Outcome) -> tuple[str, str]:
         return pipeline, "gnomAD - exact match"
     same_type = ", same type" if settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE else ""
     overlap = f"gnomAD-SV - overlapping SV (≥ {settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION:.0%}{same_type})"
-    return outcome.pipeline.label, overlap
+    pipeline = outcome.pipeline.label
+    if not outcome.symbolic:
+        pipeline += " (given to VEP as its sequence)"
+    return pipeline, overlap
 
 
 def _band_row(band: Band, sized: bool, first: bool, last: bool) -> dict:
@@ -246,8 +248,8 @@ def get_variant_type_rows() -> list[dict]:
             rows = [_band_row(b, sized, i == 0, i == len(bands) - 1) for i, b in enumerate(bands)]
             groups.append({"kind": name, "bands": rows})
     if settings.VARIANT_GENE_LEVEL_ENABLED:
-        pipeline_type = pipeline_type_for_alt("", None, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE,
-                                              is_gene_level=True)
+        sv_min_size = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+        pipeline_type = pipeline_type_for_alt("", "", None, sv_min_size, sv_min_size, is_gene_level=True)
         # A gene id where a coordinate goes, the same in every build (@see snpdb.gene_level_variants)
         groups.append({"kind": "Gene-level event (fusion, copy number, splicing)",
                        "bands": [{"name": "", "range": "", "stored_as": "Gene id + event",

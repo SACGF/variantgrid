@@ -177,6 +177,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - a symbolic del/dup/inv shorter than this went to the STANDARD
     # pipeline (@see annotation.annotation_pipeline_routing)
     structural_variant_min_size = models.IntegerField()
+    # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - an explicit (sequence) variant whose ref or alt is at least this long
+    # goes to the STRUCTURAL_VARIANT pipeline. Null (versions made before #1708) routes them all to STANDARD
+    explicit_structural_variant_min_size = models.IntegerField(null=True, blank=True)
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
@@ -256,11 +259,12 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return qs.order_by("annotation_date").last()
 
     @staticmethod
-    def latest_structural_variant_min_size(genome_build) -> int:
-        """ For routing variants not annotated yet - the setting, until a build has an active version """
+    def latest_pipeline_routing_sizes(genome_build) -> tuple[int, Optional[int]]:
+        """ (structural_variant_min_size, explicit_structural_variant_min_size) for routing variants not
+            annotated yet - the setting, until a build has an active version """
         if vav := VariantAnnotationVersion.latest(genome_build):
-            return vav.structural_variant_min_size
-        return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+            return vav.structural_variant_min_size, vav.explicit_structural_variant_min_size
+        return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     @staticmethod
     def latest_gene_annotation_releases(status: 'VariantAnnotationVersion.Status' = None) -> list[GeneAnnotationRelease]:

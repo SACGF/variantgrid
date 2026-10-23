@@ -45,8 +45,10 @@ Patterns here:
   pipeline_type. Which variants a type covers is annotation/annotation_pipeline_routing.py:pipeline_type_variant_q
   (pipeline_type_for_variant for one): a symbolic del/dup/inv under the VariantAnnotationVersion's
   structural_variant_min_size (pinned from ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, so each version keeps its own) is
-  STANDARD and dumped to VEP as its sequence, anything else symbolic is the SV pipeline, gene-level variants belong to
-  neither VEP pipeline. Branch on the run's pipeline_type, never on variant.is_symbolic.
+  STANDARD and dumped to VEP as its sequence, anything else symbolic is the SV pipeline, an explicit variant whose ref
+  or alt reaches explicit_structural_variant_min_size is the SV pipeline (dumped as its sequence; null on VAVs made
+  before #1708, so they never move one), gene-level variants belong to neither VEP pipeline. Branch on the run's
+  pipeline_type, never on variant.is_symbolic.
 - AnnotationRun.status is recomputed from its timestamp/error fields on every save
   (annotation/models/models_annotation_run.py:AnnotationRun.get_status): set dump_start / annotation_end / upload_end, never status.
   Lifecycle: annotation_scheduler makes AnnotationRangeLocks + runs on scheduling_single_worker →

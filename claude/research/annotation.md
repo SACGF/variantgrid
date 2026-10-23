@@ -62,12 +62,13 @@ not scale) and returns an `annotation/models/models_annotation_run.py:Annotation
 `annotation/annotation_version_querysets.py:get_variants_qs_for_annotation`: variants in the build's contigs passing
 `annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list` (no reference-alt, no `.`/`*` alt) with no
 VariantAnnotation row in this version's partition, restricted to a pipeline type by
-`annotation/annotation_version_querysets.py:pipeline_type_variant_q`.
+`annotation/annotation_pipeline_routing.py:pipeline_type_variant_q`.
 
 Each lock gets one `annotation/models/models_annotation_run.py:AnnotationRun` per enabled pipeline type
 (`annotation/tasks/annotation_scheduler_task.py:_handle_range_lock`). The types are the registry in
 `annotation/pipelines/__init__.py:PIPELINES`: STANDARD (VEP over short variants), STRUCTURAL_VARIANT (VEP over symbolic
-variants), GENE_LEVEL (fusions, computed locally by `annotation/gene_level_annotation.py:annotate_gene_level_run`) and
+variants from the VAV's `structural_variant_min_size`, and explicit ones whose longer allele reaches its
+`explicit_structural_variant_min_size`, #1708), GENE_LEVEL (fusions, computed locally by `annotation/gene_level_annotation.py:annotate_gene_level_run`) and
 ANNOTSV, which depends on the SV run having FINISHED and updates the rows it wrote. The scheduler only creates pending
 state. `annotation/tasks/annotation_scheduler_task.py:dispatch_annotation_runs` is the single authority that launches:
 it sweeps the latest NEW and ACTIVE VAV per build, reclaims stalled runs, fills the count lane
