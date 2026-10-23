@@ -38,7 +38,7 @@ drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
 gunicorn
-hgvs @ git+https://github.com/biocommons/hgvs@13289ab3b9db3c751918906c543991c74917ff61  # main until a release has biocommons/hgvs#899, #901, #902 and #911 (#2103)
+hgvs @ git+https://github.com/davmlaw/hgvs@56f73505c9c0db5af31a434ff62c8a3fe8679a43  # fork: biocommons main fadc43877 (until a release has biocommons/hgvs#899, #901, #902 and #911, #2103) plus the dup/inv guard near the start of a contig (davmlaw/dave-admin#247) - back to biocommons once merged
 html2docx
 ijson
 kombu
