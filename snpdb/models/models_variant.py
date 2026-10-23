@@ -1233,7 +1233,6 @@ class LiftoverRun(TimeStampedModel):
             "genome_build": genome_build,
             "conversion_tool": AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
         }
-        # There should have been 1 created in 'one_off_legacy_populate_allele_liftover'
         lr = LiftoverRun.objects.filter(**kwargs).order_by("pk").first()
         if not lr:
             # Otherwise create it

@@ -15,7 +15,7 @@ import logging
 import re
 import uuid
 from collections import Counter, namedtuple
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta
 from functools import cached_property
 from typing import (
@@ -896,28 +896,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if submitted:
             # have to re-retrieve last_edited_version as it's now the latest
             self.last_edited_version.publish(share_level=self.share_level_enum, user=user, vc=self)
-
-    def patch_history(self, patcher: Callable[[PatchMeta], None]):
-        """
-        Patches current evidence, and historic modifications "delta" and "published_evidence" fields
-        :param patcher: Code that modified PatchMeta in place through the patch methods
-        """
-        last_evidence = {}
-        modification: ClassificationModification
-        for modification in ClassificationModification.objects.filter(classification=self).order_by('created'):
-            patch_meta = PatchMeta(patch=modification.delta, existing=last_evidence)
-            last_evidence = copy.deepcopy(modification.evidence)
-            patcher(patch_meta)
-
-            modification.delta = dict(patch_meta.patch)
-            if modification.published_evidence:
-                patch_meta = PatchMeta(patch=modification.published_evidence, existing={})
-                patcher(patch_meta)
-                modification.published_evidence = dict(modification.published_evidence)
-            modification.save(update_fields=['delta', 'published_evidence'])
-
-        self.evidence = self.last_edited_version.evidence
-        Classification.objects.filter(pk=self.pk).update(evidence=self.evidence)
 
     @transaction.atomic()
     def patch_value(self,

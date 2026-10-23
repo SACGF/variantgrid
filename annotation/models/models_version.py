@@ -189,44 +189,32 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     transcript_resolver = models.TextField(null=True, blank=True)
 
     # --- backfill-completion flags ---------------------------------------
-    # These flags track per-VAV completion of one-off backfill management
-    # commands that populate derived columns the query layer can optimise on.
-    # New VAVs default True because the bulk VEP inserter populates the
-    # underlying columns at insert time. Historical VAVs created before the
-    # respective optimisation start False (set by the AddField migration's
-    # RunPython step) and are flipped True by the matching `fix_historical_*`
-    # management command once it finishes the partition.
-    #
-    # Once every active deployment has run the backfills and no rows remain
-    # with these set False, the field, its migration, the matching fallback
-    # branch in the consuming node, and this comment block can all be removed.
+    # Whether a VAV's partition has the derived columns the query layer optimises on.
+    # New VAVs default True because the bulk VEP inserter populates them at insert
+    # time. Every ACTIVE VAV was backfilled before the #736 squash; HISTORICAL ones
+    # may still be False, so the consuming node falls back (and warns) for analyses
+    # left on them. Once no row is False, the field, the fallback branch and this
+    # comment block can go.
 
-    # #574 / commit c6f3c4e6f — DamageNode.spliceai filtering. Flipped by
-    # `manage.py fix_historical_spliceai_max_ds`. Backfill source:
+    # #574 / commit c6f3c4e6f — DamageNode.spliceai filtering. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_spliceai_max_ds
     backfilled_spliceai_max_ds = models.BooleanField(default=True)
 
     # columns_version 2 / 4 rollouts — DamageNode.damage_predictions_min uses
     # predictions_num_pathogenic / predictions_num_benign aggregates which
     # default to 0 on the model, so legacy rows look "no pathogenic predictions"
-    # until backfilled. Flipped by `manage.py fix_columns_version2_damage_counts`
-    # (for columns_version=2 VAVs) and `fix_columns_version4_damage_counts`
-    # (for columns_version=4). columns_version=3 needs no recompute - those rows
-    # had the aggregates populated at insert time (rankscores + alphamissense), so
-    # migration 0155 just flips their flag back True (0151 flipped all VAVs False).
-    # Backfill source:
+    # until backfilled. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
     backfilled_damage_counts = models.BooleanField(default=True)
 
     # #579 - DamageNode.ptc_nmd_escaping filters on nmd_escape_status, which is null on
-    # rows annotated before the PTC calculation existed. Flipped by
-    # `manage.py backfill_ptc_annotation`. Backfill source:
+    # rows annotated before the PTC calculation existed. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_calculated_ptc
     backfilled_ptc = models.BooleanField(default=True)
 
     # #1657 - the SV conservation _max columns our pyBigWig stage wrote are off by one base at the
     # start of the span, and a run whose sidecar stage failed left them null. ConservationNode filters
-    # on those columns. Flipped by `manage.py backfill_sv_conservation`. Backfill source:
+    # on those columns. Source:
     # annotation/sv_conservation.py:sv_conservation_window
     backfilled_sv_conservation = models.BooleanField(default=True)
 

@@ -750,8 +750,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     transcript_genome_ref_differ = BooleanField(null=True, blank=True)
     """ The transcript sequence and the imported build's genome differ over the variant's reference.
-        None means it couldn't be checked: resolved via ClinGen, intronic, no stored sequence for the transcript, or
-        matched before the check existed (one_off_backfill_transcript_genome_ref_differ fills those in) """
+        None means it couldn't be checked: resolved via ClinGen, intronic, or no stored sequence for the transcript """
 
     status = CharField(max_length=1, choices=ImportedAlleleInfoStatus.choices, default=ImportedAlleleInfoStatus.PROCESSING)
     """ If true, indicates that this is not matchable, see the message for details """

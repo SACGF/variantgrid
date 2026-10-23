@@ -375,16 +375,13 @@ def _read_phenotype_to_genes(filename: str) -> pd.DataFrame:
     return df
 
 
-def load_phenotype_to_genes(filename: str, force: bool, existing_import: Optional[OntologyImport] = None):
-    """ existing_import: backfill into that import's partition rather than creating a new import - so the
-        OntologyVersion pointing at it gains the relations without a new version (@see backfill_phenotype_to_genes) """
+def load_phenotype_to_genes(filename: str, force: bool):
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="phenotype_to_genes",
         import_source=OntologyImportSource.HPO,
         processor_version=2,
-        force_update=force,
-        existing_import=existing_import)
+        force_update=force)
     ontology_builder.ensure_file_hash_changed(filename)
     ontology_builder.cache_everything()
     df = _read_phenotype_to_genes(filename)

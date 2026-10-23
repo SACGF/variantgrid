@@ -290,13 +290,13 @@ class DamageNode(AnalysisNode):
             warnings.append(
                 f"damage_predictions_min filter is NOT being applied on this VariantAnnotationVersion: "
                 f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
-                f"Run `manage.py fix_columns_version{vav.columns_version}_damage_counts` to enable the filter."
+                "Set the analysis to the latest annotation version to use the filter."
             )
         if self.ptc_nmd_escaping and self.columns_version >= 5 and not vav.backfilled_ptc:
             warnings.append(
                 "ptc_nmd_escaping filter is NOT being applied on this VariantAnnotationVersion: "
                 "nmd_escape_status has not been backfilled. "
-                "Run `manage.py backfill_ptc_annotation` to enable the filter."
+                "Set the analysis to the latest annotation version to use the filter."
             )
         for tool in TOOLS:
             if tool.raw_field and getattr(self, tool.node_threshold_field) is not None:

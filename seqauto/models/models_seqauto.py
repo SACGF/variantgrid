@@ -898,11 +898,6 @@ class QCGeneCoverage(SeqAutoRecord):
     # gene_coverage_collection is populated in load_from_file, set_null as needs to be deleted/reset when reloaded
     gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=SET_NULL)
 
-    @staticmethod
-    def get_path_from_qc(qc):
-        pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_GENE_COVERAGE_PATTERN)
-        return pattern % qc.get_params()
-
 
 @receiver(pre_delete, sender=QCGeneCoverage)
 def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument

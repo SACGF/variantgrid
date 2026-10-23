@@ -65,8 +65,7 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
     if vav is None:
         # Without AF for this gnomAD version we can't tell which classified variants sit in the common partition.
         # Moving a variant to uncommon is always safe (common is only a skip optimisation), so treat every
-        # classified variant as potentially common. Typically a stale filter left behind after re-annotation -
-        # migrate_common_filter_gnomad_versions retires it once the annotation exists.
+        # classified variant as potentially common. Typically a stale filter left behind after re-annotation.
         logging.warning("No VariantAnnotationVersion for gnomAD %s / %s - treating all classified variants as "
                         "common for %s", cgcfv.gnomad_version, cgcfv.genome_build, cgcfv)
         return Variant.objects.filter(q_classification)

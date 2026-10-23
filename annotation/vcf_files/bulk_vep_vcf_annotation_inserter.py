@@ -130,7 +130,7 @@ class TranscriptGeometryCache:
 def add_calculated_ptc(transcript_data: TranscriptData, indel_offset: int,
                        transcript_geometry_cache: TranscriptGeometryCache):
     """ Writes ptc_distance_codons / ptc_last_junction_distance / nmd_escape_status into
-        transcript_data. Shared by the inserter and `manage.py backfill_ptc_annotation`.
+        transcript_data.
 
         @param indel_offset len(ref) - len(alt) @see annotation.ptc.calculate_ptc_position """
     transcript_data["nmd_escape_status"] = NMDEscapeStatus.NOT_APPLICABLE
