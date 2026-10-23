@@ -8,11 +8,15 @@ reports them).
 """
 import logging
 import sys
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Optional
 
 from django.db import transaction
-from django.db.models import F, Value, Window
+from django.db.models import F, Window
 from django.db.models.aggregates import Count, Max, Min
-from django.db.models.functions import Coalesce, Lag
+from django.db.models.functions import Lag
+from django.db.utils import OperationalError
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
@@ -25,6 +29,7 @@ from annotation.models import (
 )
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from library.django_utils import highest_pk
+from library.django_utils.database_utils import pg_settings, query_was_cancelled
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 
@@ -130,29 +135,54 @@ def get_annotation_range_lock_and_unannotated_count(variant_annotation_version: 
     return annotation_range_lock, unannotated_variants_count
 
 
-def get_range_lock_gaps_with_variants(variant_annotation_version: VariantAnnotationVersion) -> list[tuple[int, int]]:
-    """ Variant pk ranges (inclusive) between consecutive AnnotationRangeLocks that hold variants the
-        scheduler would annotate. The scheduler only searches above the highest lock, so these are never
-        annotated - left by a deleted lock, or by variants committed after a lock above them was taken.
+@dataclass
+class RangeLockGaps:
+    """ Variant pk ranges (inclusive) between AnnotationRangeLocks: those holding variants of the build, and
+        those whose probe ran out of time so are unknown """
+    with_variants: list[tuple[int, int]] = dataclass_field(default_factory=list)
+    unchecked: list[tuple[int, int]] = dataclass_field(default_factory=list)
 
-        Most pk gaps between locks hold only other builds' variants. Each gap is probed with
-        ORDER BY id LIMIT 1 rather than .exists(): without the ordering Postgres walks every locus of the
-        build (the contig index) per gap, instead of just the gap's pk range. Gap variants are not joined to
-        the annotation partition to check they are unannotated (that made each probe ~7x slower): deleting
-        a lock cascades to its runs' annotation. """
-    prev_max_variant_id = Coalesce(Window(Lag("max_variant_id"), order_by="min_variant_id"), Value(0))
+
+def get_range_lock_gaps_with_variants(variant_annotation_version: VariantAnnotationVersion,
+                                      probe_timeout_seconds: Optional[int] = None) -> RangeLockGaps:
+    """ Gaps between consecutive AnnotationRangeLocks that hold variants the scheduler would annotate. The
+        scheduler only searches above the highest lock, so these are never annotated - left by a deleted lock,
+        or by variants committed after a lock above them was taken.
+
+        The leading gap (pk 0 to the first lock) is not probed: the first lock starts at the build's lowest
+        unannotated variant and pks only grow, and on a build added after others it is most of the table.
+
+        Most pk gaps between locks hold only other builds' variants, so a probe walks its whole gap.
+        Each gap is probed with ORDER BY id LIMIT 1 rather than .exists(): without the ordering Postgres walks
+        every locus of the build (the contig index) per gap, instead of just the gap's pk range. Gap variants
+        are not joined to the annotation partition to check they are unannotated (that made each probe ~7x
+        slower): deleting a lock cascades to its runs' annotation. A probe exceeding probe_timeout_seconds is
+        reported as unchecked. """
+    prev_max_variant_id = Window(Lag("max_variant_id"), order_by="min_variant_id")
     gaps_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
     gaps_qs = gaps_qs.annotate(prev_max_variant_id=prev_max_variant_id)
+    # The first lock's prev_max_variant_id is NULL, so the comparison drops the leading gap
     gaps_qs = gaps_qs.filter(min_variant_id__gt=F("prev_max_variant_id") + 1)
 
     build_variants_qs = Variant.objects.filter(Variant.get_contigs_q(variant_annotation_version.genome_build),
                                                *VariantAnnotation.get_variant_annotation_q_list())
-    gaps_with_variants = []
+    statement_timeout = probe_timeout_seconds * 1000 if probe_timeout_seconds else None
+    gaps = RangeLockGaps()
     for prev_max_id, next_min_id in gaps_qs.values_list("prev_max_variant_id", "min_variant_id"):
+        gap = (prev_max_id + 1, next_min_id - 1)
         gap_qs = build_variants_qs.filter(pk__gt=prev_max_id, pk__lt=next_min_id)
-        if gap_qs.order_by("pk").values_list("pk", flat=True).first() is not None:
-            gaps_with_variants.append((prev_max_id + 1, next_min_id - 1))
-    return gaps_with_variants
+        try:
+            # Savepoint, so a cancelled probe doesn't abort a surrounding transaction
+            with transaction.atomic(), pg_settings(local=True, statement_timeout=statement_timeout):
+                has_variants = gap_qs.order_by("pk").values_list("pk", flat=True).first() is not None
+        except OperationalError as e:
+            if not query_was_cancelled(e):
+                raise
+            gaps.unchecked.append(gap)
+            continue
+        if has_variants:
+            gaps.with_variants.append(gap)
+    return gaps
 
 
 def _range_lock_is_dispatchable(range_lock: AnnotationRangeLock, now=None) -> bool:

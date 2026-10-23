@@ -33,7 +33,7 @@ Patterns here:
   ERRORs its unleased incomplete runs: the dispatcher only leases runs on NEW / ACTIVE versions). Runs nothing will
   dispatch - no range lock, or a HISTORICAL version - are cleared by `clean_up_abandoned_annotation_runs`
   (annotation/abandoned_annotation_runs.py:clean_up_abandoned_annotation_runs).
-- Variants left in pk gaps between AnnotationRangeLocks (a deleted lock) are never annotated: `check_annotation_range_lock_gaps` reports them. It probes each gap row by row, over an hour on vgaws (`annotation/annotation_versions.py:get_range_lock_gaps_with_variants`), so it is not a deployment check.
+- Variants left in pk gaps between AnnotationRangeLocks (a deleted lock) are never annotated: `check_annotation_range_lock_gaps` reports them. It probes each gap row by row (`annotation/annotation_versions.py:get_range_lock_gaps_with_variants`), so it is not a deployment check: it skips the gap below the first lock (the first lock starts at the build's lowest unannotated variant) and gives each probe `--probe-timeout` seconds, listing the gaps that exceed it as unchecked.
 - Saving a sub-version creates its partition tables (library/django_utils/django_partition.py:RelatedModelsPartitionModel.save)
   and bumps AnnotationVersion (annotation/models/models_version.py:SubVersionPartition.save → AnnotationVersion.new_sub_version,
   which overwrites the last one if unreferenced); batch creation goes inside SubVersionPartition.defer_new_sub_version.
