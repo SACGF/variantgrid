@@ -308,6 +308,10 @@ class Wiki(TimeStampedModel):
             msg = f"You do not have permission to write to wiki {self.pk}"
             raise PermissionDenied(msg)
 
+    def citation_ids(self) -> Optional[list[str]]:
+        """ Overwrite in a wiki that links the citations in its markdown, so a save can show them """
+        return None
+
     @staticmethod
     def get_subclass_by_name(class_name):
         klass = import_class(class_name)
