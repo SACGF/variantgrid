@@ -41,6 +41,7 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | permissions, notifications, previews, `library/utils` | `library/AGENTS.md` | - |
 | the user-facing changelog (`system/changelog`) | `variantgrid/templates/default_templates/changelog.html` (rules in its header comment) | `git log` since its last update |
 | a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
+| a breakage the migration squash (#736) could explain: missing seed data, a data fix that never ran | `manual/__manual_readme.md#the-migration-squash` | `git show pre_squash_checkpoint:<path>` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
 | an issue's ZenHub pipeline, what a release shipped | `claude/runbooks/zenhub_issue_triage.md` | `$ZENHUB_TOKEN`, `gh issue view` |

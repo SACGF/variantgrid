@@ -113,6 +113,9 @@ branch, `manual/squashed_history.py` refuses an old history - `migrate` (`pre_mi
 (`deployment_check` runs it), and gunicorn and celery workers, which won't start - until the
 one-off `manage.py reset_squashed_migration_history`, run by hand before `scripts/upgrade.sh`, swaps the old
 django_migrations rows for the new initials.
+What the squash removed - the old migrations with their data fixes and SQL, the `ManualOperation`s they registered and
+the one-off commands those ran - is kept at the protected tag `pre_squash_checkpoint`. A breakage that could be a seed
+row, index or data fix some deployment missed starts from #736 and `manual/__manual_readme.md#the-migration-squash`.
 A seed migration is `initial = True` so that reset records it; nothing added after the squash may be. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.
