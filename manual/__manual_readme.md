@@ -66,3 +66,13 @@ reported as obsolete for review, where selecting it offers to mark it complete.
 Every app's migrations were squashed into fresh initials and a `seed_data` migration (#736); an older database
 upgrades through branch `migration_checkpoint` first. `squashed_history.py` holds the guard and the reset - see the
 paragraph in `claude/guides/operations.md#deploy-and-upgrade`.
+
+When something breaks in a way the squash could explain - a seed row or index a deployment lacks, a data fix that
+never ran there, a schema that differs from a fresh build - start from #736. Everything the squash removed is still
+in git on branch `migration_checkpoint`: the old per-app migrations (with their `RunPython` data fixes and `RunSQL`),
+the `ManualOperation`s they registered, and the one-off management commands those ran (deleted from master in
+593edc560 and 652c2fc3d). Read one with `git show migration_checkpoint:<path>`, list an app's old migrations with
+`git ls-tree --name-only migration_checkpoint snpdb/migrations/`, and find which migration registered a command with
+`git grep <command> migration_checkpoint -- '*/migrations/*'`. To re-run a deleted command, bring it back as a new
+command (or a new migration's `ManualOperation`) on master rather than checking the branch out, since the
+checkpoint's system check stops every command there once its last migration is applied.
