@@ -300,8 +300,11 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         max_overlap_status = None
         next_step = self.get_query_param("skew_status")
-        if next_step == _SpecialNextStep.SOLVED:  # solved overlaps
-            if not overlap.overlap_override_status and overlap.overlap_max_ever_status > overlap.overlap_status:
+        if next_step in (_SpecialNextStep.SOLVED, _SpecialNextStep.ALL_OVERLAPS):  # solved overlaps
+            if not overlap.overlap_override_status and \
+                overlap.overlap_max_ever_status > overlap.overlap_status and \
+                    overlap.overlap_max_ever_status.is_attention and \
+                    not overlap.overlap_status.is_attention:
                 max_overlap_status = overlap.overlap_max_ever_status
 
         context = {
