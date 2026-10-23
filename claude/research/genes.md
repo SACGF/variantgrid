@@ -41,7 +41,9 @@ gene accession starting with `_` (a fake from UTA data) is renamed with `Gene.FA
 URL in the file becomes a `genes/models/models_gene.py:GeneAnnotationImport`
 (`genes/management/commands/import_gene_annotation.py:GeneAnnotationImportManager`), and a version row keeps the
 `import_source` that first created it - many versions are shared between GFF releases, so a version is created once
-and re-linked afterwards. The `hgnc` FK is only set when the HGNC row exists, so HGNC should be loaded first. A
+and re-linked afterwards. The `hgnc` FK is only set when the HGNC row exists, so HGNC should be loaded first.
+`Gene.summary` and the NCBI `GeneSymbolAlias` rows also come from the file - cdot takes them from NCBI's gene esummary
+(#2431) - and a summary or alias cdot drops is kept rather than cleared. A
 transcript's whole geometry lives in `TranscriptVersion.data["genome_builds"][build]`; pre-cdot rows lack
 `genome_builds`, which `genes/models/models_gene.py:TranscriptVersion.data_is_current_cdot_format` detects.
 
@@ -73,7 +75,8 @@ release without a GeneAnnotationVersion makes `AnnotationVersion.validate` raise
 ### Symbols, aliases and per-release matching
 
 `genes/models/models_gene.py:GeneSymbol` is keyed on the symbol string under a case-insensitive collation, with
-`genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI gene_info, legacy UCSC and manual entry. Most
+`genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI (cdot's RefSeq gene `aliases`, synced by
+`genes/management/commands/import_gene_annotation.py:Command._update_ncbi_gene_symbol_aliases`), legacy UCSC and manual entry. Most
 come from `genes/cached_web_resource/hgnc.py:save_hgnc_records`, which upserts a GeneSymbol per approved symbol and
 an alias per `prev_symbol` / `alias_symbol`; `genes/cached_web_resource/hgnc.py:store_hgnc_from_web` then re-matches
 every release. Resolving one exact string is
@@ -203,7 +206,7 @@ canonical match than do - the symptom of the wrong collection on a kit. Collecti
 (`DataArchiveMixin`); `genes/models/models_gene_coverage.py:gene_coverage_collection_pre_delete_handler` drops the
 partitions.
 
-HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt, RefSeq gene summaries and the PanelApp listings all load through
+HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt and the PanelApp listings all load through
 `snpdb/models/models_cached_web_resource.py:CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
 `genes/signals/manual_signals.py:hgnc_post_save_handler` and siblings): saving the named resource row runs the
 download on a worker and the row's description records what arrived. Pfam domains are the exception:

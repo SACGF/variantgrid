@@ -1,17 +1,24 @@
 import gzip
 import io
 import json
-from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 
-from genes.enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
-from genes.models import CdotDataVersion, TranscriptVersion
+from genes.models import (
+    CdotDataVersion,
+    Gene,
+    GeneList,
+    GeneListGeneSymbol,
+    GeneSymbol,
+    GeneSymbolAlias,
+    TranscriptVersion,
+)
 from snpdb.models.models_genome import GenomeBuild
 
 
-@patch("genes.management.commands.import_gene_annotation.retrieve_refseq_gene_summaries")
 class ImportCdotDataTest(TestCase):
     URL = "https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
 
@@ -53,7 +60,7 @@ class ImportCdotDataTest(TestCase):
     def _cdot_by_accession(self) -> dict[str, str]:
         return {tv.accession: tv.modified_cdot_version for tv in TranscriptVersion.objects.filter(genome_build=self.genome_build)}
 
-    def test_only_changed_transcripts_restamped(self, _mock_gene_summaries):
+    def test_only_changed_transcripts_restamped(self):
         self._import(self._cdot_file("0.2.34"))
         self._import(self._cdot_file("0.2.35"))
         self.assertEqual({"NM_001754.4": "0.2.34", "NM_032638.4": "0.2.34"}, self._cdot_by_accession())
@@ -70,7 +77,7 @@ class ImportCdotDataTest(TestCase):
         self.assertEqual(gata2_build_data["exons"], gata2_tv.genome_build_data["exons"])
         self.assertEqual("0.2.36", CdotDataVersion.get_version(self.genome_build, AnnotationConsortium.REFSEQ))
 
-    def test_mitochondrial_fake_transcript_imported(self, _mock_gene_summaries):
+    def test_mitochondrial_fake_transcript_imported(self):
         """ cdot's versionless 'fake-rna-ND4' is stored as version 1 so MT annotation can link to it, and
             matched on re-import (#2139) """
         cdot_data = json.loads(gzip.decompress(self._cdot_file("0.2.34").getvalue()))
@@ -90,3 +97,28 @@ class ImportCdotDataTest(TestCase):
         tv = TranscriptVersion.objects.get(genome_build=self.genome_build, transcript_id="fake-rna-ND4")
         self.assertEqual(1, tv.version)
         self.assertTrue(tv.is_cdot_fake)
+
+    def _ncbi_aliases(self) -> set[tuple[str, str]]:
+        return set(GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI).values_list("alias", "gene_symbol_id"))
+
+    def test_gene_summaries_and_ncbi_aliases(self):
+        """ Summaries update on existing genes; NCBI aliases skip gene symbols and HGNC aliases, and one cdot drops is
+            deleted unless a gene list matched through it. A gene without "aliases" leaves its aliases alone """
+        GeneSymbol.objects.create(symbol="GATA2")
+        GeneSymbolAlias.objects.create(alias="CBFA2", gene_symbol_id="GATA2", source=GeneSymbolAliasSource.HGNC)
+        GeneSymbolAlias.objects.create(alias="NRSF", gene_symbol_id="GATA2", source=GeneSymbolAliasSource.NCBI)
+        cdot_data = json.loads(gzip.decompress(self._cdot_file("0.2.34").getvalue()))
+        cdot_data["genes"]["861"] |= {"summary": "old", "aliases": "AML1, CBFA2, GATA2, PEBP2aB, AMLCR1"}
+        self._import(io.BytesIO(gzip.compress(json.dumps(cdot_data).encode())))
+        expected = {("AML1", "RUNX1"), ("PEBP2aB", "RUNX1"), ("AMLCR1", "RUNX1"), ("NRSF", "GATA2")}
+        self.assertEqual(expected, self._ncbi_aliases())
+
+        user = User.objects.create_user("gene_list_user")
+        gene_list = GeneList.objects.create(name="aml1_list", user=user)
+        GeneListGeneSymbol.objects.create(gene_list=gene_list, original_name="AML1", gene_symbol_id="RUNX1",
+                                          gene_symbol_alias=GeneSymbolAlias.objects.get(alias="AML1"))
+        cdot_data["genes"]["861"] |= {"summary": "new", "aliases": "PEBP2AB, CBF2alpha"}
+        self._import(io.BytesIO(gzip.compress(json.dumps(cdot_data).encode())))
+        expected = {("AML1", "RUNX1"), ("PEBP2aB", "RUNX1"), ("CBF2alpha", "RUNX1"), ("NRSF", "GATA2")}
+        self.assertEqual(expected, self._ncbi_aliases())
+        self.assertEqual("new", Gene.objects.get(pk="861").summary)
