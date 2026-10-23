@@ -130,6 +130,7 @@ class VEPPlugin(models.TextChoices):
     PROTVAR = 'p', 'ProtVar'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
+    UTR_ANNOTATOR = 'u', 'UTRAnnotator'
 
 
 class VEPCustom(models.TextChoices):

@@ -142,6 +142,10 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
             "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
         })
 
+    # The fixtures were generated without UTRAnnotator, so its CSQ fields would be missing (#2426)
+    for build_name in (settings.BUILD_GRCH37, settings.BUILD_GRCH38):
+        TEST_ANNOTATION[build_name]["vep_config"]["utr_annotator"] = None
+
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
     ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version
     ANNOTATION_COLUMNS[settings.BUILD_GRCH38]["columns_version"] = columns_version

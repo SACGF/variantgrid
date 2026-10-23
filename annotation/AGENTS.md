@@ -87,7 +87,10 @@ Gotchas:
   readers tell "not backfilled yet" from a real null: default True, the migration sets False only on VAVs that need
   the backfill, the command that fills the partition sets it True, and a ManualOperation tests for a False flag.
   The full recipe (pin stamping, gates, flag, backfill steps and limits) is claude/research/annotation.md
-  "A new column on an existing VariantAnnotationVersion".
+  "A new column on an existing VariantAnnotationVersion"; UTRAnnotator (#2426) is the worked example.
+- The utr_annotator_* columns of variants annotated before UTRAnnotator was switched on are backfilled into
+  VariantAnnotation only, so the variant page shows the representative transcript's values from there (not the
+  transcript rows), and "not backfilled" via annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled.
 - annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list excludes reference (ref == alt) and '.'/'*' alt
   variants; they never get rows, so any "unannotated" count must apply it.
 - annotation/models/models_annotation_run.py:AnnotationRun.get_for_variant matches by range-lock bounds and pipeline_type: a variant

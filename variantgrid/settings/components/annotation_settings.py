@@ -190,6 +190,8 @@ ANNOTATION = {
             "eve": None,  # n/a for GRCh37 (GRCh38 only)
             "popeve": None,  # n/a for GRCh37 (GRCh38 only)
             "promoter_ai": None,  # n/a for GRCh37 (GRCh38 only)
+            # Added to columns_version 5 annotation already in use - a manual task backfills it (#2426)
+            "utr_annotator": "annotation_data/GRCh37/uORF_5UTR_GRCh37_PUBLIC.txt",  # VEP >= 112
         }
     },
     BUILD_GRCH38: {
@@ -244,6 +246,8 @@ ANNOTATION = {
             "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",  # VEP >= 116
             "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",  # VEP >= 116
             "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",  # VEP >= 116
+            # Added to columns_version 5 annotation already in use - a manual task backfills it (#2426)
+            "utr_annotator": "annotation_data/GRCh38/uORF_5UTR_GRCh38_PUBLIC.txt",  # VEP >= 112
         }
     },
     BUILD_T2TV2: {
@@ -292,21 +296,23 @@ ANNOTATION = {
             "eve": None,  # n/a (GRCh38 only)
             "popeve": None,  # n/a (GRCh38 only)
             "promoter_ai": None,  # n/a (GRCh38 only)
+            "utr_annotator": None,  # n/a (no T2T uORF data)
         }
     },
 }
 
 def _disable_columns_version_5_plugins(annotation):
-    """Clear the columns_version 5 VEP plugin data keys (#1638) to None across all builds.
+    """Clear the columns_version 5 VEP plugin data keys (#1638, #2426) to None across all builds.
 
-    The package default points these at real data files (ProtVar on all builds; OpenTargets / EVE /
-    popEVE / PromoterAI on GRCh38). Deployments pinned below columns_version 5 haven't installed that
-    plugin data (or VEP 116), so clear the keys - vep_columns.has_data_files then drops the plugin
-    columns and get_vep_command skips the matching --plugin invocations.
+    The package default points these at real data files (ProtVar on all builds, UTRAnnotator on
+    GRCh37/38; OpenTargets / EVE / popEVE / PromoterAI on GRCh38). Deployments pinned below
+    columns_version 5 haven't installed that plugin data (or VEP 116), so clear the keys -
+    vep_columns.has_data_files then drops the plugin columns and get_vep_command skips the matching
+    --plugin invocations.
     """
     for build_settings in annotation.values():
         vep_config = build_settings["vep_config"]
-        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai"):
+        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai", "utr_annotator"):
             if plugin_key in vep_config:
                 vep_config[plugin_key] = None
 

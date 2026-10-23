@@ -241,6 +241,23 @@ def _gnomad2_grch37(source_field: str, vgc, *, desc: Optional[str] = None,
     })
 
 
+def _utr_annotator(source_field: str, vgc, **overrides) -> VEPColumnDef:
+    """ UTRAnnotator plugin, GRCh37/38 (no T2T uORF data). Added to versions already in use rather than
+        with a columns_version bump (see VariantAnnotationVersion.backfilled_utr_annotator), so it is gated
+        at the columns_version they hold. VEP 112 renamed its uORF stop codon consequences. """
+    return VEPColumnDef(**{
+        "source_field": source_field,
+        "variant_grid_columns": _to_vgc_tuple(vgc),
+        "category": ColumnAnnotationCategory.SEQUENCE,
+        "vep_plugin": VEPPlugin.UTR_ANNOTATOR,
+        "genome_builds": GRCH37_38,
+        "pipeline_types": STANDARD,
+        "min_columns_version": 5,
+        "min_vep_version": 112,
+        **overrides,
+    })
+
+
 def _gnomad_sv(source_field: str, vgc, **overrides) -> VEPColumnDef:
     """ gnomAD SV, custom prefix, structural-variant pipeline. genome_builds varies. """
     return VEPColumnDef(**{
@@ -1235,7 +1252,18 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
         min_columns_version=5,
         min_vep_version=116,
     ),
+
+    # ---------- UTRAnnotator (GRCh37/38, VEP >= 112, columns_version >= 5) - #2426 ----
+    _utr_annotator('5UTR_consequence', 'utr_annotator_consequence', formatter=fmt.format_dash_as_none),
+    _utr_annotator('5UTR_annotation', 'utr_annotator_annotation', formatter=fmt.format_dash_as_none,
+                   separator=fmt.VEP_SEPARATOR),
+    _utr_annotator('Existing_uORFs', 'utr_annotator_existing_uorfs'),
+    _utr_annotator('Existing_OutOfFrame_oORFs', 'utr_annotator_existing_out_of_frame_oorfs'),
+    _utr_annotator('Existing_InFrame_oORFs', 'utr_annotator_existing_inframe_oorfs'),
 )
+
+# UTRAnnotator only annotates transcripts with this consequence
+FIVE_PRIME_UTR_VARIANT = "5_prime_UTR_variant"
 
 
 # vep_config setting keys (under settings.ANNOTATION[<build>]["vep_config"]) that must be
@@ -1253,6 +1281,7 @@ _VEP_PLUGIN_SETTING_KEYS: dict[VEPPlugin, tuple[str, ...]] = {
     VEPPlugin.OPEN_TARGETS: ("open_targets",),
     VEPPlugin.EVE: ("eve", "popeve"),
     VEPPlugin.PROMOTER_AI: ("promoter_ai",),
+    VEPPlugin.UTR_ANNOTATOR: ("utr_annotator",),
     VEPPlugin.GRANTHAM: (),
     VEPPlugin.LOFTOOL: (),
     VEPPlugin.NMD: (),

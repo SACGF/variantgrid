@@ -21,13 +21,16 @@ produced the version.
 import csv
 import io
 import logging
+import re
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Callable, Optional
 
 import cyvcf2
+from django.core.exceptions import FieldDoesNotExist
 from django.db import connection, transaction
+from django.db.models import BooleanField
 
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import write_qs_to_vcf
@@ -52,6 +55,8 @@ CSQ_FORMAT_SEPARATOR = "Format: "
 CSQ_PICK_FIELD = "PICK"
 
 IMPORT_PROGRESS_INTERVAL_SECONDS = 10
+
+BACKFILL_FLAG_PREFIX = "backfilled_"
 
 
 class BackfillColumnError(ValueError):
@@ -166,7 +171,7 @@ def _validate_annotation_columns(columns: Iterable[str]) -> list[str]:
 
 def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion, output_filename: str,
                             targets: list[BackfillTarget] = None, only_missing: bool = False,
-                            not_null_columns: Iterable[str] = None,
+                            not_null_columns: Iterable[str] = None, consequence: Optional[str] = None,
                             min_variant_id: int = None, max_variant_id: int = None) -> int:
     """ Write the variants annotated in this version to a VCF carrying variant_id in INFO, ready to be
         annotated externally. Returns the number of records written.
@@ -176,7 +181,10 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
 
         not_null_columns restricts to rows that already have a value for those columns. A source writes
         all of its columns together, so a sibling column being null rules the variant out - #1822's Open
-        Targets score only needed the 465k variants the plugin matched, not the version's 8.4M. """
+        Targets score only needed the 465k variants the plugin matched, not the version's 8.4M.
+
+        consequence restricts to rows whose representative transcript has that SO term - for a VEP plugin
+        that only annotates some consequences, all a --csq import of the PICK'd entry can fill (#2426). """
     annotation_version = variant_annotation_version.get_any_annotation_version()
     qs = get_variants_qs_for_annotation(annotation_version, annotated=True,
                                         min_variant_id=min_variant_id, max_variant_id=max_variant_id)
@@ -192,11 +200,33 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
             annotation_filter[f"variantannotation__{target.column}__isnull"] = True
     for column in _validate_annotation_columns(not_null_columns):
         annotation_filter[f"variantannotation__{column}__isnull"] = False
+    if consequence:
+        # consequence is VEP's '&'-joined SO terms
+        annotation_filter["variantannotation__consequence__regex"] = \
+            rf"(^|{VEP_SEPARATOR}){re.escape(consequence)}({VEP_SEPARATOR}|$)"
     qs = qs.filter(**annotation_filter)
 
     # Matched by sequence against the source's file, like the STANDARD dump - an SV stays symbolic
     return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs,
                            structural_variant_min_size=variant_annotation_version.structural_variant_min_size)
+
+
+def validate_backfill_flag(flag: str):
+    """ A VariantAnnotationVersion backfilled_* flag - what readers check to tell an un-backfilled null
+        from a real one """
+    if not flag.startswith(BACKFILL_FLAG_PREFIX):
+        raise BackfillColumnError(f"'{flag}' is not a {BACKFILL_FLAG_PREFIX}* flag")
+    try:
+        field = VariantAnnotationVersion._meta.get_field(flag)
+    except FieldDoesNotExist:
+        raise BackfillColumnError(f"VariantAnnotationVersion has no field '{flag}'") from None
+    if not isinstance(field, BooleanField):
+        raise BackfillColumnError(f"VariantAnnotationVersion.{flag} is not a flag")
+
+
+def mark_backfilled(variant_annotation_version: VariantAnnotationVersion, flag: str):
+    validate_backfill_flag(flag)
+    VariantAnnotationVersion.objects.filter(pk=variant_annotation_version.pk).update(**{flag: True})
 
 
 class _CSQPicker:

@@ -35,6 +35,7 @@ _BASENAME_PIN_FIELDS = {
     "protvar": "protvar",
     "repeatmasker": "repeat_masker",
     "transcript_blocklist": "transcript_blocklist",
+    "utr_annotator": "utr_annotator",
 }
 
 # Data files with a version in the name that don't already have a VariantAnnotationVersion field.

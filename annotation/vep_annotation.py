@@ -261,6 +261,11 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 # the variant isn't the credible set lead - ie most of a variant's GWAS L2G scores (#1822)
                 VEPPlugin.OPEN_TARGETS: lambda: f"OpenTargets,file={vc['open_targets']},cols=all,lead_variants_only=0",
             })
+            if vc.vep_version >= 112:
+                plugin_data_func.update({
+                    # Effects come from the transcript sequence - the file only adds uORF evidence
+                    VEPPlugin.UTR_ANNOTATOR: lambda: f"UTRAnnotator,file={vc['utr_annotator']}",
+                })
             # EVE and PromoterAI are only available in VEP >= 116
             if vc.vep_version >= 116:
                 plugin_data_func.update({

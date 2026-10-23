@@ -148,6 +148,7 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="protvar", label="ProtVar", orderable=True, detail=True),
             RichColumn(key="eve", label="EVE", orderable=True, detail=True),
             RichColumn(key="promoter_ai", label="PromoterAI", orderable=True, detail=True),
+            RichColumn(key="utr_annotator", label="UTRAnnotator", orderable=True, detail=True),
             RichColumn(key="fasta", orderable=True, detail=True),
             RichColumn(key="transcript_blocklist", orderable=True, detail=True),
             RichColumn(key="pick_order", orderable=True, detail=True),

@@ -131,9 +131,11 @@ version, from settings alone). A new source means a new VAV field (an entry in `
 Traps): the VEP lane halts on that VAV, and `create_new_variant_annotation_version` would `get_or_create` a fresh
 VAV. So the field is stamped on the existing NEW/ACTIVE VAVs from live settings at the same time the file is
 configured: a `RunPython` that, per VAV, reads `settings.ANNOTATION.get(vav.genome_build_id)`, skips a build with no
-config, and sets the fields `vep_component_version_kwargs` returns. HISTORICAL VAVs stay NULL - nothing looks them up
-by config again. A deployment that configures the file after the migration has run needs the same stamp as a command
-(or the runs page re-check after a manual update), then an annotation_workers restart, since `get_vep_version` is
+config, and sets the new field from what `vep_component_version_kwargs` returns. HISTORICAL VAVs stay NULL - nothing
+looks them up by config again. Shipping the file path in the package default settings
+(`variantgrid/settings/components/annotation_settings.py`) makes configuring and stamping one deploy: the migration
+reads the setting that the same release turns on. A deployment that sets or changes the file after the migration has
+run needs the same stamp by hand (below), then an annotation_workers restart, since `get_vep_version` is
 `lru_cache`d per process.
 
 **The column gates.** The `annotation/vep_columns.py:VEPColumnDef` takes `min_columns_version` equal to the existing
@@ -172,11 +174,55 @@ order and flags as the pipeline so the PICK'd transcript matches, then `--import
 
 - `--csq` reads the PICK'd CSQ entry into `VariantAnnotation` only; `VariantTranscriptAnnotation` keeps NULL
   (`annotation/backfill_columns.py:_base_table_names_for_column`). A per-transcript column needs the import extended to
-  match each CSQ entry to its transcript row, or accepts representative-only history.
+  match each CSQ entry to its transcript row, or accepts representative-only history - and a page showing it reads
+  `VariantAnnotation`, since the transcript rows of backfilled variants are NULL.
 - `--only-missing` dumps rows where every named column is NULL, which for a sparse source never shrinks, so a re-run
-  re-dumps the whole version. Bound by variant id instead, or add a dump filter that matches what the source can
-  annotate (a consequence on any transcript).
-- It doesn't set a backfill flag; that is the caller's job until it grows an option for it.
+  re-dumps the whole version. Bound by variant id instead, and narrow it with `--not-null` (a sibling column the
+  source writes) or `--consequence` (an SO term on the representative transcript, all a `--csq` import can fill).
+- `--mark-backfilled <flag>` sets the VAV's `backfilled_*` flag once the import finishes. With a split dump, pass it
+  on the last import only.
+
+**UTRAnnotator (#2426)** is this recipe applied: five `utr_annotator_*` columns on both annotation tables, gated at
+`min_columns_version=5` / `min_vep_version=112` (VEP 112 renamed its uORF stop codon terms) for GRCh37/38, the
+`utr_annotator` basename pin, and `backfilled_utr_annotator`. `annotation/migrations/0004_utr_annotator.py` stamps
+the pin and sets the flag False on NEW/ACTIVE versions with range locks that the columns cover; the ManualOperation
+in `annotation/migrations/0005_utr_annotator_manual_backfill.py` writes these steps into its note with each
+version's pk and `--max-variant-id` filled in:
+
+1. Download uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator
+   into `annotation_data/<build>/` under ANNOTATION_VEP_BASE_DIR (`vep_data_check` reports it missing). The plugin
+   computes the effects from the transcript sequence, so it runs - with every `Evidence` NA - when the file is missing.
+2. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns
+   utr_annotator_consequence,utr_annotator_annotation,utr_annotator_existing_uorfs,utr_annotator_existing_out_of_frame_oorfs,utr_annotator_existing_inframe_oorfs
+   --consequence 5_prime_UTR_variant --max-variant-id <max> --output utr_annotator_<build>.vcf.gz`, splitting by
+   `--min/max-variant-id` to run VEP in parallel.
+3. VEP: copy the `pipeline_command` of one of the version's STANDARD AnnotationRuns, swap `-i` / `-o`, replace every
+   `--plugin` / `--custom` with `--plugin UTRAnnotator,file=<file>` and add
+   `--fields Feature,PICK,5UTR_consequence,5UTR_annotation,Existing_uORFs,Existing_OutOfFrame_oORFs,Existing_InFrame_oORFs`.
+   Everything else stays, so the PICK'd transcript is the representative one.
+4. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` / `--columns`,
+   `--csq utr_annotator_consequence=5UTR_consequence --csq utr_annotator_annotation=5UTR_annotation
+   --csq utr_annotator_existing_uorfs=Existing_uORFs --csq utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs
+   --csq utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs --vcf <annotated>`, `--dry-run` first, then
+   with `--mark-backfilled backfilled_utr_annotator` (last piece only).
+
+The plugin reports one `5UTR_consequence` per transcript even when it finds several effects (the last flagged, in
+Perl hash order); `5UTR_annotation` keeps every effect. Variants whose VEP ran before the deploy and import after it
+fail with VEPMissingColumnsError (the inserter expects the new CSQ fields) and need re-running, so deploy with the
+import lane drained. A deployment that configures `utr_annotator` after the migration stamps it from `manage.py shell`:
+
+```python
+from django.conf import settings
+from annotation.models import VariantAnnotationVersion
+from annotation.vep_config import vep_component_version_kwargs
+for vav in VariantAnnotationVersion.objects.filter(status__in=["NEW", "ACTIVE"]):
+    if build_settings := settings.ANNOTATION.get(vav.genome_build_id):
+        vav.utr_annotator = vep_component_version_kwargs(build_settings)["utr_annotator"]
+        vav.save(update_fields=["utr_annotator"])
+```
+
+then sets `backfilled_utr_annotator=False` on the versions that had already annotated variants and follows the steps
+above (no manual task is registered for it).
 
 ### ClinVar
 

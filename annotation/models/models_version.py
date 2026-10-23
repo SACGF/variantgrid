@@ -170,6 +170,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     topmed = models.TextField(null=True, blank=True)
     transcript_blocklist = models.TextField(null=True, blank=True)  # --transcript_filter
     uk10k = models.TextField(null=True, blank=True)
+    utr_annotator = models.TextField(null=True, blank=True)  # UTRAnnotator uORF file - GRCh37/38 only
 
     pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
     sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
@@ -217,6 +218,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # on those columns. Source:
     # annotation/sv_conservation.py:sv_conservation_window
     backfilled_sv_conservation = models.BooleanField(default=True)
+
+    # #2426 - UTRAnnotator was added to versions already in use: the utr_annotator_* columns of variants
+    # annotated before then stay null until `annotation_backfill_columns --mark-backfilled` imports them.
+    # The migration set it False only on the NEW/ACTIVE versions the plugin applies to.
+    backfilled_utr_annotator = models.BooleanField(default=True)
 
     class Meta:
         constraints = [
