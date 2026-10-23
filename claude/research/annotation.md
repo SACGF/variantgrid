@@ -117,6 +117,67 @@ attaches `annotation/models/models_annotation_version.py:AnnotationVersion.sql_p
 its table names rewritten to the version's partitions. Django's `FilteredRelation` cannot do this job because it cannot
 follow nested relations (`variantannotation__gene__geneannotation`).
 
+### A new column on an existing VariantAnnotationVersion
+
+The default way to add a VEP plugin or data file is a new VAV and a full re-annotation, which takes weeks on a
+production database. The alternative keeps the ACTIVE VAV, turns the source on for new variants, and backfills the
+variants already annotated. Four pieces have to agree.
+
+**The pin.** Every data file `get_vep_command` passes is pinned on the VAV, either through a dedicated field filled
+from the `##VEP=` header or through `annotation/vep_config.py:vep_component_version_kwargs` (basename or parsed
+version, from settings alone). A new source means a new VAV field (an entry in `_BASENAME_PIN_FIELDS` /
+`_VERSION_PIN_FIELDS`, or header parsing in `vep_dict_to_variant_annotation_version_kwargs`). Setting the file in
+`settings.ANNOTATION[build]["vep_config"]` while the ACTIVE VAV still holds NULL in that field is a pin mismatch (see
+Traps): the VEP lane halts on that VAV, and `create_new_variant_annotation_version` would `get_or_create` a fresh
+VAV. So the field is stamped on the existing NEW/ACTIVE VAVs from live settings at the same time the file is
+configured: a `RunPython` that, per VAV, reads `settings.ANNOTATION.get(vav.genome_build_id)`, skips a build with no
+config, and sets the fields `vep_component_version_kwargs` returns. HISTORICAL VAVs stay NULL - nothing looks them up
+by config again. A deployment that configures the file after the migration has run needs the same stamp as a command
+(or the runs page re-check after a manual update), then an annotation_workers restart, since `get_vep_version` is
+`lru_cache`d per process.
+
+**The column gates.** The `annotation/vep_columns.py:VEPColumnDef` takes `min_columns_version` equal to the existing
+VAVs' `columns_version` (a bump is by definition a new VAV) and `min_vep_version` for the first VEP release whose
+VEP_plugins ships the plugin, plus `genome_builds` if the data only exists for some builds. The plugin's settings key
+goes in `_VEP_PLUGIN_SETTING_KEYS` so `filter_for(vep_config=...)` drops the columns where the file isn't configured.
+`annotation/backfill_columns.py:resolve_backfill_columns` filters by the VAV's own `columns_version` and `vep`, so a
+column gated past them cannot be backfilled.
+
+**The backfill flag.** Until the backfill finishes, a NULL in the new column means either "not backfilled" or "the
+source has nothing", and for a sparse source those look the same. A `backfilled_<thing>` BooleanField on the VAV
+(`annotation/models/models_version.py:VariantAnnotationVersion.backfilled_ptc` and its siblings) separates them:
+
+- `default=True`, because a VAV created later gets the column at insert time.
+- The schema migration adds the field, then a `RunPython` sets False only on the VAVs the backfill will actually fill:
+  status NEW/ACTIVE, a build the column defs apply to, `columns_version` / `vep` the defs cover. Setting every VAV False
+  disables correct data and points operators at work that doesn't exist.
+- The command that fills a partition sets the flag True on that VAV when it finishes, and is idempotent so a re-run
+  re-asserts it.
+- Every reader checks it. An analysis node skips the filter and says so in `get_warnings` on a False VAV
+  (`analysis/models/nodes/filters/damage_node.py:DamageNode.get_warnings` for `backfilled_ptc`), and a page or grid shows
+  "not backfilled" rather than presenting NULL as a negative.
+- The deploy step is a `ManualOperation` in a migration after the schema one (`manual/__manual_readme.md`), its `test`
+  being `VariantAnnotationVersion.objects.filter(<flag>=False).exists()`, with a `note` naming the issue. Use
+  `ManualOperation.operation_manage([...])` when one command does the whole job, `operation_other` when a step runs
+  outside VariantGrid (external VEP).
+- When no VAV is False any more, the field, the readers' fallback branches and the migrations go together.
+
+**The backfill.** `annotation/management/commands/annotation_backfill_columns.py` (#1675, wiki page
+"Backfill-Annotation", used for COSMIC counts and Open Targets) dumps already-annotated variants to a VCF carrying
+`variant_id`, the operator annotates it outside VariantGrid, and `--import` COPYs the values into a temp table and
+UPDATEs the partition. For a VEP plugin: dump bounded by `--max-variant-id` (the last variant annotated before the
+plugin was switched on), split by `--min/max-variant-id` to run VEP in parallel, run VEP with the same cache, pick
+order and flags as the pipeline so the PICK'd transcript matches, then `--import --csq <column>=<CSQ field>` with
+`--dry-run` first. Limits as it stands:
+
+- `--csq` reads the PICK'd CSQ entry into `VariantAnnotation` only; `VariantTranscriptAnnotation` keeps NULL
+  (`annotation/backfill_columns.py:_base_table_names_for_column`). A per-transcript column needs the import extended to
+  match each CSQ entry to its transcript row, or accepts representative-only history.
+- `--only-missing` dumps rows where every named column is NULL, which for a sparse source never shrinks, so a re-run
+  re-dumps the whole version. Bound by variant id instead, or add a dump filter that matches what the source can
+  annotate (a consequence on any transcript).
+- It doesn't set a backfill flag; that is the caller's job until it grows an option for it.
+
 ### ClinVar
 
 ClinVar arrives two ways. The bulk summary is the ClinVar VCF, imported through the upload app's step pipeline

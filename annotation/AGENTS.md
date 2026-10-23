@@ -77,6 +77,17 @@ Gotchas:
   get_variant_queryset_for_annotation_version raise DataArchivedError, so check data_archived before assuming rows.
 - annotation_variantannotation partitions are per VAV and huge in production: bulk work goes through COPY / temp
   tables (annotation/backfill_columns.py:import_backfill_vcf, `annotation_backfill_columns`), never per-row ORM updates.
+- Adding a VEP plugin/data file to an existing VAV (backfill instead of a new VAV): the file is a VAV pin
+  (annotation/vep_config.py:vep_component_version_kwargs), so configuring it halts annotation with
+  VEPVersionMismatchError and makes `create_new_variant_annotation_version` mint a full re-annotation until the
+  ACTIVE VAV's new field is stamped to match. Gate the VEPColumnDef on the existing VAV's columns_version and VEP
+  (min_columns_version / min_vep_version, never a columns_version bump), or `annotation_backfill_columns` refuses it.
+  Its `--csq` import reads the PICK'd entry into VariantAnnotation only; VariantTranscriptAnnotation stays null.
+- A backfilled_* flag on the VAV (annotation/models/models_version.py:VariantAnnotationVersion.backfilled_ptc) lets
+  readers tell "not backfilled yet" from a real null: default True, the migration sets False only on VAVs that need
+  the backfill, the command that fills the partition sets it True, and a ManualOperation tests for a False flag.
+  The full recipe (pin stamping, gates, flag, backfill steps and limits) is claude/research/annotation.md
+  "A new column on an existing VariantAnnotationVersion".
 - annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list excludes reference (ref == alt) and '.'/'*' alt
   variants; they never get rows, so any "unannotated" count must apply it.
 - annotation/models/models_annotation_run.py:AnnotationRun.get_for_variant matches by range-lock bounds and pipeline_type: a variant
