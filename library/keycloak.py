@@ -1,12 +1,17 @@
 import json
+import logging
 import urllib
+from collections.abc import Callable
 from typing import Optional
 
 import requests
 from django.conf import settings
 from django.contrib.auth.models import User
+from requests import JSONDecodeError, Response
 
 from library.constants import MINUTE_SECS
+from library.email import Email
+from library.log_utils import report_message
 from library.oauth import ServerAuth
 from snpdb.models.models import Lab
 from snpdb.models.models_user_settings import UserSettings
@@ -27,7 +32,7 @@ class KeycloakNewUser:
         self.last_name = last_name
         self.email = email
         self.lab = lab
-        self.welcome_email = None
+        self.welcome_email: Email = None
 
 
 class Keycloak:
@@ -39,14 +44,12 @@ class Keycloak:
         self.realm = settings.KEY_CLOAK_REALM
 
     def ping(self):
-        full_url = self.connector.url(f'/auth/admin/realms/{self.realm}/clients')
-        print(full_url)
-        response = requests.get(
-            auth=self.connector.auth,
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/clients'),
-            timeout=MINUTE_SECS,
+        # Method does a basic request to KeyCloak, should raise an exception if anything goes wrong
+        # returns nothing otherwise
+        response = self.request_json(
+            'GET',
+            url=f'/admin/realms/{self.realm}/clients',
         )
-        response.raise_for_status()
 
     def change_password(self, user: User):
         user_settings = UserSettings.get_for_user(user)
@@ -55,23 +58,24 @@ class Keycloak:
 
         user_id = user_settings.oauth_sub
 
-        response = requests.put(
-            auth=self.connector.auth,
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/execute-actions-email'),
-            json=['UPDATE_PASSWORD'],
-            timeout=MINUTE_SECS,
+        self.request(
+            'PUT',
+            url=f'/admin/realms/{self.realm}/users/{user_id}/execute-actions-email',
+            json_data=['UPDATE_PASSWORD']
         )
-
-        response.raise_for_status()
 
     def check_groups(self, groups: list[str]) -> list[str]:
+        """
+        Makes sure the groups exist within KeyCloak and returns their IDs
+        :param groups: list of group names
+        """
         groups.sort()
-        response = requests.get(
-            auth=self.connector.auth,
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups'),
-            timeout=MINUTE_SECS,
+        # Get ALL groups within KeyCloak, so we can see if the groups we want exist in there yet
+        response = self.request(
+            'GET',
+            url=f'/admin/realms/{self.realm}/groups?q=*',
         )
-        group_array = json.loads(response.text)
+        group_array = response.json()
         group_dict = {}
 
         def recurse_subgroups(sub_groups: list[dict]):
@@ -97,43 +101,58 @@ class Keycloak:
                     parent = existing_id
                 else:
                     if not parent:
-                        print(group_dict)
+                        logging.error("No parent group found for %s (%s), group_dict: %s", missing_group, combined, group_dict)
                         raise ValueError(f'No parent group found for {missing_group} ({combined})')
-                    response = requests.post(
-                        auth=self.connector.auth,
-                        url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups/{parent}/children'),
-                        json={
+                    response = self.request(
+                        'POST',
+                        url=f'/admin/realms/{self.realm}/groups/{parent}/children',
+                        json_data={
                             "name": combined.rsplit('/', maxsplit=1)[-1],
-                        },
-                        timeout=MINUTE_SECS,
+                        }
                     )
-                    response.raise_for_status()
                     new_group_json = json.loads(response.text)
                     parent = new_group_json.get('id')
                     group_dict[new_group_json.get('path')] = parent
 
         return [group_dict[gp] for gp in groups]
 
+    def request(self, method: str, url: str, json_data=None) -> Response:
+        # :param method: method for the new :class:`Request` object: ``GET``, ``OPTIONS``, ``HEAD``, ``POST``, ``PUT``, ``PATCH``, or ``DELETE``.
+        response = requests.request(
+            method,
+            auth=self.connector.auth,
+            url=self.connector.url(url),
+            json=json_data,
+            timeout=MINUTE_SECS
+        )
+        response.raise_for_status()
+        return response
+
+    def request_json(self, method: str, url: str, json_data=None) -> dict:
+        try:
+            response = self.request(method=method, url=url, json_data=json_data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as ex:
+            raise Exception(f"Error contacting {self.connector.url(url)}") from ex
+
     def existing_user(self, email: str) -> Optional[dict]:
         params = {'email': email}
         params_str = urllib.parse.urlencode(params)
-        response = requests.get(
-            auth=self.connector.auth,
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/users?{params_str}'),
-            timeout=MINUTE_SECS,
+        response = self.request(
+            'GET',
+            url=f'/admin/realms/{self.realm}/users?{params_str}',
         )
-        response.raise_for_status()
+        try:
+            if json_response := response.json():
+                return json_response[0]
+            else:
+                return None
+        except JSONDecodeError:
+            report_message("KeyCloak Error", level="error", extra_data={"target": response.text})
+            return None
 
-        user_json = json.loads(response.text)
-        if user_json:
-            return user_json[0]
-        return None
-
-    def welcome_user(self, user: KeycloakNewUser):
-        pass
-
-    def add_user(self, user: KeycloakNewUser) -> str:
-        # TODO check to see if the user already exists
+    def add_user(self, user: KeycloakNewUser, pre_password_reset: Optional[Callable] = None) -> str:
         if self.existing_user(user.email):
             raise KeycloakError(f'User with email "{user.email}" already exists. Login to Keycloak to see what groups they are associated with')
 
@@ -152,13 +171,11 @@ class Keycloak:
             'enabled': True
         }
 
-        response = requests.post(
-            auth=self.connector.auth,
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/users'),
-            json=user_rep,
-            timeout=MINUTE_SECS,
+        self.request(
+            'POST',
+            url=f'/admin/realms/{self.realm}/users',
+            json_data=user_rep
         )
-        response.raise_for_status()
 
         # create user just returns 200 success, not details about the user
         # have to search for the user manually
@@ -166,25 +183,20 @@ class Keycloak:
 
         # add groups
         for group_id in group_ids:
-            response = requests.put(
-                auth=self.connector.auth,
-                url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/groups/{group_id}'),
-                timeout=MINUTE_SECS,
+            response = self.request(
+                'PUT',
+                url=f'/admin/realms/{self.realm}/users/{user_id}/groups/{group_id}',
             )
-            response.raise_for_status()
-            print(response.text)
+            logging.info("Keycloak add user to group response: %s", response.text)
 
-        if user.welcome_email:
-            user.welcome_email.send()
+        if pre_password_reset:
+            pre_password_reset()
 
         # send password reset email (might need to double check how long this stays open for)
-        response = requests.put(
-            auth=self.connector.auth,
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/execute-actions-email'),
-            json=['UPDATE_PASSWORD'],
-            timeout=MINUTE_SECS,
+        response = self.request(
+            'PUT',
+            url=f'/admin/realms/{self.realm}/users/{user_id}/execute-actions-email',
+            json_data=['UPDATE_PASSWORD']
         )
-
-        response.raise_for_status()
 
         return response.text
