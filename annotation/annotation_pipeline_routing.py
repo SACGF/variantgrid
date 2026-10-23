@@ -2,6 +2,9 @@
 Which annotation pipeline a variant belongs to - the single source of truth, as a Q for querysets
 (pipeline_type_variant_q) and per variant (pipeline_type_for_variant / pipeline_type_for_alt).
 
+Kind first, then size. A gene-level variant is GENE_LEVEL before any size rule is read - it has no size, its
+position is a gene id (@see snpdb.gene_level_variants). Everything below is about variants with a coordinate.
+
 Storage and annotation have separate size cut-offs (#1358). A del/dup/inv is stored symbolic from
 settings.VARIANT_SYMBOLIC_ALT_SIZE (50bp, the usual definition of a structural variant), but only goes to
 the STRUCTURAL_VARIANT pipeline from VariantAnnotationVersion.structural_variant_min_size (1000bp, from
@@ -47,10 +50,8 @@ def explicit_annotated_as_structural(ref: str, alt: str, explicit_structural_var
 
 
 def pipeline_type_for_alt(ref: str, alt: str, svlen: Optional[int], structural_variant_min_size: int,
-                          explicit_structural_variant_min_size: Optional[int],
-                          is_gene_level: bool = False) -> VariantAnnotationPipelineType:
-    if is_gene_level:
-        return VariantAnnotationPipelineType.GENE_LEVEL
+                          explicit_structural_variant_min_size: Optional[int]) -> VariantAnnotationPipelineType:
+    """ STANDARD or STRUCTURAL_VARIANT for a coordinate variant. Gene-level variants are routed before this """
     if Sequence.allele_is_symbolic(alt):
         if not symbolic_annotated_as_small(alt, svlen, structural_variant_min_size):
             return VariantAnnotationPipelineType.STRUCTURAL_VARIANT
@@ -61,8 +62,10 @@ def pipeline_type_for_alt(ref: str, alt: str, svlen: Optional[int], structural_v
 
 def pipeline_type_for_variant(variant: Variant, structural_variant_min_size: int,
                               explicit_structural_variant_min_size: Optional[int]) -> VariantAnnotationPipelineType:
+    if variant.is_gene_level:
+        return VariantAnnotationPipelineType.GENE_LEVEL
     return pipeline_type_for_alt(variant.locus.ref.seq, variant.alt.seq, variant.svlen, structural_variant_min_size,
-                                 explicit_structural_variant_min_size, is_gene_level=variant.is_gene_level)
+                                 explicit_structural_variant_min_size)
 
 
 def _symbolic_annotated_as_small_q(structural_variant_min_size: int) -> Q:
@@ -86,13 +89,17 @@ def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType, struct
         pipeline_type_for_alt. New pipeline types register their predicate here - a type's predicate may
         overlap another's. """
 
+    # A gene-level variant is GENE_LEVEL whatever its size, so it's routed before any size cut-off
+    q_gene_level = Variant.get_gene_level_q()
+    if pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
+        return q_gene_level
+
     q_sv = Variant.get_symbolic_q() & ~_symbolic_annotated_as_small_q(structural_variant_min_size)
     if explicit_structural_variant_min_size is not None:
         q_sv |= _explicit_annotated_as_structural_q(explicit_structural_variant_min_size)
     # Gene-level variants carry svlen=0 (so unique_together works - Postgres treats nulls as distinct),
     # which makes them look symbolic. VEP can't parse their alt and they have no coordinate anyway, so
     # subtract them from both VEP pipelines. @see snpdb.gene_level_variants
-    q_gene_level = Variant.get_gene_level_q()
     if pipeline_type == VariantAnnotationPipelineType.STANDARD:
         return ~q_sv & ~q_gene_level
     elif pipeline_type in (VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
@@ -100,6 +107,4 @@ def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType, struct
         # AnnotSV annotates the same variants VEP's SV pipeline does - a different tool, not a different
         # class of variant. The overlap the docstring above allows for.
         return q_sv & ~q_gene_level
-    elif pipeline_type == VariantAnnotationPipelineType.GENE_LEVEL:
-        return q_gene_level
     raise ValueError(f"Unrecognised {pipeline_type=}")

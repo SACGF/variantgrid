@@ -248,12 +248,11 @@ def get_variant_type_rows() -> list[dict]:
             rows = [_band_row(b, sized, i == 0, i == len(bands) - 1) for i, b in enumerate(bands)]
             groups.append({"kind": name, "bands": rows})
     if settings.VARIANT_GENE_LEVEL_ENABLED:
-        sv_min_size = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
-        pipeline_type = pipeline_type_for_alt("", "", None, sv_min_size, sv_min_size, is_gene_level=True)
         # A gene id where a coordinate goes, the same in every build (@see snpdb.gene_level_variants)
         groups.append({"kind": "Gene-level event (fusion, copy number, splicing)",
                        "bands": [{"name": "", "range": "", "stored_as": "Gene id + event",
-                                  "pipeline": pipeline_type.label, "detail": "-"}]})
+                                  "pipeline": VariantAnnotationPipelineType.GENE_LEVEL.label,
+                                  "detail": "-"}]})
     return groups
 
 
