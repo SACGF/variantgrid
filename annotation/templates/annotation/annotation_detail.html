@@ -33,12 +33,6 @@ wget https://v21.proteinatlas.org/download/rna_tissue_consensus.tsv.zip
             {% else %}
                 <div class="no-value">Not installed</div>
             {% endif %}
-            {% install-instructions "Gene Symbol Aliases" installed=gene_symbol_alias_counts %}
-<code>
-wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-{{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz
-</code>
-             {% endinstall-instructions %}
         {% endlabelled %}
 
         {% labelled label="dbNSFP Gene Annotation" %}

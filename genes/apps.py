@@ -22,9 +22,7 @@ class GenesConfig(AppConfig):
             panel_app_australia_panels_post_save_handler,
             panel_app_england_panels_post_save_handler,
             pfam_post_save_handler,
-            refseq_gene_info_post_save_handler,
             refseq_gene_pub_med_count_post_save_handler,
-            refseq_gene_summary_post_save_handler,
             refseq_sequence_info_post_save_handler,
             uniprot_post_save_handler,
         )
@@ -42,8 +40,6 @@ class GenesConfig(AppConfig):
         post_save.connect(panel_app_england_panels_post_save_handler, sender=CachedWebResource)
         post_save.connect(panel_app_australia_panels_post_save_handler, sender=CachedWebResource)
         post_save.connect(pfam_post_save_handler, sender=CachedWebResource)
-        post_save.connect(refseq_gene_summary_post_save_handler, sender=CachedWebResource)
-        post_save.connect(refseq_gene_info_post_save_handler, sender=CachedWebResource)
         post_save.connect(refseq_sequence_info_post_save_handler, sender=CachedWebResource)
         post_save.connect(refseq_gene_pub_med_count_post_save_handler, sender=CachedWebResource)
         post_save.connect(uniprot_post_save_handler, sender=CachedWebResource)

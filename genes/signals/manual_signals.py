@@ -11,9 +11,7 @@ from genes.tasks.cached_web_resource_tasks import (
     PanelAppAustraliaPanelsWebResourceTask,
     PanelAppEnglandPanelsWebResourceTask,
     PfamWebResourceTask,
-    RefSeqGeneInfoWebResourceTask,
     RefSeqGenePubMedCountWebResourceTask,
-    RefSeqGeneSummaryWebResourceTask,
     RefSeqSequenceInfoWebResourceTask,
     UniProtWebResourceTask,
 )
@@ -39,10 +37,6 @@ panel_app_australia_panels_post_save_handler = CachedWebResource.named_handler_f
                                                                                        PanelAppAustraliaPanelsWebResourceTask)
 
 pfam_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PFAM, PfamWebResourceTask)
-
-refseq_gene_summary_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY, RefSeqGeneSummaryWebResourceTask)
-
-refseq_gene_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO, RefSeqGeneInfoWebResourceTask)
 
 refseq_sequence_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO, RefSeqSequenceInfoWebResourceTask)
 
