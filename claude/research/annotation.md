@@ -231,15 +231,17 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
      `manage.py splicevault_to_refseq --genome-build <build> --input SpliceVault_data_<hg19|GRCh38>.tsv.gz`, which
      needs MANE loaded and writes `SpliceVault_data_<hg19|GRCh38>.refseq_mane.tsv.gz` + .tbi alongside.
    - GRCh38: "AVI SNV scores" from https://deepmind.google.com/science/alphagenome/downloads (Google sign-in; commercial
-     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB: extract the .tsv.gz and .tbi into
-     `annotation_data/GRCh38/` (allow ~90 GB free).
+     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB and (like the splicing zip) stored, so the .tsv.gz is about
+     as big: extract it and the .tbi into `annotation_data/GRCh38/` from a zip on another filesystem, or stream it
+     (`curl <download url> | bsdtar -xf -`) so the zip never lands, as zip + extract need ~177 GB on one disk.
    - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or
      update that checkout.
    - GRCh38, non-commercial deployments only: "AlphaGenome SNV merged splicing scores",
      combined_splicing_snvs_tabix.zip (20.6 GB, same sign-in), stored rather than compressed: extract
      combined_alphagenome_splicing_snvs.tsv.gz + .tbi, then convert it with
      `annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh` to
-     annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz.
+     annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz (20 GB; 42 minutes with 3 jobs on
+     vg-test2), after which the TSV can go.
 2. Stop annotation_workers, so no VEP run starts on the old settings once the pins are stamped (it would latch
    VEPVersionMismatchError on its version). Env settings: set `ANNOTATION[<build>]["vep_config"]` `utr_annotator`,
    `splicevault` and (GRCh38) `avi` and `alphagenome_splicing` to those paths - the package defaults' comments name them.
