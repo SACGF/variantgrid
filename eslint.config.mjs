@@ -116,6 +116,7 @@ export default [
                 clearAutocompleteChoice: "readonly", // global.js
                 dynamicSort: "readonly", // global.js
                 createMessage: "readonly", // global.js
+                toastui: "readonly", // js/lib/toastui
                 DataTableDefinition: "readonly", // datatable_definition.js
                 resolveFunctionName: "readonly", // datatable_definition.js
                 VCTable: "readonly", // classification/vc_table.js

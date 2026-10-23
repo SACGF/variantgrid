@@ -1562,6 +1562,9 @@ class GeneSymbolWiki(Wiki):
         (annotation/signals/gene_symbol_wiki_citations.py) """
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
 
+    def citation_ids(self) -> list[str]:
+        return sorted(self.gene_symbol.genesymbolcitation_set.values_list("citation_id", flat=True))
+
 
 class ProteinDomain(models.Model):
     """ For custom domains, can be used to override PFam - used in TranscriptVersion.protein_domains_and_accession """

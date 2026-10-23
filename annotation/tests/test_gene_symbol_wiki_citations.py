@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
 from annotation.enums import CitationSource
 from annotation.models.models_citations import Citation
@@ -28,3 +29,11 @@ class GeneSymbolWikiCitationsTest(TestCase):
         wiki.markdown = "No longer cited."
         wiki.save()
         self.assertEqual(self._linked_citation_ids(), set())
+
+    def test_save_returns_linked_citations(self):
+        """ The gene page redraws its citations from the save response, without a reload """
+        self.client.force_login(self.user)
+        url = reverse("wiki_save", kwargs={"class_name": "genes.models.GeneSymbolWiki",
+                                           "unique_keyword": "gene_symbol_id", "unique_value": self.gene_symbol.pk})
+        response = self.client.post(url, {"markdown": "See PubMedCentral: 3583621 and PMID: 12345678"})
+        self.assertEqual(response.json(), {"citation_ids": ["PMCID:PMC3583621", "PMID:12345678"]})

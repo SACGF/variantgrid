@@ -384,17 +384,15 @@
             <h4>Wiki</h4>
 
             {% wiki_editor gene_symbol.genesymbolwiki class_name='genes.models.GeneSymbolWiki' unique_keyword='gene_symbol_id' unique_value=gene_symbol.pk %}
-            {% if gene_symbol.genesymbolwiki %}
-                <p>
-                Embed Pubmed IDs to have links and abstracts appear below. Examples: <kbd>PMID: 9697696</kbd> or <kbd>PubMed: 9697696</kbd> or <kbd>NCBIBookShelf: NBK447152</kbd> or <kbd>PubMedCentral: 3583621</kbd>
-                </p>
-            {% endif %}
+            <p>
+            Embed Pubmed IDs to have links and abstracts appear below. Examples: <kbd>PMID: 9697696</kbd> or <kbd>PubMed: 9697696</kbd> or <kbd>NCBIBookShelf: NBK447152</kbd> or <kbd>PubMedCentral: 3583621</kbd>
+            </p>
 
-            {% if citations_ids %}
+            <div data-wiki-citations>
                 {% for citation_id in citations_ids %}
                     <div data-citation-id="{{ citation_id }}"></div>
                 {% endfor %}
-            {% endif %}
+            </div>
         {% endif %}
     </div>
     <div class="container mt-4">

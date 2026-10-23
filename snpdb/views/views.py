@@ -82,7 +82,10 @@ def wiki_save(request, class_name, unique_keyword, unique_value):
     wiki.markdown = markdown
     wiki.last_edited_by = request.user
     wiki.save()
-    return JsonResponse({})
+    data = {}
+    if (citation_ids := wiki.citation_ids()) is not None:
+        data["citation_ids"] = citation_ids
+    return JsonResponse(data)
 
 
 def view_genome_build(request, genome_build_name):
