@@ -13,6 +13,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
+from library.vg.status import task_queue_name
 from snpdb.enums import ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_somalier import (
@@ -89,7 +90,7 @@ class Command(BaseCommand):
             logging.info("Not waiting - run this command again without --no-wait once the queue has drained")
             return
 
-        self._wait("extract", len(vcf_ids),
+        self._wait("extract", somalier_vcf_extract, len(vcf_ids),
                    lambda: VCF.objects.filter(pk__in=vcf_ids).filter(
                        Q(somaliervcfextract__isnull=True) | _still_running_q("somaliervcfextract__")))
 
@@ -103,7 +104,7 @@ class Command(BaseCommand):
         for batch in batches:
             somalier_ancestry_batch.delay(batch)
 
-        self._wait("ancestry", len(vcf_extract_ids),
+        self._wait("ancestry", somalier_ancestry_batch, len(vcf_extract_ids),
                    lambda: SomalierVCFExtract.objects.filter(pk__in=vcf_extract_ids).filter(
                        Q(somalierancestryrun__isnull=True) | _still_running_q("somalierancestryrun__")))
 
@@ -111,9 +112,11 @@ class Command(BaseCommand):
         logging.info("Dispatched the all samples relate")
 
     @staticmethod
-    def _wait(stage: str, total: int, get_pending_qs: Callable[[], QuerySet]):
+    def _wait(stage: str, task, total: int, get_pending_qs: Callable[[], QuerySet]):
         """ get_pending_qs is called each poll, so a stage stuck since the last one becomes stale """
+        queue_name = task_queue_name(task.name)
         while num_pending := get_pending_qs().count():
-            logging.info("somalier %s: %d / %d done", stage, total - num_pending, total)
+            logging.info("somalier %s: %d / %d done - waiting on celery workers consuming queue '%s' "
+                         "(stuck at 0 means none are running)", stage, total - num_pending, total, queue_name)
             time.sleep(POLL_SECONDS)
         logging.info("somalier %s: all %d done", stage, total)
