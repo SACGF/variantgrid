@@ -92,6 +92,10 @@ Gotchas:
   backfilled into VariantAnnotation only, so the variant page shows the representative transcript's values from there
   (not the transcript rows), and "not backfilled" via annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled
   and its avi_ / splicevault_ siblings.
+- UTRAnnotator / AVI / SpliceVault are off in the package defaults. A deployment downloads (and for SpliceVault
+  converts) the files, sets them in its env settings, runs `enable_vep_plugin_backfill` (stamps the pins on the
+  NEW/ACTIVE versions, flags them, prints the backfill; annotation/vep_plugin_backfill.py), restarts annotation_workers,
+  then runs the backfill - setting a file without the command halts the VEP lane on VEPVersionMismatchError.
 - The SpliceVault plugin matches the data file's transcript column against the transcript's stable_id, a versioned NM
   under --refseq, while Ensembl's file holds unversioned ENST: a RefSeq build configures the copy
   `splicevault_to_refseq` rewrites to MANE RefSeq (annotation/splicevault.py), which only covers MANE transcripts.

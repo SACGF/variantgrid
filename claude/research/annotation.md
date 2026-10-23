@@ -132,11 +132,10 @@ Traps): the VEP lane halts on that VAV, and `create_new_variant_annotation_versi
 VAV. So the field is stamped on the existing NEW/ACTIVE VAVs from live settings at the same time the file is
 configured: a `RunPython` that, per VAV, reads `settings.ANNOTATION.get(vav.genome_build_id)`, skips a build with no
 config, and sets the new field from what `vep_component_version_kwargs` returns. HISTORICAL VAVs stay NULL - nothing
-looks them up by config again. Shipping the file path in the package default settings
-(`variantgrid/settings/components/annotation_settings.py`) makes configuring and stamping one deploy: the migration
-reads the setting that the same release turns on. A deployment that sets or changes the file after the migration has
-run needs the same stamp by hand (below), then an annotation_workers restart, since `get_vep_version` is
-`lru_cache`d per process.
+looks them up by config again. A source that is off in the package defaults
+(`variantgrid/settings/components/annotation_settings.py`) leaves the upgrade a no-op; each deployment then turns it on
+with a command that stamps the same way from its live settings (`enable_vep_plugin_backfill` below), followed by an
+annotation_workers restart, since `get_vep_version` is `lru_cache`d per process.
 
 **The column gates.** The `annotation/vep_columns.py:VEPColumnDef` takes `min_columns_version` equal to the existing
 VAVs' `columns_version` (a bump is by definition a new VAV) and `min_vep_version` for the first VEP release whose
@@ -202,14 +201,15 @@ one backfill VEP pass and one import:
   reports a configured plugin with no `.pm` in ANNOTATION_VEP_PLUGINS_DIR.
 
 All are gated `min_columns_version=5` with the `utr_annotator`, `splicevault` and `avi` basename pins and one flag,
-`backfilled_utr_avi_splicevault`. `annotation/migrations/0004_utr_annotator_avi_splicevault.py` stamps the pins and
-sets the flag False on NEW/ACTIVE versions with range locks that any configured plugin's columns cover; the
-ManualOperation in `annotation/migrations/0005_utr_annotator_avi_splicevault_manual_backfill.py` writes these steps
-into its note with each version's pk, columns and `--max-variant-id` filled in. Per build, under
-ANNOTATION_VEP_BASE_DIR:
+`backfilled_utr_avi_splicevault`. They are off (None) in the package defaults, so the release changes nothing until a
+deployment turns them on. `annotation/vep_plugin_backfill.py:stamp_plugin_pins` stamps the pins on a build's
+NEW/ACTIVE versions from live settings and sets the flag False where a pin changed to a file whose columns cover the
+version and the version has range locks; an unchanged pin leaves the flag alone, so it is idempotent.
+`annotation/migrations/0004_utr_annotator_avi_splicevault.py` calls it for a deployment that set the files before
+migrating, whose ManualOperation (`annotation/migrations/0005_utr_annotator_avi_splicevault_manual_backfill.py`)
+carries the steps. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
 
-1. Data files, which must be in place before the deploy - VEP dies on a missing AVI or SpliceVault file, and
-   `vep_data_check` lists what is missing:
+1. Data files:
    - uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator into
      `annotation_data/<build>/` (the plugin computes effects from the transcript sequence and runs with every
      `Evidence` NA without it).
@@ -219,24 +219,36 @@ ANNOTATION_VEP_BASE_DIR:
      needs MANE loaded and writes `SpliceVault_data_<hg19|GRCh38>.refseq_mane.tsv.gz` + .tbi alongside.
    - GRCh38: "AVI SNV scores" from https://deepmind.google.com/science/alphagenome/downloads (Google sign-in; commercial
      and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB: extract the .tsv.gz and .tbi into
-     `annotation_data/GRCh38/` (allow ~90 GB free) and match `vep_config["avi"]` to the extracted name.
+     `annotation_data/GRCh38/` (allow ~90 GB free).
    - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or
      update that checkout.
-2. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns <every
-   configured plugin column> --max-variant-id <max> --output vep_plugins_<build>.vcf.gz` - every annotated variant,
-   as AVI scores every SNV. Split by `--min/max-variant-id` to run VEP in parallel.
-3. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
-   current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
-   every `--plugin` / `--custom` except UTRAnnotator, SpliceVault and AVI removed, and
-   `--fields Feature,PICK,<the CSQ fields>`.
-4. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
-   `--columns`, one `--csq <column>=<CSQ field>` per column (`utr_annotator_consequence=5UTR_consequence`,
-   `utr_annotator_annotation=5UTR_annotation`, `utr_annotator_existing_uorfs=Existing_uORFs`,
-   `utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs`,
-   `utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs`, `splicevault_<field>=SpliceVault_<field>` with
-   `splicevault_spliceai_delta=SpliceVault_SpliceAI_delta`, `avi_phred=AVI_PHRED`, `avi_raw=AVI_RAW`) and
-   `--vcf <annotated>`, `--dry-run` first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (last piece
-   only).
+2. Env settings: set `ANNOTATION[<build>]["vep_config"]` `utr_annotator`, `splicevault` and (GRCh38) `avi` to those
+   paths - the package defaults' comments name them.
+3. `manage.py enable_vep_plugin_backfill [--genome-build <build>] [--dry-run]`. It refuses while any file VEP would
+   be passed is missing (`annotation/vep_annotation.py:get_missing_vep_files`, which `vep_data_check` prints,
+   including a `--plugin` with no `.pm`), and while STANDARD runs on those versions have VEP output not yet imported:
+   imported once the inserter expects the new CSQ fields they fail with VEPMissingColumnsError, so let the import lane
+   drain or pass `--force` and re-run them. It prints each version's pin changes and backfill steps
+   (`annotation/vep_plugin_backfill.py:backfill_steps`, the same text the ManualOperation note holds).
+4. Restart annotation_workers, the other celery workers and gunicorn so they read the settings. A VEP run that
+   starts between the command and the restart uses the old settings and latches VEPVersionMismatchError on its
+   version; the re-check on the annotation runs page clears it.
+5. The printed backfill:
+   1. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns <every
+      configured plugin column> --max-variant-id <max> --output vep_plugins_<build>.vcf.gz` - every annotated
+      variant, as AVI scores every SNV. Split by `--min/max-variant-id` to run VEP in parallel.
+   2. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
+      current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
+      every `--plugin` / `--custom` except UTRAnnotator, SpliceVault and AVI removed, and
+      `--fields Feature,PICK,<the CSQ fields>`.
+   3. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
+      `--columns`, one `--csq <column>=<CSQ field>` per column (`utr_annotator_consequence=5UTR_consequence`,
+      `utr_annotator_annotation=5UTR_annotation`, `utr_annotator_existing_uorfs=Existing_uORFs`,
+      `utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs`,
+      `utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs`, `splicevault_<field>=SpliceVault_<field>` with
+      `splicevault_spliceai_delta=SpliceVault_SpliceAI_delta`, `avi_phred=AVI_PHRED`, `avi_raw=AVI_RAW`) and
+      `--vcf <annotated>`, `--dry-run` first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (last
+      piece only).
 
 The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
 SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the
@@ -244,25 +256,7 @@ representative transcript is the MANE one (VEP's default pick order puts MANE Se
 them from `VariantAnnotation` and shows "not backfilled" from
 `annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled`, `avi_not_backfilled` and
 `splicevault_not_backfilled`. UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds several
-effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect. Variants whose VEP ran before
-the deploy and import after it fail with VEPMissingColumnsError (the inserter expects the new CSQ fields) and need
-re-running, so deploy with the import lane drained. A deployment that configures a plugin's file after the migration
-stamps it from `manage.py shell`:
-
-```python
-from django.conf import settings
-from annotation.models import VariantAnnotationVersion
-from annotation.vep_config import vep_component_version_kwargs
-for vav in VariantAnnotationVersion.objects.filter(status__in=["NEW", "ACTIVE"]):
-    if build_settings := settings.ANNOTATION.get(vav.genome_build_id):
-        pins = vep_component_version_kwargs(build_settings)
-        for field in ("utr_annotator", "avi", "splicevault"):
-            setattr(vav, field, pins[field])
-        vav.save(update_fields=["utr_annotator", "avi", "splicevault"])
-```
-
-then sets `backfilled_utr_avi_splicevault=False` on the versions that had already annotated variants and follows the
-steps above (no manual task is registered for it).
+effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect.
 
 ### ClinVar
 
