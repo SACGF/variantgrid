@@ -8,7 +8,7 @@ from typing import Optional
 
 from django.db.models import Count, QuerySet, Subquery
 
-from classification.enums import DiscordanceLevel, ShareLevel, SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
     ClassificationFlagTypes,
@@ -417,53 +417,3 @@ class OverlapsCalculator:
             OverlapSet(segmented[0], label="Multi-Lab"),
             OverlapSet(segmented[1], label="Single-Lab"),
         ]
-
-    @cached_property
-    def multi_lab_counts(self) -> dict[DiscordanceLevel, int]:
-        counts = defaultdict(int)
-        for cc in self.clinical_groupings_overlaps:
-            if cc.shared and cc.is_multi_lab:
-                counts[cc.status.level] += 1
-        return counts
-
-    @cached_property
-    def same_lab_counts(self) -> dict[DiscordanceLevel, int]:
-        counts = defaultdict(int)
-        for cc in self.clinical_groupings_overlaps:
-            if cc.shared and not cc.is_multi_lab:
-                counts[cc.status.level] += 1
-        return counts
-
-    # utility methods for the sake of templates, I'm sure there's a better way to handle these
-
-    @property
-    def multi_concordant_agreement(self):
-        return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
-
-    @property
-    def multi_concordant_vus(self):
-        return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_DIFF_VUS]
-
-    @property
-    def multi_concordant_confidence(self):
-        return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_CONFIDENCE]
-
-    @property
-    def multi_discordant(self):
-        return self.multi_lab_counts[DiscordanceLevel.DISCORDANT]
-
-    @property
-    def single_concordant_agreement(self):
-        return self.same_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
-
-    @property
-    def single_concordant_vus(self):
-        return self.same_lab_counts[DiscordanceLevel.CONCORDANT_DIFF_VUS]
-
-    @property
-    def single_concordant_confidence(self):
-        return self.same_lab_counts[DiscordanceLevel.CONCORDANT_CONFIDENCE]
-
-    @property
-    def single_discordant(self):
-        return self.same_lab_counts[DiscordanceLevel.DISCORDANT]
