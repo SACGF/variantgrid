@@ -9,7 +9,6 @@ from datetime import UTC, date, datetime
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.core.exceptions import MultipleObjectsReturned
 from django.test import TestCase
 from django.utils import timezone
 
@@ -25,7 +24,6 @@ from patients.import_records import (
     process_record,
 )
 from patients.models import (
-    Clinician,
     ExternalModelManager,
     ExternalPK,
     Patient,
@@ -156,24 +154,6 @@ class TestSpecimenAgeAtCollectionDate(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Patient.condition_description
-# ---------------------------------------------------------------------------
-
-class TestPatientConditionDescription(TestCase):
-    def test_condition_description_consistent_with_deceased_property(self):
-        """
-        Regression: condition_description used to only check date_of_death, so a
-        patient flagged deceased with no date of death still read as 'alive'.
-        """
-        patient = Patient.objects.create(first_name="DEAD", last_name="NODOD")
-        patient._deceased = True
-        patient.save()
-        self.assertTrue(patient.deceased)
-        self.assertNotEqual(patient.condition_description, "alive",
-                            "condition_description must not say 'alive' when deceased=True")
-
-
-# ---------------------------------------------------------------------------
 # Patient.save mutual-exclusion
 # ---------------------------------------------------------------------------
 
@@ -200,30 +180,6 @@ class TestPatientMatchPrecondition(TestCase):
     def test_match_none_last_name_raises_value_error(self):
         with self.assertRaises(ValueError):
             Patient.match(first_name="ALICE", last_name=None)
-
-
-# ---------------------------------------------------------------------------
-# Clinician.cleaned_get_or_create
-# ---------------------------------------------------------------------------
-
-class TestClinicianGetOrCreate(TestCase):
-    def test_single_clinician_is_matched(self):
-        Clinician.objects.create(first_name="NICK", last_name="RIVIERA")
-        result = Clinician.cleaned_get_or_create("Nick Riviera")
-        self.assertEqual(result.last_name, "RIVIERA")
-
-    def test_multiple_matching_clinicians_does_not_create_extra(self):
-        """
-        Regression: a blanket `except Exception:` swallowed MultipleObjectsReturned,
-        so an ambiguous name silently created a third duplicate.
-        """
-        Clinician.objects.create(first_name="JOHN", last_name="SMITH")
-        Clinician.objects.create(first_name="JOHN", last_name="SMITH")
-        count_before = Clinician.objects.count()
-        with self.assertRaises(MultipleObjectsReturned):
-            Clinician.cleaned_get_or_create("John Smith")
-        self.assertEqual(Clinician.objects.count(), count_before,
-                         "A third Clinician was silently created")
 
 
 # ---------------------------------------------------------------------------

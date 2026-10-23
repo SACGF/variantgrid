@@ -12,7 +12,6 @@ from django.utils import timezone
 
 from analysis.enums import NodeStatus
 from analysis.exceptions import (
-    CeleryTasksObsoleteException,
     NodeConfigurationException,
     NodeOutOfDateException,
     NodeOutOfMemoryException,
@@ -171,27 +170,6 @@ def update_node_task(node_id, version):
         # Node is already perma-failed (ERROR) and children have been kicked; raise so the task
         # dies and the celery task_failure handler reports the OOM to Rollbar.
         raise NodeOutOfMemoryException(analysis_id, node_id, version)
-
-
-@celery.shared_task(bind=True)
-def wait_for_cache_task(self, node_cache_id):
-    """ Kept for backwards-compatibility (in-flight messages at deploy time); no longer added to
-        scheduling chains - an in-flight cache is now a dependency gate (issue #346). """
-    MAX_CHECKS = 60
-    try:
-        node_cache = NodeCache.objects.get(pk=node_cache_id)
-    except NodeCache.DoesNotExist:
-        raise CeleryTasksObsoleteException()  # Kills dependent tasks w/o reporting in Rollbar
-
-    status = node_cache.variant_collection.status
-    if status in ProcessingStatus.FINISHED_STATES:
-        return
-    if status not in (ProcessingStatus.CREATED, ProcessingStatus.PROCESSING):
-        raise ValueError(f"{node_cache} collection status={status}")
-    if self.request.retries >= MAX_CHECKS:
-        raise ValueError(f"Timed out after {self.request.retries} checks waiting for {node_cache}")
-    logging.debug(f"Waiting on {node_cache}")
-    raise self.retry(countdown=1, max_retries=MAX_CHECKS)
 
 
 @celery.shared_task

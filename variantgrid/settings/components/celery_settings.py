@@ -70,7 +70,6 @@ CELERY_TASK_ROUTES = {
     # analysis pool (not the default db_workers) so cache building scales with the rest of the
     # pipeline rather than starving on db_workers and triggering lease-expiry re-dispatch churn.
     "analysis.models.nodes.filters.venn_node.venn_cache_count": ANALYSIS_WORKERS,
-    "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
     # Annotation

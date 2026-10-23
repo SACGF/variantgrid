@@ -1185,10 +1185,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def coding_length(self) -> int:
         return self._sum_intervals(self.cds)
 
-    @cached_property
-    def threep_utr_length(self) -> int:
-        return self._sum_intervals(self.threep_utr)
-
     @property
     def num_codons(self) -> int:
         return self.coding_length // 3
@@ -1259,10 +1255,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def canonical_score(self) -> int:
         """ This is so you can sort multiple transcripts and find 'most canonical' """
         return self.CANONICAL_SCORES.get(self.canonical_tag, 0)
-
-    @property
-    def is_canonical(self) -> bool:
-        return bool(self.canonical_score)
 
     def get_contigs(self) -> set[Contig]:
         contigs = {self.genome_build_data["contig"]}
@@ -1407,21 +1399,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     def get_external_url(self):
         return self.transcript.get_external_url(self.genome_build) + f".{self.version}"
-
-    @staticmethod
-    def update_accessions(accessions: Iterable[str], genome_build=None, **update_kwargs):
-        """ A way to quickly update lots of accessions, relying on the fact that there aren't that many versions """
-
-        tv_by_version = defaultdict(set)
-        for transcript_accession in accessions:
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-            tv_by_version[version].add(transcript_id)
-
-        for version, transcripts in tv_by_version.items():
-            filter_kwargs = {"version": version, "transcript_id__in": transcripts}
-            if genome_build:
-                filter_kwargs["genome_build"] = genome_build
-            TranscriptVersion.objects.filter(**filter_kwargs).update(**update_kwargs)
 
     def __str__(self):
         return f"{self.accession} ({self.gene_version.gene_symbol}/{self.genome_build_id})"

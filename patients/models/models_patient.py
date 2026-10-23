@@ -10,7 +10,6 @@ complete the set.
 import os
 from typing import Optional
 
-import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -297,15 +296,6 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @property
     def deceased(self):
         return any([self._deceased, self.date_of_death])
-
-    @property
-    def condition_description(self):
-        if self.date_of_death:
-            dod = self.date_of_death.strftime(settings.DATE_FORMAT)
-            return f"dead (D.O.D. {dod})"
-        if self._deceased:
-            return "dead"
-        return "alive"
 
     @property
     def num_specimens(self):
@@ -956,31 +946,6 @@ class Clinician(TimeStampedModel):
         q = single_string_to_first_last_name_q(clinician_string)
         #logging.info(q)
         return Clinician.objects.get(q)
-
-    @staticmethod
-    def cleaned_get_or_create(clinician_string):
-        try:
-            clinician = Clinician.match(clinician_string)
-        except Clinician.DoesNotExist:
-            kwargs = {}
-            name = nameparser.HumanName(clinician_string)
-            if name.title:
-                title = {v: k for k, v in Title.CHOICES}.get(name.title)
-                if title:
-                    kwargs["title"] = title
-
-            first_name = name.first
-            if name.middle:
-                first_name += name.middle
-            kwargs["first_name"] = first_name.upper()
-
-            last_name = name.last
-            if last_name:
-                kwargs["last_name"] = last_name.upper()
-
-            clinician = Clinician.objects.create(**kwargs)
-
-        return clinician
 
     @staticmethod
     def user_is_clinician(user):
