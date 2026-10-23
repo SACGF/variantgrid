@@ -222,7 +222,8 @@ carries the steps. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
      `annotation_data/GRCh38/` (allow ~90 GB free).
    - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or
      update that checkout.
-2. Env settings: set `ANNOTATION[<build>]["vep_config"]` `utr_annotator`, `splicevault` and (GRCh38) `avi` to those
+2. Stop annotation_workers, so no VEP run starts on the old settings once the pins are stamped (it would latch
+   VEPVersionMismatchError on its version). Env settings: set `ANNOTATION[<build>]["vep_config"]` `utr_annotator`, `splicevault` and (GRCh38) `avi` to those
    paths - the package defaults' comments name them.
 3. `manage.py enable_vep_plugin_backfill [--genome-build <build>] [--dry-run]`. It refuses while any file VEP would
    be passed is missing (`annotation/vep_annotation.py:get_missing_vep_files`, which `vep_data_check` prints,
@@ -230,9 +231,8 @@ carries the steps. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
    imported once the inserter expects the new CSQ fields they fail with VEPMissingColumnsError, so let the import lane
    drain or pass `--force` and re-run them. It prints each version's pin changes and backfill steps
    (`annotation/vep_plugin_backfill.py:backfill_steps`, the same text the ManualOperation note holds).
-4. Restart annotation_workers, the other celery workers and gunicorn so they read the settings. A VEP run that
-   starts between the command and the restart uses the old settings and latches VEPVersionMismatchError on its
-   version; the re-check on the annotation runs page clears it.
+4. Start annotation_workers and restart the other celery workers and gunicorn so they read the settings. If a run
+   did latch VEPVersionMismatchError, the re-check on the annotation runs page clears it.
 5. The printed backfill:
    1. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns <every
       configured plugin column> --max-variant-id <max> --output vep_plugins_<build>.vcf.gz` - every annotated

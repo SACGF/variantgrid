@@ -153,7 +153,7 @@ class PluginPinStampTests(TestCase):
         self.assertTrue(historical.backfilled_utr_avi_splicevault)
         self.assertEqual(unannotated.avi, "alphagenome_variant_impact_score_snvs.tsv.gz")
         self.assertTrue(unannotated.backfilled_utr_avi_splicevault)  # No variants to backfill
-        self.assertIn("Restart annotation_workers", output)
+        self.assertIn("Start annotation_workers", output)
         self.assertIn(f"--variant-annotation-version {active.pk} ", output)
         self.assertIn("--csq avi_phred=AVI_PHRED", output)
 

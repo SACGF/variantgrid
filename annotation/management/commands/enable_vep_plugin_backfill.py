@@ -75,10 +75,10 @@ class Command(BaseCommand):
                 self.stdout.write(f"{vav}: already matches settings ({pins})")
 
         if any(stamp.changed_pins for stamp in stamps) and not options["dry_run"]:
-            self.stdout.write("\nRestart annotation_workers (get_vep_version is cached per process) and the other "
-                              "celery workers and gunicorn, which read settings at start. A VEP run that starts "
-                              "before then runs the old settings and latches VEPVersionMismatchError on its "
-                              "version - clear it with the re-check on the annotation runs page.")
+            self.stdout.write("\nStart annotation_workers (stop them before running this, as get_vep_version is "
+                              "cached per process) and restart the other celery workers and gunicorn, which read "
+                              "settings at start. A VEP run on the old settings latches VEPVersionMismatchError on "
+                              "its version - clear it with the re-check on the annotation runs page.")
 
         if to_backfill := [stamp.variant_annotation_version for stamp in stamps if stamp.needs_backfill]:
             self.stdout.write("\nThen backfill the variants annotated before the plugins were switched on:")
