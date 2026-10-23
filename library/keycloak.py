@@ -192,6 +192,9 @@ class Keycloak:
         if pre_password_reset:
             pre_password_reset()
 
+        if welcome_email := user.welcome_email:
+            welcome_email.send()
+
         # send password reset email (might need to double check how long this stays open for)
         response = self.request(
             'PUT',
