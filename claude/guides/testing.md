@@ -43,7 +43,7 @@ python3 manage.py vg tests --changed                                        # on
 - Concurrent suites on one box (several worktrees or agents) each need their own test database, or they fight
   over `test_snpdb` and its clones. Give each run a gitignored module `variantgrid/settings/env_developers/<name>.py`
   holding `from variantgrid.settings.env.vgtest2 import *` (the box's settings file) and
-  `DATABASES['default']['TEST']['NAME'] = 'test_<name>'`, and run with
+  `DATABASES['default'].setdefault('TEST', {})['NAME'] = 'test_<name>'` (a box's settings may have no `TEST` key), and run with
   `DJANGO_SETTINGS_MODULE=variantgrid.settings.env_developers.<name>`. The module has to live under
   `variantgrid.settings`: `variantgrid/__init__.py` imports celery, which reads settings while the settings module
   is still importing, so a module anywhere else fails with a missing attribute. Drop the `test_<name>*`
