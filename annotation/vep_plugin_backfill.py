@@ -113,7 +113,9 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
         f"--max-variant-id {max_variant_id['max_variant_id__max']} --output vep_plugins_{build}.vcf.gz",
         f"2. Annotate it with VEP: this build's STANDARD 'Show VEP command' on /annotation/annotation_versions, with "
         f"-i vep_plugins_{build}.vcf.gz -o vep_plugins_{build}.vep_annotated.vcf.gz, every --plugin and --custom "
-        f"except {sources} removed, and --fields {csq_fields}. Keep the other flags, so the PICK'd transcript matches",
+        f"except {sources} removed, and --fields {csq_fields}. Keep the other flags, so the PICK'd transcript matches, "
+        f"except those that only add output (--hgvs --check_existing --af --pubmed --sift --domains --protein "
+        f"--numbers), which are slow. Add --fork",
         f"3. python3 manage.py annotation_backfill_columns --import {common} {csq_args} "
         f"--vcf vep_plugins_{build}.vep_annotated.vcf.gz --dry-run",
         f"4. The same without --dry-run, plus --mark-backfilled {BACKFILL_FLAG}",

@@ -262,7 +262,10 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
    2. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
       current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
       every `--plugin` / `--custom` except UTRAnnotator, SpliceVault, AVI and AlphaGenome_splicing removed, and
-      `--fields Feature,PICK,<the CSQ fields>`.
+      `--fields Feature,PICK,<the CSQ fields>`. The flags that only add output (`--hgvs --check_existing --af
+      --pubmed --sift b --domains --protein --numbers`) can go too: the PICK'd entry stays the same (all 20,000 of a
+      GRCh38 sample), and it runs ~1.5x faster, about 300 variants/s with `--fork 3` on vg-test2's 4 cores - so
+      ~8 hours for GRCh38's 8.4M variants. The import is fast (~2,000 records/s).
    3. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
       `--columns`, one `--csq <column>=<CSQ field>` per column (`utr_annotator_consequence=5UTR_consequence`,
       `utr_annotator_annotation=5UTR_annotation`, `utr_annotator_existing_uorfs=Existing_uORFs`,

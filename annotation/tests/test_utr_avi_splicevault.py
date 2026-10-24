@@ -263,11 +263,16 @@ class UTRAnnotatorEffectsTests(TestCase):
 
     def test_effects_split_into_records(self):
         """ VEP's VCF output turns the plugin's ',' between records into '&' """
-        annotation = "KozakStrength=Weak:type=uORF:Evidence=NA&KozakStrength=Strong:type=inFrame_oORF:Evidence=True"
-        self.assertEqual(utr_annotator_effects(annotation), [
-            {"KozakStrength": "Weak", "type": "uORF", "Evidence": "NA"},
-            {"KozakStrength": "Strong", "type": "inFrame_oORF", "Evidence": "True"},
+        annotation = ("KozakStrength=Weak:type=uORF:Evidence=NA"
+                      "&Evidence=True:Unlisted=1:type=inFrame_oORF:KozakStrength=Strong")
+        effects = utr_annotator_effects(annotation)
+        self.assertEqual(effects, [
+            {"type": "uORF", "KozakStrength": "Weak", "Evidence": "NA"},
+            {"type": "inFrame_oORF", "KozakStrength": "Strong", "Evidence": "True", "Unlisted": "1"},
         ])
+        # The plugin's key order varies record to record - ours doesn't
+        self.assertEqual([list(effect) for effect in effects],
+                         [["type", "KozakStrength", "Evidence"], ["type", "KozakStrength", "Evidence", "Unlisted"]])
 
     def test_no_annotation(self):
         self.assertEqual(utr_annotator_effects(None), [])

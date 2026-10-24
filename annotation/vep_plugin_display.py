@@ -164,13 +164,27 @@ def vep_multi_fields_to_list_of_dicts(data: dict, fields: Iterable[str]) -> list
     return records
 
 
+# UTRAnnotator writes each record's pairs from a Perl hash, so in a different order every time
+_UTR_ANNOTATOR_KEY_ORDER = ["type", "ref_type", "alt_type", "KozakContext", "KozakStrength", "DistanceToCDS",
+                            "ref_StartDistanceToCDS", "CapDistanceToStart", "DistanceToStop", "ref_type_length",
+                            "alt_type_length", "FrameWithCDS", "AltStop", "AltStopDistanceToCDS", "Evidence"]
+
+
+def _utr_annotator_key_sort(key: str) -> tuple[int, str]:
+    try:
+        return _UTR_ANNOTATOR_KEY_ORDER.index(key), key
+    except ValueError:
+        return len(_UTR_ANNOTATOR_KEY_ORDER), key
+
+
 def utr_annotator_effects(utr_annotator_annotation: Optional[str]) -> list[dict[str, str]]:
     """ UTRAnnotator's 5UTR_annotation: one record per uORF effect, comma separated (which VEP's VCF
-        output turns into '&'), each record 'key=value' pairs joined by ':' """
+        output turns into '&'), each record 'key=value' pairs joined by ':', keys put in one order so the
+        records read alike """
     effects = []
     for record in (utr_annotator_annotation or "").split("&"):
         if pairs := [p.partition("=") for p in record.split(":") if p]:
-            effects.append({key: value for key, _, value in pairs})
+            effects.append({key: value for key, _, value in sorted(pairs, key=lambda p: _utr_annotator_key_sort(p[0]))})
     return effects
 
 

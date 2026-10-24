@@ -16,13 +16,13 @@ from annotation.backfill_columns import (
     normalise_source_value,
     resolve_backfill_columns,
 )
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
-from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.vep_field_formatters import format_pick_highest_int
 from genes.enums import AnnotationConsortium
