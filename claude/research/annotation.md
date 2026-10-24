@@ -201,14 +201,26 @@ one backfill VEP pass and one import:
   VEP_plugins `release/116` on 2026-08-27, so a VEP 116 plugins checkout made before then lacks it - `vep_data_check`
   reports a configured plugin with no `.pm` in ANNOTATION_VEP_PLUGINS_DIR.
 
-All are gated `min_columns_version=5` with the `utr_annotator`, `splicevault` and `avi` basename pins and one flag,
-`backfilled_utr_avi_splicevault`. They are off (None) in the package defaults, so the release changes nothing until a
+- AlphaGenome merged splicing (#2433): `alphagenome_splicing` on `VariantAnnotation` only, GRCh38 SNVs,
+  `min_vep_version=116`, from a `--custom` VCF (`VEPCustom.ALPHAGENOME_SPLICING`, CSQ field
+  `AlphaGenome_splicing_score`). No plugin reads DeepMind's TSV and `--custom` only matches alleles for VCF, so
+  `annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh` converts it once, with contigs
+  stripped of `chr` like our other GRCh38 custom VCFs. The data is licensed for non-commercial use only:
+  `ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED` (default True) False clears it in
+  `annotation/vep_config.py:allowed_vep_config_data`, which both `VEPConfig` and `vep_component_version_kwargs` go
+  through, so a commercial deployment never passes it to VEP, never stamps its pin and never shows the column, even
+  with the file configured. The variant page shows a "non-commercial use only" note next to the score.
+
+All are gated `min_columns_version=5` with the `utr_annotator`, `splicevault`, `avi` and `alphagenome_splicing`
+basename pins and one flag, `backfilled_utr_avi_splicevault`. `annotation/vep_plugin_backfill.py:SOURCE_PINS` maps each
+pin to its plugin or custom source, and only stamps the pins the model it is given has, so an earlier migration's
+historical model still works. They are off (None) in the package defaults, so the release changes nothing until a
 deployment turns them on. `annotation/vep_plugin_backfill.py:stamp_plugin_pins` stamps the pins on a build's
 NEW/ACTIVE versions from live settings and sets the flag False where a pin changed to a file whose columns cover the
 version and the version has range locks; an unchanged pin leaves the flag alone, so it is idempotent.
 `annotation/migrations/0004_utr_annotator_avi_splicevault.py` calls it for a deployment that set the files before
 migrating, whose ManualOperation (`annotation/migrations/0005_utr_annotator_avi_splicevault_manual_backfill.py`)
-carries the steps. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
+carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the same for AlphaGenome splicing. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
 
 1. Data files:
    - uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator into
@@ -219,13 +231,21 @@ carries the steps. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
      `manage.py splicevault_to_refseq --genome-build <build> --input SpliceVault_data_<hg19|GRCh38>.tsv.gz`, which
      needs MANE loaded and writes `SpliceVault_data_<hg19|GRCh38>.refseq_mane.tsv.gz` + .tbi alongside.
    - GRCh38: "AVI SNV scores" from https://deepmind.google.com/science/alphagenome/downloads (Google sign-in; commercial
-     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB: extract the .tsv.gz and .tbi into
-     `annotation_data/GRCh38/` (allow ~90 GB free).
+     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB and (like the splicing zip) stored, so its
+     alphagenome_variant_impact_score_snvs.tsv.gz (`#CHROM POS REF ALT raw_score PHRED`, `chr` contigs, which the plugin maps) is about
+     as big: extract it and the .tbi into `annotation_data/GRCh38/` from a zip on another filesystem, or stream it
+     (`curl <download url> | bsdtar -xf -`) so the zip never lands, as zip + extract need ~177 GB on one disk.
    - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or
      update that checkout.
+   - GRCh38, non-commercial deployments only: "AlphaGenome SNV merged splicing scores",
+     combined_splicing_snvs_tabix.zip (20.6 GB, same sign-in), stored rather than compressed: extract
+     combined_alphagenome_splicing_snvs.tsv.gz + .tbi, then convert it with
+     `annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh` to
+     annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz (20 GB; 42 minutes with 3 jobs on
+     vg-test2), after which the TSV can go.
 2. Stop annotation_workers, so no VEP run starts on the old settings once the pins are stamped (it would latch
-   VEPVersionMismatchError on its version). Env settings: set `ANNOTATION[<build>]["vep_config"]` `utr_annotator`, `splicevault` and (GRCh38) `avi` to those
-   paths - the package defaults' comments name them.
+   VEPVersionMismatchError on its version). Env settings: set `ANNOTATION[<build>]["vep_config"]` `utr_annotator`,
+   `splicevault` and (GRCh38) `avi` and `alphagenome_splicing` to those paths - the package defaults' comments name them.
 3. `manage.py enable_vep_plugin_backfill [--genome-build <build>] [--dry-run]`. It refuses while any file VEP would
    be passed is missing (`annotation/vep_annotation.py:get_missing_vep_files`, which `vep_data_check` prints,
    including a `--plugin` with no `.pm`), and while STANDARD runs on those versions have VEP output not yet imported:
@@ -236,19 +256,23 @@ carries the steps. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
    did latch VEPVersionMismatchError, the re-check on the annotation runs page clears it.
 5. The printed backfill:
    1. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns <every
-      configured plugin column> --max-variant-id <max> --output vep_plugins_<build>.vcf.gz` - every annotated
-      variant, as AVI scores every SNV. Split by `--min/max-variant-id` to run VEP in parallel.
+      configured plugin column> --pipeline-type STANDARD --max-variant-id <max> --output vep_plugins_<build>.vcf.gz`
+      - every variant the STANDARD pipeline annotated, as AVI scores every SNV (structural and gene-level variants
+      stay out). Split by `--min/max-variant-id` to run VEP in parallel.
    2. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
       current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
-      every `--plugin` / `--custom` except UTRAnnotator, SpliceVault and AVI removed, and
-      `--fields Feature,PICK,<the CSQ fields>`.
+      every `--plugin` / `--custom` except UTRAnnotator, SpliceVault, AVI and AlphaGenome_splicing removed, and
+      `--fields Feature,PICK,<the CSQ fields>`. The flags that only add output (`--hgvs --check_existing --af
+      --pubmed --sift b --domains --protein --numbers`) can go too: the PICK'd entry stays the same (all 20,000 of a
+      GRCh38 sample), and it runs ~1.5x faster, about 300 variants/s with `--fork 3` on vg-test2's 4 cores - so
+      ~8 hours for GRCh38's 8.4M variants. The import is fast (~2,000 records/s).
    3. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
       `--columns`, one `--csq <column>=<CSQ field>` per column (`utr_annotator_consequence=5UTR_consequence`,
       `utr_annotator_annotation=5UTR_annotation`, `utr_annotator_existing_uorfs=Existing_uORFs`,
       `utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs`,
       `utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs`, `splicevault_<field>=SpliceVault_<field>` with
-      `splicevault_spliceai_delta=SpliceVault_SpliceAI_delta`, `avi_phred=AVI_PHRED`, `avi_raw=AVI_RAW`) and
-      `--vcf <annotated>`, `--dry-run` first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (last
+      `splicevault_spliceai_delta=SpliceVault_SpliceAI_delta`, `avi_phred=AVI_PHRED`, `avi_raw=AVI_RAW`,
+      `alphagenome_splicing=AlphaGenome_splicing_score`) and `--vcf <annotated>`, `--dry-run` first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (last
       piece only).
 
 The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and

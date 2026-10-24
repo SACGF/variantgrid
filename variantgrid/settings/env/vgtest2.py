@@ -51,6 +51,19 @@ ANNOTATION[BUILD_GRCH38].update({
     "enabled": True,
 })
 
+# UTRAnnotator / SpliceVault / AVI (#2426) and AlphaGenome splicing (#2433), stamped on the versions in use with
+# manage.py enable_vep_plugin_backfill
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "utr_annotator": "annotation_data/GRCh37/uORF_5UTR_GRCh37_PUBLIC.txt",
+    "splicevault": "annotation_data/GRCh37/SpliceVault_data_hg19.refseq_mane.tsv.gz",
+})
+ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+    "utr_annotator": "annotation_data/GRCh38/uORF_5UTR_GRCh38_PUBLIC.txt",
+    "splicevault": "annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz",
+    "avi": "annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz",
+    "alphagenome_splicing": "annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz",
+})
+
 ANNOTATION[BUILD_T2TV2]["enabled"] = True
 
 PEDIGREE_MADELINE2_COMMAND='madeline2'

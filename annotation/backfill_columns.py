@@ -35,10 +35,12 @@ from django.db.models import BooleanField
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
 from library.django_utils import get_model_fields
+from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import VARIANT_ID
 from upload.vcf.sql_copy_files import sql_copy_csv_file
 
@@ -172,7 +174,8 @@ def _validate_annotation_columns(columns: Iterable[str]) -> list[str]:
 def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion, output_filename: str,
                             targets: list[BackfillTarget] = None, only_missing: bool = False,
                             not_null_columns: Iterable[str] = None, consequence: Optional[str] = None,
-                            min_variant_id: int = None, max_variant_id: int = None) -> int:
+                            min_variant_id: int = None, max_variant_id: int = None,
+                            pipeline_type: Optional[VariantAnnotationPipelineType] = None) -> int:
     """ Write the variants annotated in this version to a VCF carrying variant_id in INFO, ready to be
         annotated externally. Returns the number of records written.
 
@@ -184,10 +187,15 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
         Targets score only needed the 465k variants the plugin matched, not the version's 8.4M.
 
         consequence restricts to rows whose representative transcript has that SO term - for a VEP plugin
-        that only annotates some consequences, all a --csq import of the PICK'd entry can fill (#2426). """
+        that only annotates some consequences, all a --csq import of the PICK'd entry can fill (#2426).
+
+        pipeline_type restricts to the variants that pipeline annotates - STANDARD for a VEP plugin column,
+        so the structural variants the STANDARD VEP command never sees stay out. Gene-level variants have
+        annotation but no coordinate, so are never dumped. """
     annotation_version = variant_annotation_version.get_any_annotation_version()
-    qs = get_variants_qs_for_annotation(annotation_version, annotated=True,
+    qs = get_variants_qs_for_annotation(annotation_version, pipeline_type=pipeline_type, annotated=True,
                                         min_variant_id=min_variant_id, max_variant_id=max_variant_id)
+    qs = qs.exclude(Variant.get_gene_level_q())
     # get_variants_qs_for_annotation(annotated=True) only stops it excluding annotated variants - to dump
     # the ones that *have* annotation for this version we have to join to the partition ourselves.
     # One filter() call, so the multi-valued relation is joined once (a column's __isnull=True on its own
