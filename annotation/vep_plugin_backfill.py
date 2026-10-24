@@ -109,7 +109,7 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
     sources = ", ".join(vep_source.label for vep_source in columns_by_source)
     return [
         f"{build} (VariantAnnotationVersion {vav.pk}):",
-        f"1. python3 manage.py annotation_backfill_columns --dump {common} "
+        f"1. python3 manage.py annotation_backfill_columns --dump {common} --pipeline-type STANDARD "
         f"--max-variant-id {max_variant_id['max_variant_id__max']} --output vep_plugins_{build}.vcf.gz",
         f"2. Annotate it with VEP: this build's STANDARD 'Show VEP command' on /annotation/annotation_versions, with "
         f"-i vep_plugins_{build}.vcf.gz -o vep_plugins_{build}.vep_annotated.vcf.gz, every --plugin and --custom "

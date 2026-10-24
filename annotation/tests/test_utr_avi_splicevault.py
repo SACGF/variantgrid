@@ -4,6 +4,7 @@ VariantAnnotationVersions already in use: the VEP command, enable_vep_plugin_bac
 pins and flagging versions for the backfill, the non-commercial data setting, and the display parsing.
 """
 import io
+import tempfile
 from importlib import import_module
 from unittest.mock import patch
 
@@ -163,9 +164,10 @@ class PluginPinStampTests(TestCase):
         self.assertIsNone(vav.alphagenome_splicing)
 
     def test_command_refuses_missing_files(self):
-        """ The test settings' data files aren't installed """
         vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
-        with override_settings(**_settings_with_plugins()), self.assertRaisesRegex(CommandError, "avi.*MISSING"):
+        with tempfile.TemporaryDirectory() as empty_dir, \
+                override_settings(**_settings_with_plugins(), ANNOTATION_VEP_BASE_DIR=empty_dir), \
+                self.assertRaisesRegex(CommandError, "avi.*MISSING"):
             call_command("enable_vep_plugin_backfill", "--genome-build", "GRCh38", stdout=io.StringIO())
         vav.refresh_from_db()
         self.assertIsNone(vav.avi)

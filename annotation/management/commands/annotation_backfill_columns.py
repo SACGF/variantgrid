@@ -20,6 +20,7 @@ from annotation.backfill_columns import (
     resolve_backfill_columns,
     validate_backfill_flag,
 )
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_version import VariantAnnotationVersion
 from snpdb.models.models_genome import GenomeBuild
 
@@ -60,6 +61,9 @@ class Command(BaseCommand):
         parser.add_argument("--min-variant-id", type=int,
                             help="--dump: split a large dump into pieces that can be annotated in parallel")
         parser.add_argument("--max-variant-id", type=int, help="--dump: see --min-variant-id")
+        parser.add_argument("--pipeline-type", choices=[t.name for t in VariantAnnotationPipelineType],
+                            help="--dump: only the variants this pipeline annotates, eg STANDARD for a VEP "
+                                 "plugin column, which the STANDARD VEP command fills")
         parser.add_argument("--vcf", help="--import: the externally annotated VCF")
         parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE,
                             help="--import: records per COPY/UPDATE cycle (default %(default)s)")
@@ -136,13 +140,17 @@ class Command(BaseCommand):
             raise CommandError("--dump requires --output")
 
         not_null_columns = [c.strip() for c in (options["not_null"] or "").split(",") if c.strip()]
+        pipeline_type = None
+        if pipeline_type_name := options["pipeline_type"]:
+            pipeline_type = VariantAnnotationPipelineType[pipeline_type_name]
         try:
             count = dump_annotated_variants(variant_annotation_version, output_filename, targets=targets,
                                             only_missing=options["only_missing"],
                                             not_null_columns=not_null_columns,
                                             consequence=options["consequence"],
                                             min_variant_id=options["min_variant_id"],
-                                            max_variant_id=options["max_variant_id"])
+                                            max_variant_id=options["max_variant_id"],
+                                            pipeline_type=pipeline_type)
         except BackfillColumnError as e:
             raise CommandError(str(e))
         self.stdout.write(f"Dumped {count} variants annotated by {variant_annotation_version} "

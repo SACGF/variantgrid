@@ -256,8 +256,9 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
    did latch VEPVersionMismatchError, the re-check on the annotation runs page clears it.
 5. The printed backfill:
    1. `annotation_backfill_columns --dump --genome-build <build> --variant-annotation-version <pk> --columns <every
-      configured plugin column> --max-variant-id <max> --output vep_plugins_<build>.vcf.gz` - every annotated
-      variant, as AVI scores every SNV. Split by `--min/max-variant-id` to run VEP in parallel.
+      configured plugin column> --pipeline-type STANDARD --max-variant-id <max> --output vep_plugins_<build>.vcf.gz`
+      - every variant the STANDARD pipeline annotated, as AVI scores every SNV (structural and gene-level variants
+      stay out). Split by `--min/max-variant-id` to run VEP in parallel.
    2. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
       current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
       every `--plugin` / `--custom` except UTRAnnotator, SpliceVault, AVI and AlphaGenome_splicing removed, and
