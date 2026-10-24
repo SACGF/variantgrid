@@ -231,7 +231,8 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
      `manage.py splicevault_to_refseq --genome-build <build> --input SpliceVault_data_<hg19|GRCh38>.tsv.gz`, which
      needs MANE loaded and writes `SpliceVault_data_<hg19|GRCh38>.refseq_mane.tsv.gz` + .tbi alongside.
    - GRCh38: "AVI SNV scores" from https://deepmind.google.com/science/alphagenome/downloads (Google sign-in; commercial
-     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB and (like the splicing zip) stored, so the .tsv.gz is about
+     and non-commercial use), `avi_scores_snvs_tabix.zip`, 88.5 GB and (like the splicing zip) stored, so its
+     alphagenome_variant_impact_score_snvs.tsv.gz (`#CHROM POS REF ALT raw_score PHRED`, `chr` contigs, which the plugin maps) is about
      as big: extract it and the .tbi into `annotation_data/GRCh38/` from a zip on another filesystem, or stream it
      (`curl <download url> | bsdtar -xf -`) so the zip never lands, as zip + extract need ~177 GB on one disk.
    - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or

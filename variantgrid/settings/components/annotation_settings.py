@@ -263,7 +263,8 @@ ANNOTATION = {
             # annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz (VEP >= 112), from
             # manage.py splicevault_to_refseq
             "splicevault": None,
-            # annotation_data/GRCh38/<the .tsv.gz extracted from avi_scores_snvs_tabix.zip> (VEP >= 116)
+            # annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz (VEP >= 116), from
+            # avi_scores_snvs_tabix.zip
             "avi": None,
             # Non-commercial (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED): annotation_data/GRCh38/
             # alphagenome_splicing_snvs.GRCh38.vcf.gz (VEP >= 116), from combined_splicing_snvs_tabix.zip by
