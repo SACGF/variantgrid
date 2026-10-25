@@ -21,7 +21,7 @@ the row: `config["sync_details"]` is a key into `settings.SYNC_DETAILS`, which
 `variantgrid/settings/components/default_settings.py:get_shariant_sync_secrets` builds from the `SYNC.<key>` secrets
 (host, OAuth client, username/password) and refuses a single unkeyed `SYNC` secret. `sync/models/models.py:SyncDestination.sync_details` resolves it and
 `library/oauth.py:ServerAuth.for_sync_details` turns it into an authenticated `requests` wrapper, which refuses a plain http host or `oauth_url` other than
-localhost unless the secret sets `allow_http`. The admin's
+localhost unless the secret sets `allow_http` (`snpdb/checks.py:check_sync_urls` reports one at deploy). The admin's
 "Validate configuration" action (`sync/admin.py:SyncDestinationAdmin.validate_configuration`) checks the key resolves.
 
 Which code handles a destination is decided by matching its config against a registry:
