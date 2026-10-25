@@ -180,7 +180,7 @@ def backfill_note(variant_annotation_version_model, annotation_range_lock_model,
         qs = qs.filter(genome_build_id=genome_build_name)
     lines = ["Fill in UTRAnnotator, AVI, SpliceVault and AlphaGenome splicing annotation of variants annotated "
              "before they were switched on (#2426, #2433), with one VEP run per version. Admin steps: "
-             "https://github.com/SACGF/variantgrid/issues/2436. For each version:"]
+             "https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562. For each version:"]
     for vav in qs.order_by("genome_build_id", "pk"):
         lines.append("")
         lines.extend(backfill_steps(vav, annotation_range_lock_model))

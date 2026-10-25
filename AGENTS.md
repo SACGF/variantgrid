@@ -242,6 +242,8 @@ Preface any comment on a GitHub issue or pull request with 🤖 Written by Claud
 unless I tell you to.
 Updating an issue or PR means its title as well as its body: rewrite the title whenever the body's
 description of the problem or the fix has changed.
+Install or admin steps for a change (settings, downloads, commands to run on a deployment) go in a comment on the
+issue tracking its development, not in a new issue.
 
 ### Which repo an issue goes in
 `SACGF/variantgrid_private` is the repo from before the code went public: its code and history stop in 2021 and
