@@ -10,7 +10,7 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 |---|---|---|
 | vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; per-host rules are the "This box" table in `AGENTS.md` |
 | variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
-| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only). Labs curate on their own systems (e.g. SA Pathology's VariantGrid) and send classifications in through the API, so Shariant is almost all published records from other labs: manual testing there covers API import, cross-lab viewing, discordance/overlaps and the exports labs download, not local curation |
+| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; the analysis, pathtests, pedigree and seqauto URL apps unregistered and selected patient, gene and variant pages superuser-only (`URLS_APP_REGISTER` / `URLS_NAME_REGISTER` deny-lists in `shariantcommon.py`, so a new URL is live there unless listed); `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only). Labs curate on their own systems (e.g. SA Pathology's VariantGrid) and send classifications in through the API, so Shariant is almost all published records from other labs: manual testing there covers API import, cross-lab viewing, discordance/overlaps and the exports labs download, not local curation |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
 | runx1db | `variantgrid/settings/env/runx1db2.py` | Gene-specific public database |
 | CI | `variantgrid/settings/env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |
@@ -148,7 +148,7 @@ instead of plain collectstatic on a dev box.
 |---|---|---|
 | `PRIVATE_DATA_ROOT` | `/opt/variantgrid/data` | uploads (`UPLOAD_DIR`), per-deployment private files; gitignored |
 | `ANNOTATION_BASE_DIR` | `/data/annotation` | VEP code + caches (`ANNOTATION_VEP_BASE_DIR`), fastas, chain files, scratch, somalier |
-| `MEDIA_ROOT` | `/opt/variantgrid/media_root` | user media |
+| `MEDIA_ROOT` | `/opt/variantgrid/media_root` | generated media, served by nginx with no login check: only files behind a `SECRET_KEY`-salted name (graph PNGs, pedigree charts) belong here, which keeps that load off gunicorn; anything that needs a permission check goes in `UPLOAD_DIR` and is served by a view |
 | partition dumps | `/data/database/partition_dumps/<db>/` | pg_dump archives written before a partition is dropped (#1537) |
 
 `vg status` reports free space on each. The root filesystem on vg-test2 is small (about 30 GB) and usually above 85 %;

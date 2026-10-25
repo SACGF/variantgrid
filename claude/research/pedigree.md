@@ -56,8 +56,10 @@ of unknown affection (`None`) is unconstrained, matching `Pedigree.get_samples(a
 ### Chart
 
 `pedigree/views.py:pedigree_chart` renders through `snpdb.graphs.graphcache` to
-`pedigree/graphs/pedigree_chart.py:PedigreeChart`, which converts the *original uploaded file* with `ped_parser
---to_madeline` then runs Madeline2 (`PEDIGREE_MADELINE2_COMMAND`, off by default - the view hides the chart when unset).
+`pedigree/graphs/pedigree_chart.py:PedigreeChart`, one chart per `PedFileFamily` (Madeline2 only gives the
+`<prefix>.svg` it waits for when the input holds one family). It writes the family's stored records out as a PED file
+(`pedigree/models.py:PedFileFamily.write_ped`, so the original upload is not needed), converts it with `ped_parser
+--to_madeline`, then runs Madeline2 (`PEDIGREE_MADELINE2_COMMAND`, off by default - the view hides the chart when unset).
 `get_ped_parser_command` runs the `ped_parser` script with the current interpreter because it is not on `PATH` for a
 uv venv under systemd (#1572). `variantgrid/deployment_validation/tool_version_checks.py` checks both tools.
 
@@ -76,8 +78,8 @@ uv venv under systemd (#1572). `variantgrid/deployment_validation/tool_version_c
 - **Changing a pedigree's cohort orphans its mappings.** `pedigree/views.py:view_pedigree` lets the form repoint `cohort`,
   but the formset's `cohort_sample` choices are the old cohort's, so the saved mappings can point at samples outside the
   new cohort.
-- **The chart needs an upload.** `PedigreeChart.save` reads `ped_file.uploadedpedfile`, so a PedFile made any other way
-  (tests, shell) cannot be charted; it charts every family in the file, and its cache key is the PedFile id only.
+- **The chart is cached by family id alone.** `PedigreeChart.get_params_hash` hashes only the `PedFileFamily` pk, so
+  the SVG is not regenerated if the family's records change.
 - **`SomalierPedigreeRelate` is dead.** `pedigree/models.py:SomalierPedigreeRelate` is never created,
   its `write_ped_file` is `pass`, and it inherits `has_ped_file() -> False`; it is also missing from the pre_delete cleanup
   receiver in `snpdb/models/models_somalier.py`. Wiring it up needs a real `write_ped_file` from the mapped records.

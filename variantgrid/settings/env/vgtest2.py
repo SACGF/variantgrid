@@ -6,6 +6,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 
 # ANNOTATION_ENTREZ_EMAIL = 'your_email@yourdomain.com'
 
+SITE_ID = 10  # test.variantgrid.com (snpdb/migrations/0005_test_variantgrid_site.py)
 WEB_HOSTNAME = 'test.variantgrid.com'
 WEB_IP = '129.127.17.180'
 

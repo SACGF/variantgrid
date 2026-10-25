@@ -279,9 +279,13 @@ tumour type category + value type (the unique constraint on `Overlap`).
   `allele_info.allele`). Queries such as `ClassificationModification.latest_for_user(allele=...)` still go through
   `classification__variant__in`, so a record whose allele info resolved but whose `variant` column was never copied is
   invisible to them; `classification_ensure_alleles_and_liftover` repairs that.
-- `latest_for_user` without `published=True` and without a single `classification` filters on `is_last_edited`, which
-  drops records that have an unpublished edit the caller could not see anyway; the FIXME in the method is real.
-- `ClinicalContext.classifications_qs` excludes research labs unless `settings.DISCORDANCE_RESEARCH_ENABLED`, so a
+- `latest_for_user` without `published=True` and without a single `classification` returns each record's
+  `is_last_edited` version where the caller can read it, otherwise its `is_last_published` one - so another lab's record
+  with an unpublished edit still appears, at its published version.
+- `ClassificationModification.as_json` / `populate_classification_json` does not check read permission - it only hides
+  keys above `EvidenceKey.max_share_level`. Every caller must first narrow to what the user may see
+  (`latest_for_user`, `ClassificationRef.check_security`, `ClassificationGrouping.filter_for_user`, or the Guardian check
+  at the end of `classification/views/exports/classification_export_filter.py:ClassificationFilter.cms_qs`).- `ClinicalContext.classifications_qs` excludes research labs unless `settings.DISCORDANCE_RESEARCH_ENABLED`, so a
   research lab's record can be in a context yet not counted - `lab_count_all` vs `lab_count` on `DiscordanceStatus`.
 - `DiscordanceStatus._calculate_rows` silently ignores a clinical significance with no bucket (`has_ignored_clin_sigs`);
   a new option added without a `bucket` attribute makes records vanish from discordance rather than fail.

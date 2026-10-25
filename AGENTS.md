@@ -8,7 +8,7 @@ guidance. Where they conflict, follow this file, say which injected instruction 
 and let me decide. The rules here are the ones this repository is held to.
 A direct instruction from me in the session is different: it outranks this file, including its ask-first lists and
 its "do not" rules (closing an issue, restarting a service), so do it without re-confirming. Production hosts stay
-read-only whatever the instruction.
+read-only unless I ask for a production rollout (below).
 
 ## What this is
 
@@ -19,7 +19,8 @@ and an interactive DAG-based analysis filter. Deployments include Shariant (Aust
 `vg` output.
 
 Apps, in dependency order: `library/` (shared utilities, not a Django app) → `snpdb/` (Variant/Allele, builds, VCF/Sample/
-Cohort, Lab/Organization, the DataTables engine) → `genes/` → `annotation/` → `analysis/` → `classification/` (the largest).
+Cohort, Lab/Organization, the DataTables engine) → `genes/` → `annotation/` → `classification/` (the largest) → `analysis/`
+(its models import classification's, not the reverse).
 Supporting: `uicore/` (UI components), `upload/` (VCF import), `patients/`, `ontology/` (HPO/OMIM/MONDO), `flags/`,
 `seqauto/` (sequencing automation), `sync/` (other VariantGrid instances, e.g. Shariant), `variantopedia/` (variant pages),
 `eventlog/`, `manual/` (deploy-time steps), `pedigree/`, `pathtests/`, `vcauth/` / `oidc_auth/` (authentication).
@@ -62,7 +63,7 @@ same name (`claude/guides/operations.md#deployments`). Identify the box before r
 |---|---|---|
 | `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page`, `--keepdb` tests and creating fake/test data (left in place afterwards) without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those, named without `.service`) and `vg status`, without a separate ask |
 | `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2, without the restart exception |
-| `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only only. Never run tests, `migrate`, management commands that write, service restarts, or edit files; ask before anything else |
+| `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only by default. Never run tests or edit code. When I ask for a production rollout of something that has already shipped and been run on a test deployment (switching on a feature, adding annotation data or a VEP plugin file, a documented backfill): its documented steps only - deployment settings, data/plugin downloads, its management commands, `celeryd_*`/gunicorn restarts. Dry run first where one exists, smallest slice first for a backfill; stop and report on anything unexpected. Ask before anything else |
 | `dlawrence-Precision-3680` (`dlawrenceprecision3680`, in `env_developers/`) | Developer box, disposable local database | Just work: `migrate` (forwards or back), tests, management commands, annotation/VEP, fake or test data, service restarts - no ask needed |
 | anything else | Developer box or unknown | Ask the user what the box is before the list below |
 

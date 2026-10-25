@@ -19,7 +19,8 @@ Model fields, URLs, commands, tasks and signals are in the generated maps
 A `annotation/models/models_version.py:VariantAnnotationVersion` (VAV) is a database snapshot of one VEP install for one build:
 the VEP code version, the cache version, and a pin for every data file and plugin the command line will reference
 (gnomAD, dbNSFP, SpliceAI, COSMIC, MaveDB, Open Targets ...), plus `columns_version`, which selects the set of columns
-the pipeline writes. `annotation/vep_annotation.py:get_vep_version` runs `vep --help`-style introspection and
+the pipeline writes. `annotation/vep_annotation.py:get_vep_version` runs the full VEP command over a one-line fake VCF
+(cache load included, tens of seconds; `lru_cache`d per process) to read its `##VEP=` header, and
 `annotation/vep_annotation.py:vep_dict_to_variant_annotation_version_kwargs` turns that plus
 `annotation/vep_config.py:VEPConfig` (the `settings.ANNOTATION[build]` block) into the kwargs;
 `annotation/annotation_versions.py:get_or_create_variant_annotation_version_from_current_vep` then `get_or_create`s the
@@ -267,18 +268,30 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
       UTRAnnotator, SpliceVault, AVI and AlphaGenome_splicing `--plugin` / `--custom`, `--fields Feature,PICK,<the CSQ
       fields>`, the output-only flags (`--hgvs --check_existing --af --pubmed --sift --domains --protein --numbers`)
       dropped, `--fork` of the cores less one and `--buffer_size 5000`. The PICK'd entry is the same without those
-      flags (all 20,000 of a GRCh38 sample), and it runs ~1.5x faster: about 300 variants/s with `--fork 3` on
-      vg-test2's 4 cores, so 7h17m for GRCh38's 8.4M variants. The import is ~2,400 records/s (59 minutes).
-      A build without AVI or AlphaGenome splicing (GRCh37) needn't send every variant: UTRAnnotator only fills a
-      5'UTR PICK and SpliceVault only its own file's positions, so VEP the union of a `--consequence
-      5_prime_UTR_variant` dump and the full dump through `bcftools view -T <SpliceVault chrom/pos, 'chr' stripped>`
-      (428k of vg-test2's 5.5M). The import never touches a variant missing from its file.
-   3. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
-      `--columns`, one `--csq <column>=<CSQ field>` per column, `--vcf <annotated>` and `--dump-vcf <dump>`: `--dry-run`
-      first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (with a split dump, the last piece only).
-      `--dump-vcf` refuses unless the annotated records plus VEP's `--skipped_variants_file` rows add up to the dump's
+      flags (all 20,000 of a GRCh38 sample). The time is VEP's own consequence calculation, not the plugins: a sample
+      takes as long with none of them as with any one. So send VEP only the variants it can fill (below), not the
+      whole dump: on variantgrid.com the whole dump was 45M (GRCh37) and 25M (GRCh38) variants at 100-270 variants/s,
+      days of VEP, and the subsets below took hours.
+      - UTRAnnotator fills only a 5'UTR PICK and SpliceVault only its own file's positions, so VEP the union of a
+        `--consequence 5_prime_UTR_variant` dump and the full dump through `bcftools view -T <SpliceVault chrom/pos,
+        'chr' stripped>` (`sort -u` the records under the dump's header): 1.2M of GRCh37's 45M, 1.0M of GRCh38's 25M.
+      - AVI and AlphaGenome splicing are position + allele lookups, so GRCh38 skips VEP for them: `bcftools
+        annotate` the full dump (main chromosomes only, `bcftools view -t 1,...,22,X,Y`: the dump's header declares
+        no contigs and unplaced ones fail) with the AVI TSV (`-c CHROM,POS,REF,ALT,AVI_RAW,AVI_PHRED`, its contigs
+        are `chr`-prefixed so `--rename-chrs` there and back) and then, from an indexed file (`-W`), the splicing VCF
+        (`--pair-logic exact -c INFO/AlphaGenome_splicing_score:=INFO/score`). One pass reads the whole file, so it
+        costs the same for any dump size: about 75 + 110 minutes on one core. It matched VEP on all but 2 of 10,000
+        sampled variants, both left-padded MNV-shaped records (`AT>TT`), where bcftools trims to the SNV for AVI and
+        `--custom exact` does for the splicing score.
+   3. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version`, one
+      per file: the VEP subset with the UTRAnnotator/SpliceVault `--columns` and a `--csq <column>=<CSQ field>` each,
+      the bcftools file with `--columns avi_phred,avi_raw,alphagenome_splicing --info avi_phred=AVI_PHRED --info
+      avi_raw=AVI_RAW --info alphagenome_splicing=AlphaGenome_splicing_score`. `--dry-run` first; the last import
+      to finish takes `--mark-backfilled backfilled_utr_avi_splicevault`. The import never touches a variant missing
+      from its file, and runs at ~2,400-5,000 records/s. For the VEP file, `--dump-vcf <the VCF sent to VEP>` refuses
+      unless the annotated records plus VEP's `--skipped_variants_file` rows add up to its records
       (`annotation/backfill_columns.py:check_annotated_vcf_complete`), as VEP can exit 0 on a short file (#1701).
-   4. `rm -f` of the dump, the annotated VCF and VEP's warnings and skipped variants files.
+   4. `rm -f` of the dumps, the annotated VCFs and VEP's warnings and skipped variants files.
 
 The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
 SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the
