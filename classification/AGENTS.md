@@ -44,6 +44,8 @@ Patterns here:
   services/overlap_calculator.py onto the enums/classification_enums.py:OverlapStatus ladder
   (enums/classification_enums.py:OverlapStatus.is_discordant is the threshold), and only records at a
   ShareLevel.is_discordant_level (logged_in_users, public) count.
+- Sample names on records shared by other labs are de-identified, so showing them across labs is fine - don't hide them
+  as patient data.
 - ClinicalContext, DiscordanceStatus and DiscordanceReport are a legacy path: rendered for existing rows
   and behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
   Bucketing on that legacy path comes from the

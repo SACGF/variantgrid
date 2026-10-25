@@ -57,6 +57,10 @@ Patterns here:
   split file, batches coordinates through snpdb/variant_pk_lookup.py:VariantPKLookup and writes CSVs of unknowns;
   upload/tasks/vcf/unknown_variants_task.py:InsertUnknownVariantsTask re-checks and inserts them under a cache lock on
   the variant_id_single_worker queue. Create Variant/Locus rows only from that single worker, never from a parallel step.
+  This is the only path that inserts variants (manual entry, analysis and fusion imports all come through an upload), so
+  variant pks commit in order - annotation range locks rely on it.
+- The same variant twice in one VCF's genotypes (two records that normalise to one variant) is an import or
+  normalisation bug, not data to merge: when the two rows' genotypes differ, report it rather than picking one.
 - Genotypes go in via SQL COPY. upload/vcf/bulk_genotype_vcf_processor.py:BulkGenotypeVCFProcessor.process_entry
   accumulates rows, resolves variant ids per batch (settings.SQL_BATCH_INSERT_SIZE), splits common/rare by gnomAD AF,
   writes a CSV with upload/vcf/sql_copy_files.py:write_sql_copy_csv and spawns an
