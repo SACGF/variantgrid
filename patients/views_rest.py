@@ -9,14 +9,23 @@ from patients.serializers import (
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 
 
-class PatientViewSet(viewsets.ModelViewSet):
+class WritePermissionDestroyMixin:
+    """ get_queryset is what the user can read, so deleting needs write checked here (the serializer
+        checks it for update) """
+
+    def perform_destroy(self, instance):
+        instance.check_can_write(self.request.user)
+        super().perform_destroy(instance)
+
+
+class PatientViewSet(WritePermissionDestroyMixin, viewsets.ModelViewSet):
     serializer_class = PatientSerializer
 
     def get_queryset(self):
         return Patient.filter_for_user(self.request.user)
 
 
-class SpecimenViewSet(viewsets.ModelViewSet):
+class SpecimenViewSet(WritePermissionDestroyMixin, viewsets.ModelViewSet):
     serializer_class = SpecimenSerializer
 
     def get_queryset(self):
@@ -28,7 +37,7 @@ class SpecimenViewSet(viewsets.ModelViewSet):
         reconcile_pending_extractions.delay()
 
 
-class ExtractionViewSet(viewsets.ModelViewSet):
+class ExtractionViewSet(WritePermissionDestroyMixin, viewsets.ModelViewSet):
     serializer_class = ExtractionSerializer
 
     def get_queryset(self):

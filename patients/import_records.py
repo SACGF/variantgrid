@@ -206,11 +206,10 @@ def match_sample(user, sample_id, sample_name, validation_messages):
             else:
                 sample_without_permission = Sample.objects.filter(name=sample_name)
 
-            if sample_without_permission.exists():
+            if Sample.filter_for_user(user, queryset=sample_without_permission).exists():
                 msg += ". Samples exists with that name, but you don't have write access."
 
         if msg:
-            logging.warning(msg)
             validation_messages.append(f"Match Sample({kwargs}): {msg}")
 
     return sample
@@ -282,9 +281,6 @@ def process_record(patient_records, record_id, row):
     patient_to_check_for_phenotype_match = None
     user = patient_records.user
 
-    logging.info("row:")
-    logging.info(row)
-
     validation_messages = []
     family_code = row[PatientColumns.PATIENT_FAMILY_CODE]
     patient_code = row[PatientColumns.PATIENT_CODE]
@@ -328,6 +324,9 @@ def process_record(patient_records, record_id, row):
     if patient is None:
         patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user)
         patient_match_type = PatientRecordMatchType.CREATED
+    elif user and not patient.can_write(user):
+        raise InvalidPatientRecord(f"Matched patient {_patient_details(patient)}, which you don't have write "
+                                   "access to, so it can't be updated from this row")
 
     # update date of death if not already set
     # set _deceased back to False if DOD is being set

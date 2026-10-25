@@ -34,8 +34,9 @@ class PedigreeChart:
         self.ped_file_family_id = ped_file_family_id
 
     def get_params_hash(self):
-        """ This should be unique for every graph produced (from parameters) """
-        return sha256sum_str(f"ped_file_family={self.ped_file_family_id}")
+        """ This should be unique for every graph produced (from parameters). Salted so the media URL of a
+            family's chart can't be worked out from its id """
+        return sha256sum_str(f"{settings.SECRET_KEY}:ped_file_family={self.ped_file_family_id}")
 
     def get_filename(self):
         return self._get_prefix() + self._get_extension()
