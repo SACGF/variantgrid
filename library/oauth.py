@@ -17,6 +17,20 @@ from library.constants import MINUTE_SECS
 # "openid" - stop oauthlib raising "Scope has changed" over the widened grant
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
+LOOPBACK_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
+
+
+def url_scheme_problem(url: str, allow_http: bool = False) -> Optional[str]:
+    """ Why credentials can't be sent to url, or None: only https, or http to this machine unless allow_http """
+    parsed = urlparse(url)
+    if parsed.scheme == 'https':
+        return None
+    if parsed.scheme == 'http':
+        if allow_http or parsed.hostname in LOOPBACK_HOSTNAMES:
+            return None
+        return f"{url!r} uses http - use https, or set allow_http in the sync details"
+    return f"{url!r} must use http(s), got scheme {parsed.scheme!r}"
+
 
 class ServerAuth:
     """
@@ -24,6 +38,8 @@ class ServerAuth:
     BASIC_AUTH
     OAUTH and
     OAUTH where you need BASIC_AUTH first
+
+    Credentials only go over https, or http to this machine - other http hosts need allow_http in the sync details
     """
 
     @staticmethod
@@ -43,6 +59,7 @@ class ServerAuth:
                  client_id: Optional[str] = None,
                  app_username: Optional[str] = None,
                  app_password: Optional[str] = None,
+                 allow_http: bool = False,
                  **kwargs):
         self.username = username
         self.password = password
@@ -51,10 +68,16 @@ class ServerAuth:
         self.client_id = client_id
         self.app_username = app_username
         self.app_password = app_password
+        self.allow_http = allow_http
+
+    def _check_scheme(self, url: str):
+        if problem := url_scheme_problem(url, self.allow_http):
+            raise ValueError(f"ServerAuth {problem}")
 
     @cached_property
     def auth(self):
         if self.oauth_url:
+            self._check_scheme(self.oauth_url)
             auth_auth = None
             if self.app_username or self.app_password:
                 auth_auth = HTTPBasicAuth(
@@ -95,8 +118,6 @@ class ServerAuth:
 
     def url(self, path: str) -> str:
         """ path is relative to host even with a leading '/', so a host with a sub-path keeps it """
-        scheme = urlparse(self.host).scheme
-        if scheme not in ('https', 'http'):
-            raise ValueError(f"ServerAuth host must use http(s), got scheme {scheme!r}")
+        self._check_scheme(self.host)
         base = self.host if self.host.endswith('/') else self.host + '/'
         return urljoin(base, path.lstrip('/'))
