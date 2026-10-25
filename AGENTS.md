@@ -141,7 +141,8 @@ package. The exception is an app's enums, which live in an `<app>/enums/` packag
 (`classification/enums/`): its `__init__` star-imports each `<topic>_enums.py`, so callers write
 `from classification.enums import ShareLevel`. An enums module imports only `library`, Django and other enums packages,
 never an app's `models`. `scripts/vg imports cycles` (which follows those `__init__` imports) and `lint-imports`
-(`.importlinter`: `library` never imports an app) both gate CI.
+(`.importlinter`: `library` never imports an app, and app models import only the apps below them -
+`snpdb` < `genes` < `annotation` < `classification` < `analysis`) both gate CI.
 
 ### Code comments and docs
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't

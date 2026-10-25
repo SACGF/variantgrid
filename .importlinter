@@ -76,3 +76,17 @@ ignore_imports =
     library.django_utils.django_partition -> snpdb.models.models_partition_archive
     library.preview_request -> genes.enums
     library.preview_request -> variantgrid.perm_path
+
+[importlinter:contract:app-model-layers]
+name = app models import only the apps below them
+type = layers
+layers =
+    analysis.models
+    classification.models
+    annotation.models
+    genes.models
+    snpdb.models
+ignore_imports =
+    ; inside a function to break a cycle: genes.models imports snpdb.models
+    snpdb.models.models -> genes.models
+    snpdb.models.models_clingen_allele -> genes.hgvs

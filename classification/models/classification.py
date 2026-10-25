@@ -26,7 +26,6 @@ from typing import (
 )
 
 import django.dispatch
-from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -103,6 +102,7 @@ from genes.models import Gene, GeneSymbol, NoTranscript
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from library.django_utils.model_fields import UTCTimestampField
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
@@ -1588,8 +1588,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
 
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user
-    created = DateTimeUTCField(db_index=True, auto_now_add=True)
-    modified = DateTimeUTCField(auto_now=True)
+    created = UTCTimestampField(db_index=True, auto_now_add=True)
+    modified = UTCTimestampField(auto_now=True)
     source = models.TextField(null=False)
 
     @property

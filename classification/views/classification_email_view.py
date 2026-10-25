@@ -2,17 +2,18 @@ import collections
 import unicodedata
 from functools import cached_property
 from typing import Optional
-import celery
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.timesince import timesince
+
 from classification.models import Classification
 from classification.services.overlaps_services import OverlapsSummary
 from email_manager.models import EmailLog
-from library.log_utils import report_exc_info, report_message
+from library.log_utils import report_message
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab, UserSettings
 
@@ -50,18 +51,6 @@ class EmailSummaryData:
     def __init__(self, perspective: LabPickerData):
         labs = sorted(perspective.selected_labs)
         self.lab_summaries: list[EmailLabSummaryData] = [EmailLabSummaryData(lab=lab, user=perspective.user) for lab in labs]
-
-
-@celery.shared_task(queue='db_workers')
-def send_summary_emails():
-    report_message("Attempting to send weekly summary emails", level="info")
-    for user in User.objects.filter(is_active=True):
-        try:
-            us = UserSettings.get_for_user(user)
-            if us.email_weekly_updates:
-                send_summary_email_to_user(user=user)
-        except Exception:
-            report_exc_info({"user": user.username})
 
 
 def send_summary_email_to_user(user: User) -> bool:

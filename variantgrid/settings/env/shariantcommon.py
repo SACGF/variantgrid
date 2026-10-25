@@ -179,7 +179,6 @@ VARIANT_SHOW_CANONICAL_HGVS = False
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
 URLS_APP_REGISTER.update({"analysis": False,
-                          "expression": False,
                           "pathtests": False,
                           "pedigree": False,
                           "seqauto": False})

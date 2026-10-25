@@ -20,7 +20,6 @@ django-axes[ipware]
 django_cache_memoize
 django-compressor
 django_crispy_forms
-django_datetime_utc
 django-guardian
 django-js-reverse
 django_json_widget

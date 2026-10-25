@@ -1005,7 +1005,6 @@ INSTALLED_APPS = [
     'compressor',
     'avatar',
     'vcauth',
-    'datetimeutc',
     'django_json_widget',
     'django.contrib.humanize',
     'django.contrib.sites',
@@ -1042,7 +1041,6 @@ INSTALLED_APPS = [
     'annotation.apps.AnnotationConfig',
     'ontology',
     'eventlog',
-    'expression',  # Empty but referenced by other migrations - can delete after squash
     'flags',
     'manual',
     'email_manager',
