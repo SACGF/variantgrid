@@ -1,5 +1,4 @@
 import json
-import mimetypes
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -99,7 +98,11 @@ from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
 from library.django_utils import get_url_from_view_path, require_superuser
-from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
+from library.django_utils.file_uploads import (
+    filepond_process_response,
+    filepond_upload_receive,
+    serve_attachment,
+)
 from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_traceback
 from library.utils import delimited_row
@@ -689,6 +692,8 @@ def export_classifications_grid_redcap(request):
 
 @require_POST
 def classification_file_upload(request, classification_id):
+    if not settings.CLASSIFICATION_FILE_ATTACHMENTS:
+        raise PermissionDenied('File attachments are not enabled')
     try:
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
@@ -732,7 +737,7 @@ def get_classification_attachment_file_dicts(classification) -> list[dict]:
     return file_dicts
 
 
-def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponse:
+def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponseBase:
     """ Served through a view rather than static files so only users who can view the classification get it """
 
     vc_attachment = get_object_or_404(ClassificationAttachment, pk=pk)
@@ -744,10 +749,7 @@ def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpRes
     else:
         filename = vc_attachment.file.path
 
-    content_type, _ = mimetypes.guess_type(filename)
-    with open(filename, "rb") as f:
-        image_data = f.read()
-    return HttpResponse(image_data, content_type=content_type)
+    return serve_attachment(filename)
 
 
 def view_classification_file_attachment_thumbnail(request, pk):
