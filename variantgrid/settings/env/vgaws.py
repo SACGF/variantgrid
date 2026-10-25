@@ -37,6 +37,18 @@ ANNOTATION[BUILD_T2TV2]["enabled"] = True
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_BIG_DISK_BASE_DIR, 'annotation_scratch')
 ANNOTATION_ANNOTSV_ENABLED = True
 
+# UTRAnnotator, SpliceVault, AVI and AlphaGenome splicing on the columns_version 5 VAVs (#2426, #2433)
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "utr_annotator": "annotation_data/GRCh37/uORF_5UTR_GRCh37_PUBLIC.txt",
+    "splicevault": "annotation_data/GRCh37/SpliceVault_data_hg19.refseq_mane.tsv.gz",
+})
+ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+    "utr_annotator": "annotation_data/GRCh38/uORF_5UTR_GRCh38_PUBLIC.txt",
+    "splicevault": "annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz",
+    "avi": "annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz",
+    "alphagenome_splicing": "annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz",
+})
+
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'
 SEND_EMAILS = True
