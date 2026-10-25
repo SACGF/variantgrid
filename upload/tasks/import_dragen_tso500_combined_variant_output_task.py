@@ -62,7 +62,6 @@ from variantgrid.celery import app
 class ImportDragenTSO500CombinedVariantOutputTask(ImportTask):
 
     def process_items(self, file_upload):
-        file_upload.check_can_write_sequencing_data()
         user = file_upload.user
         sections = read_combined_variant_output(file_upload.get_filename())
         analysis_details = get_analysis_details(sections)

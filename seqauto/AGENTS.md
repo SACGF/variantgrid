@@ -30,9 +30,9 @@ API:
 - Reads are open to any logged-in user; writes need a superuser or a member of `SEQAUTO_API_WRITE_GROUP` (the
   pipeline's token user). A new write endpoint subclasses `seqauto/views_rest.py:SeqAutoModelViewSet` or
   `seqauto/views_rest.py:SeqAutoWriteAPIView`; a POST that only reads (batch lookups) stays a plain `APIView`.
-  An upload that writes onto seqauto records (a VCF or gene coverage `path`, TSO500 MetricsOutput /
-  CombinedVariantOutput) calls `upload/models/models.py:FileUpload.check_can_write_sequencing_data` - the same rule,
-  `seqauto/seqauto_permissions.py:can_write_seqauto`.
+  An upload linked to a seqauto record by its `path` (a VCF to its SingleSampleVCF / JointCalledVCF, gene coverage to
+  its QCGeneCoverage) finds it through `upload/models/models.py:FileUpload.get_sequencing_record_for_path`, which applies
+  the same rule (`seqauto/seqauto_permissions.py:can_write_seqauto`) to page and API uploads.
 - An endpoint for records of a run subclasses `seqauto/views_rest.py:SequencingRunModelViewSet` or
   `seqauto/views_rest.py:SequencingRunWriteAPIView` (calling `log_sequencing_runs` with what it saved), so its calls
   appear on the run page's API Log tab.

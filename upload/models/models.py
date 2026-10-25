@@ -43,6 +43,7 @@ from seqauto.models import (
     VariantCaller,
     get_samples_by_sequencing_sample,
 )
+from seqauto.models.models_seqauto import SeqAutoRecord
 from seqauto.seqauto_permissions import can_write_seqauto
 from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.import_status import set_vcf_and_samples_import_status
@@ -112,13 +113,18 @@ class FileUpload(TimeStampedModel):
             msg = f"You do not have permission to access FileUpload pk={self.pk}"
             raise PermissionDenied(msg)
 
-    def check_can_write_sequencing_data(self):
-        """ A file sent through the upload page or API writes onto seqauto records only for a sequencing
-            data writer - command line and SeqAuto imports are run by the server """
-        if self.import_source == ImportSource.WEB_UPLOAD and not can_write_seqauto(self.user):
-            raise UploadUserError(f"Writing sequencing data requires membership of the "
-                                  f"'{settings.SEQAUTO_API_WRITE_GROUP}' group",
-                                  summary="Needs sequencing data write access")
+    def get_sequencing_record_for_path(self, *seqauto_record_classes: type[SeqAutoRecord]) -> Optional[SeqAutoRecord]:
+        """ The first record of seqauto_record_classes (in order) for this upload's path - the sequencing file the
+            upload is linked to and writes onto. Linking a file sent through the upload page or API needs sequencing
+            data write access (command line and SeqAuto imports are run by the server) """
+        for seqauto_record_class in seqauto_record_classes:
+            if record := seqauto_record_class.objects.filter(path=self.path).first():
+                if self.import_source == ImportSource.WEB_UPLOAD and not can_write_seqauto(self.user):
+                    raise UploadUserError(f"Linking an upload to sequencing data by path requires membership of "
+                                          f"the '{settings.SEQAUTO_API_WRITE_GROUP}' group",
+                                          summary="Needs sequencing data write access")
+                return record
+        return None
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         if isinstance(user_or_group, User):

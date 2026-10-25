@@ -1,6 +1,6 @@
 """ Who may write sequencing data - the pipeline's API user. Used by the seqauto REST write views
-    (seqauto/views_rest.py:SeqAutoWritePermission) and by uploads that write onto seqauto records
-    (upload/models/models.py:FileUpload.check_can_write_sequencing_data). """
+    (seqauto/views_rest.py:SeqAutoWritePermission) and when an upload is linked to a seqauto record
+    by path (upload/models/models.py:FileUpload.get_sequencing_record_for_path). """
 
 from django.conf import settings
 from django.contrib.auth.models import User

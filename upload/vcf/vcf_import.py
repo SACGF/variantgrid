@@ -516,24 +516,16 @@ def create_backend_vcf_links(uploaded_vcf):
     # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
     if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
-        file_upload.check_can_write_sequencing_data()
-        path = file_upload.path
-        if path:
-            joint_called_vcf = None
-            single_sample_vcf = None
-            try:
-                joint_called_vcf = JointCalledVCF.objects.get(path=path)
-            except JointCalledVCF.DoesNotExist:
-                try:
-                    single_sample_vcf = SingleSampleVCF.objects.get(path=path)
-                except SingleSampleVCF.DoesNotExist:
-                    msg = f"Couldn't find joint-called or single VCF for path '{path}'"
-                    raise ValueError(msg)
+        sequencing_vcf = file_upload.get_sequencing_record_for_path(JointCalledVCF, SingleSampleVCF)
+        if sequencing_vcf is None:
+            raise ValueError(f"Couldn't find joint-called or single VCF for path '{file_upload.path}'")
 
-            defaults = {"uploaded_vcf": uploaded_vcf}
-            backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
-                                                                 joint_called_vcf=joint_called_vcf,
-                                                                 defaults=defaults)
+        joint_called_vcf = sequencing_vcf if isinstance(sequencing_vcf, JointCalledVCF) else None
+        single_sample_vcf = sequencing_vcf if isinstance(sequencing_vcf, SingleSampleVCF) else None
+        defaults = {"uploaded_vcf": uploaded_vcf}
+        backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
+                                                             joint_called_vcf=joint_called_vcf,
+                                                             defaults=defaults)
     return backend_vcf
 
 

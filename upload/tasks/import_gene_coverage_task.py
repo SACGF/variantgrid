@@ -65,8 +65,7 @@ class ImportGeneCoverageTask(ImportTask):
             # Only API or seqauto sets path - but seqauto won't call this method it just directly calls
             # GeneCoverageCollection.load_from_file
             if file_upload.path:
-                file_upload.check_can_write_sequencing_data()
-                if qc_gene_coverage := QCGeneCoverage.objects.filter(path=file_upload.path).first():
+                if qc_gene_coverage := file_upload.get_sequencing_record_for_path(QCGeneCoverage):
                     logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
                     genome_build = qc_gene_coverage.qc.genome_build
                     enrichment_kit = qc_gene_coverage.qc.sequencing_sample.enrichment_kit
