@@ -1,7 +1,6 @@
+import io
 import re
 from typing import Optional
-
-from Bio import Entrez
 
 from annotation.clinvar_xml_parser import (
     CLINVAR_REVIEW_STATUS_TO_STARS,
@@ -11,6 +10,7 @@ from annotation.clinvar_xml_parser import (
     ClinVarXmlParserOutput,
 )
 from annotation.models import ClinVarRecord
+from library.entrez import eutils_request
 from library.utils.xml_utils import PP, parser_path
 from snpdb.enums import AlleleOriginBucket
 
@@ -48,9 +48,8 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
             vcv = f"0{vcv}"
         vcv = f"VCV{vcv}"
 
-        handle = Entrez.efetch(db="clinvar", rettype="vcv", id=vcv)
-        parsed_results = cls.load_from_input(handle)
-        handle.close()
+        response = eutils_request("efetch", db="clinvar", rettype="vcv", id=vcv)
+        parsed_results = cls.load_from_input(io.BytesIO(response.content))
 
         return ClinVarXmlParserOutput(
             all_records=parsed_results,

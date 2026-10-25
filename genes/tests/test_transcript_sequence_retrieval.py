@@ -11,7 +11,7 @@ from requests import HTTPError, Response
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_fake_transcript_version
 from genes.models import TranscriptVersionSequenceInfo
-from genes.transcript_errors import NoTranscript
+from genes.transcript_errors import BadTranscript, NoTranscript
 from genes.transcript_sequence_retrieval import TranscriptSequenceFetcher
 from library.django_utils.unittest_utils import URLTestCase, _make_test_client
 from snpdb.models.models_genome import GenomeBuild
@@ -29,6 +29,21 @@ def _response(status_code: int, text: str) -> Response:
     r._content = text.encode()
     r.url = "https://rest.ensembl.org/sequence/id/ENST00000000001?type=cdna"
     return r
+
+
+class RefSeqFetchErrorTest(SimpleTestCase):
+    def test_entrez_error_body_raises_no_transcript(self):
+        """ NoTranscript is reported to the user by raise_bad_or_missing_transcript, a bare ValueError was a 500 """
+        with mock.patch("genes.transcript_sequence_retrieval.eutils_request",
+                        return_value=_response(200, "Error: F a i l e d")):
+            with self.assertRaises(NoTranscript):
+                TranscriptSequenceFetcher().fetch_refseq("NM_000001.1")
+
+    def test_400_raises_bad_transcript(self):
+        with mock.patch("genes.transcript_sequence_retrieval.eutils_request",
+                        side_effect=HTTPError(response=_response(400, ""))):
+            with self.assertRaises(BadTranscript):
+                TranscriptSequenceFetcher().fetch_refseq("NM_000001.1")
 
 
 class EnsemblFetchErrorTest(SimpleTestCase):

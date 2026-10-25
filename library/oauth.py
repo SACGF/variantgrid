@@ -68,7 +68,8 @@ class ServerAuth:
             # include_client_id sends client_id in the request body (public client) - without
             # it, requests_oauthlib fabricates a Basic auth header with an empty client_secret,
             # which Keycloak rejects with invalid_client
-            token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password, auth=auth_auth, include_client_id=True)
+            token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password, auth=auth_auth, include_client_id=True,
+                                      timeout=MINUTE_SECS)
             return OAuth2(client_id=self.client_id, token=token)
         else:
             # fall back to basic auth
