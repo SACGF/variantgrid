@@ -269,10 +269,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"
 
     def get_absolute_url(self):
-        url = self.url
-        if url is None:
-            url = reverse('view_gene_list', args=[str(self.id)])
-        return url
+        return reverse('view_gene_list', args=[str(self.id)])
 
     @classmethod
     def get_listing_url(cls):
