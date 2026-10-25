@@ -103,6 +103,7 @@ from library.django_utils.file_uploads import filepond_process_response, filepon
 from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_traceback
 from library.utils import delimited_row
+from library.utils.date_utils import utc_from_timestamp
 from library.utils.file_utils import rm_if_exists
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.enums import AlleleOriginBucket
@@ -126,7 +127,7 @@ from variantopedia.forms import SearchAndClassifyForm
 def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None, discordance_report_id: Optional[int] = None):
 
     if latest_timestamp := request.GET.get('latest_timestamp'):
-        latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
+        latest_timestamp = utc_from_timestamp(float(latest_timestamp))
 
     user: Optional[User] = None
     lab: Optional[Lab] = None
@@ -545,7 +546,9 @@ def view_classification_diff(request):
 
     elif variant_id_str := request.GET.get('variant_compare'):
         ref = ClassificationRef.init_from_str(user=request.user, id_str=variant_id_str)
-        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
+        compare_all = []
+        if allele := ref.record.allele_object:
+            compare_all = ClassificationModification.latest_for_user(user=request.user, allele=allele, published=True)
         # filter out variant we're comparing with, make it last in calculation
         latest_others_for_variant = [vcm for vcm in compare_all if vcm.classification.id != ref.record.id]
         latest_others_for_variant.sort(key=lambda cm: cm.curated_date_check, reverse=True)

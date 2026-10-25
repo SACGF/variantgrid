@@ -102,7 +102,8 @@ Gotchas:
   a live calculation, never stored.
 - Bulk-import guard: while a ClassificationImportRun is ONGOING, per-classification work (grouping, common-variant filters,
   clinical-context recalc) is skipped and caught up on classification_imports_complete_signal
-  (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). An abandoned ONGOING run silently stalls all of it.
+  (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). A run not added to for MAX_IMPORT_AGE (5 minutes) is closed as UNFINISHED by the next import or the
+  `close_abandoned_classification_import_runs_task` beat, so an abandoned run stalls that work for minutes, not until the next import.
 - /classification/api/* holds DRF views (views/classification_view.py:ClassificationView is the model), which the login
   middleware skips so token and basic auth reach DRF's IsAuthenticated. A plain Django view under that prefix still needs a
   session login - the path exempts nothing.
