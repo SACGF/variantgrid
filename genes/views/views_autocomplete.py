@@ -100,6 +100,8 @@ class TranscriptAutocompleteView(AutocompleteView):
             qs = qs.filter(transcriptversion__releasetranscriptversion__release=gene_annotation_release)
 
         if has_protein_domains:
+            if not (gene_symbol and gene_annotation_release):
+                return Transcript.objects.none()
             # Always scoped to a gene symbol, so this is the same bounded per-gene InterPro batch as
             # the hotspot graph - and this view is cached for a week, so pay for the complete list now
             store_domains_for_transcripts(qs.values_list("identifier", flat=True))
@@ -108,7 +110,7 @@ class TranscriptAutocompleteView(AutocompleteView):
             for transcript in qs:
                 tv_qs = gene_annotation_release.transcript_versions_for_transcript(transcript)
                 for tv in tv_qs:
-                    domains, domain_transcript_accession = tv.protein_domains_and_accession
+                    domains, _ = tv.protein_domains_and_accession
                     if domains.exists():
                         transcripts_with_domains.add(transcript.identifier)
                         break

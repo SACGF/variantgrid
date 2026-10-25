@@ -8,6 +8,7 @@ from genes.models import (
     GeneSymbol,
     HGNCImport,
     PanelAppPanel,
+    PanelAppPanelLocalCache,
     PanelAppPanelLocalCacheGeneSymbol,
     PanelAppServer,
 )
@@ -109,3 +110,16 @@ class TestPanelAppLocalCache(TestCase):
         gene_list = pap_lc.get_gene_list(panel_app_confidence=3)
         symbols = set(gene_list.genelistgenesymbol_set.values_list("gene_symbol_id", flat=True))
         self.assertEqual({"CFAP276"}, symbols)
+
+    @patch("genes.panel_app._get_panel_app_panel_api_json")
+    def test_failed_gene_insert_leaves_no_cache(self, mock_api_json):
+        with patch.object(PanelAppPanelLocalCacheGeneSymbol.objects, "bulk_create", side_effect=ValueError):
+            with self.assertRaises(ValueError):
+                self._cache_panel(mock_api_json, [{"gene_symbol": "C1orf194", "hgnc_id": "HGNC:32331"}])
+        self.assertFalse(PanelAppPanelLocalCache.objects.filter(panel_app_panel=self.panel).exists())
+
+    @patch("genes.panel_app._get_panel_app_panel_api_json")
+    def test_cache_already_created_for_version_is_returned(self, mock_api_json):
+        existing = PanelAppPanelLocalCache.objects.create(panel_app_panel=self.panel, version="0.2")
+        pap_lc = self._cache_panel(mock_api_json, [{"gene_symbol": "C1orf194", "hgnc_id": "HGNC:32331"}])
+        self.assertEqual(existing, pap_lc)

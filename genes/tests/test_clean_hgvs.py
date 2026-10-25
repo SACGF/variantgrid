@@ -49,3 +49,12 @@ class TestCleanHGVS(TestCase):
         for input_hgvs, expected in INVARIANTS:
             cleaned, _messages = HGVSMatcher.clean_hgvs(input_hgvs)
             self.assertEqual(cleaned, expected, msg=f"clean_hgvs({input_hgvs!r})")
+
+    def test_hgvs_clean_pattern_optional_transcript(self):
+        for hgvs_string, prefix in [("NR_001566.1:n.427_428insCx", "NR"),
+                                    ("LRG_199t1:c.100A>Gx", "LRG"),
+                                    ("NM_000059.3(BRCA2):c.1A>Gx", "NM")]:
+            m = HGVSMatcher.HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT.match(hgvs_string)
+            self.assertIsNotNone(m, msg=hgvs_string)
+            self.assertEqual(prefix, m.group("transcript_prefix"), msg=hgvs_string)
+            self.assertNotEqual("t1", m.group("gene_symbol"), msg=hgvs_string)

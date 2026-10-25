@@ -27,7 +27,7 @@ from genes.models import (
     ReleaseGeneSymbolGene,
 )
 from genes.models.models_gene import GeneNameResult
-from library.utils import clean_string
+from library.utils import clean_string, iter_fixed_chunks
 
 TokenizeResult = namedtuple("TokenizeResult", ["valid", "oversized"])
 
@@ -236,13 +236,12 @@ class ReleaseGeneMatcher:
 
     def match_gene_symbols(self, gene_symbols: Iterable[str]):
         """ gene_symbols must not have been matched  """
-        release_gene_symbols = [ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
-                                for gene_symbol_id in gene_symbols]
-        if release_gene_symbols:
-            # Need ignore_conflicts=False so we get back PKs
-            release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols,
-                                                                         batch_size=2000, ignore_conflicts=False)
-            self.match_symbols_to_genes(release_gene_symbols)
+        # Two gene lists created at once can both find a symbol unmatched - read the rows back for their PKs
+        for chunk in iter_fixed_chunks(gene_symbols, 2000):
+            ReleaseGeneSymbol.objects.bulk_create([ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
+                                                   for gene_symbol_id in chunk], ignore_conflicts=True)
+            release_gene_symbols = ReleaseGeneSymbol.objects.filter(release=self.release, gene_symbol_id__in=chunk)
+            self.match_symbols_to_genes(list(release_gene_symbols))
 
     def _match_unmatched_gene_symbol_qs(self, gene_symbol_qs):
         """ Match any matched symbols without matched genes """

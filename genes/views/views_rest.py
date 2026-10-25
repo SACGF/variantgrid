@@ -10,6 +10,7 @@ from django.views.decorators.cache import cache_page
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
@@ -104,9 +105,16 @@ class NamedGeneListView(MultipleFieldLookupMixin, RetrieveAPIView):
     lookup_fields = ('category__name', 'name')
 
     def get_queryset(self):
-        #category = self.kwargs['category']
-        #name = self.kwargs['name']
-        return GeneList.filter_for_user(self.request.user)  # .filter(category__name=category, name=name)
+        return GeneList.filter_for_user(self.request.user)
+
+    def get_object(self):
+        # (category, name) isn't unique - PanelApp cache lists can be duplicated - so take the first
+        category_name = self.kwargs['category__name']
+        name = self.kwargs['name']
+        if gene_list := self.get_queryset().filter(category__name=category_name, name=name).order_by("pk").first():
+            self.check_object_permissions(self.request, gene_list)
+            return gene_list
+        raise Http404(f"No gene list '{name}' in category '{category_name}'")
 
 
 class ModifyGeneListView(APIView):
@@ -114,9 +122,16 @@ class ModifyGeneListView(APIView):
     permission_classes = (permissions.IsAuthenticated, WriteGeneListPermission)
 
     def get_gene_list_modifications(self, data):
-        modifications = json.loads(data["modifications"])
-        gene_additions = modifications.get('add')
-        gene_deletions = modifications.get('delete')
+        try:
+            modifications = json.loads(data["modifications"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValidationError({"modifications": "Required: JSON with 'add' and/or 'delete' lists"}) from e
+        gene_additions = modifications.get('add') or []
+        gene_deletions = modifications.get('delete') or []
+        # GeneSymbol PK is case-insensitive
+        known_symbols = {s.upper() for s in GeneSymbol.objects.filter(pk__in=gene_additions).values_list("pk", flat=True)}
+        if unknown_symbols := {s for s in gene_additions if s.upper() not in known_symbols}:
+            raise ValidationError({"add": f"Unknown gene symbols: {', '.join(sorted(unknown_symbols))}"})
         return gene_additions, gene_deletions
 
     @extend_schema(
@@ -150,7 +165,7 @@ class PanelAppGeneEvidenceView(APIView):
     def get(self, request, *args, **kwargs):
         server_id = self.kwargs['server_id']
         gene_symbol = self.kwargs['gene_symbol']
-        server = PanelAppServer.objects.get(pk=server_id)
+        server = get_object_or_404(PanelAppServer, pk=server_id)
         data = get_panel_app_results_by_gene_symbol_json(server, gene_symbol)
         if data is None:
             raise Http404(f"PanelApp has no results for '{gene_symbol}'")

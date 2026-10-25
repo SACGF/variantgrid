@@ -44,7 +44,6 @@ from library.cache import timed_cache
 from library.constants import MINUTE_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import (
-    ClinGenAlleleAPIException,
     ClinGenAlleleServerException,
     clingen_check_variant_length,
     get_clingen_allele_for_variant_coordinate,
@@ -213,7 +212,7 @@ class HGVSMatcher:
     # Lenient pattern used by hgvs_search.py to extract the c./g. allele from an
     # unparseable HGVS string for error reporting. The transcript is optional.
     HGVS_CLEAN_PATTERN_OPTIONAL_TRANSCRIPT = re.compile(
-        r"^((?P<transcript_prefix>:NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
+        r"^((?P<transcript_prefix>NR|NM|NC|ENST|LRG|XR)(?P<transcript_value>[0-9_]*(t[0-9]+)?)(\.(?P<transcript_version>[0-9]+))?)?([(]?(?P<gene_symbol>[^):\.]{2,8})[)]?)?:?(?P<letter>c|g|n|p)[.]?(?P<nomen>[^:\.]*)$",
         re.IGNORECASE
     )
 
@@ -228,7 +227,6 @@ class HGVSMatcher:
                  local_resolution=True, clingen_resolution=True, allow_alternative_transcript_version=True):
         self.genome_build = genome_build
         self.allow_alternative_transcript_version = allow_alternative_transcript_version
-        self.attempt_clingen = True  # Set to False if server issues
         self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type,
                                                            local_resolution=local_resolution,
                                                            clingen_resolution=clingen_resolution)
@@ -265,9 +263,6 @@ class HGVSMatcher:
             originally_normalized = HgvsOriginallyNormalized(original_hgvs=self.create_hgvs_variant(cleaned_hgvs),
                                                              normalized_hgvs=self.create_hgvs_variant(no_gene_generated))
             return variant_coord, match_ref_allele, originally_normalized
-        except ClinGenAlleleAPIException:
-            self.attempt_clingen = False
-            raise
         except ClinGenAlleleServerException as cga_se:
             # If it's unknown reference we can just retry with another version, other errors are fatal
             if cga_se.is_unknown_reference:
@@ -290,8 +285,6 @@ class HGVSMatcher:
                                                                   ref_type=f"transcript {transcript_reference_sequence}",
                                                                   ref_source="ClinGen Allele Registry")
                             return self._clingen_get_variant_coordinate_matches_reference_and_normalized(hgvs_swapped_ref, match_ref_allele=match_ref_allele)
-
-                self.attempt_clingen = False
             raise
 
     @staticmethod
@@ -331,10 +324,6 @@ class HGVSMatcher:
         """ So we don't keep hammering their server for the same transcript they don't have, we store in Redis
             cache that they don't have that transcript - this expires over time so we'll check again in case
             they updated their references and now have it """
-
-        if not self.attempt_clingen:
-            return False  # Had non-recoverable errors before
-
         key = HGVSMatcher._get_clingen_allele_registry_key(transcript_accession)
         return not cache.get(key)
 
@@ -472,6 +461,8 @@ class HGVSMatcher:
             hgvs_methods = []
             clingen_unavailable = False
             for tv, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
+                method = None
+                clingen_skipped = False
                 used_transcript_accession = tv.accession
                 hgvs_variant.transcript = tv.accession
                 # Ensure that ref is always present so we can give warning about provided reference
@@ -481,7 +472,9 @@ class HGVSMatcher:
                     variant_coordinate, matches_reference, originally_normalized = self.hgvs_converter.hgvs_to_variant_coordinate_reference_match_and_normalized(hgvs_string_for_version, tv)
                 elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
                     method = HGVSConverterType.CLINGEN_ALLELE_REGISTRY.name
-                    if not clingen_unavailable and self._clingen_allele_registry_ok(tv.accession):
+                    if clingen_unavailable or not self._clingen_allele_registry_ok(tv.accession):
+                        clingen_skipped = True
+                    else:
                         error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry"
                         try:
                             variant_coordinate, matches_reference, originally_normalized = self._clingen_get_variant_coordinate_matches_reference_and_normalized(hgvs_string_for_version)
@@ -507,6 +500,8 @@ class HGVSMatcher:
                 if method:
                     if hgvs_string != hgvs_string_for_version:
                         method += f" as \"{hgvs_string_for_version}\""
+                    if clingen_skipped:
+                        method += " - not tried (registry unavailable or doesn't have this transcript)"
                     hgvs_methods.append(method)
 
                 if variant_coordinate:
@@ -647,7 +642,7 @@ class HGVSMatcher:
                                     # regardless of whether we use biocommons or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
                                         hgvs_variant.gene = str(gene_symbol)
-                                    hgvs_method = potential_converter_type
+                                    hgvs_method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
                             if cga_se.is_unknown_reference:
