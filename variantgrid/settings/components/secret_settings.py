@@ -95,7 +95,8 @@ _default_settings = {
         "password": None,
         "host": e.g. "https://shariant.org.au",
         "oauth_url": e.g. "https://shariant.org.au/auth/realms/master/protocol/openid-connect/token",
-        "client_id": e.g. "admin-cli"
+        "client_id": e.g. "admin-cli",
+        "allow_http": optional, true to send credentials to a plain http (non-localhost) host - SYNC.<name> takes it too
     }
 """
 
