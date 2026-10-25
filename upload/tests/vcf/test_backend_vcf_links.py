@@ -9,12 +9,12 @@ from seqauto.models.models_software import VariantCaller
 from snpdb.enums import ImportSource
 from upload.enums import UploadedFileTypes
 from upload.models import (
+    BackendVCF,
     FileUpload,
     ProcessingStatus,
     UploadedVCF,
     UploadPipeline,
 )
-from upload.models.models import UploadUserError
 from upload.vcf.vcf_import import create_backend_vcf_links
 
 
@@ -43,16 +43,12 @@ class BackendVCFLinksTest(TestCase):
         uploaded_vcf = self._make_uploaded_vcf(path="/client/machine/foo.vcf.gz")
         self.assertIsNone(create_backend_vcf_links(uploaded_vcf))
 
-    @override_settings(SEQAUTO_ENABLED=True)
-    def test_unmatched_path_errors_when_seqauto_enabled(self):
-        uploaded_vcf = self._make_uploaded_vcf(path="/client/machine/foo.vcf.gz")
-        with self.assertRaises(ValueError):
-            create_backend_vcf_links(uploaded_vcf)
 
 
 @override_settings(SEQAUTO_ENABLED=True)
 class BackendVCFLinkWriteAccessTest(TestCase):
-    """ Linking an uploaded VCF to a sequencing VCF by path needs sequencing data write access """
+    """ Linking an uploaded VCF to a sequencing VCF by path needs sequencing data write access - without it, or
+        with no sequencing VCF at the path, the VCF imports unlinked with a warning """
     PATH = "/data/RUN_2456/joint_called.vcf.gz"
 
     @classmethod
@@ -67,20 +63,36 @@ class BackendVCFLinkWriteAccessTest(TestCase):
                                                              variant_caller=VariantCaller.objects.create(name="gatk", version="4.0"),
                                                              path=cls.PATH)
 
-    def _make_uploaded_vcf(self, user):
-        file_upload = FileUpload.objects.create(user=user, name="api_upload.vcf", path=self.PATH,
+    def _make_uploaded_vcf(self, user, path=PATH):
+        file_upload = FileUpload.objects.create(user=user, name="api_upload.vcf", path=path,
                                                 file_type=UploadedFileTypes.VCF,
                                                 import_source=ImportSource.WEB_UPLOAD)
         pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
         return UploadedVCF.objects.create(file_upload=file_upload, upload_pipeline=pipeline)
 
+    @staticmethod
+    def _warnings(uploaded_vcf) -> list[str]:
+        return [str(w.message) for w in uploaded_vcf.upload_pipeline.get_warnings(include_vcf=False)]
+
     def test_link_refused_without_write_access(self):
         user = User.objects.create_user(username="backend_links_reader", password="x")
-        with self.assertRaises(UploadUserError):
-            create_backend_vcf_links(self._make_uploaded_vcf(user))
+        uploaded_vcf = self._make_uploaded_vcf(user)
+        self.assertIsNone(create_backend_vcf_links(uploaded_vcf))
+        self.assertFalse(BackendVCF.objects.exists())
+        warnings = self._warnings(uploaded_vcf)
+        self.assertEqual(1, len(warnings))
+        self.assertIn("RUN_2456", warnings[0])
+
+    def test_unmatched_path_imports_unlinked_with_a_warning(self):
+        user = User.objects.create_user(username="backend_links_unmatched", password="x")
+        uploaded_vcf = self._make_uploaded_vcf(user, path="/client/machine/foo.vcf.gz")
+        self.assertIsNone(create_backend_vcf_links(uploaded_vcf))
+        self.assertEqual(1, len(self._warnings(uploaded_vcf)))
 
     def test_link_made_for_sequencing_data_writer(self):
         user = User.objects.create_user(username="backend_links_writer", password="x")
         user.groups.add(Group.objects.get_or_create(name=settings.SEQAUTO_API_WRITE_GROUP)[0])
-        backend_vcf = create_backend_vcf_links(self._make_uploaded_vcf(user))
+        uploaded_vcf = self._make_uploaded_vcf(user)
+        backend_vcf = create_backend_vcf_links(uploaded_vcf)
         self.assertEqual(backend_vcf.joint_called_vcf, self.joint_called_vcf)
+        self.assertEqual([], self._warnings(uploaded_vcf))

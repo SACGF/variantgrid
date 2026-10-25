@@ -76,6 +76,9 @@ Patterns here:
   subclass of upload/models/models.py:UploadUserError with a short `summary`: the pipeline fails with the message and
   no traceback or Rollbar report (UploadPipeline.user_error), and the upload grid shows the summary next to the cross.
   Anything else is treated as our bug and keeps its traceback.
+- Something the user should know that doesn't fail the import is upload/models/models.py:UploadPipeline.add_warning,
+  shown on the pipeline page and in the status API's `warnings`. A single-shot import has no steps, so it makes one to
+  hold them. A link to sequencing data the upload may not make (FileUpload.may_link_to_sequencing_data) is one.
 Gotchas:
 - A killed worker child (SIGTERM/SIGKILL, `revoke(terminate=True)`) never reaches `ImportVCFStepTask.run`'s except
   blocks; the master's `task_failure`/`task_revoked` receivers in `upload/tasks/vcf/import_vcf_step_task.py` fail the

@@ -113,17 +113,35 @@ class FileUpload(TimeStampedModel):
             msg = f"You do not have permission to access FileUpload pk={self.pk}"
             raise PermissionDenied(msg)
 
-    def get_sequencing_record_for_path(self, *seqauto_record_classes: type[SeqAutoRecord]) -> Optional[SeqAutoRecord]:
+    @property
+    def may_link_to_sequencing_data(self) -> bool:
+        """ Linking an upload to a seqauto record writes onto sequencing data, so a file sent through the upload page
+            or API needs the seqauto API's write access - command line and SeqAuto imports are run by the server.
+            A link refused is not a failure: the data imports without it (warn_sequencing_link_refused) """
+        return self.import_source != ImportSource.WEB_UPLOAD or can_write_seqauto(self.user)
+
+    def warn_sequencing_link_refused(self, sequencing_data: str, consequence: str = "it was imported without the link",
+                                     upload_step: Optional['UploadStep'] = None):
+        self.uploadpipeline.add_warning(f"You don't have permission to link this to {sequencing_data}, so {consequence}",
+                                        upload_step=upload_step)
+
+    def get_sequencing_record_for_path(self, *seqauto_record_classes: type[SeqAutoRecord],
+                                       upload_step: Optional['UploadStep'] = None) -> Optional[SeqAutoRecord]:
         """ The first record of seqauto_record_classes (in order) for this upload's path - the sequencing file the
-            upload is linked to and writes onto. Linking a file sent through the upload page or API needs sequencing
-            data write access (command line and SeqAuto imports are run by the server) """
+            upload is linked to and writes onto. None, with a warning on the upload, where there is no such record
+            or the upload may not link to it """
         for seqauto_record_class in seqauto_record_classes:
             if record := seqauto_record_class.objects.filter(path=self.path).first():
-                if self.import_source == ImportSource.WEB_UPLOAD and not can_write_seqauto(self.user):
-                    raise UploadUserError(f"Linking an upload to sequencing data by path requires membership of "
-                                          f"the '{settings.SEQAUTO_API_WRITE_GROUP}' group",
-                                          summary="Needs sequencing data write access")
-                return record
+                if self.may_link_to_sequencing_data:
+                    return record
+                if record.sequencing_run_id:
+                    sequencing_data = f"sequencing run '{record.sequencing_run_id}'"
+                else:
+                    sequencing_data = str(record)
+                self.warn_sequencing_link_refused(sequencing_data, upload_step=upload_step)
+                return None
+        self.uploadpipeline.add_warning(f"No sequencing data has the path '{self.path}', so this was imported "
+                                        f"without a link to it", upload_step=upload_step)
         return None
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
@@ -277,6 +295,16 @@ class UploadPipeline(models.Model):
         logging.info("*** Deleting generated input dir for pipeline %d - '%s'", self.pk, input_dir)
         shutil.rmtree(input_dir, ignore_errors=True)
 
+    def add_warning(self, message: str, upload_step: Optional['UploadStep'] = None):
+        """ Shown on the pipeline page and in the upload status API. A single-shot import runs no steps, so its
+            warnings hang off a finished step of their own, deleted with the factory's steps on a retry """
+        if upload_step is None:
+            upload_step, _ = UploadStep.objects.get_or_create(upload_pipeline=self, name=UploadStep.IMPORT_WARNINGS_NAME,
+                                                              defaults={"sort_order": 0,
+                                                                        "status": ProcessingStatus.SUCCESS,
+                                                                        "task_type": UploadStepTaskType.CELERY})
+        SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message)
+
     def start(self):
         logging.debug("upload_pipeline.start()")
         self.status = ProcessingStatus.PROCESSING
@@ -425,6 +453,7 @@ class UploadStep(models.Model):
     PREPROCESS_VCF_NAME = "Preprocess VCF"
     PROCESS_VCF_TASK_NAME = "Process VCF File"
     NORMALIZE_SUB_STEP = "normalize"
+    IMPORT_WARNINGS_NAME = "Import warnings"
 
     name = models.TextField()
     upload_pipeline = models.ForeignKey(UploadPipeline, on_delete=CASCADE)

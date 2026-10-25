@@ -369,9 +369,9 @@ class TestMetricsOutputImportTask(TestCase):
         assign_permission_to_user_and_groups(self.user, patient)
         self.specimen = Specimen.objects.create(patient=patient, reference_id="2600000001")
 
-    def _file_upload(self, metadata) -> FileUpload:
+    def _file_upload(self, metadata, import_source=ImportSource.COMMAND_LINE) -> FileUpload:
         file_upload = FileUpload.objects.create(path=RUN_METRICS_OUTPUT,
-                                                import_source=ImportSource.COMMAND_LINE,
+                                                import_source=import_source,
                                                 user=self.user, name="MetricsOutput_orig.tsv",
                                                 file_type=UploadedFileTypes.DRAGEN_TSO500_METRICS_OUTPUT,
                                                 metadata=metadata)
@@ -395,3 +395,14 @@ class TestMetricsOutputImportTask(TestCase):
 
         self.assertIn("sequencing_run", str(cm.exception))
         self.assertFalse(LibraryQC.objects.exists())
+
+    def test_a_web_upload_without_sequencing_write_access_writes_no_rows_and_warns(self):
+        make_sequencing_run(SEQUENCING_RUN_NAME)
+        file_upload = self._file_upload({"sequencing_run": SEQUENCING_RUN_NAME}, import_source=ImportSource.WEB_UPLOAD)
+
+        self.assertEqual(0, ImportDragenTSO500MetricsOutputTask.process_items(file_upload))
+
+        self.assertFalse(LibraryQC.objects.exists())
+        warnings = [str(w.message) for w in file_upload.uploadpipeline.get_warnings()]
+        self.assertEqual(1, len(warnings))
+        self.assertIn(SEQUENCING_RUN_NAME, warnings[0])

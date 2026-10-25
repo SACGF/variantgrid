@@ -1,6 +1,7 @@
 """Import of CombinedVariantOutput.tsv - the pair's chain, its seqauto links and the analysis' record."""
 import os
 import tempfile
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -421,9 +422,9 @@ class TestCombinedVariantOutputImportTask(TestCase):
         self.user = User.objects.create_user(username="cvo_import_user")
         self.rna_sample_id = "ExampleSample_RNA_2600000001B"
 
-    def _file_upload(self, metadata=None) -> FileUpload:
+    def _file_upload(self, metadata=None, import_source=ImportSource.COMMAND_LINE) -> FileUpload:
         file_upload = FileUpload.objects.create(path=COMBINED_VARIANT_OUTPUT,
-                                                import_source=ImportSource.COMMAND_LINE,
+                                                import_source=import_source,
                                                 user=self.user,
                                                 name="ExampleSample_2600000001_CombinedVariantOutput.tsv",
                                                 file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT,
@@ -455,6 +456,21 @@ class TestCombinedVariantOutputImportTask(TestCase):
         self.assertTrue(UploadedDragenTSO500CombinedVariantOutput.objects.filter(
             file_upload=file_upload).exists())
         self.assertFalse(UploadedVCF.objects.filter(file_upload=file_upload).exists())
+
+    def test_a_web_upload_without_sequencing_write_access_makes_the_chain_but_no_analysis(self):
+        file_upload = self._file_upload({SEQUENCING_RUN: "TSO500_IMPORT"}, import_source=ImportSource.WEB_UPLOAD)
+        sample = self._make_sample(self.rna_sample_id)
+
+        # A web upload's file is its file_field, which the test file isn't
+        with patch.object(FileUpload, "get_filename", return_value=COMBINED_VARIANT_OUTPUT):
+            self.assertEqual(0, ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload))
+
+        sample.refresh_from_db()
+        self.assertEqual("2600000001B", sample.extraction.reference_id)
+        self.assertFalse(DragenTSO500CombinedVariantOutput.objects.exists())
+        warnings = [str(w.message) for w in file_upload.uploadpipeline.get_warnings()]
+        self.assertEqual(1, len(warnings))
+        self.assertIn("TSO500_IMPORT", warnings[0])
 
     def test_without_metadata_the_run_is_the_one_whose_sheet_names_the_pair(self):
         sequencing_run = make_sequencing_run("TSO500_IMPORT")
