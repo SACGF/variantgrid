@@ -5,7 +5,7 @@ cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dange
 postgres_arrays formats array literals, long_running_sql / get_active_backend_pids / signal_backends /
 wait_for_backends_to_stop find and cancel other connections' running queries, query_was_cancelled tells a
 cancel or statement_timeout apart from other OperationalErrors, pg_settings / get_pg_setting set
-and read this connection's run-time settings, and get_table_row_estimates / get_queryset_row_estimate give planner
+and read this connection's run-time settings, advisory_lock serialises work across connections, and get_table_row_estimates / get_queryset_row_estimate give planner
 row counts without scanning.
 """
 import contextlib
@@ -138,6 +138,20 @@ def pg_settings(local: bool = False, **values):
     finally:
         if previous:
             _set_pg_settings(previous, local=False)
+
+
+@contextlib.contextmanager
+def advisory_lock(name: str, key: int):
+    """ Session-level Postgres advisory lock on (name, key), waiting for it if another connection holds it.
+        Not tied to a transaction, so it can be held across work that commits as it goes; a connection that
+        dies releases it, so a lost worker never leaves it held """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_lock(hashtext(%s), %s)", [name, key])
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_unlock(hashtext(%s), %s)", [name, key])
 
 
 def query_was_cancelled(e: OperationalError) -> bool:
