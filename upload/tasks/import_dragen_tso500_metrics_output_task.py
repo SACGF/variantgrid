@@ -8,9 +8,9 @@ written. The file is read by upload.tso500.dragen_metrics_output_parser and writ
 upload.tso500.dragen_metrics_output_records.
 
 The run is the upload's 'sequencing_run' metadata and is part of the row key, so a file that names
-none cannot be keyed and fails the import saying so. Naming the run links the rows to it, so an upload
-that may not link to sequencing data (FileUpload.check_may_link_to_sequencing_data) fails before
-anything is written.
+none cannot be keyed and fails the import saying so. The rows are linked to that run, so one naming a run
+seqauto has not registered, or an upload that may not link to sequencing data, fails before anything is
+written (FileUpload.get_sequencing_run_to_link).
 
 A file that lands before its specimens have been accessioned still writes its rows, with the
 extraction claims parked - reconcile_pending_extractions is fired afterwards so a claim that only
@@ -36,12 +36,11 @@ class ImportDragenTSO500MetricsOutputTask(ImportTask):
         if not sequencing_run_name:
             raise ValueError(f"MetricsOutput.tsv is written per sequencing run and names none itself - "
                              f"upload it with '{SEQUENCING_RUN}' metadata naming the run it came off")
-        file_upload.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run_name}'")
+        sequencing_run = file_upload.get_sequencing_run_to_link(sequencing_run_name)
         UploadedDragenTSO500MetricsOutput.objects.get_or_create(file_upload=file_upload)
 
         sections = read_sections(file_upload.get_filename())
-        rows = write_library_qc(read_library_qc(sections), file_upload.user,
-                                sequencing_run_name=sequencing_run_name,
+        rows = write_library_qc(read_library_qc(sections), file_upload.user, sequencing_run,
                                 method=metrics_method(sections),
                                 date=metrics_measured_date(sections),
                                 file_upload=file_upload)

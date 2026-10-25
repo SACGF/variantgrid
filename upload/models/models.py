@@ -39,6 +39,7 @@ from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
 from seqauto.models import (
     JointCalledVCF,
+    SequencingRun,
     SingleSampleVCF,
     VariantCaller,
     get_samples_by_sequencing_sample,
@@ -135,6 +136,16 @@ class FileUpload(TimeStampedModel):
                 return record
         raise UploadUserError(f"No sequencing data has the path '{self.path}'",
                               summary="No sequencing data at path")
+
+    def get_sequencing_run_to_link(self, sequencing_run_name: str) -> SequencingRun:
+        """ The registered run a run-level file (TSO500 MetricsOutput / CombinedVariantOutput) names in its
+            metadata - such a file has no path to link it by. Raises UploadUserError where the upload may not
+            link to it or there is no such run """
+        self.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run_name}'")
+        if sequencing_run := SequencingRun.objects.filter(name=sequencing_run_name).first():
+            return sequencing_run
+        raise UploadUserError(f"No sequencing run named '{sequencing_run_name}'",
+                              summary="No such sequencing run")
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         if isinstance(user_or_group, User):
