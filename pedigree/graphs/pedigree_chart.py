@@ -6,8 +6,8 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from django.conf import settings
+from django.utils.crypto import salted_hmac
 
-from library.utils import sha256sum_str
 from pedigree.models import PedFileFamily
 
 
@@ -36,7 +36,8 @@ class PedigreeChart:
     def get_params_hash(self):
         """ This should be unique for every graph produced (from parameters). Salted so the media URL of a
             family's chart can't be worked out from its id """
-        return sha256sum_str(f"{settings.SECRET_KEY}:ped_file_family={self.ped_file_family_id}")
+        return salted_hmac("pedigree_chart", f"ped_file_family={self.ped_file_family_id}",
+                           algorithm="sha256").hexdigest()
 
     def get_filename(self):
         return self._get_prefix() + self._get_extension()
