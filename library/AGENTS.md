@@ -60,9 +60,13 @@ Gotchas:
 - `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` caches `.get()` results
   process-wide forever and `ObjectManagerCachingRequest` per request; both are plain managers under
   `settings.UNIT_TEST`, so tests see queries production never runs (GenomeBuild, GeneSymbol, FlagType, Allele, Lab,
-  Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place.
+  Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place. The key is the
+  `get()` arguments only, not the queryset's filters: `X.objects.filter(a).get(b)` and every no-argument
+  `.filter(...).get()` share a key, so on these models call `X.objects.get(**lookup)` directly.
 - `library/guardian_utils.py:assign_permission_to_user_and_groups` imports `snpdb.models.UserSettings` inside the
-  function: `library` depends on `snpdb` at runtime, and that inline import is the one sanctioned cycle-break here.
+  function: `library` depends on `snpdb` at runtime. Every import of an app from `library` (four inside functions,
+  plus `log_utils` -> eventlog and `preview_request` -> genes/variantgrid at module level) is listed in
+  `.importlinter`'s `ignore_imports`; a new one needs an entry there and the cycle flagged.
 - `library/guardian_utils.py:assign_permission_to_user_and_groups` resolves the two `Permission` rows in one
   query and writes through guardian's `assign_perm_to_many(..., ignore_conflicts=True)` rather than a
   `get_or_create` per row - a VCF import pays it per sample. Add a permission holder by extending the bulk write,

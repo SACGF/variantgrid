@@ -235,9 +235,9 @@ and classification import want the nearest. Keeping `HGVSConverterInfo` on every
 
 ## Traps
 
-`genes/models/models_gene.py:TranscriptVersion.get_transcript_version` defaults to `best_attempt=True` and returns
-the nearest higher (or highest) version when the requested one is missing, then raises `MissingTranscript` if the
-row has no valid data; `genes/models/models_gene.py:TranscriptVersion.raise_bad_or_missing_transcript` tells
+`genes/models/models_gene.py:TranscriptVersion.get_transcript_version` raises `MissingTranscript` when the requested
+version is missing, unless called with `best_attempt=True` (the LRG path), which returns the nearest higher (or
+highest) version instead; either way it raises `MissingTranscript` if the row has no valid data; `genes/models/models_gene.py:TranscriptVersion.raise_bad_or_missing_transcript` tells
 `genes/transcript_errors.py:BadTranscript` (their typo) from `NoTranscript` (our gap) by asking NCBI/Ensembl, and
 caches both answers for a week (the `UNIT_TEST` settings swap in
 `genes/tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher` so tests never make them).

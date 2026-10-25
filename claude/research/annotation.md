@@ -19,7 +19,8 @@ Model fields, URLs, commands, tasks and signals are in the generated maps
 A `annotation/models/models_version.py:VariantAnnotationVersion` (VAV) is a database snapshot of one VEP install for one build:
 the VEP code version, the cache version, and a pin for every data file and plugin the command line will reference
 (gnomAD, dbNSFP, SpliceAI, COSMIC, MaveDB, Open Targets ...), plus `columns_version`, which selects the set of columns
-the pipeline writes. `annotation/vep_annotation.py:get_vep_version` runs `vep --help`-style introspection and
+the pipeline writes. `annotation/vep_annotation.py:get_vep_version` runs the full VEP command over a one-line fake VCF
+(cache load included, tens of seconds; `lru_cache`d per process) to read its `##VEP=` header, and
 `annotation/vep_annotation.py:vep_dict_to_variant_annotation_version_kwargs` turns that plus
 `annotation/vep_config.py:VEPConfig` (the `settings.ANNOTATION[build]` block) into the kwargs;
 `annotation/annotation_versions.py:get_or_create_variant_annotation_version_from_current_vep` then `get_or_create`s the

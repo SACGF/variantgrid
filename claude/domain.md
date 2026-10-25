@@ -98,8 +98,8 @@ counts of hom/het/ref per variant, another partition table, used for the "seen i
 ## Genes and transcripts (genes)
 
 **GeneSymbol / Gene / GeneVersion** - `genes/models/models_gene.py:GeneSymbol`, `Gene`, `GeneVersion`. A GeneSymbol is the
-HGNC-style name (with `GeneSymbolAlias`); a Gene is the stable Ensembl/RefSeq id; a GeneVersion is that gene in one
-annotation release and build. Symbol→gene matching is per release (`genes/models/models_gene_annotation_release.py`).
+HGNC-style name (with `GeneSymbolAlias`); a Gene is the stable Ensembl/RefSeq id; a GeneVersion is one version of that gene
+in one build, shared by every release that contains it (`ReleaseGeneVersion`). Symbol→gene matching is per release (`genes/models/models_gene_annotation_release.py`).
 
 **Transcript / TranscriptVersion** - `genes/models/models_gene.py:Transcript`, `TranscriptVersion`. Transcript is the
 versionless accession; TranscriptVersion (`NM_000059.4`, per build) carries the cdot exon data used for HGVS. HGVS
