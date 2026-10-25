@@ -12,6 +12,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
 from django.db.models import Case, F, Q, QuerySet, TextField, Value, When
@@ -21,6 +22,7 @@ from django.dispatch.dispatcher import Signal, receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from easy_thumbnails.files import get_thumbnailer
+from guardian.models import GroupObjectPermission, UserObjectPermission
 from model_utils.models import TimeStampedModel
 
 from library.django_utils import (
@@ -272,6 +274,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         values = self._merge_values()
         copied = {attname: value for attname, value in other._merge_values().items() if attname not in values}
         other_description = f"{other}({other.pk})"
+        self._move_object_permissions(other)
         other.delete()  # before copying, as external_pk is unique
         if copied:
             for attname, value in copied.items():
@@ -280,6 +283,17 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         PatientModification.objects.create(patient=self, user=user, origin=origin,
                                            description=f"Merged {other_description}: {description}")
         patient_merged_signal.send(sender=Patient, patient=self)
+
+    def _move_object_permissions(self, other: 'Patient'):
+        """ Whoever could see other keeps seeing its specimens and samples, which now hang off this patient """
+        content_type = ContentType.objects.get_for_model(Patient)
+        for permission_model, holder in ((UserObjectPermission, "user"), (GroupObjectPermission, "group")):
+            other_permissions = permission_model.objects.filter(content_type=content_type, object_pk=str(other.pk))
+            for object_permission in other_permissions:
+                permission_model.objects.get_or_create(content_type=content_type, object_pk=str(self.pk),
+                                                       permission=object_permission.permission,
+                                                       **{holder: getattr(object_permission, holder)})
+            other_permissions.delete()
 
     @property
     def code(self):
