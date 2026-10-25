@@ -113,6 +113,14 @@ class TestAnalysisRoundTrip(TestCase):
         self.assertEqual(items[1].sort_order, 2)
         self.assertEqual(items[1].operation, "gt")
 
+    def test_filter_node_item_field_must_be_grid_column(self):
+        analysis = self._make_analysis()
+        filter_node = FilterNode.objects.create(analysis=analysis, group_operation="AND")
+        FilterNodeItem.objects.create(filter_node=filter_node, sort_order=1, operation="eq",
+                                      field="locus__contig__genomebuild__name", data="GRCh37")
+        with self.assertRaises(ValueError):
+            _round_trip(self.user, self.grch37, self.annotation_version, analysis)
+
     def test_phenotype_node_round_trip(self):
         analysis = self._make_analysis()
         phenotype_node = PhenotypeNode.objects.create(analysis=analysis)
