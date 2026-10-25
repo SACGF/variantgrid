@@ -27,7 +27,6 @@ from classification.enums import CaseReportStatus
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
-from library.utils import sha256sum_str
 from patients.enums import (
     MEASURE_CONTEXT_KEYS,
     SampleSourceLevel,
@@ -320,14 +319,8 @@ class ClassificationReportTemplate(TimeStampedModel):
         return self.name
 
 
-def _case_report_dir(lab_id, case_report_id) -> str:
-    """ Salted so the media URL of a report can't be worked out from its id """
-    salted_hash = sha256sum_str(f"{settings.SECRET_KEY}:case_report={case_report_id}")
-    return os.path.join("case_reports", str(lab_id), f"{case_report_id}_{salted_hash}")
-
-
 def case_report_upload_path(instance: 'CaseReport', filename: str) -> str:
-    return os.path.join(_case_report_dir(instance.lab_id, instance.pk), filename)
+    return os.path.join("case_reports", str(instance.lab_id), str(instance.pk), filename)
 
 
 # Which FK each level of the hierarchy uses - the level says which, so one table covers creating a
@@ -443,7 +436,7 @@ class CaseReport(TimeStampedModel):
         return self.casereportclassification_set.all()
 
     def get_media_dir(self) -> str:
-        return os.path.join(settings.MEDIA_ROOT, _case_report_dir(self.lab_id, self.pk))
+        return os.path.join(settings.MEDIA_ROOT, "case_reports", str(self.lab_id), str(self.pk))
 
     def __str__(self):
         return f"{self.get_status_display()} report for {self.source} ({self.template_id})"
