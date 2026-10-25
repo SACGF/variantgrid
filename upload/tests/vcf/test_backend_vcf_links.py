@@ -15,6 +15,7 @@ from upload.models import (
     UploadedVCF,
     UploadPipeline,
 )
+from upload.models.models import UploadUserError
 from upload.vcf.vcf_import import create_backend_vcf_links
 
 
@@ -44,11 +45,10 @@ class BackendVCFLinksTest(TestCase):
         self.assertIsNone(create_backend_vcf_links(uploaded_vcf))
 
 
-
 @override_settings(SEQAUTO_ENABLED=True)
 class BackendVCFLinkWriteAccessTest(TestCase):
-    """ Linking an uploaded VCF to a sequencing VCF by path needs sequencing data write access - without it, or
-        with no sequencing VCF at the path, the VCF imports unlinked with a warning """
+    """ Linking an uploaded VCF to a sequencing VCF by path needs sequencing data write access, and a path
+        matching no sequencing VCF fails the upload """
     PATH = "/data/RUN_2456/joint_called.vcf.gz"
 
     @classmethod
@@ -70,24 +70,19 @@ class BackendVCFLinkWriteAccessTest(TestCase):
         pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING, file_upload=file_upload)
         return UploadedVCF.objects.create(file_upload=file_upload, upload_pipeline=pipeline)
 
-    @staticmethod
-    def _warnings(uploaded_vcf) -> list[str]:
-        return [str(w.message) for w in uploaded_vcf.upload_pipeline.get_warnings(include_vcf=False)]
-
     def test_link_refused_without_write_access(self):
         user = User.objects.create_user(username="backend_links_reader", password="x")
         uploaded_vcf = self._make_uploaded_vcf(user)
-        self.assertIsNone(create_backend_vcf_links(uploaded_vcf))
+        with self.assertRaisesMessage(UploadUserError, "RUN_2456"):
+            create_backend_vcf_links(uploaded_vcf)
         self.assertFalse(BackendVCF.objects.exists())
-        warnings = self._warnings(uploaded_vcf)
-        self.assertEqual(1, len(warnings))
-        self.assertIn("RUN_2456", warnings[0])
 
-    def test_unmatched_path_imports_unlinked_with_a_warning(self):
+    def test_unmatched_path_fails(self):
         user = User.objects.create_user(username="backend_links_unmatched", password="x")
+        user.groups.add(Group.objects.get_or_create(name=settings.SEQAUTO_API_WRITE_GROUP)[0])
         uploaded_vcf = self._make_uploaded_vcf(user, path="/client/machine/foo.vcf.gz")
-        self.assertIsNone(create_backend_vcf_links(uploaded_vcf))
-        self.assertEqual(1, len(self._warnings(uploaded_vcf)))
+        with self.assertRaisesMessage(UploadUserError, "/client/machine/foo.vcf.gz"):
+            create_backend_vcf_links(uploaded_vcf)
 
     def test_link_made_for_sequencing_data_writer(self):
         user = User.objects.create_user(username="backend_links_writer", password="x")
@@ -95,4 +90,3 @@ class BackendVCFLinkWriteAccessTest(TestCase):
         uploaded_vcf = self._make_uploaded_vcf(user)
         backend_vcf = create_backend_vcf_links(uploaded_vcf)
         self.assertEqual(backend_vcf.joint_called_vcf, self.joint_called_vcf)
-        self.assertEqual([], self._warnings(uploaded_vcf))

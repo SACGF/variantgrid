@@ -259,7 +259,7 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
 def link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step=None):
     """ Also run when a pipeline is reloaded with its VCF already created, as the link is where a
         first attempt fails when the samples don't match the sheet """
-    backend_vcf = create_backend_vcf_links(uploaded_vcf, upload_step)
+    backend_vcf = create_backend_vcf_links(uploaded_vcf)
     if backend_vcf:
         logging.info("Handle backend VCF")
         link_samples_and_vcfs_to_sequencing(backend_vcf, upload_step=upload_step)
@@ -503,8 +503,8 @@ def create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples):
     return vcf
 
 
-def create_backend_vcf_links(uploaded_vcf, upload_step=None):
-    """ returns backend_vcf if we can link to SeqAuto data (None if Web VCF, or the link is warned about instead) """
+def create_backend_vcf_links(uploaded_vcf):
+    """ returns backend_vcf if we can link to SeqAuto data (None if Web VCF) """
 
     backend_vcf = None
     if not settings.SEQAUTO_ENABLED:
@@ -516,14 +516,13 @@ def create_backend_vcf_links(uploaded_vcf, upload_step=None):
     # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
     if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
-        if sequencing_vcf := file_upload.get_sequencing_record_for_path(JointCalledVCF, SingleSampleVCF,
-                                                                        upload_step=upload_step):
-            joint_called_vcf = sequencing_vcf if isinstance(sequencing_vcf, JointCalledVCF) else None
-            single_sample_vcf = sequencing_vcf if isinstance(sequencing_vcf, SingleSampleVCF) else None
-            defaults = {"uploaded_vcf": uploaded_vcf}
-            backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
-                                                                 joint_called_vcf=joint_called_vcf,
-                                                                 defaults=defaults)
+        sequencing_vcf = file_upload.get_sequencing_record_for_path(JointCalledVCF, SingleSampleVCF)
+        joint_called_vcf = sequencing_vcf if isinstance(sequencing_vcf, JointCalledVCF) else None
+        single_sample_vcf = sequencing_vcf if isinstance(sequencing_vcf, SingleSampleVCF) else None
+        defaults = {"uploaded_vcf": uploaded_vcf}
+        backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
+                                                             joint_called_vcf=joint_called_vcf,
+                                                             defaults=defaults)
     return backend_vcf
 
 

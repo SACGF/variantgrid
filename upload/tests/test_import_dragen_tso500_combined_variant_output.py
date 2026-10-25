@@ -29,6 +29,7 @@ from upload.models import (
     UploadedVCF,
     UploadPipeline,
 )
+from upload.models.models import UploadUserError
 from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
     ImportDragenTSO500CombinedVariantOutputTask,
 )
@@ -457,20 +458,20 @@ class TestCombinedVariantOutputImportTask(TestCase):
             file_upload=file_upload).exists())
         self.assertFalse(UploadedVCF.objects.filter(file_upload=file_upload).exists())
 
-    def test_a_web_upload_without_sequencing_write_access_makes_the_chain_but_no_analysis(self):
+    def test_a_web_upload_without_sequencing_write_access_fails_writing_nothing(self):
         file_upload = self._file_upload({SEQUENCING_RUN: "TSO500_IMPORT"}, import_source=ImportSource.WEB_UPLOAD)
         sample = self._make_sample(self.rna_sample_id)
 
         # A web upload's file is its file_field, which the test file isn't
         with patch.object(FileUpload, "get_filename", return_value=COMBINED_VARIANT_OUTPUT):
-            self.assertEqual(0, ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload))
+            with self.assertRaisesMessage(UploadUserError, "TSO500_IMPORT"):
+                ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload)
 
         sample.refresh_from_db()
-        self.assertEqual("2600000001B", sample.extraction.reference_id)
+        self.assertIsNone(sample.extraction)
+        self.assertFalse(Patient.objects.exists())
         self.assertFalse(DragenTSO500CombinedVariantOutput.objects.exists())
-        warnings = [str(w.message) for w in file_upload.uploadpipeline.get_warnings()]
-        self.assertEqual(1, len(warnings))
-        self.assertIn("TSO500_IMPORT", warnings[0])
+        self.assertFalse(UploadedDragenTSO500CombinedVariantOutput.objects.exists())
 
     def test_without_metadata_the_run_is_the_one_whose_sheet_names_the_pair(self):
         sequencing_run = make_sequencing_run("TSO500_IMPORT")

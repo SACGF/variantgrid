@@ -29,8 +29,8 @@ run's MetricsOutput does (@see upload.tasks.import_dragen_tso500_metrics_output_
 The run is the upload's 'sequencing_run' metadata - the file names its run 'NA'. Without it the run
 whose current sample sheet names the pair's sample IDs is used, and a pair no registered run names
 cannot be keyed, so it fails the import saying so. The run is half the row's key, so an upload that may
-not link to sequencing data (FileUpload.may_link_to_sequencing_data) writes no row, and is warned
-instead - its patient chain is the user's own to make, and still is.
+not link to sequencing data (FileUpload.check_may_link_to_sequencing_data) fails before its patient
+chain or anything else is written.
 
 A chain that cannot be made is not a failure: the row is still the analysis', with its specimen claim
 parked saying why, which the pair's page shows. reconcile_pending_extractions is fired afterwards so a
@@ -73,20 +73,17 @@ class ImportDragenTSO500CombinedVariantOutputTask(ImportTask):
             raise ValueError(f"{file_upload} names no 'Pair ID' - there is no pair to record the "
                              f"analysis against")
 
-        may_link_to_run = file_upload.may_link_to_sequencing_data
-        sequencing_run = None
-        sequencing_run_name = get_metadata_sequencing_run_name(file_upload)
-        if may_link_to_run:
-            sample_ids = [sample_id for sample_id in (analysis_details.get(DNA_SAMPLE_ID),
-                                                      analysis_details.get(RNA_SAMPLE_ID)) if sample_id]
-            if sequencing_run_name:
-                sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first()
-            elif sequencing_run := sequencing_run_for_sample_ids(sample_ids):
-                sequencing_run_name = sequencing_run.name
-            else:
-                raise ValueError(f"CombinedVariantOutput.tsv names its run 'NA' and no sequencing run "
-                                 f"names {', '.join(sample_ids)} - upload it with '{SEQUENCING_RUN}' "
-                                 f"metadata naming the run it came off")
+        sample_ids = [sample_id for sample_id in (analysis_details.get(DNA_SAMPLE_ID),
+                                                  analysis_details.get(RNA_SAMPLE_ID)) if sample_id]
+        if sequencing_run_name := get_metadata_sequencing_run_name(file_upload):
+            sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first()
+        elif sequencing_run := sequencing_run_for_sample_ids(sample_ids):
+            sequencing_run_name = sequencing_run.name
+        else:
+            raise ValueError(f"CombinedVariantOutput.tsv names its run 'NA' and no sequencing run "
+                             f"names {', '.join(sample_ids)} - upload it with '{SEQUENCING_RUN}' "
+                             f"metadata naming the run it came off")
+        file_upload.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run_name}'")
         UploadedDragenTSO500CombinedVariantOutput.objects.get_or_create(file_upload=file_upload)
 
         identifiers = None
@@ -106,18 +103,13 @@ class ImportDragenTSO500CombinedVariantOutputTask(ImportTask):
             linked = link_samples_to_extractions(resolved, user)
             logging.info("%s: linked %d sample(s) to %s", file_upload, linked, resolved.specimen)
 
-        if may_link_to_run:
-            specimen_reference = identifiers.specimen_reference if identifiers else None
-            cvo = write_combined_variant_output(sections, pair_id, sequencing_run, sequencing_run_name, user,
-                                                resolved=resolved, specimen_reference=specimen_reference,
-                                                parked_error=chain_error, file_upload=file_upload)
-            logging.info("%s: recorded %s", file_upload, cvo)
-        else:
-            sequencing_data = f"sequencing run '{sequencing_run_name}'" if sequencing_run_name else "a sequencing run"
-            file_upload.warn_sequencing_link_refused(sequencing_data,
-                                                     consequence="its TMB, MSI and GIS were not imported")
+        cvo = write_combined_variant_output(sections, pair_id, sequencing_run, sequencing_run_name, user,
+                                            resolved=resolved,
+                                            specimen_reference=identifiers.specimen_reference if identifiers else None,
+                                            parked_error=chain_error, file_upload=file_upload)
+        logging.info("%s: recorded %s", file_upload, cvo)
         reconcile_pending_extractions.delay()
-        return int(may_link_to_run)
+        return 1
 
 
 ImportDragenTSO500CombinedVariantOutputTask = app.register_task(

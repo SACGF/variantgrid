@@ -21,7 +21,8 @@ from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencin
 from snpdb.enums import ImportSource
 from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import FileUpload, UploadPipeline
+from upload.models import FileUpload, UploadedDragenTSO500MetricsOutput, UploadPipeline
+from upload.models.models import UploadUserError
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
@@ -396,13 +397,11 @@ class TestMetricsOutputImportTask(TestCase):
         self.assertIn("sequencing_run", str(cm.exception))
         self.assertFalse(LibraryQC.objects.exists())
 
-    def test_a_web_upload_without_sequencing_write_access_writes_no_rows_and_warns(self):
-        make_sequencing_run(SEQUENCING_RUN_NAME)
+    def test_a_web_upload_without_sequencing_write_access_fails_writing_nothing(self):
         file_upload = self._file_upload({"sequencing_run": SEQUENCING_RUN_NAME}, import_source=ImportSource.WEB_UPLOAD)
 
-        self.assertEqual(0, ImportDragenTSO500MetricsOutputTask.process_items(file_upload))
+        with self.assertRaisesMessage(UploadUserError, SEQUENCING_RUN_NAME):
+            ImportDragenTSO500MetricsOutputTask.process_items(file_upload)
 
         self.assertFalse(LibraryQC.objects.exists())
-        warnings = [str(w.message) for w in file_upload.uploadpipeline.get_warnings()]
-        self.assertEqual(1, len(warnings))
-        self.assertIn(SEQUENCING_RUN_NAME, warnings[0])
+        self.assertFalse(UploadedDragenTSO500MetricsOutput.objects.exists())
