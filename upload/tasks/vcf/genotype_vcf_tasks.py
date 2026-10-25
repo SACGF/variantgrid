@@ -9,7 +9,7 @@ from annotation.models.models_annotation_run import VCFAnnotationStats
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from eventlog.models import create_event
-from library.log_utils import log_traceback
+from library.log_utils import get_traceback
 from library.utils import full_class_name
 from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.enums import ImportStatus, VariantOrigin
@@ -220,26 +220,25 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 def reload_vcf_task(upload_pipeline_id, vcf_id):
     """ Needs to be done thread safely for zygosity count """
 
+    upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     try:
-        upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
         if vcf_id:
             vcf = VCF.objects.get(pk=vcf_id)
             vcf.import_status = ImportStatus.IMPORTING
             vcf.save()
 
             logging.info("VariantCount")
-            try:
-                update_all_variant_zygosity_counts_for_vcf(vcf, '-')
-            except:
-                pass
+            # A failed first attempt may never have counted, so there is nothing to subtract
+            update_all_variant_zygosity_counts_for_vcf(vcf, '-', skip_if_cannot_delete=True)
 
             logging.info("Delete internal data")
             vcf.delete_internal_data()
 
         logging.info("Reloading pipeline")
         process_upload_pipeline(upload_pipeline)
-    except:
-        log_traceback()
+    except Exception:
+        # The retry already claimed the pipeline as CREATED - put it back to ERROR so it can be retried again
+        upload_pipeline.error(get_traceback())
 
 
 ImportCreateVCFModelForGenotypeVCFTask = app.register_task(ImportCreateVCFModelForGenotypeVCFTask())

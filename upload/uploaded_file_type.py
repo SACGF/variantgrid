@@ -49,7 +49,7 @@ def get_upload_data_for_uploaded_file(file_upload) -> Optional[UploadData]:
         for klazz in classes:
             try:
                 return klazz.objects.get(file_upload=file_upload)
-            except Exception:
+            except klazz.DoesNotExist:
                 pass
 
     return None

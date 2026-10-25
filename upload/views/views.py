@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.http.response import FileResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls.base import reverse
@@ -189,7 +190,9 @@ def upload_retry_failed_imports(request):
 
 def download_uploaded_file(request, pk):
     file_upload = get_object_or_404(FileUpload, pk=pk)
-    data = get_upload_data_for_uploaded_file(file_upload).get_data()
+    if (upload_data := get_upload_data_for_uploaded_file(file_upload)) is None:
+        raise Http404(f"{file_upload} has no uploaded data")
+    data = upload_data.get_data()
     # TODO: use check_can_view once everything implements GuardianPermissionsMixin
     if not data.can_view(request.user):
         raise PermissionDenied(f"You do not have permission to access: {data}")

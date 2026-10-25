@@ -586,6 +586,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
             self.cohort_genotype_file_id += 1
 
+        self.variant_filters = []
         self.cohort_genotypes = []
         self.variant_gnomad_af = []
         self.check_pipeline_for_failures()  # Need to do this every so often

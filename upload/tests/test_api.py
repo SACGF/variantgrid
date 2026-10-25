@@ -173,6 +173,24 @@ class UploadFileAPITest(UploadAPITestBase):
         self.assertEqual(response.json()["file_upload_id"], existing.pk)
 
 
+    def test_upload_with_new_metadata_is_not_deduped(self):
+        """ Re-sending a file with a corrected build must import it again, not return the old upload """
+        existing = self._create_vcf_upload("dedup_metadata")
+        self.client.force_authenticate(user=self.owner)
+
+        def upload(query_string):
+            with patch("upload.views.views_json.upload_processing.process_uploaded_file"):
+                return self.client.post(
+                    reverse("api_file_upload") + query_string,
+                    {"file": SimpleUploadedFile("dedup_metadata.vcf", _vcf_bytes("dedup_metadata"))},
+                    format="multipart",
+                ).json()
+
+        self.assertEqual(upload("?force=false")["file_upload_id"], existing.pk)
+        new_upload_id = upload("?genome_build=GRCh37")["file_upload_id"]
+        self._temp_upload_paths.append(FileUpload.objects.get(pk=new_upload_id).get_filename())
+        self.assertNotEqual(new_upload_id, existing.pk)
+
 class UploadMetadataAPITest(UploadAPITestBase):
     """ Upload metadata is validated while the client is still connected, so a mistyped key is a 400
         rather than a silent fallback to header detection @see upload.upload_metadata """

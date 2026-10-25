@@ -60,7 +60,9 @@ Patterns here:
 - Genotypes go in via SQL COPY. upload/vcf/bulk_genotype_vcf_processor.py:BulkGenotypeVCFProcessor.process_entry
   accumulates rows, resolves variant ids per batch (settings.SQL_BATCH_INSERT_SIZE), splits common/rare by gnomAD AF,
   writes a CSV with upload/vcf/sql_copy_files.py:write_sql_copy_csv and spawns an
-  upload/tasks/vcf/import_sql_copy_task.py:ImportCohortGenotypeSQLCopyTask step. Variants-only imports use
+  upload/tasks/vcf/import_sql_copy_task.py:ImportCohortGenotypeSQLCopyTask step. Repeated variants are dropped per
+  batch (RMDUP); the COPY task then deletes any the batch shares with another split file
+  (upload/vcf/sql_copy_files.py:delete_duplicate_cohort_genotypes), as the partition tables have no unique index. Variants-only imports use
   upload/vcf/bulk_minimal_vcf_processor.py:BulkMinimalVCFProcessor (override batch_handle_variant_ids to act on ids).
 - Every processor calls AbstractBulkVCFProcessor.set_max_variant; upload/vcf/vcf_import.py:import_vcf_file then upserts
   upload/models/models.py:UploadedVCFPipelineMaxVariant (one row per annotation pipeline type, only ever raised) —

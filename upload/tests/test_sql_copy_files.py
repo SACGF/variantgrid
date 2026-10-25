@@ -5,7 +5,11 @@ from django.db import connection
 from django.test import TestCase
 
 from library.utils.file_utils import IteratorFile
-from upload.vcf.sql_copy_files import sql_copy_csv, sql_copy_csv_file
+from upload.vcf.sql_copy_files import (
+    delete_duplicate_cohort_genotypes,
+    sql_copy_csv,
+    sql_copy_csv_file,
+)
 
 TEMP_TABLE = "sql_copy_test"
 COLUMNS = ["a", "b"]
@@ -58,3 +62,16 @@ class SqlCopyFilesTest(TestCase):
         f = IteratorFile(iter(["1,one\n", "2,two\n"]))
         self.assertEqual(sql_copy_csv_file(f, TEMP_TABLE, COLUMNS), 2)
         self.assertEqual(self._get_rows(), [(1, "one"), (2, "two")])
+
+    def test_delete_duplicate_cohort_genotypes(self):
+        """ A batch on the other side of a split boundary already copied variant 2 - keep the earlier row """
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TEMP TABLE cg_dedup_test (id serial, collection_id int, variant_id int, "
+                           "info text) ON COMMIT DROP")
+            cursor.execute("INSERT INTO cg_dedup_test (collection_id, variant_id, info) "
+                           "VALUES (7, 1, 'a'), (7, 2, 'earlier'), (7, 2, 'later'), (7, 3, 'b')")
+        filename = self._write_csv("7,2,later\\,escaped,{}\n7,3,b\n")
+        self.assertEqual(delete_duplicate_cohort_genotypes(filename, "cg_dedup_test"), [2])
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT variant_id, info FROM cg_dedup_test ORDER BY id")
+            self.assertEqual(cursor.fetchall(), [(1, "a"), (2, "earlier"), (3, "b")])

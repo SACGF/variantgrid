@@ -75,6 +75,29 @@ def cohort_genotype_sql_copy_csv(input_filename, table_name):
     return sql_copy_csv(input_filename, table_name, COHORT_GENOTYPE_HEADER)
 
 
+def delete_duplicate_cohort_genotypes(input_filename, table_name) -> list[int]:
+    """ The importer drops repeated variants within a batch, but two records can normalise to the same
+        variant on either side of a split file boundary, and the partition tables have no
+        unique(collection, variant) to stop the second copy. Run after each COPY has committed: whichever
+        of two overlapping batches commits last sees the other's rows here, and the lower id is kept.
+        Returns the variant ids that had a row removed """
+    collection_ids = set()
+    variant_ids = []
+    with open(input_filename) as f:
+        for line in f:
+            collection_id, variant_id, _ = line.split(",", 2)  # Leading integer columns, never escaped
+            collection_ids.add(int(collection_id))
+            variant_ids.append(int(variant_id))
+
+    sql = f"""DELETE FROM {table_name} dup USING {table_name} kept
+        WHERE dup.collection_id = ANY(%s) AND dup.variant_id = ANY(%s)
+        AND kept.collection_id = dup.collection_id AND kept.variant_id = dup.variant_id AND kept.id < dup.id
+        RETURNING dup.variant_id"""
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [list(collection_ids), variant_ids])
+        return [row[0] for row in cursor.fetchall()]
+
+
 def modified_imported_variant_sql_copy_csv(input_filename):
     return sql_copy_csv(input_filename, "upload_modifiedimportedvariant", MODIFIED_IMPORTED_VARIANT_HEADER, quote='"')
 

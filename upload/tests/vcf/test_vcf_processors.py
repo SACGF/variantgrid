@@ -1,4 +1,5 @@
 import os
+from unittest.mock import patch
 
 import cyvcf2
 from django.conf import settings
@@ -106,6 +107,23 @@ class TestVCFProcessors(TestCase):
     def test_genotype_processor(self):
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf")
         self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)
+
+    def test_genotype_processor_several_batches(self):
+        """ Each batch must start with empty per-variant lists, or the 2nd fails the length check """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "t2t_brca2.vcf")
+        vcf_reader = cyvcf2.VCF(vcf_filename)
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, vcf_reader)
+        cohort_genotype_collection = uploaded_vcf.vcf.cohort.cohort_genotype_collection
+        processor = BulkGenotypeVCFProcessor(upload_step, cohort_genotype_collection, uploaded_vcf, None,
+                                             batch_size=2)
+        variant_ids = iter(range(1, 1_000_000))
+        with patch.object(processor.variant_pk_lookup, "get_variant_ids",
+                          side_effect=lambda hashes: [next(variant_ids) for _ in hashes]), \
+                patch.object(processor, "set_max_variant"), \
+                patch.object(processor, "create_cohort_genotype_job") as create_cohort_genotype_job:
+            for v in vcf_reader:
+                processor.process_entry(v)
+        self.assertGreater(create_cohort_genotype_job.call_count, 1)
 
     def _create_vcf_with_metadata(self, vcf_filename, metadata):
         upload_step = self._create_fake_upload_step(vcf_filename, metadata)
