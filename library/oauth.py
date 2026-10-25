@@ -20,6 +20,18 @@ os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 LOOPBACK_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
 
 
+def url_scheme_problem(url: str, allow_http: bool = False) -> Optional[str]:
+    """ Why credentials can't be sent to url, or None: only https, or http to this machine unless allow_http """
+    parsed = urlparse(url)
+    if parsed.scheme == 'https':
+        return None
+    if parsed.scheme == 'http':
+        if allow_http or parsed.hostname in LOOPBACK_HOSTNAMES:
+            return None
+        return f"{url!r} uses http - use https, or set allow_http in the sync details"
+    return f"{url!r} must use http(s), got scheme {parsed.scheme!r}"
+
+
 class ServerAuth:
     """
     Previously called OAuth but handles a URL to a server with:
@@ -59,14 +71,8 @@ class ServerAuth:
         self.allow_http = allow_http
 
     def _check_scheme(self, url: str):
-        parsed = urlparse(url)
-        if parsed.scheme == 'https':
-            return
-        if parsed.scheme == 'http':
-            if self.allow_http or parsed.hostname in LOOPBACK_HOSTNAMES:
-                return
-            raise ValueError(f"ServerAuth {url!r} uses http - use https, or set allow_http in the sync details")
-        raise ValueError(f"ServerAuth {url!r} must use http(s), got scheme {parsed.scheme!r}")
+        if problem := url_scheme_problem(url, self.allow_http):
+            raise ValueError(f"ServerAuth {problem}")
 
     @cached_property
     def auth(self):
