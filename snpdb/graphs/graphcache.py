@@ -10,7 +10,7 @@ from celery import signature
 from django.conf import settings
 
 from library.graphs import graph_base
-from library.utils import import_class
+from library.utils import import_class, sha256sum_str
 from snpdb.models import CachedGeneratedFile
 from snpdb.tasks.graph_generation_task import generate_graph
 
@@ -26,7 +26,9 @@ class CacheableGraph(graph_base.GraphBase, metaclass=abc.ABCMeta):
         pass
 
     def get_filename(self):
-        return os.path.join(settings.GENERATED_DIR, self.get_name(), self.get_params_hash() + ".png")
+        """ Salted so the media URL of a graph can't be worked out from the ids in its params """
+        filename_hash = sha256sum_str(f"{settings.SECRET_KEY}:{self.get_params_hash()}")
+        return os.path.join(settings.GENERATED_DIR, self.get_name(), filename_hash + ".png")
 
     def get_name(self):
         return self.__class__.__name__

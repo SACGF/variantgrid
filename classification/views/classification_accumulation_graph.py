@@ -7,6 +7,7 @@ from functools import total_ordering
 from typing import Any, Optional, Union
 
 import pandas as pd
+from django.core.exceptions import BadRequest
 from django.http import StreamingHttpResponse
 
 from classification.enums.classification_enums import ShareLevel
@@ -355,11 +356,16 @@ def download_report(request):
     if request.GET.get('mode') == 'allele':
         mode = AccumulationReportMode.Allele
     shared_only = True
-    if request.GET.get('share') == 'all':
+    if request.GET.get('share') == 'all' and request.user.is_superuser:
         shared_only = False
     frequency = 7
     if frequency_param := request.GET.get('frequency'):
-        frequency = int(frequency_param)
+        try:
+            frequency = int(frequency_param)
+        except ValueError as ve:
+            raise BadRequest(f"frequency '{frequency_param}' is not an integer") from ve
+        if not 1 <= frequency <= 366:
+            raise BadRequest("frequency must be between 1 and 366 days")
 
     response = StreamingHttpResponse(
         (delimited_row(r) for r in \

@@ -1,6 +1,8 @@
-from django.test import TestCase
+from django.contrib.auth.models import User
+from django.test import TestCase, override_settings
 
 from annotation.cosmic import CosmicAPI
+from annotation.fake_data import get_fake_annotation_version
 from genes.hgvs import HGVSMatcher
 from library.preview_request import PreviewData
 from snpdb.models import GenomeBuild, Sample, Sequence, Variant, VariantCoordinate
@@ -11,8 +13,13 @@ from snpdb.search import (
     SearchResult,
     SearchResultMatchStrength,
 )
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
-from variantopedia.signals.variant_search import _alt_description, _alt_mismatch_message
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
+from variantopedia.signals.variant_search import (
+    _alt_description,
+    _alt_mismatch_message,
+    search_allele_id,
+    search_variant_id,
+)
 
 
 class VariantSearchAltDescriptionTestCase(TestCase):
@@ -101,3 +108,29 @@ class SearchAutoOpenGenomeBuildTestCase(TestCase):
 
     def test_variant_in_other_build_does_not_auto_open(self):
         self.assertIsNone(self._single_preferred_result(Variant))
+
+
+@override_settings(SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN=True)
+class SearchIdRequiresClassificationTestCase(TestCase):
+    """ Searching by internal variant/allele id applies the same visibility rule as searching by coordinate """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="search_id_non_admin")
+        cls.admin = User.objects.create_superuser(username="search_id_admin")
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        cls.variant = slowly_create_test_variant("3", 5000, "A", "T", cls.grch37)
+        cls.allele = create_mock_allele(cls.variant, cls.grch37)
+
+    def _result_count(self, user, receiver, search_string) -> int:
+        search_input = SearchInput(user=user, search_string=search_string, genome_build_preferred=self.grch37)
+        return len(receiver.search(search_input).results)
+
+    def test_unclassified_variant_hidden_from_non_admin(self):
+        self.assertEqual(self._result_count(self.user, search_variant_id, f"v{self.variant.pk}"), 0)
+        self.assertEqual(self._result_count(self.admin, search_variant_id, f"v{self.variant.pk}"), 1)
+
+    def test_unclassified_allele_hidden_from_non_admin(self):
+        self.assertEqual(self._result_count(self.user, search_allele_id, f"a{self.allele.pk}"), 0)
+        self.assertEqual(self._result_count(self.admin, search_allele_id, f"a{self.allele.pk}"), 1)
