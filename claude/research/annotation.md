@@ -201,7 +201,8 @@ one backfill VEP pass and one import:
   rather than on `AbstractVariantAnnotation` never reach the transcript rows), GRCh38 SNVs (DeepMind only publishes
   hg38), `min_vep_version=116`. It matches on position and allele, so `--refseq` is fine. `AVI.pm` was added to
   VEP_plugins `release/116` on 2026-08-27, so a VEP 116 plugins checkout made before then lacks it - `vep_data_check`
-  reports a configured plugin with no `.pm` in ANNOTATION_VEP_PLUGINS_DIR.
+  reports a configured plugin with no `.pm` in ANNOTATION_VEP_PLUGINS_DIR, and `download_annotation_data` fetches it
+  (`annotation/vep_annotation.py:get_vep_plugin_url`).
 
 - AlphaGenome merged splicing (#2433): `alphagenome_splicing` on `VariantAnnotation` only, GRCh38 SNVs,
   `min_vep_version=116`, from a `--custom` VCF (`VEPCustom.ALPHAGENOME_SPLICING`, CSQ field
@@ -238,8 +239,8 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
      alphagenome_variant_impact_score_snvs.tsv.gz (`#CHROM POS REF ALT raw_score PHRED`, `chr` contigs, which the plugin maps) is about
      as big: extract it and the .tbi into `annotation_data/GRCh38/` from a zip on another filesystem, or stream it
      (`curl <download url> | bsdtar -xf -`) so the zip never lands, as zip + extract need ~177 GB on one disk.
-   - `AVI.pm` from https://github.com/Ensembl/VEP_plugins/blob/release/116/AVI.pm into ANNOTATION_VEP_PLUGINS_DIR, or
-     update that checkout.
+   - `AVI.pm`, which `download_annotation_data` fetches from VEP_plugins `release/<ANNOTATION_VEP_VERSION>` into
+     ANNOTATION_VEP_PLUGINS_DIR along with any other configured plugin missing there.
    - GRCh38, non-commercial deployments only: "AlphaGenome SNV merged splicing scores",
      combined_splicing_snvs_tabix.zip (20.6 GB, same sign-in), stored rather than compressed: extract
      combined_alphagenome_splicing_snvs.tsv.gz + .tbi, then convert it with
@@ -287,7 +288,10 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
       the bcftools file with `--columns avi_phred,avi_raw,alphagenome_splicing --info avi_phred=AVI_PHRED --info
       avi_raw=AVI_RAW --info alphagenome_splicing=AlphaGenome_splicing_score`. `--dry-run` first; the last import
       to finish takes `--mark-backfilled backfilled_utr_avi_splicevault`. The import never touches a variant missing
-      from its file, and runs at ~2,400-5,000 records/s.
+      from its file, and runs at ~2,400-5,000 records/s. For the VEP file, `--dump-vcf <the VCF sent to VEP>` refuses
+      unless the annotated records plus VEP's `--skipped_variants_file` rows add up to its records
+      (`annotation/backfill_columns.py:check_annotated_vcf_complete`), as VEP can exit 0 on a short file (#1701).
+   4. `rm -f` of the dumps, the annotated VCFs and VEP's warnings and skipped variants files.
 
 The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
 SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the
