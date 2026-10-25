@@ -29,6 +29,8 @@ class FlagsApiTest(TestCase):
         for params in [{"history": "abc"}, {"since": "xyz"}, {"since": "1e20"}]:
             with self.subTest(params=params):
                 self.assertEqual(self.client.get(self.url, params).status_code, 400)
+        url = reverse("flags_api", kwargs={"flag_collection_id": f"{self.fc.pk},abc"})
+        self.assertEqual(self.client.get(url).status_code, 400)
 
     def test_post_without_flag_type(self):
         """ The retired 'watch' POST has no flag_type """

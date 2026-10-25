@@ -121,8 +121,12 @@ The `QueryJsonFilter` key pattern must accept real evidence keys (`acmg:pvs1`, `
 `exclude_labs` pattern real lab group names (they contain `/`); a tighter pattern breaks every configured destination.
 
 `sync/tasks/sync_tasks.py:sync_all` runs destinations one after another in a single task on the default `db_workers`
-queue (no `queue=`) with no lock against the next hourly run, and `run_sync` re-raises after marking a run FAILED, so one
-failing destination stops the ones after it that hour. The admin actions run a sync inside the web request, so a large full sync belongs in a shell or
+queue (no `queue=`). It skips a destination that has an IN_PROGRESS run younger than
+`sync/tasks/sync_tasks.py:IN_PROGRESS_RUN_MAX_AGE`, so a long run is not overlapped by the next hourly one (an older
+IN_PROGRESS row is a dead worker's and doesn't block). `run_sync` re-raises after marking a run FAILED; `sync_all` reports
+that and carries on with the other destinations, raising at the end so the task still shows as failed. The upload
+matches the remote's `results` to the batch by position (the server answers each record in order) and fails the run if
+the count differs. The admin actions run a sync inside the web request, so a large full sync belongs in a shell or
 celery, not the admin. The download holds the
 whole export in memory (`stream=False`, then ijson over `response.content`).
 

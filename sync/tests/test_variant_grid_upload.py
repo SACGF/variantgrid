@@ -46,10 +46,10 @@ class VariantGridUploadSyncerTestCase(TestCase):
         syncer.configure(self.sync_destination)
         return list(syncer.records_to_sync())
 
-    def _sync(self, remote_result: dict) -> list[dict]:
+    def _sync(self, remote_result: dict, result_count_offset: int = 0) -> list[dict]:
         """ Runs a delta upload with the remote answering remote_result for every record, returns the records sent """
         response = MagicMock()
-        response.json.side_effect = lambda: {"results": [remote_result] * len(sent_records)}
+        response.json.side_effect = lambda: {"results": [remote_result] * (len(sent_records) + result_count_offset)}
         server_auth = MagicMock()
         sent_records = []
 
@@ -68,6 +68,11 @@ class VariantGridUploadSyncerTestCase(TestCase):
         sync_record = ClassificationModificationSyncRecord.objects.get()
         self.assertFalse(sync_record.success)
         self.assertEqual(self._delta_records(), [self.classification.last_published_version])
+
+    def test_result_count_mismatch_fails_run(self):
+        with self.assertRaises(ValueError):
+            self._sync({"meta": {"id": 1234}}, result_count_offset=-1)
+        self.assertFalse(ClassificationModificationSyncRecord.objects.exists())
 
     def test_withdrawal_sent_on_delta(self):
         self._sync({"meta": {"id": 1234}})

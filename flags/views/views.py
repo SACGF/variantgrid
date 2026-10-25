@@ -75,6 +75,7 @@ class FlagHelper:
         self.flag_comments: dict[Any, CommentDetails] = {}
         self.users: dict[int, User] = {}
         self.created_flag_id: Optional[int] = None
+        self._permission_levels: dict[int, FlagPermissionLevel] = {}
 
         self._include_collections = False
         self._include_flag_types = False
@@ -88,9 +89,9 @@ class FlagHelper:
 
     def include_just_closed(self):
         now = timezone.now()
-        yesterday = now - datetime.timedelta(minutes=2)
+        closed_since = now - datetime.timedelta(minutes=2)
         recently_closed_ids = FlagComment.objects.filter(
-            created__gte=yesterday,
+            created__gte=closed_since,
             flag__collection__in=self.flag_collections).exclude(flag__resolution__status=FlagStatus.OPEN)\
             .values_list('flag', flat=True).distinct()
 
@@ -158,15 +159,18 @@ class FlagHelper:
         comments = [comment for comment in comments if self.is_viewable_flag(comment.flag)]
         for comment in comments:
             since = max(since, comment.created)
-
-            if self.is_viewable_flag(comment.flag):
-                self.include_comment(comment, detailed=True)
+            self.include_comment(comment, detailed=True)
         self.since = since
+
+    def _permission_level(self, collection: FlagCollection) -> FlagPermissionLevel:
+        if (level := self._permission_levels.get(collection.pk)) is None:
+            level = self._permission_levels[collection.pk] = collection.permission_level(self.user)
+        return level
 
     def is_viewable_flag(self, flag: Flag) -> bool:
         if flag.user_private and \
-            flag.user != self.user and \
-            flag.collection.permission_level(self.user) < FlagPermissionLevel.OWNER:
+            flag.user_id != self.user.pk and \
+            self._permission_level(flag.collection) < FlagPermissionLevel.OWNER:
             return False
         return True
 
@@ -374,7 +378,10 @@ class FlagsView(APIView):
                                      description="Comma-separated FlagCollection ids")]
     )
     def get(self, request, **kwargs) -> Response:
-        pks = kwargs.get('flag_collection_id').split(',')
+        try:
+            pks = [int(pk) for pk in kwargs.get('flag_collection_id').split(',')]
+        except ValueError:
+            return Response({'error': 'Invalid flag collection id'}, status=400)
         fcs = FlagCollection.objects.filter(pk__in=pks).select_related("context")
         fcs = viewable_flag_collections(fcs, request.user)
 
