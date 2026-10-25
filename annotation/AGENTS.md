@@ -92,12 +92,14 @@ Gotchas:
   "A new column on an existing VariantAnnotationVersion"; UTRAnnotator / AVI / SpliceVault (#2426) is the worked example.
 - The utr_annotator_* and splicevault_* columns of variants annotated before those plugins were switched on are
   backfilled into VariantAnnotation only, so the variant page shows the representative transcript's values from there
-  (not the transcript rows), and "not backfilled" via annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled
-  and its avi_ / splicevault_ siblings.
-- UTRAnnotator / AVI / SpliceVault are off in the package defaults. A deployment downloads (and for SpliceVault
+  (not the transcript rows). A variant not yet backfilled shows nothing, like any other missing value.
+- UTRAnnotator / AVI / SpliceVault and the AlphaGenome splicing custom VCF (#2433) are off in the package defaults. A deployment downloads (and for SpliceVault
   converts) the files, sets them in its env settings, runs `enable_vep_plugin_backfill` (stamps the pins on the
   NEW/ACTIVE versions, flags them, prints the backfill; annotation/vep_plugin_backfill.py), restarts annotation_workers,
   then runs the backfill - setting a file without the command halts the VEP lane on VEPVersionMismatchError.
+- Non-commercial data (annotation/vep_config.py:NON_COMMERCIAL_VEP_CONFIG_KEYS) is cleared from VEPConfig and the pins
+  when ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False, so it never reaches the command line, the pins or the page.
+  Read vep_config through VEPConfig / vep_component_version_kwargs, never genome_build.settings directly.
 - The SpliceVault plugin matches the data file's transcript column against the transcript's stable_id, a versioned NM
   under --refseq, while Ensembl's file holds unversioned ENST: a RefSeq build configures the copy
   `splicevault_to_refseq` rewrites to MANE RefSeq (annotation/splicevault.py), which only covers MANE transcripts.

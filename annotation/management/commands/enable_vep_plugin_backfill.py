@@ -1,7 +1,7 @@
 """
-Switch on UTRAnnotator / AVI / SpliceVault for the VariantAnnotationVersions in use, after setting their files in
-settings.ANNOTATION[build]["vep_config"] (#2426): stamps the pins, flags versions for the backfill and prints its
-steps. @see annotation/vep_plugin_backfill.py
+Switch on UTRAnnotator / AVI / SpliceVault (#2426) and AlphaGenome splicing (#2433) for the VariantAnnotationVersions
+in use, after setting their files in settings.ANNOTATION[build]["vep_config"]: stamps the pins, flags versions for the
+backfill and prints its steps. @see annotation/vep_plugin_backfill.py
 """
 from django.core.management.base import BaseCommand, CommandError
 
@@ -9,9 +9,10 @@ from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vep_annotation import get_missing_vep_files
+from annotation.vep_config import disallowed_non_commercial_keys
 from annotation.vep_plugin_backfill import (
     ACTIVE_STATUSES,
-    PLUGIN_PINS,
+    SOURCE_PINS,
     backfill_steps,
     stamp_plugin_pins,
 )
@@ -25,7 +26,8 @@ _VEP_RUN_NOT_IMPORTED = [AnnotationStatus.EXTERNAL_DUMP_COMPLETED, AnnotationSta
 
 class Command(BaseCommand):
     category = "ops"
-    help = "Stamp UTRAnnotator / AVI / SpliceVault pins from settings on the versions in use and print the backfill"
+    help = ("Stamp UTRAnnotator / AVI / SpliceVault / AlphaGenome splicing pins from settings on the versions in use "
+            "and print the backfill")
 
     def add_arguments(self, parser):
         parser.add_argument("--genome-build", help="Default: every build with annotation")
@@ -47,6 +49,11 @@ class Command(BaseCommand):
         if problems:
             raise CommandError("VEP would fail on missing files - install them or unset them in settings:\n"
                                + "\n".join(problems))
+
+        for genome_build in genome_builds:
+            if keys := disallowed_non_commercial_keys(genome_build.settings["vep_config"]):
+                self.stdout.write(f"{genome_build}: not stamping {', '.join(keys)} - non-commercial data, and "
+                                  f"ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False")
 
         if not options["force"]:
             pending_runs = AnnotationRun.objects.filter(
@@ -71,7 +78,7 @@ class Command(BaseCommand):
                 changes = ", ".join(f"{pin}: {old} -> {new}" for pin, (old, new) in stamp.changed_pins.items())
                 self.stdout.write(f"{verb} {vav}: {changes}")
             else:
-                pins = ", ".join(f"{pin}={getattr(vav, pin)}" for pin in PLUGIN_PINS)
+                pins = ", ".join(f"{pin}={getattr(vav, pin)}" for pin in SOURCE_PINS)
                 self.stdout.write(f"{vav}: already matches settings ({pins})")
 
         if any(stamp.changed_pins for stamp in stamps) and not options["dry_run"]:
@@ -81,7 +88,8 @@ class Command(BaseCommand):
                               "its version - clear it with the re-check on the annotation runs page.")
 
         if to_backfill := [stamp.variant_annotation_version for stamp in stamps if stamp.needs_backfill]:
-            self.stdout.write("\nThen backfill the variants annotated before the plugins were switched on:")
+            self.stdout.write("\nThen backfill the variants annotated before they were switched on, running each "
+                              "build's commands in order (https://github.com/SACGF/variantgrid/issues/2436):")
             for vav in to_backfill:
                 self.stdout.write("")
                 self.stdout.write("\n".join(backfill_steps(vav, AnnotationRangeLock)))

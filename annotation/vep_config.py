@@ -29,6 +29,7 @@ def parse_cosmic_version_from_filename(path: str) -> Optional[int]:
 # vep_config data files whose name carries no version - we pin the basename, so swapping the installed
 # file registers as a change, as does removing it (which drops that data's columns via has_data_files)
 _BASENAME_PIN_FIELDS = {
+    "alphagenome_splicing": "alphagenome_splicing",
     "avi": "avi",
     "eve": "eve",
     "maxentscan": "maxentscan",
@@ -56,6 +57,25 @@ _CONSERVATION_KEYS = ("phastcons100way", "phastcons30way", "phastcons46way",
                       "phylop100way", "phylop30way", "phylop46way")
 
 
+# vep_config data licensed for non-commercial use only - never passed to VEP (so never pinned or shown) unless
+# settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED
+NON_COMMERCIAL_VEP_CONFIG_KEYS = ("alphagenome_splicing",)
+
+
+def allowed_vep_config_data(vep_config_data: dict) -> dict:
+    """ vep_config with the non-commercial data cleared when the deployment may not use it """
+    if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
+        return vep_config_data
+    return {key: None if key in NON_COMMERCIAL_VEP_CONFIG_KEYS else value for key, value in vep_config_data.items()}
+
+
+def disallowed_non_commercial_keys(vep_config_data: dict) -> list[str]:
+    """ Non-commercial data configured, but left out because the deployment may not use it """
+    if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
+        return []
+    return [key for key in NON_COMMERCIAL_VEP_CONFIG_KEYS if vep_config_data.get(key)]
+
+
 def _pin_basename(path: Optional[str]) -> Optional[str]:
     if not path:
         return None
@@ -70,7 +90,7 @@ def vep_component_version_kwargs(build_settings: dict) -> dict:
         Values come from the configured paths alone, with no filesystem access, so this returns the same
         answer on a web node as on an annotation node. """
 
-    vep_config_data = build_settings.get("vep_config", {})
+    vep_config_data = allowed_vep_config_data(build_settings.get("vep_config", {}))
     kwargs = {field: _pin_basename(vep_config_data.get(key))
               for key, field in _BASENAME_PIN_FIELDS.items()}
 
@@ -102,7 +122,7 @@ class VEPConfig:
         self.vep_version = int(settings.ANNOTATION_VEP_VERSION)
 
         # We'll strip out any config - anything left is files/data
-        vep_config = deepcopy(genome_build.settings["vep_config"])
+        vep_config = deepcopy(allowed_vep_config_data(genome_build.settings["vep_config"]))
         self.use_sift = vep_config.pop("sift", False)
         self.cache_version = vep_config.pop("cache_version", self.vep_version)
 

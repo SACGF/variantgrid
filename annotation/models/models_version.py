@@ -157,6 +157,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # basename, so installing different data registers as a change - as does removing it, which
     # drops that data's columns. All derived by vep_config.vep_component_version_kwargs().
     # NULL on versions created before #462 other than the ones migration 0161 backfilled.
+    alphagenome_splicing = models.TextField(null=True, blank=True)  # non-commercial custom VCF - GRCh38 only
     avi = models.TextField(null=True, blank=True)  # AlphaGenome Variant Impact scores - GRCh38 + VEP >= 116 only
     conservation = models.TextField(null=True, blank=True)  # phastCons/phyloP bigwig basenames
     dbscsnv = models.TextField(null=True, blank=True)
@@ -224,10 +225,10 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/sv_conservation.py:sv_conservation_window
     backfilled_sv_conservation = models.BooleanField(default=True)
 
-    # #2426 - UTRAnnotator, AVI and SpliceVault were added to versions already in use: their columns on
-    # variants annotated before then stay null until `annotation_backfill_columns --mark-backfilled`
-    # imports them, one VEP run with all three. The migration set it False only on the NEW/ACTIVE
-    # versions one of the plugins applies to.
+    # #2426 - UTRAnnotator, AVI and SpliceVault (and AlphaGenome splicing, #2433) were added to versions
+    # already in use: their columns on variants annotated before then stay null until
+    # `annotation_backfill_columns --mark-backfilled` imports them, one VEP run with all of them.
+    # annotation/vep_plugin_backfill.py:stamp_plugin_pins sets it False on the NEW/ACTIVE versions one applies to.
     backfilled_utr_avi_splicevault = models.BooleanField(default=True)
 
     class Meta:

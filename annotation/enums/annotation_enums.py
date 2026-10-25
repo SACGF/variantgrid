@@ -136,6 +136,7 @@ class VEPPlugin(models.TextChoices):
 
 
 class VEPCustom(models.TextChoices):
+    ALPHAGENOME_SPLICING = 'a', 'AlphaGenome_splicing'
     GNOMAD_2 = 'g', 'gnomAD2'
     GNOMAD_3 = 'n', 'gnomAD3'
     GNOMAD_4 = 'o', 'gnomAD4'

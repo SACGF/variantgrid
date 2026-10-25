@@ -1306,11 +1306,23 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     # ---------- AVI (GRCh38, VEP >= 116, columns_version >= 5) - #2426 ----
     _avi('AVI_PHRED', 'avi_phred'),
     _avi('AVI_RAW', 'avi_raw'),
+
+    # ---------- AlphaGenome merged splicing (custom VCF, GRCh38, columns_version >= 5) - #2433 ----
+    # Non-commercial data, dropped by VEPConfig unless ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED. Added to versions
+    # in use like the #2426 plugins, so it shares their pin stamping and backfill
+    VEPColumnDef(
+        source_field='score',
+        variant_grid_columns=('alphagenome_splicing',),
+        category=ColumnAnnotationCategory.SPLICING_PREDICTIONS,
+        vep_custom=VEPCustom.ALPHAGENOME_SPLICING,
+        source_field_has_custom_prefix=True,
+        genome_builds=GRCH38,
+        pipeline_types=STANDARD,
+        min_columns_version=5,
+        min_vep_version=116,
+        formatter=fmt.format_pick_highest_float,
+    ),
 )
-
-# UTRAnnotator only annotates transcripts with this consequence
-FIVE_PRIME_UTR_VARIANT = "5_prime_UTR_variant"
-
 
 # vep_config setting keys (under settings.ANNOTATION[<build>]["vep_config"]) that must be
 # present (non-None) for a VEPColumnDef to actually be populated. Empty tuple means the
