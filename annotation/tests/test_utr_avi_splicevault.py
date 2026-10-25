@@ -27,6 +27,11 @@ from annotation.models import VariantAnnotationVersion
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.vep_annotation import get_vep_command
 from annotation.vep_config import vep_component_version_kwargs
+from annotation.vep_plugin_backfill import (
+    backfill_fork,
+    backfill_source_columns,
+    backfill_vep_command,
+)
 from annotation.vep_plugin_display import utr_annotator_effects
 from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
@@ -251,12 +256,32 @@ class PluginPinStampTests(TestCase):
         """ AVI is configured on GRCh37 too, but has no GRCh37 columns """
         self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
         self._enable("--genome-build", "GRCh37")
-        note = _backfill_note(apps)
+        with override_settings(**_settings_with_plugins()):
+            note = _backfill_note(apps)
         self.assertIn("--csq splicevault_spliceai_delta=SpliceVault_SpliceAI_delta", note)
         self.assertIn("--csq utr_annotator_consequence=5UTR_consequence", note)
         self.assertNotIn("AVI_PHRED", note)
-        self.assertIn("except UTRAnnotator, SpliceVault removed", note)
+        self.assertIn(f"--plugin UTRAnnotator,file={settings.ANNOTATION_VEP_BASE_DIR}/{UTR_ANNOTATOR_FILE}", note)
         self.assertIn("enable_vep_plugin_backfill", note)
+
+    def test_backfill_vep_command_keeps_only_the_backfilled_sources(self):
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        with override_settings(**_settings_with_plugins()):
+            self._enable("--genome-build", "GRCh38")
+            vav.refresh_from_db()
+            columns_by_source = backfill_source_columns(vav)
+            cmd = backfill_vep_command(vav, columns_by_source, ["Feature", "PICK", "AVI_PHRED"], "in.vcf.gz",
+                                       "out.vcf.gz")
+        plugins = [cmd[i + 1].split(",")[0] for i, x in enumerate(cmd) if x == "--plugin"]
+        customs = [cmd[i + 1] for i, x in enumerate(cmd) if x == "--custom"]
+        self.assertEqual(sorted(plugins), ["AVI", "SpliceVault"])
+        self.assertEqual(len(customs), 1)
+        self.assertIn("short_name=AlphaGenome_splicing", customs[0])
+        for flag in ("--hgvs", "--check_existing", "--sift"):
+            self.assertNotIn(flag, cmd)
+        self.assertEqual(cmd[-6:], ["--fork", str(backfill_fork()), "--buffer_size", "5000",
+                                    "--fields", "Feature,PICK,AVI_PHRED"])
+        self.assertEqual(cmd.count("--buffer_size"), 1)
 
 
 class UTRAnnotatorEffectsTests(TestCase):

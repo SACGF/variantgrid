@@ -222,7 +222,8 @@ version and the version has range locks; an unchanged pin leaves the flag alone,
 migrating, whose ManualOperation (`annotation/migrations/0005_utr_annotator_avi_splicevault_manual_backfill.py`)
 carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the same for AlphaGenome splicing. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
 
-1. Data files:
+1. Data files. With the paths set in the env settings (step 2), `manage.py download_annotation_data` fetches each
+   one, already converted, from variantgrid.com. The sources, for building them from scratch:
    - uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator into
      `annotation_data/<build>/` (the plugin computes effects from the transcript sequence and runs with every
      `Evidence` NA without it).
@@ -259,25 +260,20 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
       configured plugin column> --pipeline-type STANDARD --max-variant-id <max> --output vep_plugins_<build>.vcf.gz`
       - every variant the STANDARD pipeline annotated, as AVI scores every SNV (structural and gene-level variants
       stay out). Split by `--min/max-variant-id` to run VEP in parallel.
-   2. VEP: this build's STANDARD command from "Show VEP command" on `/annotation/annotation_versions` (built from the
-      current settings and the VAV, so its cache, pick order and flags are the pipeline's), with `-i` / `-o` swapped,
-      every `--plugin` / `--custom` except UTRAnnotator, SpliceVault, AVI and AlphaGenome_splicing removed, and
-      `--fields Feature,PICK,<the CSQ fields>`. The flags that only add output (`--hgvs --check_existing --af
-      --pubmed --sift b --domains --protein --numbers`) can go too: the PICK'd entry stays the same (all 20,000 of a
-      GRCh38 sample), and it runs ~1.5x faster, about 300 variants/s with `--fork 3` on vg-test2's 4 cores - so
-      ~8 hours for GRCh38's 8.4M variants. The import is fast (~2,000 records/s).
+   2. VEP, the command `annotation/vep_plugin_backfill.py:backfill_vep_command` prints: this build's STANDARD
+      pipeline command for the version (so its cache, pick order and PICK'd transcript match), keeping only the
+      UTRAnnotator, SpliceVault, AVI and AlphaGenome_splicing `--plugin` / `--custom`, `--fields Feature,PICK,<the CSQ
+      fields>`, the output-only flags (`--hgvs --check_existing --af --pubmed --sift --domains --protein --numbers`)
+      dropped, `--fork` of the cores less one and `--buffer_size 5000`. The PICK'd entry is the same without those
+      flags (all 20,000 of a GRCh38 sample), and it runs ~1.5x faster: about 300 variants/s with `--fork 3` on
+      vg-test2's 4 cores, so 7h17m for GRCh38's 8.4M variants. The import is ~2,400 records/s (59 minutes).
       A build without AVI or AlphaGenome splicing (GRCh37) needn't send every variant: UTRAnnotator only fills a
       5'UTR PICK and SpliceVault only its own file's positions, so VEP the union of a `--consequence
       5_prime_UTR_variant` dump and the full dump through `bcftools view -T <SpliceVault chrom/pos, 'chr' stripped>`
       (428k of vg-test2's 5.5M). The import never touches a variant missing from its file.
    3. `annotation_backfill_columns --import` with the same `--genome-build` / `--variant-annotation-version` /
-      `--columns`, one `--csq <column>=<CSQ field>` per column (`utr_annotator_consequence=5UTR_consequence`,
-      `utr_annotator_annotation=5UTR_annotation`, `utr_annotator_existing_uorfs=Existing_uORFs`,
-      `utr_annotator_existing_out_of_frame_oorfs=Existing_OutOfFrame_oORFs`,
-      `utr_annotator_existing_inframe_oorfs=Existing_InFrame_oORFs`, `splicevault_<field>=SpliceVault_<field>` with
-      `splicevault_spliceai_delta=SpliceVault_SpliceAI_delta`, `avi_phred=AVI_PHRED`, `avi_raw=AVI_RAW`,
-      `alphagenome_splicing=AlphaGenome_splicing_score`) and `--vcf <annotated>`, `--dry-run` first, then with `--mark-backfilled backfilled_utr_avi_splicevault` (last
-      piece only).
+      `--columns`, one `--csq <column>=<CSQ field>` per column and `--vcf <annotated>`: `--dry-run` first, then with
+      `--mark-backfilled backfilled_utr_avi_splicevault` (with a split dump, the last piece only).
 
 The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
 SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the

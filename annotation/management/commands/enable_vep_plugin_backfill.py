@@ -88,7 +88,8 @@ class Command(BaseCommand):
                               "its version - clear it with the re-check on the annotation runs page.")
 
         if to_backfill := [stamp.variant_annotation_version for stamp in stamps if stamp.needs_backfill]:
-            self.stdout.write("\nThen backfill the variants annotated before they were switched on:")
+            self.stdout.write("\nThen backfill the variants annotated before they were switched on, running each "
+                              "build's commands in order (https://github.com/SACGF/variantgrid/issues/2436):")
             for vav in to_backfill:
                 self.stdout.write("")
                 self.stdout.write("\n".join(backfill_steps(vav, AnnotationRangeLock)))

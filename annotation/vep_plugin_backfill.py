@@ -5,9 +5,12 @@ VEP lane doesn't halt on VEPVersionMismatchError, flag the versions whose existi
 the backfill steps.
 
 Entry points: stamp_plugin_pins (the migration and `manage.py enable_vep_plugin_backfill`), backfill_steps /
-backfill_note (the ManualOperation note and the command's output). Functions take the model classes, so the migration
+backfill_note (the ManualOperation note and the command's output, with the backfill's VEP command line built by
+backfill_vep_command). Functions take the model classes, so the migration
 passes its historical ones; nothing here imports annotation.models.
 """
+import os
+import shlex
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
@@ -15,8 +18,10 @@ from django.conf import settings
 from django.db.models import Max
 
 from annotation import vep_columns
-from annotation.enums import VEPCustom, VEPPlugin
+from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
+from annotation.vep_annotation import get_vep_command
 from annotation.vep_config import vep_component_version_kwargs
+from snpdb.models.models_genome import GenomeBuild
 
 VEPSource = Union[VEPPlugin, VEPCustom]
 
@@ -29,6 +34,12 @@ SOURCE_PINS: dict[str, VEPSource] = {
 }
 BACKFILL_FLAG = "backfilled_utr_avi_splicevault"
 ACTIVE_STATUSES = ("NEW", "ACTIVE")  # HISTORICAL versions are never looked up by config again
+# Flags that only add CSQ fields the backfill doesn't import. Dropping them leaves the PICK'd entry the same and runs
+# VEP ~1.5x faster
+_OUTPUT_ONLY_FLAGS = {"--hgvs", "--check_existing", "--af", "--pubmed", "--domains", "--protein", "--numbers"}
+_OUTPUT_ONLY_FLAGS_WITH_VALUE = {"--sift"}
+# The pipeline's buffer suits its small batches; one run of every variant goes faster with each fork given more
+_BACKFILL_BUFFER_SIZE = 5000
 
 
 @dataclass
@@ -96,6 +107,44 @@ def backfill_source_columns(vav) -> dict[VEPSource, dict[str, str]]:
     return columns_by_source
 
 
+def backfill_fork() -> int:
+    """ The pipeline usually runs several VEPs at once with ANNOTATION_VEP_FORK 1 - the backfill is one big run """
+    return max(settings.ANNOTATION_VEP_FORK or 1, (os.cpu_count() or 2) - 1)
+
+
+def backfill_vep_command(vav, vep_sources, csq_fields: list[str], input_vcf: str, output_vcf: str) -> list[str]:
+    """ The pipeline's STANDARD command for this version, so the cache, pick order and PICK'd transcript match, with
+        only the backfilled sources' plugins / custom files, their CSQ fields, and the output-only flags dropped """
+    genome_build = GenomeBuild.get_name_or_alias(vav.genome_build_id)
+    pipeline_cmd = get_vep_command(input_vcf, output_vcf, genome_build, vav.annotation_consortium,
+                                   VariantAnnotationPipelineType.STANDARD, variant_annotation_version=vav)
+    plugin_names = {s.label for s in vep_sources if isinstance(s, VEPPlugin)}
+    custom_short_names = {f"short_name={s.label}" for s in vep_sources if isinstance(s, VEPCustom)}
+
+    cmd = []
+    args = iter(pipeline_cmd)
+    for arg in args:
+        if arg in _OUTPUT_ONLY_FLAGS:
+            continue
+        if arg in _OUTPUT_ONLY_FLAGS_WITH_VALUE or arg in ("--fork", "--buffer_size"):
+            next(args)
+            continue
+        if arg == "--plugin":
+            plugin_arg = next(args)
+            if plugin_arg.split(",")[0] in plugin_names:
+                cmd.extend([arg, plugin_arg])
+            continue
+        if arg == "--custom":
+            custom_arg = next(args)
+            if custom_short_names.intersection(custom_arg.split(",")):
+                cmd.extend([arg, custom_arg])
+            continue
+        cmd.append(arg)
+    cmd.extend(["--fork", str(backfill_fork()), "--buffer_size", str(_BACKFILL_BUFFER_SIZE),
+                "--fields", ",".join(csq_fields)])
+    return cmd
+
+
 def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
     """ One version's commands, bounded by the last variant it had locked for annotation when the plugins were
         switched on - anything after that is annotated with them """
@@ -105,20 +154,18 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
     max_variant_id = annotation_range_lock_model.objects.filter(version=vav).aggregate(Max("max_variant_id"))
     common = f"--genome-build {build} --variant-annotation-version {vav.pk} --columns {','.join(columns)}"
     csq_args = " ".join(f"--csq {column}={csq_field}" for column, csq_field in columns.items())
-    csq_fields = ",".join(["Feature", "PICK", *columns.values()])
-    sources = ", ".join(vep_source.label for vep_source in columns_by_source)
+    dump_vcf = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"vep_plugins_{build}.vcf.gz")
+    annotated_vcf = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"vep_plugins_{build}.vep_annotated.vcf.gz")
+    vep_cmd = backfill_vep_command(vav, columns_by_source, ["Feature", "PICK", *columns.values()],
+                                   dump_vcf, annotated_vcf)
+    import_cmd = f"python3 manage.py annotation_backfill_columns --import {common} {csq_args} --vcf {annotated_vcf}"
     return [
         f"{build} (VariantAnnotationVersion {vav.pk}):",
         f"1. python3 manage.py annotation_backfill_columns --dump {common} --pipeline-type STANDARD "
-        f"--max-variant-id {max_variant_id['max_variant_id__max']} --output vep_plugins_{build}.vcf.gz",
-        f"2. Annotate it with VEP: this build's STANDARD 'Show VEP command' on /annotation/annotation_versions, with "
-        f"-i vep_plugins_{build}.vcf.gz -o vep_plugins_{build}.vep_annotated.vcf.gz, every --plugin and --custom "
-        f"except {sources} removed, and --fields {csq_fields}. Keep the other flags, so the PICK'd transcript matches, "
-        f"except those that only add output (--hgvs --check_existing --af --pubmed --sift --domains --protein "
-        f"--numbers), which are slow. Add --fork",
-        f"3. python3 manage.py annotation_backfill_columns --import {common} {csq_args} "
-        f"--vcf vep_plugins_{build}.vep_annotated.vcf.gz --dry-run",
-        f"4. The same without --dry-run, plus --mark-backfilled {BACKFILL_FLAG}",
+        f"--max-variant-id {max_variant_id['max_variant_id__max']} --output {dump_vcf}",
+        f"2. {shlex.join(vep_cmd)}",
+        f"3. {import_cmd} --dry-run",
+        f"4. {import_cmd} --mark-backfilled {BACKFILL_FLAG}",
     ]
 
 
@@ -129,8 +176,8 @@ def backfill_note(variant_annotation_version_model, annotation_range_lock_model,
     if genome_build_name:
         qs = qs.filter(genome_build_id=genome_build_name)
     lines = ["Fill in UTRAnnotator, AVI, SpliceVault and AlphaGenome splicing annotation of variants annotated "
-             "before they were switched on (#2426, #2433), with one VEP run per version. Full recipe in claude/research/annotation.md, 'A new column "
-             "on an existing VariantAnnotationVersion'. For each version:"]
+             "before they were switched on (#2426, #2433), with one VEP run per version. Admin steps: "
+             "https://github.com/SACGF/variantgrid/issues/2436. For each version:"]
     for vav in qs.order_by("genome_build_id", "pk"):
         lines.append("")
         lines.extend(backfill_steps(vav, annotation_range_lock_model))
