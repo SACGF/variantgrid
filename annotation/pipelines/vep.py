@@ -105,7 +105,7 @@ class VEPRunner(AnnotationPipelineRunner):
                                   variant_annotation_version=annotation_run.variant_annotation_version)
             annotation_run.annotation_start = timezone.now()
             annotation_run.pipeline_command = " ".join(cmd)
-            annotation_run.save()
+            self.save_if_owner(annotation_run)
             # #1658: register VEP with the lease heartbeat so a reclaim (lost lease) kills it mid-run instead
             # of letting the losing worker annotate to completion and double-write the reassigned run's state.
             process_callback = lease_heartbeat.set_process if lease_heartbeat else None
@@ -147,7 +147,7 @@ class VEPRunner(AnnotationPipelineRunner):
             annotation_run.annotation_end = timezone.now()
             self.handle_empty_dump(annotation_run)
 
-        annotation_run.save()
+        self.save_if_owner(annotation_run)
 
     def _write_conservation_sidecar(self, annotation_run, vcf_dump_filename, vcf_annotated_filename):
         """ Conservation (phastCons/phyloP) _max columns for SVs - computed with pyBigWig instead of the

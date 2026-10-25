@@ -39,7 +39,9 @@ class VariantAnnotationView(APIView):
             raise Http404(variant_string)
 
         vav = VariantAnnotationVersion.latest(genome_build)
-        va = variant.variantannotation_set.get(version=vav)
+        va = variant.variantannotation_set.filter(version=vav).first()
+        if va is None:
+            raise Http404(f"No annotation for {variant_string} in {genome_build}")
         serializer = VariantAnnotationSerializer(va)
         return Response(serializer.data)
 

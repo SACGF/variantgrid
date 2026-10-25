@@ -35,16 +35,12 @@ class ClinVarFetchRequest:
     parser: type[ClinVarXmlParser] = ClinVarXmlParserViaVCV
 
     clinvar_versions: Optional[Collection[ClinVarVersion]] = None
+    """
+    Versions to find the variation's allele in, default the latest of each annotated build
+    """
 
     def fetch(self) -> ClinVarRecordCollection:
         fetch_date = timezone.now()
-
-        clinvar_versions = self.clinvar_versions
-        if not clinvar_versions:
-            clinvar_versions = []
-            for genome_build in GenomeBuild.builds_with_annotation():
-                if clinvar_version := ClinVarVersion.objects.filter(genome_build=genome_build).order_by('-created').first():
-                    clinvar_versions.append(clinvar_version)
 
         with transaction.atomic():
             clinvar_record_collection, created = ClinVarRecordCollection.objects.get_or_create(clinvar_variation_id=self.clinvar_variation_id)
@@ -61,17 +57,18 @@ class ClinVarFetchRequest:
 
             allele_id = clinvar_record_collection.allele_id
             if not allele_id:
-
-                versions: list = []
-                for genome_build in GenomeBuild.builds_with_annotation_cached():
-                    if clinvar_version := ClinVarVersion.objects.filter(genome_build=genome_build).order_by(
-                            '-created').first():
-                        versions.append(clinvar_version)
+                clinvar_versions = self.clinvar_versions
+                if not clinvar_versions:
+                    clinvar_versions = []
+                    for genome_build in GenomeBuild.builds_with_annotation_cached():
+                        if clinvar_version := ClinVarVersion.objects.filter(genome_build=genome_build).order_by(
+                                '-created').first():
+                            clinvar_versions.append(clinvar_version)
 
                 clinvar_record: ClinVar
                 if clinvar_record := ClinVar.objects.filter(
                         clinvar_variation_id=self.clinvar_variation_id,
-                        version_id__in=versions
+                        version__in=clinvar_versions
                 ).first():
                     if variant := clinvar_record.variant:
                         if allele := variant.allele:

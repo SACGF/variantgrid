@@ -1,7 +1,8 @@
 """
 Running VEP: get_vep_command builds the command line from settings.ANNOTATION[build] (plugins,
 custom files, cache) for a pipeline type, run_vep executes it, get_vep_version reads the installed
-versions, and vep_dict_to_variant_annotation_version_kwargs turns those into the fields a
+versions (and publishes them to the cache for the web, get_cached_vep_variant_annotation_version_kwargs),
+and vep_dict_to_variant_annotation_version_kwargs turns those into the fields a
 VariantAnnotationVersion records. The vep_check_* functions guard an annotated file against a
 version drift (VEPVersionMismatchError). Column mapping is vep_columns.py; the runs themselves are
 scheduled in annotation/tasks/.
@@ -16,6 +17,7 @@ from shlex import shlex
 from typing import Optional
 
 from django.conf import settings
+from django.core.cache import cache
 
 from annotation import vep_columns
 from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
@@ -28,9 +30,13 @@ from annotation.vep_config import (
     vep_component_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
+from library.constants import DAY_SECS
 from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
+
+# get_vep_version runs VEP, which the web must never do: workers publish it here, the web only reads it
+VEP_VERSION_CACHE_TTL = DAY_SECS
 
 
 class VEPVersionMismatchError(ValueError):
@@ -381,7 +387,29 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     skipped_variants_filename = get_vep_skipped_variants_filename(output_filename)
     if os.path.exists(skipped_variants_filename):
         os.remove(skipped_variants_filename)
+    cache_vep_version(genome_build, annotation_consortium, vep_version)
     return vep_version
+
+
+def _vep_version_cache_key(genome_build: GenomeBuild, annotation_consortium) -> str:
+    return f"vep_version_{genome_build.name}_{annotation_consortium}"
+
+
+def cache_vep_version(genome_build: GenomeBuild, annotation_consortium, vep_version: dict):
+    cache.set(_vep_version_cache_key(genome_build, annotation_consortium), vep_version, VEP_VERSION_CACHE_TTL)
+
+
+def get_cached_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild) -> Optional[dict]:
+    """ get_vep_variant_annotation_version_kwargs from the VEP version a worker last cached, or None when
+        none has - the caller asks a worker for it (cache_vep_version_task) rather than running VEP itself """
+    vep_config = VEPConfig(genome_build)
+    if settings.ANNOTATION_VEP_FAKE_VERSION:
+        return get_fake_vep_version(genome_build, vep_config.annotation_consortium, vep_config.columns_version)
+
+    vep_version_dict = cache.get(_vep_version_cache_key(genome_build, vep_config.annotation_consortium))
+    if vep_version_dict is None:
+        return None
+    return vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict)
 
 
 def _spliceai_label(spliceai_filename: str) -> str:

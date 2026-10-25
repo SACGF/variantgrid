@@ -21,9 +21,10 @@ from annotation.models.models_gene_annotation import (
 )
 from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
 from annotation.pipelines import vep_pipeline_types
+from annotation.tasks.annotate_variants import request_vep_version
 from annotation.vep_annotation import (
+    get_cached_vep_variant_annotation_version_kwargs,
     get_vep_command,
-    get_vep_variant_annotation_version_kwargs,
 )
 from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
@@ -112,8 +113,10 @@ def annotation_build_detail(request, genome_build_name):
             out_of_sync_with_current_vep = "Not created"
         else:
             vav = av.variant_annotation_version
-            vep_vav_kwargs = get_vep_variant_annotation_version_kwargs(vav.genome_build)
-            if diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
+            vep_vav_kwargs = get_cached_vep_variant_annotation_version_kwargs(vav.genome_build)
+            if vep_vav_kwargs is None:
+                out_of_sync_with_current_vep = request_vep_version(vav.genome_build)
+            elif diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
                 out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
             else:
                 sync_with_current_vep = "In sync with current VEP"
@@ -151,7 +154,6 @@ def annotation_build_detail(request, genome_build_name):
         if clinvar_counts:
             annotation_details["clinvar"] = f"{clinvar_counts} ClinVar records"
 
-        clinvar_counts = av.get_clinvar().count()
         annotation_sub_components = [sync_with_current_vep, reference_ok,
                                      genes_and_transcripts, gene_annotation_release, clinvar_counts]
         if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:

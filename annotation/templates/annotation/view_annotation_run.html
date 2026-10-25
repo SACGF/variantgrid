@@ -32,8 +32,10 @@
             that is removed once a run imports successfully - otherwise use Retry Annotation.</dd>
             <dt>Subdivide AnnotationRun</dt>
             <dd>Splits the range lock in half and replaces this run with one run per half. Use when a run keeps failing
-            from running out of memory or time; subdivide a half again if it still fails. Every run on this range,
-            of any pipeline type, is replaced - the scheduler recreates the other types for both halves. Offered for
+            from running out of memory or time; subdivide a half again if it still fails. This run, and any run of a
+            pipeline that depends on it (AnnotSV on structural variants), is replaced on both halves; the range's
+            other runs keep what they annotated and get a fresh run on the top half. Refused while one of those
+            other runs is in progress. Offered for
             ranges spanning at least 1,000 variant IDs.</dd>
             <dt>Make Local (annotate locally)</dt>
             <dd>For a run awaiting external annotation: drops the external dump and returns the run to the local

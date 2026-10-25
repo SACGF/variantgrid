@@ -253,7 +253,7 @@ def merge_pending_range_locks(variant_annotation_version: VariantAnnotationVersi
     """ #2667: Greedily combine consecutive pending range locks into larger ones (capped at batch_max)
         so a freed worker picks up one efficient merged batch instead of many tiny drip-runs.
 
-        Inverse of subdivide_annotation_range_lock. Only operates on locks whose runs are all
+        Inverse of subdivide_annotation_run_range. Only operates on locks whose runs are all
         dispatchable; "adjacent" = next lock by min_variant (locks tile the space in increasing-pk
         order). Returns the number of locks absorbed (for logging/tests). """
     if batch_max is None:
