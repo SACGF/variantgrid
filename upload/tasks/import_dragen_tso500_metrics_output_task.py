@@ -30,6 +30,7 @@ from variantgrid.celery import app
 class ImportDragenTSO500MetricsOutputTask(ImportTask):
 
     def process_items(self, file_upload):
+        file_upload.check_can_write_sequencing_data()
         sequencing_run_name = get_metadata_sequencing_run_name(file_upload)
         if not sequencing_run_name:
             raise ValueError(f"MetricsOutput.tsv is written per sequencing run and names none itself - "

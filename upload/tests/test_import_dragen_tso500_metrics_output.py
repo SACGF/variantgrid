@@ -22,6 +22,7 @@ from snpdb.enums import ImportSource
 from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import FileUpload, UploadPipeline
+from upload.models.models import UploadUserError
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
@@ -369,9 +370,9 @@ class TestMetricsOutputImportTask(TestCase):
         assign_permission_to_user_and_groups(self.user, patient)
         self.specimen = Specimen.objects.create(patient=patient, reference_id="2600000001")
 
-    def _file_upload(self, metadata) -> FileUpload:
+    def _file_upload(self, metadata, import_source=ImportSource.COMMAND_LINE) -> FileUpload:
         file_upload = FileUpload.objects.create(path=RUN_METRICS_OUTPUT,
-                                                import_source=ImportSource.COMMAND_LINE,
+                                                import_source=import_source,
                                                 user=self.user, name="MetricsOutput_orig.tsv",
                                                 file_type=UploadedFileTypes.DRAGEN_TSO500_METRICS_OUTPUT,
                                                 metadata=metadata)
@@ -394,4 +395,12 @@ class TestMetricsOutputImportTask(TestCase):
             ImportDragenTSO500MetricsOutputTask.process_items(file_upload)
 
         self.assertIn("sequencing_run", str(cm.exception))
+        self.assertFalse(LibraryQC.objects.exists())
+
+    def test_a_web_upload_needs_sequencing_data_write_access(self):
+        file_upload = self._file_upload({"sequencing_run": SEQUENCING_RUN_NAME},
+                                        import_source=ImportSource.WEB_UPLOAD)
+
+        with self.assertRaises(UploadUserError):
+            ImportDragenTSO500MetricsOutputTask.process_items(file_upload)
         self.assertFalse(LibraryQC.objects.exists())
