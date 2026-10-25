@@ -215,13 +215,14 @@ def match_sample(user, sample_id, sample_name, validation_messages):
     return sample
 
 
-def create_patient(patient_import, first_name, last_name, sex, date_of_birth, user):
+def create_patient(patient_import, first_name, last_name, sex, date_of_birth, user, patient_code=None):
     if first_name:
         first_name = first_name.upper()
     if last_name:
         last_name = last_name.upper()
 
-    patient = Patient.objects.create(last_name=last_name,
+    patient = Patient.objects.create(patient_code=patient_code,
+                                     last_name=last_name,
                                      first_name=first_name,
                                      date_of_birth=date_of_birth,
                                      sex=sex or Sex.UNKNOWN)
@@ -286,9 +287,11 @@ def process_record(patient_records, record_id, row):
     patient_code = row[PatientColumns.PATIENT_CODE]
     first_name = row[PatientColumns.PATIENT_FIRST_NAME]
     last_name = row[PatientColumns.PATIENT_LAST_NAME]
-    if not last_name:
-        raise InvalidPatientRecord(f"{PatientColumns.PATIENT_LAST_NAME}: is blank, it is needed to match or create a patient")
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
+    if not (patient_code or (last_name and (first_name or date_of_birth))):
+        raise InvalidPatientRecord(f"Needs {PatientColumns.PATIENT_CODE}, or {PatientColumns.PATIENT_LAST_NAME} with "
+                                   f"{PatientColumns.PATIENT_FIRST_NAME} or {PatientColumns.DATE_OF_BIRTH}, "
+                                   "to match or create a patient")
     date_of_death = parse_date(row, PatientColumns.DATE_OF_DEATH, validation_messages)
     sex = parse_choice(Sex.choices, row, PatientColumns.SEX, validation_messages)
     affected = parse_boolean(row, PatientColumns.AFFECTED, validation_messages)
@@ -318,11 +321,13 @@ def process_record(patient_records, record_id, row):
 
     sample = match_sample(user, sample_id, sample_name, validation_messages)
     try:
-        patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user)
-    except Patient.MultipleObjectsReturned as e:
+        patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user,
+                                                    patient_code=patient_code)
+    except (Patient.MultipleObjectsReturned, ValueError) as e:
         raise InvalidPatientRecord(str(e)) from e
     if patient is None:
-        patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user)
+        patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user,
+                                 patient_code=patient_code)
         patient_match_type = PatientRecordMatchType.CREATED
     elif user and not patient.can_write(user):
         raise InvalidPatientRecord(f"Matched patient {_patient_details(patient)}, which you don't have write "
@@ -353,13 +358,6 @@ def process_record(patient_records, record_id, row):
             patient._deceased = patient_deceased
             patient.save(check_patient_text_phenotype=False)
             description = "Updated patient as deceased = False"
-        else:
-            # only clear date_of_death and _deceased if they are not currently NULL
-            if patient.date_of_death is not None or patient._deceased is not None:
-                patient.date_of_death = None
-                patient._deceased = None
-                patient.save(check_patient_text_phenotype=False)
-                description = "Updated patient deceased and date_of_death to NULL values"
 
     # if patient has been modified, create a PatientModification record
     if description is not None:
@@ -377,7 +375,7 @@ def process_record(patient_records, record_id, row):
 
     patient_modified = False
     for patient_field, field_value in PATIENT_FIELDS.items():
-        if field_value:
+        if field_value is not None:
             old_value = getattr(patient, patient_field)
             setattr(patient, patient_field, field_value)
             description = f"Set {patient_field} to {field_value}"
