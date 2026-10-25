@@ -717,6 +717,8 @@ class AnalysisEdge(NodeAuditLogMixin, models.Model):
         return f"{self.parent_id} -> {self.child_id}"
 
     def save(self, *args, **kwargs):
+        if self.parent.analysis_id != self.child.analysis_id:
+            raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - they are in different analyses")
         dag = AnalysisDag.for_node(self.parent_id)
         if self.parent_id == self.child_id or self.child_id in dag.ancestor_ids(self.parent_id):
             raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - it would create a cycle")
