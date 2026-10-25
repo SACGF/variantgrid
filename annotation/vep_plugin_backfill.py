@@ -19,7 +19,7 @@ from django.db.models import Max
 
 from annotation import vep_columns
 from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
-from annotation.vep_annotation import get_vep_command
+from annotation.vep_annotation import get_vep_command, get_vep_skipped_variants_filename
 from annotation.vep_config import vep_component_version_kwargs
 from snpdb.models.models_genome import GenomeBuild
 
@@ -158,7 +158,8 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
     annotated_vcf = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"vep_plugins_{build}.vep_annotated.vcf.gz")
     vep_cmd = backfill_vep_command(vav, columns_by_source, ["Feature", "PICK", *columns.values()],
                                    dump_vcf, annotated_vcf)
-    import_cmd = f"python3 manage.py annotation_backfill_columns --import {common} {csq_args} --vcf {annotated_vcf}"
+    import_cmd = (f"python3 manage.py annotation_backfill_columns --import {common} {csq_args} "
+                  f"--vcf {annotated_vcf} --dump-vcf {dump_vcf}")
     return [
         f"{build} (VariantAnnotationVersion {vav.pk}):",
         f"1. python3 manage.py annotation_backfill_columns --dump {common} --pipeline-type STANDARD "
@@ -166,6 +167,8 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
         f"2. {shlex.join(vep_cmd)}",
         f"3. {import_cmd} --dry-run",
         f"4. {import_cmd} --mark-backfilled {BACKFILL_FLAG}",
+        f"5. rm -f {dump_vcf} {annotated_vcf} {annotated_vcf}_warnings.txt "
+        f"{get_vep_skipped_variants_filename(annotated_vcf)}",
     ]
 
 

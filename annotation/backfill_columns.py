@@ -19,8 +19,10 @@ whole rows, and its input deliberately comes from a different annotation source 
 produced the version.
 """
 import csv
+import gzip
 import io
 import logging
+import os
 import re
 import time
 from collections.abc import Iterable
@@ -38,8 +40,11 @@ from annotation.annotation_version_querysets import get_variants_qs_for_annotati
 from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from annotation.vep_annotation import get_vep_skipped_variants_filename
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
+from annotation.vep_warnings import parse_skipped_variants_file
 from library.django_utils import get_model_fields
+from library.utils.file_utils import open_handle_gzip
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import VARIANT_ID
 from upload.vcf.sql_copy_files import sql_copy_csv_file
@@ -217,6 +222,30 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
     # Matched by sequence against the source's file, like the STANDARD dump - an SV stays symbolic
     return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs,
                            structural_variant_min_size=variant_annotation_version.structural_variant_min_size)
+
+
+def _count_vcf_records(vcf_filename: str) -> int:
+    try:
+        with open_handle_gzip(vcf_filename, "rt") as f:
+            return sum(1 for line in f if not line.startswith("#"))
+    except (EOFError, gzip.BadGzipFile) as e:
+        raise BackfillColumnError(f"'{vcf_filename}' is truncated or corrupt: {e}") from e
+
+
+def check_annotated_vcf_complete(dump_vcf_filename: str, annotated_vcf_filename: str) -> int:
+    """ Every dumped record must come back annotated or listed in VEP's --skipped_variants_file: VEP can exit 0
+        having written a short VCF (#1701), and a backfill flagged done over one leaves the rest null for good """
+    dump_count = _count_vcf_records(dump_vcf_filename)
+    annotated_count = _count_vcf_records(annotated_vcf_filename)
+    skipped_count = 0
+    skipped_filename = get_vep_skipped_variants_filename(annotated_vcf_filename)
+    if os.path.exists(skipped_filename):
+        skipped_count = len(parse_skipped_variants_file(skipped_filename))
+    if annotated_count + skipped_count != dump_count:
+        raise BackfillColumnError(f"'{annotated_vcf_filename}' has {annotated_count} records and VEP skipped "
+                                  f"{skipped_count}, but '{dump_vcf_filename}' has {dump_count} - the annotation "
+                                  f"stopped early. Re-run it")
+    return dump_count
 
 
 def validate_backfill_flag(flag: str):
