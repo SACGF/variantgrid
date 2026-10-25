@@ -62,7 +62,9 @@ Patterns here:
   writes a CSV with upload/vcf/sql_copy_files.py:write_sql_copy_csv and spawns an
   upload/tasks/vcf/import_sql_copy_task.py:ImportCohortGenotypeSQLCopyTask step. Repeated variants are dropped per
   batch (RMDUP); the COPY task then deletes any the batch shares with another split file
-  (upload/vcf/sql_copy_files.py:delete_duplicate_cohort_genotypes), as the partition tables have no unique index. Variants-only imports use
+  (upload/vcf/sql_copy_files.py:delete_duplicate_cohort_genotypes), as the partition tables have no unique index.
+  A removed row whose genotype differed from the kept one is an import / normalisation bug, recorded as a
+  CONFLICTING_GENOTYPES SimpleVCFImportInfo warning on the upload. Variants-only imports use
   upload/vcf/bulk_minimal_vcf_processor.py:BulkMinimalVCFProcessor (override batch_handle_variant_ids to act on ids).
 - Every processor calls AbstractBulkVCFProcessor.set_max_variant; upload/vcf/vcf_import.py:import_vcf_file then upserts
   upload/models/models.py:UploadedVCFPipelineMaxVariant (one row per annotation pipeline type, only ever raised) —

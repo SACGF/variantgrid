@@ -19,6 +19,10 @@ COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters",
                           'samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
                           'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters',
                           'format', 'info']
+# What a sample's call is - two rows for one variant that differ here disagree about the genotype
+COHORT_GENOTYPE_GENOTYPE_COLUMNS = ['ref_count', 'het_count', 'hom_count', 'unk_count', 'samples_zygosity',
+                                    'samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
+                                    'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
 MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id', 'operation',
                                     'old_multiallelic', 'old_variant', 'old_variant_formatted',
                                     'operation_detail']
@@ -75,12 +79,13 @@ def cohort_genotype_sql_copy_csv(input_filename, table_name):
     return sql_copy_csv(input_filename, table_name, COHORT_GENOTYPE_HEADER)
 
 
-def delete_duplicate_cohort_genotypes(input_filename, table_name) -> list[int]:
+def delete_duplicate_cohort_genotypes(input_filename, table_name) -> list[tuple[int, bool]]:
     """ The importer drops repeated variants within a batch, but two records can normalise to the same
         variant on either side of a split file boundary, and the partition tables have no
         unique(collection, variant) to stop the second copy. Run after each COPY has committed: whichever
-        of two overlapping batches commits last sees the other's rows here, and the lower id is kept.
-        Returns the variant ids that had a row removed """
+        of two overlapping batches commits last sees the other's rows here, and the lowest id is kept.
+        Returns (variant_id, conflicting) per removed row - conflicting when its genotype data differs
+        from the kept row's """
     collection_ids = set()
     variant_ids = []
     with open(input_filename) as f:
@@ -89,13 +94,18 @@ def delete_duplicate_cohort_genotypes(input_filename, table_name) -> list[int]:
             collection_ids.add(int(collection_id))
             variant_ids.append(int(variant_id))
 
+    dup_genotype = ", ".join(f"dup.{c}" for c in COHORT_GENOTYPE_GENOTYPE_COLUMNS)
+    kept_genotype = ", ".join(f"kept.{c}" for c in COHORT_GENOTYPE_GENOTYPE_COLUMNS)
     sql = f"""DELETE FROM {table_name} dup USING {table_name} kept
         WHERE dup.collection_id = ANY(%s) AND dup.variant_id = ANY(%s)
-        AND kept.collection_id = dup.collection_id AND kept.variant_id = dup.variant_id AND kept.id < dup.id
-        RETURNING dup.variant_id"""
+        AND kept.collection_id = dup.collection_id AND kept.variant_id = dup.variant_id
+        AND kept.id = (SELECT min(earliest.id) FROM {table_name} earliest
+                       WHERE earliest.collection_id = dup.collection_id AND earliest.variant_id = dup.variant_id)
+        AND kept.id < dup.id
+        RETURNING dup.variant_id, ({dup_genotype}) IS DISTINCT FROM ({kept_genotype})"""
     with connection.cursor() as cursor:
         cursor.execute(sql, [list(collection_ids), variant_ids])
-        return [row[0] for row in cursor.fetchall()]
+        return cursor.fetchall()
 
 
 def modified_imported_variant_sql_copy_csv(input_filename):

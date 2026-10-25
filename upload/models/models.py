@@ -757,6 +757,7 @@ class VCFImportInfo(models.Model):
 class SimpleVCFImportInfo(VCFImportInfo):
     ANNOTATION_SKIPPED = "annotation_skipped"
     SVLEN_MODIFIED = "svlen_modified"
+    CONFLICTING_GENOTYPES = "conflicting_genotypes"
 
     type = models.TextField()
     has_more_details = models.BooleanField(default=False)
