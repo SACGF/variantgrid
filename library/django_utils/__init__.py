@@ -41,12 +41,8 @@ def get_url_from_view_path(view_path):
     # dirty fallback if we don't have a request
     from django.contrib.sites.models import Site
     current_site = Site.objects.get_current()
-    protocol = 'http'
-    # TODO can do better than this for determining https vs http
-    https_domains = ('shariant.org.au', 'variantgrid.com')
-    domain = current_site.domain
-    if domain in https_domains or any(domain.endswith(f'.{d}') for d in https_domains):
-        protocol = 'https'
+    # Deployments served over https import https_settings, which sets this
+    protocol = 'https' if settings.SESSION_COOKIE_SECURE else 'http'
     return f'{protocol}://{current_site.domain}{view_path}'
 
 
