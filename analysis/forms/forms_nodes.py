@@ -196,10 +196,21 @@ class AncestorSampleSourceMixin(forms.Form):
 class BaseNodeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._restrict_choices_to_analysis_user()
         if ignorable_fields := self.instance.get_ignorable_error_fields():
             label = f"Ignore {', '.join(ignorable_fields)} errors"
             self.fields["ignore_field_errors"] = forms.BooleanField(required=False, label=label,
                                                                     initial=self.instance.ignore_field_errors)
+
+    def _restrict_choices_to_analysis_user(self):
+        """ Everything in an analysis is read as its owner, so a picked cohort, gene list etc has to be
+            one the owner can see - the autocompletes only narrow what's offered, not what's posted """
+        user = self.instance.analysis.user
+        for field in self.fields.values():
+            if isinstance(field, forms.ModelChoiceField):
+                model = field.queryset.model
+                if filter_for_user := getattr(model, "filter_for_user", None):
+                    field.queryset = field.queryset.filter(pk__in=filter_for_user(user).values("pk"))
 
     def _post_clean(self):
         """ The instance now carries the submitted values, so the node's own field checks can run """

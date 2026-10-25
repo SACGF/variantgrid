@@ -86,6 +86,10 @@ class NodeView(UpdateView):
         node_class = self.object.get_class_name().lower()
         return [f"analysis/node_editors/{node_class}_editor.html"]
 
+    def post(self, request, *args, **kwargs):
+        self.get_object().analysis.check_can_write(request.user)
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
         self.object = form.save(commit=False)
         self.object.queryset_dirty = True

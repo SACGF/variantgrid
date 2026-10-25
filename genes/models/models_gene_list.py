@@ -352,6 +352,10 @@ class SampleGeneList(TimeStampedModel):
         unique_together = ('sample', 'gene_list')
         ordering = ['created']
 
+    @staticmethod
+    def filter_for_user(user):
+        return SampleGeneList.objects.filter(sample__in=Sample.filter_for_user(user))
+
     def __str__(self):
         s = f"{self.sample}: {localtime(self.modified)}"
         if not self.visible:
