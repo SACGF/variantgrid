@@ -67,6 +67,20 @@ class TestMergeCosmicIds(TestCase):
         self.assertEqual(sorted(data["cosmic_id"].split("&")), ["COSV100", "COSV200", "COSV300"])
 
 
+class TestFixMultipleGnomadValues(TestCase):
+    """ '&'-joined gnomAD duplicates (T2T liftover) keep the entry with the highest AF, compared as numbers #2438 """
+
+    def test_scientific_notation_compared_numerically(self):
+        data = {"gnomad_af": "0.25&9.1e-06&0.0012", "gnomad_ac": "500&1&20", "symbol": "BRCA1"}
+        BulkVEPVCFAnnotationInserter._fix_multiple_values(data)
+        self.assertEqual(data, {"gnomad_af": "0.25", "gnomad_ac": "500", "symbol": "BRCA1"})
+
+    def test_missing_af_sorts_lowest(self):
+        data = {"gnomad_af": ".&1e-05", "gnomad_ac": ".&3"}
+        BulkVEPVCFAnnotationInserter._fix_multiple_values(data)
+        self.assertEqual(data, {"gnomad_af": "1e-05", "gnomad_ac": "3"})
+
+
 # ---------------------------------------------------------------------------
 # gnomad_major_version parses the leading integer out of the VEP pin string,
 # which is what gnomad4_or_later / has_hemi branch on.
