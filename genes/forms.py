@@ -19,7 +19,11 @@ from snpdb.forms import BaseDeclareForm, GenomeBuildAutocompleteForwardMixin
 
 class GeneListForm(forms.ModelForm, ROFormMixin):
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
+        # Group write permission lets others edit the list, but only the owner (or an admin) hands it on
+        if not (user.is_superuser or user == self.instance.user):
+            self.fields["user"].disabled = True
         if not self.instance.error_message:
             self.fields["error_message"].widget.attrs.update({"rows": 1, "cols": 20})
 

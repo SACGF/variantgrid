@@ -15,6 +15,7 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
 from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
@@ -365,6 +366,16 @@ EXTRACTION_MATCH_FIELDS = ('extraction_reference', 'extraction_match_status',
                            'extraction_match_error', 'extraction_match_date')
 
 
+def limit_sample_patient_choices(form, user):
+    """ Sample patient/extraction choices are the ones the user can see (as the autocompletes offer),
+        plus whatever the sample already links to """
+    sample = form.instance
+    form.fields["patient"].queryset = Patient.objects.filter(
+        Q(pk__in=Patient.filter_for_user(user).values("pk")) | Q(pk=sample.patient_id))
+    form.fields["extraction"].queryset = Extraction.objects.filter(
+        Q(pk__in=Extraction.filter_for_user(user).values("pk")) | Q(pk=sample.extraction_id))
+
+
 class SampleForm(forms.ModelForm, ROFormMixin):
     genome_build = forms.CharField()  # From VCF.genome_build
     uploaded_by = forms.CharField()  # From VCF.user
@@ -391,6 +402,7 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
         self.fields['uploaded_by'].initial = self.instance.vcf.user
         self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
+        limit_sample_patient_choices(self, user)
 
     def _field_order(self) -> list[str]:
         """ Extraction matching goes last - it's system bookkeeping below the fields people edit """
