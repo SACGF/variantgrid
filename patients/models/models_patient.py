@@ -186,7 +186,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     suburb = models.TextField(null=True, blank=True)
     postcode = models.TextField(null=True, blank=True)  # Text for international - UK/Canada use alphanumeric
     state = models.TextField(null=True, blank=True)
-    telephone = models.IntegerField(null=True, blank=True)
+    telephone = models.TextField(null=True, blank=True)  # Text to keep leading zeros and '+' country codes
 
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
     _deceased = models.BooleanField(null=True, blank=True)
@@ -330,7 +330,9 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
 
     @staticmethod
     def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
-        """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown """
+        """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown.
+             A match the row's fields don't fully pin down is PARTIAL: a field the row has that the patient
+             lacks, or no first name in the row for a patient who has one (a match on surname alone) """
 
         if not last_name:
             msg = "Last name must be non-null!"
@@ -350,7 +352,9 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
                 patients_queryset = Patient.objects.all()
 
             patient = patients_queryset.get(q)
-            if (date_of_birth and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
+            if (date_of_birth and patient.date_of_birth is None) \
+                    or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN) \
+                    or (not first_name and patient.first_name):
                 match_type = PatientRecordMatchType.PARTIAL
             else:
                 match_type = PatientRecordMatchType.EXACT

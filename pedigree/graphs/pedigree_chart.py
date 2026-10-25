@@ -55,10 +55,8 @@ class PedigreeChart:
         if madeline2 is None:
             raise ValueError("settings.PEDIGREE_MADELINE2_COMMAND not set!")
         ped_file_family = PedFileFamily.objects.get(pk=self.ped_file_family_id)
-        temp_file = NamedTemporaryFile(delete=False)
-        madeline_filename = temp_file.name
-
-        with NamedTemporaryFile(suffix=".ped") as ped_temp_file:
+        with NamedTemporaryFile() as madeline_file, NamedTemporaryFile(suffix=".ped") as ped_temp_file:
+            madeline_filename = madeline_file.name
             ped_file_family.write_ped(ped_temp_file.name)
 
             # Need to convert to Madeline input file
@@ -70,17 +68,16 @@ class PedigreeChart:
                 madeline_filename,
             ]
             subprocess.check_call(convert_command)
-        logging.info("Converted .ped to madeline: %s", madeline_filename)
+            logging.info("Converted .ped to madeline: %s", madeline_filename)
 
-        command = [
-            madeline2,
-            madeline_filename,
-            "--outputprefix",
-            self._get_prefix(),
-        ]
-        logging.info("Running: \n'%s'", " ".join(command))
-        output = subprocess.check_output(command)
-        os.unlink(madeline_filename)
+            command = [
+                madeline2,
+                madeline_filename,
+                "--outputprefix",
+                self._get_prefix(),
+            ]
+            logging.info("Running: \n'%s'", " ".join(command))
+            output = subprocess.check_output(command)
         output = output.decode()
         success = "Pedigree output file is" in output
         if not success:

@@ -210,6 +210,29 @@ class TestProcessRecordDeceasedStateMachine(TestCase):
         self.assertEqual(initial_count, final_count,
                          "Spurious PatientModification created with no deceased info")
 
+    def test_blank_deceased_columns_keep_date_of_death(self):
+        Patient.objects.filter(pk=self.patient.pk).update(date_of_death=date(2020, 1, 1))
+        process_record(self.pr, record_id=1, row=_make_row())
+        self.patient.refresh_from_db()
+        self.assertEqual(date(2020, 1, 1), self.patient.date_of_death)
+
+
+class TestProcessRecordPatientFields(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("patient_fields_user", password="x")
+        cls.patient = Patient.objects.create(first_name="IMPORTTESTFIRST", last_name="IMPORTTESTLAST",
+                                             affected=True, consanguineous=True)
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def test_false_is_set_and_blank_is_left_alone(self):
+        pr = _make_patient_records(self.user)
+        process_record(pr, record_id=1, row=_make_row(**{PatientColumns.AFFECTED: "N"}))
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.affected)
+        self.assertTrue(self.patient.consanguineous)
+
 
 # ---------------------------------------------------------------------------
 # process_record specimen age
