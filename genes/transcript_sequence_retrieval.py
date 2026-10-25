@@ -8,6 +8,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from io import StringIO
+from itertools import batched
 from typing import Optional
 from urllib.error import HTTPError
 
@@ -20,7 +21,7 @@ from genes.enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript, NoTranscript
 from genes.transcript_parts import get_transcript_id_and_version
 from library.constants import MINUTE_SECS
-from library.utils import get_single_element, iter_fixed_chunks
+from library.utils import get_single_element
 from snpdb.models import GenomeBuild
 
 ENSEMBL_REST_BASE_URLS = {
@@ -123,7 +124,7 @@ class TranscriptSequenceFetcher:
     def fetch_refseq_batch(self, transcript_accessions: Iterable[str], entrez_batch_size: int = 100,
                            fail_on_error=True) -> list[FetchedTranscriptSequence]:
         fetched = []
-        for id_list in iter_fixed_chunks(transcript_accessions, entrez_batch_size):
+        for id_list in batched(transcript_accessions, entrez_batch_size):
             id_param = ",".join(id_list)
             try:
                 search_results = Entrez.read(Entrez.epost("nuccore", id=id_param))

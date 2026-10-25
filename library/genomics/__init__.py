@@ -4,13 +4,16 @@ from typing import Tuple
 
 
 def format_chrom(chrom, want_chr):
-    """ Pass in a chromosome (unknown format), return in your format (CONTIG UPPERCASED)
+    """ Pass in a chromosome (unknown format), return in your format. Only a leading "chr" is swapped, and
+        only standard chromosomes (1-22, X, Y, M, MT) are uppercased: alt contigs keep their case (chrUn_KI270302v1)
         @param chrom: chromosome ID (eg 1 or 'chr1')
-        @param want_chr: Boolean - whether you want "CHR" at the beginning of chrom
+        @param want_chr: Boolean - whether you want "chr" at the beginning of chrom
         @return: "chr1" or "1" (for want_chr True/False)
     """
 
-    chrom_no_chr = chrom.upper().replace("CHR", "")
+    chrom_no_chr = re.sub("^chr", "", chrom, flags=re.IGNORECASE)
+    if len(chrom_no_chr) <= 2:
+        chrom_no_chr = chrom_no_chr.upper()
     if want_chr:
         return f"chr{chrom_no_chr}"
     return chrom_no_chr

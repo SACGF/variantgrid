@@ -11,7 +11,6 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Max
 
-from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.database_utils import postgres_arrays
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.django_utils.model_utils import AsciiValue
@@ -93,12 +92,11 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def get_vcf_importer_version():
         """ Get identifier for this importer """
 
-        vcf_importer, _ = thread_safe_unique_together_get_or_create(VCFImporter,
-                                                                    name="PythonKnownVariantsImporter",
-                                                                    version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
-                                                                    vcf_parser="cyvcf2",
-                                                                    vcf_parser_version=cyvcf2.__version__,
-                                                                    code_version=CodeVersion.current())
+        vcf_importer, _ = VCFImporter.objects.get_or_create(name="PythonKnownVariantsImporter",
+                                                            version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
+                                                            vcf_parser="cyvcf2",
+                                                            vcf_parser_version=cyvcf2.__version__,
+                                                            code_version=CodeVersion.current())
         return vcf_importer
 
     def __init__(self, upload_step, cohort_genotype_collection,

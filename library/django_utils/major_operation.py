@@ -16,7 +16,7 @@ Wrap expensive work in the ``major_operation`` context manager. It raises
 See variantgrid_private #1502.
 """
 import logging
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Optional
 
 from django.conf import settings
@@ -113,8 +113,31 @@ class MajorOperationViewMixin:
         if not self.major_operation_name:
             return super().dispatch(request, *args, **kwargs)
 
+        with ExitStack() as stack:
+            try:
+                stack.enter_context(major_operation(request.user, self.major_operation_name))
+            except TooManyMajorOperationsError as e:
+                return JsonResponse({"error": str(e)}, status=503)
+            response = super().dispatch(request, *args, **kwargs)
+            if response.streaming:
+                # A streamed CSV runs its query as the response is iterated, after dispatch returns
+                response.streaming_content = _StreamHoldingOperation(response.streaming_content, stack.pop_all())
+            return response
+
+
+class _StreamHoldingOperation:
+    """ Streaming content that keeps the major operation (slot and statement_timeout) until the stream is
+        exhausted or the response is closed - Django closes it even when the client disconnects early """
+
+    def __init__(self, content, stack: ExitStack):
+        self.content = content
+        self.stack = stack
+
+    def __iter__(self):
         try:
-            with major_operation(request.user, self.major_operation_name):
-                return super().dispatch(request, *args, **kwargs)
-        except TooManyMajorOperationsError as e:
-            return JsonResponse({"error": str(e)}, status=503)
+            yield from self.content
+        finally:
+            self.stack.close()
+
+    def close(self):
+        self.stack.close()

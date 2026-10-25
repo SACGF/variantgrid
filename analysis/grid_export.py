@@ -3,6 +3,7 @@ import os
 import re
 from collections import Counter
 from collections.abc import Callable, Iterator
+from itertools import batched
 from typing import Optional
 
 from analysis.grids import ExportVariantGrid
@@ -12,7 +13,7 @@ from genes.models import CanonicalTranscriptCollection
 from library.django_utils import get_model_fields
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
-from library.utils import StashFile, iter_fixed_chunks
+from library.utils import StashFile
 from patients.enums import Zygosity
 from snpdb.models import Sample, VariantGridColumn
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
@@ -355,7 +356,7 @@ def _replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, item
                 for item in grid.render_export_rows(transcript_items(), columns=replaced_columns)}
 
     # Loop through items and changeroo
-    for batch in iter_fixed_chunks(items, TRANSCRIPT_REPLACE_BATCH_SIZE):
+    for batch in batched(items, TRANSCRIPT_REPLACE_BATCH_SIZE):
         transcript_items_by_id = _transcript_items_by_id([item["id"] for item in batch])
         for item in batch:
             if transcript_data := transcript_items_by_id.get(item["id"]):

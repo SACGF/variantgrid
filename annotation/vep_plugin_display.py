@@ -9,8 +9,9 @@ import logging
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Optional
 
+from more_itertools import all_equal
+
 from library.genomics import parse_gnomad_coord
-from library.utils import all_equal
 
 if TYPE_CHECKING:
     from annotation.models.models import VariantAnnotation
