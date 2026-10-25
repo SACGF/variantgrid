@@ -98,8 +98,6 @@ Read, not reproduced:
 - Groups granted in Django admin and a locally granted `is_superuser` are silently undone at that user's next login.
 - In maintenance mode a first-time user's row is still created by mozilla's `create_user` (with a hashed username)
   before `create_or_update` returns `None`; their next login finds it by verified email.
-- Bearer tokens are checked only by Keycloak's userinfo endpoint, so an access token issued to another client in the
-  same realm (eg `shariant-test`) is accepted by production; `OIDC_REQUIRED_GROUP` is the only environment gate there.
 - `VariantGridSessionRefresh` skips *any* path containing `/api/`, not just the DRF prefixes.
 - The commented `OIDC_DRF_AUTH_BACKEND` in `shariantcommon.py` names `auth.backend`, a module that does not exist;
   the real path is `oidc_auth.backend`.
