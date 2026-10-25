@@ -92,8 +92,7 @@ Gotchas:
   "A new column on an existing VariantAnnotationVersion"; UTRAnnotator / AVI / SpliceVault (#2426) is the worked example.
 - The utr_annotator_* and splicevault_* columns of variants annotated before those plugins were switched on are
   backfilled into VariantAnnotation only, so the variant page shows the representative transcript's values from there
-  (not the transcript rows), and "not backfilled" via annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled
-  and its avi_ / splicevault_ siblings.
+  (not the transcript rows). A variant not yet backfilled shows nothing, like any other missing value.
 - UTRAnnotator / AVI / SpliceVault and the AlphaGenome splicing custom VCF (#2433) are off in the package defaults. A deployment downloads (and for SpliceVault
   converts) the files, sets them in its env settings, runs `enable_vep_plugin_backfill` (stamps the pins on the
   NEW/ACTIVE versions, flags them, prints the backfill; annotation/vep_plugin_backfill.py), restarts annotation_workers,

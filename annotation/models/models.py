@@ -45,7 +45,6 @@ from annotation.external_search_terms import (
 from annotation.models.models_citations import Citation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.repeat_masker import RepeatMaskerSummary
-from annotation.vep_columns import FIVE_PRIME_UTR_VARIANT
 from genes.enums import AnnotationConsortium
 from genes.hgvs.hgvs_matcher import HGVSMatcher
 from genes.models import (
@@ -662,38 +661,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return vep_plugin_display.utr_annotator_effects(self.utr_annotator_annotation)
 
     @property
-    def utr_annotator_not_backfilled(self) -> bool:
-        """ UTRAnnotator writes its uORF counts for every 5' UTR variant, so a 5' UTR variant without
-            them predates the plugin on a version that hasn't been backfilled yet """
-        return (self.utr_annotator_existing_uorfs is None
-                and FIVE_PRIME_UTR_VARIANT in (self.consequence or "")
-                and not self.version.backfilled_utr_avi_splicevault)
-
-    @property
-    def avi_not_backfilled(self) -> bool:
-        """ AVI scores every GRCh38 SNV """
-        return (self.avi_phred is None
-                and self.variant_class == VariantClass.SNV
-                and not self.version.backfilled_utr_avi_splicevault)
-
-    @property
-    def alphagenome_splicing_not_backfilled(self) -> bool:
-        """ AlphaGenome splicing scores every GRCh38 SNV """
-        return (self.alphagenome_splicing is None
-                and self.variant_class == VariantClass.SNV
-                and not self.version.backfilled_utr_avi_splicevault)
-
-    @property
     def splicevault_top_events_list(self) -> list[str]:
         return [e for e in (self.splicevault_top_events or "").split("&") if e]
-
-    @property
-    def splicevault_not_backfilled(self) -> bool:
-        """ SpliceVault only covers variants SpliceAI scores as a splice site loss, so one without
-            SpliceAI can't be missing it """
-        return (self.splicevault_site_pos is None
-                and self.has_spliceai()
-                and not self.version.backfilled_utr_avi_splicevault)
 
     @property
     def gnomad4_or_later(self) -> bool:

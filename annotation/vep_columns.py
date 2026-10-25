@@ -1324,10 +1324,6 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     ),
 )
 
-# UTRAnnotator only annotates transcripts with this consequence
-FIVE_PRIME_UTR_VARIANT = "5_prime_UTR_variant"
-
-
 # vep_config setting keys (under settings.ANNOTATION[<build>]["vep_config"]) that must be
 # present (non-None) for a VEPColumnDef to actually be populated. Empty tuple means the
 # def needs no data file (plain VEP CSQ, or a plugin with no data — Grantham/SpliceRegion/

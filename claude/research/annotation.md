@@ -156,8 +156,9 @@ source has nothing", and for a sparse source those look the same. A `backfilled_
 - The command that fills a partition sets the flag True on that VAV when it finishes, and is idempotent so a re-run
   re-asserts it.
 - Every reader checks it. An analysis node skips the filter and says so in `get_warnings` on a False VAV
-  (`analysis/models/nodes/filters/damage_node.py:DamageNode.get_warnings` for `backfilled_ptc`), and a page or grid shows
-  "not backfilled" rather than presenting NULL as a negative.
+  (`analysis/models/nodes/filters/damage_node.py:DamageNode.get_warnings` for `backfilled_ptc`), since filtering on the
+  NULL would drop variants. A display (the variant page) shows nothing, as it does for any missing value: a "not
+  backfilled" message there is noise.
 - The deploy step is a `ManualOperation` in a migration after the schema one (`manual/__manual_readme.md`), its `test`
   being `VariantAnnotationVersion.objects.filter(<flag>=False).exists()`, with a `note` naming the issue. Use
   `ManualOperation.operation_manage([...])` when one command does the whole job, `operation_other` when a step runs
@@ -278,9 +279,7 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
 The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
 SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the
 representative transcript is the MANE one (VEP's default pick order puts MANE Select first). The variant page reads
-them from `VariantAnnotation` and shows "not backfilled" from
-`annotation/models/models.py:VariantAnnotation.utr_annotator_not_backfilled`, `avi_not_backfilled` and
-`splicevault_not_backfilled`. UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds several
+them from `VariantAnnotation`. UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds several
 effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect.
 
 ### ClinVar
