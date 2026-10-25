@@ -293,6 +293,9 @@ def process_record(patient_records, record_id, row):
     if not last_name:
         raise InvalidPatientRecord(f"{PatientColumns.PATIENT_LAST_NAME}: is blank, it is needed to match or create a patient")
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
+    if not (first_name or date_of_birth):
+        raise InvalidPatientRecord(f"{PatientColumns.PATIENT_FIRST_NAME} or {PatientColumns.DATE_OF_BIRTH}: "
+                                   "one is needed with the last name to match or create a patient")
     date_of_death = parse_date(row, PatientColumns.DATE_OF_DEATH, validation_messages)
     sex = parse_choice(Sex.choices, row, PatientColumns.SEX, validation_messages)
     affected = parse_boolean(row, PatientColumns.AFFECTED, validation_messages)

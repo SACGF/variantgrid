@@ -85,7 +85,12 @@ class TestPatientMatching(TestCase):
         self.assertEqual(Patient.match(first_name="DAVID", last_name="LAWRENCE", date_of_birth='2020-01-01'),
                          (dl_other, PatientRecordMatchType.EXACT))
 
-    def test_match_on_surname_alone_is_partial(self):
-        billie_jean = Patient.objects.get(first_name="BILLIE", last_name="JEAN")
-        self.assertEqual(Patient.match(first_name=None, last_name="JEAN", sex=Sex.FEMALE),
-                         (billie_jean, PatientRecordMatchType.PARTIAL))
+    def test_match_without_first_name_needs_date_of_birth(self):
+        dl_me = Patient.objects.get(first_name="DAVID", last_name="LAWRENCE", date_of_birth='1980-03-05')
+        with self.assertRaises(ValueError):
+            Patient.match(first_name=None, last_name="JEAN", sex=Sex.FEMALE)
+        self.assertEqual(Patient.match(first_name=None, last_name="LAWRENCE", date_of_birth='1980-03-05'),
+                         (dl_me, PatientRecordMatchType.EXACT))
+        # Bob's date of birth is unknown, so last name and date of birth don't identify him
+        self.assertEqual(Patient.match(first_name=None, last_name="DOBALINA", date_of_birth='2025-01-01'),
+                         (None, None))

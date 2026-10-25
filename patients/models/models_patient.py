@@ -331,17 +331,22 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @staticmethod
     def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
         """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown.
-             A match the row's fields don't fully pin down is PARTIAL: a field the row has that the patient
-             lacks, or no first name in the row for a patient who has one (a match on surname alone) """
+             A patient is identified by last name plus first name or date of birth: without a first name the
+             date of birth must equal the patient's. A match where the patient lacks a field the row has is PARTIAL """
 
         if not last_name:
             msg = "Last name must be non-null!"
             raise ValueError(msg)
+        if not (first_name or date_of_birth):
+            msg = "First name or date of birth is needed with the last name"
+            raise ValueError(msg)
         q = Q(last_name__iexact=last_name)
         if first_name:
             q &= Q(first_name__iexact=first_name)
-        if date_of_birth is not None:
-            q &= (Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
+            if date_of_birth is not None:
+                q &= (Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
+        else:
+            q &= Q(date_of_birth=date_of_birth)
         if sex in Sex.FILLED_IN_CHOICES:
             q &= Sex.get_q_handling_unknown('sex', sex)
 
@@ -352,9 +357,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
                 patients_queryset = Patient.objects.all()
 
             patient = patients_queryset.get(q)
-            if (date_of_birth and patient.date_of_birth is None) \
-                    or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN) \
-                    or (not first_name and patient.first_name):
+            if (date_of_birth and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
                 match_type = PatientRecordMatchType.PARTIAL
             else:
                 match_type = PatientRecordMatchType.EXACT
