@@ -33,18 +33,30 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         return self.create_or_update(user, claims)
 
     def filter_users_by_claims(self, claims):
-        """Check username first"""
+        """ The user already linked to this Keycloak `sub`, otherwise a user not yet linked to any sub, matched by
+            username, then by email only when Keycloak has verified it. A match linked to a different sub is refused
+            rather than taken over - clear its UserSettingsOverride.oauth_sub if the Keycloak account was recreated """
+        sub = claims.get('sub')
+        if sub:
+            by_sub = self.UserModel.objects.filter(usersettingsoverride__oauth_sub=sub)
+            if by_sub.exists():
+                return by_sub
+
+        candidates = self.UserModel.objects.none()
         username = claims.get('preferred_username')
         if username:
-            by_username = self.UserModel.objects.filter(username=username)
-            if by_username.exists():
-                return by_username
+            candidates = self.UserModel.objects.filter(username=username)
+        if not candidates.exists() and claims.get('email_verified') is True:
+            if email := claims.get('email'):
+                candidates = self.UserModel.objects.filter(email__iexact=email)
 
-        # Return all users matching the specified email
-        email = claims.get('email')
-        if not email:
-            return self.UserModel.objects.none()
-        return self.UserModel.objects.filter(email__iexact=email)
+        linked_elsewhere = candidates.filter(usersettingsoverride__oauth_sub__gt='')
+        if linked_elsewhere.exists():
+            report_message(f"OIDC login for {username!r} (sub={sub!r}) matched user(s) "
+                           f"{list(linked_elsewhere.values_list('username', flat=True))} linked to a different sub",
+                           level='error')
+            raise SuspiciousOperation("This account is linked to a different identity provider account")
+        return candidates
 
     def create_or_update(self, user: User, claims):
 
@@ -59,7 +71,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         try:
             _email_validator(email)
         except ValidationError:
-            raise SuspiciousOperation(f"Invalid email in OIDC claims: {email!r}")
+            raise SuspiciousOperation(f"Invalid email in OIDC claims: {email!r}") from None
         email = _sanitize_claim_str(email, 254)
 
         # Copy over basic details from open ID connect
@@ -76,7 +88,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # convert it so we get 'some_group_1', 'some_group_2'
 
         user.is_active = True
-        all_claim_groups = claims.get("groups")
+        all_claim_groups = claims.get("groups") or []
         if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in all_claim_groups:
             user.is_active = False
             user.save()
@@ -104,7 +116,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             messages.add_message(self.request, messages.ERROR, message, extra_tags="html")
             return user
 
-        oauth_groups = [g.split('/')[1:] for g in claims['groups']]
+        oauth_groups = [g.split('/')[1:] for g in all_claim_groups]
 
         associations = [g[1:] for g in oauth_groups if len(g) > 1 and g[0] == 'associations']
         # Should make 'variantgrid' setting configurable at some point in case there are 2 variantgrid installations on the same OAuth instance
@@ -191,7 +203,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 def provider_logout(request) -> str:
     oidc_logout = import_from_settings("KEY_CLOAK_PROTOCOL_BASE", "") + "/logout"
     if redirect := import_from_settings("LOGOUT_REDIRECT_URL", ""):
-        if oidc_id_token := request.session["oidc_id_token"]:
+        if oidc_id_token := request.session.get("oidc_id_token"):
             oidc_logout += "?" + urlencode({
                 "id_token_hint": oidc_id_token,
                 "post_logout_redirect_uri": redirect

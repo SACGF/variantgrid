@@ -19,7 +19,11 @@ labs they are in and whether they are an admin. Login and CSRF enforcement is gl
 which calls mozilla's `oidc_authentication_init` view directly (PKCE S256, RS256 ID tokens checked against the realm's JWKS).
 The `/oidc/` URLs are mounted `login_not_required`, and only when `USE_OIDC` (`variantgrid/urls.py`). On the callback,
 mozilla fetches userinfo and calls `oidc_auth/backend.py:VariantGridOIDCAuthenticationBackend.filter_users_by_claims`:
-match on `preferred_username` first, then case-insensitive email (more than one email match is refused by mozilla).
+the user whose `UserSettingsOverride.oauth_sub` is the Keycloak `sub`; failing that `preferred_username`, then
+case-insensitive email only when `email_verified` is true (more than one match is refused by mozilla). A username or
+email match already linked to a different `sub` is refused with `SuspiciousOperation` rather than taken over - when a
+Keycloak account is deleted and recreated, an admin clears that user's `oauth_sub` so the next login relinks it.
+Users with no stored `sub` (never logged in since it was stored) are found the old way and get it stored on login.
 Found or newly created, the user goes through `create_or_update`, which rewrites the local row from the claims every login:
 
 1. Username, email (validated, `SuspiciousOperation` if invalid), first/last name, with control characters stripped.
@@ -84,18 +88,16 @@ Reproduced on vg-test2 (2026-09-25) by calling the functions from `manage.py she
   maintenance branches of `oidc_auth/backend.py:VariantGridOIDCAuthenticationBackend.create_or_update` hit
   `messages.add_message(self.request, ...)` and raise `AttributeError`. It fails closed (no access), and the wrong-env
   branch has already saved the user inactive.
-- **Missing `groups` claim is a 500** (minor, fails closed). `create_or_update` only reports missing claims, then
-  `OIDC_REQUIRED_GROUP not in None` raises `TypeError` (or `claims['groups']` a `KeyError` when no required group is set).
-  A missing `preferred_username` likewise fails in `_sanitize_claim_str`.
-- **Logout 500s for a session without an ID token** (bug). `oidc_auth/backend.py:provider_logout` reads
-  `request.session["oidc_id_token"]`, a `KeyError` for anyone logged in by password through `ModelBackend` (above) —
-  and the menu always posts to `oidc_logout` when `USE_OIDC`.
+- **Missing `preferred_username` is a 500** (minor, fails closed): `_sanitize_claim_str(None, ...)`. A missing
+  `groups` claim is treated as no groups (inactive, wrong-environment message).
+- Logout works for a session without an ID token (a password login through `ModelBackend`, above):
+  `oidc_auth/backend.py:provider_logout` then omits `id_token_hint`.
 
 Read, not reproduced:
 
 - Groups granted in Django admin and a locally granted `is_superuser` are silently undone at that user's next login.
 - In maintenance mode a first-time user's row is still created by mozilla's `create_user` (with a hashed username)
-  before `create_or_update` returns `None`; their next login finds it by email.
+  before `create_or_update` returns `None`; their next login finds it by verified email.
 - Bearer tokens are checked only by Keycloak's userinfo endpoint, so an access token issued to another client in the
   same realm (eg `shariant-test`) is accepted by production; `OIDC_REQUIRED_GROUP` is the only environment gate there.
 - `VariantGridSessionRefresh` skips *any* path containing `/api/`, not just the DRF prefixes.
