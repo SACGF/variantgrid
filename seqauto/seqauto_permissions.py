@@ -5,6 +5,8 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 
+from library.guardian_utils import user_in_group_or_superuser
+
 
 def can_write_seqauto(user: User) -> bool:
-    return user.is_superuser or user.groups.filter(name=settings.SEQAUTO_API_WRITE_GROUP).exists()
+    return user_in_group_or_superuser(user, settings.SEQAUTO_API_WRITE_GROUP)
