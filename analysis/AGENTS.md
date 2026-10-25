@@ -172,7 +172,8 @@ Patterns here:
   (`analysis.user`): the grid (`analysis/grids.py:VariantGrid._get_permission_user`), the source pickers
   (`analysis/forms/forms_nodes.py:SampleNodeForm.clean_source`), tag / classification / phenotype nodes, template runs.
   So every viewer sees the same analysis, and adding a sample or VCF to it shares it with everyone who can see the
-  analysis. For a deactivated owner, object checks (`has_perm`, `get_for_user`) always fail while guardian's queryset
+  analysis. Someone else with write access can only add sources they can view as well
+  (`analysis/forms/forms_nodes.py:BaseNodeForm.restrict_choices_to_editor`), keeping what the node already has. For a deactivated owner, object checks (`has_perm`, `get_for_user`) always fail while guardian's queryset
   filters still pass, so the analysis keeps showing but can't take new inputs: someone with write access takes it over
   (`analysis/models/models_analysis.py:Analysis.change_owner`, from Analysis Settings or the user admin's lab head
   action), then the nodes reload as the new owner (#2325).

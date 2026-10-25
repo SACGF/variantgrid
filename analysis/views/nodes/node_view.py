@@ -113,7 +113,9 @@ class NodeView(UpdateView):
                         self._monkey_patch_widget_render(field.widget,
                                                          form.get_analysis_variable_field(field_name))
 
-        if not form.instance.analysis.can_write(self.request.user):
+        if form.instance.analysis.can_write(self.request.user):
+            form.restrict_choices_to_editor(self.request.user)
+        else:
             set_form_read_only(form)
 
         return form

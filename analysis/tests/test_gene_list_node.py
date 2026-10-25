@@ -66,6 +66,20 @@ class TestGeneListNode(AnalysisSetupMixin, TestCase):
                 form.is_valid()
                 self.assertEqual("gene_list" not in form.errors, accepted, form.errors)
 
+    def test_editor_only_adds_gene_lists_they_can_see(self):
+        """ The owner's list stays on the node, but someone they share it with can't add another of theirs """
+        editor = User.objects.get_or_create(username="test_gene_list_node_editor")[0]
+        owners_other_list = GeneList.objects.create(name="owner's other list", user=self.analysis.user,
+                                                    import_status=ImportStatus.SUCCESS)
+        node = self._node()
+        for gene_list, accepted in [(self.gene_list, True), (owners_other_list, False)]:
+            with self.subTest(gene_list=gene_list.name):
+                form = GeneListNodeForm({"gene_list": [gene_list.pk]}, instance=node,
+                                        initial={"gene_list": GeneList.objects.filter(pk=self.gene_list.pk)})
+                form.restrict_choices_to_editor(editor)
+                form.is_valid()
+                self.assertEqual("gene_list" not in form.errors, accepted, form.errors)
+
     def test_no_gene_list_does_not_modify_parents(self):
         self.assertFalse(GeneListNode.objects.create(analysis=self.analysis).modifies_parents())
 
