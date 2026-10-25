@@ -199,7 +199,10 @@ Gotchas:
   branch would re-queue the load that was just cancelled.
 - `AnalysisNode.save` locks the Analysis row first (`select_for_update`) so concurrent subtree cascades take NodeVersion
   locks in one order; copy `analysis/signals/source_data_invalidation.py:_bump_nodes` or
-  `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump.
+  `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump. Under that lock a bump counts on
+  from the stored version, not the one the request loaded (`AnalysisNode.bump_version`). An edit that doesn't bump (move,
+  name/notes) saves with `update_fields`: a whole-row save writes back the status and count read at request start over
+  the worker's load result (#2444).
 - The Q-object cache is on by default (`ANALYSIS_NODE_CACHE_Q`) and keyed only on NodeVersion pk. A test that changes a
   node and expects a different queryset without saving needs `@override_settings(ANALYSIS_NODE_CACHE_Q=False)`.
 - A small node answers `get_arg_q_dict` with `Q(pk__in=[...])` from `NodeVersion.variant_ids` (issue #546) - for its

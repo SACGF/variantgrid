@@ -148,8 +148,10 @@ def node_doc(request, analysis_id, node_id):
     if request.method == "POST":
         node.analysis.check_can_write(request.user)
         if form.is_valid():
-            # Doesn't set "queryset_dirty" so won't cause expensive reloads
-            node = form.save()
+            # Doesn't set "queryset_dirty" so won't cause expensive reloads. Saves only the form's fields (and
+            # the name auto_node_name sets) so a load finishing meanwhile keeps its status and counts
+            node = form.save(commit=False)
+            node.save(update_fields={"name", "modified", *(f for f in form._meta.fields if f in form.fields)})
 
     context = {"form": form,
                "node": node,

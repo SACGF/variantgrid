@@ -27,6 +27,7 @@ from library.django_utils.database_utils import query_was_cancelled
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
 from snpdb.enums import ProcessingStatus
+from snpdb.models.models_variant import VariantCollection
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 
@@ -198,8 +199,12 @@ def node_cache_task(node_id, version):
             variant_collection.save()
             return
 
+        # Claim the build - a second task for this node/version that read CREATED too leaves it to us
+        claimed = VariantCollection.objects.filter(pk=variant_collection.pk, status=ProcessingStatus.CREATED) \
+            .update(status=ProcessingStatus.PROCESSING)
+        if not claimed:
+            return
         variant_collection.status = ProcessingStatus.PROCESSING
-        variant_collection.save()
 
         # Node could be READY, we're just generating cache afterwards (node doesn't need but children do)
         if node.status != NodeStatus.READY:
