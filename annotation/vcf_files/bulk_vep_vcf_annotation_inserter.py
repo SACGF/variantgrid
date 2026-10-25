@@ -7,7 +7,6 @@ SVOverlapProcessor and genes.gene_overlaps.SVGeneOverlapResolver handle the stru
 skipped or annotated via --custom. Runs inside an AnnotationRun's upload step.
 """
 import logging
-import operator
 import os
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -683,7 +682,16 @@ class BulkVEPVCFAnnotationInserter:
                 self._missing_transcript_ids.add(t_id)
         return transcript_id, transcript_version_id
 
-    def _fix_multiple_values(self, transcript_data: TranscriptData):
+    @staticmethod
+    def _gnomad_af_sort_key(gnomad: dict[str, str]) -> float:
+        """ Numeric AF ('9.1e-06' is a string VEP passes through), with '.' / '' (missing) sorting lowest """
+        try:
+            return float(gnomad["gnomad_af"])
+        except (TypeError, ValueError):
+            return -1.0
+
+    @staticmethod
+    def _fix_multiple_values(transcript_data: TranscriptData):
         # T2T gnomad liftover has dupes, sometimes we get multiple entries in which case all will be dupes
         # We are going to pick the HIGHEST, as if there was a liftover error this will cause false positives after
         # gnomAD filter rather than false negatives (potentially throwing away real rare disease causing variants)
@@ -691,7 +699,7 @@ class BulkVEPVCFAnnotationInserter:
             if "&" in gnomad_af:
                 gnomad = {k: v for k, v in transcript_data.items() if k.startswith("gnomad")}
                 gnomad_list = split_dict_multi_values(gnomad, sep='&')
-                highest_af = sorted(gnomad_list, key=operator.itemgetter("gnomad_af"), reverse=True)[0]
+                highest_af = max(gnomad_list, key=BulkVEPVCFAnnotationInserter._gnomad_af_sort_key)
                 # Copy back overwriting old multi-value data with single values
                 for k, v in highest_af.items():
                     if v == '.':
