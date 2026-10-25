@@ -67,6 +67,15 @@ class IntegrationApiMiddlewareTest(TestCase):
         self.assertIsNone(api_request.response_body)
 
     @override_settings(INTEGRATION_API_TRACKING=TRACKING)
+    def test_form_body_and_query_string_redacted(self):
+        request = self.factory.post(f"{TRACKED_PATH}?api_key=abc&run=1", data="password=x&name=s1",
+                                    content_type="application/x-www-form-urlencoded")
+        self._call(TRACKED_PATH, request=request)
+        api_request = ApiRequestLog.objects.get()
+        self.assertEqual("api_key=%5Bredacted%5D&run=1", api_request.query_string)
+        self.assertEqual("password=%5Bredacted%5D&name=s1", api_request.request_body)
+
+    @override_settings(INTEGRATION_API_TRACKING=TRACKING)
     def test_multipart_body_is_noted_not_read(self):
         request = self.factory.post(TRACKED_PATH, data={"name": "value"})
         self._call(TRACKED_PATH, request=request)

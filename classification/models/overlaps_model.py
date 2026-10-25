@@ -403,6 +403,10 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         lab_ids = set(self.contributions.values_list('classification_grouping__lab', flat=True))
         return set(Lab.objects.filter(pk__in=lab_ids).all())
 
+    def can_view(self, user_or_group) -> bool:
+        """ Overlaps (and their reviews) are open to every user, as on the overlap page """
+        return True
+
     def post_review_url(self, review: Review) -> str:
         return reverse('action_overlap_review', kwargs={"review_id": review.pk})
 

@@ -118,6 +118,9 @@ class FlagType(TimeStampedModel, ModelUtilsMixin):
             res = self.resolution_for_status(FlagStatus.CLOSED)
         return res
 
+    def has_resolution(self, resolution: FlagResolution) -> bool:
+        return FlagTypeResolution.objects.filter(flag_type=self, resolution=resolution).exists()
+
 
 class FlagTypeResolution(TimeStampedModel):
     flag_type = models.ForeignKey(FlagType, on_delete=CASCADE)
@@ -515,6 +518,15 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             required_level = flag_type.raise_permission_enum
             if current_level < required_level:
                 raise PermissionError("Insufficient permissions to raise this flag type")
+            if flag_type.only_one and self.flag_set.filter(flag_type=flag_type).exists():
+                raise ValueError(f"Only one {flag_type} flag per collection, update the existing one")
+            if resolution is not None:
+                if not flag_type.has_resolution(resolution):
+                    raise ValueError(f"Resolution {resolution.pk} not available for {flag_type}")
+                if resolution.status != FlagStatus.OPEN and current_level < flag_type.permission_enum:
+                    raise PermissionError("Insufficient permissions to raise this flag already resolved")
+            if not flag_type.comments_enabled:
+                comment = None
 
         if resolution is None:
             resolution = flag_type.default_resolution()

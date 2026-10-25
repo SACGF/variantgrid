@@ -16,7 +16,12 @@
                 <a href="{{ message.get_absolute_url }}">{{ message.subject }}</a>
                 </td>
                 <td>{{ message.sent_at|date:_("DATETIME_FORMAT") }}</td>
-                <td><a href="{% url 'messages_delete' message.id %}?next={% url 'messages_outbox' %}">{% trans "delete" %}</a></td>
+                <td>
+                    <form method="post" action="{% url 'messages_delete' message.id %}?next={% url 'messages_outbox' %}">
+                        {% csrf_token %}
+                        <button class="btn btn-link p-0">{% trans "delete" %}</button>
+                    </form>
+                </td>
             </tr>
         {% endfor %}
             </tbody>

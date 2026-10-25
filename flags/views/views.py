@@ -470,12 +470,18 @@ class FlagView(APIView):
                 resolution = FlagResolution.objects.get(pk=resolution)
         except FlagResolution.DoesNotExist:
             return Response({'error': 'Invalid resolution'}, status=400)
+        if resolution and not f.flag_type.has_resolution(resolution):
+            return Response({'error': 'Invalid resolution'}, status=400)
+
+        comment = None
+        if f.flag_type.comments_enabled:
+            comment = empty_to_none(data.get('comment'))
 
         try:
             f.flag_action(
                 user=request.user,
                 resolution=resolution,
-                comment=empty_to_none(data.get('comment')))
+                comment=comment)
         except PermissionError as pe:
             raise PermissionDenied() from pe
 

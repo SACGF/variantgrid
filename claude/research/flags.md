@@ -96,6 +96,10 @@ owner so the app has no dependency on classification or snpdb; the signal is the
 viewer is above NO_PERM on (`flags/views/views.py:viewable_flag_collections`) and `?history=` must be one of them;
 `FlagsView` POST raises with `permission_check=True`, and `FlagView` answers 403 to a NO_PERM viewer. Any new path that
 reaches a collection by id needs the same check, since `raisableFlags()` in `flags.js` is presentation only.
+`FlagCollection.add_flag(permission_check=True)` also applies the type's rules the JS mirrors: the resolution must be
+one of the type's `FlagTypeResolution`s and, unless open, needs `permission`; an `only_one` type is raised once per
+collection; comments are dropped when `comments_enabled` is off. `FlagView` POST checks the resolution and comments
+the same way.
 
 **Compare `FlagPermissionLevel`s as enums, never as raw strings or truthiness.** `FlagPermissionLevel.__lt__` reads
 `other.level`, so comparing against the stored `raise_permission` / `permission` str raises AttributeError - use
