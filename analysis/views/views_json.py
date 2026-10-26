@@ -23,6 +23,7 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
+from analysis.models.models_analysis import Analysis
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
@@ -32,6 +33,7 @@ from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_samples_mixin import NodeProband
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import (
+    cancel_node_tasks,
     get_child_position,
     get_rendering_dict,
     get_toposorted_nodes,
@@ -228,22 +230,30 @@ def nodes_delete(request, analysis_id):
     node_ids = {int(i) for i in node_ids}
 
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
-    nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()
-    topo_sorted = get_toposorted_nodes(nodes_qs)
 
-    for group in reversed(topo_sorted):
-        for node in group:
-            if node.id not in node_ids:
-                continue  # parent we don't care about
-            # Detach first
-            for kid in node.analysisnode_ptr.children.select_subclasses():
-                kid.remove_parent(node)
-                kid.parents_changed = True
-                kid.save()
+    # Deleting a node drops its cache partitions, which would block behind (or deadlock with) a load reading them
+    cancel_node_tasks(NodeTask.objects.filter(node_version__node__analysis=analysis,
+                                              node_version__node__in=node_ids))
 
-            node.delete()
+    # All or nothing - a failure part way would leave some nodes deleted and children detached from the rest
+    with transaction.atomic():
+        Analysis.objects.select_related(None).select_for_update().get(pk=analysis.pk)
+        nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()
+        topo_sorted = get_toposorted_nodes(nodes_qs)
 
-    update_analysis(analysis.pk)
+        for group in reversed(topo_sorted):
+            for node in group:
+                if node.id not in node_ids:
+                    continue  # parent we don't care about
+                # Detach first
+                for kid in node.analysisnode_ptr.children.select_subclasses():
+                    kid.remove_parent(node)
+                    kid.parents_changed = True
+                    kid.save()
+
+                node.delete()
+
+        transaction.on_commit(lambda: update_analysis(analysis.pk))
     return JsonResponse({})
 
 
