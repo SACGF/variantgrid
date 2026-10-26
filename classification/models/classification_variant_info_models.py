@@ -260,6 +260,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.p_hgvs = None
         self.p_hgvs_source = None
         self.p_hgvs_error = None
+        self.error = None
         self.variant = variant
         self.genomic_sort = variant.sort_string
 

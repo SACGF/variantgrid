@@ -6,6 +6,7 @@ from annotation.fake_data import get_fake_annotation_version
 from classification.enums import ImportedAlleleInfoStatus
 from classification.models import ImportedAlleleInfo
 from classification.models.classification_variant_info_models import (
+    HGVSResolution,
     ImportedAlleleInfoValidation,
     ResolvedVariantInfo,
 )
@@ -258,3 +259,17 @@ class ResolvedVariantInfoCNVTest(TestCase):
         self.assertIsNone(variant_info.resolved_hgvs)
         self.assertIn("has no HGVS representation", variant_info.error)
         mock_report_exc_info.assert_not_called()
+
+    def test_error_cleared_when_hgvs_later_resolves(self):
+        """ #1364 - a stale error would still show on the allele info page beside the new c.HGVS """
+        variant_info = ResolvedVariantInfo(genome_build=self.genome_build, allele_info=self.allele_info,
+                                           variant=self.variant)
+        variant_info.set_variant_and_save(self.variant)
+        self.assertIsNotNone(variant_info.error)
+
+        resolution = HGVSResolution(resolved_hgvs="NM_001145661.2(GATA2):c.1018-213_1304del",
+                                    hgvs_converter_version=None, hgvs_converter_data_version="",
+                                    transcript_version=None, gene_symbol=None)
+        with patch.object(ResolvedVariantInfo, "recalc_resolved_hgvs", return_value=resolution):
+            variant_info.set_variant_and_save(self.variant)
+        self.assertIsNone(ResolvedVariantInfo.objects.get(pk=variant_info.pk).error)
