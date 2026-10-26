@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
@@ -103,8 +103,11 @@ class PanelAppPanelLocalCache(TimeStampedModel):
         }
         if gene_list := GeneList.objects.filter(**gene_list_kwargs).order_by("pk").first():
             logging.info("Reused existing gene list: %s", gene_list.pk)
-        else:
-            gene_list = GeneList.objects.create(**gene_list_kwargs)
+            return gene_list
+
+        # Only marked SUCCESS (and so reusable) once its symbols are in
+        with transaction.atomic():
+            gene_list = GeneList.objects.create(**(gene_list_kwargs | {"import_status": ImportStatus.CREATED}))
             logging.info("Created gene list: %s", gene_list.pk)
             gene_names_list = []
             for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.select_related("hgnc"):

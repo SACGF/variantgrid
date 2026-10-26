@@ -126,19 +126,17 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return self.genelistgenesymbol_set.filter(gene_symbol__isnull=False).values_list("gene_symbol", flat=True).distinct()
 
     def clone(self):
-        """ Needed to clone analysis node GeneListNode """
-        genelistgenesymbol_set = set(self.genelistgenesymbol_set.all())
-        copy = self
+        """ Needed to clone analysis node GeneListNode. Leaves self as the original """
+        copy = GeneList.objects.get(pk=self.pk)
         copy.pk = None
+        copy._state.adding = True
         copy.save()
 
-        genes = 0
-        for glgs in genelistgenesymbol_set:
+        gene_list_gene_symbols = list(self.genelistgenesymbol_set.all())
+        for glgs in gene_list_gene_symbols:
             glgs.pk = None
             glgs.gene_list = copy
-            glgs.save()
-            genes += 1
-
+        GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
         return copy
 
     def copy_for_user(self, user) -> 'GeneList':
@@ -322,14 +320,9 @@ class CustomTextGeneList(models.Model):
     gene_list = models.OneToOneField(GeneList, null=True, on_delete=SET_NULL)
 
     def clone(self):
-        copy = self
-        old_gene_list = self.gene_list
-        if self.gene_list:
-            copy.gene_list = self.gene_list.clone()
-        copy.pk = None
-        copy.save()
-        self.gene_list = old_gene_list
-        return copy
+        gene_list = self.gene_list.clone() if self.gene_list else None
+        return CustomTextGeneList.objects.create(sha256_hash=self.sha256_hash, name=self.name, text=self.text,
+                                                 gene_list=gene_list)
 
     def __str__(self):
         text = self.text

@@ -3,6 +3,7 @@ import urllib.parse
 from typing import NamedTuple, Optional, Union
 
 import requests
+from django.db import IntegrityError, transaction
 from rest_framework.exceptions import NotFound
 
 from genes.gene_matching import GeneSymbolMatcher
@@ -251,17 +252,24 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     if existing and existing.version == version:
         return existing  # cache still valid
 
-    pap_lc = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel_app_panel,
-                                                    version=version)
-    pap_lc_genes = []
-    for resolved_gene in resolve_panel_app_genes(genes, context=f"panel {panel_app_panel.panel_id}"):
-        gene_data = resolved_gene.api_record.get("gene_data") or {}
-        record = PanelAppPanelLocalCacheGeneSymbol(panel_app_local_cache=pap_lc,
-                                                   hgnc_id=resolved_gene.hgnc_pk,
-                                                   gene_symbol_reported=gene_data.get("gene_symbol") or "",
-                                                   data=resolved_gene.api_record)
-        pap_lc_genes.append(record)
+    resolved_genes = list(resolve_panel_app_genes(genes, context=f"panel {panel_app_panel.panel_id}"))
+    # The cache is trusted from then on, so its genes go in with it - and a concurrent request for the
+    # same panel version can win the insert
+    try:
+        with transaction.atomic():
+            pap_lc = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel_app_panel,
+                                                            version=version)
+            pap_lc_genes = []
+            for resolved_gene in resolved_genes:
+                gene_data = resolved_gene.api_record.get("gene_data") or {}
+                record = PanelAppPanelLocalCacheGeneSymbol(panel_app_local_cache=pap_lc,
+                                                           hgnc_id=resolved_gene.hgnc_pk,
+                                                           gene_symbol_reported=gene_data.get("gene_symbol") or "",
+                                                           data=resolved_gene.api_record)
+                pap_lc_genes.append(record)
 
-    if pap_lc_genes:
-        PanelAppPanelLocalCacheGeneSymbol.objects.bulk_create(pap_lc_genes, batch_size=2000)
+            if pap_lc_genes:
+                PanelAppPanelLocalCacheGeneSymbol.objects.bulk_create(pap_lc_genes, batch_size=2000)
+    except IntegrityError:
+        pap_lc = PanelAppPanelLocalCache.objects.get(panel_app_panel=panel_app_panel, version=version)
     return pap_lc
