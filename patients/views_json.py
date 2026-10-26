@@ -128,9 +128,12 @@ def phenotypes_matches(request):
 @require_POST
 def approve_patient_term(request):
     patient_id = request.POST["patient_id"]
-    patient = Patient.get_for_user(request.user, patient_id)
-    patient.phenotype_description.approved_by = request.user
-    patient.phenotype_description.save(update_fields=["approved_by"])
+    patient = Patient.get_for_user(request.user, patient_id, write=True)
+    phenotype_description = getattr(patient, "phenotype_description", None)
+    if phenotype_description is None:
+        raise Http404(f"Patient {patient_id} has no phenotype text to approve")
+    phenotype_description.approved_by = request.user
+    phenotype_description.save(update_fields=["approved_by"])
 
     PatientModification.objects.create(patient=patient,
                                        user=request.user,

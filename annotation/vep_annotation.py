@@ -38,6 +38,9 @@ from snpdb.models.models_genome import GenomeBuild
 # get_vep_version runs VEP, which the web must never do: workers publish it here, the web only reads it
 VEP_VERSION_CACHE_TTL = DAY_SECS
 
+# Plugins in annotation/annotation_data/generate_annotation rather than Ensembl's VEP_plugins
+_VARIANTGRID_VEP_PLUGINS = {"Grantham"}
+
 
 class VEPVersionMismatchError(ValueError):
     pass
@@ -323,6 +326,27 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     return cmd
 
 
+def get_vep_plugin_files(genome_build: GenomeBuild) -> dict[str, str]:
+    """ plugin name -> the .pm a STANDARD VEP run on this build loads """
+    vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium,
+                                  VariantAnnotationPipelineType.STANDARD)
+    plugin_files = {}
+    for flag, plugin_arg in pairwise(vep_command):
+        if flag == "--plugin":
+            plugin_name = plugin_arg.split(",")[0]
+            plugin_files[plugin_name] = os.path.join(settings.ANNOTATION_VEP_PLUGINS_DIR, f"{plugin_name}.pm")
+    return plugin_files
+
+
+def get_vep_plugin_url(plugin_name: str) -> str:
+    """ Ensembl's VEP_plugins branch for the installed VEP, or our repo for a plugin Ensembl doesn't have """
+    if plugin_name in _VARIANTGRID_VEP_PLUGINS:
+        return ("https://raw.githubusercontent.com/SACGF/variantgrid/refs/heads/master/annotation/annotation_data/"
+                f"generate_annotation/{plugin_name}.pm")
+    return (f"https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/{settings.ANNOTATION_VEP_VERSION}/"
+            f"{plugin_name}.pm")
+
+
 def get_missing_vep_files(genome_build: GenomeBuild) -> dict[str, str]:
     """ What a STANDARD VEP run on this build needs and can't find: key (a vep_config key, or
         'plugin <name>') -> path. A plugin can be newer than the VEP_plugins checkout (AVI.pm, #2426),
@@ -333,13 +357,8 @@ def get_missing_vep_files(genome_build: GenomeBuild) -> dict[str, str]:
         if rel_path is not None:
             check_files[key] = vep_config[key]
 
-    vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium,
-                                  VariantAnnotationPipelineType.STANDARD)
-    for flag, plugin_arg in pairwise(vep_command):
-        if flag == "--plugin":
-            plugin_name = plugin_arg.split(",")[0]
-            check_files[f"plugin {plugin_name}"] = os.path.join(settings.ANNOTATION_VEP_PLUGINS_DIR,
-                                                                f"{plugin_name}.pm")
+    for plugin_name, filename in get_vep_plugin_files(genome_build).items():
+        check_files[f"plugin {plugin_name}"] = filename
     return {key: filename for key, filename in check_files.items() if not os.path.exists(filename)}
 
 

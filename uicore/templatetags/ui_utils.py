@@ -480,7 +480,7 @@ def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
     render_status = status
     if count == 0:
         render_status = "info"
-    return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
+    return html.format_html(' <span class="d-inline-block ml-1 badge badge-{}">{}</span>', render_status, count)
 
 
 @register.filter()
@@ -522,7 +522,7 @@ def value(value: Any, no_value: Optional[str] = None) -> str:
     if isinstance(value, bool):
         return boolean(value)
     if not value:
-        return SafeString(f'<span class="no-value">{no_value or value}</span>')
+        return html.format_html('<span class="no-value">{}</span>', no_value or value)
     elif isinstance(value, int):
         return f'{value:,}'
     else:
@@ -571,7 +571,7 @@ def segmented_text(text: str, divider: str = ':') -> str:
     for segment in parts[:-1]:
         output.append(f"<span class='text-monospace text-small text-muted'>{escape(segment)}</span>")
         output.append(f"<span class='text-monospace text-muted'>{escape(divider)}</span>")
-    output.append(parts[-1])
+    output.append(escape(parts[-1]))
     output_str = "".join(output)
     return SafeString(f"<span>{output_str}</span>")
 

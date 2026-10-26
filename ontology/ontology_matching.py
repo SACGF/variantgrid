@@ -11,7 +11,7 @@ from library.log_utils import report_exc_info, report_message
 from library.utils import empty_to_none
 from ontology.enums import OntologyService
 from ontology.models import OntologySnake, OntologyTerm
-from ontology.monarch_search import monarch_condition_text_search
+from ontology.monarch_search import MONARCH_INTERACTIVE_TIMEOUT_SECS, monarch_condition_text_search
 
 
 class OntologySnakeJson(TypedDict):
@@ -333,7 +333,8 @@ class OntologyMatching:
                 #     server_search_text = server_search_text + " " + gene_symbol
                 try:
                     row_count = 6
-                    results = monarch_condition_text_search(server_search_text, row_limit=row_count)
+                    results = monarch_condition_text_search(server_search_text, row_limit=row_count,
+                                                            timeout=MONARCH_INTERACTIVE_TIMEOUT_SECS)
                     for index, result in enumerate(results):
                         ontology_matches.searched_term(result.id, row_count - index)
                 except Exception:

@@ -142,9 +142,8 @@ class VariantZygosityCountForVCF(AbstractVariantZygosityCountRecord):
         logging.info(msg)
 
         for sample in self.vcf.sample_set.all():
-            VariantZygosityCountForSample.objects.create(sample=sample,
-                                                         count_complete=self.count_complete,
-                                                         deleted=self.deleted)
+            VariantZygosityCountForSample.objects.create(collection=self.collection, sample=sample,
+                                                         count_complete=self.count_complete, deleted=self.deleted)
 
         self.is_split_to_sample_counts = True
         self.save()

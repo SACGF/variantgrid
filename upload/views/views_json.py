@@ -218,7 +218,7 @@ def upload_file_delete(request, pk):
 def accept_vcf_import_info_tag(request, vcf_import_info_id):
     vii = VCFImportInfo.objects.get_subclass(pk=vcf_import_info_id)
     vcf_id = vii.upload_step.upload_pipeline.file_upload.uploadedvcf.vcf.pk
-    VCF.get_for_user(request.user, vcf_id)  # Permission check
+    VCF.get_for_user(request.user, vcf_id, write=True)
     vii.accepted_date = timezone.now()
     vii.save()
 

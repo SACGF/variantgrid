@@ -106,6 +106,12 @@ app.conf.beat_schedule['retry-failed-condition-text-automatch'] = {
     'schedule': HOUR_SECS,
 }
 
+# Classification import runs whose client stopped sending, so the work deferred while they ran catches up
+app.conf.beat_schedule['close-abandoned-classification-import-runs'] = {
+    'task': 'classification.tasks.classification_import_task.close_abandoned_classification_import_runs_task',
+    'schedule': MINUTE_SECS * 5,
+}
+
 # Imports whose worker was killed from outside stay PROCESSING with a lapsed lease (#2188); time them out so
 # the retry buttons offer them. Cheap: one indexed query when nothing has lapsed.
 app.conf.beat_schedule['fail-stuck-upload-pipelines'] = {

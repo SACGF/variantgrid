@@ -4,12 +4,16 @@ from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Optional
-from urllib.error import HTTPError
 
 from django.db import transaction
 from django.utils import timezone
+from requests import HTTPError
 
-from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS, ClinVarXmlParser
+from annotation.clinvar_xml_parser import (
+    CLINVAR_RECORD_CACHE_DAYS,
+    ClinVarXmlParser,
+    ClinVarXmlParserOutput,
+)
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
 from annotation.models import ClinVar, ClinVarRecordCollection, ClinVarVersion
 from snpdb.models import GenomeBuild
@@ -81,31 +85,35 @@ class ClinVarFetchRequest:
             if not allele_id:
                 logging.warning("Couldn't determine Allele for clinvar_variation_id %s", self.clinvar_variation_id)
 
-            if fetch_from_clinvar:
-                # so while Entrez does automatically retry on 500s, ClinVar has been providing 400s (Bad Request) when
-                # the request is fine
-                attempt_count = 2
-                while True:
-                    # loop is broken out of if it works, or raise if it fails after attempt_count
-                    try:
-                        response = self.parser.load_from_clinvar_id(clinvar_variation_id=self.clinvar_variation_id)
-
-                        # update our cache
-                        clinvar_record_collection.last_loaded = fetch_date
-                        clinvar_record_collection.urls = response.urls
-                        clinvar_record_collection.parser_version = self.parser.PARSER_VERSION
-
-                        clinvar_record_collection.update_with_records_and_save(response.all_records)
-                        break
-
-                    except HTTPError as http_ex:
-                        if http_ex.code == 400:
-                            attempt_count -= 1
-                            if attempt_count > 0:
-                                logging.warning("400 from Entrez when fetching ClinVarRecord, waiting then trying again")
-                                time.sleep(10)
-                                continue
-                        # out of attempts or not 400
-                        raise
+        if fetch_from_clinvar:
+            # Fetched outside the transaction so a slow ClinVar doesn't hold the row lock for the whole HTTP request
+            response = self._load_from_clinvar()
+            with transaction.atomic():
+                clinvar_record_collection = ClinVarRecordCollection.objects.select_for_update().get(pk=clinvar_record_collection.pk)
+                # a simultaneous request may have stored a fetch started after ours
+                if not (clinvar_record_collection.last_loaded and clinvar_record_collection.last_loaded >= fetch_date):
+                    if allele_id:
+                        clinvar_record_collection.allele_id = allele_id
+                    clinvar_record_collection.last_loaded = fetch_date
+                    clinvar_record_collection.urls = response.urls
+                    clinvar_record_collection.parser_version = self.parser.PARSER_VERSION
+                    clinvar_record_collection.update_with_records_and_save(response.all_records)
 
         return clinvar_record_collection
+
+    def _load_from_clinvar(self) -> ClinVarXmlParserOutput:
+        # library.entrez retries server errors, but ClinVar has also been providing 400s (Bad Request) when
+        # the request is fine
+        attempt_count = 2
+        while True:
+            try:
+                return self.parser.load_from_clinvar_id(clinvar_variation_id=self.clinvar_variation_id)
+            except HTTPError as http_ex:
+                if http_ex.response is not None and http_ex.response.status_code == 400:
+                    attempt_count -= 1
+                    if attempt_count > 0:
+                        logging.warning("400 from Entrez when fetching ClinVarRecord, waiting then trying again")
+                        time.sleep(10)
+                        continue
+                # out of attempts or not 400
+                raise
