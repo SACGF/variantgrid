@@ -37,6 +37,6 @@ class TestAnnotationVCF(TestCase):
         gl = GeneList.objects.create(name="test", user=user)
         data = {"name": "test", "user": user.pk}
         for url, valid in [("https://example.com/panel", True), ("javascript:alert(1)", False), ("", True)]:
-            form = GeneListForm(data={**data, "url": url}, instance=gl)
+            form = GeneListForm(data={**data, "url": url}, instance=gl, user=user)
             self.assertEqual(valid, form.is_valid(), (url, form.errors))
         self.assertIsNone(form.cleaned_data["url"])
