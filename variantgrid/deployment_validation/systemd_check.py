@@ -3,10 +3,12 @@ Whether the installed systemd units can start on this checkout. The units in `co
 file for every install location: they read VG_INSTALL_DIR from /etc/variantgrid/variantgrid.env and the unit's
 own .env (`config/systemd/README.txt`). A deployment that copied a unit without those files, or whose
 VG_INSTALL_DIR points at another checkout, fails at the next restart - so this runs before it, in
-`manage.py deployment_check`, and stops the upgrade.
+`manage.py deployment_check`, and stops the upgrade. So does a unit's own .env left over from an older unit:
+the env files are copied with `cp -rn`, keeping a host's tuning, so one that no longer suits its unit stays.
 
 Entry points: `check_systemd_units`, run by `deployment_check`; `systemd_env_files_problem` is the predicate the
-manual migration that installs the env files shares; `systemctl_show` is the one place a unit's properties are read.
+manual migration that installs the env files shares; `detached_simple_units` finds a leftover .env a Type=simple unit
+can't run with; `systemctl_show` is the one place a unit's properties are read.
 """
 import os
 import shlex
@@ -45,27 +47,53 @@ def systemctl_show(unit: str, *properties: str) -> dict[str, list[str]] | None:
     return props
 
 
-def unit_environment_files(unit: str) -> list[str] | None:
-    """ Paths of the unit's EnvironmentFile= lines ("/path (ignore_errors=yes)" as systemctl prints them),
-        None when the unit isn't installed """
-    props = systemctl_show(unit, "EnvironmentFiles")
-    if props is None:
-        return None
+def _environment_file_paths(props: dict[str, list[str]]) -> list[str]:
+    """ Paths of the unit's EnvironmentFile= lines, from "/path (ignore_errors=yes)" as systemctl prints them """
     return [value.split(" (", 1)[0] for value in props.get("EnvironmentFiles", []) if value]
 
 
-def shared_env_install_dir() -> str | None:
-    """ VG_INSTALL_DIR from the shared env file, None when the file or the variable is missing """
+def unit_environment_files(unit: str) -> list[str] | None:
+    """ Paths of the unit's EnvironmentFile= lines, None when the unit isn't installed """
+    props = systemctl_show(unit, "EnvironmentFiles")
+    if props is None:
+        return None
+    return _environment_file_paths(props)
+
+
+def env_file_value(path: str, name: str) -> str | None:
+    """ `name=` from an env file with its quotes removed, as systemd reads it; None when the file or the
+        variable is missing """
     try:
-        with open(SHARED_ENV_FILE, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if line.startswith("VG_INSTALL_DIR="):
+                if line.startswith(f"{name}="):
                     value = shlex.split(line.split("=", 1)[1])
                     return value[0] if value else None
     except FileNotFoundError:
         return None
     return None
+
+
+def shared_env_install_dir() -> str | None:
+    """ VG_INSTALL_DIR from the shared env file, None when the file or the variable is missing """
+    return env_file_value(SHARED_ENV_FILE, "VG_INSTALL_DIR")
+
+
+def detached_simple_units() -> dict[str, str]:
+    """ {unit: env file} for each Type=simple unit whose own .env passes --detach in CELERYD_OPTS: the process
+        systemd started exits once celery has forked, systemd stops the unit, kills the fork and restarts it
+        until start-limit-hit. celeryd_beat became Type=simple without --detach, and an older .env survives
+        the `cp -rn` install """
+    detached = {}
+    for unit in service_names():
+        props = systemctl_show(unit, "Type", "EnvironmentFiles")
+        if props is None or props.get("Type") != ["simple"]:
+            continue
+        for path in _environment_file_paths(props):
+            if path != SHARED_ENV_FILE and "--detach" in (env_file_value(path, "CELERYD_OPTS") or "").split():
+                detached[unit] = path
+    return detached
 
 
 def _installed_units_env_files() -> dict[str, list[str]]:
@@ -104,7 +132,16 @@ def check_systemd_units() -> dict:
         hardcoded_check["warning"] = (f"{', '.join(hardcoded)} do not read {SHARED_ENV_FILE} (units from before "
                                       f"config/variantgrid.env) - {INSTALL_STEP}")
 
+    detach_check = {"valid": True}
+    if detached := detached_simple_units():
+        copies = "; ".join(f"sudo cp config/celery/{os.path.basename(path)} {path}" for path in detached.values())
+        detach_check = {"valid": False,
+                        "fix": f"{', '.join(detached)} will not stay running: their .env passes --detach, which a "
+                               f"Type=simple unit cannot run with. Refresh it from the checkout ({copies}, "
+                               f"re-applying any local tuning) then sudo systemctl restart {' '.join(detached)}"}
+
     return {
         "env files": env_check,
         "env-driven units": hardcoded_check,
+        "env files match units": detach_check,
     }

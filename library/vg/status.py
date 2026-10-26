@@ -225,6 +225,10 @@ def render_status(status: Status) -> str:
         down = [name for name, state in status.services.items() if state != "active"]
         lines.append(f"services: {len(status.services) - len(down)}/{len(status.services)} active"
                      + (f"  DOWN: {', '.join(down)}" if down else ""))
+        if "celeryd_beat" in down:
+            lines.append(f"  celeryd_beat down: none of the {len(celery_app.conf.beat_schedule)} beat schedule tasks "
+                         "run - new variants are not annotated (dispatch-annotation-runs) and the analysis backlog "
+                         "is not dispatched (dispatch-analysis-backlog)")
     if status.queues:
         lines.append("queues: " + ", ".join(
             f"{name} {info['messages']}q/{info['consumers']}c" + (" NO CONSUMER" if info["consumers"] == 0 else "")
