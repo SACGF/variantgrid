@@ -1,10 +1,12 @@
 """
-Backfills somalier for every VCF without an extract: extracts fan out as celery tasks, then the new extracts are
-grouped into ancestry batches of up to settings.SOMALIER["ancestry_batch_samples"] samples, then the all-samples
-relate. Progress is read from the DB, so the command can be killed and re-run at any point and picks up what
-is missing (#1850).
+Backfills somalier for every VCF without a successful extract: extracts fan out as celery tasks, then the new
+extracts are grouped into ancestry batches of up to settings.SOMALIER["ancestry_batch_samples"] samples, then the
+all-samples relate. Progress is read from the DB, so the command can be killed and re-run at any point and picks
+up what is missing or failed (#1850). It fails if any extract or ancestry run errored, so the upgrader keeps the
+step outstanding.
 """
 import logging
+import os
 import time
 from collections.abc import Callable, Iterable
 
@@ -19,6 +21,8 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_somalier import (
     SomalierAllSamplesRelate,
     SomalierAncestryBatch,
+    SomalierAncestryRun,
+    SomalierConfig,
     SomalierRelatePairs,
     SomalierVCFExtract,
 )
@@ -71,6 +75,12 @@ class Command(BaseCommand):
         if not settings.SOMALIER.get("enabled"):
             raise ValueError("settings.SOMALIER['enabled'] not enabled!")
 
+        # Checked before --clear, as every extract would otherwise fail and the old ones are already gone
+        somalier_bin = SomalierConfig().get_annotation("command")
+        if not os.access(somalier_bin, os.X_OK):
+            raise CommandError(f"somalier '{somalier_bin}' is missing or not executable - "
+                               "run 'manage.py download_annotation_data'")
+
         if options.get("clear"):
             SomalierVCFExtract.objects.all().delete()
             SomalierAncestryBatch.objects.all().delete()  # These, and the relates, take their report dirs
@@ -81,7 +91,8 @@ class Command(BaseCommand):
         if build_name := options.get("genome_build"):
             vcf_qs = vcf_qs.filter(genome_build=GenomeBuild.get_name_or_alias(build_name))
 
-        vcf_ids = list(vcf_qs.filter(somaliervcfextract__isnull=True).order_by("pk").values_list("pk", flat=True))
+        needs_extract_q = Q(somaliervcfextract__isnull=True) | Q(somaliervcfextract__status=ProcessingStatus.ERROR)
+        vcf_ids = list(vcf_qs.filter(needs_extract_q).order_by("pk").values_list("pk", flat=True))
         if not options.get("no_wait"):
             self._require_worker(somalier_vcf_extract)
             self._require_worker(somalier_ancestry_batch)
@@ -97,6 +108,7 @@ class Command(BaseCommand):
                    lambda: VCF.objects.filter(pk__in=vcf_ids).filter(
                        Q(somaliervcfextract__isnull=True) | _still_running_q("somaliervcfextract__")))
 
+        SomalierAncestryRun.objects.filter(vcf_extract__vcf__in=vcf_qs, status=ProcessingStatus.ERROR).delete()
         extracts = SomalierVCFExtract.objects.filter(vcf__in=vcf_qs, status=ProcessingStatus.SUCCESS,
                                                      somalierancestryrun__isnull=True)
         extract_sample_counts = extracts.annotate(num_samples=Count("somaliersampleextract")) \
@@ -113,6 +125,14 @@ class Command(BaseCommand):
 
         somalier_all_samples.delay(force=True)
         logging.info("Dispatched the all samples relate")
+
+        num_failed_extracts = SomalierVCFExtract.objects.filter(vcf__in=vcf_ids, status=ProcessingStatus.ERROR).count()
+        num_failed_ancestry = SomalierAncestryRun.objects.filter(vcf_extract__in=vcf_extract_ids,
+                                                                 status=ProcessingStatus.ERROR).count()
+        if num_failed_extracts or num_failed_ancestry:
+            raise CommandError(f"{num_failed_extracts} / {len(vcf_ids)} extracts and {num_failed_ancestry} / "
+                               f"{len(vcf_extract_ids)} ancestry runs failed - see the Somalier stages on each "
+                               "VCF's VCF Info tab, fix the cause and re-run (failed VCFs are retried)")
 
     @staticmethod
     def _require_worker(task):

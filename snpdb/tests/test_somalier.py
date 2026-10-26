@@ -12,6 +12,8 @@ from unittest.mock import patch
 import cyvcf2
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -20,6 +22,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
 from snpdb.enums import ImportStatus, ProcessingStatus, SuperPopulationCode
 from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
+from snpdb.management.commands.somalier_existing_vcfs import Command as SomalierExistingVCFsCommand
 from snpdb.management.commands.somalier_existing_vcfs import batch_by_sample_count
 from snpdb.models import (
     VCF,
@@ -495,6 +498,46 @@ class SomalierAncestryBatchTest(TestCase):
         self.assertEqual([[1], [2, 3]], batch_by_sample_count([(1, 600), (2, 600), (3, 300)], 1000))
         self.assertEqual([[1], [2]], batch_by_sample_count([(1, 1500), (2, 10)], 1000),
                          "an extract over the limit is a batch of its own")
+
+
+
+class SomalierExistingVCFsCommandTest(TestCase):
+    """ A backfill whose extracts all failed must not look finished to the upgrader """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get_or_create(username='somalier_backfill_user')[0]
+        cls.vcf = _create_vcf_samples(cls.user)[0].vcf
+
+    def setUp(self):
+        self.annotation_dir = tempfile.mkdtemp()
+        self.enterContext(override_settings(SOMALIER={**settings.SOMALIER, "enabled": True,
+                                                      "annotation_base_dir": self.annotation_dir}))
+
+    def test_missing_binary_fails_before_clear(self):
+        SomalierVCFExtract.objects.create(vcf=self.vcf, status=ProcessingStatus.SUCCESS)
+        with self.assertRaisesRegex(CommandError, "download_annotation_data"):
+            call_command("somalier_existing_vcfs", "--clear")
+        self.assertTrue(SomalierVCFExtract.objects.filter(vcf=self.vcf).exists())
+
+    def test_failed_extract_is_retried_and_fails_the_command(self):
+        somalier_bin = Path(SomalierConfig().get_annotation("command"))
+        somalier_bin.touch(mode=0o755)
+        SomalierVCFExtract.objects.create(vcf=self.vcf, status=ProcessingStatus.ERROR)
+
+        def fail_extract(vcf_id):
+            SomalierVCFExtract.objects.filter(vcf_id=vcf_id).delete()
+            SomalierVCFExtract.objects.create(vcf_id=vcf_id, status=ProcessingStatus.ERROR)
+
+        module = "snpdb.management.commands.somalier_existing_vcfs"
+        with patch.object(SomalierExistingVCFsCommand, "_require_worker"), \
+                patch(f"{module}.somalier_vcf_extract") as mock_extract, \
+                patch(f"{module}.somalier_ancestry_batch"), \
+                patch(f"{module}.somalier_all_samples"):
+            mock_extract.delay.side_effect = fail_extract
+            with self.assertRaisesRegex(CommandError, "extracts .* failed"):
+                call_command("somalier_existing_vcfs")
+        mock_extract.delay.assert_any_call(self.vcf.pk)
 
 
 class SomalierPatientRelateTest(TestCase):
