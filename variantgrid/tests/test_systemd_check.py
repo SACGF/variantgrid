@@ -1,8 +1,10 @@
 """
 The predicate the systemd env files manual migration and deployment_check share: when the installed units
 would fail to start because /etc/variantgrid/variantgrid.env or a unit's own .env is missing, or
-VG_INSTALL_DIR is another checkout.
+VG_INSTALL_DIR is another checkout. Also a unit's own .env left over from an older unit (#2482).
 """
+import os
+import tempfile
 from unittest.mock import patch
 
 from django.conf import settings
@@ -11,6 +13,7 @@ from django.test import SimpleTestCase
 from variantgrid.deployment_validation.systemd_check import (
     SHARED_ENV_FILE,
     check_systemd_units,
+    detached_simple_units,
     systemd_env_files_problem,
 )
 
@@ -50,3 +53,38 @@ class SystemdEnvFilesProblemTest(SimpleTestCase):
             checks = check_systemd_units()
             self.assertTrue(checks["env files"]["valid"])
             self.assertIn("celeryd_beat, gunicorn", checks["env-driven units"]["warning"])
+
+
+class DetachedSimpleUnitsTest(SimpleTestCase):
+
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp_dir.cleanup)
+
+    def _env_file(self, name: str, celeryd_opts: str) -> str:
+        path = os.path.join(self.tmp_dir.name, name)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(f'CELERY_BIN=".venv/bin/celery"\nCELERYD_OPTS="{celeryd_opts}"\n')
+        return path
+
+    def _installed(self, units: dict[str, tuple[str, str]]):
+        """ units: {unit: (Type, its own env file)} """
+        def show(unit, *_properties):
+            if unit not in units:
+                return None
+            unit_type, env_file = units[unit]
+            return {"LoadState": ["loaded"], "Type": [unit_type],
+                    "EnvironmentFiles": [f"{SHARED_ENV_FILE} (ignore_errors=yes)", f"{env_file} (ignore_errors=yes)"]}
+        return patch(f"{MODULE}.systemctl_show", side_effect=show)
+
+    def test_old_beat_env_under_simple_unit(self):
+        old_beat_env = self._env_file("celeryd_beat.env", "--detach --pidfile=/var/run/beat.pid --schedule=x")
+        worker_env = self._env_file("celeryd_db_workers.env", "--detach -n db_workers")
+        with self._installed({"celeryd_beat": ("simple", old_beat_env),
+                              "celeryd_db_workers": ("forking", worker_env)}):
+            self.assertEqual({"celeryd_beat": old_beat_env}, detached_simple_units())
+
+    def test_current_beat_env_is_fine(self):
+        beat_env = self._env_file("celeryd_beat.env", "--schedule=data/celery_beat_schedule")
+        with self._installed({"celeryd_beat": ("simple", beat_env)}):
+            self.assertEqual({}, detached_simple_units())

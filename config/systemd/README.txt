@@ -11,7 +11,10 @@ celery/gunicorn .env files run out of .venv/bin (see the "Install system service
 A unit installed without those env files fails to start with the fix in `systemctl status <unit>`
 (an ExecStartPre check - systemd's own error for a missing EnvironmentFile names no file), and
 `manage.py deployment_check` is invalid, stopping an upgrade before the restart that would fail. Copy
-the env files with `cp -rn` so a host's tuned celery .env files are kept.
+the env files with `cp -rn` so a host's tuned celery .env files are kept - but refresh a unit's own
+.env when the unit changes how it runs: celeryd_beat is Type=simple, and a beat .env from before that
+still passing --detach stops beat (and everything on its schedule) at every start. deployment_check is
+invalid while an installed .env does that.
 
 The celery units set OOMPolicy=continue: under systemd's default (stop) a kernel OOM kill of one
 subprocess (eg somalier) stops the whole unit, SIGTERMing every in-flight task on that queue.
