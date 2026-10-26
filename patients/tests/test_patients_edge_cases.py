@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.test import TestCase
 from django.utils import timezone
 from guardian.shortcuts import assign_perm
@@ -35,6 +36,7 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
+from patients.models.models_patient import single_string_to_first_last_name_q
 from snpdb.enums import ImportSource
 from upload.enums import UploadedFileTypes
 from upload.models import FileUpload, UploadedPatientRecords
@@ -678,3 +680,16 @@ class TestPatientDisplayIdentityExpression(TestCase):
     def test_blank_is_not_a_value(self):
         """ A cleared form field saves as "", which Python reads as absent and a NOT NULL test does not """
         self._assert_agrees_with_property(Patient.objects.create(patient_code="", first_name="", last_name="SMITH"))
+
+
+class TestSingleStringToFirstLastNameQ(TestCase):
+    def test_title_and_last_name_only(self):
+        self.assertEqual(Q(last_name__iexact="Smith"), single_string_to_first_last_name_q("Dr Smith"))
+
+    def test_first_name_or_initial(self):
+        expected = Q(last_name__iexact="Smith") & (Q(first_name__iexact="Jo") | Q(first_name__istartswith="J"))
+        self.assertEqual(expected, single_string_to_first_last_name_q("Jo Smith"))
+
+    def test_empty_raises(self):
+        with self.assertRaises(ValueError):
+            single_string_to_first_last_name_q("")

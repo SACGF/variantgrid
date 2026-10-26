@@ -1,18 +1,15 @@
 """
 Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
-and choice display formatting (get_choices_formatter), Q helpers for name searches, timezone and form
-read-only utilities, related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
+and choice display formatting (get_choices_formatter), timezone and form read-only utilities,
+related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
 SortByPKMixin that let model instances sort like their querysets. Permission checks live in
 guardian_permissions_mixin.py, partitioning in django_partition.py, test bases in unittest_utils.py.
 """
 import datetime
-import operator
 import os
-from functools import reduce
 from functools import wraps
 from typing import Any
 
-import nameparser
 from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
@@ -22,7 +19,6 @@ from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
 from django.db.models.options import Options
-from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -135,30 +131,6 @@ def get_choices_formatter(choices, default=None):
         return lookup.get(c, default)
 
     return get_choice
-
-
-def single_string_to_first_last_name_q(single_string):
-    """ Returns a DJango Q object """
-    name = nameparser.HumanName(single_string)
-    if not (name.first or name.last):
-        raise ValueError(f"No name found in '{single_string}'")
-
-    queries = []
-    first_name_queries = []
-    first_name = name.first
-    if first_name:
-        first_name_queries.append(Q(first_name__iexact=first_name))
-
-    last_name = name.last
-    if last_name:
-        queries.append(Q(last_name__iexact=last_name))
-        # If we have the last name, also accept an initial
-        if first_name:
-            first_name_queries.append(Q(first_name__istartswith=first_name[0]))
-
-    if first_name_queries:
-        queries.append(reduce(operator.or_, first_name_queries))
-    return reduce(operator.and_, queries)
 
 
 def count_values_qs(qs, field, count_field="count"):

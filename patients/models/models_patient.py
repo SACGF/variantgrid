@@ -8,9 +8,12 @@ records exist. Patient modifications and imports are audited rows; clinicians an
 complete the set.
 """
 import datetime
+import operator
 import os
+from functools import reduce
 from typing import Optional
 
+import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -26,10 +29,7 @@ from easy_thumbnails.files import get_thumbnailer
 from guardian.models import GroupObjectPermission, UserObjectPermission
 from model_utils.models import TimeStampedModel
 
-from library.django_utils import (
-    ensure_mutally_exclusive_fields_not_set,
-    single_string_to_first_last_name_q,
-)
+from library.django_utils import ensure_mutally_exclusive_fields_not_set
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums.file_attachments import AttachmentFileType
@@ -994,6 +994,30 @@ class PatientColumns:
         EXTRACTION_NUCLEIC_ACID_SOURCE: "extraction__nucleic_acid_source",
         EXTRACTION_DATE: "extraction__extraction_date",
     }
+
+
+def single_string_to_first_last_name_q(single_string):
+    """ Q on first_name/last_name for a free-text name, eg "Dr Jo Smith" - an initial also matches the first name """
+    name = nameparser.HumanName(single_string)
+    if not (name.first or name.last):
+        raise ValueError(f"No name found in '{single_string}'")
+
+    queries = []
+    first_name_queries = []
+    first_name = name.first
+    if first_name:
+        first_name_queries.append(Q(first_name__iexact=first_name))
+
+    last_name = name.last
+    if last_name:
+        queries.append(Q(last_name__iexact=last_name))
+        # If we have the last name, also accept an initial
+        if first_name:
+            first_name_queries.append(Q(first_name__istartswith=first_name[0]))
+
+    if first_name_queries:
+        queries.append(reduce(operator.or_, first_name_queries))
+    return reduce(operator.and_, queries)
 
 
 class Clinician(TimeStampedModel):
