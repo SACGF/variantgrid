@@ -57,6 +57,10 @@ Patterns here:
   split file, batches coordinates through snpdb/variant_pk_lookup.py:VariantPKLookup and writes CSVs of unknowns;
   upload/tasks/vcf/unknown_variants_task.py:InsertUnknownVariantsTask re-checks and inserts them under a cache lock on
   the variant_id_single_worker queue. Create Variant/Locus rows only from that single worker, never from a parallel step.
+  This is the only path that inserts variants (manual entry, analysis and fusion imports all come through an upload), so
+  variant pks commit in order - annotation range locks rely on it.
+- The same variant twice in one VCF's genotypes (two records that normalise to one variant) is an import or
+  normalisation bug, not data to merge: when the two rows' genotypes differ, report it rather than picking one.
 - Genotypes go in via SQL COPY. upload/vcf/bulk_genotype_vcf_processor.py:BulkGenotypeVCFProcessor.process_entry
   accumulates rows, resolves variant ids per batch (settings.SQL_BATCH_INSERT_SIZE), splits common/rare by gnomAD AF,
   writes a CSV with upload/vcf/sql_copy_files.py:write_sql_copy_csv and spawns an
@@ -82,6 +86,9 @@ Patterns here:
   subclass of upload/models/models.py:UploadUserError with a short `summary`: the pipeline fails with the message and
   no traceback or Rollbar report (UploadPipeline.user_error), and the upload grid shows the summary next to the cross.
   Anything else is treated as our bug and keeps its traceback.
+  A link to sequencing data the upload may not make, or a `path` or `sequencing_run` metadata matching no sequencing
+  record, is one (FileUpload.check_may_link_to_sequencing_data, FileUpload.get_sequencing_record_for_path,
+  FileUpload.get_sequencing_run_to_link).
 Gotchas:
 - A killed worker child (SIGTERM/SIGKILL, `revoke(terminate=True)`) never reaches `ImportVCFStepTask.run`'s except
   blocks; the master's `task_failure`/`task_revoked` receivers in `upload/tasks/vcf/import_vcf_step_task.py` fail the
@@ -120,8 +127,8 @@ Gotchas:
   analysis itself - `[Analysis Details]` and the `[TMB]`, `[MSI]`, `[GIS]` scalars - is one
   seqauto/models/models_seqauto.py:DragenTSO500CombinedVariantOutput per (run, pair) (#1904), keyed on the upload's
   `sequencing_run` metadata as the MetricsOutput is (the file names its run 'NA'); a CVO sent without it takes the run
-  whose current sheet names one of its sample IDs. The run is half the row's key, so a pair no registered run names
-  fails the import saying so, as does one naming no `Pair ID`. A chain that cannot be made does not fail it: the row
+  whose current sheet names one of its sample IDs. The run is half the row's key, so a pair no registered run names,
+  or metadata naming a run seqauto has not registered, fails the import saying so, as does one naming no `Pair ID`. A chain that cannot be made does not fail it: the row
   is still written with its specimen claim parked saying why, which the pair's page shows
   (seqauto/views.py:view_tso500_pair).
 - The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
@@ -129,7 +136,8 @@ Gotchas:
   by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run
   - the pipeline sends Results/MetricsOutput_orig.tsv, the copy the lab's run wrapper leaves untouched - and a 2.6.2
   column is a *pair* (the CVO's Pair ID) carrying both arms, not a sample. `sequencing_run` upload metadata is
-  required and is part of the key, since a pair column alone does not identify a pair across runs. It writes one
+  required, must name a run seqauto has registered, and is part of the key, since a pair column alone does not
+  identify a pair across runs. It writes one
   seqauto/models/models_seqauto.py:LibraryQC per (run, pair, QC category), naming the arm each category is about and judging every
   metric of a known section by the file's own LSL/USL guideline - settings.TSO500_LIBRARY_QC_GUIDELINES overrides that
   per (section, metric) where a lab quotes its own number, and each metric records which it was judged by. The column

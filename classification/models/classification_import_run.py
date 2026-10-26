@@ -144,7 +144,6 @@ class ClassificationImportRun(TimeStampedModel):
     def ongoing_imports() -> Optional[str]:
         """ Guard for expensive per-classification work - see classification_imports_complete_signal for how to
             defer it and do it in bulk instead """
-        # should this check to see if there are any abandoned imports
         if ongoings := list(ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING).order_by('-created')):
             return ", ".join(ongoing.identifier for ongoing in ongoings) or "ongoing-import"
         return None

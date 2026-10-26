@@ -9,6 +9,7 @@ import operator
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Iterator
 from functools import reduce
+from itertools import batched
 from typing import Any, Optional
 
 import pandas as pd
@@ -55,7 +56,6 @@ from library.unit_percent import get_allele_frequency_formatter
 from library.utils import (
     JsonDataType,
     JsonObjType,
-    iter_fixed_chunks,
     sha256sum_str,
 )
 from ontology.enums import GeneDiseaseClassification
@@ -487,7 +487,7 @@ class ExportVariantGrid(VariantGrid):
             # A node queryset can fan out over a multi-valued join, so de-dupe (keeping order) to stop
             # a repeated PK straddling a batch boundary and being exported twice
             contig_pks = list(dict.fromkeys(contig_pks_qs.values_list("pk", flat=True)))
-            for batch in iter_fixed_chunks(contig_pks, self.EXPORT_PK_BATCH_SIZE):
+            for batch in batched(contig_pks, self.EXPORT_PK_BATCH_SIZE):
                 batch_qs = qs.filter(pk__in=batch).order_by("locus__position", "pk")
                 yield from self.render_export_rows(batch_qs.values(*value_columns).iterator())
 

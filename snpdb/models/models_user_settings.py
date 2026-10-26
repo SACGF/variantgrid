@@ -25,8 +25,8 @@ from django.utils import timezone
 from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel
 
-from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.guardian_utils import user_in_group
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text
 from snpdb.enums import (
@@ -191,7 +191,7 @@ class UserGridConfig(models.Model):
 
     @staticmethod
     def get(user: User, grid_name: str) -> 'UserGridConfig':
-        return thread_safe_unique_together_get_or_create(UserGridConfig, user=user, grid_name=grid_name)[0]
+        return UserGridConfig.objects.get_or_create(user=user, grid_name=grid_name)[0]
 
     @staticmethod
     def get_rows_and_selections(user: User, grid_name: str) -> tuple[int, list[int]]:
@@ -229,7 +229,7 @@ class AllVariantsFilter(models.Model):
 
     @staticmethod
     def get(user: User, genome_build: GenomeBuild) -> 'AllVariantsFilter':
-        return thread_safe_unique_together_get_or_create(AllVariantsFilter, user=user, genome_build=genome_build)[0]
+        return AllVariantsFilter.objects.get_or_create(user=user, genome_build=genome_build)[0]
 
     def __str__(self):
         return f"{self.user}/{self.genome_build}: {self.filters}"
@@ -356,7 +356,7 @@ class UserSettingsOverride(SettingsOverride):
 
             # if user no longer belongs to the group associated to the lab
             # remove their default lab record
-            if not user.groups.filter(name=group_name).exists():
+            if not user_in_group(user, group_name):
                 self.default_lab = None
 
         if not self.default_lab:

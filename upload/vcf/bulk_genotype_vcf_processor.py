@@ -11,8 +11,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Max
 
-from library.django_utils import thread_safe_unique_together_get_or_create
-from library.django_utils.database_utils import postgres_arrays
+from library.django_utils.database_utils import postgres_array_quote, postgres_arrays
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.django_utils.model_utils import AsciiValue
 from library.genomics.vcf_enums import (
@@ -20,7 +19,7 @@ from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_SEPARATOR,
     VCFConstant,
 )
-from library.utils import double_quote, json_default_converter
+from library.utils import json_default_converter
 from library.utils.json_utils import json_dumps_nan_as_null
 from patients.enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
@@ -99,12 +98,11 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def get_vcf_importer_version():
         """ Get identifier for this importer """
 
-        vcf_importer, _ = thread_safe_unique_together_get_or_create(VCFImporter,
-                                                                    name="PythonKnownVariantsImporter",
-                                                                    version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
-                                                                    vcf_parser="cyvcf2",
-                                                                    vcf_parser_version=cyvcf2.__version__,
-                                                                    code_version=CodeVersion.current())
+        vcf_importer, _ = VCFImporter.objects.get_or_create(name="PythonKnownVariantsImporter",
+                                                            version=BulkGenotypeVCFProcessor.VCF_IMPORTER_VERSION,
+                                                            vcf_parser="cyvcf2",
+                                                            vcf_parser_version=cyvcf2.__version__,
+                                                            code_version=CodeVersion.current())
         return vcf_importer
 
     def __init__(self, upload_step, cohort_genotype_collection,
@@ -321,11 +319,11 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 for sf in s_filters:
                     sample_filters.append(self.convert_filters(sf))
                 if any([s is not None for s in sample_filters]):  # Skip if all were PASS
-                    # https://www.postgresql.org/docs/9.1/arrays.html - Postgres arrays use double quotes
+                    # Filter codes can be '\' (the 58th filter in a VCF) #2480
                     cleaned_sample_filters = []
                     for sf in sample_filters:
                         if sf is not None:
-                            sf = double_quote(sf)
+                            sf = postgres_array_quote(sf)
                         cleaned_sample_filters.append(sf)
                     samples_filters_str = postgres_arrays(cleaned_sample_filters)
         return samples_filters_str

@@ -102,6 +102,17 @@ class FeatureDependencyCheckTest(SimpleTestCase):
             self.assertEqual(ids(checks.check_feature_dependencies(None)), {"variantgrid.E010"})
 
 
+class SyncUrlCheckTest(SimpleTestCase):
+    def test_http_needs_allow_http(self):
+        sync_details = {"good": {"host": "https://vg.example.org", "oauth_url": "http://localhost:8080"},
+                        "plain": {"host": "http://vg.example.org"},
+                        "allowed": {"host": "http://vg.example.org", "allow_http": True}}
+        with override_settings(SYNC_DETAILS=sync_details, KEYCLOAK_SYNC_DETAILS={"oauth_url": "http://kc.example.org"}):
+            messages = checks.check_sync_urls(None)
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(ids(messages), {"variantgrid.E028"})
+
+
 @override_settings(**PACKAGE_VEP_SETTINGS)
 class AnnotationCheckTest(SimpleTestCase):
     """ Checked against the package default (latest) annotation settings, not the host's env file """

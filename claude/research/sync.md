@@ -20,7 +20,10 @@ A destination is a name, an `enabled` flag and a free-form `config` JSON edited 
 the row: `config["sync_details"]` is a key into `settings.SYNC_DETAILS`, which
 `variantgrid/settings/components/default_settings.py:get_shariant_sync_secrets` builds from the `SYNC.<key>` secrets
 (host, OAuth client, username/password) and refuses a single unkeyed `SYNC` secret. `sync/models/models.py:SyncDestination.sync_details` resolves it and
-`library/oauth.py:ServerAuth.for_sync_details` turns it into an authenticated `requests` wrapper. The admin's
+`library/oauth.py:ServerAuth.for_sync_details` turns it into an authenticated `requests` wrapper, which refuses a plain http host or `oauth_url` other than
+localhost unless the secret sets `allow_http` (`snpdb/checks.py:check_sync_urls` reports one at deploy). With an
+`oauth_url` a ServerAuth logs in to Keycloak (password grant) on its first request and refreshes the token as it nears
+expiry, logging in again if the refresh is refused; a run shares one through `sync/sync_runner.py:SyncRunInstance.server_auth`. The admin's
 "Validate configuration" action (`sync/admin.py:SyncDestinationAdmin.validate_configuration`) checks the key resolves.
 
 Which code handles a destination is decided by matching its config against a registry:
@@ -77,10 +80,13 @@ response and streams it with ijson. A delta run passes `since` = the remote's `L
 of the last SUCCESS run (`SyncRunInstance.last_success_server_date`) - the remote's clock, not ours. Each record's data
 loses evidence keys this instance does not know (noted on a `source_url` value pointing back at the remote record), and
 records are upserted in batches of 50 through `classification/models/classification_inserter.py:BulkClassificationInserter`
-as the admin bot with `force_publish`, sleeping 10 s between batches. A record for a lab that exists locally and is not
-`external` is skipped - the guard against importing Shariant's copy over our own records if `exclude_labs` is wrong - and
-an unknown lab is created as an external Lab (and Organization, country Australia) with a `report_message` so someone
-notices; a record whose `lab_id` is not an `org/lab` group name is skipped and reported instead. The configured
+as the admin bot with `force_publish`, sleeping 10 s between batches. Mapping is
+`sync/shariant/variant_grid_download.py:shariant_download_to_upload`, which takes the lab from the record's
+`org/lab/lab_record_id` id - the one the inserter files it under - not from `meta.lab_id`. A record (deletes included)
+for a lab that exists locally and is not `external` is skipped - the guard against importing Shariant's copy over our
+own records if `exclude_labs` is wrong - a delete for an unknown lab is skipped, and any other record for an unknown lab
+creates an external Lab (and Organization, country Australia) with a `report_message` so someone notices; a record
+whose id has no `org/lab` group name is skipped and reported instead. The configured
 `exclude_labs` / `exclude_orgs` must be well-formed group names or the run fails, because the remote export silently
 ignores a name it cannot match. `max_rows` is rejected.
 
@@ -121,8 +127,12 @@ The `QueryJsonFilter` key pattern must accept real evidence keys (`acmg:pvs1`, `
 `exclude_labs` pattern real lab group names (they contain `/`); a tighter pattern breaks every configured destination.
 
 `sync/tasks/sync_tasks.py:sync_all` runs destinations one after another in a single task on the default `db_workers`
-queue (no `queue=`) with no lock against the next hourly run, and `run_sync` re-raises after marking a run FAILED, so one
-failing destination stops the ones after it that hour. The admin actions run a sync inside the web request, so a large full sync belongs in a shell or
+queue (no `queue=`). It skips a destination that has an IN_PROGRESS run younger than
+`sync/tasks/sync_tasks.py:IN_PROGRESS_RUN_MAX_AGE`, so a long run is not overlapped by the next hourly one (an older
+IN_PROGRESS row is a dead worker's and doesn't block). `run_sync` re-raises after marking a run FAILED; `sync_all` reports
+that and carries on with the other destinations, raising at the end so the task still shows as failed. The upload
+matches the remote's `results` to the batch by position (the server answers each record in order) and fails the run if
+the count differs. The admin actions run a sync inside the web request, so a large full sync belongs in a shell or
 celery, not the admin. The download holds the
 whole export in memory (`stream=False`, then ijson over `response.content`).
 

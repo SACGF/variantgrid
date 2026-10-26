@@ -1,4 +1,5 @@
 from django.core.exceptions import EmptyResultSet
+from django.db import connection
 from django.test import TestCase
 
 from library.django_utils.database_utils import (
@@ -29,6 +30,18 @@ class RenderEmptyResultSetSQLTest(TestCase):
             pass
         with self.assertRaises(EmptyResultSet):
             queryset_to_sql(GenomeBuild.objects.filter(pk__in=[]))
+
+
+class QuerysetToSQLTest(TestCase):
+    def test_params_are_quoted_not_run(self):
+        statement_timeout = get_pg_setting("statement_timeout")
+        name = "x'\n; SET statement_timeout = 1234 --"
+        sql = queryset_to_sql(GenomeBuild.objects.filter(name=name).values_list("name"))
+        self.assertEqual(statement_timeout, get_pg_setting("statement_timeout"))
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            self.assertEqual([], cursor.fetchall())
+        self.assertEqual(statement_timeout, get_pg_setting("statement_timeout"))
 
 
 class PgSettingsTest(TestCase):

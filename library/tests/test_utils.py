@@ -9,10 +9,15 @@ import tempfile
 import time
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from unittest import mock
 
+from django.db.models import Q
 from django.test import TestCase
+from requests import HTTPError, Response
 
 from library.cache import timed_cache
+from library.django_utils import single_string_to_first_last_name_q
+from library.genomics import format_chrom
 from library.genomics.bed_file import BedFileReader
 from library.log_utils import NotificationBuilder
 from library.unit_percent import (
@@ -38,6 +43,7 @@ from library.utils.json_utils import (
     make_json_safe_in_place,
     strip_json,
 )
+from library.utils.misc_utils import retrieve_http_content
 from library.utils.text_utils import (
     emoji_to_unicode,
     format_significant_digits,
@@ -478,6 +484,18 @@ class TestTimedCache(TestCase):
         second = fn()
         self.assertNotEqual(first, second, "After TTL expiry, function should be re-called")
 
+    def test_kwargs_order_shares_a_key(self):
+        call_count = 0
+
+        @timed_cache()
+        def fn(a=None, b=None):
+            nonlocal call_count
+            call_count += 1
+
+        fn(a=1, b=2)
+        fn(b=2, a=1)
+        self.assertEqual(call_count, 1)
+
     def test_size_limit_evicts_oldest(self):
         call_tracker = []
 
@@ -491,6 +509,30 @@ class TestTimedCache(TestCase):
         fn(3)  # evicts key=1
         fn(1)  # 1 was evicted, must recalculate
         self.assertEqual(call_tracker.count(1), 2)
+
+
+class TestFormatChrom(TestCase):
+    def test_standard_chromosomes(self):
+        self.assertEqual("chrX", format_chrom("x", True))
+        self.assertEqual("MT", format_chrom("chrMT", False))
+        self.assertEqual("chr1", format_chrom("CHR1", True))
+
+    def test_alt_contig_keeps_its_case(self):
+        self.assertEqual("chrUn_KI270302v1", format_chrom("chrUn_KI270302v1", True))
+        self.assertEqual("Un_KI270302v1", format_chrom("chrUn_KI270302v1", False))
+
+
+class TestSingleStringToFirstLastNameQ(TestCase):
+    def test_title_and_last_name_only(self):
+        self.assertEqual(Q(last_name__iexact="Smith"), single_string_to_first_last_name_q("Dr Smith"))
+
+    def test_first_name_or_initial(self):
+        expected = Q(last_name__iexact="Smith") & (Q(first_name__iexact="Jo") | Q(first_name__istartswith="J"))
+        self.assertEqual(expected, single_string_to_first_last_name_q("Jo Smith"))
+
+    def test_empty_raises(self):
+        with self.assertRaises(ValueError):
+            single_string_to_first_last_name_q("")
 
 
 class TestRgbContrastingText(TestCase):
@@ -551,3 +593,27 @@ class TestFileSha256sum(TestCase):
                              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
         finally:
             os.unlink(f.name)
+
+
+class TestRetrieveHttpContentRetries(TestCase):
+    @staticmethod
+    def _session(*status_codes: int) -> mock.Mock:
+        responses = []
+        for status_code in status_codes:
+            response = Response()
+            response.status_code = status_code
+            response._content = b"x"
+            responses.append(response)
+        session = mock.Mock()
+        session.get.side_effect = responses
+        return session
+
+    def test_client_error_not_retried(self):
+        session = self._session(404, 200)
+        with self.assertRaises(HTTPError):
+            retrieve_http_content("https://example.com/x", backoff=0, session=session)
+        self.assertEqual(session.get.call_count, 1)
+
+    def test_server_error_retried(self):
+        session = self._session(503, 200)
+        self.assertEqual(retrieve_http_content("https://example.com/x", backoff=0, session=session), b"x")

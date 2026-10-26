@@ -5,11 +5,11 @@ upload.tasks.import_dragen_tso500_metrics_output_task.
 
 Entry point is write_library_qc: one row per (run, pair, QC category). The file is written per
 sequencing run and names that run nowhere, so the run comes off the upload's 'sequencing_run'
-metadata - it is what makes a re-sequenced pair a second row rather than an overwrite, and a
-re-analysis of the same run replaces its rows. The SequencingRun is linked by name where seqauto has
-registered it, and each row's arm to its SequencingSample where the run's current sheet carries the
-TSO500 Pair_ID / Sample_Type columns (seqauto.models.sequencing_sample_for_pair) - both left null
-otherwise, for reconcile_pending_extractions to fill in once the sheet is registered.
+metadata, and must be one seqauto has registered - it is what makes a re-sequenced pair a second row
+rather than an overwrite, and a re-analysis of the same run replaces its rows. Each row's arm is linked
+to its SequencingSample where the run's current sheet carries the TSO500 Pair_ID / Sample_Type columns
+(seqauto.models.sequencing_sample_for_pair) - left null otherwise, for reconcile_pending_extractions to
+fill in once the sheet is registered.
 
 A column is a Pair ID, not a sample, so it names no extraction. It claims the Specimen whose
 accession it ends in (PAIR_ID_ACCESSION_PATTERN) and never creates one - accessioning a case is the
@@ -94,12 +94,9 @@ def specimen_reference_from_sequencing_samples(sequencing_samples: list[Sequenci
     return None
 
 
-def specimen_reference_from_run(sequencing_run: Optional[SequencingRun],
-                               pair_id: str) -> Optional[str]:
+def specimen_reference_from_run(sequencing_run: SequencingRun, pair_id: str) -> Optional[str]:
     """ The accession a run's sample sheet holds for a pair named only by its patient code, on a sheet
         posted without Pair_ID data: the sheet row whose name carries the code """
-    if sequencing_run is None:
-        return None
     try:
         patient_code = parse_patient_code(pair_id)
     except CombinedVariantOutputIdentityError:
@@ -114,12 +111,11 @@ def specimen_reference_from_run(sequencing_run: Optional[SequencingRun],
     return None
 
 
-def write_library_qc(libraries: list[LibraryQCMetrics], user: User, sequencing_run_name: str,
+def write_library_qc(libraries: list[LibraryQCMetrics], user: User, sequencing_run: SequencingRun,
                      method: str, date=None, file_upload=None) -> list[LibraryQC]:
     """ Every category each pair has QC for. Both arms are in the one column, so a pair sequenced on
         both gets the five DNA categories and RNA - an arm it does not have is all NA, which is no QC
         rather than a failure, and is not written """
-    sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first()
     rows = []
     for library in libraries:
         arm_samples = {arm: sequencing_sample_for_pair(sequencing_run, library.pair_id, arm)
@@ -131,7 +127,7 @@ def write_library_qc(libraries: list[LibraryQCMetrics], user: User, sequencing_r
         resolved = None
         if reference_id is None:
             parked_error = (f"'{library.pair_id}' carries no lab accession, and nothing on "
-                            f"sequencing run '{sequencing_run_name}' is named for it")
+                            f"sequencing run '{sequencing_run.name}' is named for it")
             logging.info("%s - its library QC is parked", parked_error)
         else:
             resolved = resolve_reference(Specimen, ExternalReference(reference_id=reference_id), user)
@@ -140,7 +136,7 @@ def write_library_qc(libraries: list[LibraryQCMetrics], user: User, sequencing_r
             if passed is None:
                 continue  # an arm this pair does not have - every value in the section is NA
             library_qc, _ = LibraryQC.objects.update_or_create(
-                sequencing_run_name=sequencing_run_name, pair_id=library.pair_id,
+                sequencing_run_name=sequencing_run.name, pair_id=library.pair_id,
                 category=category,
                 defaults={
                     "sequencing_run": sequencing_run,

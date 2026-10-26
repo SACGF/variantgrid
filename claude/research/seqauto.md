@@ -77,8 +77,9 @@ columns, the sheet-changed one relinks samples to patients.
 
 ### DRAGEN TSO 500 pairs
 
-A TSO 500 pair is a DNA and an RNA library from one specimen. Two uploads describe it, in either order and either
-before or after the run is posted: MetricsOutput writes one `LibraryQC` per (run name, pair, category)
+A TSO 500 pair is a DNA and an RNA library from one specimen. Two uploads describe it, in either order once the
+run is posted - an upload naming a run seqauto has not registered fails
+(`upload/models/models.py:FileUpload.get_sequencing_run_to_link`): MetricsOutput writes one `LibraryQC` per (run name, pair, category)
 (`upload/tso500/dragen_metrics_output_records.py:write_library_qc`) and CombinedVariantOutput writes one
 `DragenTSO500CombinedVariantOutput` per (run name, pair) with TMB / MSI / GIS
 (`upload/tso500/dragen_combined_variant_output_records.py:write_combined_variant_output`). Both store the run name as

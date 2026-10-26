@@ -1,8 +1,7 @@
 """
 Small Django helpers with no model of their own: `require_superuser` / RequireSuperUserView, field
-and choice display formatting (get_choices_formatter), Q helpers for name
-searches, timezone and form read-only utilities, `thread_safe_unique_together_get_or_create`,
-related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
+and choice display formatting (get_choices_formatter), Q helpers for name searches, timezone and form
+read-only utilities, related-object introspection (related_objects, object_relations) and the SortMetaOrderingMixin /
 SortByPKMixin that let model instances sort like their querysets. Permission checks live in
 guardian_permissions_mixin.py, partitioning in django_partition.py, test bases in unittest_utils.py.
 """
@@ -17,7 +16,7 @@ import nameparser
 from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.db.models import JSONField
 from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
@@ -42,12 +41,8 @@ def get_url_from_view_path(view_path):
     # dirty fallback if we don't have a request
     from django.contrib.sites.models import Site
     current_site = Site.objects.get_current()
-    protocol = 'http'
-    # TODO can do better than this for determining https vs http
-    https_domains = ('shariant.org.au', 'variantgrid.com')
-    domain = current_site.domain
-    if domain in https_domains or any(domain.endswith(f'.{d}') for d in https_domains):
-        protocol = 'https'
+    # Deployments served over https import https_settings, which sets this
+    protocol = 'https' if settings.SESSION_COOKIE_SECURE else 'http'
     return f'{protocol}://{current_site.domain}{view_path}'
 
 
@@ -145,6 +140,8 @@ def get_choices_formatter(choices, default=None):
 def single_string_to_first_last_name_q(single_string):
     """ Returns a DJango Q object """
     name = nameparser.HumanName(single_string)
+    if not (name.first or name.last):
+        raise ValueError(f"No name found in '{single_string}'")
 
     queries = []
     first_name_queries = []
@@ -156,9 +153,11 @@ def single_string_to_first_last_name_q(single_string):
     if last_name:
         queries.append(Q(last_name__iexact=last_name))
         # If we have the last name, also accept an initial
-        first_name_queries.append(Q(first_name__istartswith=first_name[0]))
+        if first_name:
+            first_name_queries.append(Q(first_name__istartswith=first_name[0]))
 
-    queries.append(reduce(operator.or_, first_name_queries))
+    if first_name_queries:
+        queries.append(reduce(operator.or_, first_name_queries))
     return reduce(operator.and_, queries)
 
 
@@ -216,19 +215,6 @@ def set_form_read_only(form):
     for f in forms:
         for field in f.fields.values():
             field.disabled = True
-
-
-def thread_safe_unique_together_get_or_create(klass, **kwargs):
-    """ get_or_create has race conditions across threads.
-        So, use unique_together to prevent a duplicate object being created, then
-        fall back on normal get.
-
-        If you get MultipleObjectsReturned - You need to add the unique_together
-        constraint on your model to prevent creating duplicate objects """
-    try:
-        return klass.objects.get_or_create(**kwargs)
-    except ValidationError:
-        return klass.objects.get(**kwargs), False
 
 
 def get_models_dict_by_column(klass, column='pk'):
@@ -291,10 +277,12 @@ class SortMetaOrderingMixin:
 
     def __lt__(self, other):
         for f in self._meta.ordering:
+            descending = f.startswith("-")
+            f = f.removeprefix("-")
             v = getattr(self, f)
             ov = getattr(other, f)
             if v != ov:
-                return v < ov
+                return v > ov if descending else v < ov
         return False
 
 

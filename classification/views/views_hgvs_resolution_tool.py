@@ -2,16 +2,16 @@ from dataclasses import dataclass
 from typing import Optional
 
 from cdot.hgvs import HGVSFixSeverity
-from cdot.hgvs import clean_hgvs as cdot_clean_hgvs, HGVSFixSeverity
+from cdot.hgvs import clean_hgvs as cdot_clean_hgvs
 from django import forms
 from django.http import HttpRequest
 from django.shortcuts import render
+from more_itertools import all_equal
 
 from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSConverterType, HGVSMatcher, VariantResolvingError
 from genes.models import TranscriptParts, TranscriptVersion
 from library.django_utils import require_superuser
-from library.utils import all_equal
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 

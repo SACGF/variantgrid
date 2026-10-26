@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
-from requests import Session
+from requests import HTTPError, Session
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -129,6 +129,15 @@ _ses = Session()
 _ses.mount("http://", HTTPAdapter(max_retries=_retry))
 _ses.mount("https://", HTTPAdapter(max_retries=_retry))
 
+
+def _is_client_error(e: Exception) -> bool:
+    """ A 4xx (other than 429 Too Many Requests) won't change on retry """
+    if isinstance(e, HTTPError) and e.response is not None:
+        status_code = e.response.status_code
+        return 400 <= status_code < 500 and status_code != 429
+    return False
+
+
 def iter_http_lines(url, timeout=60, attempts=5, backoff=2, encoding="utf-8", session=_ses):
     """ Streams lines (newline stripped) of a file too big to hold in memory. A dropped connection
         re-downloads from the start, skipping the lines already yielded """
@@ -147,8 +156,8 @@ def iter_http_lines(url, timeout=60, attempts=5, backoff=2, encoding="utf-8", se
                     yield line.rstrip("\n")
                     num_yielded += 1
             return
-        except Exception:
-            if n + 1 >= attempts:
+        except Exception as e:
+            if n + 1 >= attempts or _is_client_error(e):
                 raise
             time.sleep(backoff * 2**n)
 
@@ -164,8 +173,8 @@ def retrieve_http_content(url, timeout=60, attempts=5, backoff=2, headers=None, 
             if url.endswith(".gz"):
                 content = gzip.decompress(content)
             return content
-        except Exception:
-            if n + 1 >= attempts:
+        except Exception as e:
+            if n + 1 >= attempts or _is_client_error(e):
                 raise
             time.sleep(backoff * 2**n)
 
@@ -188,11 +197,3 @@ def retrieve_ftp_content(host, path, attempts=5, backoff=2) -> bytes:
             time.sleep(backoff * 2**n)
 
 
-def add_exception_note(exc: BaseException, note: str) -> BaseException:
-    """ Make equivalent helper for pre-3.11 add_note """
-    if hasattr(exc, 'add_note'):  # Py>=3.11
-        exc.add_note(note)
-    else:                         # Py<=3.10
-        head = exc.args[0] if exc.args else ''
-        exc.args = (f'{head}\nnote: {note}',) + exc.args[1:]
-    return exc

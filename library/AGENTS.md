@@ -40,7 +40,8 @@ Patterns here:
 - Register an app health check with `@receiver(signal=health_check_signal)` returning `library/health_check.py:HealthCheckRecentActivity`
   / `HealthCheckTotalAmount` / `HealthCheckAge` stats; uptime probes go through `library/uptime_check.py:uptime_check_signal`.
 - Wrap DB-heavy request handlers in `library/django_utils/major_operation.py:major_operation` (per-user concurrency cap
-  plus a lower `statement_timeout`), handling `TooManyMajorOperationsError`; grids use `MajorOperationViewMixin`.
+  plus a lower `statement_timeout`), handling `TooManyMajorOperationsError`; grids use `MajorOperationViewMixin`,
+  which holds the operation until a streamed response (CSV download) has been read or closed.
 - Grid column filters and FilterNode share one vocabulary: `library/django_utils/filter_rules.py:FILTER_OPERATIONS`
   and `rules_to_q`; streaming CSV downloads go through `library/django_utils/grid_export.py:grid_export_csv`.
 - `library/utils/` (the `library.utils` facade) holds plain-Python helpers; anything built on Django's ORM, models or
@@ -60,9 +61,9 @@ Gotchas:
 - `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` caches `.get()` results
   process-wide forever and `ObjectManagerCachingRequest` per request; both are plain managers under
   `settings.UNIT_TEST`, so tests see queries production never runs (GenomeBuild, GeneSymbol, FlagType, Allele, Lab,
-  Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place. The key is the
-  `get()` arguments only, not the queryset's filters: `X.objects.filter(a).get(b)` and every no-argument
-  `.filter(...).get()` share a key, so on these models call `X.objects.get(**lookup)` directly.
+  Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place. Only a `get()` on the bare manager
+  queryset is cached (the key is the `get()` arguments); one after `filter()`, `values()`, `select_for_update()`,
+  `using()`, an annotation or through a related manager goes to the database, so call `X.objects.get(**lookup)`.
 - `library/guardian_utils.py:assign_permission_to_user_and_groups` imports `snpdb.models.UserSettings` inside the
   function: `library` depends on `snpdb` at runtime. Every import of an app from `library` (four inside functions,
   plus `log_utils` -> eventlog and `preview_request` -> genes/variantgrid at module level) is listed in
@@ -90,7 +91,7 @@ Gotchas:
   relations for one no-op delete), so two concurrent VCF re-imports each holding `AccessExclusive` on the partition
   they just dropped deadlock - SACGF/variantgrid_sapath#450. `VariantZygosityCount` is the exception: nothing drops
   its partition, so its `CASCADE` is the only cleanup.
-- `library/cache.py:timed_cache` keys on `(*args, kwargs.items())` and holds results in module memory, so each celery
+- `library/cache.py:timed_cache` keys on `(*args, sorted(kwargs.items()))` and holds results in module memory, so each celery
   and web worker process has its own copy. `clear_cached_property` there and
   `library/utils/misc_utils.py:invalidate_cached_property` do the same job — use either, add no third.
 - Signal receivers under `<app>/signals/` only register when imported from the app's `ready()`;

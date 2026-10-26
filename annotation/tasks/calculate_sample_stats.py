@@ -20,7 +20,6 @@ from annotation.models import (
 )
 from annotation.models.models_annotation_run import VCFAnnotationStats
 from eventlog.models import create_event
-from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.database_utils import pg_settings
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
@@ -70,10 +69,9 @@ def get_sample_stats_code_version() -> SampleStatsCodeVersion:
         4 - fusions_count, and gene-level variants left out of VCFLengthStats
         5 - Per-sample totals and chrX hom only count the sample's own variant calls (#2087)
     """
-    code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
-                                                                name="SampleStats",
-                                                                version=SAMPLE_STATS_CODE_VERSION,
-                                                                code_version=CodeVersion.current())
+    code_version, _ = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats",
+                                                                   version=SAMPLE_STATS_CODE_VERSION,
+                                                                   code_version=CodeVersion.current())
     return code_version
 
 

@@ -263,6 +263,7 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 qs = qs[:max_rows]
                 record_count = min(record_count, max_rows)
 
+            other_variant_grid = sync_run_instance.server_auth
             site_name = socket.gethostname().lower().split('.')[0].replace('-', '')
             for batch, finished in batch_iterator_end(qs, batch_size=50):
                 # providing import_id and status:complete when we're done lets Shariant know
@@ -275,7 +276,6 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 if finished:
                     json_to_send["status"] = "complete"
                 json_duration = time.time() - json_start
-                other_variant_grid = sync_run_instance.server_auth()
 
                 post_start = time.time()
                 # records are upserts keyed by lab/lab_record_id, so re-sending a batch after a
@@ -292,8 +292,11 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 post_duration = time.time() - post_start
                 # results are sent back in an array in the same order they were sent up
                 results = response.json().get('results')
+                if not isinstance(results, list) or len(results) != len(batch):
+                    raise ValueError(f"{sync_run_instance.sync_destination}: sent {len(batch)} records, "
+                                     f"remote returned results: {str(results)[:200]}")
 
-                for record, result in zip(batch, results):
+                for record, result in zip(batch, results, strict=True):
                     rows_uploaded += 1
                     # the remote answers a record it couldn't process with {"internal_error": ...} inside the 200;
                     # an unsuccessful sync record keeps it in the next delta run

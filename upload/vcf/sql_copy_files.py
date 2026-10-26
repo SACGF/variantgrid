@@ -10,9 +10,9 @@ from collections.abc import Sequence
 from typing import Optional
 
 from django.db import connection
+from psycopg.sql import SQL, Identifier, Literal
 
 from library.django_utils.django_postgres import copy_from_file
-from library.utils import single_quote
 
 LOCI_HEADER = ['contig_id', 'position', 'ref_id']
 VARIANTS_HEADER = ['locus_id', 'alt_id', 'end', 'svlen']
@@ -47,25 +47,25 @@ def sql_copy_csv(input_filename, table_name, columns, delimiter=',', quote=None)
 
 
 def sql_copy_csv_file(f, table_name, columns, delimiter=',', quote=None):
-    # Quote identifiers as psycopg2's copy_from() did - some columns (eg Variant.end) are reserved words
-    columns_str = ','.join(f'"{c}"' for c in columns)
+    columns_sql = SQL(',').join(Identifier(c) for c in columns)
     if quote:
         if delimiter != ',':
             msg = f"Don't know how to do this (sql_copy_csv_file sep='{delimiter}', quote='{quote}'"
             raise ValueError(msg)
-        sql = f"COPY {table_name} ({columns_str}) FROM STDIN WITH (FORMAT csv, QUOTE {single_quote(quote)})"
+        sql = SQL("COPY {} ({}) FROM STDIN WITH (FORMAT csv, QUOTE {})").format(
+            Identifier(table_name), columns_sql, Literal(quote))
     else:
-        sql = f"COPY {table_name} ({columns_str}) FROM STDIN " \
-              f"WITH (FORMAT text, DELIMITER {single_quote(delimiter)}, NULL '')"
+        sql = SQL("COPY {} ({}) FROM STDIN WITH (FORMAT text, DELIMITER {}, NULL '')").format(
+            Identifier(table_name), columns_sql, Literal(delimiter))
 
     try:
         with connection.cursor() as cursor:
-            affected = copy_from_file(cursor, sql, f)
+            affected = copy_from_file(cursor, sql.as_string(), f)
             logging.debug("copy affected %d rows", affected)
             return affected
     except Exception as e:
         logging.error(e)
-        logging.info("columns = '%s'", columns_str)
+        logging.info("columns = '%s'", columns)
         raise e
 
 

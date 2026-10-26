@@ -7,12 +7,12 @@ import celery
 from celery import states
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
+from psycopg.sql import Literal
 
 from library.django_utils.database_utils import run_sql
 from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.django_postgres import model_to_insert_sql, pg_sql_array
 from library.log_utils import log_traceback
-from library.utils import single_quote
 from patients.enums import Zygosity
 from snpdb.common_variants import get_common_filter
 from snpdb.enums import CohortGenotypeCollectionType, ImportStatus
@@ -170,7 +170,7 @@ def _get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection, common=False)
                 sample_field = f"{sample_field}[{i}]"
             else:
                 sample_field = f"SUBSTRING({sample_field}, {i}, 1)"
-                empty_value = single_quote(empty_value)
+                empty_value = Literal(empty_value).as_string()
 
             sample_value = f"coalesce({sample_field}, {empty_value})"
             column_pack_lists[column].append(sample_value)

@@ -1,7 +1,7 @@
 """
-django-guardian plumbing: DjangoPermission builds the `app.read_model` / `app.write_model` permission
+django-guardian plumbing: DjangoPermission builds the `view_<model>` / `change_<model>` permission
 strings, the standard groups (all_users_group, public_group, bot_group) and the `admin_bot` system
-user are looked up here, and assign_permission_to_user_and_groups grants a new object's read/write
+user are looked up here, user_in_group / user_in_group_or_superuser are the group-membership checks, and assign_permission_to_user_and_groups grants a new object's read/write
 perms from the user's UserSettings initial groups (the one sanctioned import of snpdb from library).
 Models check permissions through library/django_utils/guardian_permissions_mixin.py, not directly here.
 """
@@ -22,6 +22,15 @@ def is_superuser(user):
     Can use this as the func in @user_passes_test annotation
     """
     return user.is_superuser
+
+
+def user_in_group(user: User, group: Union[Group, str]) -> bool:
+    group_name = group.name if isinstance(group, Group) else group
+    return user.groups.filter(name=group_name).exists()
+
+
+def user_in_group_or_superuser(user: User, group: Union[Group, str]) -> bool:
+    return user.is_superuser or user_in_group(user, group)
 
 
 def all_users_group():
