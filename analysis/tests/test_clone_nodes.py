@@ -30,7 +30,7 @@ from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
 from genes.fake_data import create_fake_transcript_version
-from genes.models import GeneList, GeneListGeneSymbol
+from genes.models import CustomTextGeneList, GeneList, GeneListGeneSymbol
 from ontology.models import OntologyTerm
 from patients.enums import GnomADPopulation
 from pedigree.enums import PedigreeInheritance
@@ -144,6 +144,17 @@ class TestCloneAnalysisNodes(TestCase):
         clone = gene_list_node.save_clone()
         self.assertEqual([gln_gl.gene_list for gln_gl in clone.genelistnodegenelist_set.all()],
                          [self.gene_list], "Clone gets its own link to the same GeneList")
+
+    def test_clone_analysis_with_custom_text_gene_list(self):
+        custom_text_gene_list = CustomTextGeneList.objects.create(name="custom", text="BRCA1", sha256_hash="x")
+        gene_list_node = GeneListNode.objects.create(analysis=self.analysis,
+                                                     custom_text_gene_list=custom_text_gene_list)
+        analysis_copy = Analysis.objects.get(pk=self.analysis.pk).clone()
+        copy_node = GeneListNode.objects.get(analysis=analysis_copy)
+        gene_list_node.refresh_from_db()
+        self.assertEqual(gene_list_node.custom_text_gene_list, custom_text_gene_list)
+        self.assertNotEqual(copy_node.custom_text_gene_list, custom_text_gene_list)
+        self.assertEqual(copy_node.custom_text_gene_list.text, "BRCA1")
 
     def test_clone_intersection_node(self):
         # Resolved entries are concrete fields, so the clone carries them without save_clone() plumbing

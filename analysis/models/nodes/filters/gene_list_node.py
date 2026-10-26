@@ -204,9 +204,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         return "Filter to gene symbols from lists, tests or PanelApp"
 
     def save_clone(self):
-        orig_custom_text_gene_list = self.custom_text_gene_list
-
-        # custom_text_gene_list is a 1-to-1 field, so don't want to copy it in super().save_clone()
+        # custom_text_gene_list is a 1-to-1 field, so the copy needs its own
         if self.custom_text_gene_list:
             self.custom_text_gene_list = self.custom_text_gene_list.clone()
 
@@ -214,7 +212,6 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         genelistnode_panel_app = list(self.genelistnodepanelapppanel_set.all())
 
         copy = super().save_clone()
-        self.custom_text_gene_list = orig_custom_text_gene_list
 
         for gln_gl in genelistnode_gene_lists:
             copy.genelistnodegenelist_set.create(gene_list=gln_gl.gene_list)
