@@ -2,7 +2,7 @@
 Raw-SQL helpers: queryset_to_sql and get_queryset_select_from_where_parts turn a QuerySet into SQL
 text to embed in COPY / INSERT statements, dictfetchall / iter_db_results read
 cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dangerous - read it first),
-postgres_arrays formats array literals, long_running_sql / get_active_backend_pids / signal_backends /
+postgres_arrays / postgres_array_quote format array literals, long_running_sql / get_active_backend_pids / signal_backends /
 wait_for_backends_to_stop find and cancel other connections' running queries, query_was_cancelled tells a
 cancel or statement_timeout apart from other OperationalErrors, pg_settings / get_pg_setting set
 and read this connection's run-time settings, advisory_lock serialises work across connections, and get_table_row_estimates / get_queryset_row_estimate give planner
@@ -313,6 +313,13 @@ def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
 
 def postgres_arrays(array):
     return "{%s}" % ','.join([str(s) if s is not None else "NULL" for s in array])
+
+
+def postgres_array_quote(value: str) -> str:
+    """ A text element for postgres_arrays: double quoted, with backslash and double quote escaped
+        (https://www.postgresql.org/docs/current/arrays.html#ARRAYS-IO) """
+    escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 TX = TypeVar('TX')
