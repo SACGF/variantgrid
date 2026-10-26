@@ -6,15 +6,17 @@ from django.utils import timezone
 from annotation.fake_data import get_fake_annotation_version
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models import Classification
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import all_users_group, assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, TissueStatus, Zygosity
 from patients.models import Extraction, Patient, Specimen, Tissue
-from patients.models_enums import NucleicAcid, TissueStatus, Zygosity
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     CohortGenotype,
     CohortGenotypeCollection,
     GenomeBuild,
+    GenomeBuildPatchVersion,
     Sample,
     VariantZygosityCount,
     VariantZygosityCountCollection,
@@ -248,7 +250,10 @@ class VariantSampleGenotypesClassificationsTest(TestCase):
             assign_permission_to_user_and_groups(cls.lab_user, sample)
 
         cls.variant = slowly_create_test_variant("3", 6000, "A", "T", cls.grch37)
-        create_mock_allele(cls.variant, cls.grch37)
+        allele = create_mock_allele(cls.variant, cls.grch37)
+        cls.allele_info = ImportedAlleleInfo.objects.create(
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(cls.grch37),
+            imported_c_hgvs="NM_000000.1:c.1A>T", allele=allele)
         cgc = CohortGenotypeCollection.objects.get(cohort=cls.cohort)
         CohortGenotype.objects.create(collection=cgc, variant=cls.variant,
                                       samples_zygosity=Zygosity.HET * 3,
@@ -266,6 +271,7 @@ class VariantSampleGenotypesClassificationsTest(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False,
             variant=self.variant,
+            allele_info=self.allele_info,
             sample=sample)
         classification.publish_latest(user=self.lab_user, share_level=share_level)
         return classification

@@ -18,7 +18,7 @@ genes.models.models_splice_event.SpliceEvent is consulted only where a row's own
 
 The written-label grammar (SPLICE_STRING_PATTERN: V7 / vIVa / ex14skip with any spacing) is the part of
 this that costs upkeep - free-text names drift, and canonicalising them has needed a pass over stored
-labels before (classification/migrations/0185_one_off_canonicalise_splice_labels.py). If it needs
+labels before. If it needs
 simplifying, the direction is fewer accepted written forms with SpliceEvent rows as the names, not a
 different identity.
 

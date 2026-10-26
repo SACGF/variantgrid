@@ -17,7 +17,8 @@ from nltk.corpus import words as nltk_words
 from library.log_utils import log_traceback
 from library.utils import is_not_none
 from library.utils.nltk_utils import ensure_nltk_data
-from ontology.models import OntologyService, OntologyTerm, OntologyTermRelation, OntologyVersion
+from ontology.enums import OntologyService
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologyVersion
 
 # Bump when a change to the lookups or matching logic would change the matches of an already matched sentence.
 # TextPhenotype records the version a sentence was matched with; `match_patient_phenotypes --stale` redoes older ones.

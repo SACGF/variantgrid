@@ -3,9 +3,10 @@ from django.utils import timezone
 
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from genes.enums import AnnotationConsortium
 from genes.models import Gene, GeneAnnotationImport, GeneSymbol, GeneVersion
-from genes.models_enums import AnnotationConsortium
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
 from snpdb.models.models_genome import GenomeBuild
 
 

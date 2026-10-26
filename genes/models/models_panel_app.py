@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.models.models_gene import HGNC
 from genes.models.models_gene_list import GeneList, GeneListCategory
@@ -13,8 +13,8 @@ from library.guardian_utils import (
     add_public_group_read_permission,
     admin_bot,
 )
+from snpdb.enums import ImportStatus
 from snpdb.models import Company
-from snpdb.models.models_enums import ImportStatus
 
 
 class PanelAppServer(models.Model):

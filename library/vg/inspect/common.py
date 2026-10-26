@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models.classification import Classification
-from flags.models.models import FlagStatus
+from flags.enums import FlagStatus
 from library.vg.inspect import ref
 from snpdb.models import Allele, Lab, Sample, Variant
 

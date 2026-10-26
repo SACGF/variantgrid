@@ -8,7 +8,7 @@ from typing import Optional
 
 from django.db.models import Count, QuerySet, Subquery
 
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import DiscordanceLevel, ShareLevel, SpecialEKeys
 from classification.models import (
     Classification,
     ClassificationFlagTypes,
@@ -19,13 +19,14 @@ from classification.models import (
     DiscordanceReport,
     classification_flag_types,
 )
-from classification.models.clinical_context_models import DiscordanceLevel, DiscordanceStatus
+from classification.models.clinical_context_models import DiscordanceStatus
 from classification.models.criteria_strengths import (
     AcmgPointScore,
     CriteriaStrengths,
     CriteriaSummarizer,
 )
-from flags.models import Flag, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import Flag
 from genes.hgvs import HGVSDisplay
 from library.utils import first, group_by_key, segment
 from snpdb.lab_picker import LabPickerData

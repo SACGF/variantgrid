@@ -10,9 +10,9 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.models import EvidenceKey
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from snpdb.enums import AlleleOrigin
 from snpdb.models import (
     Allele,
-    AlleleOrigin,
     ClinGenAllele,
     Country,
     GenomeBuild,
@@ -85,6 +85,7 @@ class Test(URLTestCase):
             # ('classification_diff', {"GET_PARAMS": {"record_ids": f"[{classification.pk}]"}}, 200),
             # ('classification_csv', record_kwargs, 200),
             # ('view_template_report', record_kwargs, 200),
+            ('classification_csv', classification_kwargs, 200),
             ('classification_history', classification_kwargs, 200),
             ('view_classification', classification_kwargs, 200),
             ('view_classification_lab_record',

@@ -27,6 +27,7 @@ from django.db.models.deletion import SET_NULL
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
 
+from eventlog.enums import IntegrationActivityStatus
 from library.django_utils.change_tracking import active_collector
 from library.enums.log_level import LogLevel
 from library.integration_status import IntegrationDirection
@@ -71,12 +72,6 @@ class Event(models.Model):
 
 
 API_KEY_PREFIX = "api:"  # IntegrationActivity.key of an API endpoint, before its view name
-
-
-class IntegrationActivityStatus(models.TextChoices):
-    SUCCESS = "S", "Success"
-    NO_CHANGE = "N", "No change"
-    ERROR = "E", "Error"
 
 
 @dataclass

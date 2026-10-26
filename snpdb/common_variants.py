@@ -7,8 +7,8 @@ from django.db.models import Q, QuerySet
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models_version import VariantAnnotationVersion
 from classification.models import Classification
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import Allele, CohortGenotypeCommonFilterVersion, CommonVariantClassified, Variant
-from snpdb.models.models_enums import ClinicalSignificance
 
 
 def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersion]:
@@ -25,7 +25,8 @@ def get_common_filter(genome_build) -> Optional[CohortGenotypeCommonFilterVersio
             defaults={"additional_gnomad_versions": additional_gnomad_versions}, **kwargs)
         if not created and common_filter.additional_gnomad_versions != additional_gnomad_versions:
             common_filter.additional_gnomad_versions = additional_gnomad_versions
-            common_filter.save(update_fields=["additional_gnomad_versions"])
+            CohortGenotypeCommonFilterVersion.objects.filter(pk=common_filter.pk).update(
+                additional_gnomad_versions=additional_gnomad_versions)
         if created:
             # At this point - no VCFs have been imported, and all future ones will handle current classifications
             # So we can mark all as handled
@@ -64,8 +65,7 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
     if vav is None:
         # Without AF for this gnomAD version we can't tell which classified variants sit in the common partition.
         # Moving a variant to uncommon is always safe (common is only a skip optimisation), so treat every
-        # classified variant as potentially common. Typically a stale filter left behind after re-annotation -
-        # migrate_common_filter_gnomad_versions retires it once the annotation exists.
+        # classified variant as potentially common. Typically a stale filter left behind after re-annotation.
         logging.warning("No VariantAnnotationVersion for gnomAD %s / %s - treating all classified variants as "
                         "common for %s", cgcfv.gnomad_version, cgcfv.genome_build, cgcfv)
         return Variant.objects.filter(q_classification)

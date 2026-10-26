@@ -6,6 +6,7 @@ makes them for a build that has no real gene annotation to place fake variants i
 The 'create_fake_data gene_level' step makes the gene-level events the search page gives as examples (fusion, copy
 number, splice), resolved from their written strings as a classification import would.
 """
+from genes.enums import AnnotationConsortium
 from genes.gene_copy_number import create_gene_copy_number_events_for_variants
 from genes.gene_fusions import create_gene_fusions_for_variants
 from genes.gene_level_strings import resolve_gene_level_string
@@ -21,13 +22,12 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from library.fake_data import FakeData, FakeDataContext, register
 from library.utils import sha256sum_str
 from snpdb.gene_level_variants import GENE_LEVEL_SVLEN
 from snpdb.models import Contig, GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
 
-# The examples on the search page's gene-level receivers (snpdb/signals/variant_search.py)
+# The examples on the search page's gene-level receivers (variantopedia/signals/variant_search.py)
 GENE_LEVEL_EXAMPLES = ["BCR::ABL1", "CD74--ROS1", "EGFR amplification", "PTEN loss", "AR V7", "MET exon 14 skipping"]
 
 

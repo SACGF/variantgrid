@@ -7,10 +7,11 @@ from annotation.tasks.import_clinvar_vcf_task import (
 )
 from annotation.vcf_files.import_clinvar_vcf import check_can_import_clinvar
 from snpdb.vcf_utils import cyvcf2_header_get
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.abstract_vcf_import_task_factory import (
     AbstractVCFImportTaskFactory,
 )
-from upload.models import UploadedClinVarVersion, UploadedFileTypes
+from upload.models import UploadedClinVarVersion
 
 
 class ImportClinVarTaskFactory(AbstractVCFImportTaskFactory):

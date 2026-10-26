@@ -3,12 +3,13 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import TrioInheritance
 from analysis.models import Analysis, TrioNode
-from analysis.models.enums import TrioInheritance
 from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin
 from annotation.fake_data import get_fake_annotation_version
+from snpdb.enums import BuiltInFilters
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_trio, make_cohort_genotype
-from snpdb.models import BuiltInFilters, GenomeBuild
+from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 

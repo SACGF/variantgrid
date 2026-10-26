@@ -8,7 +8,7 @@ from library.django_utils.database_utils import get_queryset_select_from_where_p
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosome_bin_values, plot_chromosomes
 from library.utils import sha256sum_str
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import Sample, Variant
 

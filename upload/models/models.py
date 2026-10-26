@@ -21,8 +21,8 @@ from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from annotation.enums import VariantAnnotationPipelineType
@@ -39,17 +39,20 @@ from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
 from seqauto.models import (
     JointCalledVCF,
+    SequencingRun,
     SingleSampleVCF,
     VariantCaller,
     get_samples_by_sequencing_sample,
 )
+from seqauto.models.models_seqauto import SeqAutoRecord
+from seqauto.seqauto_permissions import can_write_seqauto
+from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
 from snpdb.models.models import CodeVersionMixin
-from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
-from upload.models.models_enums import (
+from upload.enums import (
     ModifiedImportedVariantOperation,
     UploadedFileTypes,
     UploadStepOrigin,
@@ -110,6 +113,39 @@ class FileUpload(TimeStampedModel):
         if not self.can_view(user_or_group):
             msg = f"You do not have permission to access FileUpload pk={self.pk}"
             raise PermissionDenied(msg)
+
+    def check_may_link_to_sequencing_data(self, sequencing_data: str):
+        """ Linking an upload to a seqauto record writes onto sequencing data, so a file sent through the upload page
+            or API needs the seqauto API's write access - command line and SeqAuto imports are run by the server.
+            Raises UploadUserError naming sequencing_data where the upload may not link to it """
+        if self.import_source == ImportSource.WEB_UPLOAD and not can_write_seqauto(self.user):
+            raise UploadUserError(f"You don't have permission to link uploads to {sequencing_data}",
+                                  summary="No permission to link to sequencing data")
+
+    def get_sequencing_record_for_path(self, *seqauto_record_classes: type[SeqAutoRecord]) -> SeqAutoRecord:
+        """ The first record of seqauto_record_classes (in order) for this upload's path - the sequencing file the
+            upload is linked to and writes onto. Raises UploadUserError where there is no such record or the upload
+            may not link to it """
+        for seqauto_record_class in seqauto_record_classes:
+            if record := seqauto_record_class.objects.filter(path=self.path).first():
+                if record.sequencing_run_id:
+                    sequencing_data = f"sequencing run '{record.sequencing_run_id}'"
+                else:
+                    sequencing_data = str(record)
+                self.check_may_link_to_sequencing_data(sequencing_data)
+                return record
+        raise UploadUserError(f"No sequencing data has the path '{self.path}'",
+                              summary="No sequencing data at path")
+
+    def get_sequencing_run_to_link(self, sequencing_run_name: str) -> SequencingRun:
+        """ The registered run a run-level file (TSO500 MetricsOutput / CombinedVariantOutput) names in its
+            metadata - such a file has no path to link it by. Raises UploadUserError where the upload may not
+            link to it or there is no such run """
+        self.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run_name}'")
+        if sequencing_run := SequencingRun.objects.filter(name=sequencing_run_name).first():
+            return sequencing_run
+        raise UploadUserError(f"No sequencing run named '{sequencing_run_name}'",
+                              summary="No such sequencing run")
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         if isinstance(user_or_group, User):

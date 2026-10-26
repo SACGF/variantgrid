@@ -21,7 +21,8 @@ from library.django_utils.database_utils import queryset_to_sql
 from library.django_utils.major_operation import planner_join_collapse_limit
 from library.log_utils import log_traceback
 from library.utils import add_exception_note
-from snpdb.models import Contig, ProcessingStatus, VariantCollection
+from snpdb.enums import ProcessingStatus
+from snpdb.models import Contig, VariantCollection
 from snpdb.variant_collection import write_sql_to_variant_collection
 
 

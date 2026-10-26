@@ -6,6 +6,7 @@ from typing import Optional
 
 from celery.result import AsyncResult
 from django.conf import settings
+from django.db import transaction
 from django.db.models import F
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -13,16 +14,15 @@ from django.utils.timezone import localtime
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from analysis.enums import CandidateStatus, NodeStatus, TagLocation, TagNodeMode
 from analysis.models import (
     AnalysisTemplate,
     AnalysisVariable,
     Candidate,
     CandidateSearchRun,
-    CandidateStatus,
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import NodeStatus, TagLocation, TagNodeMode
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
@@ -51,8 +51,8 @@ from library.django_utils import require_superuser
 from ontology.models import OntologyTerm, OntologyVersion
 from ontology.serializers import OntologyTermSerializer
 from patients.models import Patient
-from snpdb.models import BuiltInFilters, GenomeBuild, Tag
-from snpdb.models.models_enums import TagFilter
+from snpdb.enums import BuiltInFilters, TagFilter
+from snpdb.models import GenomeBuild, Tag
 from variantgrid.celery import app
 
 
@@ -114,7 +114,9 @@ class NodeUpdate(NodeJSONPostView):
         if op == "move":
             node.x = int(params['x'])
             node.y = int(params['y'])
-            node.save()
+            # Only the position - a whole-row save would write back the status/count read at request start
+            # over a worker's load result
+            node.save(update_fields=["x", "y", "modified"])
         elif op == "update_connection":
             parent_id = params["parent_id"]
             parent = get_node_subclass_or_non_fatal_exception(request.user, parent_id, write=True)
@@ -183,35 +185,37 @@ def nodes_copy(request, analysis_id):
     else:
         copy_x_offset, copy_y_offset = 80, 10
 
-    old_new_map = {}
-    for group in topo_sorted:
-        for node in group:
-            template_node = get_node_subclass_or_404(request.user, node.id)
-            parents = list(template_node.parents())
+    # All or nothing - a failure part way would leave copies with only some of their edges
+    with transaction.atomic():
+        old_new_map = {}
+        for group in topo_sorted:
+            for node in group:
+                template_node = get_node_subclass_or_404(request.user, node.id)
+                parents = list(template_node.parents())
 
-            clone_node = template_node.save_clone()
-            clone_node.x += copy_x_offset
-            clone_node.y += copy_y_offset
-            clone_node.status = NodeStatus.DIRTY
-            clone_node.save()
-            old_new_map[node.id] = clone_node
+                clone_node = template_node.save_clone()
+                clone_node.x += copy_x_offset
+                clone_node.y += copy_y_offset
+                clone_node.status = NodeStatus.DIRTY
+                clone_node.save()
+                old_new_map[node.id] = clone_node
 
-            clone_node.adjust_cloned_parents(old_new_map)
+                clone_node.adjust_cloned_parents(old_new_map)
 
-            # Parents copied alongside are swapped for their copies, the rest are shared with the original.
-            # add_child leaves parents_changed alone, so the clone keeps cloned_from and its counts
-            for parent in parents:
-                new_parent = old_new_map.get(parent.pk, parent)
-                new_parent.add_child(clone_node)
-                edges.append(clone_node.get_connection_data(new_parent))
+                # Parents copied alongside are swapped for their copies, the rest are shared with the original.
+                # add_child leaves parents_changed alone, so the clone keeps cloned_from and its counts
+                for parent in parents:
+                    new_parent = old_new_map.get(parent.pk, parent)
+                    new_parent.add_child(clone_node)
+                    edges.append(clone_node.get_connection_data(new_parent))
 
-            # Connected via add_child, so the clone's save doesn't revalidate it
-            clone_node.valid = clone_node.is_valid
-            if not clone_node.valid:
-                clone_node.count = None
+                # Connected via add_child, so the clone's save doesn't revalidate it
+                clone_node.valid = clone_node.is_valid
+                if not clone_node.valid:
+                    clone_node.count = None
 
-            clone_node.save()
-            nodes.append(get_rendering_dict(clone_node))
+                clone_node.save()
+                nodes.append(get_rendering_dict(clone_node))
 
     update_analysis(analysis.pk)
     return JsonResponse({"nodes": nodes,

@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from io import StringIO
 
-import requests
 from dateutil import parser
 from django.conf import settings
 from pandas import DataFrame, isna, read_csv
@@ -10,16 +9,18 @@ from pandas import DataFrame, isna, read_csv
 from library.constants import MINUTE_SECS
 from library.pandas_utils import df_nan_to_none
 from library.utils import md5sum_str
-from ontology.models import GeneDiseaseClassification, OntologyRelation
+from library.utils.misc_utils import retrieve_http_content
+from ontology.enums import GeneDiseaseClassification
+from ontology.models import OntologyRelation
 from ontology.ontology_builder import OntologyBuilder
 from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_gencc_from_web(cached_web_resource: CachedWebResource):
     GENCC_CSV_URL = "https://search.thegencc.org/download/action/submissions-export-csv"
-    r = requests.get(GENCC_CSV_URL, timeout=MINUTE_SECS)
-    file_hash = md5sum_str(r.text)
-    fileobj = StringIO(r.text)
+    text = retrieve_http_content(GENCC_CSV_URL, timeout=MINUTE_SECS).decode("utf-8")
+    file_hash = md5sum_str(text)
+    fileobj = StringIO(text)
     num_gene_disease_relationships = load_gencc(fileobj, force=True, url=GENCC_CSV_URL, file_hash=file_hash)
     cached_web_resource.description = f"{num_gene_disease_relationships} gene/disease relationships"
     cached_web_resource.save()

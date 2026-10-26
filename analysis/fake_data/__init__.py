@@ -3,7 +3,7 @@ Fake analyses and variant tags for 'manage.py create_fake_data' (@see library.fa
 an analysis over the fake trio, and the "tags" step in variant_tags.py.
 """
 from analysis.fake_data import variant_tags  # registers the "tags" step
-from analysis.models.enums import SetOperations, TrioInheritance
+from analysis.enums import SetOperations, TrioInheritance
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.filters.damage_node import DamageNode

@@ -9,10 +9,12 @@ from django.db import transaction
 from django.db.models import F, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 
+from annotation.enums import EffectiveDate
 from annotation.models import ClinVarRecordCollection
-from annotation.models.data_enums import EffectiveDate
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import (
+    DiscordanceReportResolution,
+    DiscordanceReportTriageStatus,
     OverlapEntrySourceTextChoices,
     OverlapStatus,
     OverlapType,
@@ -20,7 +22,6 @@ from classification.enums import (
     SpecialEKeys,
     TestingContextBucket,
 )
-from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.enums.overlaps_enums import (
     OverlapContributionStatus,
     TriageDecision,
@@ -34,7 +35,6 @@ from classification.models import (
     ClassificationModification,
     ClassificationResultValue,
     DiscordanceReport,
-    DiscordanceReportTriageStatus,
     Overlap,
     OverlapContribution,
     OverlapContributionNextStep,
@@ -42,10 +42,11 @@ from classification.models import (
 )
 from classification.services.overlap_calculator import overlap_calculator_for_value_type
 from classification.services.overlaps_services import OverlapPageDetails, OverlapServices
-from flags.models import Flag, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import Flag
 from library.django_utils import chunked_queryset
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class Command(BaseCommand):

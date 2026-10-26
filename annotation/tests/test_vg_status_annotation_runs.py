@@ -12,7 +12,7 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.vg.status import _annotation_runs, _annotation_runs_abandoned
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

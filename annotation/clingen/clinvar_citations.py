@@ -4,11 +4,11 @@ import io
 import logging
 
 import pandas as pd
-import requests
 
 from annotation.models import Citation
 from annotation.models.models_citations import CitationIdNormalized
 from annotation.models.models_clinvar import ClinVarCitation, ClinVarCitationsCollection
+from library.utils.misc_utils import retrieve_http_content
 
 ALLELE_ID = '#AlleleID'
 VARIATION_ID = 'VariationID'
@@ -19,10 +19,8 @@ DOWNLOAD_TIMEOUT_SECONDS = 120
 
 
 def store_clinvar_citations_from_web(cached_web_resource):
-    response = requests.get(CITATIONS_URL, timeout=DOWNLOAD_TIMEOUT_SECONDS)
-    response.raise_for_status()
-
-    df = pd.read_csv(io.BytesIO(response.content), sep='\t', index_col=None,
+    content = retrieve_http_content(CITATIONS_URL, timeout=DOWNLOAD_TIMEOUT_SECONDS)
+    df = pd.read_csv(io.BytesIO(content), sep='\t', index_col=None,
                      dtype={ALLELE_ID: int,
                             VARIATION_ID: int,
                             "rs": str,

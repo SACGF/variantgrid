@@ -24,9 +24,9 @@ from django.utils import timezone
 from library.genomics.vcf_enums import VCFConstant
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import get_single_element, invert_dict
+from patients.enums import MatchStatus
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction
-from patients.models_enums import MatchStatus
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     JointCalledVCF,
@@ -36,11 +36,11 @@ from seqauto.models import (
     VCFFromSequencingRun,
 )
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
+from snpdb.enums import ImportSource, ImportStatus, VariantOrigin, VCFInfoTypes
 from snpdb.models import (
     VCF,
     AbstractVCFField,
     Cohort,
-    ImportStatus,
     Sample,
     UserSettings,
     VCFFilter,
@@ -48,7 +48,6 @@ from snpdb.models import (
     VCFInfo,
     VCFSourceSettings,
 )
-from snpdb.models.models_enums import ImportSource, VariantOrigin, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (
@@ -56,6 +55,7 @@ from snpdb.vcf_utils import (
     cyvcf2_header_get,
     cyvcf2_header_types,
 )
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     BackendVCF,
     FileUpload,
@@ -64,8 +64,6 @@ from upload.models import (
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.models.models import UploadUserError
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
@@ -518,23 +516,13 @@ def create_backend_vcf_links(uploaded_vcf):
     # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
     sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
     if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
-        path = file_upload.path
-        if path:
-            joint_called_vcf = None
-            single_sample_vcf = None
-            try:
-                joint_called_vcf = JointCalledVCF.objects.get(path=path)
-            except JointCalledVCF.DoesNotExist:
-                try:
-                    single_sample_vcf = SingleSampleVCF.objects.get(path=path)
-                except SingleSampleVCF.DoesNotExist:
-                    msg = f"Couldn't find joint-called or single VCF for path '{path}'"
-                    raise ValueError(msg)
-
-            defaults = {"uploaded_vcf": uploaded_vcf}
-            backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
-                                                                 joint_called_vcf=joint_called_vcf,
-                                                                 defaults=defaults)
+        sequencing_vcf = file_upload.get_sequencing_record_for_path(JointCalledVCF, SingleSampleVCF)
+        joint_called_vcf = sequencing_vcf if isinstance(sequencing_vcf, JointCalledVCF) else None
+        single_sample_vcf = sequencing_vcf if isinstance(sequencing_vcf, SingleSampleVCF) else None
+        defaults = {"uploaded_vcf": uploaded_vcf}
+        backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
+                                                             joint_called_vcf=joint_called_vcf,
+                                                             defaults=defaults)
     return backend_vcf
 
 

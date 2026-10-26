@@ -18,8 +18,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchiveMixin
@@ -27,15 +27,10 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.genomics.vcf_enums import VariantClass, VCFConstant
 from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewKeyValue, PreviewModelMixin, SvgSymbolPreviewIconMixin
+from patients.enums import Sex
 from patients.models.models_patient import ExtractionMatchMixin, FakeData, Patient, Specimen
-from patients.models_enums import Sex
+from snpdb.enums import ImportStatus, SampleFileType, VariantOrigin, VCFInfoTypes
 from snpdb.models.models import CodeVersionMixin, LabProject
-from snpdb.models.models_enums import (
-    ImportStatus,
-    SampleFileType,
-    VariantOrigin,
-    VCFInfoTypes,
-)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Variant
 
@@ -172,11 +167,10 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return queryset
 
     @staticmethod
-    def get_for_user(user, vcf_id):
-        vcf = get_object_or_404(VCF, pk=vcf_id)
-        read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        if not user.has_perm(read_perm, vcf):
-            raise PermissionDenied()
+    def get_for_user(user, vcf_id, write=False):
+        """ Hides VCFs being deleted, as filter_for_user does """
+        vcf = get_object_or_404(VCF.objects.exclude(import_status__in=ImportStatus.DELETION_STATES), pk=vcf_id)
+        vcf.check_permission(user, write)
         return vcf
 
     def save(self, *args, **kwargs):

@@ -37,7 +37,8 @@ from classification.tasks.classification_import_process_variants_task import (
 )
 from library.git import Git
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
-from snpdb.models import GenomeBuild, ImportSource, Lab, Sample, Variant
+from snpdb.enums import ImportSource
+from snpdb.models import GenomeBuild, Lab, Sample, Variant
 
 
 def create_classification_for_sample_and_variant_objects(

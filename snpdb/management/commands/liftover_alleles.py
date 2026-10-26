@@ -1,7 +1,8 @@
 from django.core.management.base import BaseCommand
 
 from library.guardian_utils import admin_bot
-from snpdb.models import AlleleConversionTool, GenomeBuild
+from snpdb.enums import AlleleConversionTool
+from snpdb.models import GenomeBuild
 from snpdb.tasks.liftover_tasks import liftover_alleles
 
 

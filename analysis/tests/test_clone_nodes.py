@@ -32,17 +32,11 @@ from annotation.models import AnnotationRun, VariantGeneOverlap
 from genes.fake_data import create_fake_transcript_version
 from genes.models import GeneList, GeneListGeneSymbol
 from ontology.models import OntologyTerm
-from patients.models_enums import GnomADPopulation
-from pedigree.models import PedigreeInheritance
+from patients.enums import GnomADPopulation
+from pedigree.enums import PedigreeInheritance
+from snpdb.enums import BuiltInFilters, ImportStatus
 from snpdb.fake_data import create_fake_pedigree, create_fake_trio
-from snpdb.models import (
-    AbstractNodeCountSettings,
-    BuiltInFilters,
-    GenomeBuild,
-    ImportStatus,
-    Tag,
-    Variant,
-)
+from snpdb.models import AbstractNodeCountSettings, GenomeBuild, Tag, Variant
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

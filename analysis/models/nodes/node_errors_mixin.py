@@ -2,12 +2,12 @@
     configuration errors as (NodeErrorSource, message) pairs, field errors the user may waive, warnings,
     and the node status / exception an error source maps to. Entry points: get_errors, get_warnings,
     get_field_errors, get_status_from_errors, throw_errors_exception. """
+from analysis.enums import AnalysisTemplateType, NodeErrorSource, NodeStatus
 from analysis.exceptions import (
     NodeConfigurationException,
     NodeParentErrorsException,
     NonFatalNodeError,
 )
-from analysis.models.enums import AnalysisTemplateType, NodeErrorSource, NodeStatus
 from snpdb.models import GenomeBuild
 
 

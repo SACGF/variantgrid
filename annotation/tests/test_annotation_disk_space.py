@@ -46,7 +46,7 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     has_free_disk_for_annotation,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils.file_utils import DiskUsage
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

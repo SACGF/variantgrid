@@ -12,7 +12,8 @@ from django.utils import timezone
 from model_utils.models import now
 
 from library.utils.hash_utils import file_sha256sum
-from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation, OntologyTermStatus
+from ontology.enums import OntologyTermStatus
+from ontology.models import OntologyImport, OntologyTerm, OntologyTermRelation
 
 MD5_HEX_LENGTH = 32
 
@@ -79,16 +80,13 @@ class CachedObj(Generic[T]):
 
 class OntologyBuilder:
 
-    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False, versioned: bool = True,
-                 existing_import: Optional[OntologyImport] = None):
+    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False, versioned: bool = True):
         """
         :filename: Name of the resource used, only used for logging purposes
         :context: In what context are we inserting records (e.g. full file context, or partial panel app)
         :ontology_service: Service that sources this data, but import is not restricted to this service
         :force_update: If true, the ensure methods don't raise exceptions
         :versioned: Does the import exist outside of versions (e.g. PanelAppAU that does incremental version updates should have it as False)
-        :existing_import: Write into this OntologyImport (and its relation partition) instead of creating a new one -
-                          for backfilling an import an OntologyVersion already points at, without a new version
         """
         self.start = datetime.now()
         self.filename = filename if ':' in filename else filename.split("/")[-1]
@@ -98,7 +96,6 @@ class OntologyBuilder:
         self.data_hash = None
         self.force_update = force_update
         self.versioned = versioned
-        self.existing_import = existing_import
 
         self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(import_source=import_source, context=context, completed=True).order_by('-modified').first()
         if self.previous_import and self.previous_import.processor_version != self.processor_version:
@@ -308,12 +305,6 @@ class OntologyBuilder:
 
     @cached_property
     def _ontology_import(self) -> OntologyImport:
-        if self.existing_import:
-            self.existing_import.processed_date = now
-            self.existing_import.processor_version = self.processor_version
-            self.existing_import.hash = self.data_hash
-            self.existing_import.save()
-            return self.existing_import
         return OntologyImport.objects.create(
             import_source=self.import_source,
             context=self.context,

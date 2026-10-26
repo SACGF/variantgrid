@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from dataclasses_json import DataClassJsonMixin
-from django.db.models import TextChoices
+from django.db.models import IntegerChoices, TextChoices
 from django.utils.safestring import mark_safe
 
 from classification.enums.classification_enums import (
@@ -187,3 +187,35 @@ class OverlapSnapshot(DataClassJsonMixin):
             return True
         return False
 
+
+class TriageNextStep(IntegerChoices):
+    NOT_INVOLVED = 0, "Not Involved"
+    PENDING_CALCULATION = 1, "Pending Calculation"
+    AWAITING_OTHER_LAB = 2, "Waiting on Other Lab" # changed text to Waiting on Other, so Awaiting means waiting on you
+    AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
+    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting Your Triage - others have triaged"
+    AWAITING_YOUR_AMEND = 5, "Awaiting Your Amendment"
+    UNANIMOUSLY_COMPLEX = 6, "Unanimously Complex"
+    TO_DISCUSS = 7, "To Discuss"
+
+    @property
+    def user_should_action(self) -> bool:
+        match self:
+            case TriageNextStep.AWAITING_YOUR_TRIAGE: return True
+            case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED: return True
+            case TriageNextStep.AWAITING_YOUR_AMEND: return True
+            case TriageNextStep.TO_DISCUSS: return True
+            case _: return False
+
+    @property
+    def icon(self):
+        match self:
+            case TriageNextStep.AWAITING_YOUR_TRIAGE:
+                return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
+            case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED:
+                return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
+            case TriageNextStep.AWAITING_YOUR_AMEND:
+                return mark_safe('<i class="fa-solid fa-square-pen mr-1" style="opacity:0.6"></i>')
+            case TriageNextStep.TO_DISCUSS:
+                return mark_safe('<i class="fa-solid fa-comments mr-1" style="opacity:0.6"></i>')
+            case _: return ""

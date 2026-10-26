@@ -40,10 +40,10 @@ from annotation.pathogenicity_predictions import (
 )
 from annotation.vep_columns import visible_columns_for
 from annotation.vep_config import VEPConfig
+from genes.enums import AnnotationConsortium
 from genes.models import (
     GeneAnnotationRelease,
 )
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from snpdb.models import (
@@ -157,6 +157,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # basename, so installing different data registers as a change - as does removing it, which
     # drops that data's columns. All derived by vep_config.vep_component_version_kwargs().
     # NULL on versions created before #462 other than the ones migration 0161 backfilled.
+    alphagenome_splicing = models.TextField(null=True, blank=True)  # non-commercial custom VCF - GRCh38 only
+    avi = models.TextField(null=True, blank=True)  # AlphaGenome Variant Impact scores - GRCh38 + VEP >= 116 only
     conservation = models.TextField(null=True, blank=True)  # phastCons/phyloP bigwig basenames
     dbscsnv = models.TextField(null=True, blank=True)
     eve = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
@@ -167,9 +169,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     promoter_ai = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
     protvar = models.TextField(null=True, blank=True)
     repeat_masker = models.TextField(null=True, blank=True)
+    splicevault = models.TextField(null=True, blank=True)  # converted to RefSeq for RefSeq builds - GRCh37/38 only
     topmed = models.TextField(null=True, blank=True)
     transcript_blocklist = models.TextField(null=True, blank=True)  # --transcript_filter
     uk10k = models.TextField(null=True, blank=True)
+    utr_annotator = models.TextField(null=True, blank=True)  # UTRAnnotator uORF file - GRCh37/38 only
 
     pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
     sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
@@ -177,6 +181,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - a symbolic del/dup/inv shorter than this went to the STANDARD
     # pipeline (@see annotation.annotation_pipeline_routing)
     structural_variant_min_size = models.IntegerField()
+    # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - an explicit (sequence) variant whose ref or alt is at least this long
+    # goes to the STRUCTURAL_VARIANT pipeline. Null (versions made before #1708) routes them all to STANDARD
+    explicit_structural_variant_min_size = models.IntegerField(null=True, blank=True)
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
@@ -189,46 +196,40 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     transcript_resolver = models.TextField(null=True, blank=True)
 
     # --- backfill-completion flags ---------------------------------------
-    # These flags track per-VAV completion of one-off backfill management
-    # commands that populate derived columns the query layer can optimise on.
-    # New VAVs default True because the bulk VEP inserter populates the
-    # underlying columns at insert time. Historical VAVs created before the
-    # respective optimisation start False (set by the AddField migration's
-    # RunPython step) and are flipped True by the matching `fix_historical_*`
-    # management command once it finishes the partition.
-    #
-    # Once every active deployment has run the backfills and no rows remain
-    # with these set False, the field, its migration, the matching fallback
-    # branch in the consuming node, and this comment block can all be removed.
+    # Whether a VAV's partition has the derived columns the query layer optimises on.
+    # New VAVs default True because the bulk VEP inserter populates them at insert
+    # time. Every ACTIVE VAV was backfilled before the #736 squash; HISTORICAL ones
+    # may still be False, so the consuming node falls back (and warns) for analyses
+    # left on them. Once no row is False, the field, the fallback branch and this
+    # comment block can go.
 
-    # #574 / commit c6f3c4e6f — DamageNode.spliceai filtering. Flipped by
-    # `manage.py fix_historical_spliceai_max_ds`. Backfill source:
+    # #574 / commit c6f3c4e6f — DamageNode.spliceai filtering. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_spliceai_max_ds
     backfilled_spliceai_max_ds = models.BooleanField(default=True)
 
     # columns_version 2 / 4 rollouts — DamageNode.damage_predictions_min uses
     # predictions_num_pathogenic / predictions_num_benign aggregates which
     # default to 0 on the model, so legacy rows look "no pathogenic predictions"
-    # until backfilled. Flipped by `manage.py fix_columns_version2_damage_counts`
-    # (for columns_version=2 VAVs) and `fix_columns_version4_damage_counts`
-    # (for columns_version=4). columns_version=3 needs no recompute - those rows
-    # had the aggregates populated at insert time (rankscores + alphamissense), so
-    # migration 0155 just flips their flag back True (0151 flipped all VAVs False).
-    # Backfill source:
+    # until backfilled. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
     backfilled_damage_counts = models.BooleanField(default=True)
 
     # #579 - DamageNode.ptc_nmd_escaping filters on nmd_escape_status, which is null on
-    # rows annotated before the PTC calculation existed. Flipped by
-    # `manage.py backfill_ptc_annotation`. Backfill source:
+    # rows annotated before the PTC calculation existed. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_calculated_ptc
     backfilled_ptc = models.BooleanField(default=True)
 
     # #1657 - the SV conservation _max columns our pyBigWig stage wrote are off by one base at the
     # start of the span, and a run whose sidecar stage failed left them null. ConservationNode filters
-    # on those columns. Flipped by `manage.py backfill_sv_conservation`. Backfill source:
+    # on those columns. Source:
     # annotation/sv_conservation.py:sv_conservation_window
     backfilled_sv_conservation = models.BooleanField(default=True)
+
+    # #2426 - UTRAnnotator, AVI and SpliceVault (and AlphaGenome splicing, #2433) were added to versions
+    # already in use: their columns on variants annotated before then stay null until
+    # `annotation_backfill_columns --mark-backfilled` imports them, one VEP run with all of them.
+    # annotation/vep_plugin_backfill.py:stamp_plugin_pins sets it False on the NEW/ACTIVE versions one applies to.
+    backfilled_utr_avi_splicevault = models.BooleanField(default=True)
 
     class Meta:
         constraints = [
@@ -268,11 +269,12 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return qs.order_by("annotation_date").last()
 
     @staticmethod
-    def latest_structural_variant_min_size(genome_build) -> int:
-        """ For routing variants not annotated yet - the setting, until a build has an active version """
+    def latest_pipeline_routing_sizes(genome_build) -> tuple[int, Optional[int]]:
+        """ (structural_variant_min_size, explicit_structural_variant_min_size) for routing variants not
+            annotated yet - the setting, until a build has an active version """
         if vav := VariantAnnotationVersion.latest(genome_build):
-            return vav.structural_variant_min_size
-        return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+            return vav.structural_variant_min_size, vav.explicit_structural_variant_min_size
+        return settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     @staticmethod
     def latest_gene_annotation_releases(status: 'VariantAnnotationVersion.Status' = None) -> list[GeneAnnotationRelease]:

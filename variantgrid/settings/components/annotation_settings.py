@@ -128,6 +128,11 @@ ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
 # regardless of this flag.
 ANNOTATION_SHOW_LEGACY_RANKSCORES = False
 
+# Some annotation data is licensed for non-commercial use only (vep_config.NON_COMMERCIAL_VEP_CONFIG_KEYS, eg
+# AlphaGenome merged splicing scores). A commercial deployment sets this False: that data is then never passed to
+# VEP, pinned or shown, even when its file is configured (#2433)
+ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED = True
+
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
@@ -190,6 +195,14 @@ ANNOTATION = {
             "eve": None,  # n/a for GRCh37 (GRCh38 only)
             "popeve": None,  # n/a for GRCh37 (GRCh38 only)
             "promoter_ai": None,  # n/a for GRCh37 (GRCh38 only)
+            # Off until a deployment sets them and runs manage.py enable_vep_plugin_backfill, which stamps the
+            # columns_version 5 annotation already in use and prints its backfill (#2426)
+            "utr_annotator": None,  # annotation_data/GRCh37/uORF_5UTR_GRCh37_PUBLIC.txt (VEP >= 112)
+            # annotation_data/GRCh37/SpliceVault_data_hg19.refseq_mane.tsv.gz (VEP >= 112), from
+            # manage.py splicevault_to_refseq
+            "splicevault": None,
+            "avi": None,  # n/a for GRCh37 (GRCh38 only)
+            "alphagenome_splicing": None,  # n/a for GRCh37 (GRCh38 only)
         }
     },
     BUILD_GRCH38: {
@@ -244,6 +257,19 @@ ANNOTATION = {
             "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",  # VEP >= 116
             "popeve": "annotation_data/GRCh38/grch38_popEVE_ukbb_20250715.vcf.gz",  # VEP >= 116
             "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",  # VEP >= 116
+            # Off until a deployment sets them and runs manage.py enable_vep_plugin_backfill, which stamps the
+            # columns_version 5 annotation already in use and prints its backfill (#2426)
+            "utr_annotator": None,  # annotation_data/GRCh38/uORF_5UTR_GRCh38_PUBLIC.txt (VEP >= 112)
+            # annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz (VEP >= 112), from
+            # manage.py splicevault_to_refseq
+            "splicevault": None,
+            # annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz (VEP >= 116), from
+            # avi_scores_snvs_tabix.zip
+            "avi": None,
+            # Non-commercial (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED): annotation_data/GRCh38/
+            # alphagenome_splicing_snvs.GRCh38.vcf.gz (VEP >= 116), from combined_splicing_snvs_tabix.zip by
+            # annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh
+            "alphagenome_splicing": None,
         }
     },
     BUILD_T2TV2: {
@@ -292,21 +318,27 @@ ANNOTATION = {
             "eve": None,  # n/a (GRCh38 only)
             "popeve": None,  # n/a (GRCh38 only)
             "promoter_ai": None,  # n/a (GRCh38 only)
+            "utr_annotator": None,  # n/a (no T2T uORF data)
+            "splicevault": None,  # n/a (GRCh37/38 only)
+            "avi": None,  # n/a (GRCh38 only)
+            "alphagenome_splicing": None,  # n/a (GRCh38 only)
         }
     },
 }
 
 def _disable_columns_version_5_plugins(annotation):
-    """Clear the columns_version 5 VEP plugin data keys (#1638) to None across all builds.
+    """Clear the columns_version 5 VEP plugin data keys (#1638, #2426) to None across all builds.
 
     The package default points these at real data files (ProtVar on all builds; OpenTargets / EVE /
-    popEVE / PromoterAI on GRCh38). Deployments pinned below columns_version 5 haven't installed that
-    plugin data (or VEP 116), so clear the keys - vep_columns.has_data_files then drops the plugin
-    columns and get_vep_command skips the matching --plugin invocations.
+    popEVE / PromoterAI on GRCh38), and a deployment may set UTRAnnotator / SpliceVault / AVI / AlphaGenome
+    splicing. Deployments pinned below columns_version 5 haven't installed that plugin data (or VEP 116), so
+    clear the keys - vep_columns.has_data_files then drops the plugin columns and get_vep_command skips the
+    matching --plugin / --custom invocations.
     """
     for build_settings in annotation.values():
         vep_config = build_settings["vep_config"]
-        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai"):
+        for plugin_key in ("protvar", "open_targets", "eve", "popeve", "promoter_ai", "utr_annotator",
+                           "splicevault", "avi", "alphagenome_splicing"):
             if plugin_key in vep_config:
                 vep_config[plugin_key] = None
 
@@ -420,7 +452,6 @@ ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")
 
-ANNOTATION_PUBMED_GENE_SYMBOL_COUNT_CACHE_DAYS = 30
 ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED = False
 
 
@@ -434,8 +465,6 @@ CACHED_WEB_RESOURCE_MANE = "MANE"
 CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS = "PanelApp Australia Panels"
 CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS = "Genomics England PanelApp Panels"
 CACHED_WEB_RESOURCE_PFAM = "Pfam"
-CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY = "RefSeq Gene Summary"
-CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO = "RefSeq Gene Info"
 CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO = "RefSeq Sequence Info"
 CACHED_WEB_RESOURCE_REFSEQ_GENE_PUBMED_COUNTS = "RefSeq Gene PubMed Counts"
 CACHED_WEB_RESOURCE_UNIPROT = "UniProt"
@@ -450,8 +479,6 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
     CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
     CACHED_WEB_RESOURCE_PFAM,
-    CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY,
-    CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO,
     CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO,
     CACHED_WEB_RESOURCE_REFSEQ_GENE_PUBMED_COUNTS,
     CACHED_WEB_RESOURCE_UNIPROT,

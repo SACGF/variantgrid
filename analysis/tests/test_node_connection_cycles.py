@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge
 from analysis.models.nodes.filters.filter_node import FilterNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -47,6 +48,15 @@ class TestNodeConnectionCycles(AnalysisSetupMixin, TestCase):
                 self.assertFalse(self._edge_exists(self.grandchild, node))
 
         self.assertIsNone(VennNode.objects.get(pk=self.venn.pk).right_parent)
+
+    def test_other_analysis_rejected(self, _update_analysis):
+        other_analysis = Analysis(genome_build=self.grch37)
+        other_analysis.set_defaults_and_save(self.analysis.user)
+        other_source = AllVariantsNode.objects.create(analysis=other_analysis)
+
+        data = self._connect(other_source, self.grandchild)
+        self.assertTrue(data.get("non_fatal"))
+        self.assertFalse(self._edge_exists(other_source, self.grandchild))
 
     def test_diamond_allowed(self, _update_analysis):
         """ Two paths up to the same ancestor is not a cycle """

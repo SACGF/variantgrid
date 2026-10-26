@@ -45,17 +45,18 @@ from annotation.external_search_terms import (
 from annotation.models.models_citations import Citation
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.models.repeat_masker import RepeatMaskerSummary
+from genes.enums import AnnotationConsortium
+from genes.hgvs.hgvs_matcher import HGVSMatcher
 from genes.models import (
     Gene,
     GeneSymbol,
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict
-from patients.models_enums import GnomADPopulation
+from patients.enums import GnomADPopulation
 from snpdb.models import Variant
 from snpdb.models.models_cached_web_resource import CachedWebResource
 
@@ -145,6 +146,29 @@ class AbstractVariantAnnotation(models.Model):
     mavedb_score = models.FloatField(null=True, blank=True)
     mavedb_urn = models.TextField(null=True, blank=True)
 
+    # UTRAnnotator and SpliceVault (#2426). Rows annotated before the plugins were switched on are null
+    # until backfilled (VariantAnnotationVersion.backfilled_utr_avi_splicevault), and the backfill only
+    # reaches VariantAnnotation, never VariantTranscriptAnnotation.
+
+    # UTRAnnotator - 5' UTR variants only
+    utr_annotator_consequence = models.TextField(null=True, blank=True)  # eg 5_prime_UTR_premature_start_codon_gain_variant
+    # One record per uORF effect, '&'-joined, each 'key=value:key=value' (KozakStrength, DistanceToCDS, type, ...)
+    utr_annotator_annotation = models.TextField(null=True, blank=True)
+    utr_annotator_existing_uorfs = models.IntegerField(null=True, blank=True)
+    utr_annotator_existing_out_of_frame_oorfs = models.IntegerField(null=True, blank=True)
+    utr_annotator_existing_inframe_oorfs = models.IntegerField(null=True, blank=True)
+
+    # SpliceVault - RNA-seq mis-splicing events at a splice site SpliceAI predicts lost. Keyed by MANE
+    # transcript, so only that transcript's entry has values (annotation/splicevault.py)
+    # One record per event, '&'-joined, each 'rank:type:transcript_impact:percent_of_samples:frame'
+    splicevault_top_events = models.TextField(null=True, blank=True)
+    splicevault_site_sample_count = models.IntegerField(null=True, blank=True)
+    splicevault_site_max_depth = models.IntegerField(null=True, blank=True)
+    splicevault_out_of_frame_events = models.TextField(null=True, blank=True)  # eg Frameshift:2/4
+    splicevault_site_pos = models.TextField(null=True, blank=True)  # eg chr1:925801
+    splicevault_site_type = models.TextField(null=True, blank=True)  # Donor_loss / Acceptor_loss
+    splicevault_spliceai_delta = models.FloatField(null=True, blank=True)
+
     class Meta:
         abstract = True
 
@@ -208,7 +232,6 @@ class AbstractVariantAnnotation(models.Model):
             # parse, and nothing to graft a symbol onto. @see genes.models.fusion_canonical_str
             return hgvs_c
         if self.has_hgvs_c and self.symbol:
-            from genes.hgvs import HGVSMatcher
             hgvs_matcher = HGVSMatcher.instance(self.version.genome_build)
             hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)
             hgvs_variant.gene = self.symbol
@@ -359,6 +382,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # PromoterAI (columns_version >= 5, GRCh38, VEP >= 116)
     promoter_ai_score = models.FloatField(null=True, blank=True)
     promoter_ai_tss_pos = models.IntegerField(null=True, blank=True)
+    # AlphaGenome Variant Impact (#2426) - GRCh38 SNVs, VEP >= 116. Null before the backfill as above
+    avi_phred = models.FloatField(null=True, blank=True)
+    avi_raw = models.FloatField(null=True, blank=True)
+    # AlphaGenome merged splicing score (#2433) - GRCh38 SNVs, non-commercial data
+    # (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED). Null before the backfill as above
+    alphagenome_splicing = models.FloatField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)
@@ -628,6 +657,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return vep_plugin_display.protvar_pocket_parsed(self)
 
     @property
+    def utr_annotator_effects(self) -> list[dict[str, str]]:
+        return vep_plugin_display.utr_annotator_effects(self.utr_annotator_annotation)
+
+    @property
+    def splicevault_top_events_list(self) -> list[str]:
+        return [e for e in (self.splicevault_top_events or "").split("&") if e]
+
+    @property
     def gnomad4_or_later(self) -> bool:
         return self.version.gnomad_major_version >= 4
 
@@ -797,7 +834,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
             None for what has no g.HGVS to write - <CNV>/<INS> and gene-level """
         if not variant.can_make_g_hgvs:
             return None
-        from genes.hgvs import HGVSMatcher
         matcher = HGVSMatcher.instance(variant.any_genome_build)
         return matcher.variant_to_g_hgvs(variant)
 

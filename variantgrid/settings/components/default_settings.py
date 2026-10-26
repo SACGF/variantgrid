@@ -405,7 +405,6 @@ BEACON_QUERY_NODES = {
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
-VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
 # Uploaded VCFs have their first SNVs' REF bases checked against the build they're imported as (#2030). A wrong
@@ -535,7 +534,6 @@ PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = None  # Sample gene matrix of these gen
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = False  # True = show all samples
 PUBLIC_SAMPLE_GENE_MATRIX_TYPE = 'Damage'
 PUBLIC_SAMPLE_GENE_MATRIX_HIGHLIGHT_GENE_SYMBOLS = []
-PUBLIC_LAB_LOCATION_PAGE_VISIBLE = False
 
 PROCESSED_BED_FILES_DIR = os.path.join(PRIVATE_DATA_ROOT, 'processed_bed_files')
 INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_upload_variant_collection.sh')
@@ -660,7 +658,6 @@ CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during
 CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
 CLASSIFICATION_AUTOFUZZ_AGE = False
 
-CLASSIFICATION_DASHBOARD_SIZE = 50
 CLASSIFICATION_RECLASSIFICATION_EMAIL = True
 CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY = False  # Reclassification analytics only counts internal labs (Lab.external=False)
 CLASSIFICATION_RECLASSIFICATION_ANALYTICS_NON_ADMIN = False  # Every user can view reclassification analytics, not only admins
@@ -721,7 +718,6 @@ ISSUE_TRACKER_TEXT = "GitHub issue tracker"
 USER_SETTINGS_SHOW_GROUPS = True
 
 SQL_BATCH_INSERT_SIZE = 50000
-SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
 # Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
 VARIANTGRID_MAJOR_VERSION = 4
@@ -840,9 +836,6 @@ STORAGES = {
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)
 
-# Seed data only: the classify queue tag a fresh install is created with (tags can't have spaces).
-# What behaves as a queue tag is Tag.requires_classification, set per tag on the tag settings page
-TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"
 
 TEMPLATES = [
     {
@@ -1035,9 +1028,7 @@ INSTALLED_APPS = [
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'user_messages',
-    'django_dag',  # only for old seqauto/annotation migrations - remove after squashing (#736)
     'django_js_reverse',
-    'django_extensions',
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
@@ -1175,6 +1166,9 @@ LOGGING = {
         },
     }
 }
+if UNIT_TEST:
+    # Tests asserting a 4xx would each print the request's traceback - 5xx are logged at ERROR so still show
+    LOGGING['loggers']['django.request'] = {'level': 'ERROR'}
 
 # Instead of @login_required, LoginRequiredMiddleware requires login everywhere. A view opts out with
 # @login_not_required (django.contrib.auth.decorators); DRF views are already marked, and check auth at view time.
@@ -1334,6 +1328,8 @@ VIEW_GENE_HOTSPOT_GRAPH = True
 VIEW_GENE_HOTSPOT_GRAPH_PREFER_CANONICAL_WITH_DIFF_VERSION = True
 VIEW_GENE_WIKI = True
 
+VIEW_DASHBOARD_TAG_STATS_GRAPH = True  # Tag events by month slide on the dashboard
+
 TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
 
 # User awards (#1819): admin-given kudos plus computed badges, shown on the profile pages.
@@ -1395,7 +1391,9 @@ def get_keycloak_sync_secrets() -> dict:
     """
     KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
     """
-    return get_secrets("KEYCLOAK", ["username", "password", "host", "oauth_url", "client_id"])
+    keycloak_secrets = get_secrets("KEYCLOAK", ["username", "password", "host", "oauth_url", "client_id"])
+    keycloak_secrets["allow_http"] = get_secret("KEYCLOAK.allow_http", mandatory=False)
+    return keycloak_secrets
 
 
 def get_shariant_sync_secrets() -> dict:
@@ -1409,7 +1407,8 @@ def get_shariant_sync_secrets() -> dict:
     if set(sync.keys()) == set(sync_fields):
         raise ValueError("Old secret 'SYNC' detected - need to use SyncDestination.config['sync_details'] as keys")
 
-    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password"]
+    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password",
+                       "allow_http"]
     return {sd: get_secrets(f"SYNC.{sd}", sync_all_fields, False) for sd in sync}
 
 

@@ -221,7 +221,7 @@ formats on an existing VCF) and everything downstream must be safe to run twice 
 Steps are rows, not celery state, because an import outlives any one worker process: the page at
 `upload/views/views.py:view_upload_pipeline` and `APIUploadStatusView` read progress straight from `UploadStep`, a
 crashed worker leaves a row that says where it died, and retry can reason about what to delete. The stage/dependency
-split (`upload/models/models_enums.py:VCFPipelineStage`) is what lets steps be created during the run - by preprocess
+split (`upload/enums/upload_enums.py:VCFPipelineStage`) is what lets steps be created during the run - by preprocess
 for each chunk, by the header task per sample - and still be scheduled correctly, since the scheduler only ever asks
 "is anything in this stage still open" rather than following a fixed list.
 

@@ -3,15 +3,16 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from annotation.enums import CitationSource
 from annotation.models import Citation, CitationFetchRequest
-from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from snpdb.models.models_enums import AlleleOriginBucket
+from annotation.models.models_citations import CitationIdNormalized
 from classification.models import ClassificationModification
 from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
 )
 from genes.hgvs import HGVSComponents
+from snpdb.enums import AlleleOriginBucket
 
 
 class CitationCounter:

@@ -13,8 +13,8 @@ from genes.gene_fusions import create_gene_fusions_for_variants
 from library.log_utils import log_traceback
 from library.utils import import_class
 from snpdb.bcftools_liftover import bcftools_liftover
+from snpdb.enums import AlleleConversionTool, ProcessingStatus
 from snpdb.models import AlleleLiftover, Variant
-from snpdb.models.models_enums import AlleleConversionTool, ProcessingStatus
 from upload.models import ModifiedImportedVariants, UploadedVCF, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
@@ -27,8 +27,8 @@ from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import (
     BulkManualVariantEntryLinkingVCFProcessor,
 )
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
-from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.gene_level_vcf_preprocess import preprocess_gene_level_vcf
+from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.vcf_preprocess import preprocess_vcf
 from variantgrid.celery import app
 

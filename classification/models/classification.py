@@ -15,9 +15,8 @@ import logging
 import re
 import uuid
 from collections import Counter, namedtuple
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta
-from enum import Enum
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -41,10 +40,10 @@ from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone as django_timezone
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from model_utils.models import TimeStampedModel
 
-from annotation.models.data_enums import (
+from annotation.enums import (
     ClassificationDate,
     ClassificationDateType,
     EffectiveDate,
@@ -56,10 +55,12 @@ from annotation.models.models_version import VariantAnnotationVersion
 from classification.enums import (
     CRITERIA_NOT_MET,
     CriteriaEvaluation,
+    ImportedAlleleInfoStatus,
     ShareLevel,
     SpecialEKeys,
     SubmissionSource,
     TestingContextBucket,
+    WipeMode,
     WithdrawReason,
 )
 from classification.models.classification_evidence_normalise import (
@@ -75,7 +76,6 @@ from classification.models.classification_utils import (
 )
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     tidy_hgvs_whitespace,
 )
 from classification.models.condition_resolved import ConditionResolved, ConditionResolvedDict
@@ -85,7 +85,6 @@ from classification.models.evidence_key import (
     EvidenceKeyValueType,
     VCDataDict,
     VCPatch,
-    WipeMode,
     resolve_default_value,
 )
 from classification.models.evidence_mixin import EvidenceMixin
@@ -113,10 +112,10 @@ from library.utils import (
     md5sum_str,
     utc_from_timestamp,
 )
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Sample, Variant
 from snpdb.models.models import CodeVersion, CodeVersionMixin
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Allele, AlleleSource, VariantAllele
 
@@ -133,13 +132,6 @@ classification_variant_set_signal = django.dispatch.Signal()  # args: "classific
 classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
 # This signal is called if a classification is assigned to a variant (or liftover), or the classification changes
 variants_classification_changed_signal = django.dispatch.Signal()  # args: "classification", "variant"
-
-
-class VCBlobKeys(Enum):
-    VALUE = "value"
-    NOTE = "note"
-    DB_REFS = "db_refs"
-    EXPLAIN = "explain"
 
 
 class ClassificationProcessError(Exception):
@@ -332,7 +324,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def summary_obj(self) -> ClassificationSummaryCacheObj:
-        from classification.models import ClassificationSummaryCacheObj
         return ClassificationSummaryCacheObj.from_dict_safe(self.summary)
 
     last_source_id = models.TextField(blank=True, null=True)
@@ -906,28 +897,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # have to re-retrieve last_edited_version as it's now the latest
             self.last_edited_version.publish(share_level=self.share_level_enum, user=user, vc=self)
 
-    def patch_history(self, patcher: Callable[[PatchMeta], None]):
-        """
-        Patches current evidence, and historic modifications "delta" and "published_evidence" fields
-        :param patcher: Code that modified PatchMeta in place through the patch methods
-        """
-        last_evidence = {}
-        modification: ClassificationModification
-        for modification in ClassificationModification.objects.filter(classification=self).order_by('created'):
-            patch_meta = PatchMeta(patch=modification.delta, existing=last_evidence)
-            last_evidence = copy.deepcopy(modification.evidence)
-            patcher(patch_meta)
-
-            modification.delta = dict(patch_meta.patch)
-            if modification.published_evidence:
-                patch_meta = PatchMeta(patch=modification.published_evidence, existing={})
-                patcher(patch_meta)
-                modification.published_evidence = dict(modification.published_evidence)
-            modification.save(update_fields=['delta', 'published_evidence'])
-
-        self.evidence = self.last_edited_version.evidence
-        self.save(update_fields=['evidence'])
-
     @transaction.atomic()
     def patch_value(self,
                     patch: dict[str, Any],
@@ -964,6 +933,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             patch_known_keys_only = settings.CLASSIFICATION_ALLOW_UNKNOWN_KEYS is False
 
         source = source or SubmissionSource.API
+
+        if save and self.pk:
+            # concurrent patches of one record (web autosave + API) apply one after another, each on top of the
+            # evidence the last one committed rather than the evidence this instance was loaded with
+            self.evidence = self.lock_row()
 
         patch_response = ClassificationPatchResponse()
 
@@ -1286,6 +1260,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 pending_modification.save()
                 assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
 
+    def lock_row(self) -> dict:
+        """ Locks this record's row until the end of the transaction, returning its evidence as last committed """
+        return Classification.objects.select_for_update().values_list("evidence", flat=True).get(pk=self.pk)
+
     def publish_latest(self, user: User, share_level=None) -> bool:
         if not share_level:
             share_level = self.share_level_enum
@@ -1473,9 +1451,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def get_other_classifications_summary_for_variant(self, user: User) -> str:
         other_classifications_summary = None
-        if self.variant and self.variant.allele:
+        if allele := self.allele_object:
             latest_others_for_variant = ClassificationModification.latest_for_user(user=user,
-                                                                                   allele=self.variant.allele,
+                                                                                   allele=allele,
                                                                                    published=True)
             latest_others_for_variant = latest_others_for_variant.exclude(classification__id=self.id)
             other_classifications_summary = Classification.clinical_significance_counts_summary(latest_others_for_variant)
@@ -1702,6 +1680,14 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
     # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
     code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["classification"], condition=Q(is_last_edited=True),
+                                    name="classificationmodification_one_last_edited"),
+            models.UniqueConstraint(fields=["classification"], condition=Q(is_last_published=True),
+                                    name="classificationmodification_one_last_published"),
+        ]
+
     def __str__(self) -> str:
         return self.id_str
 
@@ -1789,7 +1775,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
             else:
                 qs = qs.filter(classification__variant__in=variant)
         if allele:
-            qs = qs.filter(classification__variant__in=allele.variants)
+            qs = qs.filter(classification__allele_info__allele=allele)
         if clinical_context:
             qs = qs.filter(classification__clinical_context=clinical_context)
         if exclude_withdrawn:
@@ -1857,6 +1843,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
             # nothing to do, do not re-publish
             return False
 
+        vc.lock_row()  # so a concurrent publish can't also find previously_published still marked last published
         lab = self.classification.lab
         vc.share_level_enum = share_level
 

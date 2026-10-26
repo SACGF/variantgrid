@@ -5,9 +5,9 @@ handler built by CachedWebResource.named_handler_factory, which each app connect
 its loader task (a snpdb/tasks/cached_web_resource_tasks.py:CachedWebResourceTask subclass).
 """
 from django.db import models
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 
 __all__ = ["CachedWebResource"]
 

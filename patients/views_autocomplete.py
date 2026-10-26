@@ -1,8 +1,6 @@
 """
 @see https://django-autocomplete-light.readthedocs.io/en/master/
 """
-import operator
-from functools import reduce
 
 from django.db.models.query_utils import Q
 from django.http import JsonResponse
@@ -12,8 +10,8 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
+from patients.enums import SampleSourceLevel
 from patients.models import ExternalPK, Extraction, Patient, Specimen
-from patients.models_enums import SampleSourceLevel
 from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView, SampleAutocompleteView
 
 
@@ -59,22 +57,20 @@ class ExtractionAutocompleteView(GenomeBuildAutocompleteView):
         return self.filter_to_readable_samples(qs, ["sample"])
 
 
-@method_decorator(cache_page(30), name='dispatch')
+@method_decorator([cache_page(30), vary_on_cookie], name='dispatch')
 class ExternalPKAutocompleteView(AutocompleteView):
+    """ A code can be an MRN or accession, so only those on a record the user can view """
     fields = ['code']
 
-    def get_user_queryset(self, _user):
-        """ This is just a PK with no identifiable info, so doesn't require
-            any per-user filtering """
-        external_type = self.forwarded.get('external_type', None)
-        q_list = []
-        if external_type:
-            q_list.append(Q(external_type=external_type))
+    def get_user_queryset(self, user):
+        visible_q = Q()
+        for rel in ExternalPK._meta.related_objects:
+            if rel.one_to_one:  # each ExternallyManagedModel
+                visible_q |= Q(pk__in=rel.related_model.filter_for_user(user).values(rel.field.name))
 
-        qs = ExternalPK.objects.all()
-        if q_list:
-            q = reduce(operator.and_, q_list)
-            qs = qs.filter(q)
+        qs = ExternalPK.objects.filter(visible_q)
+        if external_type := self.forwarded.get('external_type'):
+            qs = qs.filter(external_type=external_type)
         return qs
 
 

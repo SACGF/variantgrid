@@ -19,8 +19,8 @@ They deliberately exercise the parts the substitution touches or risks:
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import ZygosityNodeZygosity
 from analysis.models import Analysis
-from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.filters.population_node import PopulationNode
@@ -31,7 +31,8 @@ from annotation.models import AnnotationRun
 from annotation.models.models import VariantAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from library.django_utils.django_partition import temporary_db_table
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
+from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild, Variant
 from snpdb.models.models_cohort import (
@@ -39,7 +40,6 @@ from snpdb.models.models_cohort import (
     CohortGenotypeCollection,
     CohortGenotypeCommonFilterVersion,
 )
-from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

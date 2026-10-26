@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from library.utils import full_class_name
 from seqauto import forms
+from seqauto.enums import QCCompareType
 from seqauto.graphs.index_metrics_qc_graph import IndexMetricsQCGraph
 from seqauto.graphs.qc_exec_summary_graph import QCExecSummaryGraph
 from seqauto.graphs.sequencing_run_qc_graph import SequencingRunQCGraph
@@ -20,7 +21,6 @@ from seqauto.models import (
     SequencingRun,
     SequencingSample,
 )
-from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.sequencing_run_utils import (
     get_qc_exec_summary_data,
     get_sequencing_run_columns,

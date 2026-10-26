@@ -13,7 +13,7 @@ from mme.tests.fakes import (
     FakeSubmission,
     make_term,
 )
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
 
 SERVER_CONTACT = {"name": "Node Operator", "href": "mailto:node@example.org",
                   "institution": "Node Org"}

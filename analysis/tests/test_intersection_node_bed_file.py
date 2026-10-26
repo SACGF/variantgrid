@@ -3,7 +3,7 @@ from django.test import TestCase
 
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
-from snpdb.models.models_enums import ImportStatus
+from snpdb.enums import ImportStatus
 from snpdb.models.models_genomic_interval import (
     GenomicIntervalsCategory,
     GenomicIntervalsCollection,

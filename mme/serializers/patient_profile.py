@@ -17,8 +17,9 @@ from classification.enums.classification_enums import ShareLevel, SpecialEKeys
 from classification.models.classification import ClassificationModification
 from mme.contact import mme_contact_for_classification
 from mme.genes import resolve_gene
-from ontology.models import OntologyService, OntologySnake, OntologyTerm, OntologyTermRelation
-from snpdb.models.models_enums import ClinicalSignificance
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
+from snpdb.enums import ClinicalSignificance
 
 
 def classification_ontology_slots(classification, include_patient_phenotype: bool = True) -> tuple[list[dict], list[dict]]:

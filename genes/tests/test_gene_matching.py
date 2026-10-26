@@ -1,7 +1,11 @@
+from contextlib import redirect_stdout
+from io import StringIO
+
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
 
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from genes.gene_matching import (
     MAX_GENE_SYMBOL_LENGTH,
     GeneSymbolMatcher,
@@ -22,8 +26,13 @@ from genes.models import (
     ReleaseGeneSymbolGene,
     ReleaseGeneVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from snpdb.models import GenomeBuild
+
+
+def _call_command(*args, **kwargs):
+    """ The command prints a line per change """
+    with redirect_stdout(StringIO()):
+        call_command("fix_rematch_release_symbols_to_genes", *args, **kwargs)
 
 
 class TestGeneSymbolMatcherGeneList(TestCase):
@@ -62,6 +71,26 @@ class TestSetGeneListFromText(TestCase):
         self.assertEqual((["GATA2"], ["NOTAGENE", "RUNX1"]), (added, removed))
         rows = dict(gene_list.genelistgenesymbol_set.values_list("original_name", "modification_info"))
         self.assertEqual({"KAL1": "original", "GATA2": "edit"}, rows)
+
+    def test_warning_follows_the_text(self):
+        """ The ambiguous alias warning goes once the name is replaced, and stays while the name is kept """
+        for symbol in ["SEPTIN2", "SEPTIN6", "RUNX1"]:
+            GeneSymbol.objects.create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        user = User.objects.get_or_create(username='test_user')[0]
+        gene_list = GeneList.objects.create(name="test_warning", user=user)
+        matcher = GeneSymbolMatcher()
+        matcher.create_gene_list_gene_symbols_from_text(gene_list, "SEPTX")
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias", gene_list.error_message)
+
+        matcher.set_gene_list_gene_symbols_from_text(gene_list, "SEPTX RUNX1")
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias", gene_list.error_message)
+
+        matcher.set_gene_list_gene_symbols_from_text(gene_list, "SEPTIN2 RUNX1")
+        gene_list.refresh_from_db()
+        self.assertFalse(gene_list.error_message)
 
 
 class TestOversizedTokens(TestCase):
@@ -198,12 +227,12 @@ class TestFixRematchReleaseSymbolsToGenes(ReleaseGeneMatcherTestCase):
                    .values_list("gene_id", flat=True))
 
     def test_resync_deletes_chained_inserts_missing_and_keeps_direct(self):
-        call_command("fix_rematch_release_symbols_to_genes")
+        _call_command()
         self.assertEqual(set(), self._matched_genes("MT-TS2"))
         self.assertEqual({"5134"}, self._matched_genes("PDCD2"))
         self.assertEqual({"3730"}, self._matched_genes("KAL1"))
 
     def test_dry_run_writes_nothing(self):
-        call_command("fix_rematch_release_symbols_to_genes", dry_run=True)
+        _call_command(dry_run=True)
         self.assertEqual({"5134"}, self._matched_genes("MT-TS2"))
         self.assertEqual(set(), self._matched_genes("KAL1"))

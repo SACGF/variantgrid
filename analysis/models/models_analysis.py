@@ -24,10 +24,10 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm
+from model_utils.models import TimeStampedModel
 
-from analysis.models.enums import AnalysisTemplateType, AnalysisType
+from analysis.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from classification.models import Classification
 from genes.models import CanonicalTranscriptCollection
@@ -35,6 +35,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.guardian_utils import DjangoPermission, admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
 from seqauto.models import EnrichmentKit
+from snpdb.enums import BuiltInFilters
 from snpdb.models import (
     AbstractNodeCountSettings,
     Cohort,
@@ -44,7 +45,6 @@ from snpdb.models import (
     TagConfigCollection,
     UserSettings,
 )
-from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
 

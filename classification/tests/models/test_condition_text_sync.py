@@ -11,10 +11,10 @@ from classification.models.classification_variant_info_models import (
     allele_info_changed_signal,
 )
 from classification.models.condition_text_matching import ConditionTextMatch
+from genes.enums import GeneSymbolAliasSource
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, GeneSymbolAlias
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
-from genes.models_enums import GeneSymbolAliasSource
 from library.request_context import set_thread_variable
 from snpdb.models import Country, Lab, Organization
 

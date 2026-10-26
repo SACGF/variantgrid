@@ -4,8 +4,8 @@ from django import forms
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from seqauto import models
+from seqauto.enums import QCCompareType, QCGraphTypes2
 from seqauto.models import EnrichmentKit, QCColumn, QCType, SequencingRun
-from seqauto.models.models_enums import QCCompareType, QCGraphTypes2
 from snpdb.forms import BaseDeclareForm
 
 

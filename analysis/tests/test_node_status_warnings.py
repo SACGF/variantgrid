@@ -8,7 +8,7 @@ from unittest.mock import patch
 from django.test import Client
 from django.urls import reverse
 
-from analysis.models import NodeStatus
+from analysis.enums import NodeStatus
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.test_grid_export import GridExportTestCase
 

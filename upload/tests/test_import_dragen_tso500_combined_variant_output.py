@@ -1,6 +1,7 @@
 """Import of CombinedVariantOutput.tsv - the pair's chain, its seqauto links and the analysis' record."""
 import os
 import tempfile
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -8,25 +9,28 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import link_combined_variant_outputs
 from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     SampleFromSequencingSample,
+    SequencingRun,
     band_call,
 )
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import VCF, GenomeBuild, ImportSource, Sample
+from snpdb.enums import ImportSource
+from snpdb.models import VCF, GenomeBuild, Sample
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
     UploadedDragenTSO500CombinedVariantOutput,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
 )
+from upload.models.models import UploadUserError
 from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
     ImportDragenTSO500CombinedVariantOutputTask,
 )
@@ -283,10 +287,12 @@ class TestCombinedVariantOutputRecords(TestCase):
         self.assertNotEqual(patient, resolved.patient)
         self.assertEqual("C0000001", resolved.patient.patient_code)
 
-    def _write(self, sequencing_run_name="TSO500_CVO", sequencing_run=None, resolve=True):
+    def _write(self, sequencing_run_name="TSO500_CVO", resolve=True):
         resolved = resolve_pair(self.identifiers, self.user) if resolve else None
+        sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first() or \
+            make_sequencing_run(sequencing_run_name)
         return write_combined_variant_output(self.sections, self.identifiers.pair_id, sequencing_run,
-                                             sequencing_run_name, self.user, resolved=resolved,
+                                             self.user, resolved=resolved,
                                              specimen_reference=self.identifiers.specimen_reference,
                                              parked_error=None if resolve else "not accessioned")
 
@@ -332,32 +338,29 @@ class TestCombinedVariantOutputRecords(TestCase):
                                                                              self.identifiers.rna.sample_id])
         dna_sample = self._make_sample(self.identifiers.dna.sample_id)
 
-        cvo = self._write(sequencing_run=sequencing_run)
+        cvo = self._write()
 
         self.assertEqual((dna_ss, rna_ss), (cvo.dna_sequencing_sample, cvo.rna_sequencing_sample))
         self.assertEqual(dna_sample, cvo.dna_sample)
         self.assertIsNone(cvo.rna_sample)
 
-    def test_run_sheet_and_arms_arriving_after_the_file_are_reconciled(self):
+    def test_sheet_and_arms_arriving_after_the_file_are_reconciled(self):
         cvo = self._write()
-        sequencing_run = make_sequencing_run("TSO500_CVO")
-        _sample_sheet, (dna_ss, _rna_ss) = make_sample_sheet(sequencing_run, [self.identifiers.dna.sample_id,
-                                                                              self.identifiers.rna.sample_id])
+        _sample_sheet, (dna_ss, _rna_ss) = make_sample_sheet(cvo.sequencing_run, [self.identifiers.dna.sample_id,
+                                                                                  self.identifiers.rna.sample_id])
         dna_sample = self._make_sample(self.identifiers.dna.sample_id)
 
         self.assertEqual(1, link_combined_variant_outputs())
 
         cvo.refresh_from_db()
-        self.assertEqual(sequencing_run, cvo.sequencing_run)
         self.assertEqual(dna_ss, cvo.dna_sequencing_sample)
         self.assertEqual(dna_sample, cvo.dna_sample)
 
     def test_an_arm_vcf_seqauto_links_later_fills_the_waiting_row(self):
-        sequencing_run = make_sequencing_run("TSO500_CVO")
-        cvo = self._write(sequencing_run=sequencing_run)
+        cvo = self._write()
         rna_sample = self._make_sample(self.identifiers.rna.sample_id)
 
-        self.assertEqual(1, DragenTSO500CombinedVariantOutput.link_arm_sample(rna_sample, sequencing_run))
+        self.assertEqual(1, DragenTSO500CombinedVariantOutput.link_arm_sample(rna_sample, cvo.sequencing_run))
         cvo.refresh_from_db()
         self.assertEqual(rna_sample, cvo.rna_sample)
 
@@ -404,7 +407,7 @@ class TestCombinedVariantOutputRecords(TestCase):
         _sample_sheet, (_dna_ss, rna_ss) = make_sample_sheet(sequencing_run,
                                                              [self.identifiers.dna.sample_id,
                                                               self.identifiers.rna.sample_id])
-        cvo = self._write(sequencing_run=sequencing_run)
+        cvo = self._write()
         splice_sample = self._make_sample("SAMPLE")
         SampleFromSequencingSample.objects.create(sample=splice_sample, sequencing_sample=rna_ss)
 
@@ -420,9 +423,9 @@ class TestCombinedVariantOutputImportTask(TestCase):
         self.user = User.objects.create_user(username="cvo_import_user")
         self.rna_sample_id = "ExampleSample_RNA_2600000001B"
 
-    def _file_upload(self, metadata=None) -> FileUpload:
+    def _file_upload(self, metadata=None, import_source=ImportSource.COMMAND_LINE) -> FileUpload:
         file_upload = FileUpload.objects.create(path=COMBINED_VARIANT_OUTPUT,
-                                                import_source=ImportSource.COMMAND_LINE,
+                                                import_source=import_source,
                                                 user=self.user,
                                                 name="ExampleSample_2600000001_CombinedVariantOutput.tsv",
                                                 file_type=UploadedFileTypes.DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT,
@@ -437,6 +440,7 @@ class TestCombinedVariantOutputImportTask(TestCase):
         return Sample.objects.create(vcf=vcf, name=sample_name, vcf_sample_name=sample_name)
 
     def test_the_pair_lands_with_its_chain_and_analysis(self):
+        sequencing_run = make_sequencing_run("TSO500_IMPORT")
         file_upload = self._file_upload({SEQUENCING_RUN: "TSO500_IMPORT"})
         sample = self._make_sample(self.rna_sample_id)
 
@@ -448,12 +452,41 @@ class TestCombinedVariantOutputImportTask(TestCase):
         self.assertEqual("2600000001B", sample.extraction.reference_id)
         self.assertEqual(specimen, sample.extraction.specimen)
         cvo = DragenTSO500CombinedVariantOutput.objects.get(specimen=specimen)
+        self.assertEqual(sequencing_run, cvo.sequencing_run)
         self.assertEqual("TSO500_IMPORT", cvo.sequencing_run_name)
         self.assertEqual(file_upload, cvo.file_upload)
         self.assertEqual(sample, cvo.rna_sample)
         self.assertTrue(UploadedDragenTSO500CombinedVariantOutput.objects.filter(
             file_upload=file_upload).exists())
         self.assertFalse(UploadedVCF.objects.filter(file_upload=file_upload).exists())
+
+    def test_a_web_upload_without_sequencing_write_access_fails_writing_nothing(self):
+        file_upload = self._file_upload({SEQUENCING_RUN: "TSO500_IMPORT"}, import_source=ImportSource.WEB_UPLOAD)
+        sample = self._make_sample(self.rna_sample_id)
+
+        # A web upload's file is its file_field, which the test file isn't
+        with patch.object(FileUpload, "get_filename", return_value=COMBINED_VARIANT_OUTPUT):
+            with self.assertRaisesMessage(UploadUserError, "TSO500_IMPORT"):
+                ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload)
+
+        sample.refresh_from_db()
+        self.assertIsNone(sample.extraction)
+        self.assertFalse(Patient.objects.exists())
+        self.assertFalse(DragenTSO500CombinedVariantOutput.objects.exists())
+        self.assertFalse(UploadedDragenTSO500CombinedVariantOutput.objects.exists())
+
+    def test_metadata_naming_a_run_seqauto_has_not_registered_fails_writing_nothing(self):
+        file_upload = self._file_upload({SEQUENCING_RUN: "UNREGISTERED_RUN"})
+        sample = self._make_sample(self.rna_sample_id)
+
+        with self.assertRaisesMessage(UploadUserError, "No sequencing run named 'UNREGISTERED_RUN'"):
+            ImportDragenTSO500CombinedVariantOutputTask.process_items(file_upload)
+
+        sample.refresh_from_db()
+        self.assertIsNone(sample.extraction)
+        self.assertFalse(Patient.objects.exists())
+        self.assertFalse(DragenTSO500CombinedVariantOutput.objects.exists())
+        self.assertFalse(UploadedDragenTSO500CombinedVariantOutput.objects.exists())
 
     def test_without_metadata_the_run_is_the_one_whose_sheet_names_the_pair(self):
         sequencing_run = make_sequencing_run("TSO500_IMPORT")

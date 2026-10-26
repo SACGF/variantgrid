@@ -171,6 +171,8 @@ format_pick_highest_float_na = get_clean_and_pick_single_value_func(max, float,
                                                                     empty_values=_EMPTY_MAVE_FLOAT_VALUES)
 
 format_empty_as_none = get_format_empty_as_none(empty_values=EMPTY_VALUES)
+# UTRAnnotator writes '-' for a 5' UTR variant with no uORF effect
+format_dash_as_none = get_format_empty_as_none(empty_values=EMPTY_VALUES | {'-'})
 
 # COSMIC v90 (5/9/2019) switched to COSV (build independent identifiers)
 extract_cosmic = get_extract_existing_variation("COSV")

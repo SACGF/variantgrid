@@ -10,15 +10,17 @@ from classification.classification_import import (
     GENE_LEVEL_API_UPLOAD_NAME,
     _classification_upload_pipeline,
 )
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport
 from classification.tasks.classification_import_process_variants_task import (
     ClassificationImportProcessVariantsTask,
 )
+from snpdb.enums import ImportSource
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
-from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, ImportSource, VariantCoordinate
+from snpdb.models import GenomeBuild, GenomeBuildPatchVersion, VariantCoordinate
+from upload.enums import UploadedFileTypes, UploadStepOrigin, UploadStepTaskType
 from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
-from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, UploadStepTaskType
 
 
 class TestClassificationImportPipelines(TestCase):

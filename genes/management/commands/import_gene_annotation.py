@@ -3,20 +3,21 @@ import time
 
 import ijson
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.db.models.functions import Upper
 
-from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     HGNC,
     CdotDataVersion,
     Gene,
     GeneAnnotationImport,
     GeneSymbol,
+    GeneSymbolAlias,
     GeneVersion,
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import get_cdot_transcript_id_and_version
 from library.utils import invert_dict
 from library.utils.file_utils import open_handle_gzip
@@ -46,6 +47,9 @@ class GeneAnnotationImportManager:
 class Command(BaseCommand):
     """
         Insert the gene/transcript versions from a cdot JSON.gz file.
+
+        RefSeq gene summaries and NCBI gene symbol aliases also come from here: cdot takes them from
+        NCBI Entrez gene esummary (#2431)
 
         To create a GeneAnnotationRelease (which links the versions from a single GFF/GTF so they
         match a VEP build) use 'import_cdot_gene_annotation_release'.
@@ -131,12 +135,13 @@ class Command(BaseCommand):
     @classmethod
     def _import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_version,
                           genes_iter, transcripts_iter):
-        print(f"importing {genome_build}/{annotation_consortium}")
+        logging.info("Importing %s/%s", genome_build, annotation_consortium)
 
         start = time.time()
         known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))
         genes_qs = Gene.objects.filter(annotation_consortium=annotation_consortium)
-        known_genes_ids = set(genes_qs.values_list("identifier", flat=True))
+        summary_by_gene_id = dict(genes_qs.values_list("identifier", "summary"))
+        known_genes_ids = set(summary_by_gene_id)
         transcripts_qs = Transcript.objects.filter(annotation_consortium=annotation_consortium)
         known_transcript_ids = set(transcripts_qs.values_list("identifier", flat=True))
         hgnc_ids = set(HGNC.objects.all().values_list("pk", flat=True))
@@ -151,6 +156,8 @@ class Command(BaseCommand):
 
         new_gene_symbols = set()
         new_genes = []
+        modified_gene_summaries = []
+        aliases_by_symbol = {}
         new_gene_versions = []
         modified_gene_versions = []
 
@@ -170,19 +177,23 @@ class Command(BaseCommand):
             if version is None:
                 version = 0  # RefSeq genes have no version, store as 0
 
+            gene_summary = gv_data.get("summary") or None
             if gene_id not in known_genes_ids:
-                gene = Gene(identifier=gene_id,
-                            annotation_consortium=annotation_consortium)
-                if gene_summary := gv_data.get("summary"):
-                    gene.summary = gene_summary
-                new_genes.append(gene)
+                new_genes.append(Gene(identifier=gene_id, annotation_consortium=annotation_consortium,
+                                      summary=gene_summary))
                 known_genes_ids.add(gene_id)
+            elif gene_summary and gene_summary != summary_by_gene_id[gene_id]:
+                modified_gene_summaries.append(Gene(identifier=gene_id, summary=gene_summary))
+                summary_by_gene_id[gene_id] = gene_summary
 
             if symbol := gv_data["gene_symbol"]:
                 uc_symbol = symbol.upper()
                 if uc_symbol not in known_uc_gene_symbols:
                     new_gene_symbols.add(symbol)
                     known_uc_gene_symbols.add(uc_symbol)
+                # A gene with no "aliases" key has no NCBI gene info in cdot, so leaves what we have
+                if (aliases := gv_data.get("aliases")) is not None:
+                    aliases_by_symbol.setdefault(symbol, set()).update(a.strip() for a in aliases.split(",") if a.strip())
 
             hgnc_id = None  # Foreign Key - only set if we have it (ie not withdrawn)
             if hgnc_identifier := gv_data.get("hgnc"):
@@ -216,10 +227,16 @@ class Command(BaseCommand):
         if new_genes:
             logging.info("Creating %d new genes", len(new_genes))
             Gene.objects.bulk_create(new_genes, batch_size=cls.BATCH_SIZE)
-            has_new_genes = True
-        else:
-            has_new_genes = False
         del new_genes
+
+        if modified_gene_summaries:
+            logging.info("Updating %d gene summaries", len(modified_gene_summaries))
+            Gene.objects.bulk_update(modified_gene_summaries, ["summary"], batch_size=cls.BATCH_SIZE)
+        del modified_gene_summaries, summary_by_gene_id
+
+        if annotation_consortium == AnnotationConsortium.REFSEQ:
+            cls._update_ncbi_gene_symbol_aliases(aliases_by_symbol, known_uc_gene_symbols)
+        del aliases_by_symbol
 
         if new_gene_versions:
             logging.info("Creating %d new gene versions", len(new_gene_versions))
@@ -306,9 +323,29 @@ class Command(BaseCommand):
                      totals["new_transcripts"], totals["new_transcript_versions"],
                      totals["modified_transcript_versions"], totals["existing_transcript_versions"])
 
-        if has_new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
-            print("Created new RefSeq genes - retrieving gene summaries via API")
-            retrieve_refseq_gene_summaries()
+    @classmethod
+    def _update_ncbi_gene_symbol_aliases(cls, aliases_by_symbol: dict[str, set[str]], known_uc_gene_symbols: set[str]):
+        """ Sync the NCBI aliases of each symbol in the file. An alias that is a gene symbol, or already comes
+            from another source (eg HGNC), is skipped. One NCBI no longer lists is kept while a gene list matched
+            through it, as deleting it would cascade to the GeneListGeneSymbol """
+        other_source_qs = GeneSymbolAlias.objects.exclude(source=GeneSymbolAliasSource.NCBI)
+        other_source_uc_aliases = set(other_source_qs.annotate(uc_alias=Upper("alias")).values_list("uc_alias", flat=True))
+        skip_uc_aliases = known_uc_gene_symbols | other_source_uc_aliases
+        cdot_aliases = {(alias.upper(), symbol.upper()): (alias, symbol)
+                        for symbol, aliases in aliases_by_symbol.items()
+                        for alias in aliases if alias.upper() not in skip_uc_aliases}
+
+        ncbi_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI, gene_symbol__in=aliases_by_symbol)
+        stored_pk_by_alias = {(alias.upper(), symbol.upper()): pk
+                              for pk, alias, symbol in ncbi_qs.values_list("pk", "alias", "gene_symbol_id")}
+        new_aliases = [GeneSymbolAlias(alias=alias, gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+                       for key, (alias, symbol) in cdot_aliases.items() if key not in stored_pk_by_alias]
+        removed_pks = [pk for key, pk in stored_pk_by_alias.items() if key not in cdot_aliases]
+        with transaction.atomic():
+            unused_qs = GeneSymbolAlias.objects.filter(pk__in=removed_pks, genelistgenesymbol__isnull=True)
+            num_deleted, _ = unused_qs.delete()
+            GeneSymbolAlias.objects.bulk_create(new_aliases, batch_size=cls.BATCH_SIZE, ignore_conflicts=True)
+        logging.info("NCBI gene symbol aliases: %d created, %d deleted", len(new_aliases), num_deleted)
 
     @classmethod
     def _update_changed_transcript_versions(cls, transcript_versions: list[TranscriptVersion]) -> int:

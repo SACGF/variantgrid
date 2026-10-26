@@ -4,4 +4,6 @@ exclude-newer = "7 days"
 
 # Packages we publish ourselves are exempt, so a new release can be picked up straight away.
 # Their dependencies still get the cooldown. One-off on the command line: --exclude-newer-package <name>=false
-exclude-newer-package = { cdot = false }
+# certifi and pillow carry security fixes inside the cooldown, so they get a fixed cutoff that admits them; this
+# freezes them at that date, so remove both entries once the default 7 days has passed it (after 2026-10-28).
+exclude-newer-package = { cdot = false, certifi = "2026-10-21T00:00:00Z", pillow = "2026-10-21T00:00:00Z" }

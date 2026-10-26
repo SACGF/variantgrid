@@ -15,16 +15,16 @@ from django.db.models import CASCADE, Count, Q, QuerySet
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
+from patients.enums import Sex
 from patients.models.models_patient import Patient
-from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
+from snpdb.enums import ImportStatus, ProcessingStatus, SuperPopulationCode
 from snpdb.models.models_cohort import Cohort
-from snpdb.models.models_enums import ImportStatus, ProcessingStatus, SuperPopulationCode
 from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample

@@ -1,12 +1,13 @@
 """Whole-gene copy number identity - the words accepted, the alt encoding, and lookup."""
 from django.core.exceptions import ValidationError
 
+from genes.enums import GeneCopyNumberEventKind
 from genes.gene_copy_number import (
     find_gene_copy_number_events_for_string,
     parse_gene_copy_number_string,
     resolve_gene_copy_number_string,
 )
-from genes.models import GeneCopyNumberEvent, GeneCopyNumberEventKind, GeneLevelId
+from genes.models import GeneCopyNumberEvent, GeneLevelId
 from genes.tests.gene_level_test_utils import create_gene_copy_number_event
 from genes.tests.test_gene_fusions import GeneFusionTestCase
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt

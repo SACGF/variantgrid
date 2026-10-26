@@ -12,24 +12,26 @@ from eventlog.models import create_event
 from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
+from snpdb.enums import ImportStatus
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus
 from upload import upload_processing
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     ImportSource,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadPipeline,
     VCFImportInfo,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.upload_metadata import (
     UploadMetadataError,
     get_metadata_keys_for_file_type,
     validate_upload_metadata,
 )
-from upload.uploaded_file_type import get_uploaded_file_type, get_url_and_data_for_uploaded_file_data
+from upload.uploaded_file_type import (
+    get_uploaded_file_type,
+    get_url_and_data_for_uploaded_file_data,
+)
 
 
 def _get_basic_uploaded_file_context(file_upload) -> dict:
@@ -216,7 +218,7 @@ def upload_file_delete(request, pk):
 def accept_vcf_import_info_tag(request, vcf_import_info_id):
     vii = VCFImportInfo.objects.get_subclass(pk=vcf_import_info_id)
     vcf_id = vii.upload_step.upload_pipeline.file_upload.uploadedvcf.vcf.pk
-    VCF.get_for_user(request.user, vcf_id)  # Permission check
+    VCF.get_for_user(request.user, vcf_id, write=True)
     vii.accepted_date = timezone.now()
     vii.save()
 

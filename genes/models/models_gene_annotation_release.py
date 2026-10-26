@@ -2,8 +2,9 @@
 from django.db import models
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
+from genes.enums import AnnotationConsortium
 from genes.models.models_gene import (
     Gene,
     GeneAnnotationImport,
@@ -11,7 +12,6 @@ from genes.models.models_gene import (
     GeneVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 
 

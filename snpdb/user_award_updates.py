@@ -9,8 +9,8 @@ from django.conf import settings
 from django.utils import timezone
 
 from library.guardian_utils import admin_bot
+from snpdb.enums import UserAwardKind, UserAwardLevel
 from snpdb.models import UserAward
-from snpdb.models.models_enums import UserAwardKind, UserAwardLevel
 from snpdb.user_awards import AwardDefinition, get_award_definitions
 
 BADGE_LEVELS = (UserAwardLevel.BRONZE, UserAwardLevel.SILVER, UserAwardLevel.GOLD)

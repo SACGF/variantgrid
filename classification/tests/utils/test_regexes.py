@@ -83,6 +83,11 @@ class RegexTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(str(results[0]), 'PMCID:PMC123456')
 
+    def test_pubmed_central_prefix(self):
+        """ PubMedCentral isn't taken as a PubMed prefix followed by 'Central' """
+        results = db_citation_regexes.search('PubMedCentral: 3583621')
+        self.assertEqual([str(r) for r in results], ['PMCID:PMC3583621'])
+
     def test_pmid_and_pmc(self):
         text = """
         Richards (2015) Genet Med, Standards and guidelines for the interpretation of sequence variants: a joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology.

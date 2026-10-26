@@ -26,9 +26,11 @@ locus); exclude them with `Variant.get_no_reference_q` when you mean real calls.
 `Variant.qs_from_variant_coordinate` applies it for you. Symbolic is a storage form, not "a structural variant" for
 annotation: one under the annotation version's `structural_variant_min_size` (pinned from
 `settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE`) goes through the STANDARD pipeline
-(`annotation/annotation_pipeline_routing.py`), and the Variant Types page (`variantopedia/variant_types.py`) tabulates
+(`annotation/annotation_pipeline_routing.py`); the other way round, a long variant stored as its sequence (a delins, an
+insertion that isn't a dup) goes to the STRUCTURAL_VARIANT pipeline from the version's
+`explicit_structural_variant_min_size` (null on versions made before #1708). The Variant Types page (`variantopedia/variant_types.py`) tabulates
 every such rule by size. Gene-level events are Variants on a fake contig - guard
-coordinate code with `Variant.get_gene_level_q`.
+coordinate and size code with `Variant.get_gene_level_q`.
 
 **Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its
 `Locus.position` and inside its alt. The HGNC id where the gene has one, otherwise a local id above 1,000,000; anything
@@ -96,8 +98,8 @@ counts of hom/het/ref per variant, another partition table, used for the "seen i
 ## Genes and transcripts (genes)
 
 **GeneSymbol / Gene / GeneVersion** - `genes/models/models_gene.py:GeneSymbol`, `Gene`, `GeneVersion`. A GeneSymbol is the
-HGNC-style name (with `GeneSymbolAlias`); a Gene is the stable Ensembl/RefSeq id; a GeneVersion is that gene in one
-annotation release and build. Symbol→gene matching is per release (`genes/models/models_gene_annotation_release.py`).
+HGNC-style name (with `GeneSymbolAlias`); a Gene is the stable Ensembl/RefSeq id; a GeneVersion is one version of that gene
+in one build, shared by every release that contains it (`ReleaseGeneVersion`). Symbol→gene matching is per release (`genes/models/models_gene_annotation_release.py`).
 
 **Transcript / TranscriptVersion** - `genes/models/models_gene.py:Transcript`, `TranscriptVersion`. Transcript is the
 versionless accession; TranscriptVersion (`NM_000059.4`, per build) carries the cdot exon data used for HGVS. HGVS
@@ -194,9 +196,9 @@ analysis' collection when there is one, else the viewer's.
 
 **Classify-queue tag** - a live `snpdb/models/models.py:Tag` with `requires_classification` set: tagging a variant with one
 is asking for it to be classified, and classifying resolves the tagging rather than deleting it. A lab flags its own on the
-tag settings page; `settings.TAG_REQUIRES_CLASSIFICATION` only names the one a fresh install is seeded with. A queue tag is
+tag settings page; `RequiresClassification` is only the one a fresh install is seeded with (`snpdb/migrations/0002_seed_data.py`). A queue tag is
 *for a bucket* when its `allele_origin_bucket` is that bucket or "Both", the same rule
-`snpdb/models/models_enums.py:AlleleOriginFilterDefault` uses. Query with `snpdb/models/models.py:Tag.classify_queue_qs` /
+`snpdb/enums/snpdb_enums.py:AlleleOriginFilterDefault` uses. Query with `snpdb/models/models.py:Tag.classify_queue_qs` /
 `classify_queue_qs_for_bucket` rather than naming a tag.
 
 ## People, labs and permissions (snpdb, library)

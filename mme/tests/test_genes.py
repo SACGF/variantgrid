@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import GeneSymbol, GeneSymbolAlias
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from mme.genes import (
     canonical_gene_key,
     clear_gene_identity_cache,

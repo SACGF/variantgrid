@@ -16,7 +16,8 @@ from classification.models.clinvar_export_exclude_models import ClinVarKeyExclud
 from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.evidence_mixin import EvidenceMixin
 from classification.models.flag_types import classification_flag_types
-from flags.models import Flag, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import Flag
 from library.guardian_utils import admin_bot
 from library.utils import get_timer
 

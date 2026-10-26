@@ -25,8 +25,8 @@ from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
@@ -39,9 +39,9 @@ from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.unit_percent import convert_from_percent_to_unit
 from library.utils import invert_dict
 from library.utils.json_utils import canonical_filter_key
+from patients.enums import Zygosity
 from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
-from patients.models_enums import Zygosity
-from snpdb.models.models_enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
+from snpdb.enums import CohortGenotypeCollectionType, ImportStatus, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant, VariantCollection
 from snpdb.models.models_vcf import VCF, Sample
@@ -551,7 +551,7 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
     # data on disk - fixed when the partition is built/migrated - not config, so it can't be derived from settings.
     additional_gnomad_versions = ArrayField(models.TextField(), default=list, blank=True)
     gnomad_af_min = models.FloatField()
-    # A models_enums.ClinicalSignificance value
+    # A snpdb.enums.ClinicalSignificance value
     clinical_significance_max = models.CharField(max_length=1, null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 

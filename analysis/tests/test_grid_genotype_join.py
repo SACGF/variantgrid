@@ -8,9 +8,9 @@ than add a second one, or rows the node took from the common collection show bla
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import ZygosityNodeZygosity
 from analysis.grids import VariantGrid
 from analysis.models import Analysis
-from analysis.models.enums import ZygosityNodeZygosity
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.sources.sample_node import SampleNode
@@ -20,6 +20,7 @@ from annotation.models.models import VariantAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
+from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import (
@@ -27,7 +28,6 @@ from snpdb.models.models_cohort import (
     CohortGenotypeCollection,
     CohortGenotypeCommonFilterVersion,
 )
-from snpdb.models.models_enums import CohortGenotypeCollectionType
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

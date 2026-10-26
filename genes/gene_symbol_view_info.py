@@ -2,13 +2,14 @@ import operator
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import cached_property, reduce
 from typing import Optional, Union
 
 from django.conf import settings
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
+from django.utils import timezone
 
 from analysis.models import VariantTag
 from annotation.models import Citation
@@ -19,6 +20,7 @@ from annotation.models.models_gene_annotation import (
 )
 from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
+from genes.enums import AnnotationConsortium
 from genes.models import (
     HGNC,
     Gene,
@@ -30,9 +32,9 @@ from genes.models import (
     GnomADGeneConstraint,
     PanelAppServer,
 )
-from genes.models_enums import AnnotationConsortium
 from library.utils import defaultdict_to_dict
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm
 from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -253,7 +255,7 @@ class GeneSymbolViewInfo:
             classification__allele_info__allele__isnull=True,
             classification__withdrawn=False,
             is_last_published=True,
-            classification__created__lte=datetime.now() - timedelta(minutes=1),
+            classification__created__lte=timezone.now() - timedelta(minutes=1),
         ).filter(reduce(operator.or_, evidence_q_list))
         classifications_qs = ClassificationModification.filter_for_user(user=self.user, queryset=classifications_qs)
         classifications_qs = classifications_qs.select_related('classification', 'classification__lab')

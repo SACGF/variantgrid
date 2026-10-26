@@ -4,8 +4,8 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
 from library.graphs.graph_utils import ForceMandKIntFormatter
+from seqauto.enums import QCCompareType
 from seqauto.models import QCExecSummary, QCType
-from seqauto.models.models_enums import QCCompareType
 from seqauto.qc.sequencing_run_utils import get_qc_exec_summary_data
 from snpdb.graphs.graphcache import CacheableGraph
 

@@ -25,6 +25,7 @@ from annotation.vep_annotation import (
     get_vep_command,
     get_vep_variant_annotation_version_kwargs,
 )
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     CdotDataVersion,
     GeneAnnotationImport,
@@ -33,9 +34,9 @@ from genes.models import (
     GeneVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils import get_field_counts, require_superuser
-from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm, OntologyVersion
 from snpdb.models import (
     VCF,
     GenomeBuild,
@@ -285,6 +286,13 @@ def load_cached_web_resource(request, pk):
     # this will call post_save signal handlers - which populate things appropriately
     CachedWebResource.objects.create(name=pk)
     return HttpResponse()
+
+
+def view_cached_web_resource(request, pk):
+    """ One CachedWebResource's status block on the annotation page, polled while it imports """
+    cwr = get_object_or_404(CachedWebResource, pk=pk)
+    cwr.disabled_url = settings.DISABLED_CACHED_WEB_RESOURCES.get(cwr.name)
+    return render(request, "annotation/cached_web_resource.html", {"cwr": cwr})
 
 
 def annotation_versions(request):

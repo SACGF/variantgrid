@@ -31,7 +31,6 @@ urlpatterns = [
     path('view_transcript_accession/<transcript_accession>', views.view_transcript_accession, name='view_transcript_accession'),
     path('gene_symbol_info_tab/<gene_symbol>/tool_tips/<tool_tips>', views.gene_symbol_info_tab, name='gene_symbol_info_tab'),
     path('gene_lists', views.gene_lists, name='gene_lists'),
-    path('gene_lists/create_custom', views.create_custom_gene_list, name='create_custom_gene_list'),
     path('view_gene_list/<int:gene_list_id>', views.view_gene_list, name='view_gene_list'),
     path('gene_list/<int:gene_list_id>/set_genes', views.set_gene_list_genes_from_text, name='set_gene_list_genes_from_text'),
     path('gene_list/<int:gene_list_id>/copy', views.copy_gene_list, name='copy_gene_list'),

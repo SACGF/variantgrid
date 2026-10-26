@@ -9,8 +9,8 @@ from library.django_utils.change_tracking import (
     collect_changes,
     update_or_create_if_changed,
 )
+from seqauto.enums import DataGeneration
 from seqauto.models import Experiment, Sequencer, SequencerModel, SequencingRun
-from seqauto.models.models_enums import DataGeneration
 
 TRACKED_PATH = reverse('eventlog_detail', kwargs={'pk': 1})
 TRACKING = {TRACKED_PATH.rsplit("/", 1)[0]: "Lab pipeline API"}

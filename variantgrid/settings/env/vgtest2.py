@@ -6,6 +6,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 
 # ANNOTATION_ENTREZ_EMAIL = 'your_email@yourdomain.com'
 
+SITE_ID = 10  # test.variantgrid.com (snpdb/migrations/0005_test_variantgrid_site.py)
 WEB_HOSTNAME = 'test.variantgrid.com'
 WEB_IP = '129.127.17.180'
 
@@ -49,6 +50,19 @@ ANNOTATION[BUILD_GRCH37].update({
 ANNOTATION[BUILD_GRCH38].update({
     "annotation_consortium": "RefSeq",
     "enabled": True,
+})
+
+# UTRAnnotator / SpliceVault / AVI (#2426) and AlphaGenome splicing (#2433), stamped on the versions in use with
+# manage.py enable_vep_plugin_backfill
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "utr_annotator": "annotation_data/GRCh37/uORF_5UTR_GRCh37_PUBLIC.txt",
+    "splicevault": "annotation_data/GRCh37/SpliceVault_data_hg19.refseq_mane.tsv.gz",
+})
+ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+    "utr_annotator": "annotation_data/GRCh38/uORF_5UTR_GRCh38_PUBLIC.txt",
+    "splicevault": "annotation_data/GRCh38/SpliceVault_data_GRCh38.refseq_mane.tsv.gz",
+    "avi": "annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz",
+    "alphagenome_splicing": "annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz",
 })
 
 ANNOTATION[BUILD_T2TV2]["enabled"] = True

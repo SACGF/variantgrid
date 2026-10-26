@@ -8,15 +8,12 @@ from library.django_utils import (
     get_field_counts,
     require_superuser,
 )
+from snpdb.enums import AlleleConversionTool, ProcessingStatus
 from snpdb.models import (
     Allele,
     AlleleLiftover,
     GenomeBuild,
     LiftoverRun,
-)
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    ProcessingStatus,
 )
 from snpdb.tasks.liftover_tasks import liftover_alleles
 

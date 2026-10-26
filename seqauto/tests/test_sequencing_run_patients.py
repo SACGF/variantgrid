@@ -5,8 +5,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
+from patients.enums import MatchStatus
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, SampleFromSequencingSample
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
 from seqauto.views import _get_sequencing_run_patients

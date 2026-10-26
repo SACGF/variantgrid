@@ -20,8 +20,8 @@ from analysis.tasks.analysis_grid_export_tasks import (
     get_zipped_csv_filename,
 )
 from library.log_utils import report_exc_info
+from snpdb.enums import ImportStatus
 from snpdb.models import CachedGeneratedFile, Cohort
-from snpdb.models.models_enums import ImportStatus
 from upload.models import FileUpload
 from upload.upload_metadata import UploadMetadataError
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
@@ -34,7 +34,12 @@ def _get_file_upload_for_user(user, *, file_upload_id=None, sha256_hash=None) ->
         file_upload = get_object_or_404(FileUpload, pk=file_upload_id)
     elif sha256_hash:
         # Most-recent matching upload the user can see
-        file_upload = get_object_or_404(FileUpload.objects.order_by("-pk"), sha256_hash=sha256_hash)
+        file_uploads = FileUpload.objects.filter(sha256_hash=sha256_hash).order_by("-pk")
+        if not user.is_superuser:
+            file_uploads = file_uploads.filter(user=user)
+        file_upload = file_uploads.first()
+        if file_upload is None:
+            raise Http404(f"No upload with sha256_hash={sha256_hash}")
     else:
         raise Http404("Provide file_upload_id or sha256_hash")
     file_upload.check_can_view(user)

@@ -23,6 +23,7 @@ from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
 )
+from analysis.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.forms import (
     AnalysisChoiceForm,
     AnalysisNodeIssuesFilterForm,
@@ -43,7 +44,6 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.models.models_analysis import AnalysisClassification
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
@@ -67,8 +67,8 @@ from classification.views.views import (
 )
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
+from patients.enums import SampleSourceLevel
 from patients.models import Patient
-from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm

@@ -22,18 +22,20 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
+from analysis.enums import (
+    AnalysisType,
+    CandidateSearchType,
+    CandidateStatus,
+    GroupOperation,
+    NodeStatus,
+)
 from analysis.forms.forms import AnalysisNodeIssuesFilterForm
 from analysis.models import (
     Analysis,
     AnalysisNode,
     AnalysisTemplate,
-    AnalysisType,
     Candidate,
     CandidateSearchRun,
-    CandidateSearchType,
-    CandidateStatus,
-    GroupOperation,
-    NodeStatus,
     VariantTag,
 )
 from analysis.models.nodes.node_counts import (
@@ -56,9 +58,11 @@ from library.utils import (
     iter_fixed_chunks,
     sha256sum_str,
 )
+from ontology.enums import GeneDiseaseClassification
 from ontology.grids import AbstractOntologyGenesConfig
-from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
-from patients.models_enums import Zygosity
+from ontology.models import OntologyTermRelation, OntologyVersion
+from patients.enums import Zygosity
+from snpdb.enums import ProcessingStatus, SequenceRole
 from snpdb.grid_columns.custom_columns import (
     get_all_variant_grid_columns,
     get_variantgrid_extra_annotate,
@@ -72,15 +76,7 @@ from snpdb.grid_columns.grid_sample_columns import (
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import (
-    CohortGenotype,
-    ProcessingStatus,
-    Sample,
-    UserGridConfig,
-    VariantGridColumn,
-    VCFFilter,
-)
-from snpdb.models.models_enums import SequenceRole
+from snpdb.models import CohortGenotype, Sample, UserGridConfig, VariantGridColumn, VCFFilter
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_dataframe import DataFrameDatatableConfig
 from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder

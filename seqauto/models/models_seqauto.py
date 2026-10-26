@@ -19,7 +19,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import (
@@ -38,16 +38,16 @@ from library.constants import DAY_SECS
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
+from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import ResolvedReference
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
+from seqauto.enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
+from snpdb.enums import ImportStatus, SampleFileType
 from snpdb.models import VCF, GenomeBuild, InheritanceManager, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus, SampleFileType
 from snpdb.models.models_vcf import SampleFilePath
 
 
@@ -898,11 +898,6 @@ class QCGeneCoverage(SeqAutoRecord):
     # gene_coverage_collection is populated in load_from_file, set_null as needs to be deleted/reset when reloaded
     gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=SET_NULL)
 
-    @staticmethod
-    def get_path_from_qc(qc):
-        pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_GENE_COVERAGE_PATTERN)
-        return pattern % qc.get_params()
-
 
 @receiver(pre_delete, sender=QCGeneCoverage)
 def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
@@ -1077,10 +1072,9 @@ class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
         DRAGEN writes one MetricsOutput per run, with a column per pair carrying both of its arms, so a row is
         keyed on (run, pair, category). The run is part of the key because the column alone does not identify a
         pair across runs - the lab's pair IDs carry a leading sequencing number, and nothing promises a
-        re-sequenced pair is renamed. The SequencingRun is linked where seqauto has registered it and left null
-        where it has not, the way the CombinedVariantOutput's link_to_sequencing_run tolerates a missing sample
-        sheet; a nullable FK cannot be the key, since Postgres treats nulls as distinct, so the run's name is
-        stored too.
+        re-sequenced pair is renamed. The upload must name a run seqauto has registered, and links to it; the FK
+        is nullable so deleting a run keeps its QC, and a nullable FK cannot be the key, since Postgres treats
+        nulls as distinct, so the run's name is stored too.
 
         The pair claims a Specimen by the accession inside its ID and never creates one - the
         CombinedVariantOutput is what accessions a case, and QC that arrives first parks its claim

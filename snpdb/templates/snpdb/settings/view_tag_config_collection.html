@@ -225,7 +225,7 @@
             {% for tag_id, rgb in user_tag_colors.items %}
                 <tr class="tag-color-row" tag_id="{{ tag_id }}">
                     <td><span class='grid-tag tagged-{{ tag_id }}'><span class='user-tag-colored'> {{ tag_id }}</span></span></td>
-                    <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="color" value="{{ rgb|default:'#ffffff' }}"/></td>
+                    <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="color" value="{{ rgb|default:'#ffffff' }}" {% if not has_write_permission %}disabled="disabled"{% endif %}/></td>
                     <td><input class="tag-quick-tag" tag_id='{{ tag_id }}' type="checkbox" {% if tag_id in quick_tags %}checked{% endif %} {% if not has_write_permission %}disabled="disabled"{% endif %} /></td>
                 </tr>
             {% endfor %}

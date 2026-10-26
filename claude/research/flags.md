@@ -18,9 +18,8 @@ new development does not build on flags, but existing uses stay. Fields and URLs
 ### Lookup tables, then collections
 
 `FlagTypeContext` (classification, allele, clinical_context), `FlagType`, `FlagResolution` and the
-`FlagTypeResolution` join that says which resolutions a type allows are reference data created by data migrations -
-`flags/migrations/0002_initial_data.py` for the bulk, later ones (and some in classification's migrations) for types
-added since. A resolution carries a `flags/models/enums.py:FlagStatus` (open, closed, rejected); a flag is "open"
+`FlagTypeResolution` join that says which resolutions a type allows are reference data seeded by `flags/migrations/0002_seed_data.py`; a type added later
+comes with its own data migration. A resolution carries a `flags/enums/flags_enums.py:FlagStatus` (open, closed, rejected); a flag is "open"
 when its resolution's status is OPEN (`FlagCollection.Q_OPEN_FLAGS`). `flags/models/models.py:FlagType.default_resolution`
 picks the type's OPEN resolution, falling back to CLOSED. Each consuming app wraps the type ids in a helper object
 (`classification/models/flag_types.py:ClassificationFlagTypes`, `snpdb/models/flag_types.py:AlleleFlagTypes`, whose
@@ -110,8 +109,8 @@ has not already set it (e.g. `permission_level` from `FlagView` POST for a non-s
 
 **`watch_toggle()` in `flags.js` is dead.** Nothing calls it, and `FlagsView` POST answers 400 to its `watch` body
 (no `flag_type`), as it does to an unknown flag type or resolution and a bad `?history=` / `?since=`.
-`FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and nothing raises the allele flag types
-(`flags/migrations/0004_one_off_allele_37_not_38_data.py`).
+`FlagInfos.record_sub_flag` is likewise unused (its caller is commented out), and the `allele` FlagTypeContext is
+seeded with no flag type under it.
 
 **`classification_not_public` is switched off in JSON only.** Without `CLINVAR_EXPORT` mode, `FlagHelper.to_json`
 sends that type's `permission` / `raise_permission` as `FlagPermissionLevel.SYSTEM.level` (4), above any browser user's

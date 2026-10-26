@@ -32,7 +32,7 @@
             Perform {{ atv.template.name }}
         </a>
         {% if atv.is_draft %}<span class="badge badge-warning">draft v{{ atv.version }}</span>{% endif %}
-        {{ atv.template.description|safe }}
+        {{ atv.template.description }}
     </li>
     {% endfor %}
 </ul>

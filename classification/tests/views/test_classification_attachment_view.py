@@ -38,4 +38,4 @@ class ClassificationAttachmentViewTestCase(TestCase):
         self.client.force_login(self.lab_user)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content, b"lab only")
+        self.assertEqual(b"".join(response.streaming_content), b"lab only")
