@@ -3,7 +3,7 @@ Creating the VCF and Sample rows from an uploaded file's header: create_vcf_from
 create_vcf_from_vcf read the header only, resolve_genome_build (header, then what was declared at
 upload, then the source's fallback), configure_vcf_from_header binds the sample FORMAT fields
 (overridable per source through VCFSourceSettings in handle_vcf_source), create_cohort_genotype_collection_from_vcf
-makes the automatic cohort, and create_backend_vcf_links attaches SeqAuto records. import_vcf_file
+makes the automatic cohort, and uploaded_vcf_configured_signal lets seqauto link sequencing records. import_vcf_file
 is the per-split-file genotype import that runs in parallel. Steps are wired in
 upload/import_task_factories/.
 """
@@ -23,20 +23,10 @@ from django.utils import timezone
 
 from library.genomics.vcf_enums import VCFConstant
 from library.guardian_utils import assign_permission_to_user_and_groups
-from library.utils import get_single_element, invert_dict
-from patients.enums import MatchStatus
+from library.utils import invert_dict
 from patients.external_references import ExternalReference, resolve_reference
 from patients.models import Extraction
-from seqauto.models import (
-    DragenTSO500CombinedVariantOutput,
-    JointCalledVCF,
-    QCGeneList,
-    SampleFromSequencingSample,
-    SingleSampleVCF,
-    VCFFromSequencingRun,
-)
-from seqauto.signals.signals_list import backend_vcf_import_start_signal
-from snpdb.enums import ImportSource, ImportStatus, VariantOrigin, VCFInfoTypes
+from snpdb.enums import ImportStatus, VCFInfoTypes
 from snpdb.models import (
     VCF,
     AbstractVCFField,
@@ -57,7 +47,6 @@ from snpdb.vcf_utils import (
 )
 from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
-    BackendVCF,
     FileUpload,
     PipelineFailedJobTerminateEarlyException,
     SimpleVCFImportInfo,
@@ -66,6 +55,7 @@ from upload.models import (
     UploadStep,
 )
 from upload.models.models import UploadUserError
+from upload.signals.signals import uploaded_vcf_configured_signal
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.upload_metadata import (
     SAMPLE_EXTRACTIONS,
@@ -76,9 +66,6 @@ from upload.upload_metadata import (
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from user_messages.models import Message
-
-MIXED_ENRICHMENT_KIT_MESSAGE = "Joint called VCF spans sequencing runs with different enrichment kits - " \
-                               "enrichment kit settings were not applied to this VCF"
 
 
 def get_format_field(vcf_formats, wanted_format_id):
@@ -251,19 +238,10 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     vcf.genome_build = resolve_genome_build(vcf_reader, file_upload)
 
     configure_vcf_from_header(vcf, vcf_reader)
-    link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step)
+    uploaded_vcf_configured_signal.send(sender=os.path.basename(__file__),
+                                        uploaded_vcf=uploaded_vcf, upload_step=upload_step)
     assign_sample_extractions(vcf, upload_step)
     return vcf
-
-
-def link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step=None):
-    """ Also run when a pipeline is reloaded with its VCF already created, as the link is where a
-        first attempt fails when the samples don't match the sheet """
-    backend_vcf = create_backend_vcf_links(uploaded_vcf)
-    if backend_vcf:
-        logging.info("Handle backend VCF")
-        link_samples_and_vcfs_to_sequencing(backend_vcf, upload_step=upload_step)
-        backend_vcf_import_start_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
 
 
 def assign_sample_extractions(vcf: VCF, upload_step=None):
@@ -501,126 +479,6 @@ def create_vcf_from_uploaded_vcf(uploaded_vcf, num_genotype_samples):
     assign_permission_to_user_and_groups(user, vcf)
 
     return vcf
-
-
-def create_backend_vcf_links(uploaded_vcf):
-    """ returns backend_vcf if we can link to SeqAuto data (None if Web VCF) """
-
-    backend_vcf = None
-    if not settings.SEQAUTO_ENABLED:
-        # Only SeqAuto deployments link uploads to backend sequencing VCFs by path.
-        # Elsewhere 'path' is just an optional client hint (e.g. API dedup), so skip linking.
-        return backend_vcf
-
-    file_upload = uploaded_vcf.file_upload
-    # APIFileUploadView (including the SeqAuto API client) comes through as WEB_UPLOAD
-    sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
-    if file_upload.path and file_upload.import_source in sequencing_vcf_sources:
-        sequencing_vcf = file_upload.get_sequencing_record_for_path(JointCalledVCF, SingleSampleVCF)
-        joint_called_vcf = sequencing_vcf if isinstance(sequencing_vcf, JointCalledVCF) else None
-        single_sample_vcf = sequencing_vcf if isinstance(sequencing_vcf, SingleSampleVCF) else None
-        defaults = {"uploaded_vcf": uploaded_vcf}
-        backend_vcf, _ = BackendVCF.objects.update_or_create(single_sample_vcf=single_sample_vcf,
-                                                             joint_called_vcf=joint_called_vcf,
-                                                             defaults=defaults)
-    return backend_vcf
-
-
-def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False, upload_step=None):
-    if backend_vcf:
-        logging.info("link_samples_and_vcfs_to_sequencing backend_vcf: %s", backend_vcf.pk)
-        filesystem_vcf = backend_vcf.filesystem_vcf
-        sequencing_run = backend_vcf.sample_sheet.sequencing_run
-        vcf = backend_vcf.vcf
-        if ek := filesystem_vcf.enrichment_kit:
-            vcf.variant_zygosity_count = ek.variant_zygosity_count
-            logging.info("Setting %s variant_zygosity_count to %s", vcf, vcf.variant_zygosity_count)
-        elif filesystem_vcf.has_mixed_enrichment_kits:
-            logging.warning("%s: %s", vcf, MIXED_ENRICHMENT_KIT_MESSAGE)
-            if upload_step:
-                SimpleVCFImportInfo.objects.create(upload_step=upload_step,
-                                                   message_string=MIXED_ENRICHMENT_KIT_MESSAGE)
-        vcf.fake_data = sequencing_run.fake_data
-        vcf.save()
-
-        samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
-        if not samples_by_sequencing_sample:
-            expected = ", ".join(str(ss) for ss in filesystem_vcf.get_sequencing_samples())
-            raise ValueError("Couldn't link VCF samples to sequencing samples. "
-                             f"VCF samples must start with one of: {expected}")
-
-        if backend_vcf.joint_called_vcf:
-            VCFFromSequencingRun.objects.update_or_create(
-                vcf=vcf,
-                defaults={"sequencing_run": sequencing_run,
-                          "variant_caller": backend_vcf.variant_caller},
-            )
-        elif backend_vcf.single_sample_vcf:
-            # A re-analysis replaces the arm's earlier VCF from the same caller. A BAM can have a VCF per
-            # caller (eg DRAGEN TSO 500's small variants, gene-level CNV and fusions), and those stay
-            sequencing_sample = get_single_element(samples_by_sequencing_sample)
-            existing = VCFFromSequencingRun.objects.filter(
-                vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
-                vcf__uploadedvcf__backendvcf__single_sample_vcf__variant_caller=backend_vcf.variant_caller,
-            )
-            if existing.exists():
-                existing_vcfs = ", ".join([str(vfsr.vcf) for vfsr in existing])
-                logging.info("Removing existing VCFs linked against run: %s / sequencing_sample=%s",
-                             existing_vcfs, sequencing_sample)
-                existing.delete()
-
-            VCFFromSequencingRun.objects.create(sequencing_run=sequencing_run,
-                                                variant_caller=backend_vcf.variant_caller,
-                                                vcf=vcf)
-
-        for sequencing_sample, sample in samples_by_sequencing_sample.items():
-            modified_sample = False
-            # Set sample.variants_type from EnrichmentKit (eg to Mixed somatic for somatic panels)
-            if ek := sequencing_sample.enrichment_kit:
-                if ek.sample_variants_type != VariantOrigin.UNKNOWN:
-                    sample.variants_type = ek.sample_variants_type
-                    modified_sample = True
-
-            # One link call per sequencing sample reaches all of that arm's VCFs through here
-            if sequencing_sample.extraction_id and not sample.extraction_id:
-                sample.extraction = sequencing_sample.extraction
-                sample.extraction_match_status = MatchStatus.MATCHED
-                sample.extraction_match_date = timezone.now()
-                modified_sample = True
-            elif sequencing_sample.extraction_reference and not sample.extraction_reference:
-                # Still parked upstream - carry the claim so one reconcile pass settles both rows
-                sample.extraction_reference = sequencing_sample.extraction_reference
-                sample.extraction_match_status = sequencing_sample.extraction_match_status
-                sample.extraction_match_date = sequencing_sample.extraction_match_date
-                modified_sample = True
-
-            for alignment_file in sequencing_sample.alignmentfile_set.all():
-                alignment_file.create_sample_file_path(sample)
-
-            if modified_sample:
-                sample.save()
-
-            try:
-                sfss = SampleFromSequencingSample.objects.get(sample=sample)
-                if replace_existing or sfss.sample.import_status in ImportStatus.DELETION_STATES:
-                    logging.info("Updating SampleFromSequencingSample")
-                    sfss.sequencing_sample = sequencing_sample
-                    sfss.sample = sample
-                    sfss.save()
-                else:
-                    logging.warning("SS %s already linked to sample: %s (%s/%s)", sfss.sequencing_sample, sfss.sample,
-                                    sfss.sample.pk, sfss.sample.import_status)
-            except SampleFromSequencingSample.DoesNotExist:
-                SampleFromSequencingSample.objects.create(sample=sample,
-                                                          sequencing_sample=sequencing_sample)
-
-            DragenTSO500CombinedVariantOutput.link_arm_sample(sample, sequencing_run)
-
-            # Link any QCGeneLists
-            for qcgl in QCGeneList.objects.filter(qc__sequencing_sample=sequencing_sample,
-                                                  custom_text_gene_list__gene_list__isnull=False,
-                                                  sample_gene_list__isnull=True).distinct():
-                qcgl.create_and_assign_sample_gene_list(sample)
 
 
 def create_import_success_message(vcf):

@@ -7,8 +7,9 @@ from upload.import_task_factories.import_task_factory import (
     get_import_task_factories,
     get_import_task_factory_from_extension,
 )
-from upload.models import UploadData, UploadedVCF
+from upload.models import UploadedVCF
 from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task
+from upload.upload_data import UploadData
 from upload.upload_processing import process_upload_pipeline
 
 

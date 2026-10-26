@@ -11,7 +11,6 @@ from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from eventlog.models import create_event
 from library.log_utils import get_traceback
 from library.utils import full_class_name
-from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.enums import ImportStatus, VariantOrigin
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
@@ -31,7 +30,7 @@ from upload.models import (
     UploadPipeline,
     UploadStep,
 )
-from upload.signals.signals import vcf_import_success_signal
+from upload.signals.signals import uploaded_vcf_configured_signal, vcf_import_success_signal
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
 from upload.vcf.vcf_import import (
@@ -41,7 +40,6 @@ from upload.vcf.vcf_import import (
     create_vcf_from_vcf,
     genotype_vcf_processor_factory,
     import_vcf_file,
-    link_uploaded_vcf_to_sequencing,
 )
 from variantgrid.celery import app
 
@@ -61,7 +59,8 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
             logging.info("VCF already existed - reusing!")
             # Maybe reloading really old VCF - need to re-detect format fields etc
             configure_vcf_from_header(vcf, vcf_reader)
-            link_uploaded_vcf_to_sequencing(uploaded_vcf, upload_step)
+            uploaded_vcf_configured_signal.send(sender=os.path.basename(__file__),
+                                                uploaded_vcf=uploaded_vcf, upload_step=upload_step)
         except (AttributeError, UploadedVCF.DoesNotExist):
             vcf = create_vcf_from_vcf(upload_step, vcf_reader)
 
@@ -206,11 +205,6 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
             create_event(archived_by, "vcf_restored",
                          details=f"vcf_id={vcf.pk} name={vcf.name!r} restored_from={archived_from!r}")
 
-        try:
-            backend_vcf = vcf.uploadedvcf.backendvcf
-            backend_vcf_import_success_signal.send(sender=os.path.basename(__file__), backend_vcf=backend_vcf)
-        except:
-            pass
         vcf_import_success_signal.send(sender=os.path.basename(__file__), vcf=vcf)
 
         create_import_success_message(vcf)

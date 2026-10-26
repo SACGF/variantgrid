@@ -1,7 +1,7 @@
 """
 The database side of a TSO 500 pair's CombinedVariantOutput - everything in the file that is not a
 variant. The file itself is read by upload.tso500.dragen_combined_variant_output_parser and the import
-step is upload.tasks.import_dragen_tso500_combined_variant_output_task.
+step is seqauto.tasks.import_dragen_tso500_combined_variant_output_task.
 
 The analysis itself - '[Analysis Details]' and the '[TMB]', '[MSI]' and '[GIS]' scalars - is one
 seqauto.models.DragenTSO500CombinedVariantOutput row per (run, pair), written by

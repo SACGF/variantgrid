@@ -20,18 +20,18 @@ every record with its FILTER (#1903).
 
 What the file is imported for is the pair: its patient chain, the seqauto links and the analysis
 itself - one seqauto.models.DragenTSO500CombinedVariantOutput per (run, pair), holding its TMB, MSI and
-GIS (@see upload.tso500.dragen_combined_variant_output_records).
+GIS (@see seqauto.tso500.dragen_combined_variant_output_records).
 
 Entry point is ImportDragenTSO500CombinedVariantOutputTask, a single-shot ImportTask (the file has no
 variants and no coordinates, so there is no VCF pipeline) returning the number of rows written, as the
-run's MetricsOutput does (@see upload.tasks.import_dragen_tso500_metrics_output_task).
+run's MetricsOutput does (@see seqauto.tasks.import_dragen_tso500_metrics_output_task).
 
 The run is the upload's 'sequencing_run' metadata - the file names its run 'NA' - and must be one seqauto
-has registered (FileUpload.get_sequencing_run_to_link). Without it the run whose current sample sheet
-names the pair's sample IDs is used, and a pair no registered run names cannot be keyed, so it fails the
-import saying so. The run is half the row's key, so an unknown run, or an upload that may not link to
-sequencing data (FileUpload.check_may_link_to_sequencing_data), fails before its patient chain or
-anything else is written.
+has registered (seqauto.upload_links.get_sequencing_run_to_link). Without it the run whose current sample
+sheet names the pair's sample IDs is used, and a pair no registered run names cannot be keyed, so it fails
+the import saying so. The run is half the row's key, so an unknown run, or an upload that may not link to
+sequencing data (seqauto.upload_links.check_may_link_to_sequencing_data), fails before its patient chain
+or anything else is written.
 
 A chain that cannot be made is not a failure: the row is still the analysis', with its specimen claim
 parked saying why, which the pair's page shows. reconcile_pending_extractions is fired afterwards so a
@@ -40,7 +40,16 @@ claim that only became resolvable with this file attaches straight away.
 import logging
 
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
-from upload.models import UploadedDragenTSO500CombinedVariantOutput
+from seqauto.models.models_upload import UploadedDragenTSO500CombinedVariantOutput
+from seqauto.tso500.dragen_combined_variant_output_records import (
+    CombinedVariantOutputIdentityError,
+    link_samples_to_extractions,
+    parse_pair_identifiers,
+    resolve_pair,
+    sequencing_run_for_sample_ids,
+    write_combined_variant_output,
+)
+from seqauto.upload_links import check_may_link_to_sequencing_data, get_sequencing_run_to_link
 from upload.tasks.import_task import ImportTask
 from upload.tso500.dragen_combined_variant_output_parser import (
     DNA_SAMPLE_ID,
@@ -48,14 +57,6 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     RNA_SAMPLE_ID,
     get_analysis_details,
     read_combined_variant_output,
-)
-from upload.tso500.dragen_combined_variant_output_records import (
-    CombinedVariantOutputIdentityError,
-    link_samples_to_extractions,
-    parse_pair_identifiers,
-    resolve_pair,
-    sequencing_run_for_sample_ids,
-    write_combined_variant_output,
 )
 from upload.upload_metadata import SEQUENCING_RUN, get_metadata_sequencing_run_name
 from variantgrid.celery import app
@@ -76,9 +77,9 @@ class ImportDragenTSO500CombinedVariantOutputTask(ImportTask):
         sample_ids = [sample_id for sample_id in (analysis_details.get(DNA_SAMPLE_ID),
                                                   analysis_details.get(RNA_SAMPLE_ID)) if sample_id]
         if sequencing_run_name := get_metadata_sequencing_run_name(file_upload):
-            sequencing_run = file_upload.get_sequencing_run_to_link(sequencing_run_name)
+            sequencing_run = get_sequencing_run_to_link(file_upload, sequencing_run_name)
         elif sequencing_run := sequencing_run_for_sample_ids(sample_ids):
-            file_upload.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run.name}'")
+            check_may_link_to_sequencing_data(file_upload, f"sequencing run '{sequencing_run.name}'")
         else:
             raise ValueError(f"CombinedVariantOutput.tsv names its run 'NA' and no sequencing run "
                              f"names {', '.join(sample_ids)} - upload it with '{SEQUENCING_RUN}' "

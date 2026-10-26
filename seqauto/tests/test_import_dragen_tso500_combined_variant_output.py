@@ -19,21 +19,29 @@ from seqauto.models import (
     SequencingRun,
     band_call,
 )
+from seqauto.models.models_upload import UploadedDragenTSO500CombinedVariantOutput
+from seqauto.tasks.import_dragen_tso500_combined_variant_output_task import (
+    ImportDragenTSO500CombinedVariantOutputTask,
+)
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
+from seqauto.tso500.dragen_combined_variant_output_records import (
+    CombinedVariantOutputIdentityError,
+    combined_variant_output_values,
+    link_samples_to_extractions,
+    parse_pair_identifiers,
+    resolve_pair,
+    write_combined_variant_output,
+)
 from snpdb.enums import ImportSource
 from snpdb.models import VCF, GenomeBuild, Sample
 from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import (
     FileUpload,
-    UploadedDragenTSO500CombinedVariantOutput,
     UploadedVCF,
     UploadPipeline,
 )
 from upload.models.models import UploadUserError
-from upload.tasks.import_dragen_tso500_combined_variant_output_task import (
-    ImportDragenTSO500CombinedVariantOutputTask,
-)
 from upload.tso500.dragen_combined_variant_output_parser import (
     AFFECTED_EXON,
     BREAKPOINT_1,
@@ -47,14 +55,6 @@ from upload.tso500.dragen_combined_variant_output_parser import (
     get_analysis_details,
     get_splice_rows,
     read_combined_variant_output,
-)
-from upload.tso500.dragen_combined_variant_output_records import (
-    CombinedVariantOutputIdentityError,
-    combined_variant_output_values,
-    link_samples_to_extractions,
-    parse_pair_identifiers,
-    resolve_pair,
-    write_combined_variant_output,
 )
 from upload.upload_metadata import SEQUENCING_RUN
 

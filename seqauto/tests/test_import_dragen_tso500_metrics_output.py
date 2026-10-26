@@ -18,26 +18,27 @@ from seqauto.models import (
     SequencingRun,
     SequencingSampleData,
 )
-from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.enums import ImportSource
-from upload.enums import UploadedFileTypes
-from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import FileUpload, UploadedDragenTSO500MetricsOutput, UploadPipeline
-from upload.models.models import UploadUserError
-from upload.tasks.import_dragen_tso500_metrics_output_task import (
+from seqauto.models.models_upload import UploadedDragenTSO500MetricsOutput
+from seqauto.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
-from upload.tso500.dragen_metrics_output_parser import (
+from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
+from seqauto.tso500.dragen_metrics_output_parser import (
     GUIDELINE_SETTING,
     can_process_file,
     read_library_qc,
     read_sections,
 )
-from upload.tso500.dragen_metrics_output_records import (
+from seqauto.tso500.dragen_metrics_output_records import (
     metrics_measured_date,
     metrics_method,
     write_library_qc,
 )
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
+from upload.import_task_factories.import_task_factory import get_import_task_factories
+from upload.models import FileUpload, UploadPipeline
+from upload.models.models import UploadUserError
 
 TSO500_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500")
 TSO500_PAIR_DIR = os.path.join(TSO500_DIR, "ExampleSample_2600000001")

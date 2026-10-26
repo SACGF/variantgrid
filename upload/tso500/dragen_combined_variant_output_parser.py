@@ -1,11 +1,11 @@
 """
 Reader for Illumina DRAGEN TSO 500's CombinedVariantOutput.tsv - the file only, no database work.
 
-What becomes of it is upload.tasks.import_dragen_tso500_combined_variant_output_task. The
+What becomes of it is seqauto.tasks.import_dragen_tso500_combined_variant_output_task. The
 '[Splice Variants]' rows are the only variants read from here - small variants and copy number stay on
 their VCFs and fusions on AllFusions.csv, which carries the caller, score and filters this file drops -
 and '[Analysis Details]', '[TMB]', '[MSI]' and '[GIS]' name the pair and its measures
-(@see upload.tso500.dragen_combined_variant_output_records).
+(@see seqauto.tso500.dragen_combined_variant_output_records).
 
 The file is the pair-level summary written beside the two arm directories: a banner, then one
 '[Section]' per call type. A section is either key/value ('[Analysis Details]', '[TMB]') or a table
@@ -40,7 +40,7 @@ MODULE_VERSION = "Module Version"
 PIPELINE_VERSION = "Pipeline Version"
 
 # The key/value sections holding the pair's measures - what each is written as is
-# upload.tso500.dragen_combined_variant_output_records
+# seqauto.tso500.dragen_combined_variant_output_records
 TOTAL_TMB = "Total TMB"
 CODING_REGION_SIZE = "Coding Region Size in Megabases"
 PASSING_ELIGIBLE_VARIANTS = "Number of Passing Eligible Variants"

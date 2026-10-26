@@ -40,10 +40,10 @@ with `QCExecSummary`, `QCGeneList` and `QCGeneCoverage` bulk endpoints beside it
 ### The VCF arrives and is joined by path
 
 The VCF file itself is uploaded separately with `path` set to the same string the pipeline gave the record.
-`upload/vcf/vcf_import.py:create_backend_vcf_links` looks the path up as a `JointCalledVCF`, then a
+`seqauto/upload_links.py:create_backend_vcf_links` looks the path up as a `JointCalledVCF`, then a
 `SingleSampleVCF`, and makes a `BackendVCF`; a path matching neither fails the import, which is why
 `seqauto/serializers/sequencing_serializers.py:validate_unique_vcf_path` refuses the same path on two records.
-`upload/vcf/vcf_import.py:link_samples_and_vcfs_to_sequencing` then copies what seqauto knows onto the VCF and its
+`seqauto/upload_links.py:link_samples_and_vcfs_to_sequencing` then copies what seqauto knows onto the VCF and its
 samples: zygosity-count flag and `variants_type` from the kit, fake-data flag from the run, the BAM path as a
 `SampleFilePath`, the sequencing sample's extraction, a `SampleFromSequencingSample` link, a `VCFFromSequencingRun`
 row for the run page (a re-analysis from the same caller replaces the arm's earlier one), pending QC gene lists as
@@ -79,10 +79,10 @@ columns, the sheet-changed one relinks samples to patients.
 
 A TSO 500 pair is a DNA and an RNA library from one specimen. Two uploads describe it, in either order once the
 run is posted - an upload naming a run seqauto has not registered fails
-(`upload/models/models.py:FileUpload.get_sequencing_run_to_link`): MetricsOutput writes one `LibraryQC` per (run name, pair, category)
-(`upload/tso500/dragen_metrics_output_records.py:write_library_qc`) and CombinedVariantOutput writes one
+(`seqauto/upload_links.py:get_sequencing_run_to_link`): MetricsOutput writes one `LibraryQC` per (run name, pair, category)
+(`seqauto/tso500/dragen_metrics_output_records.py:write_library_qc`) and CombinedVariantOutput writes one
 `DragenTSO500CombinedVariantOutput` per (run name, pair) with TMB / MSI / GIS
-(`upload/tso500/dragen_combined_variant_output_records.py:write_combined_variant_output`). Both store the run name as
+(`seqauto/tso500/dragen_combined_variant_output_records.py:write_combined_variant_output`). Both store the run name as
 text beside a nullable run FK, because a nullable FK cannot be part of a unique key. Both claim a Specimen by the
 accession inside the pair ID without creating one (`seqauto/models/models_seqauto.py:SpecimenClaimMixin`), and each
 arm finds its sheet row through the `Pair_ID` / `Sample_Type` sheet columns

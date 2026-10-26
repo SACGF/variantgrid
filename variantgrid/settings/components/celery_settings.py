@@ -103,13 +103,13 @@ CELERY_TASK_ROUTES = {
     # 1. As it may be a different machine than DB workers etc.
     # 2. So that these jobs (which don't require DB access) fill up their own queue so run in parallel with db_workers
     'classification.tasks.classification_import_map_and_insert_task.ClassificationImportMapInsertTask': WEB_WORKERS,
+    'seqauto.tasks.import_dragen_tso500_combined_variant_output_task.ImportDragenTSO500CombinedVariantOutputTask': WEB_WORKERS,
+    'seqauto.tasks.import_dragen_tso500_metrics_output_task.ImportDragenTSO500MetricsOutputTask': WEB_WORKERS,
     'snpdb.tasks.graph_generation_task.generate_graph': WEB_WORKERS,
     'upload.tasks.vcf.genotype_vcf_tasks.ProcessGenotypeVCFDataTask': WEB_WORKERS,
     'upload.tasks.import_bedfile_task.ImportBedFileTask': WEB_WORKERS,
     'upload.tasks.import_gene_coverage_task.ImportGeneCoverageTask': WEB_WORKERS,
     'upload.tasks.import_gene_list_task.ImportGeneListTask': WEB_WORKERS,
-    'upload.tasks.import_dragen_tso500_combined_variant_output_task.ImportDragenTSO500CombinedVariantOutputTask': WEB_WORKERS,
-    'upload.tasks.import_dragen_tso500_metrics_output_task.ImportDragenTSO500MetricsOutputTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
     'upload.tasks.retry_upload_pipelines_task.retry_upload_pipeline_task': WEB_WORKERS,  # removes processing files
@@ -173,6 +173,8 @@ CELERY_IMPORTS = (
     'patients.tasks.extraction_matching_tasks',
     'pedigree.models',
     'seqauto.tasks.gold_summary_tasks',
+    'seqauto.tasks.import_dragen_tso500_combined_variant_output_task',
+    'seqauto.tasks.import_dragen_tso500_metrics_output_task',
     'snpdb.models',
     'snpdb.tasks.clingen_tasks',
     'snpdb.tasks.cohort_genotype_tasks',
@@ -186,8 +188,6 @@ CELERY_IMPORTS = (
     'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
     'upload.tasks.import_dragen_tso500_all_fusions_task',
-    'upload.tasks.import_dragen_tso500_combined_variant_output_task',
-    'upload.tasks.import_dragen_tso500_metrics_output_task',
     'upload.tasks.import_gene_coverage_task',
     'upload.tasks.import_gene_level_cnv_task',
     'upload.tasks.import_splicegirl_vcf_task',

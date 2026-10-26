@@ -16,9 +16,9 @@ from collections import Counter
 from eventlog.models import api_request_note
 from library.django_utils.change_tracking import active_collector
 from seqauto.models import IlluminaFlowcellQC, JointCalledVCF
+from seqauto.models.models_upload import BackendVCF
 from seqauto.signals.signals_list import sequencing_run_current_sample_sheet_changed_signal
-from upload.models import BackendVCF
-from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
+from seqauto.upload_links import link_samples_and_vcfs_to_sequencing
 
 
 def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):

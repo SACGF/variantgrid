@@ -87,8 +87,8 @@ Patterns here:
   no traceback or Rollbar report (UploadPipeline.user_error), and the upload grid shows the summary next to the cross.
   Anything else is treated as our bug and keeps its traceback.
   A link to sequencing data the upload may not make, or a `path` or `sequencing_run` metadata matching no sequencing
-  record, is one (FileUpload.check_may_link_to_sequencing_data, FileUpload.get_sequencing_record_for_path,
-  FileUpload.get_sequencing_run_to_link).
+  record, is one (seqauto/upload_links.py: check_may_link_to_sequencing_data, get_sequencing_record_for_path,
+  get_sequencing_run_to_link).
 Gotchas:
 - A killed worker child (SIGTERM/SIGKILL, `revoke(terminate=True)`) never reaches `ImportVCFStepTask.run`'s except
   blocks; the master's `task_failure`/`task_revoked` receivers in `upload/tasks/vcf/import_vcf_step_task.py` fail the
@@ -110,51 +110,16 @@ Gotchas:
   (genes/gene_splice.py:SpliceEventResolver.resolve_junction, which also takes a stored coordinate Variant). A junction in
   no gene, or ambiguously in two, is skipped and counted on the import page. The header keeps `##source`, so the
   `^SpliceGirl` VCFSourceSettings row still binds AD/DP as alt/ref depth.
-- A TSO 500 pair's CombinedVariantOutput tsv is no variant source (#1903) - its `[Splice Variants]` are the VCF's PASS
-  calls on EGFR, MET and AR - and has no coordinates, so it is a single-shot import rather than a VCF pipeline
-  (import_task_factories/import_task_factories.py:DragenTSO500CombinedVariantOutputImportTaskFactory,
-  tasks/import_dragen_tso500_combined_variant_output_task.py:ImportDragenTSO500CombinedVariantOutputTask, with an
-  `UploadedDragenTSO500CombinedVariantOutput` UploadData one-to-one with the file). It writes no VCF and takes no
-  `genome_build`; `sequencing_run` is its only metadata key.
-- What that file is for is the pair's identity (tso500/dragen_combined_variant_output_records.py).
-  `[Analysis Details]` names the Patient (the code
-  `settings.TSO500_PAIR_ID_PATIENT_CODE_REGEX` reads out of `Pair ID` - the lab writes that either as the whole pair
-  sample name, whose leading sequencing sample ID changes when the patient is re-sequenced, or as the bare patient
-  code, and the default regex reads both), the Specimen
-  (the ten-digit accession inside each sample ID) and the two Extractions (its container suffix), created when absent;
-  the DNA/RNA sample IDs are exact `Sample.vcf_sample_name` and `SequencingSample.sample_name`, which links both arms'
-  samples to their extraction without seqauto's filename matching. The
-  analysis itself - `[Analysis Details]` and the `[TMB]`, `[MSI]`, `[GIS]` scalars - is one
-  seqauto/models/models_seqauto.py:DragenTSO500CombinedVariantOutput per (run, pair) (#1904), keyed on the upload's
-  `sequencing_run` metadata as the MetricsOutput is (the file names its run 'NA'); a CVO sent without it takes the run
-  whose current sheet names one of its sample IDs. The run is half the row's key, so a pair no registered run names,
-  or metadata naming a run seqauto has not registered, fails the import saying so, as does one naming no `Pair ID`. A chain that cannot be made does not fail it: the row
-  is still written with its specimen claim parked saying why, which the pair's page shows
-  (seqauto/views.py:view_tso500_pair).
-- The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
-  tso500/dragen_metrics_output_parser.py + _records.py): it has no variants and no coordinates, and recognises itself
-  by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run
-  - the pipeline sends Results/MetricsOutput_orig.tsv, the copy the lab's run wrapper leaves untouched - and a 2.6.2
-  column is a *pair* (the CVO's Pair ID) carrying both arms, not a sample. `sequencing_run` upload metadata is
-  required, must name a run seqauto has registered, and is part of the key, since a pair column alone does not
-  identify a pair across runs. It writes one
-  seqauto/models/models_seqauto.py:LibraryQC per (run, pair, QC category), naming the arm each category is about and judging every
-  metric of a known section by the file's own LSL/USL guideline - settings.TSO500_LIBRARY_QC_GUIDELINES overrides that
-  per (section, metric) where a lab quotes its own number, and each metric records which it was judged by. The column
-  names a Specimen by its trailing ten-digit accession and never creates one (that is the CVO's job). Each row links its
-  arm's SequencingSample where the run's current sheet carries the TSO500 Pair_ID / Sample_Type columns as
-  SequencingSampleData (seqauto/models/models_seqauto.py:sequencing_sample_for_pair). A bare-patient-code Pair ID has no
-  accession, so the run supplies it: off the linked arm's name, or on a sheet without Pair_ID data off the SequencingSample
-  whose name carries the code - the sheet's names carry the code and the accession together. A column nothing on the run is named for
-  (a control, another assay on the flowcell) keeps its rows with the claim parked saying so, and an unresolvable
-  accession parks like a VCF sample's, with reconcile_pending_extractions fired after the writes.
+- DRAGEN TSO 500's run-level files (CombinedVariantOutput, MetricsOutput) write sequencing records, so their importers
+  are seqauto's (seqauto/import_task_factories.py, registered through settings.IMPORT_TASK_FACTORY_IMPORTS);
+  its AllFusions, SpliceGirl and CNV VCFs write variants and are imported here.
 - Failure is one-way: UploadStep.error_exception → upload/models/models.py:UploadPipeline.error sets ERROR, marks the
   VCF/samples ImportStatus.ERROR, logs an Event and reports to Rollbar. Later steps see status != PROCESSING and mark
   themselves SKIPPED; BulkGenotypeVCFProcessor.check_pipeline_for_failures bails mid-file. Running steps are not killed.
 - Retry (upload/upload_processing.py:process_upload_pipeline, upload/tasks/vcf/genotype_vcf_tasks.py:reload_vcf_task)
   deletes only steps with origin IMPORT_TASK_FACTORY and resets the rest (USER_ADDITION steps re-run as is), so the
   create-data-from-header tasks must stay idempotent. A retry finds the VCF the first attempt created and skips
-  create_vcf_from_vcf, so the sequencing link (upload/vcf/vcf_import.py:link_uploaded_vcf_to_sequencing) is re-run
+  create_vcf_from_vcf, so uploaded_vcf_configured_signal (seqauto's sequencing link) is sent
   on that path too - it is where a sample the sheet doesn't name fails, and without it the retry imports unlinked.
   The reloaded file may add or reorder sample columns: snpdb/models/models_cohort.py:Cohort.set_vcf_samples moves each
   existing CohortSample's packed index to its new column (a stale index reads another sample's genotypes) and does the

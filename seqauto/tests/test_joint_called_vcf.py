@@ -29,19 +29,19 @@ from seqauto.models import (
     VariantCaller,
     VCFFromSequencingRun,
 )
+from seqauto.models.models_upload import BackendVCF
 from seqauto.sequencing_files.sample_sheet import current_sample_sheet_changed
 from seqauto.serializers.sequencing_serializers import JointCalledVCFSerializer
+from seqauto.upload_links import MIXED_ENRICHMENT_KIT_MESSAGE, link_samples_and_vcfs_to_sequencing
 from snpdb.enums import ImportStatus, ProcessingStatus
 from snpdb.models import VCF, Sample
 from upload.models import (
-    BackendVCF,
     FileUpload,
     SimpleVCFImportInfo,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
 )
-from upload.vcf.vcf_import import MIXED_ENRICHMENT_KIT_MESSAGE, link_samples_and_vcfs_to_sequencing
 
 
 def _make_sequencing_run(name="RUN_001", enrichment_kit=None):

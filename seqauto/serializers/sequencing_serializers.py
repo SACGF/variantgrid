@@ -555,7 +555,7 @@ class SingleSampleVCFPathSerializer(serializers.ModelSerializer):
 
 def validate_unique_vcf_path(klass, path, **kwargs):
     """ We need to ensure there is only 1 backend/sequencing VCF model with path
-        as we need it as a unique result lookup in upload.vcf.vcf_import.create_backend_vcf_links
+        as we need it as a unique result lookup in seqauto.upload_links.create_backend_vcf_links
 
         We want the API to be idempotent (can be called multiple times) so ok if the lookup is the same
         (hence exists call if passed in same class below)

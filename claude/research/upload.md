@@ -81,8 +81,9 @@ chord, because a chord produces endless `celery.chord_unlock` retries (#175).
 `upload/tasks/vcf/genotype_vcf_tasks.py:ImportCreateVCFModelForGenotypeVCFTask` reads only the header with cyvcf2 and
 calls `upload/vcf/vcf_import.py:create_vcf_from_vcf`, which reuses or creates the `UploadedVCF`, creates the
 `snpdb` VCF with the raw header saved immediately (so a crash later still leaves something to inspect), resolves the
-build, configures INFO/FORMAT/FILTER models and samples from the header (`configure_vcf_from_header`), links SeqAuto
-data when the deployment has it (`create_backend_vcf_links`, `link_samples_and_vcfs_to_sequencing`) and assigns any
+build, configures INFO/FORMAT/FILTER models and samples from the header (`configure_vcf_from_header`), sends
+`upload/signals/signals.py:uploaded_vcf_configured_signal`, on which seqauto links its records when the deployment
+has them (`seqauto/upload_links.py:link_uploaded_vcf_to_sequencing`), and assigns any
 extraction metadata (`assign_sample_extractions`). `upload/vcf/vcf_import.py:resolve_genome_build` orders the evidence:
 contig lengths in the header (`vcf_detect_genome_build_from_header`), then the build the submitter declared as upload
 metadata, then the build configured for the VCF's `##source` in `VCFSourceSettings`, then the only annotated build on a
@@ -268,6 +269,6 @@ stalled preprocess. `vg status` shows the queue depth.
 them under `UploadPipeline.get_pipeline_processing_dir`, and retry deletes them before re-running, so read the
 sub-step `output_text` on the pipeline page first.
 
-`create_backend_vcf_links` raises when a SeqAuto deployment receives a VCF whose `path` matches no registered
+`seqauto/upload_links.py:create_backend_vcf_links` raises when a SeqAuto deployment receives a VCF whose `path` matches no registered
 `SingleSampleVCF` or `JointCalledVCF`; on non-SeqAuto deployments the same `path` is ignored entirely, so a client
 sending `path` behaves differently per server.
