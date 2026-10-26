@@ -450,7 +450,12 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
     )
 )
 def search_variant_id(search_input: SearchInputInstance):
-    yield Variant.objects.filter(pk=search_input.match.group(2))
+    variant_id = search_input.match.group(2)
+    if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not search_input.user.is_superuser:
+        for genome_build in search_input.genome_builds:
+            yield get_visible_variants(search_input, genome_build).filter(pk=variant_id)
+    else:
+        yield Variant.objects.filter(pk=variant_id)
 
 
 ALLELE_ID_SEARCH_PATTERN = re.compile(r"^a(\d+)$")
@@ -465,7 +470,11 @@ ALLELE_ID_SEARCH_PATTERN = re.compile(r"^a(\d+)$")
     )
 )
 def search_allele_id(search_input: SearchInputInstance):
-    yield Allele.objects.filter(pk=search_input.match.group(1))
+    allele_qs = Allele.objects.filter(pk=search_input.match.group(1))
+    if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not search_input.user.is_superuser:
+        published_qs = Classification.objects.published_for_user(search_input.user)
+        allele_qs = allele_qs.filter(pk__in=published_qs.values("allele"))
+    yield allele_qs
 
 
 # The separators classification import accepts - never a single hyphen, which gene names contain (HLA-A)

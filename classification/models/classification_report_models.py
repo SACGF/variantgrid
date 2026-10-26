@@ -16,17 +16,19 @@ from dataclasses import dataclass
 from typing import Optional
 
 import django.dispatch
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import CASCADE, PROTECT, SET_NULL, Prefetch, Q, QuerySet
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from model_utils.models import TimeStampedModel
 
 from classification.enums import CaseReportStatus
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
+from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from patients.enums import (
     MEASURE_CONTEXT_KEYS,
     SampleSourceLevel,
@@ -320,6 +322,8 @@ class ClassificationReportTemplate(TimeStampedModel):
 
 
 def case_report_upload_path(instance: 'CaseReport', filename: str) -> str:
+    """ Under the private upload storage, which nginx doesn't serve - documents are only downloaded through
+        views/views_case_report.py, which checks the report's permissions """
     return os.path.join("case_reports", str(instance.lab_id), str(instance.pk), filename)
 
 
@@ -362,8 +366,8 @@ class CaseReport(TimeStampedModel):
 
     context_snapshot = models.JSONField(default=dict)
     html = models.TextField(blank=True)  # the rendered document - PDF and DOCX are derived from it
-    pdf_file = models.FileField(null=True, blank=True, upload_to=case_report_upload_path)
-    docx_file = models.FileField(null=True, blank=True, upload_to=case_report_upload_path)
+    pdf_file = models.FileField(null=True, blank=True, upload_to=case_report_upload_path, storage=PrivateUploadStorage())
+    docx_file = models.FileField(null=True, blank=True, upload_to=case_report_upload_path, storage=PrivateUploadStorage())
     json_output = models.JSONField(null=True, blank=True)
 
     class Meta:
@@ -435,11 +439,16 @@ class CaseReport(TimeStampedModel):
         """ The pinned classifications in report order - plain, so for_case's prefetch is used """
         return self.casereportclassification_set.all()
 
-    def get_media_dir(self) -> str:
-        return os.path.join(settings.MEDIA_ROOT, "case_reports", str(self.lab_id), str(self.pk))
-
     def __str__(self):
         return f"{self.get_status_display()} report for {self.source} ({self.template_id})"
+
+
+@receiver(post_delete, sender=CaseReport)
+def case_report_post_delete(sender, instance: CaseReport, **kwargs):
+    """ FileFields leave their files behind when the row goes, cascades from the lab or case included """
+    for file_field in (instance.pdf_file, instance.docx_file):
+        if file_field:
+            file_field.delete(save=False)
 
 
 class CaseReportClassification(models.Model):

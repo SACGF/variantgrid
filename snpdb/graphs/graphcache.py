@@ -8,6 +8,7 @@ import os
 
 from celery import signature
 from django.conf import settings
+from django.utils.crypto import salted_hmac
 
 from library.graphs import graph_base
 from library.utils import import_class
@@ -26,7 +27,9 @@ class CacheableGraph(graph_base.GraphBase, metaclass=abc.ABCMeta):
         pass
 
     def get_filename(self):
-        return os.path.join(settings.GENERATED_DIR, self.get_name(), self.get_params_hash() + ".png")
+        """ Keyed on SECRET_KEY so the media URL of a graph can't be worked out from the ids in its params """
+        filename_hash = salted_hmac("CacheableGraph.get_filename", self.get_params_hash(), algorithm="sha256").hexdigest()
+        return os.path.join(settings.GENERATED_DIR, self.get_name(), filename_hash + ".png")
 
     def get_name(self):
         return self.__class__.__name__

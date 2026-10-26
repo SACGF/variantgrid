@@ -82,7 +82,9 @@ Patterns here:
   to keep it in step with that system writes it in Python (SA Path's TSO 500 shape) - there is no JSON template.
 - A CaseReport's permissions are its own (models/classification_report_models.py:CaseReport.can_view / can_write):
   its lab's users may build, finalise and rebuild, and anyone who can see the case may read. Every document is served
-  by views/views_case_report.py rather than a media URL - MEDIA_ROOT has no permissions of its own.
+  by views/views_case_report.py rather than a media URL - MEDIA_ROOT has no permissions of its own, so the PDF/DOCX
+  are in PrivateUploadStorage. Delivery elsewhere (SA Path to Mocha) POSTs json_output through an API; nothing reads
+  the files from a shared drive.
 Gotchas:
 - "Every edit makes a ClassificationModification" has one exception: models/classification.py:ClassificationModification.is_edit_appendable
   folds a patch into the previous unpublished modification when it is the same user and source within a minute.

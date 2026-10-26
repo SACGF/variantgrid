@@ -135,14 +135,14 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
             if sample.patient:
                 try:
+                    # Check you have Patient permissions
+                    patient = Patient.get_for_user(request.user, sample.patient.pk)
                     try:
                         age = sample.specimen.age_at_collection_date
                     except:
                         age = None
                     text_df.loc["Age", sample_name] = age or ''
 
-                    # Check you have Patient permissions
-                    patient = Patient.get_for_user(request.user, sample.patient.pk)
                     terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(patient.get_ontology_term_ids())
 
                     def format_ontology(ontology_term):

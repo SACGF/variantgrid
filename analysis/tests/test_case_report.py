@@ -4,9 +4,11 @@
     classification/tests/report/; what needs a real case is here: which samples a specimen or
     extraction case is, who may act on a built report, and what finalising writes.
 """
+import os
 from dataclasses import replace
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import override_settings
@@ -121,6 +123,15 @@ class CaseReportFinaliseTest(ClassifyReportTestCase):
         # The pinned version is the one that carries the stamp, so the tab's stale check stays quiet
         self.assertEqual(case_report.rows.get().classification_modification,
                          classification.last_published_version)
+
+    def test_documents_are_private_and_deleted_with_the_report(self):
+        case_report, _ = self._build()
+        pdf_path = case_report.pdf_file.path
+        self.assertTrue(pdf_path.startswith(settings.UPLOAD_DIR))
+        self.assertTrue(os.path.exists(pdf_path))
+
+        case_report.delete()
+        self.assertFalse(os.path.exists(pdf_path))
 
     def test_finalise_is_idempotent(self):
         case_report, classification = self._build()

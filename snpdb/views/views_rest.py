@@ -4,9 +4,9 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import permissions, viewsets
+from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import RetrieveAPIView, get_object_or_404
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -15,7 +15,6 @@ from patients.enums import Zygosity
 from snpdb.clingen_allele import get_variant_allele_for_variant
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
 from snpdb.models import Duo, GenomeBuild, Quad, Sample, Trio, Variant
-from snpdb.models.models_vcf import Project
 from snpdb.serializers import (
     DuoSerializer,
     ProjectSerializer,
@@ -142,6 +141,5 @@ class VariantSampleGenotypesView(APIView):
         return limit
 
 
-class ProjectViewSet(viewsets.ModelViewSet):
-    queryset = Project.objects.all()
+class ProjectCreateView(CreateAPIView):
     serializer_class = ProjectSerializer

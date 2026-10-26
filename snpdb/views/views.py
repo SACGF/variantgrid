@@ -2,6 +2,7 @@ import json
 
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_not_required
+from django.core.exceptions import BadRequest
 from django.http.response import (
     HttpResponse,
     HttpResponseRedirect,
@@ -9,6 +10,7 @@ from django.http.response import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls.base import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from termsandconditions.decorators import terms_required
 
@@ -60,6 +62,9 @@ def staff_only(request):
 
 
 def wait_for_task(request, celery_task, sleep_ms, redirect_url):
+    if not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts={request.get_host()},
+                                           require_https=request.is_secure()):
+        raise BadRequest("redirect_url must be on this site")
     async_result = AsyncResult(celery_task)
     if async_result.successful():
         return HttpResponseRedirect(redirect_url)
