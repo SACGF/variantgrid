@@ -13,6 +13,7 @@ from django.db.models import Count
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
@@ -22,6 +23,7 @@ from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
 )
+from analysis.enums import AnalysisType, MinimisationResultType, NodeStatus
 from analysis.forms import (
     AnalysisChoiceForm,
     AnalysisNodeIssuesFilterForm,
@@ -42,15 +44,16 @@ from analysis.models import (
     TagNode,
     VariantTag,
 )
-from analysis.models.enums import AnalysisType, MinimisationResultType, NodeStatus
+from analysis.models.models_analysis import AnalysisClassification
 from analysis.models.mutational_signatures import MutationalSignature
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import AnalysisClassification
 from analysis.models.nodes.node_counts import get_node_count_colors, get_tag_node_count_colors
 from analysis.models.nodes.node_types import (
     get_node_display_data_by_class_name,
     get_node_types_hash,
 )
+from analysis.scheduler_status import get_analyses_with_work, get_scheduler_status
+from analysis.tasks.analysis_update_tasks import dispatch_analysis_backlog
 from analysis.variant_tag_operations import (
     resolve_launching_variant_tag,
     resolve_requires_classification_tags,
@@ -64,8 +67,8 @@ from classification.views.views import (
 )
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
+from patients.enums import SampleSourceLevel
 from patients.models import Patient
-from patients.models_enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 from seqauto.models import EnrichmentKit
 from snpdb.forms import SampleChoiceForm
@@ -338,17 +341,20 @@ def analysis_export(request, analysis_id):
 
 
 @user_passes_test(is_superuser)
-def view_analysis_issues(request):
+def view_analysis_status(request):
     if request.method == "POST":
         if "unpause-jobs" in request.POST:
             JobsControl.resume(by=str(request.user))
             messages.add_message(request, messages.INFO,
                                  "Resumed analysis + annotation job dispatch")
         if "pause-jobs" in request.POST:
-            JobsControl.pause(reason=f"Paused from analysis issues page by {request.user}",
+            JobsControl.pause(reason=f"Paused from analysis status page by {request.user}",
                               by=str(request.user))
             messages.add_message(request, messages.WARNING,
                                  "Paused analysis + annotation job dispatch")
+        if "dispatch-backlog" in request.POST:
+            dispatch_analysis_backlog.si().apply_async()
+            messages.add_message(request, messages.INFO, "Queued the analysis backlog dispatcher")
         if "reload-matching" in request.POST:
             filter_form = AnalysisNodeIssuesFilterForm(request.POST)
             nodes_qs = filter_form.get_queryset()
@@ -359,7 +365,7 @@ def view_analysis_issues(request):
             messages.add_message(request, messages.INFO,
                                  f"Reloading {num_nodes} failed nodes in {len(analysis_ids)} analyses")
             query_string = urlencode({k: v for k, v in filter_form.cleaned_data.items() if v})
-            return redirect(f"{reverse('analysis_issues')}?{query_string}")
+            return redirect(f"{reverse('analysis_status')}?{query_string}")
 
     all_nodes = AnalysisNode.objects.all()
     field_counts = get_field_counts(all_nodes, "status")
@@ -371,13 +377,16 @@ def view_analysis_issues(request):
     field_counts = {NodeStatus(k).label: v for k, v in field_counts.items()}
     # Don't force-create the singleton just by viewing the page
     jobs_control = JobsControl.objects.filter(pk=JobsControl.SINGLETON_PK).first()
-    context = {"nodes_status_summary": summary_data,
+    now = timezone.now()
+    context = {"scheduler_status": get_scheduler_status(now),
+               "analyses_with_work": get_analyses_with_work(now),
+               "nodes_status_summary": summary_data,
                "field_counts": field_counts,
                "jobs_control": jobs_control,
                "jobs_paused": bool(jobs_control and jobs_control.paused),
                "filter_form": AnalysisNodeIssuesFilterForm(request.GET or None),
                "node_types_display": get_node_display_data_by_class_name()}
-    return render(request, 'analysis/view_analysis_issues.html', context)
+    return render(request, 'analysis/view_analysis_status.html', context)
 
 
 def view_mutational_signature(request, pk):

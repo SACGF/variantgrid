@@ -13,8 +13,8 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timezone import localtime
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from genes.models.models_gene import Gene, GeneSymbol, GeneSymbolAlias
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease, ReleaseGeneSymbol
@@ -23,8 +23,8 @@ from library.guardian_utils import (
     DjangoPermission,
     assign_permission_to_user_and_groups,
 )
+from snpdb.enums import ImportStatus
 from snpdb.models import Company, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
 
 
 class GeneListCategory(models.Model):
@@ -103,13 +103,6 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
 
-    def get_q(self, variant_annotation_version):
-        """ For a Variant queryset """
-        from annotation.models.models import VariantTranscriptAnnotation
-        genes_qs = self.get_genes(variant_annotation_version.gene_annotation_release)
-        return VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version,
-                                                                   genes_qs)
-
     @staticmethod
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
         """ For GeneList node, we need to get query for multiple lists - and it's much faster to build the merged
@@ -146,6 +139,17 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
             glgs.save()
             genes += 1
 
+        return copy
+
+    def copy_for_user(self, user) -> 'GeneList':
+        """ An unlocked, uncategorised copy owned by user - unlike clone(), which keeps the owner, lock and
+            category, and is used to snapshot a list for an analysis node or pathology test """
+        copy = GeneList.objects.create(name=f"Copy of {self.name}", user=user, import_status=self.import_status)
+        gene_list_gene_symbols = list(self.genelistgenesymbol_set.all())
+        for glgs in gene_list_gene_symbols:
+            glgs.pk = None
+            glgs.gene_list = copy
+        GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
         return copy
 
     def save(self, *args, **kwargs):
@@ -240,7 +244,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         # Sample gene lists for samples we have permission to see
         samples_qs = Sample.filter_for_user(user)
         sample_gene_list_qs = GeneList.objects.filter(category__name=GeneListCategory.SAMPLE_GENE_LIST,
-                                                      customtextgenelist__qcgenelist__qc__alignment_file__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+                                                      customtextgenelist__qcgenelist__qc__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
 
         qs = user_qs | sample_gene_list_qs
         if success_only:
@@ -265,10 +269,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"
 
     def get_absolute_url(self):
-        url = self.url
-        if url is None:
-            url = reverse('view_gene_list', args=[str(self.id)])
-        return url
+        return reverse('view_gene_list', args=[str(self.id)])
 
     @classmethod
     def get_listing_url(cls):
@@ -347,6 +348,10 @@ class SampleGeneList(TimeStampedModel):
     class Meta:
         unique_together = ('sample', 'gene_list')
         ordering = ['created']
+
+    @staticmethod
+    def filter_for_user(user):
+        return SampleGeneList.objects.filter(sample__in=Sample.filter_for_user(user))
 
     def __str__(self):
         s = f"{self.sample}: {localtime(self.modified)}"

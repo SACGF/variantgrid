@@ -12,27 +12,26 @@ from annotation.models import (
     DBNSFPGeneAnnotationVersion,
     GeneAnnotation,
     GeneAnnotationVersion,
-    GenomeBuild,
     InvalidAnnotationVersionError,
-    OntologyTerm,
     VariantAnnotationVersion,
 )
-from annotation.models.models import SubVersionPartition
+from annotation.models.models_version import SubVersionPartition
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import Gene, GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import (
     get_import_processing_filename,
     remove_import_processing_dir,
 )
+from ontology.enums import GeneDiseaseClassification, OntologyService
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
-    GeneDiseaseClassification,
-    OntologyService,
     OntologyTermRelation,
     OntologyVersion,
 )
+from ontology.models.models_ontology import OntologyTerm
 from ontology.ontology_traversal import get_ontology_traverser
 from ontology.panel_app_ontology import bulk_update_gene_relations, panel_app_bulk_data_age
+from snpdb.models.models_genome import GenomeBuild
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 
@@ -41,6 +40,8 @@ class Command(BaseCommand):
     GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "dbnsfp_gene_id", "hpo_terms", "omim_terms", "mondo_terms",
                               "gene_disease_moderate_or_above", "gene_disease_supportive_or_below", "gnomad_oe_lof"]
     TERM_JOIN_STRING = " | "
+    in_memory_graph = False
+    update_panel_app = True
 
     def add_arguments(self, parser):
         gar_ov_dbsnfp_help = "gene-annotation-release, ontology-version and dbnsfp-gene-version are optional but must" \
@@ -172,7 +173,7 @@ class Command(BaseCommand):
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
 
             status = VariantAnnotationVersion.Status.NEW if new_releases else VariantAnnotationVersion.Status.ACTIVE
-            releases = GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds(status=status)
+            releases = VariantAnnotationVersion.latest_gene_annotation_releases(status=status)
             if not releases:
                 print(f"No GeneAnnotationReleases linked to the latest {status.label} "
                       f"VariantAnnotationVersions - nothing to do")
@@ -449,9 +450,26 @@ class Command(BaseCommand):
         gene_matcher = ReleaseGeneMatcher(gav.gene_annotation_release)
         gene_matcher.match_unmatched_symbols(gene_symbols)
 
-        hgnc_terms = list(OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC))
         self._bulk_fetch_panel_app()
+        gene_annotation_records, missing_genes = self._build_gene_annotation_records(gav)
 
+        if not gene_annotation_records:
+            # Creating the GeneAnnotationVersion has already bumped a new AnnotationVersion pointing at it,
+            # so returning quietly here leaves an empty version live - gene level filters (eg OMIM) then
+            # match nothing at all rather than failing
+            raise ValueError(f"{gav} produced no GeneAnnotation records - "
+                             f"{gav.gene_annotation_release} matched no gene symbols ({missing_genes})")
+        self._write_records(gav, gene_annotation_records)
+
+        if missing_genes:
+            print("WARNING: Could not map genes to the following records: ")
+            print(missing_genes)
+
+        print(f"Finished: {timezone.now()}")
+
+    def _build_gene_annotation_records(self, gav: GeneAnnotationVersion) -> tuple[list[tuple], Counter]:
+        """ One GENE_ANNOTATION_HEADER tuple per gene the release's symbols reach that has any ontology,
+            dbNSFP or gnomAD data """
         traverser = get_ontology_traverser(gav.ontology_version, in_memory=self.in_memory_graph,
                                            call_update_gene_relations=False)
         if self.in_memory_graph:
@@ -463,6 +481,8 @@ class Command(BaseCommand):
         symbol_to_gene_ids = defaultdict(set)
         for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
             symbol_to_gene_ids[gene_symbol.upper()].add(gene_id)
+
+        hgnc_terms = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
 
         missing_genes = Counter()
         # The various annotations are for different genes, so group kwargs by gene
@@ -482,9 +502,8 @@ class Command(BaseCommand):
                 continue  # Skip who cares
 
             uc_symbol = gene_symbol.upper()
-            gene_ids = symbol_to_gene_ids.get(uc_symbol)
-            if gene_ids:
-                for gene_id in gene_ids:
+            if gene_ids_for_symbol := symbol_to_gene_ids.get(uc_symbol):
+                for gene_id in gene_ids_for_symbol:
                     for ontology_service, terms in service_terms.items():
                         column = f"{str(ontology_service).lower()}_terms"
                         annotation_by_gene[gene_id][column] = terms
@@ -520,20 +539,7 @@ class Command(BaseCommand):
             ga_data["gene_id"] = gene_id
             ga_data["version_id"] = gav.pk
             gene_annotation_records.append(tuple(ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER))
-
-        if not gene_annotation_records:
-            # Creating the GeneAnnotationVersion has already bumped a new AnnotationVersion pointing at it,
-            # so returning quietly here leaves an empty version live - gene level filters (eg OMIM) then
-            # match nothing at all rather than failing
-            raise ValueError(f"{gav} produced no GeneAnnotation records - "
-                             f"{gav.gene_annotation_release} matched no gene symbols ({missing_genes})")
-        self._write_records(gav, gene_annotation_records)
-
-        if missing_genes:
-            print("WARNING: Could not map genes to the following records: ")
-            print(missing_genes)
-
-        print(f"Finished: {timezone.now()}")
+        return gene_annotation_records, missing_genes
 
     def _write_records(self, gene_annotation_version: GeneAnnotationVersion, gene_annotation_records):
         print(f"Creating {len(gene_annotation_records)} gene annotation records")
@@ -554,7 +560,7 @@ class Command(BaseCommand):
 
 
 def bad_gene_annotation():
-    """ This is used as a test in annotation/migrations/0068_one_off_manual_fix_bad_gene_annotation """
+    """ Gene annotation versions whose dbNSFP gene data never loaded """
     bad_gene_annotation = []
     for gav in GeneAnnotationVersion.objects.all():
         if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():

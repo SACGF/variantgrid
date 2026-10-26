@@ -1,0 +1,280 @@
+"""
+Enums for the annotation pipeline: AnnotationStatus (an AnnotationRun's lifecycle, with the
+completed / error sets), VariantAnnotationPipelineType (which tool handles which class of variant),
+VEPPlugin / VEPCustom (what a VariantAnnotationVersion recorded running), ClinVar review status
+and pathogenicity / oncogenicity scales, and the Human Protein Atlas abundance levels. Stored
+codes: add values, never renumber. Predictor scales live in damage_enums.py.
+"""
+from django.db import models
+
+from library.utils import Constant
+
+
+class HumanProteinAtlasAbundance(models.TextChoices):
+    NOT_DETECTED = 'N', 'Not detected'
+    LOW = 'L', 'Low'
+    MEDIUM = 'M', 'Medium'
+    HIGH = 'H', 'High'
+
+    @staticmethod
+    def get_abundance_or_greater_levels(abundance):
+        higher_levels = []
+        found = False
+        for k, _ in HumanProteinAtlasAbundance.choices:
+            if k == abundance:
+                found = True
+            if found:
+                higher_levels.append(k)
+        return higher_levels
+
+
+class DetectedHumanProteinAtlasAbundance(models.TextChoices):
+    LOW = 'L', 'Low'
+    MEDIUM = 'M', 'Medium'
+    HIGH = 'H', 'High'
+
+
+class AnnotationStatus(models.TextChoices):
+    CREATED = 'C', "Created"
+    DELETING = 'x', "Deleting"
+    DUMP_STARTED = 'd', "Dump Started"
+    DUMP_COMPLETED = 'D', "Dump Completed"
+    # External annotation (#1568): dump written, parked waiting for the operator to run VEP externally
+    # and re-import the annotated VCF. NOT a completed state - genuinely waiting on the operator.
+    EXTERNAL_DUMP_COMPLETED = 'e', "Awaiting external annotation"
+    ANNOTATION_STARTED = 'a', "Annotation Started"
+    ANNOTATION_COMPLETED = 'A', "Annotation Completed"
+    UPLOAD_STARTED = 'U', "Upload Started"
+    FINISHED = 'F', "Finished"
+    ERROR = 'E', "Error"
+
+    @classmethod
+    def get_completed_states(cls):
+        return [
+            cls.FINISHED,
+            cls.ERROR,
+        ]
+
+    @classmethod
+    def get_summary_state(cls, annotation_status):
+        SUMMARY_STATES = {cls.CREATED: "Queued",
+                          cls.EXTERNAL_DUMP_COMPLETED: "External",
+                          cls.FINISHED: "Finished",
+                          cls.ERROR: "Error"}
+        return SUMMARY_STATES.get(annotation_status, "Running")
+
+
+class HPOSynonymScope(models.TextChoices):
+    BROAD = 'B', 'Broad'
+    EXACT = 'E', 'Exact'
+    NARROW = 'N', 'Narrow'
+    RELATED = 'R', 'Related'
+
+
+class VariantAnnotationPipelineType(models.TextChoices):
+    """ An annotation pipeline is a tool applied to a class of variant. Most are VEP over a variant class;
+        GENE_LEVEL and ANNOTSV run other tools. This enum is only the stored key - what each pipeline
+        selects, depends on and runs is declared in annotation.pipelines. """
+    STANDARD = "S", "Standard Short Variant"
+    STRUCTURAL_VARIANT = "C", "Structural Variant"
+    # Never reaches VEP - annotation is computed locally from the gene identity in the alt
+    GENE_LEVEL = "G", "Gene Level"
+    # AnnotSV over the same variants as STRUCTURAL_VARIANT, after that run has committed its rows. Its own
+    # pipeline so it can be enabled (and backfilled) and its bundle rolled without re-running VEP (#720)
+    ANNOTSV = "A", "AnnotSV"
+
+
+class NMDEscapeStatus(models.TextChoices):
+    """ PTC-aware NMD prediction (#579) - the NMD.pm rules anchored on the premature
+        termination codon rather than the variant. NOT_APPLICABLE means we ran the
+        calculation and it doesn't apply (eg not a frameshift, or VEP couldn't locate
+        the new stop) - null means the row predates the calculation. """
+    ESCAPING = "E", "Escapes NMD"
+    PREDICTED_NMD = "N", "NMD predicted"
+    NOT_APPLICABLE = "A", "Not applicable"
+
+
+class ColumnAnnotationCategory(models.TextChoices):
+    """ Based on categories from:
+        https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html """
+
+    CONSERVATION = 'C', "Conservation"
+    EXTERNAL_ID = 'E', "External ID"
+    FREQUENCY_DATA = 'F', "Frequency Data"
+    FUNCTIONAL_EFFECT = 'f', "Functional Effect"
+    GENE_ANNOTATIONS = 'G', 'Gene Annotations'
+    HGVS = 'H', "HGVS"
+    LITERATURE = 'L', 'Literature'
+    NEARBY_FEATURES = 'N', "Nearby Features"
+    PATHOGENICITY_PREDICTIONS = 'P', "Pathogenicity Predictions"
+    PHENOTYPE = 'Y', "Phenotype"
+    PROTEIN_DOMAINS = 'D', "Protein Domains"
+    SEQUENCE = 'Q', "Sequence"
+    SPLICING_PREDICTIONS = 'S', "Splicing Predictions"
+    CLASSIFICATIONS = 'K', "Classifications"
+    VARIANT_DATA = 'V', "Variant Data"
+
+
+class VEPPlugin(models.TextChoices):
+    AVI = 'i', 'AVI'
+    DBNSFP = 'd', 'dbNSFP'
+    DBSCSNV = 'v', 'dbscSNV'
+    EVE = 'E', 'EVE'
+    GRANTHAM = 'g', 'Grantham'
+    LOFTOOL = 'l', 'LoFtool'
+    MASTERMIND = 'n', 'Mastermind'
+    MAVEDB = 'V', "MaveDb"
+    MAXENTSCAN = 'm', 'MaxEntScan'
+    NMD = "N", 'NMD'
+    OPEN_TARGETS = 'O', 'OpenTargets'
+    PROMOTER_AI = 'A', 'PromoterAI'
+    PROTVAR = 'p', 'ProtVar'
+    SPLICEAI = 'a', 'SpliceAI'
+    SPLICEREGION = 's', 'SpliceRegion'
+    SPLICEVAULT = 't', 'SpliceVault'
+    UTR_ANNOTATOR = 'u', 'UTRAnnotator'
+
+
+class VEPCustom(models.TextChoices):
+    ALPHAGENOME_SPLICING = 'a', 'AlphaGenome_splicing'
+    GNOMAD_2 = 'g', 'gnomAD2'
+    GNOMAD_3 = 'n', 'gnomAD3'
+    GNOMAD_4 = 'o', 'gnomAD4'
+    # We split GNOMAD_SV into 2, as we need to call custom twice
+    GNOMAD_SV = 'S', 'gnomAD_SV'
+    GNOMAD_SV_NAME = 'N', 'gnomAD_SV_name'
+    PHASTCONS_100_WAY = '1', 'phastCons100way'
+    PHASTCONS_30_WAY = '2', 'phastCons30way'
+    PHASTCONS_46_WAY = '3', 'phastCons46way'
+    PHYLOP_100_WAY = '4', 'phyloP100way'
+    PHYLOP_30_WAY = '5', 'phyloP30way'
+    PHYLOP_46_WAY = '6', 'phyloP46way'
+    REPEAT_MASKER = 'r', 'RepeatMasker'
+    TOPMED = 't', 'TopMed'
+    UK10K = 'u', 'UK10k'
+    COSMIC = 'c', 'COSMIC'
+    DENOVO_DB = 'D', 'denovo_db'
+
+
+class VEPSkippedReason(models.TextChoices):
+    UNKNOWN_CONTIG = 'c', "Unknown Contig"
+    INCOMPLETE = 'i', "Incomplete"
+    UNKNOWN = 'u', "Unknown"
+    TOO_LONG = 'l', "Too Long"
+
+
+class ClinVarReviewStatus(models.TextChoices):
+    NO_ASSERTION_PROVIDED = "N", "No assertion provided"
+    NO_ASSERTION_CRITERIA_PROVIDED = "C", "No assertion criteria provided"
+    NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT = "I", "No interpretation for the single variant"
+    NO_CLASSIFICATION_PROVIDED = 'n', "No Classification Provided"
+    NO_CLASSIFICATIONS_FROM_UNFLAGGED_RECORDS = 'f', "No classifications from unflaggedrecords"
+    CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS = "F", "Criteria provided - conflicting interpretations"
+    CRITERIA_PROVIDED_SINGLE_SUBMITTER = "S", "Criteria provided - single submitter"
+    CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS = "M", "Criteria provided - multiple submitters w/no conflicts"
+    CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS = "m", "Criteria provided - multiple submitters"  # somatic only
+    REVIEWED_BY_EXPERT_PANEL = "E", "Reviewed by expert panel"
+    PRACTICE_GUIDELINE = "P", "Practice guideline"
+
+    STARS = Constant({
+        NO_CLASSIFICATION_PROVIDED[0]: 0,
+        NO_ASSERTION_PROVIDED[0]: 0,
+        NO_ASSERTION_CRITERIA_PROVIDED[0]: 0,
+        NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0]: 0,
+        NO_CLASSIFICATIONS_FROM_UNFLAGGED_RECORDS[0]: 0,
+        CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0]: 1,
+        CRITERIA_PROVIDED_SINGLE_SUBMITTER[0]: 1,
+        CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0]: 2,
+        CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS[0]: 2,
+        REVIEWED_BY_EXPERT_PANEL[0]: 3,
+        PRACTICE_GUIDELINE[0]: 4,
+    })
+
+    VCF_MAPPINGS = Constant({
+        'no_assertion_provided': NO_ASSERTION_PROVIDED[0],
+        'no_assertion_criteria_provided': NO_ASSERTION_CRITERIA_PROVIDED[0],
+        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # Old value
+        'no_classification_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # New one
+        'no_classification_provided': NO_CLASSIFICATION_PROVIDED[0],  # New one
+        'no_classifications_from_unflagged_records': NO_CLASSIFICATIONS_FROM_UNFLAGGED_RECORDS[0],  # new for oncogenic
+        'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
+        'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
+        'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
+        'criteria_provided,_multiple_submitters': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS[0],  # new for somatic
+        'criteria_provided,_multiple_submitters,_no_conflicts': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0],
+        'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL[0],
+        'practice_guideline': PRACTICE_GUIDELINE[0],
+    })
+
+    def stars(self):
+        return ClinVarReviewStatus.STARS[self.value]
+
+    @staticmethod
+    def statuses_gte_stars(min_stars: int) -> list['ClinVarReviewStatus']:
+        statuses = []
+        for rs, stars in ClinVarReviewStatus.STARS.items():
+            if stars >= min_stars:
+                statuses.append(rs)
+        return statuses
+
+
+class Pathogenicity(models.IntegerChoices):
+    """ The five-tier ACMG germline scale as an ordered integer: ClinVar.highest_pathogenicity (CLNSIG
+        mapped onto it, 0 = none of the below) and VariantAnnotation.annotsv_acmg_class (AnnotSV's ACMG_class) """
+    BENIGN = 1, "Benign"
+    LIKELY_BENIGN = 2, "Likely benign"
+    UNCERTAIN = 3, "Uncertain"
+    LIKELY_PATHOGENIC = 4, "Likely pathogenic"
+    PATHOGENIC = 5, "Pathogenic"
+
+    SHORT_LABELS = Constant({
+        1: "B",
+        2: "LB",
+        3: "VUS",
+        4: "LP",
+        5: "P",
+    })
+
+    @property
+    def short_label(self) -> str:
+        """ Also the classification clinical_significance evidence key option values """
+        return Pathogenicity.SHORT_LABELS[self.value]
+
+    @property
+    def css_class(self) -> str:
+        return f"cs-{self.short_label.lower()}"
+
+
+class ClinVarOncogenicity(models.IntegerChoices):
+    """ ClinVar.highest_oncogenicity - ONC mapped onto an ordered scale (0 = ClinVar has given no
+        oncogenicity call for this variant) """
+    BENIGN = 1, "Benign"
+    LIKELY_BENIGN = 2, "Likely benign"
+    UNCERTAIN = 3, "Uncertain"
+    LIKELY_ONCOGENIC = 4, "Likely oncogenic"
+    ONCOGENIC = 5, "Oncogenic"
+
+
+class ManualVariantEntryType(models.TextChoices):
+    DBSNP = "d", "dbSNP"
+    HGVS = "h", "HGVS"
+    VARIANT = "v", "Variant"
+    UNKNOWN = "u", "Unknown"
+
+
+class EssentialGeneCRISPR(models.TextChoices):
+    ESSENTIAL = "E", "Essential"
+    NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
+
+
+class EssentialGeneCRISPR2(models.TextChoices):
+    ESSENTIAL = "E", "Essential"
+    NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
+    CONTEXT_SPECIFIC_ESSENTIAL = "S", "Context-Specific essential"
+
+
+class EssentialGeneGeneTrap(models.TextChoices):
+    ESSENTIAL = "E", "Essential"
+    NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
+    HAP1_SPECIFIC_ESSENTIAL = "H", "HAP1-Specific essential"
+    KBM7_SPECIFIC_ESSENTIAL = "K", "KBM7-Specific essential"

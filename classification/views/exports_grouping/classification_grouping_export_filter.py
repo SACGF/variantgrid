@@ -1,23 +1,37 @@
+import itertools
+import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Set, Union, Optional, Iterator
+from typing import Iterator, Optional, Set, Union
 
-import itertools
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from more_itertools.more import peekable
-from classification.enums import ShareLevel, AlleleOriginBucket
-from classification.models import ClassificationGrouping, ImportedAlleleInfo, \
-    OverlapContribution, OverlapContributionNextStep
-from classification.models import EvidenceKeyMap
+
+from classification.enums import OverlapStatus, OverlapType, OverlapContributionStatus, OverlapOverrideStatus, \
+    ClassificationResultValue
+from classification.enums.classification_enums import ShareLevel
+from classification.models import (
+    ClassificationGrouping,
+    EvidenceKeyMap,
+    ImportedAlleleInfo,
+    OverlapContribution,
+    OverlapContributionNextStep, Overlap,
+)
 from genes.hgvs import HGVSComponents
 from library.utils import local_date_string
-from snpdb.models import Organization, Lab, GenomeBuild, Variant, VariantAllele
-import re
+from snpdb.enums import AlleleOriginBucket
+from snpdb.models import GenomeBuild, Lab, Organization, Variant, VariantAllele
+
+
+@dataclass(frozen=True)
+class OverlapStatusSummary:
+    oncopath_status: Optional[OverlapStatus] = None
+    somatic_clinsig_status: Optional[OverlapStatus] = None
 
 
 @dataclass
@@ -132,6 +146,39 @@ class ClassificationGroupingExportFilter:
 
         return groupings
 
+    def check_discordance(self, classification_grouping_id: int) -> OverlapStatusSummary:
+        if statuses := self._overlap_statuses.get(classification_grouping_id):
+            onc_path_status = statuses.get(ClassificationResultValue.ONC_PATH)
+            somatic_clinsig_status = statuses.get(ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE)
+            return OverlapStatusSummary(
+                oncopath_status=OverlapStatus(onc_path_status) if onc_path_status else None,
+                somatic_clinsig_status=OverlapStatus(somatic_clinsig_status) if somatic_clinsig_status else None
+            )
+        else:
+            return OverlapStatusSummary()
+
+    @cached_property
+    def _overlap_statuses(self):
+        all_discordant_overlaps_qs = Overlap.objects.filter(
+            overlap_type=OverlapType.SINGLE_CONTEXT,
+            overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES,
+            overlap_override_status=OverlapOverrideStatus.NO_OVERRIDE
+        )
+        all_contributions_qs = OverlapContribution.objects.filter(
+            contribution_status=OverlapContributionStatus.CONTRIBUTING,
+            classification_grouping__in=self.queryset()
+        )
+        overlap_next_steps_qs = OverlapContributionNextStep.objects.filter(
+            overlap__in=all_discordant_overlaps_qs,
+            contribution__in=all_contributions_qs
+        )
+        grouping_to_value_type_to_status = defaultdict(dict)
+        for entry in overlap_next_steps_qs.values_list('overlap__overlap_status', 'overlap__value_type', 'contribution__classification_grouping').iterator():
+            overlap_status, value_type, classification_grouping = entry
+            grouping_to_value_type_to_status[classification_grouping][value_type] = overlap_status
+        print(grouping_to_value_type_to_status)
+        return grouping_to_value_type_to_status
+
     def latest_date(self) -> Optional[datetime]:
         if latest_record := self.queryset().order_by('-latest_classification_modification__modified').values_list('latest_classification_modification__modified', flat=True).first():
             return latest_record
@@ -149,6 +196,8 @@ class ClassificationGroupingExportFileSettings:
         rows_per_file: Optional[int] = None
         if rows_per_file_str := request.GET.get("rows_per_file"):
             rows_per_file = int(rows_per_file_str)
+            if rows_per_file < 100:
+                rows_per_file = 100
         return ClassificationGroupingExportFileSettings(
             rows_per_file=rows_per_file
         )

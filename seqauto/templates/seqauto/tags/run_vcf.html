@@ -1,11 +1,7 @@
 {# A VCF made from a sequencing run: the seqauto record (file on disk) as a link, the imported VCF as an icon #}
 <li class='seqauto-record'>
     {% if run_vcf.vcf %}
-        {% if run_vcf.can_view %}
-            <a href="{% url 'view_vcf' run_vcf.vcf.pk %}" title="VCF: {{ run_vcf.vcf }}"><div class='vcf-icon icon24 run-vcf-icon'></div></a>
-        {% else %}
-            <div title="You don't have permission to view this VCF" class='vcf-icon icon24 run-vcf-icon'></div>
-        {% endif %}
+        {% include "seqauto/tags/vcf_status_icon.html" with vcf=run_vcf.vcf can_view=run_vcf.can_view %}
     {% endif %}
     {% if run_vcf.record %}
         <a href="{{ run_vcf.record_url }}">{{ run_vcf.record }}</a>

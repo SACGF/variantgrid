@@ -1,18 +1,15 @@
+import datetime
+import warnings
 from dataclasses import dataclass
-from datetime import date
 from functools import cached_property
 from typing import Optional, Self
 
 from dataclasses_json import DataClassJsonMixin
 
-from classification.enums import (
-    AlleleOriginBucket,
-    ClassificationResultValue,
-    SpecialEKeys,
-    TestingContextBucket,
-)
+from classification.enums import ClassificationResultValue, SpecialEKeys, TestingContextBucket
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
+from snpdb.enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)
@@ -25,9 +22,9 @@ class ClassificationSummaryCacheObjDate(DataClassJsonMixin):
         return bool(self.date)
 
     @property
-    def as_date(self) -> Optional[date]:
+    def as_date(self) -> Optional[datetime.date]:
         try:
-            return date.fromisoformat(self.date)
+            return datetime.date.fromisoformat(self.date)
         except (TypeError, ValueError):
             return None
 
@@ -82,20 +79,10 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
         for man_sub_field in ["pathogenicity", "somatic", "date"]:
             if man_sub_field not in data_copy:
                 data_copy[man_sub_field] = {}
-        return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
-
-
-_SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
-    SomaticClinicalSignificanceValue("tier_1", "A"): 10,
-    SomaticClinicalSignificanceValue("tier_1", "B"): 9,
-    SomaticClinicalSignificanceValue("tier_1"): 8,
-    SomaticClinicalSignificanceValue("tier_1_or_2"): 7,
-    SomaticClinicalSignificanceValue("tier_2", "C"): 6,
-    SomaticClinicalSignificanceValue("tier_2", "D"): 5,
-    SomaticClinicalSignificanceValue("tier_2"): 4,
-    SomaticClinicalSignificanceValue("tier_3"): 3,
-    SomaticClinicalSignificanceValue("tier_4"): 2
-}
+        # A summary written before a field existed (or an empty one) is expected to decode with None for it
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Missing value of non-optional type", category=RuntimeWarning)
+            return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
 
 
 class ClassificationSummaryCalculator:

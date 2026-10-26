@@ -1,0 +1,4 @@
+##fileformat=VCFv4.2
+##contig=<ID=chr17,length=83257441>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	brca_sample
+chr17	43074436	.	A	AGG	.	.	.	GT	0/1

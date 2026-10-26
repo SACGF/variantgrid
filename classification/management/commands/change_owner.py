@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.core.management import BaseCommand
 from django.db.models import Q
 
-from classification.models import ClassificationModification
+from classification.models import Classification, ClassificationModification
 from snpdb.models import Lab
 
 
@@ -58,5 +58,5 @@ class Command(BaseCommand):
                 c = cm.classification
                 c.evidence["owner"]["value"] = new_user.email
                 c.user = new_user
-                c.save(update_fields=["evidence", "user"])
+                Classification.objects.filter(pk=c.pk).update(evidence=c.evidence, user=new_user)
             print("Done")

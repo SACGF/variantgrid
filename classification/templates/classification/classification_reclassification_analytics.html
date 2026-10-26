@@ -379,7 +379,7 @@
         lab to see that lab's own keys.
     </p>
     <h5 class="mt-4">Reclassifications towards pathogenic</h5>
-    {% if analytics.evidence_towards_pathogenic %}
+    {% if analytics.evidence.towards_pathogenic %}
         <div id="evidence-towards-pathogenic" class="chart"></div>
         <p><a href="#" id="evidence-towards-pathogenic-toggle" class="d-none"></a></p>
     {% else %}
@@ -387,7 +387,7 @@
     {% endif %}
 
     <h5 class="mt-4">Reclassifications towards benign</h5>
-    {% if analytics.evidence_towards_benign %}
+    {% if analytics.evidence.towards_benign %}
         <div id="evidence-towards-benign" class="chart"></div>
         <p><a href="#" id="evidence-towards-benign-toggle" class="d-none"></a></p>
     {% else %}
@@ -426,6 +426,6 @@
 
 <script src="{% static 'js/classification/classification_reclassification_analytics.js' %}"></script>
 <script>
-    showReclassificationAnalytics({{ analytics.chart_data|jsonify }});
+    showReclassificationAnalytics({{ chart_data|jsonify }});
 </script>
 {% endblock content %}

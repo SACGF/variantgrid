@@ -24,8 +24,8 @@ from annotation.models import (
     VariantAnnotationVersion,
     VariantTranscriptAnnotation,
 )
+from genes.enums import AnnotationConsortium
 from genes.models import Gene
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchivedError
 from snpdb.models import GenomeBuild
 

@@ -7,7 +7,6 @@ SVOverlapProcessor and genes.gene_overlaps.SVGeneOverlapResolver handle the stru
 skipped or annotated via --custom. Runs inside an AnnotationRun's upload step.
 """
 import logging
-import operator
 import os
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -20,14 +19,14 @@ from django.conf import settings
 from annotation import annotsv_columns as annotsv_columns_registry
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
+from annotation.enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
 from annotation.models.models import (
-    AnnotationRun,
     VariantAnnotation,
-    VariantAnnotationVersion,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType, VEPCustom
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
 from annotation.refseq_ensembl_resolver import DBNSFPGeneResolver
 from annotation.sv_conservation import (
@@ -39,10 +38,14 @@ from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
+from annotation.vep_plugin_display import (
+    GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS,
+    vep_multi_fields_to_list_of_dicts,
+)
+from genes.enums import AnnotationConsortium
 from genes.gene_overlaps import SVGeneOverlapResolver
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneVersion, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from genes.transcript_parts import CDOT_FAKE_TRANSCRIPT_VERSION, get_cdot_fake_transcript_id
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import (
@@ -52,8 +55,8 @@ from library.django_utils.django_file_utils import (
 from library.genomics import Range, overlap_fraction, parse_gnomad_coord
 from library.log_utils import log_traceback
 from library.utils import split_dict_multi_values
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import VariantCoordinate
-from snpdb.models.models_enums import AssemblyMoleculeType
 from upload.vcf.sql_copy_files import sql_copy_csv, write_sql_copy_csv
 
 DELIMITER = '\t'
@@ -126,7 +129,7 @@ class TranscriptGeometryCache:
 def add_calculated_ptc(transcript_data: TranscriptData, indel_offset: int,
                        transcript_geometry_cache: TranscriptGeometryCache):
     """ Writes ptc_distance_codons / ptc_last_junction_distance / nmd_escape_status into
-        transcript_data. Shared by the inserter and `manage.py backfill_ptc_annotation`.
+        transcript_data.
 
         @param indel_offset len(ref) - len(alt) @see annotation.ptc.calculate_ptc_position """
     transcript_data["nmd_escape_status"] = NMDEscapeStatus.NOT_APPLICABLE
@@ -296,6 +299,9 @@ class BulkVEPVCFAnnotationInserter:
         self.sv_overlap_processor = sv_overlap_processor
         self.sv_gene_overlap_resolver = sv_gene_overlap_resolver
         self._generated_hgvs_c = Counter()
+        # Reported once in finish() - a gene/transcript set behind VEP's misses on most records
+        self._missing_gene_ids: set[str] = set()
+        self._missing_transcript_ids: set[str] = set()
         self.transcript_geometry_cache = TranscriptGeometryCache()
         # RefSeq MT transcripts are VEP gene-name Features ('ND4.1') with no real accession (#2139)
         self.refseq_mitochondrial_chroms: set[str] = set()
@@ -624,7 +630,7 @@ class BulkVEPVCFAnnotationInserter:
             return
 
         empty_scores = EMPTY_VALUES | {"NA"}
-        records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, cls.PROMOTER_AI_COLUMNS)
+        records = vep_multi_fields_to_list_of_dicts(raw_db_data, cls.PROMOTER_AI_COLUMNS)
         scored = [r for r in records if r.get(cls.PROMOTER_AI_SCORE_COLUMN) not in empty_scores]
         if scored:
             best = max(scored, key=lambda r: abs(float(r[cls.PROMOTER_AI_SCORE_COLUMN])))
@@ -642,7 +648,7 @@ class BulkVEPVCFAnnotationInserter:
             if vep_gene in self.gene_identifiers:
                 gene_id = vep_gene
             else:
-                logging.warning(f"Could not find gene_id: '{vep_gene}'")
+                self._missing_gene_ids.add(vep_gene)
         return gene_id
 
     def _get_transcript_accession(self, vep_transcript_data: TranscriptData) -> Optional[str]:
@@ -660,22 +666,32 @@ class BulkVEPVCFAnnotationInserter:
         transcript_version_id: Optional[str] = None
         if transcript_accession:
             t_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            if refseq_mitochondrial:
+                # VEP's 'ND4' is cdot's 'fake-rna-ND4' (coding genes only - tRNA/rRNA have neither). Preferred over
+                # a gene-named 'ND4.1' row left by a pre-cdot import, which has no data to read a transcript from
+                fake_t_id = get_cdot_fake_transcript_id(t_id)
+                if fake_t_id in self.transcript_versions_by_id:
+                    t_id, version = fake_t_id, CDOT_FAKE_TRANSCRIPT_VERSION
             transcript_versions = self.transcript_versions_by_id.get(t_id)
-            if not transcript_versions and refseq_mitochondrial:
-                # VEP's 'ND4' is cdot's 'fake-rna-ND4' (coding genes only - tRNA/rRNA have neither)
-                t_id = get_cdot_fake_transcript_id(t_id)
-                version = CDOT_FAKE_TRANSCRIPT_VERSION
-                transcript_versions = self.transcript_versions_by_id.get(t_id)
             if transcript_versions:
                 transcript_id = t_id  # Know it's valid to link
                 transcript_version_id = transcript_versions.get(version)
                 if transcript_version_id is None:
                     logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
             else:
-                logging.warning(f"Could not find transcript: '{t_id}'")
+                self._missing_transcript_ids.add(t_id)
         return transcript_id, transcript_version_id
 
-    def _fix_multiple_values(self, transcript_data: TranscriptData):
+    @staticmethod
+    def _gnomad_af_sort_key(gnomad: dict[str, str]) -> float:
+        """ Numeric AF ('9.1e-06' is a string VEP passes through), with '.' / '' (missing) sorting lowest """
+        try:
+            return float(gnomad["gnomad_af"])
+        except (TypeError, ValueError):
+            return -1.0
+
+    @staticmethod
+    def _fix_multiple_values(transcript_data: TranscriptData):
         # T2T gnomad liftover has dupes, sometimes we get multiple entries in which case all will be dupes
         # We are going to pick the HIGHEST, as if there was a liftover error this will cause false positives after
         # gnomAD filter rather than false negatives (potentially throwing away real rare disease causing variants)
@@ -683,7 +699,7 @@ class BulkVEPVCFAnnotationInserter:
             if "&" in gnomad_af:
                 gnomad = {k: v for k, v in transcript_data.items() if k.startswith("gnomad")}
                 gnomad_list = split_dict_multi_values(gnomad, sep='&')
-                highest_af = sorted(gnomad_list, key=operator.itemgetter("gnomad_af"), reverse=True)[0]
+                highest_af = max(gnomad_list, key=BulkVEPVCFAnnotationInserter._gnomad_af_sort_key)
                 # Copy back overwriting old multi-value data with single values
                 for k, v in highest_af.items():
                     if v == '.':
@@ -953,6 +969,10 @@ class BulkVEPVCFAnnotationInserter:
         self.bulk_insert()
         if self._generated_hgvs_c:
             logging.info("Generated HGVS C results: %s" % self._generated_hgvs_c)
+        for kind, missing in [("gene_ids", self._missing_gene_ids), ("transcripts", self._missing_transcript_ids)]:
+            if missing:
+                examples = ", ".join(sorted(missing)[:5])
+                logging.warning("%s: %d VEP %s not in the database, eg %s", self.description, len(missing), kind, examples)
 
     def bulk_insert(self):
         ANNOTATION_TYPE = {
@@ -996,10 +1016,6 @@ class BulkVEPVCFAnnotationInserter:
         for data in annotations_list:
             data_values = [data.get(v) for v in header]
             yield data_values
-
-    @staticmethod
-    def _gene_overlap_to_row_data(_header, annotations_list: list):
-        pass
 
     def remove_processing_files(self):
         remove_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
@@ -1057,7 +1073,7 @@ class SVOverlapProcessor:
 
         # The StructuralVariantOverlap fields are joined via '&'
         # Get it into a nice structure then process it
-        sv_records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, self.sv_fields)
+        sv_records = vep_multi_fields_to_list_of_dicts(raw_db_data, self.sv_fields)
         if required_substrings := self._get_required_substrings(raw_db_data["variant_class"]):
             filtered_sv_records = []
             for r in sv_records:
@@ -1074,11 +1090,11 @@ class SVOverlapProcessor:
             # Update if not special multi-field
             update_fields = {}
             for k, v in chosen_record.items():
-                if k not in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
+                if k not in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
                     update_fields[k] = v
 
             # Need to re-build the multi-files from what is filtered
-            for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
+            for f in GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
                 update_fields[f] = VEP_SEPARATOR.join([r[f] for r in filtered_sv_records])
         else:
             # Nothing left after filtering - need to blank out all our values

@@ -14,6 +14,7 @@ from unittest import mock
 from django.test import TestCase
 from django.test.utils import override_settings
 
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -25,10 +26,9 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.tasks import annotate_variants as annotate_variants_module
 from annotation.tasks.annotate_variants import annotation_run_retry, reset_annotation_run_for_retry
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -123,7 +123,7 @@ class AnnotationRunRetryTestCase(TestCase):
                 scratch_dir = os.path.join(import_processing_dir, f"annotation_run_{run.pk}")
                 os.makedirs(scratch_dir)
                 stale_tsv = os.path.join(scratch_dir, "annotation_run_annotation_variantannotation_0.tsv")
-                with open(stale_tsv, "w") as f:
+                with open(stale_tsv, "w", encoding="utf-8") as f:
                     f.write("stale data from a previous attempt")
                 self.assertTrue(os.path.exists(stale_tsv))
 

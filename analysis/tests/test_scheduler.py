@@ -17,14 +17,14 @@ from django.db.utils import OperationalError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from analysis.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
 from analysis.models import AllVariantsNode, AnalysisNode, NodeTask
-from analysis.models.enums import NodeStatus, SetOperations, TagNodeInput, TagNodeMode
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeCache, NodeVersion
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.venn_node import VennNode, VennNodeCache, venn_cache_count
 from analysis.models.nodes.node_utils import cancel_node_tasks, reload_analysis_nodes
+from analysis.models.nodes.node_version import NodeCache, NodeVersion
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.tasks import analysis_update_tasks
 from analysis.tasks.analysis_update_tasks import (
@@ -43,7 +43,8 @@ from analysis.tasks.node_update_tasks import (
     update_node_task,
 )
 from analysis.tests.utils import AnalysisSetupMixin
-from snpdb.models import ProcessingStatus, VariantCollection
+from snpdb.enums import ProcessingStatus
+from snpdb.models import VariantCollection
 from variantgrid.celery import app
 
 
@@ -277,7 +278,7 @@ class TestNodeReadyToLease(AnalysisSetupMixin, TestCase):
         nodes_by_id, parents_by_child = self._graph()
         self.assertTrue(_node_ready_to_lease(nodes_by_id[child.pk], parents_by_child, nodes_by_id))
 
-    # --- cache dependency gate (replaces WAIT_FOR_CACHE_TASK) ---
+    # --- cache dependency gate ---
 
     def _make_cache_owner(self, status):
         """A node owning a NodeCache whose variant_collection has the given ProcessingStatus."""

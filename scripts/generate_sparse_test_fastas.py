@@ -28,7 +28,7 @@ FULL_CONTIG_MAX = 100_000  # contigs this small with any fetch recorded are incl
 LINE = 60
 
 regions_by_file = defaultdict(lambda: defaultdict(list))
-with open(REGIONS_FILE) as f:
+with open(REGIONS_FILE, encoding="utf-8") as f:
     for line in f:
         filename, contig, start, end = json.loads(line)
         regions_by_file[filename][contig].append((start, end))

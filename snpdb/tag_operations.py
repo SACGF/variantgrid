@@ -19,17 +19,17 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 
-from Levenshtein import distance
 from auditlog.models import LogEntry
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Count, Model, QuerySet, TextChoices
 from django.utils import timezone
+from Levenshtein import distance
 
 from analysis.models import VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
-from classification.enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import TAG_ALLELE_ORIGIN_CHOICES, Tag, TagConfig
 
 MERGE_SUGGESTION_MAX_DISTANCE = 1

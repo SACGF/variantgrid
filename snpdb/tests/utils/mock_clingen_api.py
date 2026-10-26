@@ -457,7 +457,7 @@ class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
 
     @classmethod
     def get_hgvs(cls, hgvs_string: str):
-        with open(CLINGEN_HGVS_RESPONSES_FILENAME) as f:
+        with open(CLINGEN_HGVS_RESPONSES_FILENAME, encoding="utf-8") as f:
             responses = json.load(f)
         if response := responses.get(hgvs_string):
             return response

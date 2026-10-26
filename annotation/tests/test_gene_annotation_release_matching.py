@@ -4,7 +4,7 @@ from annotation.gene_annotation_release_matching import (
     VepGeneSetVersions,
     match_gene_annotation_release,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 
 NCBI = "https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/9606"
 ENSEMBL = "https://ftp.ensembl.org/pub"

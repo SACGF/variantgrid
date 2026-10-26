@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase, TestCase
 
-from annotation.models.models_enums import NMDEscapeStatus
+from annotation.enums import NMDEscapeStatus
 from annotation.ptc import calculate_ptc_position, parse_ptc_distance_codons, predict_nmd_escape
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import (
     TranscriptGeometryCache,

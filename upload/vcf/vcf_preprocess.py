@@ -1,7 +1,21 @@
+"""
+VCF preprocess: clean, normalize and split an uploaded VCF before the data-insertion tasks read it.
+
+Entry points: preprocess_vcf (the pipe, with a bcftools sort retry for unsorted files) and
+schedule_split_file_steps (shared with upload.vcf.gene_level_vcf_preprocess).
+
+The stages run as one bash pipe (run_pipe), each with its stderr redirected to its own file and the
+pipe followed by 'echo ${PIPESTATUS[*]}' into a status file. That status file - not pipefail - is how
+a failure is detected: it gives every stage's exit code, so the error names the stage that failed and
+carries its stderr alone. The culprit is the first non-zero stage that was not merely killed by the
+stage after it dying (exit 141 = SIGPIPE, or a Python BrokenPipeError traceback) - @see _failed_stage.
+Every stage is a sub step UploadStep whose output_text is its stderr.
+"""
 import glob
 import logging
 import os
 import shlex
+import signal
 from dataclasses import dataclass
 from subprocess import PIPE, CalledProcessError, Popen
 from typing import Optional
@@ -18,6 +32,7 @@ from library.genomics.vcf_enums import (
 )
 from library.utils.file_utils import name_from_filename
 from snpdb.vcf_utils import write_cleaned_vcf_header
+from upload.enums import UploadStepTaskType, VCFImportInfoSeverity, VCFPipelineStage
 from upload.models import (
     ModifiedImportedVariant,
     ModifiedImportedVariants,
@@ -25,12 +40,9 @@ from upload.models import (
     ToolVersion,
     UploadStep,
     UploadStepMultiFileOutput,
-    UploadStepTaskType,
-    VCFPipelineStage,
     VCFSkippedContig,
     VCFSkippedContigs,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.unknown_variants_task import (
     AnnotateImportedVCFTask,
     SeparateUnknownVariantsTask,
@@ -38,6 +50,8 @@ from upload.tasks.vcf.unknown_variants_task import (
 from upload.vcf.vcf_ref_check import check_vcf_ref_matches_build
 
 MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
+SIGPIPE_EXIT_CODE = 128 + signal.SIGPIPE  # bash reports a stage killed by signal N as exit 128+N
+PIPE_STATUS_FILENAME = "pipestatus.txt"
 
 VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
 SORT_VCF_SUB_STEP = "sort_vcf"
@@ -150,8 +164,9 @@ def _get_preprocess_files(upload_pipeline, vcf_filename: str, cleaned_vcf_header
 def get_split_vcf_command(vcf_name: str, split_file_rows: int) -> list[str]:
     """ GNU split (--filter / --additional-suffix are not POSIX) writing bgzipped chunks named
         <vcf_name>NN.vcf.gz into $VG_SPLIT_VCF_DIR. Also run by deployment_check to prove the tools are there. """
-    return ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
-            "--lines", str(split_file_rows), SPLIT_VCF_FILTER]
+    # '--' so a vcf_name (from the uploaded filename) starting with '-' is the prefix, not an option
+    return ["split", "--additional-suffix=.vcf.gz", "--numeric-suffixes",
+            "--lines", str(split_file_rows), SPLIT_VCF_FILTER, "--", "-", vcf_name]
 
 
 def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False, sort_vcf=False) -> tuple[dict, dict]:
@@ -217,89 +232,124 @@ def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False
     split_file_rows = upload_step.split_file_rows or settings.VCF_IMPORT_FILE_SPLIT_ROWS
     pipe_commands[SPLIT_VCF_SUB_STEP] = get_split_vcf_command(vcf_name, split_file_rows)
 
-    sub_steps = {}
+    # Every stage is a sub step, so whichever one fails shows its stderr on the pipeline page
     bcftools_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
-    for sub_step_name in [VCF_CLEAN_AND_FILTER_SUB_STEP, SORT_VCF_SUB_STEP, UploadStep.NORMALIZE_SUB_STEP]:
-        if sub_step_commands := pipe_commands.get(sub_step_name):
-            sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands,
-                                                       bcftools_version)
+    bcftools_stages = {SORT_VCF_SUB_STEP, UploadStep.NORMALIZE_SUB_STEP, REMOVE_HEADER_SUB_STEP}
+    sub_steps = {}
+    for sub_step_name, sub_step_commands in pipe_commands.items():
+        tool_version = bcftools_version if sub_step_name in bcftools_stages else None
+        sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands, tool_version)
 
     return pipe_commands, sub_steps
 
 
+@dataclass
+class PipeStage:
+    """ One stage of the preprocess pipe, as run """
+    name: str  # key in pipe_commands, e.g. UploadStep.NORMALIZE_SUB_STEP
+    command: list[str]
+    stderr_filename: str
+    returncode: Optional[int] = None  # None until the pipe has run
+    stderr: str = ""  # truncated to MAX_STDERR_OUTPUT, head and tail
+
+    @property
+    def killed_by_downstream(self) -> bool:
+        """ Exited because the stage reading its output went away: SIGPIPE, or for Python (which ignores
+            SIGPIPE) a BrokenPipeError traceback """
+        return self.returncode == SIGPIPE_EXIT_CODE or "BrokenPipeError" in self.stderr
+
+
+class PipeStageError(CalledProcessError):
+    """ CalledProcessError for the stage that caused the failure (cmd/returncode/stderr are that stage's),
+        with the whole pipe's results for the message """
+
+    def __init__(self, stage: PipeStage, stages: list[PipeStage]):
+        super().__init__(stage.returncode, shlex.join(stage.command), stderr=stage.stderr)
+        self.stage = stage
+        self.stages = stages
+
+    def __str__(self):
+        position = self.stages.index(self.stage) + 1
+        exit_codes = " ".join(f"{s.name}={s.returncode}" for s in self.stages)
+        return (f"Preprocess stage '{self.stage.name}' ({position} of {len(self.stages)}) failed: "
+                f"{super().__str__()}\nexit codes: {exit_codes}")
+
+
+def _failed_stage(stages: list[PipeStage]) -> PipeStage:
+    """ The stage to blame for a failed pipe: the first non-zero exit in pipe order that is not just a
+        consequence of a later stage dying. When a stage dies, everything upstream of it gets SIGPIPE
+        (or BrokenPipeError) on its next write, so it exits non-zero too - but it is a victim, and blaming
+        the first non-zero stage would name 'zcat' for every failure. If every failure is SIGPIPE-shaped
+        (eg the last stage was killed by a signal), blame the last one. """
+    failed = [stage for stage in stages if stage.returncode]
+    for stage in failed:
+        if not stage.killed_by_downstream:
+            return stage
+    return failed[-1]
+
+
+def _read_stderr(stderr_filename: str) -> str:
+    if not os.path.exists(stderr_filename):
+        return ""
+    with open(stderr_filename, errors="replace") as f:
+        stderr_output = f.read().strip()
+    if len(stderr_output) > MAX_STDERR_OUTPUT:
+        # Keep the tail - a tool's fatal error is the last thing it writes, after any number of warnings
+        half = MAX_STDERR_OUTPUT // 2
+        stderr_output = stderr_output[:half] + "\n ... \n" + stderr_output[-half:]
+    return stderr_output
+
+
 def run_pipe(pipe_commands: dict, sub_steps: dict, split_env: dict, upload_pipeline):
-    # Commands are argv lists - quote each argument so the shell sees exactly those arguments
-    piped_command = ' | '.join(shlex.join(command_with_args) for command_with_args in pipe_commands.values())
+    """ Run pipe_commands (dict order = pipe order) as one bash pipe. Each stage's stderr goes to its own
+        file and is written to its sub step's output_text. Raises PipeStageError naming the failed stage """
+    stages = []
+    shell_stages = []
+    for stage_name, command in pipe_commands.items():
+        stderr_filename = get_import_processing_filename(upload_pipeline.pk, f"stderr_out_{stage_name}.log")
+        stages.append(PipeStage(name=stage_name, command=command, stderr_filename=stderr_filename))
+        # Commands are argv lists - quote each argument so the shell sees exactly those arguments
+        shell_stages.append(f"{shlex.join(command)} 2> {shlex.quote(stderr_filename)}")
 
-    # if POPEN_SHELL=True we're running this all as one command as native shell text
-    # this is not recommended, less portable and if commands have errors
-    if settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL:
-        logging.info("single_commands: %s", piped_command)
-        # Use pipefail so that a non-zero exit from any stage in the pipe is reported,
-        # not just the last command (see #3813 - bcftools errors were silently swallowed)
-        shell_command = f"set -o pipefail; {piped_command}"
-        p = Popen(
-            shell_command,
-            shell=True,
-            executable="/bin/bash",  # pipefail requires bash, not sh
-            stdout=PIPE,
-            stderr=PIPE,
-            env=split_env,
-        )
-        p_stdout, p_stderr = p.communicate()
-        logging.info("single command pipe/shell completed - return code: %d", p.returncode)
+    pipe_status_filename = get_import_processing_filename(upload_pipeline.pk, PIPE_STATUS_FILENAME)
+    if os.path.exists(pipe_status_filename):
+        os.remove(pipe_status_filename)  # Left by an earlier attempt - its absence means the pipe never ran
 
-        p_stdout = p_stdout.decode()
-        if p_stdout:
-            logging.info(p_stdout)
+    # PIPESTATUS is expanded before echo runs, so it is still the pipe's. bash's own exit status is the echo's
+    shell_command = ' | '.join(shell_stages) + f'; echo "${{PIPESTATUS[*]}}" > {shlex.quote(pipe_status_filename)}'
+    logging.info("preprocess pipe: %s", shell_command)
+    p = Popen(shell_command, shell=True, executable="/bin/bash", stdout=PIPE, stderr=PIPE, env=split_env)
+    p_stdout, p_stderr = p.communicate()
+    logging.info("preprocess pipe completed - return code: %d", p.returncode)
+    if p_stdout := p_stdout.decode(errors="replace"):
+        logging.info(p_stdout)
+    if bash_stderr := p_stderr.decode(errors="replace"):
+        logging.error(bash_stderr)
 
-        p_stderr = p_stderr.decode()
-        if p_stderr:
-            logging.error(p_stderr)
+    if not os.path.exists(pipe_status_filename):
+        raise CalledProcessError(p.returncode, shell_command, stderr=bash_stderr)
+    with open(pipe_status_filename) as f:
+        returncodes = [int(code) for code in f.read().split()]
+    os.remove(pipe_status_filename)
+    if len(returncodes) != len(stages):
+        raise CalledProcessError(p.returncode, shell_command,
+                                 stderr=f"Expected {len(stages)} PIPESTATUS codes, got {returncodes}\n{bash_stderr}")
 
-        if p.returncode:
-            raise CalledProcessError(p.returncode, piped_command, stderr=p_stderr)
+    for stage, returncode in zip(stages, returncodes):
+        stage.returncode = returncode
+        stage.stderr = _read_stderr(stage.stderr_filename)
+        if stage.stderr:
+            logging.warning("%s stderr:\n%s", stage.name, stage.stderr)
+        if sub_step := sub_steps.get(stage.name):
+            sub_step.output_text = stage.stderr
+            sub_step.save()
 
-    else:
-        pipes = {}
-        stderr_filenames = {}
-        p = None
-        for sub_step_name, cmd in pipe_commands.items():
-            stderr_filename = get_import_processing_filename(upload_pipeline.pk, f"stderr_out_{sub_step_name}.log")
-            stderr_f = open(stderr_filename, "wb")
-            kwargs = {"stdout": PIPE,
-                      "stderr": stderr_f}
-            if p:
-                kwargs["stdin"] = p.stdout
-            if sub_step_name == SPLIT_VCF_SUB_STEP:
-                kwargs["env"] = split_env
-            p = Popen(cmd, **kwargs)
-            pipes[sub_step_name] = p
-            stderr_filenames[sub_step_name] = stderr_filename
-
-        logging.info("pipe_commands: %s", " | ".join([' '.join(x) for x in pipe_commands.values()]))
-
-        for sub_step_name, p_cmd in reversed(pipe_commands.items()):
-            p = pipes[sub_step_name]
-            p.communicate()
-            stderr_output = None
-            stderr_filename = stderr_filenames.get(sub_step_name)
-            if stderr_filename:
-                with open(stderr_filename) as sf:
-                    stderr_output = sf.read()
-                if stderr_output and len(stderr_output) > MAX_STDERR_OUTPUT:
-                    half = MAX_STDERR_OUTPUT // 2
-                    stderr_output = stderr_output[:half] + "\n ... \n" + stderr_output[-half:]
-                sub_step = sub_steps.get(sub_step_name)
-                if sub_step:
-                    sub_step.output_text = stderr_output
-                    sub_step.save()
-                else:
-                    logging.warning("%s stderr:", p_cmd)
-                    logging.warning(stderr_output)
-
-            if p.returncode:
-                raise CalledProcessError(p.returncode, p_cmd, stderr=stderr_output)
+    if any(stage.returncode for stage in stages):
+        failed_stage = _failed_stage(stages)
+        if sub_step := sub_steps.get(failed_stage.name):
+            sub_step.error_message = failed_stage.stderr
+            sub_step.save()
+        raise PipeStageError(failed_stage, stages)
 
 
 def _reset_for_retry(files: PreprocessFiles, sub_steps: dict):

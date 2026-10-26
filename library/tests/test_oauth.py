@@ -18,3 +18,10 @@ class ServerAuthUrlTest(SimpleTestCase):
     def test_non_http_host_rejected(self):
         with self.assertRaises(ValueError):
             self._server_auth("file:///etc/passwd").url("x")
+
+    def test_http_host_needs_allow_http(self):
+        with self.assertRaises(ValueError):
+            self._server_auth("http://example.com").url("x")
+        allowed = ServerAuth(username="user", password="password", host="http://example.com", allow_http=True)
+        self.assertEqual(allowed.url("x"), "http://example.com/x")
+        self.assertEqual(self._server_auth("http://localhost:8080").url("x"), "http://localhost:8080/x")

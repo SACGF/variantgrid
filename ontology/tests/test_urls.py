@@ -7,7 +7,8 @@ from django.utils import timezone
 
 from genes.fake_data import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
 from ontology.tests.test_data_ontology import create_test_ontology_version
 from snpdb.models import GenomeBuild
 

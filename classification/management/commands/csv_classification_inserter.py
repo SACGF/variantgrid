@@ -44,8 +44,8 @@ class Command(BaseCommand):
     category = "import"
 
     def add_arguments(self, parser):
-        parser.add_argument('--max-records', type=int, default=1,  # TODO: Remove after testing ok
-                            help="Limit number of records created")
+        parser.add_argument('--max-records', type=int, default=None,
+                            help="Limit number of records created (default: all)")
         parser.add_argument('--lab', required=True, type=str,
                             help="Lab name")
         parser.add_argument('--variants-ekeys-csv', required=True,
@@ -67,7 +67,7 @@ class Command(BaseCommand):
         lab = Lab.objects.get(name=lab_name)
 
         df = self.read_variants_df(variants_ekeys_csv)
-        total_records = min(len(df), max_records)
+        total_records = len(df) if max_records is None else min(len(df), max_records)
         records = self.iter_records(lab, static_dict, df)
 
         count = 0
@@ -92,9 +92,9 @@ class Command(BaseCommand):
                             submission_source=SubmissionSource.API,
                             import_run=import_run,
                         )
-                        import_run.increment_status(response.status)
+                        import_run.increment_status(response)
                         count = count + 1
-                        if count >= max_records:
+                        if max_records is not None and count >= max_records:
                             break
                 except Exception:
                     log_traceback()
@@ -108,7 +108,7 @@ class Command(BaseCommand):
                         logging.info("Inserted %d/%d (%.1f%%)", count, total_records,
                                      100 * count / total_records)
 
-                if count >= max_records:
+                if max_records is not None and count >= max_records:
                     break
 
     @staticmethod

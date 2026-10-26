@@ -30,8 +30,8 @@ from typing import Optional
 
 from django.conf import settings
 
-from patients.models_enums import NucleicAcid
-from seqauto.models.models_enums import LibraryQCCategory
+from patients.enums import NucleicAcid
+from seqauto.enums import LibraryQCCategory
 from upload.tso500.dragen_combined_variant_output_parser import (
     MISSING_VALUE,
     CombinedVariantOutputSection,

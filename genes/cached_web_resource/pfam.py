@@ -5,14 +5,14 @@ PFam entries (used for annotating protein domains). Uses data from:
 
 The domains themselves come from the InterPro API, fetched per-gene on demand - @see genes/interpro.py
 """
-import ftplib
-import gzip
 import logging
 import re
 from io import BytesIO
 
 import pandas as pd
+from django.db import transaction
 
+from genes.enums import AnnotationConsortium
 from genes.models import (
     Pfam,
     PfamSequence,
@@ -20,7 +20,7 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from library.utils.misc_utils import retrieve_ftp_content
 
 BULK_INSERT_SIZE = 2000
 PFAM_SEQUENCE_PATTERN = re.compile(r"(.+?)-\d+$")
@@ -35,50 +35,41 @@ def store_pfam_from_web(cached_web_resource):
     if not Transcript.objects.exists():
         raise ValueError("No transcripts - you need to import them first.")
 
-    # Clear existing records + recreate. This cascades away every lazily fetched PfamDomains row, which is
-    # what we want - a new Pfam/UniProt release invalidates them, and they refill as genes are viewed
-    Pfam.objects.all().delete()
-    PfamSequence.objects.all().delete()
+    logging.debug("Retrieving PFam clans via FTP")
+    clans_tsv = retrieve_ftp_content("ftp.ebi.ac.uk", "/pub/databases/Pfam/current_release/Pfam-A.clans.tsv.gz")
+    logging.debug("Retrieving Uniprot mappings via FTP")
+    idmapping_dat = retrieve_ftp_content("ftp.uniprot.org",
+                                         "/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz")
 
-    num_pfam = store_pfam()
-    num_sequences = store_pfam_sequences()
+    with transaction.atomic():
+        # Clear existing records + recreate. This cascades away every lazily fetched PfamDomains row, which is
+        # what we want - a new Pfam/UniProt release invalidates them, and they refill as genes are viewed
+        Pfam.objects.all().delete()
+        PfamSequence.objects.all().delete()
+
+        num_pfam = store_pfam(clans_tsv)
+        num_sequences = store_pfam_sequences(idmapping_dat)
 
     cached_web_resource.description = f"{num_pfam} Pfam. {num_sequences} sequences."
     cached_web_resource.save()
 
 
-def store_pfam() -> int:
+def store_pfam(clans_tsv: bytes) -> int:
     PFAM_CLANS_COLUMNS = ["accession", "clan_accession", "clan_id", "pfam_id", "description"]
 
-    logging.debug("Retrieving PFam clans via FTP")
-    ftp = ftplib.FTP("ftp.ebi.ac.uk")
-    ftp.login("anonymous", "anonymous")
-    buffer = BytesIO()
-    ftp.retrbinary('RETR /pub/databases/Pfam/current_release/Pfam-A.clans.tsv.gz', buffer.write)
-    buffer.seek(0)
-
     pfam_list = []
-    with gzip.GzipFile(fileobj=buffer) as f:
-        df = pd.read_csv(f, sep='\t', names=PFAM_CLANS_COLUMNS, header=None)
-        for _, row in df.iterrows():
-            pfam_list.append(Pfam(pk=Pfam.get_pk_from_accession(row["accession"]),
-                                  pfam_id=row["pfam_id"],
-                                  description=row["description"]))
+    df = pd.read_csv(BytesIO(clans_tsv), sep='\t', names=PFAM_CLANS_COLUMNS, header=None)
+    for _, row in df.iterrows():
+        pfam_list.append(Pfam(pk=Pfam.get_pk_from_accession(row["accession"]),
+                              pfam_id=row["pfam_id"],
+                              description=row["description"]))
 
     Pfam.objects.bulk_create(pfam_list)
     return len(pfam_list)
 
 
-def store_pfam_sequences() -> int:
-    logging.debug("Retrieving Uniprot mappings via FTP")
-    ftp = ftplib.FTP("ftp.uniprot.org")
-    ftp.login("anonymous", "anonymous")
-    buffer = BytesIO()
-    ftp.retrbinary('RETR /pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz', buffer.write)
-    buffer.seek(0)
-
-    with gzip.GzipFile(fileobj=buffer) as f:
-        mapping_df = pd.read_csv(f, header=None, names=["seq_id", "id_type", "identifier"], sep='\t')
+def store_pfam_sequences(idmapping_dat: bytes) -> int:
+    mapping_df = pd.read_csv(BytesIO(idmapping_dat), header=None, names=["seq_id", "id_type", "identifier"], sep='\t')
 
     ensembl_transcript_mask = mapping_df["id_type"] == "Ensembl_TRS"
     refseq_transcript_mask = mapping_df["id_type"] == "RefSeq_NT"

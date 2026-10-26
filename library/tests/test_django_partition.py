@@ -7,7 +7,8 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
 from genes.models import GeneCoverage, GeneCoverageCollection
-from snpdb.models import DataState, GenomeBuild
+from snpdb.enums import DataState
+from snpdb.models import GenomeBuild
 
 
 class PartitionIdSequenceTests(TestCase):

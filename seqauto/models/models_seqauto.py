@@ -19,7 +19,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import (
@@ -38,16 +38,16 @@ from library.constants import DAY_SECS
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename
+from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import ResolvedReference
 from patients.models import ExtractionMatchMixin, FakeData, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
+from seqauto.enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_enums import DataGeneration, LibraryQCCategory, PairedEnd, SequencerRead
 from seqauto.models.models_sequencing import EnrichmentKit, Experiment, Sequencer
 from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
+from snpdb.enums import ImportStatus, SampleFileType
 from snpdb.models import VCF, GenomeBuild, InheritanceManager, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus, SampleFileType
 from snpdb.models.models_vcf import SampleFilePath
 
 
@@ -146,30 +146,6 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
     def get_old_sample_sheets(self):
         current_sample_sheet = self.get_current_sample_sheet()
         return SampleSheet.objects.filter(sequencing_run=self).exclude(pk=current_sample_sheet.pk)
-
-    @property
-    def is_data_out_of_date_from_current_sample_sheet(self):
-        try:
-            current_sample_sheet = self.get_current_sample_sheet()
-        except SequencingRunCurrentSampleSheet.DoesNotExist:
-            return False
-
-        for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
-            if joint_called_vcf.needs_to_be_linked():
-                return True
-
-        old_sample_sheets = self.get_old_sample_sheets()
-        illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet=current_sample_sheet)
-        old_illuminate_qc = IlluminaFlowcellQC.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
-        old_sample_links = SampleFromSequencingSample.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-        old_unaligned_reads = UnalignedReads.get_for_old_sample_sheets(self)
-        old_alignment_files = AlignmentFile.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-        return any([not illuminate_qc.exists() and old_illuminate_qc.exists(),
-                    old_joint_called_vcfs.exists(),
-                    old_unaligned_reads.exists(),
-                    old_alignment_files.exists(),
-                    old_sample_links.exists()])
 
     @staticmethod
     def get_external_links_for(name: str, date: Optional[datetime.date],
@@ -346,9 +322,8 @@ class SequencingSample(ExtractionMatchMixin, models.Model):
         return params
 
     def get_single_qc(self):
-        """ A sample can have several alignment files (eg BAM and recalibrated BAM), QC hangs off one of them """
         try:
-            return QC.objects.get(alignment_file__sequencing_sample=self)
+            return QC.objects.get(sequencing_sample=self)
         except (QC.DoesNotExist, QC.MultipleObjectsReturned):
             logging.error("Wasn't exactly 1 QC for sequencing sample %s", self)
         return None
@@ -490,11 +465,6 @@ class UnalignedReads(models.Model):
             params["read_2"] = self.fastq_r2.path
         return params
 
-    @staticmethod
-    def get_for_old_sample_sheets(sequencing_run):
-        old_sample_sheets = sequencing_run.get_old_sample_sheets()
-        return UnalignedReads.objects.filter(sequencing_sample__sample_sheet__in=old_sample_sheets)
-
     def __str__(self):
         return f"UnalignedReads from sample {self.sequencing_sample}"
 
@@ -515,10 +485,15 @@ class AlignmentFile(SeqAutoRecord):
         return SampleFileType.BAM
 
     def get_params(self):
-        params = self.sequencing_sample.get_params()
+        params = self.get_sequencing_sample_params(self.sequencing_sample)
         if self.unaligned_reads:
             params.update(self.unaligned_reads.get_params())
-        params['bam'] = self.get_path_from_sequencing_sample(self.sequencing_sample)
+        return params
+
+    @staticmethod
+    def get_sequencing_sample_params(sequencing_sample):
+        params = sequencing_sample.get_params()
+        params['bam'] = AlignmentFile.get_path_from_sequencing_sample(sequencing_sample)
         return params
 
     @staticmethod
@@ -589,20 +564,22 @@ def get_seqauto_user():
 
 
 class SingleSampleVCF(SeqAutoRecord):
-    """ Single-sample VCFs from the file system, called from one AlignmentFile """
-    alignment_file = models.ForeignKey(AlignmentFile, on_delete=CASCADE)
+    """ Single-sample VCF from the file system, one per sequencing sample and variant caller, called from the
+        sample's alignment files (all of the same sequencing sample) """
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
+    alignment_files = models.ManyToManyField(AlignmentFile)
     variant_caller = models.ForeignKey(VariantCaller, on_delete=CASCADE)
 
     def get_params(self):
-        return self.alignment_file.get_params()
+        return AlignmentFile.get_sequencing_sample_params(self.sequencing_sample)
 
     def get_sequencing_samples(self):
         """ The sequencing samples this VCF is allowed to link against """
-        return SequencingSample.objects.filter(pk=self.alignment_file.sequencing_sample_id)
+        return SequencingSample.objects.filter(pk=self.sequencing_sample_id)
 
     @property
     def enrichment_kit(self) -> Optional[EnrichmentKit]:
-        return self.alignment_file.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
+        return self.sequencing_sample.sample_sheet.sequencing_run.enrichment_kit
 
     @property
     def has_mixed_enrichment_kits(self) -> bool:
@@ -622,7 +599,7 @@ class SingleSampleVCF(SeqAutoRecord):
 
     @property
     def sample_sheet(self) -> SampleSheet:
-        return self.alignment_file.sequencing_sample.sample_sheet
+        return self.sequencing_sample.sample_sheet
 
     @property
     def vcf(self) -> Optional[VCF]:
@@ -743,7 +720,8 @@ class QC(SeqAutoRecord):
 
         TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
     """
-    alignment_file = models.ForeignKey(AlignmentFile, on_delete=CASCADE)
+    sequencing_sample = models.ForeignKey(SequencingSample, on_delete=CASCADE)
+    alignment_files = models.ManyToManyField(AlignmentFile)
     vcf_file = models.ForeignKey(SingleSampleVCF, on_delete=CASCADE)
 
     @property
@@ -756,14 +734,6 @@ class QC(SeqAutoRecord):
 
     def get_params(self):
         return self.vcf_file.get_params()
-
-    @property
-    def qc_dir_path(self):
-        return os.path.dirname(self.path)
-
-    @property
-    def sequencing_sample(self):
-        return self.alignment_file.sequencing_sample
 
     @staticmethod
     def get_path_from_vcf(vcf):
@@ -896,7 +866,7 @@ class QCExecSummary(SeqAutoRecord):
 
     @staticmethod
     def get_sequencing_run_path():
-        return "qc__alignment_file__sequencing_sample__sample_sheet__sequencing_run"
+        return "qc__sequencing_sample__sample_sheet__sequencing_run"
 
     def __str__(self):
         return f"QCExecSummary for {self.qc}"
@@ -927,11 +897,6 @@ class QCGeneCoverage(SeqAutoRecord):
     qc = models.OneToOneField(QC, on_delete=CASCADE)
     # gene_coverage_collection is populated in load_from_file, set_null as needs to be deleted/reset when reloaded
     gene_coverage_collection = models.OneToOneField(GeneCoverageCollection, null=True, on_delete=SET_NULL)
-
-    @staticmethod
-    def get_path_from_qc(qc):
-        pattern = os.path.join(settings.SEQAUTO_QC_DIR_PATTERN, settings.SEQAUTO_QC_GENE_COVERAGE_PATTERN)
-        return pattern % qc.get_params()
 
 
 @receiver(pre_delete, sender=QCGeneCoverage)
@@ -966,7 +931,7 @@ class GoldGeneCoverageCollection(models.Model):
         If you wish to delete / replace a GeneCoverageCollection here, you must delete the
         old gold first (PROTECT) to stop Stored gold reference and current gold runs
         getting out of sync """
-    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
+    SEQUENCING_SAMPLE_PATH = "gene_coverage_collection__qcgenecoverage__qc__sequencing_sample"
 
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=PROTECT)
@@ -1107,10 +1072,9 @@ class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
         DRAGEN writes one MetricsOutput per run, with a column per pair carrying both of its arms, so a row is
         keyed on (run, pair, category). The run is part of the key because the column alone does not identify a
         pair across runs - the lab's pair IDs carry a leading sequencing number, and nothing promises a
-        re-sequenced pair is renamed. The SequencingRun is linked where seqauto has registered it and left null
-        where it has not, the way the CombinedVariantOutput's link_to_sequencing_run tolerates a missing sample
-        sheet; a nullable FK cannot be the key, since Postgres treats nulls as distinct, so the run's name is
-        stored too.
+        re-sequenced pair is renamed. The upload must name a run seqauto has registered, and links to it; the FK
+        is nullable so deleting a run keeps its QC, and a nullable FK cannot be the key, since Postgres treats
+        nulls as distinct, so the run's name is stored too.
 
         The pair claims a Specimen by the accession inside its ID and never creates one - the
         CombinedVariantOutput is what accessions a case, and QC that arrives first parks its claim
@@ -1541,7 +1505,7 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
         Cached per gene/threshold as (count, num collections, max collection pk) so a call only counts collections
         added since; the cache is dropped when a collection at or below the cached max disappears or stops being
         current """
-    current_sheet_filter = "qcgenecoverage__qc__alignment_file__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
+    current_sheet_filter = "qcgenecoverage__qc__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull"
     gcg_qs = GeneCoverageCollection.objects.filter(**{current_sheet_filter: False})
 
     existing_count = 0
@@ -1577,5 +1541,3 @@ def get_20x_gene_coverage(gene_symbol, min_coverage=100):
     else:
         count = existing_count
     return count
-
-

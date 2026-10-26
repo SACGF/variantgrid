@@ -1,9 +1,9 @@
 import logging
 import os
-import re
 import shutil
 import traceback
 from collections import namedtuple
+from datetime import timedelta
 from functools import cached_property
 from typing import Optional, Union
 
@@ -21,11 +21,11 @@ from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import (
@@ -39,17 +39,20 @@ from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
 from seqauto.models import (
     JointCalledVCF,
+    SequencingRun,
     SingleSampleVCF,
     VariantCaller,
     get_samples_by_sequencing_sample,
 )
+from seqauto.models.models_seqauto import SeqAutoRecord
+from seqauto.seqauto_permissions import can_write_seqauto
+from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
 from snpdb.models.models import CodeVersionMixin
-from snpdb.models.models_enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
-from upload.models.models_enums import (
+from upload.enums import (
     ModifiedImportedVariantOperation,
     UploadedFileTypes,
     UploadStepOrigin,
@@ -76,8 +79,10 @@ class FileUpload(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     @property
-    def exists(self):
-        if self.file_field:
+    def exists(self) -> bool:
+        """ Whether the file is still on disk - uploads can be cleaned up, or a database restored without them """
+        has_file = self.file_field if self.import_source == ImportSource.WEB_UPLOAD else self.path
+        if has_file:
             return os.path.exists(self.get_filename())
         return False
 
@@ -108,6 +113,39 @@ class FileUpload(TimeStampedModel):
         if not self.can_view(user_or_group):
             msg = f"You do not have permission to access FileUpload pk={self.pk}"
             raise PermissionDenied(msg)
+
+    def check_may_link_to_sequencing_data(self, sequencing_data: str):
+        """ Linking an upload to a seqauto record writes onto sequencing data, so a file sent through the upload page
+            or API needs the seqauto API's write access - command line and SeqAuto imports are run by the server.
+            Raises UploadUserError naming sequencing_data where the upload may not link to it """
+        if self.import_source == ImportSource.WEB_UPLOAD and not can_write_seqauto(self.user):
+            raise UploadUserError(f"You don't have permission to link uploads to {sequencing_data}",
+                                  summary="No permission to link to sequencing data")
+
+    def get_sequencing_record_for_path(self, *seqauto_record_classes: type[SeqAutoRecord]) -> SeqAutoRecord:
+        """ The first record of seqauto_record_classes (in order) for this upload's path - the sequencing file the
+            upload is linked to and writes onto. Raises UploadUserError where there is no such record or the upload
+            may not link to it """
+        for seqauto_record_class in seqauto_record_classes:
+            if record := seqauto_record_class.objects.filter(path=self.path).first():
+                if record.sequencing_run_id:
+                    sequencing_data = f"sequencing run '{record.sequencing_run_id}'"
+                else:
+                    sequencing_data = str(record)
+                self.check_may_link_to_sequencing_data(sequencing_data)
+                return record
+        raise UploadUserError(f"No sequencing data has the path '{self.path}'",
+                              summary="No sequencing data at path")
+
+    def get_sequencing_run_to_link(self, sequencing_run_name: str) -> SequencingRun:
+        """ The registered run a run-level file (TSO500 MetricsOutput / CombinedVariantOutput) names in its
+            metadata - such a file has no path to link it by. Raises UploadUserError where the upload may not
+            link to it or there is no such run """
+        self.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run_name}'")
+        if sequencing_run := SequencingRun.objects.filter(name=sequencing_run_name).first():
+            return sequencing_run
+        raise UploadUserError(f"No sequencing run named '{sequencing_run_name}'",
+                              summary="No such sequencing run")
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         if isinstance(user_or_group, User):
@@ -316,6 +354,7 @@ class UploadPipeline(models.Model):
         self.save()
 
         self._set_related_data_import_status(ImportStatus.ERROR)
+        self.error_liftover()
 
         user = self.file_upload.user
         name = f"import_{self.file_type}_failed"
@@ -332,6 +371,15 @@ class UploadPipeline(models.Model):
                 mvec.save()
             except ObjectDoesNotExist:
                 pass
+
+    def error_liftover(self):
+        """ A failed or timed out liftover pipeline won't finish its alleles - #2246 """
+        try:
+            liftover = self.file_upload.uploadedliftover.liftover
+        except ObjectDoesNotExist:
+            return
+        if liftover:
+            liftover.error()
 
     @property
     def vcf(self):
@@ -423,20 +471,14 @@ class UploadStep(models.Model):
     child_script = models.TextField(null=True)
     import_variant_table = models.TextField(null=True, blank=True)
     celery_task = models.CharField(max_length=36, null=True)
+    # Renewed by the running worker (UploadStepLeaseHeartbeat); lapsed means the worker died (#2188)
+    lease_expires = models.DateTimeField(null=True)
     tool_version = models.ForeignKey(ToolVersion, null=True, on_delete=CASCADE)
     output_text = models.TextField(null=True)
 
     @property
     def file_upload(self) -> FileUpload:
         return self.upload_pipeline.file_upload
-
-    @property
-    def processing_seconds(self):
-        if self.start_date and self.end_date:
-            seconds = (self.end_date - self.start_date).total_seconds()
-        else:
-            seconds = None
-        return seconds
 
     @property
     def genome_build(self):
@@ -448,8 +490,27 @@ class UploadStep(models.Model):
             raise ValueError(msg)
 
         self.start_date = timezone.now()
+        self.lease_expires = self.start_date + timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
         self.status = ProcessingStatus.PROCESSING
         self.items_processed = 0
+
+    def renew_lease(self, celery_task: str) -> bool:
+        """ Extend the lease while still held by celery_task. False means the step was closed or taken over
+            (marked timed out and retried), so the caller should stop """
+        lease_expires = timezone.now() + timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        return bool(UploadStep.objects.filter(pk=self.pk, celery_task=celery_task, end_date__isnull=True)
+                    .update(lease_expires=lease_expires))
+
+    @staticmethod
+    def lease_lapsed_q(now=None) -> Q:
+        """ Running steps whose worker stopped renewing. A step started before lease_expires existed has none
+            and is judged on start_date instead. Sub-steps (vcf_preprocess) are closed by their parent and
+            never hold a lease """
+        if now is None:
+            now = timezone.now()
+        lease_seconds = timedelta(seconds=settings.UPLOAD_STEP_LEASE_SECONDS)
+        return Q(status=ProcessingStatus.PROCESSING, end_date__isnull=True, parent_upload_step__isnull=True) & (
+            Q(lease_expires__lt=now) | Q(lease_expires__isnull=True, start_date__lt=now - lease_seconds))
 
     def error_exception(self, e):
         status = ProcessingStatus.ERROR
@@ -468,17 +529,25 @@ class UploadStep(models.Model):
         self.upload_pipeline.error(self.error_message)
 
     @transaction.atomic()
-    def mark_timed_out(self, user: Optional[User] = None):
+    def mark_timed_out(self, user: Optional[User] = None, error_message: Optional[str] = None):
+        """ Close a step nothing will finish (its worker died, or an admin gave up on it) and fail its pipeline
+            so the retry can pick it up """
         self.status = ProcessingStatus.TIMED_OUT
-        if user:
+        if error_message:
+            self.error_message = error_message
+        elif user:
             self.error_message = f"Marked as timed out by {user.username}"
         else:
             self.error_message = "Timed out"
+        if self.end_date is None:
+            self.end_date = timezone.now()
 
         self.save()
+        self.close_sub_steps()
         qs = UploadPipeline.objects.filter(pk=self.upload_pipeline.pk)
         progress_status = f"Failure in import step id: {self.pk}, ({self.error_message})"
         qs.update(status=self.status, progress_status=progress_status)
+        self.upload_pipeline.error_liftover()
 
     def get_uploaded_vcf(self) -> 'UploadedVCF':
         return self.file_upload.uploadedvcf
@@ -815,9 +884,6 @@ class ModifiedImportedVariant(models.Model):
     """ Keep track of variants that were modified during import pre-processing by bcftools,
         so people can find out why a variant they expected didn't turn up.  """
     BCFTOOLS_OLD_VARIANT_TAG = "BCFTOOLS_OLD_VARIANT"
-    VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([^/]+)/([^/]+)$")
-    NORM_TOOL_VT = "vt"
-    NORM_TOOL_BCFTOOLS = "bcftools"
 
     import_info = models.ForeignKey(ModifiedImportedVariants, on_delete=CASCADE, null=True)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
@@ -859,16 +925,6 @@ class ModifiedImportedVariant(models.Model):
         return self.import_info.upload_step.genome_build
 
     @staticmethod
-    def _to_variant_coordinate(old_variant) -> VariantCoordinate:
-        if full_match := ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN.fullmatch(old_variant):
-            chrom = full_match.group(1)
-            position = int(full_match.group(2))
-            ref = full_match.group(3)
-            alt = full_match.group(4)
-            return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
-        raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
-
-    @staticmethod
     def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
@@ -889,24 +945,6 @@ class ModifiedImportedVariant(models.Model):
         contig = genome_build.chrom_contig_mappings[chrom]
         variant_coordinate = VariantCoordinate(chrom=contig.name, position=position, ref=ref, alt=alt, svlen=svlen)
         return [ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate)]
-
-    @staticmethod
-    def _vt_split_old_variant(old_variant) -> list[str]:
-        """ VT decompose writes OLD_VARIANT as comma separated, but if not decomposed (eg someone uploads already
-            normalized) could be multi-alt that looks like 5:132240059:CT/CTT/T """
-        old_variants = []
-        for ov in old_variant.split(","):
-            locus, *alts = ov.split("/")
-            num_alts = len(alts)
-            if num_alts == 1:
-                # Quick most common path - no need to pull apart and re-assemble
-                old_variants.append(ov)
-            elif num_alts >= 2:
-                for alt in alts:
-                    old_variants.append(f"{locus}/{alt}")
-            else:
-                raise ValueError(f"Badly formatted INFO - 'OLD_VARIANT': '{ov}'")
-        return old_variants
 
     @staticmethod
     def get_old_variant_from_variant_coordinate(vc: VariantCoordinate) -> str:

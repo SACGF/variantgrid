@@ -31,7 +31,7 @@ from annotation.models import (
     CohortGenotypeVariantAnnotationStats,
     VCFAnnotationStats,
 )
-from annotation.models.models import ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from annotation.tasks.calculate_sample_stats import (
     SAMPLE_STATS_CODE_VERSION,
@@ -56,6 +56,7 @@ from snpdb.archive import (
     restore_vcf,
     vcf_can_be_archived,
 )
+from snpdb.enums import ImportStatus
 from snpdb.forms import (
     SampleChoiceForm,
     SampleForm,
@@ -79,9 +80,6 @@ from snpdb.models import (
     VariantZygosityCountForVCF,
     VCFLengthStatsCollection,
     get_igv_data,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
 )
 from snpdb.models.models_somalier import DUPLICATE_SAMPLE_RELATEDNESS
 from snpdb.sample_file_path import (
@@ -198,11 +196,9 @@ def view_vcf(request, vcf_id):
                                              widgets=SampleForm.Meta.widgets)
 
     cohort = None
-    cohort_id = None
     try:
         # Some legacy data was too hard to fix and relies on being re-imported
         cohort = vcf.cohort
-        cohort_id = cohort.pk
         _ = cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
         messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
@@ -210,11 +206,16 @@ def view_vcf(request, vcf_id):
         # Banner from _data_archived_banner.html shows the message; cohort stays set if available.
         pass
 
+    has_write_permission = vcf.can_write(request.user)
+    if request.method == 'POST' and not has_write_permission:
+        raise PermissionDenied("You do not have write permission for this VCF")
+
     post = request.POST or None
     vcf_form = forms.VCFForm(post, instance=vcf)
     samples_form = VCFSampleFormSet(post, instance=vcf)
     for form in samples_form.forms:
         form.fields["vcf_sample_name"].disabled = True
+        forms.limit_sample_patient_choices(form, request.user)
     # The VCF's automatic cohort carries the phenotype - it saves with the rest of the vcf-form POST
     cohort_phenotype_form = None
     if cohort:
@@ -250,7 +251,6 @@ def view_vcf(request, vcf_id):
         for info in _get_vcf_infos(vcf):
             messages.add_message(request, messages.INFO, info, extra_tags='import-message')
 
-    has_write_permission = vcf.can_write(request.user)
     if not has_write_permission:
         set_form_read_only(vcf_form)
         for form in samples_form.forms:
@@ -271,8 +271,8 @@ def view_vcf(request, vcf_id):
 
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
-        if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
-            annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort_id)
+        if vcf.import_status == ImportStatus.SUCCESS and cohort:
+            annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort)
 
     vcf_length_stats = _get_vcf_length_stats(vcf)
 
@@ -553,7 +553,7 @@ def view_sample(request, sample_id):
     annotated_download_files = {}
     if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
         if sample.import_status == ImportStatus.SUCCESS:
-            annotated_download_files = get_annotated_download_files_cgf("export_sample_to_downloadable_file", sample.pk)
+            annotated_download_files = get_annotated_download_files_cgf("export_sample_to_downloadable_file", sample)
 
     context = {
         'annotated_download_files': annotated_download_files,

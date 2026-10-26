@@ -1,16 +1,18 @@
 import logging
+from io import BytesIO
 
 import pandas as pd
 
-from annotation.models import CachedWebResource
+from genes.enums import LRGRefSeqGeneCategory
 from genes.models import LRGRefSeqGene
-from genes.models_enums import LRGRefSeqGeneCategory
 from library.pandas_utils import df_nan_to_none
+from library.utils.misc_utils import retrieve_http_content
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 
 def store_lrg_ref_seq_gene_from_web(cached_web_resource: CachedWebResource):
     LRG_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/RefSeqGene/LRG_RefSeqGene"
-    df = pd.read_csv(LRG_URL, sep='\t', on_bad_lines='warn')
+    df = pd.read_csv(BytesIO(retrieve_http_content(LRG_URL)), sep='\t', on_bad_lines='warn')
     lrg_mask = ~pd.isna(df["LRG"])
     lrg_df = df_nan_to_none(df[lrg_mask])
 

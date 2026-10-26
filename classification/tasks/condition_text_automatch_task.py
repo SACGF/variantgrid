@@ -1,3 +1,9 @@
+"""
+Celery beat entry points for ConditionText automatch: the pending_automatch sweep (#1780) and the hourly retry of
+texts whose Monarch search failed (#1744). The logic lives on ConditionTextMatch.
+"""
+import logging
+
 import celery
 
 from classification.models.classification_import_run import ClassificationImportRun
@@ -22,3 +28,9 @@ def condition_text_automatch_task():
             # attempt_automatch saves the whole row, so the instance must agree with the claim above
             ct.pending_automatch = False
             ConditionTextMatch.attempt_automatch(condition_text=ct)
+
+
+@celery.shared_task
+def retry_failed_condition_text_automatch():
+    cleared = ConditionTextMatch.retry_failed_automatch()
+    logging.info("Condition text automatch retry: cleared %d", cleared)

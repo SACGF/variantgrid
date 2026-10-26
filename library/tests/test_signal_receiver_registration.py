@@ -66,7 +66,7 @@ class SignalReceiverRegistrationTest(SimpleTestCase):
                     if not filename.endswith(".py") or filename == "__init__.py":
                         continue
                     path = os.path.join(dir_path, filename)
-                    with open(path) as f:
+                    with open(path, encoding="utf-8") as f:
                         if not _registers_on_import(f.read()):
                             continue
                     dotted = os.path.relpath(path, app_config.path)[:-len(".py")].replace(os.sep, ".")

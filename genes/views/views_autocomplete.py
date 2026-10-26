@@ -149,10 +149,11 @@ class GeneAnnotationReleaseAutocompleteView(AutocompleteView):
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
 class GeneListAutocompleteView(AutocompleteView):
+    """ User-chosen lists only: categorised ones (node custom text, sample QC, PanelApp cache) are internal """
     fields = ['name']
 
     def get_user_queryset(self, user):
-        return GeneList.filter_for_user(user)
+        return GeneList.filter_for_user(user).filter(category__isnull=True)
 
 
 #@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')

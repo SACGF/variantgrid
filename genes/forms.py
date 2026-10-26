@@ -1,6 +1,6 @@
 from dal import forward
 from django import forms
-from django.forms.models import ALL_FIELDS
+from django.core.validators import URLValidator
 from django.forms.widgets import HiddenInput, TextInput
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -19,17 +19,23 @@ from snpdb.forms import BaseDeclareForm, GenomeBuildAutocompleteForwardMixin
 
 
 class GeneListForm(forms.ModelForm, ROFormMixin):
+    url = forms.URLField(required=False, empty_value=None,
+                         validators=[URLValidator(schemes=["http", "https"])])
+
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
+        # Group write permission lets others edit the list, but only the owner (or an admin) hands it on
+        if not (user.is_superuser or user == self.instance.user):
+            self.fields["user"].disabled = True
         if not self.instance.error_message:
             self.fields["error_message"].widget.attrs.update({"rows": 1, "cols": 20})
 
     class Meta:
         model = GeneList
-        fields = ALL_FIELDS
-        read_only = ('category', 'import_status', 'error_message', 'locked')
+        fields = ['category', 'name', 'user', 'error_message', 'locked', 'url']
+        read_only = ('category', 'error_message', 'locked')
         widgets = {"name": TextInput(),
-                   "url": TextInput(),
                    "user": ModelSelect2(url='user_autocomplete',
                                         attrs={'data-placeholder': 'User...'})}
 

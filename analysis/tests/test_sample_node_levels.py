@@ -20,13 +20,13 @@ import pickle
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.core.management import call_command
 from django.template import Context, Template
 from django.test import TestCase, override_settings
 from django.urls.base import reverse
 from django.utils import timezone
 
 from analysis.analysis_templates import run_analysis_template
+from analysis.enums import AnalysisTemplateType, NodeStatus, TagLocation
 from analysis.forms.forms_nodes import SampleFiltersMixin, SampleNodeForm, ZygosityNodeForm
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.grids import VariantGrid
@@ -34,7 +34,6 @@ from analysis.models import (
     AlleleFrequencyNode,
     Analysis,
     AnalysisTemplate,
-    AnalysisTemplateType,
     AnalysisTemplateVersion,
     AnalysisVariable,
     GeneListNode,
@@ -43,9 +42,7 @@ from analysis.models import (
     VariantTag,
     ZygosityNode,
 )
-from analysis.models.enums import NodeStatus, TagLocation
-from analysis.models.nodes.analysis_node import NodeVCFFilter
-from analysis.models.nodes.filters.merge_node import MergeNode
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
@@ -55,9 +52,10 @@ from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, SampleSourceLevel, Sex, Zygosity
 from patients.sample_grouping import get_sample_group
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
     Cohort,
@@ -65,7 +63,6 @@ from snpdb.models import (
     CohortGenotypeCollection,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
     Sample,
     Tag,
     VCFFilter,
@@ -665,6 +662,15 @@ class TestSampleNodeForm(SampleNodeLevelsTestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("source", form.errors)
 
+    def test_an_editor_keeps_the_current_source_but_only_picks_what_they_can_view(self):
+        editor = User.objects.get_or_create(username="test_sample_node_form_editor")[0]
+        for source, accepted in [(f"{SampleSourceLevel.EXTRACTION}:{self.extraction.pk}", True),
+                                 (f"{SampleSourceLevel.SPECIMEN}:{self.specimen.pk}", False)]:
+            with self.subTest(source=source):
+                form = self._form(self._extraction_node(), source=source)
+                form.restrict_choices_to_editor(editor)
+                self.assertEqual(form.is_valid(), accepted, form.errors)
+
     @override_settings(ANALYSIS_SAMPLE_NODE_LEVELS=["S", "E"])
     def test_a_level_the_deployment_has_turned_off_is_a_form_error(self):
         form = self._form(self._extraction_node(),
@@ -919,54 +925,10 @@ class VariantTagPatientTest(SampleNodeLevelsTestCase):
         self.assertEqual(tagging["patient"], self.patient.pk)
         self.assertEqual(tagging["patient_name"], str(self.patient))
 
-    # ── The backfill ──────────────────────────────────────────────────────────
-
     def _old_tagging(self, node=None, sample=None) -> VariantTag:
         """ A tagging from before the field existed - patient null """
         return VariantTag.objects.create(variant=self.v_snv, tag=self.tag, genome_build=self.grch37,
                                          analysis=self.analysis, node=node, sample=sample, user=self.user)
-
-    def _two_patient_node(self):
-        other_patient, other_sample = self._other_patient()
-        merge = MergeNode.objects.create(analysis=self.analysis)
-        merge.add_parent(self.patient_node)
-        merge.add_parent(self._node(SampleSourceLevel.SAMPLE, other_sample))
-        return merge, other_patient
-
-    def test_backfill_takes_the_patient_from_the_node(self):
-        variant_tag = self._old_tagging(node=self.patient_node)
-
-        call_command("one_off_backfill_variant_tag_patient")
-
-        variant_tag.refresh_from_db()
-        self.assertEqual(variant_tag.patient, self.patient)
-
-    def test_backfill_takes_the_patient_of_a_tagging_that_has_a_sample(self):
-        """ The sample is the more specific answer, even where the graph has since become ambiguous """
-        merge, _ = self._two_patient_node()
-        variant_tag = self._old_tagging(node=merge, sample=self.snv_sample)
-
-        call_command("one_off_backfill_variant_tag_patient")
-
-        variant_tag.refresh_from_db()
-        self.assertEqual(variant_tag.patient, self.patient)
-
-    def test_backfill_leaves_a_two_patient_node_alone(self):
-        merge, _ = self._two_patient_node()
-        variant_tag = self._old_tagging(node=merge)
-
-        call_command("one_off_backfill_variant_tag_patient")
-
-        variant_tag.refresh_from_db()
-        self.assertIsNone(variant_tag.patient)
-
-    def test_backfill_dry_run_writes_nothing(self):
-        variant_tag = self._old_tagging(node=self.patient_node)
-
-        call_command("one_off_backfill_variant_tag_patient", "--dry-run")
-
-        variant_tag.refresh_from_db()
-        self.assertIsNone(variant_tag.patient)
 
     # ── The classify form ─────────────────────────────────────────────────────
 

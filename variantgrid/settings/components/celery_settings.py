@@ -70,7 +70,6 @@ CELERY_TASK_ROUTES = {
     # analysis pool (not the default db_workers) so cache building scales with the rest of the
     # pipeline rather than starving on db_workers and triggering lease-expiry re-dispatch churn.
     "analysis.models.nodes.filters.venn_node.venn_cache_count": ANALYSIS_WORKERS,
-    "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
     # Annotation
@@ -85,6 +84,8 @@ CELERY_TASK_ROUTES = {
     # slot - the dispatcher runs it once a run reaches ANNOTATION_COMPLETED. See #1649.
     "annotation.tasks.annotate_variants.annotate_variants": ANNOTATION_WORKERS,
     "annotation.tasks.annotate_variants.import_annotation_run": DB_WORKERS,
+    # #1679: re-runs VEP on the fake VCF, so it must run where annotate_variants does.
+    "annotation.tasks.annotate_variants.recheck_vep_version": ANNOTATION_WORKERS,
     'annotation.tasks.calculate_sample_stats.calculate_vcf_stats': ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CalculateCohortSampleGeneDamageCountsTask": ANNOTATION_WORKERS,
     "annotation.tasks.cohort_sample_gene_damage_counts.CohortSampleGeneDamageCountTask": ANNOTATION_WORKERS,
@@ -111,6 +112,7 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.import_dragen_tso500_metrics_output_task.ImportDragenTSO500MetricsOutputTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
+    'upload.tasks.retry_upload_pipelines_task.retry_upload_pipeline_task': WEB_WORKERS,  # removes processing files
 
     # VariantID workers
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
@@ -118,6 +120,8 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.vcf.genotype_vcf_tasks.reload_vcf_task': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.SomalierVCFTask': HEAVY_WORKERS,  # somalier ancestry is ~1GB RSS
     'snpdb.tasks.somalier_tasks.somalier_patient_relate': HEAVY_WORKERS,  # where the .somalier files are made
+    'snpdb.tasks.somalier_tasks.somalier_vcf_extract': HEAVY_WORKERS,
+    'snpdb.tasks.somalier_tasks.somalier_ancestry_batch': HEAVY_WORKERS,
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
@@ -129,6 +133,8 @@ CELERY_TASK_ROUTES = {
     # #2667: single-authority annotation dispatcher - all run leasing/merge serialises here
     'annotation.tasks.annotation_scheduler_task.dispatch_annotation_runs': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
+    # Off db_workers, which are the ones an import OOM takes down
+    'upload.tasks.retry_upload_pipelines_task.fail_stuck_upload_pipelines_task': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.user_award_tasks.update_user_awards': SCHEDULING_SINGLE_WORKER,
     # Nightly all-vs-all relate rewrites every SomalierRelatePairs row - two runs must never overlap
@@ -158,8 +164,10 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_import_task',
     'classification.tasks.classification_candidate_search_tasks',
     'classification.tasks.classification_create_tasks',
+    'classification.tasks.classification_citation_tasks',
     'classification.tasks.classification_reclassification_tasks',
     'classification.tasks.condition_text_automatch_task',
+    'classification.tasks.resolved_variant_info_p_hgvs_task',
     'classification.views.classification_email_view',
     'genes.tasks.gene_coverage_tasks',
     'patients.tasks.extraction_matching_tasks',
@@ -188,6 +196,7 @@ CELERY_IMPORTS = (
     'upload.tasks.import_ped_task',
     'upload.tasks.import_variant_tags_task',
     'upload.tasks.import_wiki_task',
+    'upload.tasks.retry_upload_pipelines_task',
     'upload.tasks.vcf.genotype_vcf_tasks',
     'upload.tasks.vcf.import_sql_copy_task',
     'upload.tasks.vcf.import_vcf_step_task',

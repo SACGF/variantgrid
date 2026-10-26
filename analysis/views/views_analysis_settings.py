@@ -13,17 +13,18 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from analysis import forms
+from analysis.enums import AnalysisTemplateType
 from analysis.models import AnalysisLock
-from analysis.models.enums import AnalysisTemplateType
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.node_counts import get_node_counts_mine_and_available
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.views.analysis_permissions import get_analysis_or_404
 from analysis.views.views import get_analysis_settings
 from classification.models import ClassificationModification
 from library.django_utils import add_save_message, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import defaultdict_to_dict
+from patients.models.models_patient import Patient
 
 
 def view_analysis_settings(request, analysis_id):
@@ -34,6 +35,7 @@ def view_analysis_settings(request, analysis_id):
                "new_analysis_settings": analysis_settings,
                "has_write_permission": analysis.can_write(request.user),
                "can_unlock": analysis.can_unlock(request.user),
+               "can_take_ownership": analysis.can_take_ownership(request.user),
                "hidden_badge": _get_hidden_badge(analysis)}
     return render(request, 'analysis/analysis_settings.html', context)
 
@@ -238,6 +240,16 @@ def analysis_settings_lock(request, analysis_id):
     return redirect(analysis)  # Reload
 
 
+@require_POST
+def analysis_take_ownership(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    if not analysis.can_take_ownership(request.user):
+        raise PermissionDenied(f"You can't take ownership of analysis {analysis.pk}")
+    analysis.change_owner(request.user)
+    node_utils.reload_analysis_nodes(analysis.pk)
+    return redirect(analysis)
+
+
 def analysis_input_samples(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     input_nodes = analysis.analysisnode_set.filter(analysisnode_parent__isnull=True)
@@ -267,8 +279,11 @@ def analysis_input_samples(request, analysis_id):
                                                                    classification__sample__in=all_samples)
     sample_classification_counts = dict(classification_qs.order_by().values_list("classification__sample")
                                         .annotate(Count("pk")))
+    patient_ids = {sample.patient_id for sample in all_samples if sample.patient_id}
+    patients_by_id = Patient.filter_for_user(request.user).in_bulk(patient_ids)
     for node_input_data in node_inputs:
-        node_input_data["samples"] = [(sample, sample_classification_counts.get(sample.pk, 0))
+        node_input_data["samples"] = [(sample, patients_by_id.get(sample.patient_id),
+                                       sample_classification_counts.get(sample.pk, 0))
                                       for sample in node_input_data["samples"]]
 
     context = {"analysis": analysis,

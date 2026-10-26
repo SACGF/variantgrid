@@ -15,7 +15,7 @@ from django.forms import Widget
 from django.utils import timezone
 from django.utils.safestring import SafeString
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import (
     get_evidence_fields_for_variant,
 )
@@ -23,10 +23,15 @@ from classification.classification_import import (
     reattempt_variant_matching,
     variant_matching_dry_run,
 )
-from classification.enums import WithdrawReason
+from classification.enums import (
+    ClassificationImportRunStatus,
+    DiscordanceReportTriageStatus,
+    ImportedAlleleInfoStatus,
+    ShareLevel,
+    WithdrawReason,
+)
 from classification.enums.classification_enums import (
     EvidenceCategory,
-    ShareLevel,
     SpecialEKeys,
     SubmissionSource,
 )
@@ -45,11 +50,9 @@ from classification.models import (
     DiscordanceReport,
     DiscordanceReportClassification,
     DiscordanceReportTriage,
-    DiscordanceReportTriageStatus,
     EvidenceKey,
     EvidenceKeyMap,
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     OverlapDiscordanceNotification,
     ReclassificationEvent,
     ReclassificationEventBuildState,
@@ -58,10 +61,7 @@ from classification.models import (
     ensure_discordance_report_triages_bulk,
 )
 from classification.models.classification import Classification
-from classification.models.classification_import_run import (
-    ClassificationImportRun,
-    ClassificationImportRunStatus,
-)
+from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfoValidation,
     ResolvedVariantInfo,
@@ -435,7 +435,7 @@ class ClassificationAdmin(ModelAdminBasics):
         changed_count = 0
         for vc in queryset:
             vc.summary = ClassificationSummaryCalculator(vc.last_published_version).cache_dict()
-            vc.save(update_fields=["summary"])
+            Classification.objects.filter(pk=vc.pk).update(summary=vc.summary)
             changed_group = ClassificationGrouping.assign_grouping_for_classification(vc)
             if changed_group:
                 changed_count += 1
@@ -1117,7 +1117,7 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
 
 @admin.register(OverlapDiscordanceNotification)
 class OverlapDiscordanceNotificationAdmin(ModelAdminBasics):
-    list_display = ("overlap", "old_state", "new_state", "notification_sent_date")
+    list_display = ("overlap", "lab", "old_state", "new_state", "notification_sent_date")
     #list_filter = (('notification_sent_date', DateFieldListFilter))
 
     @admin_action("Resend Notifications")
@@ -1165,10 +1165,14 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'genome_build',
         'variant',
         'resolved_hgvs',
+        'p_hgvs',
+        'p_hgvs_short',
+        'p_hgvs_source',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
-        'error'
+        'error',
+        'p_hgvs_error',
     )
 
     search_fields = (

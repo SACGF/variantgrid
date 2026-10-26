@@ -1,11 +1,9 @@
-import json
 import logging
 from collections import defaultdict
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
-from django.http.response import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http.response import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -14,6 +12,7 @@ from genes.models import GeneList, GeneListCategory, GeneSymbol
 from genes.views.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
 from library.enums import ModificationOperation
+from pathtests.enums import PathologyTestGeneModificationOutcome
 from pathtests.forms import (
     CaseForm,
     CreatePathologyTestForm,
@@ -25,71 +24,13 @@ from pathtests.forms import (
 from pathtests.models import (
     Case,
     PathologyTest,
-    PathologyTestGeneModificationOutcome,
     PathologyTestGeneModificationRequest,
     PathologyTestOrder,
     PathologyTestVersion,
-    get_cases_qs,
     get_external_order_system_last_checked,
 )
 from patients.forms import external_pk_autocomplete_form_factory
-from patients.models import FollowLeadScientist, get_lead_scientist_users_for_user
-from snpdb.models.models_enums import ImportStatus
-
-
-def my_cases(request, has_menu=True):
-    users_list = get_lead_scientist_users_for_user(request.user)
-    title = "My cases"
-    return view_cases_for_users(request, title, users_list, has_menu=has_menu)
-
-
-def scientist_cases(request, user_id, has_menu=True):
-    user = get_object_or_404(User, pk=user_id)
-    title = f"Cases for {user}"
-    return view_cases_for_users(request, title, [user], has_menu=has_menu)
-
-
-@require_POST
-def follow_scientist(request, follow_user_id):
-    checked = json.loads(request.POST["checked"])
-    follow_user = get_object_or_404(User, pk=follow_user_id)
-
-    if checked:
-        FollowLeadScientist.objects.get_or_create(user=request.user, follow=follow_user)
-    else:
-        FollowLeadScientist.objects.filter(user=request.user, follow=follow_user).delete()
-
-    return HttpResponse()
-
-
-def view_cases_for_users(request, title, users_list, has_menu=True):
-    cases_qs = get_cases_qs(request.user).filter(lead_scientist__in=users_list).order_by("-created")
-
-    last_checked = get_external_order_system_last_checked()
-    if has_menu:
-        template_name = 'pathtests/cases/cases_menu.html'
-    else:
-        template_name = 'pathtests/cases/show_cases.html'
-
-    is_following = False
-    if len(users_list) == 1:
-        single_lead_scientist = users_list[0]
-        is_following = request.user.following.filter(follow=single_lead_scientist).exists()
-    else:
-        single_lead_scientist = None
-
-    context = {"title": title,
-               "single_lead_scientist": single_lead_scientist,
-               "is_following": is_following,
-               "is_clinician": False,
-               "cases_qs": cases_qs,
-               "last_checked": last_checked}
-
-    return render(request, template_name, context)
-
-
-def my_cases_tab(request):
-    return my_cases(request, has_menu=False)
+from snpdb.enums import ImportStatus
 
 
 def pathology_tests(request):
@@ -269,20 +210,24 @@ def view_pathology_test_version(request, pk):
 
         confirm_test = request.POST.get("confirm_test")
         if confirm_test:
-            if not pathology_test_version.can_confirm:
-                msg = "Can't set as active test!"
-                raise ValueError(msg)
-
-            pathology_test_version.confirmed_date = timezone.now()
-            pathology_test_version.save()
-            pathology_test_version.set_as_active_test()
-            messages.add_message(request, messages.INFO, "Test Confirmed")
+            if pathology_test_version.can_confirm:
+                pathology_test_version.confirmed_date = timezone.now()
+                pathology_test_version.save()
+                pathology_test_version.set_as_active_test()
+                messages.add_message(request, messages.INFO, "Test Confirmed")
+            else:
+                messages.add_message(request, messages.ERROR,
+                                     "Can't confirm a test version that is already confirmed or has no enrichment kit")
         else:
             valid = pathology_test_version_form.is_valid()
             if pathology_test_version_form.cleaned_data:  # Got something in POST
-                if valid:
-                    pathology_test_version = pathology_test_version_form.save()
-                add_save_message(request, valid, "Pathology Test Version")
+                if pathology_test_version.can_modify:
+                    if valid:
+                        pathology_test_version = pathology_test_version_form.save()
+                    add_save_message(request, valid, "Pathology Test Version")
+                else:
+                    pathology_test_version.refresh_from_db()  # is_valid() copied the POSTed kit onto it
+                    messages.add_message(request, messages.ERROR, "A confirmed test version can't be changed")
             else:
                 gene_addition_requests, gene_deletion_requests, _ = get_gene_modification_request(pathology_test_version)
                 test_confirmed = pathology_test_version.confirmed_date is not None

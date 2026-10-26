@@ -7,20 +7,23 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import (
     SAMPLE_SHEET_PAIR_ID_COLUMN,
     SAMPLE_SHEET_SAMPLE_TYPE_COLUMN,
     LibraryQC,
+    SequencingRun,
     SequencingSampleData,
 )
-from seqauto.models.models_enums import LibraryQCCategory
 from seqauto.tests.test_extraction_link import make_sample_sheet, make_sequencing_run
-from snpdb.models import ImportSource
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
 from upload.import_task_factories.import_task_factory import get_import_task_factories
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline
+from upload.models import FileUpload, UploadedDragenTSO500MetricsOutput, UploadPipeline
+from upload.models.models import UploadUserError
 from upload.tasks.import_dragen_tso500_metrics_output_task import (
     ImportDragenTSO500MetricsOutputTask,
 )
@@ -81,7 +84,7 @@ def edited_metrics_file(tmp_dir: str, *replacements) -> str:
         assert old in contents, old
         contents = contents.replace(old, new)
     path = os.path.join(tmp_dir, "edited_MetricsOutput.tsv")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(contents)
     return path
 
@@ -193,7 +196,9 @@ class TestMetricsOutputRecords(TestCase):
         return Specimen.objects.create(patient=self.patient, reference_id=reference_id)
 
     def _write(self, sequencing_run_name=SEQUENCING_RUN_NAME) -> dict:
-        rows = write_library_qc(self.libraries, self.user, sequencing_run_name,
+        sequencing_run = SequencingRun.objects.filter(name=sequencing_run_name).first() or \
+            make_sequencing_run(sequencing_run_name)
+        rows = write_library_qc(self.libraries, self.user, sequencing_run,
                                 method=metrics_method(self.sections),
                                 date=metrics_measured_date(self.sections))
         return {(row.pair_id, row.category): row for row in rows}
@@ -291,27 +296,12 @@ class TestMetricsOutputRecords(TestCase):
             path = edited_metrics_file(tmp_dir, ("GENE_SCALED_MAD (Count)\t0\t0.134\t0.047",
                                                  "GENE_SCALED_MAD (Count)\t0\t0.134\t0.9"))
             sections = read_sections(path)
-            write_library_qc(read_library_qc(sections), self.user, SEQUENCING_RUN_NAME,
+            write_library_qc(read_library_qc(sections), self.user, SequencingRun.objects.get(name=SEQUENCING_RUN_NAME),
                              method=metrics_method(sections))
 
         self.assertEqual(30, LibraryQC.objects.count())
         cnv = LibraryQC.objects.get(pair_id=FIRST_PAIR, category=LibraryQCCategory.CNV)
         self.assertFalse(cnv.passed)
-
-    def test_a_registered_run_is_linked(self):
-        sequencing_run = make_sequencing_run(SEQUENCING_RUN_NAME)
-
-        row = self._write()[(FIRST_PAIR, LibraryQCCategory.CNV)]
-
-        self.assertEqual(sequencing_run, row.sequencing_run)
-
-    def test_a_run_seqauto_has_not_seen_leaves_the_link_null(self):
-        """ The rows are still written and still keyed - the run can be registered afterwards """
-        row = self._write()[(FIRST_PAIR, LibraryQCCategory.CNV)]
-
-        self.assertIsNone(row.sequencing_run)
-        self.assertIsNone(row.sequencing_sample)
-        self.assertEqual(SEQUENCING_RUN_NAME, row.sequencing_run_name)
 
     def test_each_arm_links_its_row_on_the_sheet(self):
         """ The sheet's Pair_ID / Sample_Type columns say which sample is which arm of the pair """
@@ -337,14 +327,13 @@ class TestMetricsOutputRecords(TestCase):
 
     def test_a_sheet_registered_after_the_file_is_linked_by_reconcile(self):
         row = self._write()[(FIRST_PAIR, LibraryQCCategory.RNA)]
-        self.assertIsNone(row.sequencing_run)
+        self.assertIsNone(row.sequencing_sample)
 
-        sequencing_run = make_sequencing_run(SEQUENCING_RUN_NAME)
-        by_name = make_pair_sample_sheet(sequencing_run, {FIRST_PAIR: {"DNA": DNA_SAMPLE_ID, "RNA": RNA_SAMPLE_ID}})
+        by_name = make_pair_sample_sheet(row.sequencing_run,
+                                         {FIRST_PAIR: {"DNA": DNA_SAMPLE_ID, "RNA": RNA_SAMPLE_ID}})
         reconcile_pending_extractions()
 
         row.refresh_from_db()
-        self.assertEqual(sequencing_run, row.sequencing_run)
         self.assertEqual(by_name[RNA_SAMPLE_ID], row.sequencing_sample)
 
     def test_a_re_sent_sheet_moves_the_link_to_its_new_rows(self):
@@ -367,10 +356,11 @@ class TestMetricsOutputImportTask(TestCase):
         patient = Patient.objects.create(patient_code="C0000001")
         assign_permission_to_user_and_groups(self.user, patient)
         self.specimen = Specimen.objects.create(patient=patient, reference_id="2600000001")
+        self.sequencing_run = make_sequencing_run(SEQUENCING_RUN_NAME)
 
-    def _file_upload(self, metadata) -> FileUpload:
+    def _file_upload(self, metadata, import_source=ImportSource.COMMAND_LINE) -> FileUpload:
         file_upload = FileUpload.objects.create(path=RUN_METRICS_OUTPUT,
-                                                import_source=ImportSource.COMMAND_LINE,
+                                                import_source=import_source,
                                                 user=self.user, name="MetricsOutput_orig.tsv",
                                                 file_type=UploadedFileTypes.DRAGEN_TSO500_METRICS_OUTPUT,
                                                 metadata=metadata)
@@ -382,7 +372,8 @@ class TestMetricsOutputImportTask(TestCase):
 
         self.assertEqual(30, ImportDragenTSO500MetricsOutputTask.process_items(file_upload))
 
-        self.assertEqual(30, LibraryQC.objects.filter(file_upload=file_upload).count())
+        self.assertEqual(30, LibraryQC.objects.filter(file_upload=file_upload,
+                                                      sequencing_run=self.sequencing_run).count())
         self.assertEqual(6, LibraryQC.objects.filter(specimen=self.specimen).count())
         self.assertEqual(self.user, LibraryQC.objects.first().user)
 
@@ -394,3 +385,21 @@ class TestMetricsOutputImportTask(TestCase):
 
         self.assertIn("sequencing_run", str(cm.exception))
         self.assertFalse(LibraryQC.objects.exists())
+
+    def test_an_upload_naming_a_run_seqauto_has_not_registered_fails_writing_nothing(self):
+        file_upload = self._file_upload({"sequencing_run": "UNREGISTERED_RUN"})
+
+        with self.assertRaisesMessage(UploadUserError, "No sequencing run named 'UNREGISTERED_RUN'"):
+            ImportDragenTSO500MetricsOutputTask.process_items(file_upload)
+
+        self.assertFalse(LibraryQC.objects.exists())
+        self.assertFalse(UploadedDragenTSO500MetricsOutput.objects.exists())
+
+    def test_a_web_upload_without_sequencing_write_access_fails_writing_nothing(self):
+        file_upload = self._file_upload({"sequencing_run": SEQUENCING_RUN_NAME}, import_source=ImportSource.WEB_UPLOAD)
+
+        with self.assertRaisesMessage(UploadUserError, SEQUENCING_RUN_NAME):
+            ImportDragenTSO500MetricsOutputTask.process_items(file_upload)
+
+        self.assertFalse(LibraryQC.objects.exists())
+        self.assertFalse(UploadedDragenTSO500MetricsOutput.objects.exists())

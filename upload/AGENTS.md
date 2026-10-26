@@ -28,7 +28,7 @@ Patterns here:
 - Steps are rows. An UploadStep with pipeline_stage runs now; one with pipeline_stage_dependency is created inert and
   launched by upload/tasks/vcf/import_vcf_step_task.py:schedule_pipeline_stage_steps once the last step of that stage
   ends (ImportVCFStepTask.check_pipeline_stage). Stages: PRE_DATA_INSERTION → DATA_INSERTION → ANNOTATION_COMPLETE →
-  FINISH (upload/models/models_enums.py:VCFPipelineStage). Add a step by adding its class to the factory's
+  FINISH (upload/enums/upload_enums.py:VCFPipelineStage). Add a step by adding its class to the factory's
   get_post_vcf_header_classes / get_post_data_insertion_classes / get_finish_task_classes
   (upload/import_task_factories/abstract_vcf_import_task_factory.py:AbstractVCFImportTaskFactory), or create the
   UploadStep inside a running step and call upload/models/models.py:UploadStep.launch_task.
@@ -37,6 +37,10 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- upload/vcf/vcf_preprocess.py:run_pipe detects failure from a `${PIPESTATUS[*]}` status file, not pipefail, and gives
+  every stage its own stderr file. The stage blamed (upload/vcf/vcf_preprocess.py:_failed_stage) is the first non-zero
+  exit that is not SIGPIPE-shaped (141, or a Python `BrokenPipeError`) - those stages were killed because the one after
+  them died. Every stage is a sub step and its stderr is its `output_text`; the blamed one's is also its `error_message`.
 - Symbolic alts outside settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES (`<CNV>`/`<DEL>`/`<DUP>`/`<INV>`) never become
   Variants: management/commands/vcf_clean_alts.py:Command skips them into the upload's skipped-record stats. `<INS>` is
   one of them - the `<INS>` branches in snpdb, annotation and genes are written ahead of any `<INS>` Variant existing.
@@ -53,6 +57,10 @@ Patterns here:
   split file, batches coordinates through snpdb/variant_pk_lookup.py:VariantPKLookup and writes CSVs of unknowns;
   upload/tasks/vcf/unknown_variants_task.py:InsertUnknownVariantsTask re-checks and inserts them under a cache lock on
   the variant_id_single_worker queue. Create Variant/Locus rows only from that single worker, never from a parallel step.
+  This is the only path that inserts variants (manual entry, analysis and fusion imports all come through an upload), so
+  variant pks commit in order - annotation range locks rely on it.
+- The same variant twice in one VCF's genotypes (two records that normalise to one variant) is an import or
+  normalisation bug, not data to merge: when the two rows' genotypes differ, report it rather than picking one.
 - Genotypes go in via SQL COPY. upload/vcf/bulk_genotype_vcf_processor.py:BulkGenotypeVCFProcessor.process_entry
   accumulates rows, resolves variant ids per batch (settings.SQL_BATCH_INSERT_SIZE), splits common/rare by gnomAD AF,
   writes a CSV with upload/vcf/sql_copy_files.py:write_sql_copy_csv and spawns an
@@ -72,6 +80,9 @@ Patterns here:
   subclass of upload/models/models.py:UploadUserError with a short `summary`: the pipeline fails with the message and
   no traceback or Rollbar report (UploadPipeline.user_error), and the upload grid shows the summary next to the cross.
   Anything else is treated as our bug and keeps its traceback.
+  A link to sequencing data the upload may not make, or a `path` or `sequencing_run` metadata matching no sequencing
+  record, is one (FileUpload.check_may_link_to_sequencing_data, FileUpload.get_sequencing_record_for_path,
+  FileUpload.get_sequencing_run_to_link).
 Gotchas:
 - A killed worker child (SIGTERM/SIGKILL, `revoke(terminate=True)`) never reaches `ImportVCFStepTask.run`'s except
   blocks; the master's `task_failure`/`task_revoked` receivers in `upload/tasks/vcf/import_vcf_step_task.py` fail the
@@ -110,8 +121,8 @@ Gotchas:
   analysis itself - `[Analysis Details]` and the `[TMB]`, `[MSI]`, `[GIS]` scalars - is one
   seqauto/models/models_seqauto.py:DragenTSO500CombinedVariantOutput per (run, pair) (#1904), keyed on the upload's
   `sequencing_run` metadata as the MetricsOutput is (the file names its run 'NA'); a CVO sent without it takes the run
-  whose current sheet names one of its sample IDs. The run is half the row's key, so a pair no registered run names
-  fails the import saying so, as does one naming no `Pair ID`. A chain that cannot be made does not fail it: the row
+  whose current sheet names one of its sample IDs. The run is half the row's key, so a pair no registered run names,
+  or metadata naming a run seqauto has not registered, fails the import saying so, as does one naming no `Pair ID`. A chain that cannot be made does not fail it: the row
   is still written with its specimen claim parked saying why, which the pair's page shows
   (seqauto/views.py:view_tso500_pair).
 - The run's MetricsOutput.tsv is a separate, single-shot import (tasks/import_dragen_tso500_metrics_output_task.py,
@@ -119,7 +130,8 @@ Gotchas:
   by a banner line ending 'Metrics Output' (with the module version, as the CVO's has it). One file covers a whole run
   - the pipeline sends Results/MetricsOutput_orig.tsv, the copy the lab's run wrapper leaves untouched - and a 2.6.2
   column is a *pair* (the CVO's Pair ID) carrying both arms, not a sample. `sequencing_run` upload metadata is
-  required and is part of the key, since a pair column alone does not identify a pair across runs. It writes one
+  required, must name a run seqauto has registered, and is part of the key, since a pair column alone does not
+  identify a pair across runs. It writes one
   seqauto/models/models_seqauto.py:LibraryQC per (run, pair, QC category), naming the arm each category is about and judging every
   metric of a known section by the file's own LSL/USL guideline - settings.TSO500_LIBRARY_QC_GUIDELINES overrides that
   per (section, metric) where a lab quotes its own number, and each metric records which it was judged by. The column
@@ -161,6 +173,17 @@ Gotchas:
   was before UploadPipeline.objects.create has only an orphan FileUpload to show for itself and nothing to reload;
   classification imports get back in through `manage.py classification_rematch_stuck`, which re-derives the coordinates
   and runs new pipelines.
+- Bulk retry (the upload page's "Retry failed", the sequencing run page's "Retry failed imports") goes through
+  upload/tasks/retry_upload_pipelines_task.py:retry_upload_pipelines: it claims each pipeline ERROR/TIMED_OUT ->
+  CREATED ("Retry queued") before queueing, so a double click can't queue it twice, and spaces the tasks
+  RETRY_STAGGER_SECONDS apart so a whole run's relaunch doesn't recreate the memory spike that failed it.
+- A step whose worker was killed from outside (OOM, restart) stays PROCESSING - the task_failure handler only sees a
+  child lost under a live master. A running step holds a lease (`UploadStep.lease_expires`) its worker renews on a
+  thread (`upload/tasks/upload_step_lease.py`, every UPLOAD_STEP_LEASE_HEARTBEAT_SECONDS, guarded on its own task
+  id); `fail_stuck_upload_pipelines` marks a step with a lapsed lease TIMED_OUT, from the 5-minute beat task on
+  scheduling_single_worker and again before each retry. The admin's "Mark process as timed out" on an UploadStep is
+  the manual equivalent. Don't judge liveness by `celery_task`: launch_task sets it before any worker picks the task
+  up, and celery inspect misses a worker too loaded to answer.
 - settings.UPLOAD_ENABLED=False makes InsertUnknownVariantsTask raise; IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS
   wipes the processing dir on success, so inspect a failed pipeline's files before retrying it.
 - upload/tasks/vcf/import_vcf_step_task.py:pipeline_success_task is the only thing that closes a VCF pipeline, and it is
@@ -182,7 +205,8 @@ Tests:
 - Whole pipeline in-process: create a FileUpload, then process_uploaded_file(file_upload, run_async=False) under
   CELERY_TASK_ALWAYS_EAGER (library/django_utils/unittest_utils.py:URLTestCase sets it) —
   upload/tests/test_import_patient_records.py:TestPatientUploadImport is the pattern. The VCF pipeline needs bcftools
-  and a reference fasta, so tests stop short of preprocess_vcf (upload/tests/vcf/test_vcf_preprocess.py mocks run_pipe).
+  and a reference fasta, so tests stop short of preprocess_vcf (upload/tests/vcf/test_vcf_preprocess.py mocks run_pipe,
+  and runs the real run_pipe on toy stages in TestRunPipe).
 - Processors without celery: upload/tests/vcf/test_vcf_processors.py:TestVCFProcessors builds an UploadStep + VCF from
   a cyvcf2 reader via create_vcf_from_vcf and feeds process_entry directly (needs Sequence rows for GATC).
 - Test VCFs: upload/test_data/vcf (grch38_brca1.vcf, no_genotype.GRCh37.vcf, symbolic_alt/, detect_build_by_header/)

@@ -4,7 +4,6 @@ import tempfile
 from django.test import SimpleTestCase
 
 from annotation.vep_warnings import (
-    annotation_run_shortfall,
     parse_skipped_variants_file,
     parse_vep_warnings,
 )
@@ -86,7 +85,7 @@ class ParseSkippedVariantsFileTests(SimpleTestCase):
     def _parse(self, contents):
         with tempfile.TemporaryDirectory() as tmp_dir:
             filename = os.path.join(tmp_dir, "skipped_variants.tsv")
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 f.write(contents)
             return parse_skipped_variants_file(filename)
 
@@ -102,14 +101,3 @@ class ParseSkippedVariantsFileTests(SimpleTestCase):
     def test_empty_file(self):
         self.assertEqual(self._parse(""), [])
 
-
-class AnnotationRunShortfallTests(SimpleTestCase):
-    def test_complete_run(self):
-        self.assertEqual(annotation_run_shortfall(100, 100, None), 0)
-
-    def test_skips_accounted_for(self):
-        blob = f"{MODERN_CONTIG_WARNING}\n{MODERN_OTHER_WARNING}"
-        self.assertEqual(annotation_run_shortfall(100, 98, blob), 0)
-
-    def test_truncated(self):
-        self.assertEqual(annotation_run_shortfall(12501, 0, None), 12501)

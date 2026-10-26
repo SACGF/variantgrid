@@ -3,7 +3,7 @@ from collections import Counter
 from django.dispatch import receiver
 
 from library.health_check import HealthCheckTotalAmount, health_check_overall_stats_signal
-from patients.models_enums import MatchStatus
+from patients.enums import MatchStatus
 from seqauto.models import SequencingSample
 from snpdb.models import Sample
 

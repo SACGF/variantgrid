@@ -7,47 +7,39 @@ from django.test import SimpleTestCase
 from variantgrid.deployment_validation.somalier_check import (
     ALLELE_ORDER_SITES_PER_ORDER,
     allele_order_result,
-    allele_order_unchecked,
 )
 
 NUM_SITES = 2 * ALLELE_ORDER_SITES_PER_ORDER
+HALF = ALLELE_ORDER_SITES_PER_ORDER
 
 
 class SomalierAlleleOrderResultTest(SimpleTestCase):
     """ Every site the check writes is hom-alt against a no-call, so how many come back as opposite
-        homozygotes says who is right """
+        homozygotes - uncompensated, then compensated if that was wrong - says which way to set it """
 
-    def test_all_opposite_is_valid(self):
-        for compensating in (True, False):
-            with self.subTest(compensating=compensating):
-                self.assertTrue(allele_order_result("GRCh38", NUM_SITES, NUM_SITES, compensating)["valid"])
+    def test_fixed_somalier_must_not_be_compensated(self):
+        """ Compensating a somalier that reads REF/ALT itself breaks ancestry, not relate, so only the
+            uncompensated probe can tell """
+        self.assertTrue(allele_order_result("GRCh38", NUM_SITES, NUM_SITES, None, False)["valid"])
+        result = allele_order_result("GRCh38", NUM_SITES, NUM_SITES, None, True)
+        self.assertFalse(result["valid"])
+        self.assertIn('compensate_allele_order"] = False', result["fix"])
+        self.assertIn("ancestry", result["fix"])
+        self.assertIn("somalier_existing_vcfs --clear", result["fix"])
 
-    def test_half_missing_says_which_way_to_set_it(self):
-        """ Only the half whose alleles disagree dropping out is the setting being wrong, nothing else """
-        for compensating in (True, False):
-            with self.subTest(compensating=compensating):
-                result = allele_order_result("GRCh38", NUM_SITES, ALLELE_ORDER_SITES_PER_ORDER, compensating)
+    def test_unfixed_somalier_must_be_compensated(self):
+        """ v0.3.5 (half the sites wrong uncompensated) and older (no relate --sites at all) """
+        for uncompensated_ibs0 in (HALF, None):
+            with self.subTest(uncompensated_ibs0=uncompensated_ibs0):
+                self.assertTrue(allele_order_result("GRCh38", NUM_SITES, uncompensated_ibs0, NUM_SITES, True)["valid"])
+                result = allele_order_result("GRCh38", NUM_SITES, uncompensated_ibs0, NUM_SITES, False)
                 self.assertFalse(result["valid"])
-                self.assertIn(f'compensate_allele_order"] = {not compensating}', result["fix"])
-                self.assertIn("somalier_existing_vcfs --clear", result["fix"])
+                self.assertIn('compensate_allele_order"] = True', result["fix"])
 
-    def test_anything_else_does_not_claim_to_know_why(self):
-        result = allele_order_result("GRCh38", NUM_SITES, 0, True)
-        self.assertFalse(result["valid"])
-        self.assertNotIn("compensate_allele_order\"] =", result["fix"])
-        self.assertIn("third way", result["fix"])
-
-
-class SomalierAlleleOrderUncheckedTest(SimpleTestCase):
-    def test_relate_refusing_sites_is_an_answer_not_a_missing_one(self):
-        """ Only a somalier before v0.3.5 has no relate --sites, so it can't be the one the settings
-            are written for """
-        result = allele_order_unchecked("somalier relate failed: Error: unhandled exception: "
-                                        "unknown option: --sites [UsageError]")
-        self.assertFalse(result["valid"])
-        self.assertIn('compensate_allele_order"] = True', result["fix"])
-
-    def test_anything_else_is_a_warning(self):
-        result = allele_order_unchecked("tabix failed: no such file")
-        self.assertTrue(result["valid"])
-        self.assertIn("unchecked", result["warning"])
+    def test_neither_way_right_does_not_claim_to_know_why(self):
+        for compensating in (True, False):
+            with self.subTest(compensating=compensating):
+                result = allele_order_result("GRCh38", NUM_SITES, HALF, 0, compensating)
+                self.assertFalse(result["valid"])
+                self.assertNotIn('compensate_allele_order"] =', result["fix"])
+                self.assertIn("third way", result["fix"])

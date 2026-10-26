@@ -4,8 +4,8 @@ from django import forms
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from seqauto import models
+from seqauto.enums import QCCompareType, QCGraphTypes2
 from seqauto.models import EnrichmentKit, QCColumn, QCType, SequencingRun
-from seqauto.models.models_enums import QCCompareType, QCGraphTypes2
 from snpdb.forms import BaseDeclareForm
 
 
@@ -41,8 +41,8 @@ class AlignmentFileForm(forms.ModelForm, ROFormMixin):
 class QCFileForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.QC
-        fields = ('path', 'alignment_file', 'vcf_file')
-        read_only = ('path', 'alignment_file', 'vcf_file')
+        fields = ('path', 'sequencing_sample', 'vcf_file')
+        read_only = ('path', 'sequencing_sample', 'vcf_file')
 
 
 class QCColumnForm(BaseDeclareForm):

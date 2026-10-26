@@ -20,7 +20,8 @@ the generated maps ([models](../maps/models.md#ontology), [urls](../maps/urls.md
 
 Every source goes through `ontology/ontology_builder.py:OntologyBuilder`, which is the whole import contract: one
 builder per (`import_source`, `context`, `processor_version`); `OntologyBuilder.ensure_hash_changed` raises
-`OntologyBuilderDataUpToDateException` when the file's md5 matches the last completed import of that context;
+`OntologyBuilderDataUpToDateException` when the data hash matches the last completed import of that context (file
+loaders call `OntologyBuilder.ensure_file_hash_changed`, the file's sha256, which also accepts an md5 stored before #2273);
 `OntologyBuilder.cache_everything` pulls every existing term into memory; `add_term` / `add_ontology_relation` mutate
 cached objects that `OntologyBuilder.complete` writes back with one bulk create and one bulk update per model. A previous import made with a different `processor_version` is ignored, so bumping the number
 in a loader is how a parsing change forces a reload of an unchanged file. `add_term` distinguishes the
@@ -40,9 +41,7 @@ OMIM->gene `mim2gene` edges, deleting any relations from the legacy `OMIM_ALL_FR
 layouts, seven columns behind a `#Format:` comment (`source` column, `mim2gene` rows kept) and five columns with a header
 row (`disease_id`, OMIM rows kept); the loader tells them apart by the first line and raises if the frame comes out
 empty, because a zero-relation import leaves every HPO term without genes (#1862).
-`ontology/management/commands/backfill_phenotype_to_genes.py` repairs a deployment whose import has no relations, in place: it loads the file
-into the import the latest `OntologyVersion` already points at (`OntologyBuilder(existing_import=...)`), so no new
-version or gene annotation build follows. `load_omim`
+`load_omim`
 reads mimTitles.txt as the primary source for OMIM names and aliases and marks gene and removed entries
 `NON_CONDITION`; deployments without an OMIM licence use `load_biomart` instead, which fills the same terms from
 Ensembl BioMart's morbid descriptions. `sync_hgnc` mirrors the genes app's HGNC table into HGNC terms (previous
@@ -69,7 +68,7 @@ crawl is fresh.
 phenotype_to_genes.txt, and optionally OMIM), unique together, and it is created lazily: `OntologyVersion.latest`
 picks the newest completed import per slot, `get_or_create`s the version, and on creation calls
 `AnnotationVersion.new_sub_version` so every build's AnnotationVersion now points at it. That is the link that makes
-an ontology import a deploy event: `annotation/models/models.py:AnnotationVersion.validate` refuses a version whose
+an ontology import a deploy event: `annotation/models/models_annotation_version.py:AnnotationVersion.validate` refuses a version whose
 GeneAnnotationVersion was built for a different OntologyVersion, so `manage.py gene_annotation` must follow every
 import (the command prints the `--ontology-version` to pass). Readers pick their graph through
 `OntologyVersion.get_ontology_term_relations` (relations whose `from_import` is one of the version's five) or, for
@@ -93,7 +92,7 @@ against MONDO while labs often pick OMIM. `ontology/ontology_traversal.py:get_on
 the same API over a `MemoryOntologyTraverser`, which loads one version's whole edge list into adjacency dicts once;
 `gene_annotation` uses it across every HGNC term, where a query per step would be the bottleneck. The HGNC bridge is
 `ontology/models/models_ontology.py:OntologyTerm.get_gene_symbol`: name match, then alias match, then
-`genes/gene_matching.py:HGNCMatcher` - and if HGNC knows the gene but no term exists it creates one on the spot under
+`genes/models/models_gene.py:GeneSymbol.resolve_name` - and if HGNC knows the gene but no term exists it creates one on the spot under
 an ad-hoc import. Its docstring is the rule: pass GeneSymbols around and only cross to the HGNC term at the edge of a
 traversal.
 

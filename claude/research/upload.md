@@ -99,10 +99,14 @@ are picked up by the scheduler like any other.
 `PreprocessVCFTask` for the others, and `GeneLevelPreprocessVCFTask` splits only, since gene-level variants have no
 reference base for bcftools to check) calls `upload/vcf/vcf_preprocess.py:preprocess_vcf`. It writes a cleaned header
 first, then `_build_pipe_commands` assembles `zcat | manage.py vcf_clean_and_filter | bcftools norm | bcftools view
---no-header | manage.py vcf_clean_alts | split`, and `run_pipe` runs it under `set -o pipefail` (#3813) with the split
-filter re-attaching the header and bgzipping each chunk of `settings.VCF_IMPORT_FILE_SPLIT_ROWS` lines. The stages that
-carry a versioned tool become child `UploadStep` rows via `create_sub_step`, which is where `ToolVersion` and the
-per-stage stdout/stderr live. `upload/management/commands/vcf_clean_and_filter.py:Command` is the gatekeeper bcftools
+--no-header | manage.py vcf_clean_alts | split`, with the split filter re-attaching the header and bgzipping each chunk
+of `settings.VCF_IMPORT_FILE_SPLIT_ROWS` lines. `run_pipe` runs it as one bash pipe with each stage's stderr redirected
+to its own file and `${PIPESTATUS[*]}` echoed to a status file afterwards; that status file, not pipefail, is the
+failure signal (#1005). The stage blamed is `_failed_stage`'s pick - the first non-zero exit that was not just killed by
+a later stage dying (exit 141 or a Python `BrokenPipeError`) - and `PipeStageError` carries its command, exit code and
+stderr plus every stage's exit code, which is what the step's error and Rollbar show. Every stage is a child
+`UploadStep` via `create_sub_step`, which is where `ToolVersion` (the bcftools stages) and the per-stage stderr
+(`output_text`) live. `upload/management/commands/vcf_clean_and_filter.py:Command` is the gatekeeper bcftools
 needs: it renames contigs to the reference's names, drops non-standard contigs and out-of-range positions (counted into
 `VCFSkippedContigs`), drops records matching `settings.VCF_IMPORT_SKIP_RECORD_REGEX` and reference spans, moves FILTER
 values the header never declared into INFO so bcftools does not abort on them (#1711), and watches sort order. An
@@ -217,7 +221,7 @@ formats on an existing VCF) and everything downstream must be safe to run twice 
 Steps are rows, not celery state, because an import outlives any one worker process: the page at
 `upload/views/views.py:view_upload_pipeline` and `APIUploadStatusView` read progress straight from `UploadStep`, a
 crashed worker leaves a row that says where it died, and retry can reason about what to delete. The stage/dependency
-split (`upload/models/models_enums.py:VCFPipelineStage`) is what lets steps be created during the run - by preprocess
+split (`upload/enums/upload_enums.py:VCFPipelineStage`) is what lets steps be created during the run - by preprocess
 for each chunk, by the header task per sample - and still be scheduled correctly, since the scheduler only ever asks
 "is anything in this stage still open" rather than following a fixed list.
 
@@ -236,7 +240,8 @@ Normalisation history is kept as `ModifiedImportedVariant` because users search 
 file, not the left-aligned one: `ModifiedImportedVariant.get_variant_for_unnormalized_variant` and
 `get_other_loci_variants_by_multiallelic` answer "where did my variant go", and `ModifiedImportedVariants.get_for_pipeline`
 hangs the collection off the normalize sub-step so the tool version is recorded with it. Legacy rows
-hold vt-format `OLD_VARIANT` strings, which `_vt_split_old_variant` parses, so the model reads both.
+hold vt-format `OLD_VARIANT` strings; lookups go through `old_variant_formatted`, which has the same
+`chrom:pos:ref/alt` shape for both tools, so those rows are still found.
 
 ## Traps
 

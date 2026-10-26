@@ -8,8 +8,8 @@ search summaries, health and uptime checks, per-instance Postgres partitions, th
 operation" throttle, the grid filter vocabulary, the test base classes, `library/utils/` (the `library.utils` facade),
 and `library/vg/`, the introspection tooling behind `manage.py vg`. It is not an installed app - it has no models,
 migrations or URLs of its own, only two abstract mixins that other apps' models inherit - which is why it sits below
-`snpdb` in the dependency order and why its one upward import (`snpdb.models.UserSettings`) is worth a paragraph
-below. `library/AGENTS.md` holds the rules; this is the story behind them. Setting values are in the generated
+`snpdb` in the dependency order and why its upward imports - each one listed in the `ignore_imports` of
+`.importlinter` - are worth a paragraph below. `library/AGENTS.md` holds the rules; this is the story behind them. Setting values are in the generated
 [settings map](../maps/settings.md), commands in [commands](../maps/commands.md), and `claude/domain.md` has the
 vocabulary.
 
@@ -22,8 +22,11 @@ before `models.Model`, so its `save` runs first: on the initial save (no pk yet,
 explicitly) it calls `library/guardian_utils.py:assign_permission_to_user_and_groups`, which grants the owner read and
 write on the object and then reads `UserSettings.get_for_user(user).initial_perm_read_and_write_groups` to grant the
 same to the lab or organisation groups the user has asked new objects to be shared with. That `UserSettings` import
-sits inside the function - `library` cannot import `snpdb` at module level without a cycle - and is the one sanctioned
-inline import in the package. Permission strings are never spelled out by hand:
+sits inside the function - `library` cannot import `snpdb` at module level without a cycle. The other function-level
+imports of an app are `EmailLog` in `AdminNotificationBuilder.send`, `UserSettingsManager` in
+`library/utils/export_utils.py:ExportSettings.get_for_request` and `PartitionArchive` in
+`RelatedModelsPartitionModel._warn_if_no_archive`; `log_utils` (eventlog) and `preview_request` (`genes.enums`,
+`variantgrid.perm_path`) import theirs at module level. Permission strings are never spelled out by hand:
 `library/guardian_utils.py:DjangoPermission.perm` builds `view_<model>` / `change_<model>` from a model, a queryset or
 a list, so a rename of the model cannot leave a stale string behind.
 
@@ -60,7 +63,7 @@ into one `FieldsBlock`), `add_markdown`, `add_divider`, `merge` - each of which 
 calls `library/log_utils.py:send_notification`, which posts the Slack blocks to the webhook: the builder's own
 `webhook_url` if it has one (snpdb's `LabNotificationBuilder` supplies the lab's), otherwise
 `settings.SLACK["admin_callback_url"]` when `SLACK["enabled"]`. Blocks are JSON-counted and cut at
-`SLACK_CHARACTER_LIMIT` (3500, under Slack's 4000) with a "check EventLog" block appended, since the event row already
+`SLACK_CHARACTER_LIMIT` (2000, well under Slack's 4000) with a "check EventLog" block appended, since the event row already
 holds the whole message. Slack refusing the payload goes to Rollbar with the JSON attached; no webhook at all degrades
 to `library/log_utils.py:report_event`, so a deployment without Slack still gets a Rollbar info line and an Event.
 `library/log_utils.py:AdminNotificationBuilder.send` adds superuser email through `EmailLog.send_mail` when
@@ -171,6 +174,12 @@ and `path:Symbol` is resolved by AST against the working tree, live plans includ
 `LOOKAHEAD_PYTHON`, so a call typeshed marks deprecated in a Python we haven't deployed shows before the upgrade, and
 splits the hits from our own `@deprecated` markers by name; `manage.py check` under `-W always::DeprecationWarning`
 adds the `warnings.warn` deprecations Django and packages raise at import, which no stub records.
+`library/vg/health.py:render_health` lists the pylint errors from `lint.txt`; `agent-maps.yml` runs
+`scripts/linting/run_pylint.sh --errors-only` on every push and turns each into a warning annotation, not a failure.
+`library/vg/health.py:ruff_health` runs `ruff check` live for the count per rule, and the same workflow writes
+ruff's per-rule statistics to the job summary, annotating only the pyflakes and bugbear families.
+`scripts/linting/pylint_model_utils.py` is a pylint plugin that drops django-model-utils' `TYPE_CHECKING` manager
+stubs, without which every query through an `InheritanceManager` reads as assignment-from-no-return.
 
 ## Why it is shaped this way
 
@@ -226,13 +235,13 @@ the base table twice gets both occurrences rewritten, which is usually right and
 `ObjectManagerCachingImmutable` on a model whose rows are ever updated serves stale instances until every worker
 restarts; `Meta.base_manager_name = 'objects'` is needed for the cache to cover related-object access too. The request
 cache needs `RequestContextMiddleware`; in a celery task there is no request and every `get` hits the database, which is
-correct but surprising in a query count. `timed_cache` has no `cache_clear` across processes and keys on argument
-identity, so passing a model instance rather than its pk defeats it.
+correct but surprising in a query count. `timed_cache`'s `cache_clear` only clears the calling process, and keys
+on the positional arguments plus the keyword arguments in call order, so `f(1)` and `f(x=1)` are cached separately.
 
 `major_operation` counts against a single per-user key shared by every operation type; a user with twenty grids open
-in twenty tabs is at the limit for the analysis grid too. `_statement_timeout` resets to
-`DATABASE_STATEMENT_TIMEOUT_SECONDS`, not to whatever the connection had before, so nesting two major operations
-restores the global value after the inner one exits. Under `MAJOR_OPERATION_LIMITS_ENABLED=False` neither the cap nor
+in twenty tabs is at the limit for the analysis grid too. The shorter `statement_timeout` goes through
+`library/django_utils/database_utils.py:pg_settings`, which reads each setting first and puts it back on exit, so
+nested major operations restore the outer one's value. Under `MAJOR_OPERATION_LIMITS_ENABLED=False` neither the cap nor
 the shorter timeout applies.
 
 `library/vg/inspect/__init__.py:inspect` and `library/vg/page.py:render_page` call `set_rollback(True)` only after the

@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from library.log_utils import get_traceback
 from library.utils import format_called_process_error, full_class_name, import_class
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     PipelineFailedJobTerminateEarlyException,
     ProcessingStatus,
@@ -20,9 +21,8 @@ from upload.models import (
     SkipUploadStepException,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
+from upload.tasks.upload_step_lease import UploadStepLeaseHeartbeat
 
 
 class ImportVCFStepTask(Task):
@@ -87,7 +87,8 @@ class ImportVCFStepTask(Task):
             if upload_pipeline.status != ProcessingStatus.PROCESSING:
                 upload_step.status = ProcessingStatus.SKIPPED
             else:
-                items_processed = self.process_items(upload_step)
+                with UploadStepLeaseHeartbeat(upload_step, this_task):
+                    items_processed = self.process_items(upload_step)
                 upload_step = load_upload_step()  # Reload from DB (other processes may have modified)
                 upload_step.items_processed = items_processed
 

@@ -20,7 +20,9 @@ from analysis.models import (
 from analysis.models.nodes.analysis_node import AnalysisDag
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
 from analysis.related_analyses import get_related_analysis_details_for_samples
+from annotation.models import AnnotationVersion
 from genes.models import ActiveSampleGeneList
+from library.django_utils.database_utils import advisory_lock
 from library.guardian_utils import add_public_group_read_permission
 from snpdb.models import Cohort, GenomeBuild, Sample
 
@@ -29,9 +31,11 @@ def run_analysis_template(analysis_template: AnalysisTemplate,
                           genome_build: GenomeBuild,
                           user: User = None,
                           template_version: AnalysisTemplateVersion = None,
+                          annotation_version: AnnotationVersion = None,
                           **kwargs) -> AnalysisTemplateRun:
     template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=user,
-                                              template_version=template_version)
+                                              template_version=template_version,
+                                              annotation_version=annotation_version)
     template_run.populate_arguments(kwargs)
     populate_analysis_from_template_run(template_run)
     return template_run
@@ -79,8 +83,11 @@ def populate_analysis_from_template_run(template_run):
 
 
 def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate,
-                                      obj, field_name) -> Analysis:
-    """ Can only be 1 per sample/template run combo """
+                                      obj, field_name,
+                                      annotation_version: Optional[AnnotationVersion] = None) -> Analysis:
+    """ One per sample (or cohort), template version and annotation version - a run left on a superseded
+        annotation version is passed over for a new one, so the sample tab and the annotated exports show
+        the current annotation (#2209). annotation_version defaults to the build's latest """
     kwargs = {
         field_name: obj,
     }
@@ -88,13 +95,19 @@ def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate
     template_version = analysis_template.active
     if template_version is None:
         raise ValueError(f"{analysis_template} has no active version")
+    if annotation_version is None:
+        annotation_version = AnnotationVersion.latest(obj.genome_build)
 
-    try:
-        satr = klass.objects.get(analysis_template_run__template_version=template_version, **kwargs)
-        return satr.analysis_template_run.analysis
-    except klass.DoesNotExist:
-        at_run = run_analysis_template(analysis_template, obj.genome_build,
-                                       template_version=template_version, **kwargs)
+    # Concurrent requests (a page and an export) would each create a run - the second waits and finds the first's
+    with advisory_lock(klass._meta.db_table, obj.pk):
+        satr = klass.objects.filter(analysis_template_run__template_version=template_version,
+                                    analysis_template_run__analysis__annotation_version=annotation_version,
+                                    **kwargs).order_by("-pk").first()
+        if satr:
+            return satr.analysis_template_run.analysis
+
+        at_run = run_analysis_template(analysis_template, obj.genome_build, template_version=template_version,
+                                       annotation_version=annotation_version, **kwargs)
         at_run.analysis.visible = False
         at_run.analysis.save()
         add_public_group_read_permission(at_run.analysis)
@@ -102,16 +115,16 @@ def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate
         return at_run.analysis
 
 
-def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate) -> Analysis:
-    """ Can only be 1 per sample/template run combo """
-
+def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate,
+                        annotation_version: Optional[AnnotationVersion] = None) -> Analysis:
     return _get_single_template_run_analysis(SampleAnalysisTemplateRun, analysis_template,
-                                             sample, "sample")
+                                             sample, "sample", annotation_version=annotation_version)
 
 
-def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate) -> Analysis:
+def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate,
+                        annotation_version: Optional[AnnotationVersion] = None) -> Analysis:
     return _get_single_template_run_analysis(CohortAnalysisTemplateRun, analysis_template,
-                                             cohort, "cohort")
+                                             cohort, "cohort", annotation_version=annotation_version)
 
 
 def _get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):

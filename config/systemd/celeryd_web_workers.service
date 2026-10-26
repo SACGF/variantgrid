@@ -1,3 +1,6 @@
+# One unit for every install location: nothing here is hardcoded (/opt/variantgrid, /mnt/variantgrid). The
+# install dir is VG_INSTALL_DIR from /etc/variantgrid/variantgrid.env, and the unit's own .env uses paths
+# relative to it.
 [Unit]
 Description=VG Web worker
 After=network.target
@@ -8,8 +11,13 @@ User=variantgrid
 ExecStartPre=/bin/mkdir -p /var/log/variantgrid
 Restart=always
 OOMPolicy=continue
-EnvironmentFile=/etc/variantgrid/variantgrid.env
-EnvironmentFile=/etc/variantgrid/celery/celeryd_web_workers.env
+# Read in order and merged: variantgrid.env is shared by every unit, the second is this unit's own
+# (copied from config/celery/). Optional (-) so a missing file reaches the ExecStartPre check below, which
+# names the fix - systemd's own failure for a missing EnvironmentFile does not say which file.
+EnvironmentFile=-/etc/variantgrid/variantgrid.env
+EnvironmentFile=-/etc/variantgrid/celery/celeryd_web_workers.env
+ExecStartPre=/bin/sh -c 'test -n "${VG_INSTALL_DIR}" && cd "${VG_INSTALL_DIR}" && test -x "${CELERY_BIN}" || { echo "VG_INSTALL_DIR=${VG_INSTALL_DIR} CELERY_BIN=${CELERY_BIN} - the /etc/variantgrid env files are not installed, see config/systemd/README.txt"; exit 1; }'
+# WorkingDirectory= does not expand variables, so cd to VG_INSTALL_DIR here instead.
 ExecStart=/bin/sh -c 'cd "${VG_INSTALL_DIR}" && ${CELERY_BIN} multi start ${CELERYD_NODES} \
   -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} \
   --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'

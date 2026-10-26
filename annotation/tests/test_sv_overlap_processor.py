@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation import vep_columns
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import SVOverlapProcessor
 
 

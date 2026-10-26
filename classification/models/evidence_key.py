@@ -11,7 +11,6 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from datetime import date
-from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union, cast
 
@@ -20,19 +19,24 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import SET_NULL
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource
+from classification.enums import (
+    CriteriaEvaluation,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+    WipeMode,
+)
 from classification.enums.classification_enums import (
-    AlleleOriginBucket,
     CopyAlleleOrigin,
     CopyScope,
     EvidenceCategory,
     EvidenceKeyValueType,
-    ShareLevel,
 )
 from library.cache import timed_cache
 from library.utils import empty_to_none, first, pretty_label, strip_json
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import VariantGridColumn
 
 if TYPE_CHECKING:
@@ -438,10 +442,13 @@ class EvidenceKey(TimeStampedModel):
 
     @property
     def option_dictionary(self) -> dict[str, str]:
-        if options := self.virtual_options:
-            return {x.get('key'): x.get('label') for x in options}
-        else:
-            return {}
+        return self.option_dictionary_property("label")
+
+    def prop(self, key: str, prop: str) -> Any:
+        for option in self.virtual_options:
+            if option.get('key') == key:
+                return option.get(prop)
+        return None
 
     def option_dictionary_property(self, prop: str) -> dict[str, Any]:
         if options := self.virtual_options:
@@ -564,7 +571,8 @@ class EvidenceKey(TimeStampedModel):
             'examples': self.examples,
             'hide': self.hide,
             'mandatory': self.mandatory,
-            'see': self.see
+            'see': self.see,
+            'copy_scope': self.copy_scope
         })
 
     @staticmethod
@@ -753,16 +761,6 @@ class EvidenceKeyMap:
             return AlleleOriginBucket.GERMLINE
         else:
             return AlleleOriginBucket.UNKNOWN
-
-
-class WipeMode(Enum):
-    """
-    When wiping out a value from a patch... how do we wipe it
-    """
-    SET_NONE = 'set_none'  # None
-    SET_EMPTY = 'set_empty'  # {}
-    POP = 'pop'  # remove it from the patch dictionary all together
-    ATTRIBUTES_TO_NONE = 'atts_to_none'  # {"value": None, "note": None, "explain": None}
 
 
 class VCDataCell:

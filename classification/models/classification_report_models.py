@@ -23,17 +23,18 @@ from django.db import models
 from django.db.models import CASCADE, PROTECT, SET_NULL, Prefetch, Q, QuerySet
 from model_utils.models import TimeStampedModel
 
-from classification.enums import AlleleOriginBucket
+from classification.enums import CaseReportStatus
 from classification.models.classification import ClassificationModification
 from classification.report.template_validation import validate_case_template
 from library.case_report_delivery import CaseReportDelivery
-from patients.models import Extraction, Patient, Specimen, measure_value_description
-from patients.models_enums import (
+from patients.enums import (
     MEASURE_CONTEXT_KEYS,
     SampleSourceLevel,
 )
+from patients.models import Extraction, Patient, Specimen, measure_value_description
+from seqauto.enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
 from seqauto.models import LibraryQC
-from seqauto.models.models_enums import CVO_MEASURE_CONTEXT_KEYS, LIBRARY_QC_CONTEXT_KEYS
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab, Sample
 
 # A report has gone out with the case, so a deployment that files it somewhere else can now do so.
@@ -316,12 +317,6 @@ class ClassificationReportTemplate(TimeStampedModel):
 
     def __str__(self):
         return self.name
-
-
-class CaseReportStatus(models.TextChoices):
-    DRAFT = 'D', 'Draft'
-    FINAL = 'F', 'Final'
-    SUPERSEDED = 'S', 'Superseded'
 
 
 def case_report_upload_path(instance: 'CaseReport', filename: str) -> str:

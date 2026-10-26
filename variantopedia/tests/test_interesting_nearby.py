@@ -9,10 +9,11 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationRun, VariantTranscriptAnnotation
-from classification.enums import AlleleOriginBucket, ShareLevel
+from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_fake_transcript_version
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, Tag, Variant, VariantZygosityCountCollection
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
 from variantopedia.interesting_nearby import (

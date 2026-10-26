@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.test.client import Client
 from django.urls.base import reverse
 
-from analysis.models.enums import NodeMatchInput
+from analysis.enums import NodeMatchInput
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.damage_node import DamageNode

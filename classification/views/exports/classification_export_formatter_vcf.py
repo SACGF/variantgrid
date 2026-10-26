@@ -7,7 +7,7 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
 
-from classification.enums import AlleleOriginBucket, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
@@ -30,6 +30,7 @@ from classification.views.exports.vcf_export_utils import (
 from library.django_utils import get_url_from_view_path
 from library.utils import local_date_str_no_dash
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele, Variant
 
 

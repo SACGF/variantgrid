@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -14,26 +14,30 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
 )
 from classification.enums import SpecialEKeys
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, PatientRecordMatchType, TissueStatus
 from patients.forms import ExtractionForm
 from patients.import_records import process_record
 from patients.models import (
-    Extraction,
+    AmbiguousExtraction,
     ExternalModelManager,
     ExternalPK,
+    Extraction,
     Patient,
     PatientColumns,
     PatientImport,
+    PatientModification,
     PatientRecord,
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import NucleicAcid, TissueStatus
+from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 from patients.views import CREATE_EXTRACTION
 from patients.views_autocomplete import ExtractionAutocompleteView, SpecimenAutocompleteView
-from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, Sample
+from snpdb.enums import ImportSource, ImportStatus, VariantOrigin
+from snpdb.models import VCF, GenomeBuild, Sample
 from snpdb.search import SearchResultMatchStrength, search_data
-from snpdb.models.models_enums import VariantOrigin
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 _FAKE_CSV = os.path.join(os.path.dirname(__file__), "test_data", "fake_patient_records.csv")
 
@@ -224,7 +228,7 @@ class TestSpecimenExtractionPermissions(TestCase):
 
 
 class TestPatientCSVExtractionRoundTrip(TestCase):
-    """ R6 - the existing SPECIMEN_NUCLEIC_ACID_SOURCE column implies a single extraction """
+    """ A row through process_record: the sample, else the EXTRACTION_* columns, say which extraction it is """
 
     @classmethod
     def setUpTestData(cls):
@@ -252,7 +256,7 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
             PatientColumns.SAMPLE_NAME: "csv_sample",
             PatientColumns.SPECIMEN_REFERENCE_ID: "CSVSPEC001",
             PatientColumns.SPECIMEN_DESCRIPTION: "left femur",
-            PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE: "DNA",
+            PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "DNA",
             **overrides,
         })
         process_record(self.patient_records, record_id=1, row=row)
@@ -284,7 +288,7 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
 
     def test_reimport_updates_nucleic_acid_source_in_place(self):
         self._import_row()
-        self._import_row(**{PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE: "RNA"})
+        self._import_row(**{PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "RNA"})
 
         extractions = Extraction.objects.filter(specimen__reference_id="CSVSPEC001")
         self.assertEqual(extractions.count(), 1)
@@ -298,7 +302,7 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
                                            import_status=ImportStatus.SUCCESS)
         assign_permission_to_user_and_groups(self.user, rna_sample)
         self._import_row(**{PatientColumns.SAMPLE_NAME: "csv_sample_rna",
-                            PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE: "RNA"})
+                            PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "RNA"})
 
         self.assertEqual(Extraction.objects.filter(specimen__reference_id="CSVSPEC001").count(), 2)
         self.sample.refresh_from_db()
@@ -307,7 +311,7 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
         self.assertEqual(rna_sample.extraction.nucleic_acid_source, NucleicAcid.RNA)
 
     def test_blank_nucleic_acid_source_still_links_sample(self):
-        self._import_row(**{PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE: None})
+        self._import_row(**{PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: None})
 
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.extraction.specimen.reference_id, "CSVSPEC001")
@@ -328,6 +332,73 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
         specimen = Specimen.objects.get(reference_id="CSVSPEC001")
         self.assertEqual(specimen.tissue_status, TissueStatus.UNKNOWN)
 
+    def _import_arm(self, record_id=1, **overrides):
+        """ A sample-less row naming one arm of block 2600000001 """
+        row = _make_row(**{PatientColumns.SPECIMEN_REFERENCE_ID: "2600000001", **overrides})
+        process_record(self.patient_records, record_id=record_id, row=row)
+        return PatientRecord.objects.get(patient_records=self.patient_records, record_id=record_id)
+
+    def _import_both_arms(self):
+        return [self._import_arm(record_id=1, **{PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001C",
+                                                 PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "DNA",
+                                                 PatientColumns.EXTRACTION_DATE: "06/05/2025"}),
+                self._import_arm(record_id=2, **{PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001B",
+                                                 PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "RNA"})]
+
+    def test_sample_less_rows_name_both_arms(self):
+        records = self._import_both_arms()
+        self.assertEqual([PatientRecordMatchType.CREATED] * 2, [r.extraction_match for r in records])
+        arms = {e.reference_id: e.nucleic_acid_source
+                for e in Extraction.objects.filter(specimen__reference_id="2600000001")}
+        self.assertEqual({"2600000001C": NucleicAcid.DNA, "2600000001B": NucleicAcid.RNA}, arms)
+        self.assertEqual(timezone.localdate(records[0].extraction.extraction_date), datetime(2025, 5, 6).date())
+
+        self.patient_records = PatientRecords.objects.create(
+            patient_import=PatientImport.objects.create(name="extraction_reimport"))
+        records = self._import_both_arms()
+        self.assertEqual([PatientRecordMatchType.EXACT] * 2, [r.extraction_match for r in records])
+        self.assertEqual(2, Extraction.objects.filter(specimen__reference_id="2600000001").count())
+
+    def test_reference_relinks_the_sample(self):
+        self._import_arm(**{PatientColumns.SAMPLE_NAME: "csv_sample",
+                            PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001C"})
+        self._import_arm(record_id=2, **{PatientColumns.SAMPLE_NAME: "csv_sample",
+                                         PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001B",
+                                         PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "RNA"})
+
+        self.sample.refresh_from_db()
+        self.assertEqual("2600000001B", self.sample.extraction.reference_id)
+        relinks = PatientModification.objects.filter(description__contains="previously extraction was: 2600000001C")
+        self.assertEqual(1, relinks.count())
+
+    def test_extraction_reference_needs_a_specimen(self):
+        record = self._import_arm(**{PatientColumns.SPECIMEN_REFERENCE_ID: None,
+                                     PatientColumns.SAMPLE_NAME: "csv_sample",
+                                     PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001C"})
+        self.assertFalse(record.valid)
+        self.assertIn("needs a Specimen Reference id", record.validation_message)
+        self.assertIsNone(record.extraction)
+        self.assertFalse(Extraction.objects.filter(reference_id="2600000001C").exists())
+        self.sample.refresh_from_db()
+        self.assertIsNone(self.sample.extraction)
+
+    def test_ambiguous_row_is_a_validation_message(self):
+        self._import_arm(**{PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001C",
+                            PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "DNA"})
+        self._import_arm(record_id=2, **{PatientColumns.EXTRACTION_REFERENCE_ID: "2600000001D",
+                                         PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "DNA"})
+        record = self._import_arm(record_id=3, **{PatientColumns.SAMPLE_NAME: "csv_sample",
+                                                  PatientColumns.SPECIMEN_DESCRIPTION: "FFPE block",
+                                                  PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE: "DNA"})
+
+        self.assertFalse(record.valid)
+        self.assertIn("2600000001C, 2600000001D", record.validation_message)
+        self.assertIsNone(record.extraction)
+        self.sample.refresh_from_db()
+        self.assertIsNone(self.sample.extraction)
+        self.assertEqual(self.patient, self.sample.patient)
+        self.assertEqual("FFPE block", Specimen.objects.get(reference_id="2600000001").description)
+
     def test_export_columns_round_trip(self):
         """ The CSV written back out reads the same values through the new relations """
         self._import_row()
@@ -337,10 +408,18 @@ class TestPatientCSVExtractionRoundTrip(TestCase):
                          "CSVSPEC001")
         self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.SPECIMEN_DESCRIPTION]],
                          "left femur")
-        self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.SPECIMEN_NUCLEIC_ACID_SOURCE]],
+        self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE]],
                          NucleicAcid.DNA)
         self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.SPECIMEN_TISSUE_STATUS]],
                          TissueStatus.UNKNOWN)
+
+        self._import_row(**{PatientColumns.EXTRACTION_REFERENCE_ID: "CSVSPEC001C",
+                            PatientColumns.EXTRACTION_DATE: "06/05/2025"})
+        values = Sample.objects.filter(pk=self.sample.pk).values(*PatientColumns.SAMPLE_QUERYSET_PATH.values()).get()
+        self.assertEqual(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.EXTRACTION_REFERENCE_ID]],
+                         "CSVSPEC001C")
+        self.assertEqual(timezone.localdate(values[PatientColumns.SAMPLE_QUERYSET_PATH[PatientColumns.EXTRACTION_DATE]]),
+                         datetime(2025, 5, 6).date())
 
 
 class TestAutocompleteForwarding(TestCase):
@@ -461,8 +540,8 @@ class TestSpecimenExtractionGrids(TestCase):
 
 
 class TestGetOrCreateExtraction(TestCase):
-    """ The patient CSV names one extraction per specimen, so it has to fill in the right one without
-        repurposing an arm somebody else named """
+    """ A patient CSV row says which extraction it is by reference, then sample, then acid and date - and
+        must not repurpose an arm somebody else named """
 
     @classmethod
     def setUpTestData(cls):
@@ -485,6 +564,46 @@ class TestGetOrCreateExtraction(TestCase):
         self.assertNotEqual(dna, rna)
         rna.refresh_from_db()
         self.assertEqual(rna.nucleic_acid_source, NucleicAcid.RNA)
+        self.assertEqual(self.specimen.extraction_set.count(), 2)
+
+    def test_reference_finds_its_extraction_and_updates_the_acid(self):
+        named = Extraction.objects.create(specimen=self.specimen, reference_id="2600000010C",
+                                          nucleic_acid_source=NucleicAcid.DNA)
+        self.assertEqual(self.specimen.get_or_create_extraction(NucleicAcid.RNA, reference_id="2600000010C"), named)
+        named.refresh_from_db()
+        self.assertEqual(named.nucleic_acid_source, NucleicAcid.RNA)
+
+    def test_new_reference_is_a_new_extraction(self):
+        """ even with an unnamed extraction of that acid there to fill in """
+        unnamed = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA)
+        named = self.specimen.get_or_create_extraction(NucleicAcid.DNA, reference_id="2600000010C")
+        self.assertNotEqual(named, unnamed)
+        self.assertEqual(named.reference_id, "2600000010C")
+
+    def test_reference_beats_the_samples_extraction(self):
+        dna = Extraction.objects.create(specimen=self.specimen, reference_id="2600000010C")
+        rna = Extraction.objects.create(specimen=self.specimen, reference_id="2600000010B")
+        sample = Sample(extraction=dna)
+        self.assertEqual(self.specimen.get_or_create_extraction(sample=sample, reference_id="2600000010B"), rna)
+
+    def test_same_acid_twice_needs_a_date(self):
+        first = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA,
+                                          extraction_date=timezone.make_aware(datetime(2026, 1, 20)))
+        Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA,
+                                  extraction_date=timezone.make_aware(datetime(2026, 3, 14)))
+        with self.assertRaises(AmbiguousExtraction):
+            self.specimen.get_or_create_extraction(NucleicAcid.DNA)
+
+        picked = self.specimen.get_or_create_extraction(NucleicAcid.DNA,
+                                                        extraction_date=timezone.make_aware(datetime(2026, 1, 20)))
+        self.assertEqual(picked, first)
+
+    def test_a_different_date_is_a_re_extraction(self):
+        first = Extraction.objects.create(specimen=self.specimen, nucleic_acid_source=NucleicAcid.DNA,
+                                          extraction_date=timezone.make_aware(datetime(2026, 1, 20)))
+        redo = self.specimen.get_or_create_extraction(NucleicAcid.DNA,
+                                                      extraction_date=timezone.make_aware(datetime(2026, 3, 14)))
+        self.assertNotEqual(redo, first)
         self.assertEqual(self.specimen.extraction_set.count(), 2)
 
     def test_no_source_reuses_whatever_is_there(self):
@@ -696,3 +815,32 @@ class TestSpecimenExtractionSearch(TestCase):
         preferred = search_data(self.user, "SPECIMEN1", False).single_preferred_result()
         self.assertIsNotNone(preferred, "A whole specimen reference has somewhere to jump to")
         self.assertEqual(preferred.preview.internal_url, self.specimen.get_absolute_url())
+
+
+@override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
+class TestSpecimenExtractionSearchNormalized(TestCase):
+    """ A reference typed the way another system writes it still names the row """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("search_norm_user", password="x")
+        cls.patient = Patient.objects.create(first_name="SEARCH", last_name="NORMALIZED")
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def setUp(self):
+        self.specimen = Specimen.objects.create(reference_id="26-000-00001", patient=self.patient)
+        self.dna = Extraction.objects.create(specimen=self.specimen, reference_id="26-000-00001C")
+
+    def _strengths(self, search_string) -> dict:
+        results = search_data(self.user, search_string, False).results
+        return {r.preview.internal_url: r.match_strength for r in results}
+
+    def test_the_other_form_names_the_specimen(self):
+        strengths = self._strengths("2600000001")
+        self.assertEqual(strengths[self.specimen.get_absolute_url()], SearchResultMatchStrength.ID_MATCH)
+        self.assertEqual(strengths[self.dna.get_absolute_url()], SearchResultMatchStrength.FUZZY_MATCH)
+
+    def test_the_other_form_names_the_extraction(self):
+        strengths = self._strengths("2600000001C")
+        self.assertEqual(strengths[self.dna.get_absolute_url()], SearchResultMatchStrength.ID_MATCH)

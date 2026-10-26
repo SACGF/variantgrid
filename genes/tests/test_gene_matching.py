@@ -1,11 +1,14 @@
+from contextlib import redirect_stdout
+from io import StringIO
+
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test.testcases import TestCase
 
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from genes.gene_matching import (
     MAX_GENE_SYMBOL_LENGTH,
     GeneSymbolMatcher,
-    HGNCMatcher,
     ReleaseGeneMatcher,
     tokenize_gene_symbols,
 )
@@ -23,77 +26,71 @@ from genes.models import (
     ReleaseGeneSymbolGene,
     ReleaseGeneVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus
 from snpdb.models import GenomeBuild
 
 
-class TestGeneMatching(TestCase):
-    # TODO: This isn't really testing anything anymore, maybe put in some aliases??
-    GENE_SYMBOLS = ["AGRN", "BRCA1"]
-
-    def setUp(self):
-        for gene_symbol in TestGeneMatching.GENE_SYMBOLS:
-            gene_symbol, _ = GeneSymbol.objects.get_or_create(symbol=gene_symbol)
-
-    def test_gene_matcher(self):
-        gene_matcher = GeneSymbolMatcher()
-
-        for gene_name in TestGeneMatching.GENE_SYMBOLS:
-            gene_symbol_id = gene_matcher.get_gene_symbol_id(gene_name)
-            self.assertEqual(gene_name, gene_symbol_id)
-            # print(f"{gene_symbol}/{transcript_id} => gene: {gene}, transcript: {transcript}")
+def _call_command(*args, **kwargs):
+    """ The command prints a line per change """
+    with redirect_stdout(StringIO()):
+        call_command("fix_rematch_release_symbols_to_genes", *args, **kwargs)
 
 
-class TestHGNCMatcher(TestCase):
-    """ HGNC alias rows accumulate across imports and are never pruned, and include HGNC's informal
-        alias_symbol synonyms - which are often another gene's approved symbol. So a symbol that HGNC
-        currently approves has to win over any alias redirect. """
+class TestGeneSymbolMatcherGeneList(TestCase):
+    def test_alias_recorded_and_ambiguous_alias_warned(self):
+        for symbol in ["SEPTIN2", "SEPTIN6"]:
+            GeneSymbol.objects.create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        kal1 = GeneSymbolAlias.objects.create(alias="KAL1", gene_symbol=GeneSymbol.objects.create(symbol="ANOS1"),
+                                              source=GeneSymbolAliasSource.HGNC)
+        user = User.objects.get_or_create(username='test_user')[0]
+        gene_list = GeneList.objects.create(name="test_ambiguous", user=user)
 
-    def setUp(self):
-        hgnc_import = HGNCImport.objects.create()
+        GeneSymbolMatcher().create_gene_list_gene_symbols_from_text(gene_list, "SEPTX KAL1")
 
-        def _hgnc(pk, symbol, previous_symbols="", alias_symbols=""):
-            GeneSymbol.objects.get_or_create(symbol=symbol)
-            return HGNC.objects.create(pk=pk, gene_symbol_id=symbol, hgnc_import=hgnc_import,
-                                       status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name",
-                                       previous_symbols=previous_symbols, alias_symbols=alias_symbols)
+        glgs_by_name = {glgs.original_name: glgs for glgs in gene_list.genelistgenesymbol_set.all()}
+        self.assertIsNone(glgs_by_name["SEPTX"].gene_symbol_id)
+        self.assertEqual(("ANOS1", kal1.pk), (glgs_by_name["KAL1"].gene_symbol_id,
+                                              glgs_by_name["KAL1"].gene_symbol_alias_id))
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias for SEPTIN2, SEPTIN6", gene_list.error_message)
 
-        def _alias(alias, symbol):
-            GeneSymbol.objects.get_or_create(symbol=symbol)
-            GeneSymbolAlias.objects.create(alias=alias, gene_symbol_id=symbol,
-                                           source=GeneSymbolAliasSource.HGNC)
 
-        # AIP is approved, but AURKAIP1 lists "AIP" as an informal synonym
-        self.aip = _hgnc(358, "AIP")
-        self.aurkaip1 = _hgnc(24114, "AURKAIP1", alias_symbols="AIP")
-        _alias("AIP", "AURKAIP1")
+class TestSetGeneListFromText(TestCase):
+    def test_diff_keeps_alias_and_removes_unmatched(self):
+        for symbol in ["ANOS1", "RUNX1", "GATA2"]:
+            GeneSymbol.objects.create(symbol=symbol)
+        GeneSymbolAlias.objects.create(alias="KAL1", gene_symbol_id="ANOS1", source=GeneSymbolAliasSource.HGNC)
+        user = User.objects.get_or_create(username='test_user')[0]
+        gene_list = GeneList.objects.create(name="test_set_from_text", user=user)
+        matcher = GeneSymbolMatcher()
+        matcher.create_gene_list_gene_symbols(gene_list, ["KAL1", "RUNX1", "NOTAGENE"], modification_info="original")
 
-        # POPDC1 is approved after being renamed from BVES, but a leftover row from when BVES was
-        # the approved symbol still points POPDC1 -> BVES, which no longer exists
-        self.popdc1 = _hgnc(1152, "POPDC1", previous_symbols="BVES")
-        _alias("BVES", "POPDC1")
-        _alias("POPDC1", "BVES")
+        # Text box shows the alias row as its symbol, and the unmatched row by its name
+        added, removed = matcher.set_gene_list_gene_symbols_from_text(gene_list, "anos1, GATA2", modification_info="edit")
 
-    def test_approved_symbol_wins_over_informal_alias(self):
-        self.assertEqual(self.aip, HGNCMatcher().match_hgnc("AIP"))
+        self.assertEqual((["GATA2"], ["NOTAGENE", "RUNX1"]), (added, removed))
+        rows = dict(gene_list.genelistgenesymbol_set.values_list("original_name", "modification_info"))
+        self.assertEqual({"KAL1": "original", "GATA2": "edit"}, rows)
 
-    def test_approved_symbol_wins_over_retired_redirect(self):
-        self.assertEqual(self.popdc1, HGNCMatcher().match_hgnc("POPDC1"))
+    def test_warning_follows_the_text(self):
+        """ The ambiguous alias warning goes once the name is replaced, and stays while the name is kept """
+        for symbol in ["SEPTIN2", "SEPTIN6", "RUNX1"]:
+            GeneSymbol.objects.create(symbol=symbol)
+            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        user = User.objects.get_or_create(username='test_user')[0]
+        gene_list = GeneList.objects.create(name="test_warning", user=user)
+        matcher = GeneSymbolMatcher()
+        matcher.create_gene_list_gene_symbols_from_text(gene_list, "SEPTX")
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias", gene_list.error_message)
 
-    def test_previous_symbol_still_resolves_via_alias(self):
-        self.assertEqual(self.popdc1, HGNCMatcher().match_hgnc("BVES"))
+        matcher.set_gene_list_gene_symbols_from_text(gene_list, "SEPTX RUNX1")
+        gene_list.refresh_from_db()
+        self.assertIn("'SEPTX' is an ambiguous alias", gene_list.error_message)
 
-    def test_alias_is_case_insensitive(self):
-        self.assertEqual(self.popdc1, HGNCMatcher().match_hgnc("bves"))
-
-    def test_unknown_symbol_returns_none(self):
-        self.assertIsNone(HGNCMatcher().match_hgnc("NOT_A_GENE_SYMBOL"))
-
-    def test_alias_target_that_no_longer_exists_returns_none(self):
-        _ = GeneSymbol.objects.get_or_create(symbol="GONE")
-        GeneSymbolAlias.objects.create(alias="RETIRED_ONLY", gene_symbol_id="GONE",
-                                       source=GeneSymbolAliasSource.HGNC)
-        self.assertIsNone(HGNCMatcher().match_hgnc("RETIRED_ONLY"))
+        matcher.set_gene_list_gene_symbols_from_text(gene_list, "SEPTIN2 RUNX1")
+        gene_list.refresh_from_db()
+        self.assertFalse(gene_list.error_message)
 
 
 class TestOversizedTokens(TestCase):
@@ -230,12 +227,12 @@ class TestFixRematchReleaseSymbolsToGenes(ReleaseGeneMatcherTestCase):
                    .values_list("gene_id", flat=True))
 
     def test_resync_deletes_chained_inserts_missing_and_keeps_direct(self):
-        call_command("fix_rematch_release_symbols_to_genes")
+        _call_command()
         self.assertEqual(set(), self._matched_genes("MT-TS2"))
         self.assertEqual({"5134"}, self._matched_genes("PDCD2"))
         self.assertEqual({"3730"}, self._matched_genes("KAL1"))
 
     def test_dry_run_writes_nothing(self):
-        call_command("fix_rematch_release_symbols_to_genes", dry_run=True)
+        _call_command(dry_run=True)
         self.assertEqual({"5134"}, self._matched_genes("MT-TS2"))
         self.assertEqual(set(), self._matched_genes("KAL1"))

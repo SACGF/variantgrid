@@ -9,7 +9,7 @@ from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTr
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection, TranscriptVersion
 from seqauto.models import EnrichmentKit
-from snpdb.models import DataState
+from snpdb.enums import DataState
 
 
 @celery.shared_task
@@ -56,7 +56,7 @@ def create_canonical_gene_coverage_for_enrichment_kit(enrichment_kit_id):
     if enrichment_kit_id:
         enrichment_kit = EnrichmentKit.objects.get(pk=enrichment_kit_id)
         canonical_collection = canonical_transcript_manager.get_canonical_collection_for_enrichment_kit(enrichment_kit)
-        coverage_collection_qs = GeneCoverageCollection.objects.filter(qc__alignment_file__sequencing_sample__enrichment_kit=enrichment_kit)
+        coverage_collection_qs = GeneCoverageCollection.objects.filter(qc__sequencing_sample__enrichment_kit=enrichment_kit)
     else:
         canonical_collection = canonical_transcript_manager.get_default_canonical_collection()
         coverage_collection_qs = GeneCoverageCollection.objects.filter(qc__isnull=True)

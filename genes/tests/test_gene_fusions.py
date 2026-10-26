@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from annotation.fake_data import get_fake_annotation_version
+from genes.enums import GeneSymbolAliasSource, HGNCStatus
 from genes.gene_fusions import (
     GeneFusionResolver,
     find_gene_fusions_for_string,
@@ -18,11 +19,11 @@ from genes.models import (
     GeneSymbolAlias,
     HGNCImport,
 )
-from genes.models_enums import GeneSymbolAliasSource, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from genes.tests.gene_level_test_utils import make_release_gene
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
-from snpdb.models import Contig, GenomeBuild, SequenceRole
+from snpdb.enums import SequenceRole
+from snpdb.models import Contig, GenomeBuild
 
 
 class GeneFusionTestCase(TestCase):
@@ -52,16 +53,18 @@ class GeneFusionTestCase(TestCase):
         cls.hgnc_ids["SEPTIN14"] = 17167
 
         # ACPP is HGNC's previous symbol for ACP3, and Ensembl still writes it, so there is a
-        # GeneSymbol row for it and no GeneSymbolAlias - the matcher stops at the direct hit
+        # GeneSymbol row for the old name as well as the alias the HGNC import stores
         GeneSymbol.objects.get_or_create(symbol="ACP3")
         GeneSymbol.objects.get_or_create(symbol="ACPP")
         HGNC.objects.create(pk=125, gene_symbol_id="ACP3", hgnc_import=hgnc_import,
                             status=HGNCStatus.APPROVED, approved_name="acid phosphatase 3",
                             previous_symbols="ACPP")
+        GeneSymbolAlias.objects.create(alias="ACPP", gene_symbol_id="ACP3",
+                                       source=GeneSymbolAliasSource.HGNC)
         cls.hgnc_ids["ACP3"] = 125
 
         # SEPT2 is SEPTIN2's previous symbol and, on an unrelated gene, one of SEPTIN6's aliases -
-        # GeneSymbolAlias holds a row for each, and keeps only one of them per alias
+        # the HGNC import stores a GeneSymbolAlias for each
         for pk, symbol, previous, alias in [(7729, "SEPTIN2", "SEPT2", ""),
                                             (15848, "SEPTIN6", "SEPT6", "SEP2,SEPT2")]:
             GeneSymbol.objects.get_or_create(symbol=symbol)
@@ -69,8 +72,9 @@ class GeneFusionTestCase(TestCase):
                                 status=HGNCStatus.APPROVED, approved_name=f"{symbol} approved name",
                                 previous_symbols=previous, alias_symbols=alias)
             cls.hgnc_ids[symbol] = pk
-        GeneSymbolAlias.objects.create(alias="SEPT2", gene_symbol_id="SEPTIN6",
-                                       source=GeneSymbolAliasSource.HGNC)
+        for symbol in ["SEPTIN2", "SEPTIN6"]:
+            GeneSymbolAlias.objects.create(alias="SEPT2", gene_symbol_id=symbol,
+                                           source=GeneSymbolAliasSource.HGNC)
 
         # Clone-based identifiers: known to the annotation as gene symbols, but HGNC carries neither
         for symbol in ["RP11-458D21.5", "AC016683.6"]:
@@ -145,18 +149,27 @@ class TestFusionResolution(GeneFusionTestCase):
         self.assertIsNone(gene.gene_level_id.gene_symbol_id)
 
     def test_previous_symbol_resolves_when_a_gene_symbol_row_shadows_it(self):
-        """ ACPP is a GeneSymbol in its own right, so the matcher never reaches an alias - HGNC's
-            own previous symbols are what places it on ACP3 """
+        """ ACPP is a GeneSymbol in its own right, but with no HGNC record of its own - HGNC's
+            previous symbols are what place it on ACP3 """
         gene = self.resolver.resolve_side("ACPP")
         self.assertEqual("ACP3", gene.resolved_symbol)
         self.assertEqual(self.hgnc_ids["ACP3"], gene.gene_level_id.pk)
         self.assertTrue(gene.was_renamed)
 
     def test_a_rename_outranks_another_gene_alias_of_the_same_name(self):
-        """ SEPT2 became SEPTIN2; SEPTIN6 merely lists it as an alias, and GeneSymbolAlias has kept
-            that one. A rename says 'the same gene', an alias does not """
+        """ SEPT2 became SEPTIN2; SEPTIN6 merely lists it as an alias. A rename says 'the same
+            gene', an alias does not """
         gene = self.resolver.resolve_side("SEPT2")
         self.assertEqual("SEPTIN2", gene.resolved_symbol)
+
+    def test_an_alias_of_several_genes_is_refused_naming_them(self):
+        for symbol in ["SEPTIN2", "SEPTIN6"]:
+            GeneSymbolAlias.objects.create(alias="SEPTX", gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        resolution = resolve_fusion_string("SEPTX::BCR")
+        self.assertIsNone(resolution.resolved)
+        self.assertIn("ambiguous alias for SEPTIN2, SEPTIN6", resolution.reason)
+        # another name in the cell places the gene
+        self.assertEqual("BCR", self.resolver.resolve_side("SEPTX;BCR").resolved_symbol)
 
     def test_local_ids_are_allocated_without_collision(self):
         first = self.resolver.resolve_side("RP11-458D21.5").gene_level_id

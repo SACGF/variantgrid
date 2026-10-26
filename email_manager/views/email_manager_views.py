@@ -54,13 +54,14 @@ class EmailColumns(DatatableConfig[EmailLog]):
 
         self.search_box_enabled = True
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('email_detail', expected_height=300)
+        self.set_expand_ajax('email_detail', expected_height=300)
         self.rich_columns = [
             RichColumn('id', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('subject', orderable=True),
             RichColumn('recipient_list', label='Recipients', orderable=False),
-            RichColumn('probably_sent', client_renderer='TableFormat.boolean.bind(null, "false_is_error")'),
+            RichColumn('probably_sent', client_renderer='TableFormat.boolean',
+                       client_renderer_kwargs={"style": "false_is_error"}),
         ]
 
     def get_initial_queryset(self) -> QuerySet[EmailLog]:

@@ -19,7 +19,10 @@ per-transcript dbNSFP scores for a given annotation run.
 
 from typing import Optional, Protocol
 
-from annotation.models.models import DBNSFPGeneAnnotation, DBNSFPGeneAnnotationVersion
+from annotation.models.models_gene_annotation import (
+    DBNSFPGeneAnnotation,
+    DBNSFPGeneAnnotationVersion,
+)
 
 
 class RefSeqEnsemblTranscriptResolver(Protocol):

@@ -1,5 +1,3 @@
-import csv
-import json
 from collections import defaultdict
 from datetime import timedelta
 from typing import Optional
@@ -10,23 +8,21 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.utils import OperationalError
 from django.forms import model_to_dict
-from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.text import slugify
 from django.utils.timezone import localtime
 
 from analysis.models import VariantTag
 from annotation.models import (
     AnnotationVersion,
-    Classification,
-    ClassificationModification,
     ClinVar,
     ClinVarRecordCollection,
     VariantAnnotation,
     VariantTranscriptAnnotation,
 )
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.models.classification import Classification, ClassificationModification
+from classification.models.classification_grouping import ClassificationGrouping
 from eventlog.models import create_event
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.models import (
@@ -37,13 +33,9 @@ from genes.models import (
 )
 from library.django_utils import get_field_counts
 from library.django_utils.database_utils import pg_settings, query_was_cancelled
-from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK
 from library.genomics import format_bp
 from library.git import Git
 from library.log_utils import log_traceback
-from library.utils import StashFile
-from library.utils.date_utils import local_date_string
-from pathtests.models import cases_for_user
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.forms import TagForm, UserSelectForm, get_settings_form_features
@@ -64,7 +56,6 @@ from snpdb.variant_filters import (
 from upload.models.models import ModifiedImportedVariant
 from variantopedia import forms
 from variantopedia.grids import (
-    VariantTagsColumns,
     filter_unresolved_variant_tags,
     show_resolved_variant_tags,
     variant_tags_for_user,
@@ -114,12 +105,10 @@ def dashboard(request):
         latest_sequencing_vcfs = qs[:NUM_SEQUENCING_PROJECTS]
         sample_enrichment_kits_df = get_sample_enrichment_kits_df()
 
-    user_has_cases = cases_for_user(request.user).exists()
-
     context = {'git': Git(settings.BASE_DIR),
-               'user_has_cases': user_has_cases,
                'sample_enrichment_kits_df': sample_enrichment_kits_df,
-               "latest_sequencing_vcfs": latest_sequencing_vcfs}
+               "latest_sequencing_vcfs": latest_sequencing_vcfs,
+               "show_tag_stats_graph": settings.VIEW_DASHBOARD_TAG_STATS_GRAPH}
     return render(request, "variantopedia/dashboard.html", context)
 
 
@@ -231,27 +220,19 @@ def view_variant(request, variant_id, genome_build_name=None):
 
     variant = get_object_or_404(Variant, pk=variant_id)
     in_multiple_genome_builds = len(variant.genome_builds) > 1
-    genome_build = None
     if genome_build_name:
         genome_build = get_genome_build_or_404(genome_build_name)
         if genome_build not in variant.genome_builds:
             return redirect(reverse('view_variant', kwargs={'variant_id': variant_id}))
     else:
-        if in_multiple_genome_builds:
-            user_settings = UserSettings.get_for_user(request.user)
-            if user_settings.default_genome_build in variant.genome_builds:
-                genome_build = user_settings.default_genome_build
-
-    if genome_build is None:
-        genome_build = variant.any_genome_build
+        genome_build = variant.preferred_genome_build(UserSettings.get_for_user(request.user).default_genome_build)
 
     GenomeBuildManager.set_current_genome_build(genome_build)
 
     igv_data = get_igv_data(request.user, genome_build=genome_build)
     extra_context = {"igv_data": igv_data,
                      "in_multiple_genome_builds": in_multiple_genome_builds,
-                     "view_variant": True,
-                     "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'}
+                     "view_variant": True}
 
     annotation_version = AnnotationVersion.latest(genome_build)
     return variant_details_annotation_version(request, variant_id, annotation_version.pk,
@@ -437,8 +418,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             genes_canonical_transcripts = get_genes_canonical_transcripts(variant, annotation_version)
 
-        except Exception:  # May not have been annotated?
+        except Exception as e:
             log_traceback()
+            messages.add_message(request, messages.ERROR, f"Could not load this variant's annotation: {e!r}")
 
     old_variants_qs = variant.modifiedimportedvariant_set.filter(ModifiedImportedVariant.q_normalised())
     old_variants_qs = old_variants_qs.order_by("old_variant_formatted").distinct("old_variant_formatted")
@@ -466,6 +448,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
+    has_classifications = False
+    if allele := variant.allele:
+        grouping_qs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele=allele).exclude(classification_count=0)
+        has_classifications = ClassificationGrouping.filter_for_user(request.user, grouping_qs).exists()
     gene_fusion = _get_gene_fusion(variant)
     gene_copy_number_event = _get_gene_copy_number_event(variant)
     splice_event_variant = _get_splice_event_variant(variant)
@@ -482,6 +468,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
+        "has_classifications": has_classifications,
         "has_tags": has_tags,
         "show_resolved_tags": show_resolved_variant_tags(request),
         "hgvs_g": hgvs_g,
@@ -580,54 +567,3 @@ def nearby_variants(request, variant_id, annotation_version_id):
     }
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)
-
-
-def _get_grid_name(request, name) -> str:
-    name_parts = [name]
-    tag_id = request.GET.get("tag")
-    if extra_filters := request.GET.get("extra_filters"):
-        tag_id = json.loads(extra_filters).get("tag")
-    if tag_id:
-        name_parts.extend(["tag", tag_id])
-    return "_".join(name_parts)
-
-
-# The DataTable pages at 100 rows, so the variant tags CSV comes from the queryset directly
-VARIANT_TAGS_EXPORT_COLUMNS = {
-    "variant_string": "Variant",
-    "gene_symbol": "Gene",
-    "tag__id": "Tag",
-    "analysis__id": "Analysis ID",
-    "analysis__name": "Analysis",
-    "sample__name": "Sample",
-    "patient_identity": "Patient",
-    "user__username": "Username",
-    "created": "Created",
-    "variant__id": "Variant ID",
-    "id": "Tag ID",
-}
-
-
-def variant_tags_export(request, genome_build_name):
-    config = VariantTagsColumns(request)
-    qs = config.filter_queryset(config.get_initial_queryset()).order_by("variant_string")
-    basename = f"{_get_grid_name(request, 'variant_tags_export')}_{local_date_string()}"
-
-    pseudo_buffer = StashFile()
-    writer = csv.writer(pseudo_buffer, dialect='excel', quoting=csv.QUOTE_MINIMAL)
-
-    def iter_rows():
-        writer.writerow(["Genome Build"] + list(VARIANT_TAGS_EXPORT_COLUMNS.values()))
-        yield pseudo_buffer.value
-        for i, row in enumerate(qs.values(*VARIANT_TAGS_EXPORT_COLUMNS), start=1):
-            writer.writerow([genome_build_name] + [row[k] for k in VARIANT_TAGS_EXPORT_COLUMNS])
-            if i % EXPORT_ROWS_PER_CHUNK == 0:
-                yield pseudo_buffer.value
-        if remaining := pseudo_buffer.value:
-            yield remaining
-
-    response = StreamingHttpResponse(iter_rows(), content_type="text/csv")
-    response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
-    return response
-
-

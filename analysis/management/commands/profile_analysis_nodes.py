@@ -46,12 +46,13 @@ from django.db.models import Q
 from django.db.models.functions import Substr as DjSubstr
 
 from analysis.models import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_version import NodeVersion
 from annotation.models import VariantAnnotationVersion, VariantGeneOverlap
 from genes.models import GeneList
 from library.django_utils.database_utils import get_pg_setting, pg_settings
+from snpdb.enums import ProcessingStatus
 from snpdb.models import Cohort, Sample, Trio, Variant, VariantCollection
-from snpdb.models.models_enums import ProcessingStatus
 
 CSV_FIELDS = [
     "source",

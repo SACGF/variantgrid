@@ -32,7 +32,9 @@
         {% page_help 'genes/transcript_version_ensembl' 'Ensembl Transcript Versions' %}
     {% endif %}
 
-    {% if tv_sequence_info %}
+    {% if transcript.is_cdot_fake %}
+        {% include "genes/cdot_fake_transcript_alert.html" %}
+    {% elif tv_sequence_info %}
         <h4>Transcript Version Sequence Info</h4>
         <table class="table">
             <thead>
@@ -151,9 +153,12 @@
                 {% if user.is_staff %}
                     <td style="word-break: break-all">{{ transcript_version.import_source }}</td>
                 {% endif %}
-                <td><a class="hover-link external-link" target="_blank" href="{{ transcript_version.get_external_url }}">
+                <td>
+                    {% if not transcript.is_cdot_fake %}
+                    <a class="hover-link external-link" target="_blank" href="{{ transcript_version.get_external_url }}">
                         {{ transcript.get_annotation_consortium_display }} page.
                     </a>
+                    {% endif %}
                 </td>
             </tr>
         {% endfor %}

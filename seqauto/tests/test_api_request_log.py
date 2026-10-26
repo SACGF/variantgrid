@@ -6,8 +6,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from eventlog.models import ApiRequestLog
-from seqauto.models import Sequencer, SequencerModel, SequencingRun
-from seqauto.models.models_enums import DataGeneration
+from seqauto.enums import DataGeneration
+from seqauto.models import EnrichmentKit, SampleSheet, Sequencer, SequencerModel, SequencingRun
 
 
 @override_settings(INTEGRATION_API_TRACKING={"/seqauto/api/v1/": "Sequencing pipeline API"})
@@ -44,6 +44,31 @@ class SequencingRunApiRequestLogTest(TestCase):
         content_type = ContentType.objects.get_for_model(SequencingRun)
         self.assertEqual({found, failed}, set(ApiRequestLog.for_object(content_type, self.sequencing_run.name)))
         self.assertEqual({other_failed}, set(ApiRequestLog.for_object(content_type, self.other_run.name)))
+
+    def test_replayed_sample_sheet_is_unchanged(self):
+        """ A re-post of the same sheet writes nothing, so modified keeps meaning "changed" (#1413) """
+        kit = EnrichmentKit.objects.create(name="api_log_replay_kit")
+        payload = {
+            "path": "/data/RUN_1/SampleSheet.csv",
+            "sequencing_run": self.sequencing_run.pk,
+            "hash": "REPLAY",
+            "sequencingsample_set": [{"sample_id": "s1", "sample_name": "s1", "sample_number": 1, "lane": 1,
+                                      "barcode": "ACGT", "enrichment_kit": {"name": kit.name, "version": kit.version},
+                                      "sequencingsampledata_set": [{"column": "Pair_ID", "value": "p1"}]}],
+        }
+        def post_sheet():
+            response = self.client.post(reverse("api_sample_sheet-list"), data=json.dumps(payload),
+                                        content_type="application/json")
+            self.assertEqual(201, response.status_code, response.content)
+            return SampleSheet.objects.get(hash="REPLAY").modified
+
+        modified = post_sheet()
+        self.assertEqual(modified, post_sheet())
+
+        first, replay = ApiRequestLog.objects.order_by("pk")
+        self.assertEqual(1, first.changes["seqauto.samplesheet"]["created"])
+        self.assertEqual(0, replay.num_changes, replay.changes)
+        self.assertEqual(1, replay.changes["seqauto.samplesheet"]["unchanged"])
 
     def test_run_page_tab(self):
         self.client.get(reverse("api_sequencing_run-detail", kwargs={"name": self.sequencing_run.name}))

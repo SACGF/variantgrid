@@ -5,12 +5,14 @@ import pandas as pd
 from django.conf import settings
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
+from genes.enums import AnnotationConsortium
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import AnnotationConsortium, GeneCoverageCollection, TranscriptVersion
+from genes.models import GeneCoverageCollection, TranscriptVersion
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
 from seqauto.models.models_seqauto import QCGeneCoverage
-from snpdb.models import DataState, GenomeBuild, Sample
+from snpdb.enums import DataState
+from snpdb.models import GenomeBuild, Sample
 from upload.models import UploadedGeneCoverage
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app
@@ -63,10 +65,10 @@ class ImportGeneCoverageTask(ImportTask):
             # Only API or seqauto sets path - but seqauto won't call this method it just directly calls
             # GeneCoverageCollection.load_from_file
             if file_upload.path:
-                if qc_gene_coverage := QCGeneCoverage.objects.filter(path=file_upload.path).first():
-                    logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
-                    genome_build = qc_gene_coverage.qc.genome_build
-                    enrichment_kit = qc_gene_coverage.qc.sequencing_sample.enrichment_kit
+                qc_gene_coverage = file_upload.get_sequencing_record_for_path(QCGeneCoverage)
+                logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
+                genome_build = qc_gene_coverage.qc.genome_build
+                enrichment_kit = qc_gene_coverage.qc.sequencing_sample.enrichment_kit
 
         filename = file_upload.get_filename()
 

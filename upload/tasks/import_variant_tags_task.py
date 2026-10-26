@@ -5,13 +5,15 @@ import pandas as pd
 from dateutil import parser
 from django.utils.timezone import make_aware
 
-from analysis.models import ImportedVariantTag, TagLocation, VariantTag, VariantTagsImport
+from analysis.enums import TagLocation
+from analysis.models import ImportedVariantTag, VariantTag, VariantTagsImport
 from library.django_utils import UserMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.utils import invert_dict
+from snpdb.enums import ImportSource
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, GenomeBuild, ImportSource, Tag, VariantAllele, VariantCoordinate
+from snpdb.models import Allele, GenomeBuild, Tag, VariantAllele, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import write_vcf_from_variant_coordinates
 from upload.models import (
@@ -187,7 +189,11 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         for ivt, variant_id in ivt_variants.items():
             tag = tag_cache.get(ivt.tag_string)
             if tag is None:
-                tag, _ = Tag.objects.get_or_create(pk=ivt.tag_string)
+                if (tag := Tag.objects.filter(pk=ivt.tag_string).first()) is None:
+                    # The same rule as snpdb.forms.CreateTagForm - tag ids go into the page as class names
+                    if not ivt.tag_string.isalnum():
+                        raise ValueError(f"Tag '{ivt.tag_string}' must be alphanumeric (no spaces or special characters)")
+                    tag = Tag.objects.create(pk=ivt.tag_string)
                 tag_cache[tag.pk] = tag
 
             # We're not going to link analysis/nodes - as probably don't match up across systems

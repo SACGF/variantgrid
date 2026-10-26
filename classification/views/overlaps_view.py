@@ -10,9 +10,9 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, OverlapContributionStatus, \
-    OverlapOverrideStatus
+    OverlapOverrideStatus, TriageNextStep
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionNextStep
+    EvidenceKeyMap, OverlapContribution, Overlap, OverlapContributionNextStep
 from classification.enums.overlaps_enums import TriageDecision, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
@@ -64,6 +64,7 @@ class ClassificationGroupingValueTriageForm(forms.Form):
         required=True,
         widget=forms.Textarea({"rows": 5})
     )
+
 
 def _onc_path_choices():
     return [("undecided", "Undecided")] + \
@@ -151,14 +152,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
         saved = False
 
-        value_e_key: EvidenceKey
-        if value_type == ClassificationResultValue.ONC_PATH:
-            value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH)
-        elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
-            value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        else:
-            raise ValueError(f"Unexpected ValueType {value_type}")
-
         # if request.GET.get("edit") == "true":
         initial_data = {
             "triage_status": triage.triage_state_obj.status,
@@ -181,7 +174,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
             "triage": triage,
             "classification_grouping": classification_grouping,
             "value_type": value_type,
-            "evidence_key": value_e_key,
         }
 
         if form.is_valid() and request.method == "POST":
@@ -350,8 +342,8 @@ class OverlapDownloadRow(ExportRow):
         return get_url_from_view_path(self.overlap.get_absolute_url())
 
     @export_column("c.HGVS")
-    def c_hgvs(self):
-        return "\n".join([str(chgvs) for chgvs in self.overlap.c_hgvs_all(
+    def dna_hgvs(self):
+        return "\n".join([str(hgvs) for hgvs in self.overlap.all_hgvs(
             lab_picker=self.lab_picker,
             genome_build=GenomeBuildManager.get_current_genome_build()
         )])
@@ -391,14 +383,14 @@ class OverlapDownloadRow(ExportRow):
         rows = []
         for cont in self.overlap.contributions_list:
             if cont.is_amending:
-                value = f"{cont.lab_like} : {cont.pretty_value} -> {cont.pretty_effective_value}"
+                value = f"{cont.lab_like} : {cont.effective_date_obj.date} | {cont.pretty_value} -> {cont.pretty_effective_value}"
             else:
-                value = f"{cont.lab_like} : {cont.pretty_effective_value}"
+                value = f"{cont.lab_like} : {cont.effective_date_obj.date} | {cont.pretty_effective_value}"
             rows.append(value)
             if last_comment_entry := cont.last_comment:
                 if last_comment := last_comment_entry.value:
                     if text := last_comment.text:
-                        rows.append(f"    \"{text}\" - {last_comment_entry.user}")
+                        rows.append(f"    \"{text}\" - {last_comment_entry.timestamp.strftime('%Y-%m-%d')} {last_comment_entry.user}")
                         rows.append("")
 
         return "\n".join(rows)
@@ -441,11 +433,7 @@ def download_overlaps(request, lab_id: str):
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
     qs = qs.prefetch_related("overlapcontributionnextstep_set")
-    categories: dict
-    if solved_mode:
-        categories = {"solved": True}
-    else:
-        categories = {"outstanding": True}
+    categories = {"solved": solved_mode, "outstanding": not solved_mode}
 
     return OverlapDownloadRow.streaming_csv(
         data=qs.iterator(chunk_size=1000),

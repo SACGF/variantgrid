@@ -19,12 +19,12 @@ from django.conf import settings
 from django.utils.text import slugify
 
 from library.pandas_utils import read_csv_skip_header
+from snpdb.enums import AssemblyMoleculeType, SequenceRole
 from snpdb.gene_level_variants import (
     GENE_LEVEL_CONTIG_LENGTH,
     GENE_LEVEL_CONTIG_NAME,
     GENE_LEVEL_CONTIG_REFSEQ_ACCESSION,
 )
-from snpdb.models import AssemblyMoleculeType, SequenceRole
 
 GRCH37 = "GCF_000001405.25_GRCh37.p13_assembly_report.txt"
 ASSEMBLY_REPORTS = {

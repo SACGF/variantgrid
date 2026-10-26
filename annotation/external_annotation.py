@@ -17,8 +17,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.models.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import get_runner
 from annotation.tasks.annotation_scheduler_task import dispatch_annotation_runs
 from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
@@ -137,14 +138,14 @@ def write_dump_metadata(annotation_run: AnnotationRun, dump_dir=None, identity: 
         Pass a precomputed `identity` (see build_dump_metadata) to avoid re-running VEP per run. """
     meta_filename = annotation_run.get_dump_metadata_filename(dump_dir=dump_dir)
     mk_path_for_file(meta_filename)
-    with open(meta_filename, "w") as f:
+    with open(meta_filename, "w", encoding="utf-8") as f:
         json.dump(build_dump_metadata(annotation_run, identity=identity), f, indent=2)
     return meta_filename
 
 
 def parse_dump_metadata(path) -> dict:
     """ Read + validate a sidecar metadata JSON written by write_dump_metadata (#1568). """
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         meta = json.load(f)
     schema = meta.get("schema")
     if schema != DUMP_METADATA_SCHEMA_VERSION:
@@ -448,7 +449,7 @@ _SNAKEFILE_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates_ex
 
 
 def render_snakefile(vep_command_template: list[str]) -> str:
-    with open(_SNAKEFILE_TEMPLATE_PATH) as f:
+    with open(_SNAKEFILE_TEMPLATE_PATH, encoding="utf-8") as f:
         template = f.read()
     return (template
             .replace("__TEMPLATE_JSON__", json.dumps(vep_command_template, indent=4))
@@ -464,11 +465,11 @@ def write_snakemake_bundle(output_dir: str,
     config = build_snakemake_config(pipeline_type=pipeline_type)
 
     config_path = os.path.join(output_dir, "config.yaml")
-    with open(config_path, "w") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         f.write(_render_config_yaml(config))
 
     snakefile_path = os.path.join(output_dir, "Snakefile")
-    with open(snakefile_path, "w") as f:
+    with open(snakefile_path, "w", encoding="utf-8") as f:
         f.write(render_snakefile(template))
 
     logging.info("Wrote Snakemake bundle: %s + %s", snakefile_path, config_path)
@@ -527,16 +528,14 @@ def explain_unmatched_variant_annotation_version(meta: dict) -> str:
     genome_build = GenomeBuild.get_name_or_alias(meta["genome_build"])
     annotation_consortium = meta["annotation_consortium"]
     expected = _expected_matchable_identity(meta)
-    best = None  # (variant_annotation_version, diff)
+    candidates = []  # (variant_annotation_version, diff)
     for variant_annotation_version in VariantAnnotationVersion.objects.filter(
             genome_build=genome_build, annotation_consortium=annotation_consortium):
         actual = _matchable_identity(variant_annotation_version_identity(variant_annotation_version))
-        diff = _identity_diff(expected, actual)
-        if best is None or len(diff) < len(best[1]):
-            best = (variant_annotation_version, diff)
-    if best is None:
+        candidates.append((variant_annotation_version, _identity_diff(expected, actual)))
+    if not candidates:
         return f"no local VariantAnnotationVersion exists for {genome_build}/{annotation_consortium}"
-    variant_annotation_version, diff = best
+    variant_annotation_version, diff = min(candidates, key=lambda candidate: len(candidate[1]))
     fields = "; ".join(f"{key}: dump={dump_value!r} local={local_value!r}"
                        for key, (dump_value, local_value) in sorted(diff.items()))
     return (f"closest local VAV {variant_annotation_version.pk} ({variant_annotation_version}) "

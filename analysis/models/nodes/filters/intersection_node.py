@@ -12,11 +12,12 @@ from django.db.models import CASCADE
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.variant_text import get_variant_text_summary, parse_region, resolve_variant_text
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomicIntervalsCollection, VariantCollection
-from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import Contig
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically

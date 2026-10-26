@@ -12,7 +12,7 @@
 {% block title %}Lab: {{ lab }}{% endblock %}
 {% block content %}
     <div class="container">
-        <h3>{{ lab }} {% if classification_distinguish_research and lab.research %}<span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %} {% admin_link lab %}</h3>
+        <h3>{{ lab }} {% if classification_distinguish_research and lab.classification_settings.research %}<span class="badge badge-info" title="Research lab">{{ research_icon }} Research</span>{% endif %} {% admin_link lab %}</h3>
         {% ui_register_tab_embedded label="Lab Activity" tab_set="lab_tabs" %}
             <div class="row">
                 <div class="col-md-6 col-lg-4 mt-4">
@@ -53,14 +53,9 @@
             {% if url_name_visible.analysis %}
                 {% ui_register_tab label="Node Counts" url="lab_settings_node_counts_tab" param=lab.pk tab_set="lab_tabs" url_check=True %}
             {% endif %}
+            {% ui_register_tab label="Classification" url="lab_classification_settings_tab" param=lab.pk tab_set="lab_tabs" %}
             {% if clinvar_export_enabled %}
-                {% if lab.clinvar_key %}
-                    {% ui_register_tab tab_set="lab_tabs" url='clinvar_key' param=lab.clinvar_key.pk label="ClinVar" %}
-                {% else %}
-                    {% ui_register_tab_embedded tab_set="lab_tabs" label="ClinVar" %}
-                        ClinVar is not configured for this lab. Contact a site administrator if you'd like to change that.
-                    {% end_ui_register_tab_embedded %}
-                {% endif %}
+                {% ui_register_tab tab_set="lab_tabs" url='lab_clinvar_key_tab' param=lab.pk label="ClinVar" %}
             {% endif %}
         {% endif %}
         {% if user.is_superuser %}

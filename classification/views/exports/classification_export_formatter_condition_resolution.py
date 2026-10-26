@@ -17,15 +17,13 @@ from classification.views.exports.classification_export_formatter import (
 )
 from genes.models import GeneSymbol
 from library.utils import ExportRow, delimited_row, export_column
+from ontology.enums import GeneDiseaseClassification, OntologyService, PanelAppClassification
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER,
-    GeneDiseaseClassification,
     OntologyImportSource,
     OntologyRelation,
-    OntologyService,
     OntologySnake,
     OntologyTerm,
-    PanelAppClassification,
 )
 
 

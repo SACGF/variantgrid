@@ -6,8 +6,9 @@ from functools import reduce
 from django.conf import settings
 
 from library.utils import full_class_name, is_not_none
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
-from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
+from upload.models import UploadStep
 from upload.tasks.vcf.import_vcf_step_task import pipeline_start_task
 from upload.tasks.vcf.import_vcf_tasks import (
     CheckStartAnnotationTask,

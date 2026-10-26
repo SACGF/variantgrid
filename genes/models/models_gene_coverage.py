@@ -9,11 +9,11 @@ from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
+from genes.enums import AnnotationConsortium
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models.models_gene import GeneSymbol, Transcript, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_file_utils import (
     get_import_processing_dir,
@@ -21,7 +21,7 @@ from library.django_utils.django_file_utils import (
 )
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.log_utils import log_traceback
-from snpdb.models import DataState
+from snpdb.enums import DataState
 from snpdb.models.models_genome import GenomeBuild
 from upload.vcf.sql_copy_files import (
     GENE_COVERAGE_HEADER,
@@ -127,6 +127,7 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         genes_with_matched_canonical = set()
         unmatched_transcripts_by_gene = defaultdict(set)
 
+        gene_matcher.resolve_names(gene_coverage_df["original_gene_symbol"])
         for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["original_gene_symbol"]
             original_transcript = row["original_transcript"]
@@ -273,7 +274,7 @@ class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):
 
     @staticmethod
     def filter_for_kit_and_gene_symbol(enrichment_kit, genome_build, gene_symbol):
-        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__alignment_file__sequencing_sample"
+        sequencing_sample = "gene_coverage_collection__qcgenecoverage__qc__sequencing_sample"
         kwargs = {sequencing_sample + "__enrichment_kit": enrichment_kit,
                   # Ensure we only get current SampleSheet
                   sequencing_sample + "__sample_sheet__sequencingruncurrentsamplesheet__isnull": False}

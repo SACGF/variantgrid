@@ -5,8 +5,8 @@ than "unset" - these all used to be lost to truthiness checks.
 
 from django.test import TestCase, override_settings
 
+from analysis.enums import GroupOperation
 from analysis.models import AllVariantsNode, Analysis
-from analysis.models.enums import GroupOperation
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.tests.utils import AnalysisSetupMixin

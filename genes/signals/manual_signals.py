@@ -2,7 +2,6 @@ import logging
 
 from django.conf import settings
 
-from annotation.models.models import CachedWebResource
 from genes.models import GeneListCategory
 from genes.tasks.cached_web_resource_tasks import (
     GnomADGeneConstraintWebResourceTask,
@@ -12,12 +11,11 @@ from genes.tasks.cached_web_resource_tasks import (
     PanelAppAustraliaPanelsWebResourceTask,
     PanelAppEnglandPanelsWebResourceTask,
     PfamWebResourceTask,
-    RefSeqGeneInfoWebResourceTask,
     RefSeqGenePubMedCountWebResourceTask,
-    RefSeqGeneSummaryWebResourceTask,
     RefSeqSequenceInfoWebResourceTask,
     UniProtWebResourceTask,
 )
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 # Remember to connect these handlers up in apps.GenesConfig
 # For some reason this doesn't work as a variable, has to be stored here...
@@ -39,10 +37,6 @@ panel_app_australia_panels_post_save_handler = CachedWebResource.named_handler_f
                                                                                        PanelAppAustraliaPanelsWebResourceTask)
 
 pfam_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PFAM, PfamWebResourceTask)
-
-refseq_gene_summary_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY, RefSeqGeneSummaryWebResourceTask)
-
-refseq_gene_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO, RefSeqGeneInfoWebResourceTask)
 
 refseq_sequence_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO, RefSeqSequenceInfoWebResourceTask)
 

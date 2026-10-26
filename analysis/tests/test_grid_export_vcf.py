@@ -45,7 +45,7 @@ class TestGridExportVCF(TestCase):
 
         header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=False)
         with tempfile.NamedTemporaryFile(mode="wt", suffix=".vcf", delete=True) as temp_file:
-            with open(temp_file.name, "w") as f:
+            with open(temp_file.name, "w", encoding="utf-8") as f:
                 writer = VCFWriter(f, header_lines)
                 for item in items:
                     chrom, pos, vcf_id, ref, alt, info, fmt, sample_calls = \

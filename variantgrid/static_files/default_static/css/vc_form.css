@@ -2,6 +2,9 @@ table.diff {
   background-color: white;
   width: inherit;
 }
+table.diff.copied-only tbody tr.not-copied {
+  display: none;
+}
 table.diff th, table.diff td {
   padding: 4px 6px 4px 6px;
 }

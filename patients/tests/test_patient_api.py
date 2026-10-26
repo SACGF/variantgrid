@@ -6,12 +6,14 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import override_settings
 from django.urls import reverse
+from guardian.shortcuts import assign_perm
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from library.guardian_utils import assign_permission_to_user_and_groups
+from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, TissueStatus
 from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, TissueStatus
+from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 
 RECONCILE_TASK = "patients.views_rest.reconcile_pending_extractions.delay"
 
@@ -69,6 +71,18 @@ class PatientAPITest(APITestCase):
         self.assertEqual(Patient.objects.filter(patient_code="2600000001P").count(), 1)
         self.assertEqual(Specimen.objects.filter(reference_id="2600000001").count(), 1)
         self.assertEqual(Extraction.objects.filter(reference_id="2600000001C").count(), 1)
+
+    @override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
+    def test_re_posting_in_another_systems_form_updates_the_same_row(self):
+        """ The LIMS accessioned '26-000-00001C'; the sequencer's API client sends '2600000001C' """
+        self._create_patient()
+        self._create_specimen(reference_id="26-000-00001")
+        self._create_extraction(reference_id="26-000-00001C", nucleic_acid_source=None)
+        response = self._create_extraction(reference_id="2600000001C", nucleic_acid_source=NucleicAcid.DNA)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        extraction = Extraction.objects.get(reference_id="26-000-00001C")
+        self.assertEqual(extraction.nucleic_acid_source, NucleicAcid.DNA)
+        self.assertEqual(Extraction.objects.filter(specimen__reference_id="26-000-00001").count(), 1)
 
     def test_both_arms_post_against_one_specimen(self):
         """ nucleic_acid_source is on Extraction, so the DNA and RNA arms share their block """
@@ -224,3 +238,13 @@ class PatientAPIPermissionTest(APITestCase):
         self.client.force_authenticate(user=self.other_user)
         response = self.client.get(reverse("api_specimen-detail", kwargs={"pk": self.specimen.pk}))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_read_only_user_cannot_delete(self):
+        assign_perm(DjangoPermission.perm(Patient, DjangoPermission.READ), self.other_user, self.patient)
+        self.client.force_authenticate(user=self.other_user)
+        for url_name, obj in (("api_extraction-detail", self.extraction),
+                              ("api_specimen-detail", self.specimen),
+                              ("api_patient-detail", self.patient)):
+            response = self.client.delete(reverse(url_name, kwargs={"pk": obj.pk}))
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, url_name)
+            self.assertTrue(type(obj).objects.filter(pk=obj.pk).exists(), url_name)

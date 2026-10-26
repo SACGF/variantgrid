@@ -1,0 +1,7 @@
+name: "VariantGrid CodeQL config"
+
+query-filters:
+  # Flags any log line whose value it guesses is "private" from a variable name (sample, patient, filename),
+  # so every server-side log of a filename or pk is an alert. Each dismissal only holds until the line moves.
+  - exclude:
+      id: py/clear-text-logging-sensitive-data

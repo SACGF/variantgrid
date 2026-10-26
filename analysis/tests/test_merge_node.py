@@ -1,7 +1,7 @@
 from django.test import TestCase, override_settings
 
+from analysis.enums import NodeStatus
 from analysis.models import AllVariantsNode
-from analysis.models.enums import NodeStatus
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.tests.utils import AnalysisSetupMixin
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

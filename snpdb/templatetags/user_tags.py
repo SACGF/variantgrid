@@ -4,9 +4,11 @@ from functools import cached_property
 from typing import Any, Union
 
 from django import template
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from library.cache import timed_cache
+from library.guardian_utils import user_in_group, user_in_group_or_superuser
 from library.utils import first
 from snpdb.models import AvatarDetails, Lab
 from snpdb.models.models_user_settings import UserSettings
@@ -17,12 +19,12 @@ register = template.Library()
 
 @register.filter(name='has_group')
 def has_group(user, group_name):
-    return user.groups.filter(name=group_name).exists()
+    return user_in_group(user, group_name)
 
 
 @register.filter(name='has_group_or_admin')
 def has_group_or_admin(user, group_name):
-    return user.is_superuser or has_group(user, group_name)
+    return user_in_group_or_superuser(user, group_name)
 
 
 @timed_cache(ttl=60)
@@ -98,6 +100,12 @@ def user(context, u: User,
             return us
 
         @property
+        def kudos_html(self) -> str:
+            if not settings.USER_AWARDS_ENABLED:
+                return ""
+            return self.avatar.awards.kudos_html
+
+        @property
         def email_weekly_updates(self):
             return self.user_settings.email_weekly_updates
 
@@ -147,9 +155,11 @@ def award_cabinet(u: User):
     """ Badges (earned and progress towards the rest) and kudos - the profile pages """
     avatar = AvatarDetails.avatar_for(u)
     awards = avatar.awards
-    badge_progress = [awards.progress(d) for d in get_award_definitions()]
+    badge_progress = []
+    if settings.USER_AWARDS_BADGES_ENABLED:
+        badge_progress = [awards.progress(d) for d in get_award_definitions()]
     return {
         "avatar": avatar,
         "badge_progress": badge_progress,
-        "kudos": awards.kudos,
+        "kudos": awards.all_kudos,
     }

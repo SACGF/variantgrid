@@ -3,7 +3,8 @@ Analysis (a DAG of nodes over one build and AnnotationVersion, Guardian-permissi
 version that invalidates every node cache) and its template machinery: AnalysisTemplate /
 AnalysisTemplateVersion snapshot an analysis, AnalysisVariable exposes node fields as parameters,
 AnalysisTemplateRun records a run and its arguments, and Sample/CohortAnalysisTemplateRun plus
-AutoLaunchAnalysisTemplate drive the auto-analyses on import. Nodes are in nodes/analysis_node.py.
+AutoLaunchAnalysisTemplate drive the auto-analyses on import. AnalysisClassification links the
+classifications made from an analysis. Nodes are in nodes/analysis_node.py.
 """
 from collections import defaultdict
 from datetime import datetime
@@ -23,15 +24,18 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
+from guardian.shortcuts import assign_perm
+from model_utils.models import TimeStampedModel
 
-from analysis.models.enums import AnalysisTemplateType, AnalysisType
+from analysis.enums import AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
+from classification.models import Classification
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
+from library.guardian_utils import DjangoPermission, admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
 from seqauto.models import EnrichmentKit
+from snpdb.enums import BuiltInFilters
 from snpdb.models import (
     AbstractNodeCountSettings,
     Cohort,
@@ -41,7 +45,6 @@ from snpdb.models import (
     TagConfigCollection,
     UserSettings,
 )
-from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -140,6 +143,18 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         if super().can_write(user_or_group):
             return not self.is_locked
         return False
+
+    def can_take_ownership(self, user: User) -> bool:
+        """ Someone who can write to the analysis of a deactivated owner can take it over """
+        return not self.user.is_active and self.can_write(user)
+
+    def change_owner(self, user: User):
+        """ Everything inside an analysis is permission-checked as its owner, so the caller reloads the nodes
+            afterwards (analysis/models/nodes/node_utils.py:reload_analysis_nodes) """
+        self.user = user
+        self.save()
+        for permission in (DjangoPermission.READ, DjangoPermission.WRITE):
+            assign_perm(DjangoPermission.perm(self, permission), user, self)
 
     @classmethod
     def filter_writable_for_user(cls, user, pks=None):
@@ -369,8 +384,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
                 edge.pk = None
                 edge.save()
 
-            # re-save all the nodes to re-validate them after all joined up
+            # Edges are copied after the nodes, so validate them now they're joined up
             for node in nodes:
+                node.valid = node.is_valid
                 node.save()
 
             for av in AnalysisVariable.objects.filter(node__analysis_id=analysis_id):
@@ -397,6 +413,12 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             warnings.append("INPUT LOCKED - cannot create new input source nodes.")
         if not self.can_write(user) and not self.is_locked:  # Locked has own icon, no need for warning
             warnings.append("This analysis is READ-ONLY - you do not have write permission to modify anything")
+        if not self.user.is_active:
+            warning = (f"The analysis owner ({self.user}) is deactivated - permissions are checked as the owner, "
+                       "so changing inputs may fail.")
+            if self.can_take_ownership(user):
+                warning += " Take ownership from Analysis Settings."
+            warnings.append(warning)
         return warnings
 
 
@@ -721,7 +743,9 @@ class AnalysisTemplateRun(TimeStampedModel):
 
     @staticmethod
     def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None,
-               template_version: 'AnalysisTemplateVersion' = None):
+               template_version: 'AnalysisTemplateVersion' = None,
+               annotation_version: AnnotationVersion = None):
+        """ annotation_version: the build's latest unless the caller has already settled on one """
         if user is None:
             user = admin_bot()
 
@@ -730,10 +754,13 @@ class AnalysisTemplateRun(TimeStampedModel):
             if template_version is None:
                 raise ValueError(f"{analysis_template} has no active version")
 
+        if annotation_version is None:
+            annotation_version = AnnotationVersion.latest(genome_build, validate=True)
+
         analysis = template_version.analysis_snapshot.clone()
         analysis.user = user
         analysis.genome_build = genome_build
-        analysis.annotation_version = AnnotationVersion.latest(genome_build, validate=True)
+        analysis.annotation_version = annotation_version
         analysis.template_type = None
         analysis.visible = True
         analysis.name = f"TemplateRun from {analysis_template.name}"  # Will be set in populate arguments
@@ -837,7 +864,8 @@ class AnalysisTemplateRunArgument(models.Model):
 
 
 class CohortAnalysisTemplateRun(models.Model):
-    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT) automatically run once against a cohort  """
+    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT) automatically run against a cohort - one per
+        template version and annotation version (@see analysis.analysis_templates.get_cohort_analysis) """
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     analysis_template_run = models.ForeignKey(AnalysisTemplateRun, on_delete=CASCADE)
 
@@ -846,12 +874,19 @@ class CohortAnalysisTemplateRun(models.Model):
 
 
 class SampleAnalysisTemplateRun(models.Model):
-    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE) automatically run once against a sample  """
+    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE) automatically run against a sample - one per
+        template version and annotation version (@see analysis.analysis_templates.get_sample_analysis) """
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     analysis_template_run = models.ForeignKey(AnalysisTemplateRun, on_delete=CASCADE)
 
     class Meta:
         unique_together = ('sample', 'analysis_template_run')
+
+
+
+class AnalysisClassification(models.Model):
+    analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
+    classification = models.ForeignKey(Classification, on_delete=CASCADE)
 
 
 auditlog.register(Analysis)

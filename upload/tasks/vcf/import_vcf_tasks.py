@@ -13,8 +13,8 @@ from genes.gene_fusions import create_gene_fusions_for_variants
 from library.log_utils import log_traceback
 from library.utils import import_class
 from snpdb.bcftools_liftover import bcftools_liftover
+from snpdb.enums import AlleleConversionTool, ProcessingStatus
 from snpdb.models import AlleleLiftover, Variant
-from snpdb.models.models_enums import AlleleConversionTool, ProcessingStatus
 from upload.models import ModifiedImportedVariants, UploadedVCF, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
@@ -27,8 +27,8 @@ from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import (
     BulkManualVariantEntryLinkingVCFProcessor,
 )
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
-from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.gene_level_vcf_preprocess import preprocess_gene_level_vcf
+from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.vcf_preprocess import preprocess_vcf
 from variantgrid.celery import app
 
@@ -222,7 +222,9 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
         liftover = upload_pipeline.file_upload.uploadedliftover.liftover
-        AlleleLiftover.objects.filter(liftover=liftover).update(status=ProcessingStatus.PROCESSING)
+        # Alleles that failed the pre-liftover checks are already ERROR and aren't in the VCF
+        AlleleLiftover.objects.filter(liftover=liftover,
+                                      status=ProcessingStatus.CREATED).update(status=ProcessingStatus.PROCESSING)
 
         if liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
             reject_vcf, num_rejected = bcftools_liftover(upload_step.input_filename, liftover.source_genome_build,
@@ -232,11 +234,6 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
                 self._schedule_steps(child_task_class, upload_step, [(reject_vcf, num_rejected)])
         else:
             raise ValueError(f"Don't know how to produce liftover VCF for {liftover.get_conversion_tool_display()}")
-
-    def _error(self, upload_step: UploadStep, error_message: str):
-        super()._error(upload_step, error_message)
-        liftover = upload_step.upload_pipeline.file_upload.uploadedliftover.liftover
-        liftover.error()
 
 
 class LiftoverProcessFailureVCFTask(ImportVCFStepTask):

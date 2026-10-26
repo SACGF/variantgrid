@@ -9,8 +9,8 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models.models import AnnotationPipelineVersion
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
+from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from library.utils.file_utils import mk_path_for_file
 from snpdb.models import Variant
 
@@ -115,7 +115,8 @@ class AnnotationPipelineRunner(abc.ABC):
         if os.path.exists(vcf_dump_filename):
             raise ValueError(f"Don't want to overwrite '{vcf_dump_filename}' which already exists!")
         mk_path_for_file(vcf_dump_filename)
-        # Only the STANDARD queryset holds short symbolic variants, so this leaves the SV pipelines' dumps symbolic
+        # Only the STANDARD queryset holds short symbolic variants, so the SV pipelines' symbolic variants stay
+        # symbolic (and their long explicit ones are written as sequence, #1708)
         sv_min_size = annotation_run.variant_annotation_version.structural_variant_min_size
         vcf_dump_count = write_qs_to_vcf(vcf_dump_filename, annotation_run.genome_build,
                                          self.get_variants_qs(annotation_run), samples=self.dump_samples,

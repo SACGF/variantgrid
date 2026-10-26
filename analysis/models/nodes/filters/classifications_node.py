@@ -4,14 +4,13 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import CASCADE, Q
 
-from analysis.models.enums import NodeMatchInput
+from analysis.enums import NodeMatchInput
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
 from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
-from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models.classification import Classification, ClassificationModification
+from snpdb.enums import AlleleOriginFilterDefault, ClinicalSignificance, SomaticClinicalSignificance
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginFilterDefault
 
 
 class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
@@ -80,7 +79,7 @@ class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
         vc_qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
         if lab_list := list(self.get_labs()):
             vc_qs = vc_qs.filter(lab__in=lab_list)
-        return Classification.get_variant_q_from_classification_qs(vc_qs, self.analysis.genome_build)
+        return vc_qs.variant_q(self.analysis.genome_build)
 
     def has_classification_filters(self) -> bool:
         """ Whether any classification significance is selected for the node's allele origin """

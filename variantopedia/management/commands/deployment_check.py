@@ -20,9 +20,14 @@ from variantgrid.deployment_validation.classification_checks import check_classi
 from variantgrid.deployment_validation.column_check import check_variantgrid_columns
 from variantgrid.deployment_validation.library_version_checks import check_library_versions
 from variantgrid.deployment_validation.liftover_check import check_alleles_never_lifted_over
+from variantgrid.deployment_validation.memory_check import check_memory_protection
+from variantgrid.deployment_validation.settings_check import (
+    check_settings_references,
+    check_system_checks,
+)
 from variantgrid.deployment_validation.somalier_check import check_somalier
+from variantgrid.deployment_validation.systemd_check import check_systemd_units
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
-from variantgrid.deployment_validation.variant_check import check_symbolic_variants
 from variantgrid.deployment_validation.vep_check import check_vep
 from variantgrid.deployment_validation.vep_columns_check import check_vep_columns_registry
 
@@ -39,6 +44,8 @@ class Command(BaseCommand):
         die_if_invalid = options["die_if_invalid"]
 
         checks = {
+            "Settings": check_system_checks(),
+            "Settings references": check_settings_references(),
             "Annotation data exists": annotation_data_exists(flat=True),
             "Annotation Versions": check_annotation_versions(),
             "Gene Annotation": check_gene_annotation_versions(),
@@ -52,8 +59,9 @@ class Command(BaseCommand):
             "Columns": check_variantgrid_columns(),
             "VEP Columns Registry": check_vep_columns_registry(),
             "VEP": check_vep(),
-            "Symbolic variants": check_symbolic_variants(),
             "Liftover": check_alleles_never_lifted_over(),
+            "Memory": check_memory_protection(),
+            "systemd units": check_systemd_units(),
         }
         if settings.SOMALIER.get("enabled"):
             checks["somalier"] = check_somalier()

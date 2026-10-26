@@ -1,22 +1,21 @@
 """
-Composite grid columns - the cell, the members riding along hidden, and the migration helper that
-collapses a collection onto them.
+Composite grid columns - the cell, and the members riding along hidden.
 
-@see snpdb.models.models_columns.CompositeColumnMember, snpdb/migrations/0238_composite_columns.py
+@see snpdb.models.models_columns.CompositeColumnMember
 """
 import re
 
-from django.apps import apps
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test.client import Client
 from django.urls.base import reverse
 
+from annotation.enums import Pathogenicity
 from annotation.fake_data import get_fake_annotation_version
-from annotation.models.models_enums import Pathogenicity
-from library.django_utils.composite_columns import collapse_into_composite
+from snpdb.enums import ColumnAnnotationLevel
 from snpdb.grid_columns.custom_columns import (
     DBNSFP_NOTE,
+    get_all_variant_grid_columns,
     get_variant_grid_columns,
     variant_column_rich_column,
 )
@@ -73,6 +72,7 @@ class CompositeColumnGridTest(TestCase):
         self.assertIsNone(composite.key, "Display only - it has no value of its own")
         self.assertEqual(["variantannotation__spliceai_max_ds"], composite.sort_keys)
         self.assertTrue(composite.orderable)
+        self.assertFalse(composite.include_in_csv, "Nothing to write - the members export under their own labels")
 
         members = VariantGridColumn.objects.filter(pk__in=SPLICEAI_MEMBERS)
         member_paths = {vgc.pk: vgc.variant_column for vgc in members}
@@ -105,6 +105,7 @@ class CompositeColumnGridTest(TestCase):
         columns = self._columns(["variant"])
         self.assertEqual("id", columns[0].key)
         self.assertIsNone(columns[0].sort_keys)
+        self.assertTrue(columns[0].include_in_csv, "The variant id is what the export rows are keyed on")
         self.assertIn("locus__contig__name", [rc.name for rc in columns[1:]])
 
     def test_member_shown_standalone_is_emitted_once_visible(self):
@@ -133,6 +134,49 @@ class CompositeColumnGridTest(TestCase):
                 self.assertIn(member.pk, catalogue, member.pk)
 
 
+class AllVariantGridColumnsTest(TestCase):
+    """ The annotated sample/cohort exports take every column the version annotates rather than a
+        collection (#2209) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.annotation_version = get_fake_annotation_version(GenomeBuild.get_name_or_alias("GRCh38"))
+        cls.rich_columns, cls.sample_position = get_all_variant_grid_columns(cls.annotation_version, {})
+        cls.by_path = {vgc.variant_column: vgc
+                       for vgc in VariantGridColumn.objects.prefetch_related("composite_members")}
+
+    def test_variant_and_its_members_lead_then_the_genotypes(self):
+        names = [rc.name for rc in self.rich_columns]
+        variant = VariantGridColumn.objects.get(pk=CustomColumnsCollection.ROW_ID_COLUMN)
+        self.assertEqual(["id"] + [m.variant_column for m in variant.member_columns], names[:self.sample_position])
+
+    def test_the_rest_are_grouped_by_annotation_level(self):
+        level_order = [None, ColumnAnnotationLevel.VARIANT_LEVEL, ColumnAnnotationLevel.TRANSCRIPT_LEVEL,
+                       ColumnAnnotationLevel.GENE_LEVEL, ColumnAnnotationLevel.HGNC_LEVEL,
+                       ColumnAnnotationLevel.UNIPROT_LEVEL, ColumnAnnotationLevel.CLINVAR_LEVEL,
+                       ColumnAnnotationLevel.DATABASE_LEVEL]
+        shown = [self.by_path[rc.name] for rc in self.rich_columns[self.sample_position:] if rc.visible]
+        keys = [(level_order.index(vgc.annotation_level), vgc.pk) for vgc in shown]
+        self.assertEqual(sorted(keys), keys)
+        self.assertGreater(len({level for level, _ in keys}), 3, "a real spread of levels was ordered")
+
+    def test_every_export_column_has_a_value_to_write(self):
+        """ A composite writes nothing, so it is left out; its members ride along and are written """
+        export_columns = [rc for rc in self.rich_columns if rc.include_in_csv]
+        self.assertTrue(all(rc.key for rc in export_columns), [rc.name for rc in export_columns if not rc.key])
+        by_name = {rc.name: rc for rc in self.rich_columns}
+        self.assertFalse(by_name["spliceai"].include_in_csv)
+        self.assertTrue(by_name["variantannotation__spliceai_max_ds"].include_in_csv)
+        self.assertFalse(by_name["variantannotation__spliceai_max_ds"].visible, "Drawn inside the composite's cell")
+
+    def test_no_analysis_tags_and_nothing_twice(self):
+        names = [rc.name for rc in self.rich_columns]
+        self.assertNotIn("tags", names, "The export's analysis is an invisible auto one")
+        self.assertIn("tags_global", names)
+        self.assertEqual(len(names), len(set(names)))
+
+
 class ChoiceFieldColumnTest(TestCase):
     """ An IntegerField with choices reaches the grid, the CSV and the column summary as its label -
         which is what makes node_column_summary count it rather than draw a box plot """
@@ -144,57 +188,6 @@ class ChoiceFieldColumnTest(TestCase):
         cell = CellData(all_data={"variantannotation__annotsv_acmg_class": Pathogenicity.LIKELY_PATHOGENIC},
                         key="variantannotation__annotsv_acmg_class")
         self.assertEqual("Likely pathogenic", rich_column.renderer(cell))
-
-
-class CollapseIntoCompositeTest(TestCase):
-    """ The migration helper - every collection, user and system, comes through it """
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.user = User.objects.get_or_create(username="test_collapse_into_composite")[0]
-
-    def _collection(self, column_ids: list[str]) -> CustomColumnsCollection:
-        ccc = CustomColumnsCollection.objects.create(name=f"test {column_ids}", user=self.user)
-        ccc.customcolumn_set.all().delete()
-        for sort_order, column_id in enumerate(column_ids):
-            CustomColumn.objects.create(custom_columns_collection=ccc, column_id=column_id,
-                                        sort_order=sort_order)
-        ccc.refresh_from_db()
-        return ccc
-
-    def _collapse(self, ccc, composite_id="spliceai") -> list[str]:
-        collapse_into_composite(apps, composite_id)
-        ccc.refresh_from_db()
-        return list(ccc.customcolumn_set.order_by("sort_order").values_list("column_id", flat=True))
-
-    def test_run_of_members_becomes_the_composite_at_the_runs_position(self):
-        ccc = self._collection(["gene_symbol", "spliceai_max_ds", "spliceai_pred_ds_ag",
-                                "spliceai_pred_dp_ag", "hgvs_c"])
-        version = ccc.version_id
-        self.assertEqual(["gene_symbol", "spliceai", "hgvs_c"], self._collapse(ccc))
-        self.assertGreater(ccc.version_id, version, "The node grid definition cache is keyed on it")
-
-    def test_lone_member_becomes_the_composite(self):
-        ccc = self._collection(["gene_symbol", "spliceai_pred_dp_dl"])
-        self.assertEqual(["gene_symbol", "spliceai"], self._collapse(ccc))
-
-    def test_composite_already_present_loses_the_stray_members(self):
-        ccc = self._collection(["spliceai", "gene_symbol", "spliceai_pred_ds_al"])
-        self.assertEqual(["spliceai", "gene_symbol"], self._collapse(ccc))
-
-    def test_collection_without_the_group_is_untouched(self):
-        ccc = self._collection(["gene_symbol", "hgvs_c"])
-        version = ccc.version_id
-        self.assertEqual(["gene_symbol", "hgvs_c"], self._collapse(ccc))
-        self.assertEqual(version, ccc.version_id, "Nothing changed, so nothing to invalidate")
-
-    def test_is_idempotent(self):
-        ccc = self._collection(["spliceai_max_ds", "gene_symbol"])
-        self.assertEqual(["spliceai", "gene_symbol"], self._collapse(ccc))
-        version = ccc.version_id
-        self.assertEqual(["spliceai", "gene_symbol"], self._collapse(ccc))
-        self.assertEqual(version, ccc.version_id)
 
 
 class CustomColumnsArrangePageTest(TestCase):

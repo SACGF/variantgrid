@@ -7,12 +7,13 @@ ExternallyManagedModel). ExtractionMatchMixin is how a Sample claims its extract
 records exist. Patient modifications and imports are audited rows; clinicians and patient records
 complete the set.
 """
+import datetime
 import os
 from typing import Optional
 
-import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
 from django.db.models import Case, F, Q, QuerySet, TextField, Value, When
@@ -21,8 +22,9 @@ from django.db.models.functions import Concat
 from django.dispatch.dispatcher import Signal, receiver
 from django.urls.base import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from easy_thumbnails.files import get_thumbnailer
+from guardian.models import GroupObjectPermission, UserObjectPermission
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import (
     ensure_mutally_exclusive_fields_not_set,
@@ -34,17 +36,18 @@ from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import calculate_age
-from patients.external_references import ResolvedReference
-from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
-from patients.models_enums import (
+from patients.enums import (
     MatchStatus,
     NucleicAcid,
     PatientRecordMatchType,
+    PatientRecordOriginType,
     PopulationGroup,
     Sex,
     SpecimenMeasureType,
     TissueStatus,
 )
+from patients.external_references import ResolvedReference, normalize_specimen_reference
+from patients.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 
 TEST_PATIENT_KWARGS = {"first_name": "PATIENT", "last_name": "TESTPATIENT"}
 
@@ -107,6 +110,11 @@ class ExternallyManagedModel(TimeStampedModel):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        """ The form LOCAL_REFERENCE_FIELD is stored in, so a lookup can be handed any other """
+        return reference_id
 
     @property
     def short_identifier(self):
@@ -181,7 +189,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     suburb = models.TextField(null=True, blank=True)
     postcode = models.TextField(null=True, blank=True)  # Text for international - UK/Canada use alphanumeric
     state = models.TextField(null=True, blank=True)
-    telephone = models.IntegerField(null=True, blank=True)
+    telephone = models.TextField(null=True, blank=True)  # Text to keep leading zeros and '+' country codes
 
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
     _deceased = models.BooleanField(null=True, blank=True)
@@ -267,6 +275,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         values = self._merge_values()
         copied = {attname: value for attname, value in other._merge_values().items() if attname not in values}
         other_description = f"{other}({other.pk})"
+        self._move_object_permissions(other)
         other.delete()  # before copying, as external_pk is unique
         if copied:
             for attname, value in copied.items():
@@ -275,6 +284,17 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         PatientModification.objects.create(patient=self, user=user, origin=origin,
                                            description=f"Merged {other_description}: {description}")
         patient_merged_signal.send(sender=Patient, patient=self)
+
+    def _move_object_permissions(self, other: 'Patient'):
+        """ Whoever could see other keeps seeing its specimens and samples, which now hang off this patient """
+        content_type = ContentType.objects.get_for_model(Patient)
+        for permission_model, holder in ((UserObjectPermission, "user"), (GroupObjectPermission, "group")):
+            other_permissions = permission_model.objects.filter(content_type=content_type, object_pk=str(other.pk))
+            for object_permission in other_permissions:
+                permission_model.objects.get_or_create(content_type=content_type, object_pk=str(self.pk),
+                                                       permission=object_permission.permission,
+                                                       **{holder: getattr(object_permission, holder)})
+            other_permissions.delete()
 
     @property
     def code(self):
@@ -291,15 +311,6 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @property
     def deceased(self):
         return any([self._deceased, self.date_of_death])
-
-    @property
-    def condition_description(self):
-        if self.date_of_death:
-            dod = self.date_of_death.strftime(settings.DATE_FORMAT)
-            return f"dead (D.O.D. {dod})"
-        if self._deceased:
-            return "dead"
-        return "alive"
 
     @property
     def num_specimens(self):
@@ -333,40 +344,90 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return args
 
     @staticmethod
-    def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
-        """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown """
+    def match(first_name, last_name, sex=None, date_of_birth=None, user=None,
+              patient_code=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
+        """" A patient is identified by patient code alone, or by last name plus first name or date of birth (which
+             must equal the patient's when there is no first name). A row with a code that no patient has only
+             matches by name a patient without a code.
+             We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown.
+             A match where the patient lacks a field the row has is PARTIAL """
 
-        if not last_name:
-            msg = "Last name must be non-null!"
+        if patient_code:
+            identity_q = Q(patient_code=patient_code)
+        elif not last_name:
+            msg = "Patient code or last name must be non-null!"
             raise ValueError(msg)
+        elif not (first_name or date_of_birth):
+            msg = "First name or date of birth is needed with the last name"
+            raise ValueError(msg)
+        else:
+            identity_q = None
+
+        if user:
+            patients_queryset = Patient.filter_for_user(user)
+        else:
+            patients_queryset = Patient.objects.all()
+
+        if identity_q is not None:
+            patient = Patient._get_single_match(patients_queryset, identity_q)
+            if patient:
+                Patient._check_code_match_agrees(patient, first_name, last_name, date_of_birth)
+                return patient, Patient._match_type(patient, sex, date_of_birth)
+            if not last_name or not (first_name or date_of_birth):
+                return None, None
+            patients_queryset = patients_queryset.filter(Q(patient_code__isnull=True) | Q(patient_code=""))
+
         q = Q(last_name__iexact=last_name)
         if first_name:
             q &= Q(first_name__iexact=first_name)
-        if date_of_birth is not None:
-            q &= (Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
+            if date_of_birth is not None:
+                q &= (Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
+        else:
+            q &= Q(date_of_birth=date_of_birth)
         if sex in Sex.FILLED_IN_CHOICES:
             q &= Sex.get_q_handling_unknown('sex', sex)
 
-        try:
-            if user:
-                patients_queryset = Patient.filter_for_user(user)
-            else:
-                patients_queryset = Patient.objects.all()
+        patient = Patient._get_single_match(patients_queryset, q)
+        if patient is None:
+            return None, None
+        return patient, Patient._match_type(patient, sex, date_of_birth)
 
-            patient = patients_queryset.get(q)
-            if (date_of_birth and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
-                match_type = PatientRecordMatchType.PARTIAL
-            else:
-                match_type = PatientRecordMatchType.EXACT
+    @staticmethod
+    def _get_single_match(patients_queryset, q) -> Optional['Patient']:
+        try:
+            return patients_queryset.get(q)
         except Patient.DoesNotExist:
-            patient = None
-            match_type = None
+            return None
         except Patient.MultipleObjectsReturned as e:
             # Name them, so whoever is importing can fix the row or merge the patients
             matched = ", ".join(f"Patient:{p.pk} {p}" for p in patients_queryset.filter(q).order_by("pk"))
             raise Patient.MultipleObjectsReturned(f"Matched multiple patients: {matched}. "
                                                   "Add date of birth or sex to the row to tell them apart") from e
-        return patient, match_type
+
+    @staticmethod
+    def _check_code_match_agrees(patient, first_name, last_name, date_of_birth):
+        """ A code matched, but a name or date of birth on both the row and the patient that differs means the
+            code is on the wrong row (or the wrong patient) - refuse rather than attach it to someone else """
+        differs = []
+        for label, row_value, patient_value in [("first name", first_name, patient.first_name),
+                                                ("last name", last_name, patient.last_name)]:
+            if row_value and patient_value and row_value.upper() != patient_value.upper():
+                differs.append(label)
+        if isinstance(date_of_birth, datetime.datetime):
+            date_of_birth = date_of_birth.date()
+        elif isinstance(date_of_birth, str):
+            date_of_birth = datetime.date.fromisoformat(date_of_birth)
+        if date_of_birth and patient.date_of_birth and date_of_birth != patient.date_of_birth:
+            differs.append("date of birth")
+        if differs:
+            msg = f"Patient code {patient.patient_code} matched Patient:{patient.pk} but the {', '.join(differs)} differs"
+            raise ValueError(msg)
+
+    @staticmethod
+    def _match_type(patient, sex, date_of_birth) -> PatientRecordMatchType:
+        if (date_of_birth and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
+            return PatientRecordMatchType.PARTIAL
+        return PatientRecordMatchType.EXACT
 
     def save(self, *args, **kwargs):
         ensure_mutally_exclusive_fields_not_set(self, "date_of_death", "_deceased")
@@ -451,6 +512,30 @@ class Tissue(TimeStampedModel):
         return self.name
 
 
+class NormalizedReferenceQuerySet(QuerySet):
+    """ The bulk writes that skip save() still store reference_id in the model's canonical form """
+
+    def bulk_create(self, objs, *args, **kwargs):
+        for obj in objs:
+            obj.reference_id = self.model.normalize_reference_id(obj.reference_id)
+        return super().bulk_create(objs, *args, **kwargs)
+
+    def update(self, **kwargs):
+        if "reference_id" in kwargs:
+            kwargs["reference_id"] = self.model.normalize_reference_id(kwargs["reference_id"])
+        return super().update(**kwargs)
+
+
+class AmbiguousExtraction(ValueError):
+    """ A patient CSV row matches several of a specimen's extractions and has nothing to pick one with """
+
+    def __init__(self, specimen, nucleic_acid_source, extractions):
+        names = ", ".join(e.reference_id or f"unnamed:{e.pk}" for e in extractions)
+        acid = f"{NucleicAcid(nucleic_acid_source).label} " if nucleic_acid_source else ""
+        super().__init__(f"Specimen {specimen.reference_id} has {len(extractions)} {acid}extractions ({names}): "
+                         "name one with Extraction Reference id or Extraction date")
+
+
 class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMixin):
     """ Biological material collected from a patient - one tissue at one timepoint (block, blood draw).
         The nucleic acid taken off it lives on Extraction below """
@@ -468,6 +553,16 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
     class Meta:
         unique_together = ("patient", "reference_id")
+
+    objects = NormalizedReferenceQuerySet.as_manager()
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        return normalize_specimen_reference(reference_id)
+
+    def save(self, *args, **kwargs):
+        self.reference_id = self.normalize_reference_id(self.reference_id)
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_permission_class(cls):
@@ -521,14 +616,36 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
 
         return age
 
-    def get_or_create_extraction(self, nucleic_acid_source=None, sample=None) -> 'Extraction':
-        """ The patient CSV describes a single extraction per specimen - the one the row's sample came
-            off. Re-importing that row corrects that extraction in place, so the sample is what says
-            which extraction the row is talking about.
+    def get_or_create_extraction(self, nucleic_acid_source=None, sample=None, reference_id=None,
+                                 extraction_date=None) -> 'Extraction':
+        """ The extraction a patient CSV row describes, first hit wins:
 
-            Without it, a row for a second sample would repurpose the first sample's extraction, and
-            both arms of a TSO 500 specimen would end up on one. """
+            1. reference_id: the extraction with that reference on this specimen (the key the API upserts
+               on), its acid and date set from the row where given - else a new one with all three.
+               A reference beats the sample, so a row naming another arm relinks the sample
+            2. The sample's current extraction, when it is on this specimen (acid updated in place) - so an
+               existing file re-imports as before
+            3. The specimen's extractions, filtered by the row's acid and date where given: one is it,
+               several raise AmbiguousExtraction rather than guess (two DNA re-extractions look alike without
+               a date). None, and the row gave an acid: an extraction with no acid yet is the row's to fill
+               in. Otherwise a new one """
         extractions = self.extraction_set.order_by("pk")
+        if reference_id := Extraction.normalize_reference_id(reference_id):
+            if extraction := extractions.filter(reference_id=reference_id).first():
+                # A blank cell leaves the stored value alone
+                row_values = {"nucleic_acid_source": nucleic_acid_source, "extraction_date": extraction_date}
+                changed = False
+                for field, value in row_values.items():
+                    if value is not None and getattr(extraction, field) != value:
+                        setattr(extraction, field, value)
+                        changed = True
+                if changed:
+                    extraction.save()
+                return extraction
+            return Extraction.objects.create(specimen=self, reference_id=reference_id,
+                                             nucleic_acid_source=nucleic_acid_source,
+                                             extraction_date=extraction_date)
+
         if sample and sample.extraction_id:
             if extraction := extractions.filter(pk=sample.extraction_id).first():
                 if nucleic_acid_source and extraction.nucleic_acid_source != nucleic_acid_source:
@@ -536,23 +653,32 @@ class Specimen(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelMix
                     extraction.save()
                 return extraction
 
-        if extraction := extractions.filter(nucleic_acid_source=nucleic_acid_source).first():
-            return extraction
+        candidates = extractions
+        if nucleic_acid_source:
+            candidates = candidates.filter(nucleic_acid_source=nucleic_acid_source)
+        if extraction_date:
+            if timezone.is_aware(extraction_date):
+                extraction_date = timezone.localtime(extraction_date)
+            candidates = candidates.filter(extraction_date__date=extraction_date.date())
+        matches = list(candidates)
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise AmbiguousExtraction(self, nucleic_acid_source, matches)
 
-        if not nucleic_acid_source:
-            # The CSV didn't say, so whatever is already there answers for it
-            if extraction := extractions.first():
-                return extraction
-        else:
-            # An extraction nobody has named an acid for is the CSV's to fill in; one already naming
+        if nucleic_acid_source:
+            # An extraction nobody has named an acid for is the row's to fill in; one already naming
             # a different acid is somebody else's arm
             unnamed_source = Q(nucleic_acid_source__isnull=True) | Q(nucleic_acid_source="")
             if extraction := extractions.filter(unnamed_source).first():
                 extraction.nucleic_acid_source = nucleic_acid_source
+                if extraction_date:
+                    extraction.extraction_date = extraction_date
                 extraction.save()
                 return extraction
 
-        return Extraction.objects.create(specimen=self, nucleic_acid_source=nucleic_acid_source)
+        return Extraction.objects.create(specimen=self, nucleic_acid_source=nucleic_acid_source,
+                                         extraction_date=extraction_date)
 
     def __str__(self):
         s = self.reference_id
@@ -576,6 +702,16 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
         # Unnamed extractions are all distinct under Postgres, which is what the re-extraction
         # case wants - extraction_date tells those apart
         unique_together = ("specimen", "reference_id")
+
+    objects = NormalizedReferenceQuerySet.as_manager()
+
+    @classmethod
+    def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        return normalize_specimen_reference(reference_id)
+
+    def save(self, *args, **kwargs):
+        self.reference_id = self.normalize_reference_id(self.reference_id)
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_permission_class(cls):
@@ -748,20 +884,6 @@ class PatientAttachment(TimeStampedModel):
         }
 
 
-class PatientRecordOriginType:
-    UPLOADED_CSV = 'C'
-    MANUAL_VG_GUI = 'G'
-    EXTERNAL_DATABASE = 'E'
-    INTERNAL_VG = 'I'
-
-    CHOICES = (
-        (UPLOADED_CSV, 'Uploaded CSV'),
-        (INTERNAL_VG, 'Internal change'),
-        (MANUAL_VG_GUI, 'Manual change by user'),
-        (EXTERNAL_DATABASE, 'External Database'),
-    )
-
-
 class PatientImport(TimeStampedModel):
     """ All the modifications hang off this. We don't want this to get deleted so modifications stay there
         Even after reload patient import """
@@ -811,8 +933,10 @@ class PatientColumns:
     SPECIMEN_COLLECTION_DATE = 'Specimen Collection date'
     SPECIMEN_RECEIVED_DATE = 'Specimen Received date'
     SPECIMEN_TISSUE_STATUS = 'Specimen Tissue status (Reference/Affected/Unknown)'
-    SPECIMEN_NUCLEIC_ACID_SOURCE = 'Specimen Nucleic acid source (DNA/RNA)'
     SPECIMEN_AGE_AT_COLLECTION_DATE = 'Age at collection date (mutually exclusive to date of birth)'
+    EXTRACTION_REFERENCE_ID = 'Extraction Reference id'
+    EXTRACTION_NUCLEIC_ACID_SOURCE = 'Extraction Nucleic acid source (DNA/RNA)'
+    EXTRACTION_DATE = 'Extraction date'
 
     COLUMN_DETAILS = [
         (PATIENT_FAMILY_CODE, "String", "Family Code"),
@@ -834,8 +958,13 @@ class PatientColumns:
         (SPECIMEN_COLLECTION_DATE, "Date", ""),
         (SPECIMEN_RECEIVED_DATE, "Date", ""),
         (SPECIMEN_TISSUE_STATUS, "Tissue Status", "Role the material plays in the test"),
-        (SPECIMEN_NUCLEIC_ACID_SOURCE, "Nucleic Acid Source", ""),
         (SPECIMEN_AGE_AT_COLLECTION_DATE, "Int", "Only use this column if date of birth is unavailable"),
+        (EXTRACTION_REFERENCE_ID, "String", "Names one extraction of the specimen, eg the DNA and RNA arms of a "
+                                            "block - one row per extraction, repeating the specimen columns. "
+                                            "Unique within the specimen. Blank: the row's sample, else the nucleic "
+                                            "acid and extraction date, say which extraction it is"),
+        (EXTRACTION_NUCLEIC_ACID_SOURCE, "Nucleic Acid Source", ""),
+        (EXTRACTION_DATE, "Date", "Tells two extractions of the same acid apart"),
     ]
 
     COLUMNS = [c[0] for c in COLUMN_DETAILS]
@@ -860,8 +989,10 @@ class PatientColumns:
         SPECIMEN_COLLECTION_DATE: "extraction__specimen__collection_date",
         SPECIMEN_RECEIVED_DATE: "extraction__specimen__received_date",
         SPECIMEN_TISSUE_STATUS: "extraction__specimen__tissue_status",
-        SPECIMEN_NUCLEIC_ACID_SOURCE: "extraction__nucleic_acid_source",
         SPECIMEN_AGE_AT_COLLECTION_DATE: "extraction__specimen___age_at_collection_date",
+        EXTRACTION_REFERENCE_ID: "extraction__reference_id",
+        EXTRACTION_NUCLEIC_ACID_SOURCE: "extraction__nucleic_acid_source",
+        EXTRACTION_DATE: "extraction__extraction_date",
     }
 
 
@@ -880,31 +1011,6 @@ class Clinician(TimeStampedModel):
         q = single_string_to_first_last_name_q(clinician_string)
         #logging.info(q)
         return Clinician.objects.get(q)
-
-    @staticmethod
-    def cleaned_get_or_create(clinician_string):
-        try:
-            clinician = Clinician.match(clinician_string)
-        except Clinician.DoesNotExist:
-            kwargs = {}
-            name = nameparser.HumanName(clinician_string)
-            if name.title:
-                title = {v: k for k, v in Title.CHOICES}.get(name.title)
-                if title:
-                    kwargs["title"] = title
-
-            first_name = name.first
-            if name.middle:
-                first_name += name.middle
-            kwargs["first_name"] = first_name.upper()
-
-            last_name = name.last
-            if last_name:
-                kwargs["last_name"] = last_name.upper()
-
-            clinician = Clinician.objects.create(**kwargs)
-
-        return clinician
 
     @staticmethod
     def user_is_clinician(user):
@@ -968,6 +1074,8 @@ class PatientRecord(TimeStampedModel):
     patient_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
     specimen = models.ForeignKey(Specimen, null=True, related_name='related_specimen', on_delete=SET_NULL)
     specimen_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
+    extraction = models.ForeignKey(Extraction, null=True, related_name='related_extraction', on_delete=SET_NULL)
+    extraction_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
 
     # These are filled in from spreadsheet or manually entered
     sample_identifier = models.IntegerField(null=True)
@@ -989,8 +1097,10 @@ class PatientRecord(TimeStampedModel):
     specimen_collection_date = models.TextField(null=True)
     specimen_received_date = models.TextField(null=True)
     specimen_tissue_status = models.CharField(max_length=1, choices=TissueStatus.choices, null=True)
-    specimen_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, null=True)
     specimen_age_at_collection_date = models.IntegerField(null=True, blank=True)
+    extraction_reference_id = models.TextField(null=True)
+    extraction_nucleic_acid_source = models.CharField(max_length=1, choices=NucleicAcid.choices, null=True)
+    extraction_date = models.TextField(null=True)  # As typed - Extraction.extraction_date holds the parsed value
 
     # Methods on this can include save / isvalid etc -
     # call out to helper funcs etc

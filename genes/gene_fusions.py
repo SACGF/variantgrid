@@ -29,6 +29,7 @@ from genes.gene_level_resolver import (
     unknown_gene_reason,
 )
 from genes.models import HGNC, GeneFusion, GeneLevelId, fusion_canonical_str
+from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.gene_level_variants import (
     GENE_LEVEL_CONTIG_NAME,
@@ -109,10 +110,10 @@ class GeneFusionResolver(GenePositionResolver):
         if not names:
             return None
 
-        resolved_names = [self.resolve_name(name) for name in names]
+        resolved_names, ambiguities = self.resolve_names(names)
         if candidate := self._breakpoint_candidate(breakpoint, genome_build, resolved_names):
             return ResolvedGeneLevelGene(written=cell, gene_level_id=self.identity_for_candidate(candidate))
-        return self._resolve_from_names(cell, names, resolved_names, allow_unknown)
+        return self._resolve_from_names(cell, names, resolved_names, ambiguities, allow_unknown)
 
     def resolve_fusion(self, gene_a: Optional[ResolvedGeneLevelGene], gene_b: Optional[ResolvedGeneLevelGene],
                        directionality_known: bool) -> 'ResolvedFusion':
@@ -211,7 +212,10 @@ def resolve_fusion_string(fusion_string: str, resolver: GeneFusionResolver = Non
 
     sides = []
     for name in genes:
-        side = resolver.resolve_side(name, allow_unknown=False)
+        try:
+            side = resolver.resolve_side(name, allow_unknown=False)
+        except AmbiguousGeneSymbolAlias as ambiguous:
+            return GeneLevelResolution.refused(str(ambiguous))
         if side is None:
             return GeneLevelResolution.refused(unknown_gene_reason(name))
         sides.append(side)

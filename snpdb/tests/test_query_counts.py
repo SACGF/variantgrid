@@ -16,18 +16,9 @@ from library.django_utils.unittest_utils import (
     frozen_cache_expiry,
     production_query_count,
 )
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.fake_data import create_fake_trio
-from snpdb.models import (
-    Allele,
-    AlleleConversionTool,
-    AlleleLiftover,
-    AlleleOrigin,
-    GenomeBuild,
-    LiftoverRun,
-    ProcessingStatus,
-    Trio,
-    VariantAllele,
-)
+from snpdb.models import Allele, AlleleLiftover, GenomeBuild, LiftoverRun, Trio, VariantAllele
 from snpdb.templatetags.model_tags import trio_short_description
 from snpdb.templatetags.related_data_tags import (
     TRIO_SAMPLES_SELECT_RELATED,

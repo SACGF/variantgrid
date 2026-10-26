@@ -9,18 +9,22 @@ from django.db.models import QuerySet
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import EvidenceKeyMap, ClassificationGrouping
+from classification.enums import SpecialEKeys
+from classification.models import ClassificationGrouping, EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObjDate
-from classification.views.classification_export_view import InvalidExportParameter
-from classification.views.exports_grouping.classification_grouping_export_filter import \
-    ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
-    ClassificationGroupingExportFilter, ClassificationGroupingByAlleleAndOrigin
+from classification.views.exports.classification_export_filter import InvalidExportParameter
+from classification.views.exports_grouping.classification_grouping_export_filter import (
+    ClassificationGroupingByAlleleAndOrigin,
+    ClassificationGroupingExportFilter,
+    ClassificationGroupingExportFormat,
+    ClassificationGroupingExportFormatProperties,
+)
 from genes.hgvs import HGVSComponents
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, delimited_row, export_column
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild
 
 

@@ -227,3 +227,12 @@ class ClinGenAlleleRegistryAPIRetryTestCase(SimpleTestCase):
             self._put()
         self.assertEqual(mock_put.call_count, 1)
         mock_sleep.assert_not_called()
+
+    def test_request_level_error_with_200_raises_server_exception(self, mock_put, mock_sleep):
+        """ Not a list of per-line results, so callers mustn't iterate it (that gave the dict's keys) """
+        error = {"description": "Access denied", "errorType": "AuthorizationError", "message": "No privileges"}
+        mock_put.return_value = self._response(200, json.dumps(error).encode())
+        with self.assertRaises(ClinGenAlleleServerException) as cm:
+            list(self.api.hgvs_put(["NC_000001.10:g.100A>G"]))
+        self.assertEqual(cm.exception.response_json, error)
+        mock_sleep.assert_not_called()

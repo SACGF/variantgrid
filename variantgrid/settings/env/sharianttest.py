@@ -15,6 +15,9 @@ SITE_NAME = "Shariant Test"
 SITE_SHORT_NAME = "Shariant Test"
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
 
+# Discordance emails are logged, not sent, on this host (SEND_EMAILS is False in shariantcommon)
+SILENCED_SYSTEM_CHECKS = [*SILENCED_SYSTEM_CHECKS, "variantgrid.W001"]
+
 SLACK['emoji'] = ':mouse:'
 # HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m785768698-f47e172d7c428063e2f452af783dadfcc07da004'
 CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True
@@ -31,6 +34,5 @@ _SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_file
 STATICFILES_DIRS = (_SHARIANT_TEST_STATIC_FILES_DIR,) + STATICFILES_DIRS
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
-VARIANT_DETAILS_SHOW_ANNOTATION = True  # just for test
 
 DATA_UPLOAD_MAX_MEMORY_SIZE=5242880

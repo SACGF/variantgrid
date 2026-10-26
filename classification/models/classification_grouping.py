@@ -4,9 +4,10 @@ import operator
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import TYPE_CHECKING, Optional, Self, Iterable
+from typing import TYPE_CHECKING, Iterable, Optional, Self
 
 import django
+from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -15,40 +16,36 @@ from django.db.models import (
     SET_NULL,
     Count,
     F,
-    IntegerChoices,
     OuterRef,
     Q,
     QuerySet,
-    TextChoices,
 )
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
-from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
+from model_utils.models import TimeStampedModel
 from more_itertools import last
 
 from classification.enums import (
-    AlleleOriginBucket,
+    ClassificationGroupingPathogenicDifference,
+    ClassificationGroupingSearchTermType,
+    ClassificationGroupingSomaticDifference,
     ClassificationResultValue,
     ShareLevel,
     SpecialEKeys,
     TestingContextBucket,
     TestingContextFull,
 )
-from classification.models.classification import (
-    Classification,
-    ClassificationModification,
-    ConditionReference,
-    ConditionResolved,
-)
+from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from classification.models.condition_resolved import ConditionReference, ConditionResolved
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheObj
 from genes.models import GeneSymbol
 from library.utils import JsonDataType, strip_json
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele, Lab
-from django.contrib.auth.models import User
 
 if TYPE_CHECKING:
     from classification.models.overlaps_model import OverlapContribution
@@ -61,32 +58,6 @@ classification_grouping_summary_signal = django.dispatch.Signal()  # args: "inst
 #     STANDARD = "S", "Standard"
 #     LEGACY = "L", "Legacy"
 #     INCOMPLETE = "I", "Incomplete"
-
-
-class ClassificationClassificationBucket(TextChoices):
-    BENIGN = "B", "Benign"
-    VUS = "V", "VUS"
-    PATHOGENIC = "P", "Pathogenic"
-    ONCOGENIC = "O", "Oncogenic"  # should oncogenic just be an alias for pathogenic?
-    OTHER = "X", "Other"
-    CONFLICTING = "C", "Conflicting"
-    NO_DATA = "N", "No Data"
-
-    @staticmethod
-    def bucket_for_classification(value: Optional[str]):
-        if value is None:
-            return ClassificationClassificationBucket.NO_DATA
-        if value.startswith("VUS"):
-            return ClassificationClassificationBucket.VUS
-        if value in {"B", "LB"}:
-            return ClassificationClassificationBucket.BENIGN
-        if value in {"P", "LP"}:
-            return ClassificationClassificationBucket.PATHOGENIC
-        if value in {"O", "LO"}:
-            return ClassificationClassificationBucket.ONCOGENIC
-        return ClassificationClassificationBucket.OTHER
-
-        # this goes a little against the buckets that we store directly into
 
 
 def classification_significance_sort_key(clin_sig: Optional[str]) -> tuple[bool, int, int]:
@@ -181,18 +152,6 @@ class ClassificationGroupingCount:
             "css_class": self.css_class,
             "count": self.count
         }
-
-
-class ClassificationGroupingPathogenicDifference(IntegerChoices):
-    NO_DIFF = 0, "No Differences"
-    SMALL_DIFF = 1, "Differences"
-    CLIN_SIG_DIFFS = 2, "Clinical Significance Difference"
-
-
-class ClassificationGroupingSomaticDifference(IntegerChoices):
-    NO_DIFF = 0, "No Differences"
-    AMP_DIFF = 1, "Same Tier, different AMP Level"
-    TIER_DIFF = 2, "Different Tier"
 
 
 class ClassificationGrouping(TimeStampedModel):
@@ -317,7 +276,7 @@ class ClassificationGrouping(TimeStampedModel):
     def dirty_up(self):
         # this method was more useful when we also dirtied up alleleOrigin
         self.dirty = True
-        self.save(update_fields=["dirty"])
+        ClassificationGrouping.objects.filter(pk=self.pk).update(dirty=True)
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):
@@ -434,9 +393,10 @@ class ClassificationGrouping(TimeStampedModel):
 
     @transaction.atomic
     def update(self):
-
-        # FIXME there's a bunch of overlap calculation here that doesn't need to happen
-        # as that is now managed by Overlaps
+        """ Recalculates the grouping from its classifications' last published modifications - the latest one
+            (shown in grids) and what the grouping holds across all of them: conditions, zygosities and whether
+            they differ in (somatic) clinical significance within this lab. Comparisons across labs are
+            OverlapContribution's, which the save signal refreshes from here """
 
         if all_modifications := self.classification_modifications:
             # FIND THE MOST RECENT CLASSIFICATION
@@ -451,14 +411,8 @@ class ClassificationGrouping(TimeStampedModel):
             self._set_latest_cached_summary(best_classification.classification.summary)
             self.latest_allele_info = best_classification.classification.allele_info
 
-            # TODO check for dirty values
             all_terms = Counter()
-            all_free_text_conditions = Counter()
-
-            all_terms.keys()
-
-            # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
-            # TODO - CLINICAL SIGNIFICANCE
+            all_free_text_conditions = defaultdict(list)
             all_zygosities: set[str] = set()
 
             all_buckets = set()
@@ -471,18 +425,13 @@ class ClassificationGrouping(TimeStampedModel):
                 if condition := modification.classification.condition_resolution_obj:
                     for term in condition.terms:
                         all_terms[term] += 1
-                    # all_terms |= set(condition.terms)
-                    # if plain_text := condition.plain_text:
-                    #     all_free_text_conditions.add(plain_text)
                 elif condition_text := modification.get(SpecialEKeys.CONDITION):
-                    all_free_text_conditions[condition_text] += 1
-                    # all_free_text_conditions.add(condition_text)
+                    # use a normalised version of the condition as the key
+                    # for now just lowercasing but we could do other normalisations
+                    all_free_text_conditions[condition_text.lower()].append(condition_text)
 
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
-                # only store valid terms as quick links to the classification
-                # all_terms = {term for term in all_terms if term.is_valid_for_condition}
-                # self._update_conditions(all_terms)
                 summary_obj = modification.classification.summary_obj
 
                 if bucket := summary_obj.pathogenicity.bucket:
@@ -503,17 +452,14 @@ class ClassificationGrouping(TimeStampedModel):
             all_zygosities = sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities))
             self.zygosity_values = all_zygosities
 
-            # self.conditions = strip_json(ConditionResolved.from_uncounted_terms(
-            #     terms=list(sorted(all_terms)),
-            #     plain_text_terms=list(sorted(all_free_text_conditions))
-            # ).to_json(include_join=False))
             for term, count in all_terms.items():
                 condition_references.append(ConditionReference(term=term, count=count))
-            for text, count in all_free_text_conditions.items():
-                condition_references.append(ConditionReference(name=text, count=count))
+            for values in all_free_text_conditions.values():
+                display_text = min(values)  # grab the max text value
+                # as sometimes the condition is purely lower case, min will get us some capital letters
+                condition_references.append(ConditionReference(name=display_text, count=len(values)))
             condition_references.sort()
             self.conditions = strip_json(ConditionResolved(references=condition_references).to_json())
-
             self.classification_count = len(all_modifications)
 
             pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
@@ -542,9 +488,7 @@ class ClassificationGrouping(TimeStampedModel):
             if previous_summary and previous_summary != new_summary:
                 classification_grouping_summary_signal.send(sender=ClassificationGrouping, instance=self, old_summary=previous_summary, new_summary=new_summary)
         else:
-            # soft delete
-            # share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
-
+            # soft delete - leaving the share level and allele info alone
             self.classification_count = 0
             # these differences are internal within a lab, even if it's medical significant the overall
             self.pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
@@ -553,11 +497,6 @@ class ClassificationGrouping(TimeStampedModel):
             self.zygosity_values = None
             self.latest_classification_modification = None
             self._set_latest_cached_summary({})
-            # leaving the share level and allele info alone
-            # latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
-
-            # TODO if we're never shared or if the overlap was single only, maybe hard delete?
-            # self.delete()
         self.dirty = False
         self.save()
         # note the save signal will update the OverlapContribution
@@ -625,20 +564,6 @@ class ClassificationGrouping(TimeStampedModel):
             grouping_id=OuterRef('id')
         ).values('grouping_id').annotate(cnt=Count('pk')).values('cnt')[:1])
         grouping_counts.exclude(classification_count=F('live_count')).update(dirty=True)
-
-
-class ClassificationGroupingSearchTermType(TextChoices):
-    # CLASSIFICATION_ID = "CR_ID", "Classification Record ID"
-    # CLASSIFICATION_LAB_ID = "CR_LAB_ID", "Classification Lab Record ID"
-    # SOURCE_ID = "SOURCE_ID", "Classification Source ID"
-    CONDITION_ID = "CON_ID", "Condition ID"
-    CLINVAR_SCV = "SCV", "Clinvar SCV"
-    GENE_SYMBOL = "GENE_SYMBOL", "Gene Symbol"
-    DISCORDANCE_REPORT = "DR", "Discordance Report"
-
-    @property
-    def is_partial_text(self):
-        return False
 
 
 class ClassificationGroupingSearchTerm(TimeStampedModel):

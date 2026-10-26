@@ -5,15 +5,14 @@ from django.forms.widgets import TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import PatientRecordOriginType, PopulationGroup
 from patients.models import (
-    Extraction,
     ExternalPK,
+    Extraction,
     Patient,
     PatientModification,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import PopulationGroup
 from uicore.widgets.date_widget import NativeDateInput
 
 
@@ -123,7 +122,7 @@ class PatientContactForm(forms.ModelForm):
         widgets = {'street_address': TextInput(attrs={'placeholder': 'Number, Street'}),
                    'suburb': TextInput(attrs={'placeholder': 'Suburb'}),
                    'postcode': TextInput(attrs={'placeholder': 'Postcode'}),
-                   'telephone': TextInput(attrs={'placeholder': 'Numbers only'})}
+                   'telephone': TextInput(attrs={'placeholder': 'Telephone'})}
 
 
 class PatientSearchForm(forms.Form):
@@ -171,7 +170,7 @@ class ExtractionForm(forms.ModelForm):
     def clean_reference_id(self):
         # Unnamed extractions are all distinct under Postgres (@see Extraction.Meta), so an empty box
         # means unnamed rather than named ""
-        return self.cleaned_data['reference_id'] or None
+        return Extraction.normalize_reference_id(self.cleaned_data['reference_id']) or None
 
     def clean(self):
         cleaned_data = super().clean()

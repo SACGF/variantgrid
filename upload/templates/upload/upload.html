@@ -81,6 +81,21 @@
 				<option value="{{ value }}">{{ label }}</option>
 			{% endfor %}
 		</select>
+		<label for="status-select" class="ml-3 mr-2">Status</label>
+		<select id="status-select" class="form-control">
+			<option value="">All</option>
+			{% for value, label in processing_statuses %}
+				<option value="{{ value }}">{{ label }}</option>
+			{% endfor %}
+		</select>
+		{% if upload_enabled %}
+		<form id="retry-failed-imports-form" class="ml-3" method="post" action="{% url 'upload_retry_failed_imports' %}">
+			{% csrf_token %}
+			<input type="hidden" name="file_type">
+			<button type="submit" class="btn btn-outline-primary"
+					title="Retry every failed import of this file type uploaded in the last {{ retry_failed_imports_days }} days">Retry failed</button>
+		</form>
+		{% endif %}
 	</div>
 
 	<table id="file-uploads-datatable" class="sticky-header"

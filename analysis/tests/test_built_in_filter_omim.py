@@ -4,9 +4,10 @@ from analysis.models.nodes.node_counts import get_omim_q
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun, GeneAnnotation, GeneAnnotationVersion
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
+from genes.enums import AnnotationConsortium
 from genes.models import Gene
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

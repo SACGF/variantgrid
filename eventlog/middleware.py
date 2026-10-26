@@ -8,13 +8,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.http.response import HttpResponseRedirectBase
 from django.urls import Resolver404, resolve
 
-from eventlog.models import (
-    API_KEY_PREFIX,
-    ApiRequestLog,
-    IntegrationActivity,
-    IntegrationActivityStatus,
-    ViewEvent,
-)
+from eventlog.enums import IntegrationActivityStatus
+from eventlog.models import API_KEY_PREFIX, ApiRequestLog, IntegrationActivity, ViewEvent
+from library.django_utils.change_tracking import ChangeCollector, collect_changes
 from library.integration_status import IntegrationDirection
 from oidc_auth.session_refresh import VariantGridSessionRefresh
 
@@ -51,40 +47,7 @@ class PageViewsMiddleware:
 
         return response
 
-    # This code adds too much complexity and redundancy to the logging ()
-    # leave classification activity to the
-
-    # def is_special_case(self, request, view_func, view_args, view_kwargs) -> Optional[ViewEvent]:
-    #     if 'classification' not in settings.LOG_ACTIVITY_APPS:
-    #         return
-    #
-    #     # check to HTTP_X_REQUESTED_WITH as that implies it's a browser performing the request so hopefully we skip it when it's being performed by the API
-    #     if request.path_info == '/classification/api/classifications/v1/record/' and request.method == 'POST' and request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
-    #         data = json.loads(request.body)
-    #         if isinstance(data, dict) and data.get('source') == 'form':
-    #             all_params = {'classification_id': data.get('id').get('record_id'), **data.get('patch')}
-    #             if data.get('delete') is not None:
-    #                 all_params['delete'] = data.get('delete')
-    #             if data.get('publish') is not None:
-    #                 all_params['publish'] = data.get('publish')
-    #
-    #             return ViewEvent(
-    #                 user=request.user,
-    #                 # doesn't match any actual view name, just trying to be explicit
-    #                 view_name='classification:classification_form',
-    #                 args=all_params,
-    #                 path=request.get_full_path(),
-    #                 method=request.method,
-    #                 referer=request.headers.get('Referer')
-    #             )
-    #
-    #         pass
-
     def process_view(self, request, view_func, view_args, view_kwargs):
-        # if special_view_event := self.is_special_case(request, view_func, view_args, view_kwargs):
-        #     request.view_event = special_view_event
-        #     return
-
         if VariantGridSessionRefresh.is_ajax(request):
             return
 
@@ -159,7 +122,8 @@ class IntegrationApiMiddleware:
     """
     Records each call an external client makes to us: the rolling "last run" on Server Status
     (IntegrationActivity) and one ApiRequestLog row with what was sent and what came back, for
-    endpoints that would otherwise leave nothing behind but the records they wrote.
+    endpoints that would otherwise leave nothing behind but the records they wrote. What the call
+    created, updated or left unchanged is collected by library/django_utils/change_tracking.py.
 
     Driven by settings.INTEGRATION_API_TRACKING - {url path prefix: display name} - so a
     deployment only pays for the endpoints it names.
@@ -177,13 +141,15 @@ class IntegrationApiMiddleware:
         # read before the view, which consumes the stream
         request_body = _request_body_for_log(request)
         start = time.perf_counter()
-        response = self.get_response(request)
+        with collect_changes() as collector:
+            response = self.get_response(request)
         duration_ms = int((time.perf_counter() - start) * 1000)
-        self._record(request, response, display_name, request_body, duration_ms)
+        self._record(request, response, display_name, request_body, duration_ms, collector)
         return response
 
     @staticmethod
-    def _record(request, response, display_name: str, request_body: Optional[str], duration_ms: int):
+    def _record(request, response, display_name: str, request_body: Optional[str], duration_ms: int,
+                collector: ChangeCollector):
         try:
             resolver_match = request.resolver_match or resolve(request.path_info)
         except Resolver404:
@@ -232,6 +198,9 @@ class IntegrationApiMiddleware:
             response_body=response_body,
             content_type=content_type,
             object_pks=sorted(getattr(request, "api_log_object_pks", ())),
+            changes=collector.as_dict(),
+            num_changes=collector.num_changes,
+            notes=collector.notes,
         )
 
 

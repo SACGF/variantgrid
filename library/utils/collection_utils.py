@@ -61,7 +61,6 @@ T = TypeVar("T")
 
 
 def first(obj: Iterable[T]) -> T:
-    # FIXME, use collection_tools.first()
     for element in obj:
         return element
     return None

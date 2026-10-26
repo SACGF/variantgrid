@@ -110,10 +110,11 @@ function load_variant_details(variant_id) {
 
 const GENE_LEVEL_CONTIG_NAME = "GENE_LEVEL";  // @see snpdb/gene_level_variants.py
 
-// Expand renderer for the variant grids (@see AbstractVariantGrid.get_expand_client_renderer). The
+// Expand renderer for the variant grids (@see AbstractVariantGrid), kwargs: {annotationVersionId}. The
 // identifiers come from the server for the grid's annotation version; the actions are built here so
 // IGV follows ANALYSIS_SETTINGS.show_igv_links like the rest of the page
-function variantGridRowDetail(annotationVersionId, rowData) {
+function variantGridRowDetail(rowData, ctx) {
+    const annotationVersionId = ctx.kwargs.annotationVersionId;
     const variantId = rowData["id"];
     const detail = $('<div>', {class: 'variant-row-detail'});
     const fragment = $('<div>', {class: 'variant-row-detail-fragment', text: 'Loading...'});
@@ -210,6 +211,12 @@ function createFilterChild(columnName, columnFilter) {
         success: getAnalysisWindow().addConnectedNode,
     });
 }
+
+// Read with attr() rather than data(), which would turn a "null" filter value into null
+$(document).on("click", ".create-filter-child", function() {
+    const link = $(this);
+    createFilterChild(link.attr("data-column-name"), link.attr("data-column-filter"));
+});
 
 function inAnalysis() {
     // Variant selection and filter child links are wired up by the analysis page - other pages showing
@@ -324,14 +331,14 @@ function colorTagAutocompleteResults(tagSelect) {
 }
 
 
-/* options: tagLabel (HTML, defaults to the tag), extraClasses, title, variantTagId (the tagging the
+/* options: tagLabel (HTML - escape the tag in it - defaults to the tag), extraClasses, title, variantTagId (the tagging the
    pill is - what the X deletes) and marker (icon classes drawn after the label, saying whose tagging
    it is - @see VariantGridFormat.tags) */
 function getVariantTagHtml(variantId, tag, readOnly, options) {
     options = options || {};
-    const tagLabel = typeof(options.tagLabel) === 'undefined' ? tag : options.tagLabel;
+    const tagLabel = typeof(options.tagLabel) === 'undefined' ? escapeHtml(tag) : options.tagLabel;
     const title = typeof(options.title) === 'undefined' ? `Tagged as ${tag}` : options.title;
-    const outerClasses = ["grid-tag", "tagged-" + tag];
+    const outerClasses = ["grid-tag", "tagged-" + escapeHtml(tag)];
     if (!readOnly) {
         outerClasses.push("grid-tag-deletable");
     }
@@ -339,9 +346,9 @@ function getVariantTagHtml(variantId, tag, readOnly, options) {
         outerClasses.push(...options.extraClasses);
     }
     // A tagging's own pk - the analysis grid's X removes that one tagging, not every tagging of the tag
-    const pkAttr = options.variantTagId ? ` variant_tag_id='${options.variantTagId}'` : "";
+    const pkAttr = options.variantTagId ? ` variant_tag_id='${escapeHtml(options.variantTagId)}'` : "";
     const marker = options.marker ? `<i class='grid-tag-sample-marker ${options.marker}'></i>` : "";
-    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${variantId}' tag_id='${tag}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
+    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${escapeHtml(variantId)}' tag_id='${escapeHtml(tag)}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
 }
 
 
@@ -585,7 +592,7 @@ function gridLoadError(jqXHR, textStatus, errorThrown) {
 
     const ec = $("#error-container");
     ec.empty();
-    ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + errorMessage + "</li></ul>");
+    ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + escapeHtml(errorMessage) + "</li></ul>");
     $("#node-data-container").empty();
     hideLoadingOverlay();
     if (typeof hideGridLoadingOverlay === 'function') {

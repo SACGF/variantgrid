@@ -7,11 +7,13 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.dispatch import receiver
 
+from annotation.canonical_annotation import get_canonical_c_hgvs
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
-from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
+from genes.hgvs import HGVSDisplay
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab, Organization, Variant
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
@@ -103,11 +105,14 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     if cms.exists():
         extras += classification_qs_to_extras(cms)
         column = ClassificationModification.column_name_for_build(genome_build)
+        p_column = ClassificationModification.column_name_for_build(genome_build, 'p_hgvs')
         # provide the c.HGVS for alleles
-        if c_hgvs := sorted(
-                c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
-            for hgvs in c_hgvs:
-                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", hgvs, dedicated_row=True))
+        c_and_p_qs = cms.order_by(column, p_column).values_list(column, p_column).distinct()
+        if c_and_p := sorted(((c_hgvs, p_hgvs) for c_hgvs, p_hgvs in c_and_p_qs if c_hgvs),
+                             key=lambda pair: (pair[0], pair[1] or "")):
+            for c_hgvs, p_hgvs in c_and_p:
+                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", HGVSDisplay.parse(dna_hgvs=c_hgvs, p_hgvs=p_hgvs),
+                                                   dedicated_row=True))
 
     if not hgvs_extras:
         try:
@@ -136,7 +141,7 @@ def _variant_location_summary(va: VariantAnnotation) -> Optional[str]:
 def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> list[PreviewKeyValue]:
     """ c.HGVS where there's a canonical transcript, otherwise the g.HGVS and where it lies """
     hgvs_extras = []
-    if c_hgvs := variant.get_canonical_c_hgvs(genome_build):
+    if c_hgvs := get_canonical_c_hgvs(variant, genome_build):
         hgvs_extras.append(PreviewKeyValue(None, c_hgvs, dedicated_row=True))
     else:
         if hgvs_g := VariantAnnotation.get_hgvs_g(variant):
@@ -157,7 +162,7 @@ def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwar
 
 @receiver(preview_extra_signal, sender=Variant)
 def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
-    genome_build = next(iter(obj.genome_builds))
+    genome_build = obj.preferred_genome_build(GenomeBuildManager.get_current_genome_build(user))
     if allele := obj.allele:
         return _allele_preview_classifications_extra(user, allele, genome_build)
     else:

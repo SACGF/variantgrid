@@ -21,8 +21,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from genes.enums import AnnotationConsortium
 from genes.gene_annotation_import_urls import canonical_import_url
-from genes.models_enums import AnnotationConsortium
 
 # The one RefSeq value that reports a timestamp instead of an annotation release
 LEGACY_GRCH37_REFSEQ = {

@@ -9,14 +9,13 @@ from django.utils import timezone
 from frozendict import frozendict
 from more_itertools import first
 
+from classification.enums import DiscordanceReportNextStep, DiscordanceReportTriageStatus
 from classification.models import (
     ClassificationLabSummary,
     ClassificationModification,
     DiscordanceReport,
     DiscordanceReportClassification,
-    DiscordanceReportNextStep,
     DiscordanceReportTriage,
-    DiscordanceReportTriageStatus,
 )
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from genes.hgvs import HGVSDisplay
@@ -97,8 +96,8 @@ class DiscordanceReportRowData(ExportRow):
             return pretty_label(next_step.name.lower())
 
     @export_column(label="c.HGVS")
-    def _chgvs(self):
-        return str(self.c_hgvs)
+    def _dna_hgvs(self):
+        return str(self.hgvs)
 
     @property
     def is_medically_significant(self):
@@ -196,12 +195,12 @@ class DiscordanceReportRowData(ExportRow):
         return date_str
 
     @property
-    def c_hgvs(self) -> HGVSDisplay:
-        return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
+    def hgvs(self) -> HGVSDisplay:
+        return self._cm_candidate.hgvs_best(genome_build=self.perspective.genome_build)
 
     @property
-    def c_hgvses(self) -> list[HGVSDisplay]:
-        return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
+    def hgvses(self) -> list[HGVSDisplay]:
+        return sorted({candidate.hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
     @property
     def is_pending_concordance(self):

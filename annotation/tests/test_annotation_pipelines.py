@@ -15,13 +15,17 @@ from django.urls import reverse
 from django.utils import timezone
 
 from annotation.annotation_versions import _reset_run_counts_after_extend
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_vep_version,
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotationVersion
-from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationRun
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models.models_annotation_run import (
+    AnnotationPipelineVersion,
+    AnnotationRangeLock,
+    AnnotationRun,
+)
 from annotation.pipelines import blocking_pipeline_types, enabled_pipeline_types, get_runner
 from annotation.tasks.annotation_scheduler_task import (
     COUNT_LEASE_PREFIX,
@@ -29,7 +33,7 @@ from annotation.tasks.annotation_scheduler_task import (
     _handle_variant_annotation_version,
     count_annotation_runs,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import execute_cmd
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

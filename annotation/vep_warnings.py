@@ -18,8 +18,6 @@ where N is the Nth *data* record of the input VCF (the parser starts its line_nu
 once per record in create_VariationFeatures; header lines are consumed by htslib and never counted).
 The pre-112 wording is recognised too, because a scan of historical rows meets blobs written by
 whichever VEP was current at the time.
-
-Nothing here touches the ORM, so a migration can import it.
 """
 import logging
 import re
@@ -103,7 +101,7 @@ def parse_skipped_variants_file(filename: str) -> list[VEPSkippedVariant]:
 
         (printf "Line %-5s\t%-40.40s\t%s\n", so both leading fields are blank-padded). """
     skipped_variants = []
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         for line in f:
             line = line.rstrip("\n")
             if not line or line.startswith(SKIPPED_VARIANTS_FILE_HEADER_PREFIX):
@@ -120,10 +118,3 @@ def parse_skipped_variants_file(filename: str) -> list[VEPSkippedVariant]:
             ))
     return skipped_variants
 
-
-def annotation_run_shortfall(dump_count: int, annotated_count: int, vep_warnings: Optional[str]) -> int:
-    """ #1701: records handed to VEP that neither came back annotated nor were reported skipped.
-
-        A plain function over row values (no ORM) so the Part C command and its ManualOperation
-        migration run identical arithmetic. """
-    return dump_count - (annotated_count + parse_vep_warnings(vep_warnings).skipped_count)

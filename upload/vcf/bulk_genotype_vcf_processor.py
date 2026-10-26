@@ -22,20 +22,18 @@ from library.genomics.vcf_enums import (
 )
 from library.utils import double_quote, json_default_converter
 from library.utils.json_utils import json_dumps_nan_as_null
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
+from snpdb.enums import ProcessingStatus
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models import CodeVersion
-from snpdb.models.models_enums import ProcessingStatus
+from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     ModifiedImportedVariant,
-    ModifiedImportedVariantOperation,
     PipelineFailedJobTerminateEarlyException,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
     VCFImporter,
-    VCFPipelineStage,
 )
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
@@ -360,12 +358,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             # AF will already be there
             self.cohort_genotypes.extend(self.locus_cohort_genotypes)
         else:
-            # TODO: In Python3.10 we can replace this check with zip(strict=True)
-            if len(self.locus_cohort_genotypes) != len(self.locus_allele_depths):
-                raise ValueError("Locus cohort genotype and locus Allele depths not equal!")
-
             # Calculate ourselves across locus
-            for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
+            for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths, strict=True):
                 vaf = ad / self.locus_ad_sum
                 vaf[np.isnan(vaf)] = CohortGenotype.MISSING_NUMBER_VALUE
                 cgt[self.cohort_gt_vaf_index] = postgres_arrays(vaf)
@@ -543,7 +537,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         cohort_genotypes_common = []
         cohort_genotypes_rare = []
 
-        # TODO: This check can be replaced with Python 3.10 zip(strict=True)
         num_variants = len(variant_ids)
         for name, array in {"variant_filters": self.variant_filters,
                             "cohort_genotypes": self.cohort_genotypes,
