@@ -167,11 +167,10 @@ class VCF(GuardianPermissionsMixin, DataArchiveMixin, PreviewModelMixin):
         return queryset
 
     @staticmethod
-    def get_for_user(user, vcf_id):
-        vcf = get_object_or_404(VCF, pk=vcf_id)
-        read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        if not user.has_perm(read_perm, vcf):
-            raise PermissionDenied()
+    def get_for_user(user, vcf_id, write=False):
+        """ Hides VCFs being deleted, as filter_for_user does """
+        vcf = get_object_or_404(VCF.objects.exclude(import_status__in=ImportStatus.DELETION_STATES), pk=vcf_id)
+        vcf.check_permission(user, write)
         return vcf
 
     def save(self, *args, **kwargs):

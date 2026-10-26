@@ -10,10 +10,9 @@ from dataclasses import dataclass
 from io import StringIO
 from itertools import batched
 from typing import Optional
-from urllib.error import HTTPError
 
 import requests
-from Bio import Entrez, SeqIO
+from Bio import SeqIO
 from django.conf import settings
 from django.utils.module_loading import import_string
 
@@ -21,6 +20,7 @@ from genes.enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript, NoTranscript
 from genes.transcript_parts import get_transcript_id_and_version
 from library.constants import MINUTE_SECS
+from library.entrez import efetch, epost
 from library.utils import get_single_element
 from snpdb.models import GenomeBuild
 
@@ -69,19 +69,18 @@ class TranscriptSequenceFetcher:
 
     def fetch_refseq(self, transcript_accession: str) -> FetchedTranscriptSequence:
         try:
-            data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
-        except HTTPError as e:
-            if e.code == 400:
+            api_response = efetch('nuccore', transcript_accession, rettype='gb', retmode='text')
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 400:
                 raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found") from e
             raise e
-        api_response = data.read()
         with StringIO(api_response) as f:
             if api_response.startswith("Error:"):
                 error_message = api_response[6:]
                 if len(error_message) > 2 and error_message[2] == " ":
                     # error messages seem to have been iterated so that every 2nd characer is a space, fix this
                     error_message = "".join(char for i, char in enumerate(error_message) if i % 2 == 1)
-                raise ValueError("ClinGen API response: " + error_message)
+                raise NoTranscript(f"Entrez API error for \"{transcript_accession}\": {error_message}")
 
             record = get_single_element(list(SeqIO.parse(f, "genbank")))
             return _fetched_from_genbank_record(record, api_response)
@@ -127,23 +126,17 @@ class TranscriptSequenceFetcher:
         for id_list in batched(transcript_accessions, entrez_batch_size):
             id_param = ",".join(id_list)
             try:
-                search_results = Entrez.read(Entrez.epost("nuccore", id=id_param))
-                fetch_handle = Entrez.efetch(
-                    db="nuccore",
-                    rettype="gb",
-                    retmode="text",
-                    webenv=search_results["WebEnv"],
-                    query_key=search_results["QueryKey"],
-                    idtype="acc",
-                )
-                for record in SeqIO.parse(fetch_handle, "genbank"):
+                posted = epost("nuccore", id_list)
+                genbank = efetch("nuccore", rettype="gb", retmode="text", webenv=posted["WebEnv"],
+                                 query_key=posted["QueryKey"], idtype="acc", timeout=MINUTE_SECS)
+                for record in SeqIO.parse(StringIO(genbank), "genbank"):
                     # Store raw data so that we can retrieve more stuff from it later
                     s = StringIO()
                     SeqIO.write(record, s, "genbank")
                     s.seek(0)
                     fetched.append(_fetched_from_genbank_record(record, s.read()))
             except Exception as e:
-                # Entrez surfaces failures as RuntimeError, urllib HTTPError (e.g. 429 rate limit), etc.
+                # Entrez surfaces failures as RuntimeError, requests HTTPError (e.g. 429 rate limit), etc.
                 # When the caller passed fail_on_error=False they want a best-effort batch, so swallow them all.
                 logging.warning("Entrez failed w/params: %s (%s)", id_param, e)
                 if fail_on_error:

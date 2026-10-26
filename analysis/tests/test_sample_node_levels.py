@@ -662,6 +662,15 @@ class TestSampleNodeForm(SampleNodeLevelsTestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("source", form.errors)
 
+    def test_an_editor_keeps_the_current_source_but_only_picks_what_they_can_view(self):
+        editor = User.objects.get_or_create(username="test_sample_node_form_editor")[0]
+        for source, accepted in [(f"{SampleSourceLevel.EXTRACTION}:{self.extraction.pk}", True),
+                                 (f"{SampleSourceLevel.SPECIMEN}:{self.specimen.pk}", False)]:
+            with self.subTest(source=source):
+                form = self._form(self._extraction_node(), source=source)
+                form.restrict_choices_to_editor(editor)
+                self.assertEqual(form.is_valid(), accepted, form.errors)
+
     @override_settings(ANALYSIS_SAMPLE_NODE_LEVELS=["S", "E"])
     def test_a_level_the_deployment_has_turned_off_is_a_form_error(self):
         form = self._form(self._extraction_node(),

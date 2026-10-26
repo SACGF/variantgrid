@@ -11,6 +11,7 @@ from django.test.utils import override_settings
 
 from annotation.backfill_columns import (
     BackfillColumnError,
+    check_annotated_vcf_complete,
     dump_annotated_variants,
     import_backfill_vcf,
     normalise_source_value,
@@ -24,6 +25,7 @@ from annotation.fake_data import (
 )
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
+from annotation.vep_annotation import get_vep_skipped_variants_filename
 from annotation.vep_field_formatters import format_pick_highest_int
 from genes.enums import AnnotationConsortium
 from genes.fake_data import create_gene_level_variant
@@ -313,3 +315,20 @@ class BackfillColumnRoundTripTests(TestCase):
 
             with self.assertRaises(BackfillColumnError):
                 import_backfill_vcf(self.vav, stripped_filename, self.targets)
+
+    def test_annotated_vcf_must_account_for_every_dumped_record(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._dump_and_annotate(tmp_dir, {})
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            with open(annotated_filename, encoding="utf-8") as f:
+                lines = f.readlines()
+            with open(annotated_filename, "w", encoding="utf-8") as f:
+                f.writelines(lines[:-1])
+
+            with self.assertRaises(BackfillColumnError):
+                check_annotated_vcf_complete(dump_filename, annotated_filename)
+
+            with open(get_vep_skipped_variants_filename(annotated_filename), "w", encoding="utf-8") as f:
+                f.write(f"[VEP skipped the following variants from {dump_filename}]\n"
+                        f"Line 4    \t{lines[-1][:40]}\tInvalid allele\n")
+            self.assertEqual(check_annotated_vcf_complete(dump_filename, annotated_filename), 4)

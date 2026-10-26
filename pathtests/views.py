@@ -210,20 +210,24 @@ def view_pathology_test_version(request, pk):
 
         confirm_test = request.POST.get("confirm_test")
         if confirm_test:
-            if not pathology_test_version.can_confirm:
-                msg = "Can't set as active test!"
-                raise ValueError(msg)
-
-            pathology_test_version.confirmed_date = timezone.now()
-            pathology_test_version.save()
-            pathology_test_version.set_as_active_test()
-            messages.add_message(request, messages.INFO, "Test Confirmed")
+            if pathology_test_version.can_confirm:
+                pathology_test_version.confirmed_date = timezone.now()
+                pathology_test_version.save()
+                pathology_test_version.set_as_active_test()
+                messages.add_message(request, messages.INFO, "Test Confirmed")
+            else:
+                messages.add_message(request, messages.ERROR,
+                                     "Can't confirm a test version that is already confirmed or has no enrichment kit")
         else:
             valid = pathology_test_version_form.is_valid()
             if pathology_test_version_form.cleaned_data:  # Got something in POST
-                if valid:
-                    pathology_test_version = pathology_test_version_form.save()
-                add_save_message(request, valid, "Pathology Test Version")
+                if pathology_test_version.can_modify:
+                    if valid:
+                        pathology_test_version = pathology_test_version_form.save()
+                    add_save_message(request, valid, "Pathology Test Version")
+                else:
+                    pathology_test_version.refresh_from_db()  # is_valid() copied the POSTed kit onto it
+                    messages.add_message(request, messages.ERROR, "A confirmed test version can't be changed")
             else:
                 gene_addition_requests, gene_deletion_requests, _ = get_gene_modification_request(pathology_test_version)
                 test_confirmed = pathology_test_version.confirmed_date is not None

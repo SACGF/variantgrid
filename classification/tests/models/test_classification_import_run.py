@@ -1,15 +1,24 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.timezone import now
 
-from classification.enums import SubmissionSource
+from classification.enums import ClassificationImportRunStatus, SubmissionSource
 from classification.models.classification import Classification
-from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.classification_import_run import (
+    MAX_IMPORT_AGE,
+    ClassificationImportRun,
+    classification_imports_complete_signal,
+)
 from classification.models.classification_inserter import BulkClassificationInserter
 from classification.models.uploaded_classifications_unmapped import (
     UploadedClassificationsUnmapped,
     UploadedClassificationsUnmappedStatus,
+)
+from classification.tasks.classification_import_task import (
+    close_abandoned_classification_import_runs_task,
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
 
@@ -51,3 +60,21 @@ class ClassificationImportRunAlreadyWithdrawnTest(TestCase):
         withdrawn_1 = Classification.objects.get(lab=lab, lab_record_id="withdrawn_1")
         self.assertContains(response, reverse("view_classification", kwargs={"classification_id": withdrawn_1.pk}))
         self.assertContains(response, "Only the first 1 are listed")
+
+
+class ClassificationImportRunAbandonedTest(TestCase):
+
+    def test_abandoned_run_closed_without_another_import(self):
+        abandoned = ClassificationImportRun.objects.create(identifier="abandoned")
+        recent = ClassificationImportRun.objects.create(identifier="recent")
+        ClassificationImportRun.objects.filter(pk=abandoned.pk).update(modified=now() - MAX_IMPORT_AGE - timedelta(minutes=1))
+
+        close_abandoned_classification_import_runs_task()
+        abandoned.refresh_from_db()
+        self.assertEqual(abandoned.status, ClassificationImportRunStatus.UNFINISHED)
+        self.assertEqual(ClassificationImportRun.ongoing_imports(), "recent")
+
+        ClassificationImportRun.objects.filter(pk=recent.pk).update(modified=now() - MAX_IMPORT_AGE - timedelta(minutes=1))
+        with patch.object(classification_imports_complete_signal, "send") as complete_signal:
+            close_abandoned_classification_import_runs_task()
+        complete_signal.assert_called_once()

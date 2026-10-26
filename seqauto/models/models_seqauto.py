@@ -1072,10 +1072,9 @@ class LibraryQC(PreviewModelMixin, SpecimenClaimMixin, TimeStampedModel):
         DRAGEN writes one MetricsOutput per run, with a column per pair carrying both of its arms, so a row is
         keyed on (run, pair, category). The run is part of the key because the column alone does not identify a
         pair across runs - the lab's pair IDs carry a leading sequencing number, and nothing promises a
-        re-sequenced pair is renamed. The SequencingRun is linked where seqauto has registered it and left null
-        where it has not, the way the CombinedVariantOutput's link_to_sequencing_run tolerates a missing sample
-        sheet; a nullable FK cannot be the key, since Postgres treats nulls as distinct, so the run's name is
-        stored too.
+        re-sequenced pair is renamed. The upload must name a run seqauto has registered, and links to it; the FK
+        is nullable so deleting a run keeps its QC, and a nullable FK cannot be the key, since Postgres treats
+        nulls as distinct, so the run's name is stored too.
 
         The pair claims a Specimen by the accession inside its ID and never creates one - the
         CombinedVariantOutput is what accessions a case, and QC that arrives first parks its claim

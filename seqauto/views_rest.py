@@ -41,6 +41,7 @@ from seqauto.models import (
     SingleSampleVCF,
     VariantCaller,
 )
+from seqauto.seqauto_permissions import can_write_seqauto
 from seqauto.serializers import (
     EnrichmentKitSerializer,
     EnrichmentKitSummarySerializer,
@@ -80,8 +81,7 @@ class SeqAutoWritePermission(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
-        user = request.user
-        return user.is_superuser or user.groups.filter(name=settings.SEQAUTO_API_WRITE_GROUP).exists()
+        return can_write_seqauto(request.user)
 
 
 class SeqAutoModelViewSet(ModelViewSet):
