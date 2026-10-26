@@ -4,6 +4,9 @@ ordered, and names (dotted paths, URL names) that must resolve. Django runs them
 and at server start; `manage.py deployment_check` reports them alongside its own checks
 (`variantgrid/deployment_validation/settings_check.py`), so the upgrader stops on an Error.
 
+`check_unused_annotation_data` walks the annotation data directories, so it is a deploy check
+(`manage.py check --deploy`) rather than one paid for on every command.
+
 A setting the code already validates at the point of use isn't repeated here. Ids: variantgrid.E0xx stop the
 command, variantgrid.W0xx are printed. Silence one a deployment does on purpose with SILENCED_SYSTEM_CHECKS.
 """
@@ -12,6 +15,7 @@ from importlib import import_module
 
 from django.conf import settings
 from django.core.checks import Error, Tags, Warning, register
+from django.template.defaultfilters import filesizeformat
 from django.urls import get_resolver
 from django.utils.module_loading import import_string
 
@@ -20,6 +24,7 @@ from genes.enums import AnnotationConsortium
 from library.oauth import url_scheme_problem
 from patients.enums import SampleSourceLevel
 from snpdb.enums import AlleleOriginBucket
+from variantgrid.deployment_validation.unused_annotation_files import unused_annotation_data
 
 OIDC_BACKEND = 'oidc_auth.backend.VariantGridOIDCAuthenticationBackend'
 OIDC_LOGIN_URL = '/oidc_login/'
@@ -213,6 +218,25 @@ def check_annotation(app_configs, **kwargs):
         messages.append(Error(f"ANNOTATION_MAX_BENIGN_RANKSCORE ({settings.ANNOTATION_MAX_BENIGN_RANKSCORE}) must be "
                               f"below ANNOTATION_MIN_PATHOGENIC_RANKSCORE "
                               f"({settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE})", id="variantgrid.E017"))
+    return messages
+
+
+def _size(num_bytes: int) -> str:
+    return filesizeformat(num_bytes).replace("\xa0", " ")
+
+
+@register(Tags.compatibility, deploy=True)
+def check_unused_annotation_data(app_configs, **kwargs):
+    """ Annotation data files nothing in ANNOTATION / VCF_IMPORT_COMMON_FILTERS refers to (#2435) """
+    messages = []
+    for directory, unused in unused_annotation_data().items():
+        total = sum(u.size for u in unused)
+        lines = "".join(f"\n  {u.path} ({_size(u.size)})" for u in sorted(unused, key=lambda u: -u.size))
+        messages.append(Warning(f"{len(unused)} entries in {directory} ({_size(total)}) are not used by the "
+                                f"annotation settings:{lines}",
+                                hint="Delete what no annotation version needs - kept on purpose (about to be "
+                                     "switched on, or to re-run an older version), add variantgrid.W007 to SILENCED_SYSTEM_CHECKS.",
+                                id="variantgrid.W007"))
     return messages
 
 
