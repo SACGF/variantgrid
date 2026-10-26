@@ -192,7 +192,7 @@ def get_range_lock_gaps_with_variants(variant_annotation_version: VariantAnnotat
 
 def _range_lock_is_dispatchable(range_lock: AnnotationRangeLock, now=None) -> bool:
     """ A range lock is mergeable only while all of its runs are still pending (#2667):
-        CREATED, un-leased, no task_id and not external. A lock with no runs yet (orphaned mid-create)
+        CREATED, un-leased, no task_id and not external. A lock with no runs (they were deleted)
         is pure metadata and safe to merge too.
 
         #1646: empty-finished runs (the count task found no variants of that pipeline type in range) are

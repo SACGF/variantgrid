@@ -124,7 +124,7 @@ def annotation_scheduler(status: str = None):
                 logging.warning("annotation_scheduler: skipping %s - %s", variant_annotation_version, blocker)
             else:
                 pipeline_versions = _scheduled_pipeline_versions(genome_build)
-                _assign_orphaned_range_locks(variant_annotation_version, pipeline_versions)
+                _create_missing_runs(variant_annotation_version, pipeline_versions)
                 while True:
                     range_lock = _handle_variant_annotation_version(variant_annotation_version, pipeline_versions)
                     if range_lock is None:
@@ -260,10 +260,10 @@ def _dispatch_counts(vav: VariantAnnotationVersion, now):
     count_annotation_runs.apply_async((run_ids, token))  # @UndefinedVariable
 
 
-def _assign_orphaned_range_locks(variant_annotation_version, pipeline_versions):
-    """ Create the runs missing from existing locks - left by a crash between creating a lock and its runs,
-        and how a newly enabled pipeline backfills, or a versioned one re-runs after its tool is upgraded
-        (#720): "no run at the version we schedule against" is one query covering all of them. Turning eg
+def _create_missing_runs(variant_annotation_version, pipeline_versions):
+    """ Create the runs missing from existing locks: how a newly enabled pipeline backfills, a versioned one
+        re-runs after its tool is upgraded (#720), and a deleted run comes back - "no run at the version we
+        schedule against" is one query covering all of them. Turning eg
         ANNOTATION_ANNOTSV_ENABLED on, or promoting a new AnnotSV, creates its run for every existing lock.
         Cheap: most locks hold no SVs, and the count lane finishes those without ever dispatching them.
 
@@ -273,7 +273,7 @@ def _assign_orphaned_range_locks(variant_annotation_version, pipeline_versions):
     for pipeline_type, pipeline_version in pipeline_versions.items():
         for range_lock in arl_qs.exclude(annotationrun__pipeline_type=pipeline_type,
                                          annotationrun__pipeline_version=pipeline_version):
-            logging.warning("Assigned orphaned annotation range lock: %s, run type: %s",
+            logging.warning("Creating missing run for annotation range lock: %s, run type: %s",
                             range_lock, VariantAnnotationPipelineType(pipeline_type).label)
             _handle_range_lock(range_lock, {pipeline_type: pipeline_version})
 
@@ -283,8 +283,9 @@ def _handle_variant_annotation_version(variant_annotation_version, pipeline_vers
                                                                                     settings.ANNOTATION_VEP_BATCH_MIN,
                                                                                     settings.ANNOTATION_VEP_BATCH_MAX)
     if range_lock is not None:
-        range_lock.save()
-        _handle_range_lock(range_lock, pipeline_versions)
+        with transaction.atomic():
+            range_lock.save()
+            _handle_range_lock(range_lock, pipeline_versions)
     else:
         if unannotated_count:
             logging.warning("Unannotated variants but couldn't get a lock.")

@@ -56,7 +56,7 @@ Annotation is scheduled by variant pk range. `annotation/tasks/annotation_schedu
 (beat, and kicked by `upload/tasks/vcf/import_vcf_tasks.py:CheckStartAnnotationTask` after a VCF's variants are
 inserted) runs on `scheduling_single_worker` (one process, which is what serialises it with the dispatcher) and, for each
 annotated build's latest VAV of the requested status, creates any runs missing from existing locks once
-(`annotation/tasks/annotation_scheduler_task.py:_assign_orphaned_range_locks`), then loops `annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version` until
+(`annotation/tasks/annotation_scheduler_task.py:_create_missing_runs`), then loops `annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version` until
 `annotation/annotation_versions.py:get_annotation_range_lock_and_unannotated_count` finds no more unannotated variants.
 That function walks pk blocks above the highest existing lock (never a sort-and-limit over the whole table, which does
 not scale) and returns an `annotation/models/models_annotation_run.py:AnnotationRangeLock` of at least

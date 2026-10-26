@@ -29,7 +29,7 @@ from annotation.models.models_annotation_run import (
 from annotation.pipelines import blocking_pipeline_types, enabled_pipeline_types, get_runner
 from annotation.tasks.annotation_scheduler_task import (
     COUNT_LEASE_PREFIX,
-    _assign_orphaned_range_locks,
+    _create_missing_runs,
     _dispatchable_runs_qs,
     _scheduled_pipeline_versions,
     count_annotation_runs,
@@ -58,8 +58,8 @@ class AnnotSVPipelineTestCase(TestCase):
         cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
         cls.av = AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
 
-    def _assign_orphaned_range_locks(self):
-        _assign_orphaned_range_locks(self.vav, _scheduled_pipeline_versions(self.grch37))
+    def _schedule_existing_locks(self):
+        _create_missing_runs(self.vav, _scheduled_pipeline_versions(self.grch37))
 
     def _make_lock(self):
         return AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.variants[0],
@@ -152,15 +152,15 @@ class AnnotSVPipelineTestCase(TestCase):
 
     @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
     def test_enabling_annotsv_creates_runs_for_existing_locks(self):
-        """ #720's backfill: enabling the pipeline makes the scheduler's orphaned-lock repair create an
-            ANNOTSV run for every lock that already finished VEP. """
+        """ #720's backfill: enabling the pipeline makes the scheduler create an ANNOTSV run for every lock
+            that already finished VEP. """
         lock = self._make_lock()
         self._finish_vep_runs(lock)
         active = self._make_pipeline_version("3.5.8")
         self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).exists())
 
-        self._assign_orphaned_range_locks()
+        self._schedule_existing_locks()
 
         self.assertEqual(AnnotationRun.objects.get(annotation_range_lock=lock,
                                                    pipeline_type=ANNOTSV).pipeline_version, active)
@@ -173,7 +173,7 @@ class AnnotSVPipelineTestCase(TestCase):
         lock = self._make_lock()
         self._finish_vep_runs(lock)
         old_version = self._make_pipeline_version("3.5.8")
-        self._assign_orphaned_range_locks()
+        self._schedule_existing_locks()
         old_run = AnnotationRun.objects.get(annotation_range_lock=lock, pipeline_type=ANNOTSV)
         old_run.dump_count = 0
         old_run.save()
@@ -181,12 +181,12 @@ class AnnotSVPipelineTestCase(TestCase):
 
         new_version = self._make_pipeline_version("3.5.9", status=AnnotationPipelineVersion.Status.NEW)
         # Registered but not promoted - nothing is scheduled against it yet
-        self._assign_orphaned_range_locks()
+        self._schedule_existing_locks()
         self.assertEqual(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).count(), 1)
 
         new_version.promote_to_active()
-        self._assign_orphaned_range_locks()
+        self._schedule_existing_locks()
 
         runs = AnnotationRun.objects.filter(annotation_range_lock=lock, pipeline_type=ANNOTSV)
         self.assertEqual({r.pipeline_version for r in runs}, {old_version, new_version})
@@ -202,7 +202,7 @@ class AnnotSVPipelineTestCase(TestCase):
         lock = self._make_lock()
         self._finish_vep_runs(lock)
 
-        self._assign_orphaned_range_locks()
+        self._schedule_existing_locks()
 
         self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).exists())
@@ -211,7 +211,7 @@ class AnnotSVPipelineTestCase(TestCase):
     def test_annotsv_runs_not_created_while_disabled(self):
         self.assertNotIn(ANNOTSV, enabled_pipeline_types())
         lock = self._make_lock()
-        self._assign_orphaned_range_locks()
+        self._schedule_existing_locks()
         self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).exists())
 
