@@ -28,8 +28,9 @@ from classification.models.uploaded_classifications_unmapped import UploadedClas
 from classification.tasks.classification_import_map_and_insert_task import (
     ClassificationImportMapInsertTask,
 )
+from eventlog.notifications import NotificationBuilder
 from library.django_utils import get_url_from_view_path
-from library.log_utils import NotificationBuilder, report_exc_info
+from library.log_utils import report_exc_info
 from library.utils import empty_to_none
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab

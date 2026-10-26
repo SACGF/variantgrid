@@ -15,9 +15,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from email_manager.models import EmailLog
+from eventlog.notifications import AdminNotificationBuilder
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
-from library.log_utils import AdminNotificationBuilder
 from mme.models import MMEInboundMatch
 from user_messages.models import Message
 

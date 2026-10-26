@@ -27,7 +27,8 @@ from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 import json
 from library.django_utils import get_url_from_view_path
-from library.log_utils import NotificationBuilder, report_exc_info
+from eventlog.notifications import NotificationBuilder
+from library.log_utils import report_exc_info
 from library.utils.collection_utils import batch_iterator
 from review.models import Review, ReviewableModelMixin
 from snpdb.lab_picker import LabPickerData

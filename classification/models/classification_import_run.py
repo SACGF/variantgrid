@@ -14,7 +14,7 @@ from model_utils.models import TimeStampedModel
 from classification.enums import ClassificationImportRunStatus, ClassificationPatchStatus
 from classification.models.classification_utils import ClassificationPatchResponse
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
-from library.log_utils import NotificationBuilder
+from eventlog.notifications import NotificationBuilder
 
 classification_imports_complete_signal = dispatch.Signal()
 """

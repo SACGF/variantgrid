@@ -769,7 +769,7 @@ ROLLBAR = {
     'root': BASE_DIR,
     'capture_username': True,
     'code_version': GIT_HASH,
-    # pyrollbar has no threshold of its own: library.log_utils report_event/report_message drop messages below this
+    # pyrollbar has no threshold of its own: eventlog.notifications.report_event / library.log_utils.report_message drop messages below this
     'min_level': 'warning',
     'ignorable_404_urls': (
         re.compile(r'.*\.map'),

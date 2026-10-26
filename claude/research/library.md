@@ -23,10 +23,9 @@ explicitly) it calls `library/guardian_utils.py:assign_permission_to_user_and_gr
 write on the object and then reads `UserSettings.get_for_user(user).initial_perm_read_and_write_groups` to grant the
 same to the lab or organisation groups the user has asked new objects to be shared with. That `UserSettings` import
 sits inside the function - `library` cannot import `snpdb` at module level without a cycle. The other function-level
-imports of an app are `EmailLog` in `AdminNotificationBuilder.send`, `UserSettingsManager` in
-`library/utils/export_utils.py:ExportSettings.get_for_request` and `PartitionArchive` in
-`RelatedModelsPartitionModel._warn_if_no_archive`; `log_utils` (eventlog) and `preview_request` (`genes.enums`,
-`variantgrid.perm_path`) import theirs at module level. Permission strings are never spelled out by hand:
+imports of an app are `UserSettingsManager` in `library/utils/export_utils.py:ExportSettings.get_for_request` and
+`PartitionArchive` in `RelatedModelsPartitionModel._warn_if_no_archive`; `preview_request` (`genes.enums`,
+`variantgrid.perm_path`) imports its at module level. Permission strings are never spelled out by hand:
 `library/guardian_utils.py:DjangoPermission.perm` builds `view_<model>` / `change_<model>` from a model, a queryset or
 a list, so a rename of the model cannot leave a stale string behind.
 
@@ -55,29 +54,16 @@ reads every permission row the group holds - flat ~400ms a page at 200k VariantT
 whose class returns True, so the base returns False and only the auto-initial-save mixin (user-created objects) opts in,
 keeping audit rows like `ClassificationModification` out of its reach.
 
-### A notification, from code to Slack
+### Reporting a problem
 
-`library/log_utils.py:NotificationBuilder` is a list of blocks - `add_header`, `add_field` (consecutive fields fold
-into one `FieldsBlock`), `add_markdown`, `add_divider`, `merge` - each of which renders itself three ways (`as_text`,
-`as_html`, `as_slack`). `NotificationBuilder.send` first writes the text rendering as an `eventlog` `Event` row and then
-calls `library/log_utils.py:send_notification`, which posts the Slack blocks to the webhook: the builder's own
-`webhook_url` if it has one (snpdb's `LabNotificationBuilder` supplies the lab's), otherwise
-`settings.SLACK["admin_callback_url"]` when `SLACK["enabled"]`. Blocks are JSON-counted and cut at
-`SLACK_CHARACTER_LIMIT` (2000, well under Slack's 4000) with a "check EventLog" block appended, since the event row already
-holds the whole message. Slack refusing the payload goes to Rollbar with the JSON attached; no webhook at all degrades
-to `library/log_utils.py:report_event`, so a deployment without Slack still gets a Rollbar info line and an Event.
-`library/log_utils.py:AdminNotificationBuilder.send` adds superuser email through `EmailLog.send_mail` when
-`is_communication=True` and `settings.ADMIN_EMAIL_NOTIFICATION` is set. The builder's `__del__` reports a builder that
-was never sent, which is how a forgotten `send()` gets noticed.
-
-The other half of the module is reporting. `library/log_utils.py:report_exc_info` sends `sys.exc_info()` to Rollbar
+`library/log_utils.py:report_exc_info` sends `sys.exc_info()` to Rollbar
 with the exception message as extra data and prints the traceback; `library/log_utils.py:report_message` is the
 non-fatal variant. Both find the current request through `library/request_context.py` (`RequestContextMiddleware` in
 `MIDDLEWARE`), so a caller deep in a model never has to thread a request through. Uncaught view exceptions take a
 different road: `library/django_utils/rollbar_middleware.py:CustomRollbarNotifierMiddleware` attaches the message and
 skips anything derived from `RollbarIgnoreException` (analysis node errors that are the user's problem, not ours).
-The nightly health check is a notification too: `variantopedia/tasks/server_status_tasks.py:notify_server_status_now`
-builds a `NotificationBuilder` and `library/health_check.py:populate_health_check` fills it from every
+The nightly health check is an `eventlog` notification: `variantopedia/tasks/server_status_tasks.py:notify_server_status_now`
+builds a `NotificationBuilder` and `variantopedia/server_status.py:populate_health_check` fills it from every
 `health_check_signal` / `health_check_overall_stats_signal` receiver, sorting the returned
 `library/health_check.py:HealthCheckStat` objects into a "last 24 hours" and an "Overall" section. The receivers are
 called with `send_robust`, so one app's broken check becomes a line in the message rather than a lost message.
@@ -223,9 +209,7 @@ must come before `models.Model` in the bases and the model must have a `user` at
 `ValueError` after the row is already written. `filter_for_user(user, queryset=...)` with a queryset from a
 *different* model than `cls` silently filters the wrong pks - the delegation path expects the queryset to be of `cls`.
 
-`NotificationBuilder.__init__`'s `message` is the Event name and the Slack fallback text, not a block; a builder with
-no blocks sends an empty Slack message. `send_notification` truncates by JSON length of the blocks, so one very long
-markdown block is dropped whole rather than trimmed. `report_exc_info` outside an `except` reports `None`.
+`report_exc_info` outside an `except` reports `None`.
 
 `RelatedModelsPartitionModel.get_partition_table()` with no argument raises once a holder has more than one base table
 (VariantZygosityCountCollection), and `save()` on an existing holder never recreates a dropped partition - re-import

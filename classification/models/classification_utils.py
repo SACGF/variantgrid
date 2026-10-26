@@ -11,8 +11,8 @@ from django.db.models import Q
 
 from classification.enums import ClassificationPatchStatus
 from classification.models.evidence_key import VCPatch, VCStore
+from eventlog.notifications import NotificationBuilder
 from genes.models import GeneSymbol, Transcript
-from library.log_utils import NotificationBuilder
 from library.utils import VarsDict, local_date_string
 from snpdb.models import Allele
 

@@ -36,12 +36,12 @@ from model_utils.models import TimeStampedModel
 from more_itertools import first
 
 from eventlog.models import create_event
+from eventlog.notifications import AdminNotificationBuilder
 from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
-from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import import_class, string_deterministic_hash
 from snpdb.enums import AlleleOriginBucket, LabUserRole, UserAwardKind, UserAwardLevel

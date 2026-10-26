@@ -1,9 +1,9 @@
 # library — agent notes
-Owns: model-free plumbing — Guardian permissions, notifications/error reporting, previews, health checks, caching
+Owns: model-free plumbing — Guardian permissions, error reporting, previews, health checks, caching
 managers, partitioning, grid filter rules/CSV export, test base classes, `library/utils/` (re-exported as `library.utils`).
 Start with: `guardian_utils.py` (DjangoPermission, group getters, assign_permission_to_user_and_groups) ·
-`django_utils/guardian_permissions_mixin.py` (GuardianPermissionsMixin) · `log_utils.py` (NotificationBuilder,
-report_exc_info) · `preview_request.py` (PreviewModelMixin, PreviewData, the preview signals) ·
+`django_utils/guardian_permissions_mixin.py` (GuardianPermissionsMixin) · `log_utils.py` (report_exc_info,
+report_message) · `preview_request.py` (PreviewModelMixin, PreviewData, the preview signals) ·
 `django_utils/unittest_utils.py` (URLTestCase, query profiling) · `django_utils/django_object_managers.py`
 Patterns here:
 - `library` sits below the apps: `.importlinter` (checked in CI by `lint-imports`) forbids it importing one. Code that
@@ -25,13 +25,9 @@ Patterns here:
   `get_permission_object`, and `allow_group_permission_delete` is opt-in (default False).
 - Build permission strings with `library/guardian_utils.py:DjangoPermission.perm(obj, DjangoPermission.READ|WRITE)`;
   standard groups are `library/guardian_utils.py:all_users_group` / `public_group` / `bot_group`, the system user `admin_bot`.
-- Notify humans with `library/log_utils.py:AdminNotificationBuilder` (Slack, plus superuser email when
-  `is_communication=True`) or snpdb's `LabNotificationBuilder`; add blocks with `add_header`/`add_field`/`add_markdown`
-  (Markdown, converted to HTML and Slack) and call `send()`. `library/log_utils.py:send_notification` is the raw
-  Slack hook, falls back to `report_event` (EventLog) when Slack is unconfigured, and truncates blocks at `SLACK_CHARACTER_LIMIT`.
 - Report caught exceptions with `library/log_utils.py:report_exc_info` (Rollbar + traceback) and non-fatal problems
   with `library/log_utils.py:report_message`; both find the current request via `library/request_context.py`.
-  `report_message` and `report_event` (level info) drop Rollbar messages below `ROLLBAR['min_level']` (default warning);
+  `report_message` and `eventlog/notifications.py:report_event` (level info) drop Rollbar messages below `ROLLBAR['min_level']` (default warning);
   pyrollbar has no threshold setting of its own.
 - Make a model hover-previewable and searchable by implementing `library/preview_request.py:PreviewModelMixin`
   (`preview_category`, `preview_icon`, `preview`) and returning `library/preview_request.py:PreviewData` via

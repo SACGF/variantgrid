@@ -13,7 +13,8 @@ from classification.enums import SubmissionSource, UploadedClassificationsUnmapp
 from classification.models import UploadedClassificationsUnmapped
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
-from library.log_utils import NotificationBuilder, report_message
+from eventlog.notifications import NotificationBuilder
+from library.log_utils import report_message
 from library.utils import batch_iterator, pretty_label
 from variantgrid.celery import app
 

@@ -67,9 +67,6 @@ ignore_imports =
     ; tests build fixtures from app models
     library.**.tests.** -> **
     library.tests.** -> **
-    ; NotificationBuilder records each notification as an Event, and AdminNotificationBuilder emails it
-    library.log_utils -> eventlog.models
-    library.log_utils -> email_manager.models
     ; inside a function to break a cycle: snpdb.models imports these modules
     library.guardian_utils -> snpdb.models
     library.utils.export_utils -> snpdb.user_settings_manager

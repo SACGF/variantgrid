@@ -19,7 +19,6 @@ from library.cache import timed_cache
 from library.django_utils import single_string_to_first_last_name_q
 from library.genomics import format_chrom
 from library.genomics.bed_file import BedFileReader
-from library.log_utils import NotificationBuilder
 from library.unit_percent import (
     convert_from_percent_to_unit,
     convert_from_unit_to_percent,
@@ -128,12 +127,6 @@ class TestFormatSignificantDigits(TestCase):
 
     def test_custom_sig_digits(self):
         self.assertEqual(format_significant_digits(3.14159, sig_digits=2), "3.1")
-
-
-class TestSlackMarkdownToHtml(TestCase):
-    def test_emoji_stripped_and_bold_converted(self):
-        self.assertEqual(NotificationBuilder.slack_markdown_to_html(":hospital: This is **bold**"),
-                         "This is <strong>bold</strong>")
 
 
 class TestUtcFromTimestamp(TestCase):

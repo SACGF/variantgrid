@@ -25,11 +25,12 @@ from registration.backends.simple.views import RegistrationView as SimpleRegistr
 from registration.signals import user_registered
 
 from email_manager.models import EmailLog
+from eventlog.notifications import AdminNotificationBuilder
 from library.django_utils import require_superuser
 from library.django_utils.database_utils import get_postgresql_version
 from library.email import Email
 from library.git import Git
-from library.log_utils import AdminNotificationBuilder, report_exc_info
+from library.log_utils import report_exc_info
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.keycloak import Keycloak, KeycloakError, KeycloakNewUser

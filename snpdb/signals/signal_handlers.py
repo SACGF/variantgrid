@@ -3,7 +3,7 @@ from django.contrib.auth.models import Group
 from django.db import transaction
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
-from library.log_utils import AdminNotificationBuilder
+from eventlog.notifications import AdminNotificationBuilder
 from snpdb.models import Lab, Organization, SettingsInitialGroupPermission, UserDataPrefix
 
 

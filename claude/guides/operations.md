@@ -64,7 +64,7 @@ Logs: `/var/log/variantgrid/` (`gunicorn.log`, `celery*.log`, `celeryd_beat.log`
 `eventlog/models.py:Event` (severity, app, name, details) - `vg status` lists the last ten ERRORs; `ViewEvent` records page views
 (the `claude_agent` user's included). `ApiRequestLog` keeps one row per call (body, status, duration) to the endpoints in
 `INTEGRATION_API_TRACKING`, kept forever unless `API_REQUEST_LOG_DAYS` is set; admins read it at Settings → API Log.
-Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and Slack notifications through `library/log_utils.py:AdminNotificationBuilder` when `SLACK.enabled`.
+Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and Slack notifications through `eventlog/notifications.py:AdminNotificationBuilder` when `SLACK.enabled`.
 
 ## Deploy and upgrade
 
