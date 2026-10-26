@@ -33,6 +33,9 @@ function tweakAjax() {
             console.log("suppressErrors = True");
             return;
         }
+        if (settings.retriesTooManyRequests && jqxhr.status === 429) {
+            return;  // DataTableDefinition asks again shortly
+        }
         // only relevant when using ODIC https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
         if (jqxhr.status === 403 && jqxhr.getResponseHeader('refresh_url')) {
                 // shouldn't happen anymore if avoid sending cookie refresh on ajax call

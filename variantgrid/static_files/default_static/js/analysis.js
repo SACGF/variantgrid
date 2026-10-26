@@ -582,6 +582,9 @@ function ajaxError(event, jqxhr, settings, thrownError) {
     if(settings.suppressErrors) {
         return;
     }
+    if (settings.retriesTooManyRequests && jqxhr.status === 429) {
+        return;  // DataTableDefinition asks again shortly
+    }
 
     const rj = jqxhr.responseJSON;
     if (rj) {

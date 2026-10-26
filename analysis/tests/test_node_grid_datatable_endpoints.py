@@ -6,6 +6,7 @@ as postData); node_grid_handler answers the rows in the DataTables envelope. Bot
 @cache_page, so what the client sends has to be a stable, whitelisted param set.
 """
 import json
+from unittest.mock import patch
 from urllib.parse import parse_qsl, urlencode
 
 from django.test.client import Client
@@ -13,6 +14,7 @@ from django.urls.base import reverse
 
 from analysis.tests.test_grid_export import GridExportTestCase
 from analysis.views.views_grid import _NODE_GRID_ALLOWED_PARAMS, _add_allowed_node_grid_params
+from library.django_utils.major_operation import TooManyMajorOperationsError
 
 
 class NodeGridEndpointTestCase(GridExportTestCase):
@@ -103,6 +105,28 @@ class NodeGridHandlerTest(NodeGridEndpointTestCase):
         self.assertLess(data["recordsFiltered"], self.node.count)
 
 
+class NodeGridHandlerRetryTest(NodeGridEndpointTestCase):
+    """ A request that can't run yet answers at once for the browser to retry, rather than holding the
+        gunicorn worker (#2476) """
+
+    def _assert_retry_later(self):
+        url = reverse("node_grid_handler", kwargs={"analysis_id": self.analysis.pk})
+        response = self.client.get(url, self._handler_params())
+        self.assertEqual(429, response.status_code)
+        self.assertEqual("2", response["Retry-After"])
+        self.assertNotIn("data", json.loads(response.content))
+
+    def test_same_query_already_running(self):
+        with patch("analysis.views.views_grid.cache.add", return_value=False):
+            self._assert_retry_later()
+
+    def test_too_many_major_operations(self):
+        with patch("analysis.views.views_grid.major_operation",
+                   side_effect=TooManyMajorOperationsError(self.user, "node_grid", 1)):
+            self._assert_retry_later()
+        self._handler()  # the lock was released, and a 429 was never cached in place of the rows
+
+
 class NodeGridCacheKeyTest(NodeGridEndpointTestCase):
     """ node_grid_handler is @cache_page(WEEK_SECS) - a param that varies per request silently costs
         every user the week-long cache, so the client sends a minimal, stably ordered set """
@@ -122,8 +146,8 @@ class NodeGridCacheKeyTest(NodeGridEndpointTestCase):
     ]
 
     def test_every_param_the_client_sends_is_allowed(self):
-        """ A param that isn't whitelisted is dropped from the redirect URL, so the retry would ask
-            for something other than what the user is looking at """
+        """ A param that isn't whitelisted is dropped from the lock key and the redirect URL, so the
+            redirect would ask for something other than what the user is looking at """
         for key, _value in self.CLIENT_PARAMS:
             self.assertIn(key, _NODE_GRID_ALLOWED_PARAMS, f"{key} would be dropped")
 
