@@ -29,7 +29,6 @@ APPS_WITH_URLS = [
     "patients",
     "pedigree",
     "ontology",
-    "sapath",
     "seqauto",
     "snpdb",
     "upload",
@@ -100,7 +99,10 @@ handler404 = views.page_not_found
 handler500 = views.server_error
 
 
-for app_name in APPS_WITH_URLS:
+# An app from outside this repo mounts its urls by setting variantgrid_urls = True on its AppConfig
+plugin_apps_with_urls = [app_config.name for app_config in apps.get_app_configs()
+                         if getattr(app_config, "variantgrid_urls", False) and app_config.name not in APPS_WITH_URLS]
+for app_name in APPS_WITH_URLS + plugin_apps_with_urls:
     if apps.is_installed(app_name):
         if settings.URLS_APP_REGISTER[app_name]:
             app_urls = f"{app_name}.urls"
