@@ -6,7 +6,7 @@ from django.contrib.auth.models import Group, User
 from django.http import Http404
 
 from email_manager.models import EmailLog
-from library.log_utils import NotificationBuilder, send_notification
+from eventlog.notifications import NotificationBuilder, send_notification
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, Lab, Tag, TagConfigCollection, UserSettings
 

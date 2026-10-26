@@ -1,7 +1,8 @@
 """
 The health check page and its Slack summary: an app answers health_check_signal with
 HealthCheckRecentActivity / HealthCheckTotalAmount / HealthCheckCapacity / HealthCheckAge stats
-for the HealthCheckRequest window, and populate_health_check gathers them into the notification.
+for the HealthCheckRequest window (variantopedia/server_status.py:populate_health_check gathers them into
+the Slack summary).
 Uptime probes are library/uptime_check.py.
 """
 import itertools
@@ -16,9 +17,8 @@ from django.utils.html import format_html
 from django.utils.timezone import localtime
 
 from library.django_utils.model_utils import model_has_field
-from library.log_utils import NotificationBuilder
 from library.preview_request import PreviewData
-from library.utils import flatten_nested_lists, limit_str
+from library.utils import limit_str
 
 """
 HealthChecks are generated nightly and posted in Slack.
@@ -322,54 +322,3 @@ class HealthCheckAge(HealthCheckStat):
 health_check_signal = django.dispatch.Signal()
 health_check_overall_stats_signal = django.dispatch.Signal()
 
-
-def populate_health_check(notification: NotificationBuilder, since: Optional[datetime] = None):
-    # calling send_robust will respond with a list of tuples of receiver, the result of calling the receiver
-    # the results could be an Exception, a HealthCheckStat, or a list of HealthCheckStats
-    # flatten the results, report all the exceptions, then present all the HealthChecks
-
-    now = localtime()
-    if since is None:
-        since = now - timedelta(days=1)
-    health_request = HealthCheckRequest(since=since, now=now)
-
-    results = []
-    for caller, result in health_check_signal.send_robust(sender=None, health_request=health_request):
-        if isinstance(result, Exception):
-            notification.add_markdown(f"Exception generating health check by {caller}: {result}")
-        else:
-            results.extend(result if isinstance(result, list) else [result])
-
-    for caller, result in health_check_overall_stats_signal.send_robust(sender=None, health_request=health_request):
-        if isinstance(result, Exception):
-            notification.add_markdown(f"Exception generating health check by {caller}: {result}")
-        else:
-            results.extend(result if isinstance(result, list) else [result])
-
-    checks: list[HealthCheckStat] = flatten_nested_lists(results)
-    checks.sort(key=lambda hc: hc.sort_order())
-
-    recent_lines = []
-    overall_lines = []
-    for check_type, checks_typed in itertools.groupby(checks, key=type):
-        checks_typed_list = list(checks_typed)
-
-        if issubclass(check_type, HealthCheckAge):
-            age_lines = HealthCheckAge.to_lines(checks_typed_list, health_request)
-            if check_type.is_recent_activity():
-                recent_lines.extend(age_lines)
-            else:
-                overall_lines.extend(age_lines)
-        else:
-            section_lines = [check.as_markdown() for check in checks_typed_list]
-            if check_type.is_recent_activity():
-                recent_lines.extend(section_lines)
-            else:
-                overall_lines.extend(section_lines)
-
-    if recent_lines:
-        notification.add_markdown("\n".join(recent_lines), indented=True)
-
-    if overall_lines:
-        notification.add_markdown("*Overall*")
-        notification.add_markdown("\n".join(overall_lines), indented=True)

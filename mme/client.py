@@ -9,9 +9,9 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 
+from eventlog.notifications import AdminNotificationBuilder
 from library.constants import MINUTE_SECS
 from library.django_utils import get_url_from_view_path
-from library.log_utils import AdminNotificationBuilder
 from mme.enums import MMESubmissionStatus
 from mme.models import MMEMatchResult
 from mme.notifications import notify_match

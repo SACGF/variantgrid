@@ -5,9 +5,9 @@ import celery
 from django.conf import settings
 from django.urls import reverse
 
+from eventlog.notifications import NotificationBuilder
 from library.django_utils import get_url_from_view_path
-from library.health_check import populate_health_check
-from library.log_utils import NotificationBuilder
+from variantopedia.server_status import populate_health_check
 
 
 @celery.shared_task(queue='db_workers')

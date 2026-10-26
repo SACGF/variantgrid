@@ -15,8 +15,9 @@ from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
 )
+from eventlog.notifications import NotificationBuilder
 from library.guardian_utils import bot_group, user_in_group
-from library.log_utils import NotificationBuilder, report_exc_info
+from library.log_utils import report_exc_info
 from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.models import GenomeBuild
 

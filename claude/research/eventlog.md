@@ -52,10 +52,25 @@ through `eventlog/views.py:eventlog_detail`, which checks superuser-or-owner.
 `eventlog/signals/active_users_health_check.py:active_users_health_check` answers the nightly health check by counting
 distinct users with an `Event` or `ViewEvent` in the window, admins on their own line.
 
+### A notification, from code to Slack
+
+`eventlog/notifications.py:NotificationBuilder` is a list of blocks - `add_header`, `add_field` (consecutive fields fold
+into one `FieldsBlock`), `add_markdown`, `add_divider`, `merge` - each of which renders itself three ways (`as_text`,
+`as_html`, `as_slack`). `NotificationBuilder.send` first writes the text rendering as an `Event` row and then
+calls `eventlog/notifications.py:send_notification`, which posts the Slack blocks to the webhook: the builder's own
+`webhook_url` if it has one (snpdb's `LabNotificationBuilder` supplies the lab's), otherwise
+`settings.SLACK["admin_callback_url"]` when `SLACK["enabled"]`. Blocks are JSON-counted and cut at
+`SLACK_CHARACTER_LIMIT` (2000, well under Slack's 4000) with a "check EventLog" block appended, since the event row already
+holds the whole message. Slack refusing the payload goes to Rollbar with the JSON attached; no webhook at all degrades
+to `eventlog/notifications.py:report_event`, so a deployment without Slack still gets a Rollbar info line and an Event.
+`eventlog/notifications.py:AdminNotificationBuilder.send` adds superuser email through `EmailLog.send_mail` when
+`is_communication=True` and `settings.ADMIN_EMAIL_NOTIFICATION` is set. The builder's `__del__` reports a builder that
+was never sent, which is how a forgotten `send()` gets noticed.
+
 ## Why it is shaped this way
 
-`Event` is an in-database audit trail; Rollbar and the Slack and email paths in `library/log_utils.py` cover
-alerting. `ViewEvent` exists for Shariant's usage reporting, which is why it is opt-in per
+`Event` is an in-database audit trail; Rollbar (`library/log_utils.py`) and the Slack and email paths in
+`eventlog/notifications.py` cover alerting, and every notification sent leaves an `Event` behind. `ViewEvent` exists for Shariant's usage reporting, which is why it is opt-in per
 deployment and skips the noisy paths. `IntegrationActivity` exists because outbound and inbound integrations (Shariant
 sync, the SA Pathology Mocha API) otherwise leave nothing behind but the records they write, so "when did this last run" has no
 answer; one mutable row per integration keeps the table bounded however chatty the integration is.
@@ -67,3 +82,7 @@ without defining the set. The middleware infers the app from the first URL segme
 `EventLogHandler` swallows anonymous-request errors entirely - a 500 on a public path is in Rollbar, not the event log.
 `Event.can_write` is superuser-or-owner and an `Event` with `user=None` is writable by admins only. Tests:
 `eventlog/tests/test_integration_activity.py`, `eventlog/tests/test_integration_api_middleware.py`, `eventlog/tests/test_models.py`.
+
+`NotificationBuilder.__init__`'s `message` is the Event name and the Slack fallback text, not a block; a builder with
+no blocks sends an empty Slack message. `send_notification` truncates by JSON length of the blocks, so one very long
+markdown block is dropped whole rather than trimmed.

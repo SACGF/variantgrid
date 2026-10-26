@@ -13,7 +13,8 @@ from classification.views.exports_grouping.classification_grouping_export_filter
     ClassificationGroupingExportFileSettings,
     ClassificationGroupingExportFormat,
 )
-from library.log_utils import NotificationBuilder, report_exc_info
+from eventlog.notifications import NotificationBuilder
+from library.log_utils import report_exc_info
 from library.utils import http_header_date_now
 
 

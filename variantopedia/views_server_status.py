@@ -18,12 +18,13 @@ from annotation.models import (
     VariantAnnotationVersion,
 )
 from classification.models.classification_import_run import ClassificationImportRun
+from eventlog.notifications import AdminNotificationBuilder, slack_bot_username
 from genes.hgvs import HGVSMatcher
 from library.django_utils import highest_pk, require_superuser
 from library.django_utils.database_utils import long_running_sql, signal_backends
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
 from library.integration_status import get_integration_statuses, run_integration_trigger
-from library.log_utils import AdminNotificationBuilder, report_message, slack_bot_username
+from library.log_utils import report_message
 from library.utils import flatten_nested_lists
 from snpdb.models import VCF, Sample, Variant
 from snpdb.models.models_genome import GenomeBuild

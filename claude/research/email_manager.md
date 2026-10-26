@@ -18,7 +18,7 @@ no recipient sees another. Either way the `EmailLog` row is written afterwards w
 `probably_sent` set to the backend's return value and `single_email` recording which mode was used. Both sends use
 `fail_silently=True`: a dead mail server produces `probably_sent=False`, never an exception in the caller.
 
-The callers are the notification builders and the account flows. `library/log_utils.py:AdminNotificationBuilder.send`
+The callers are the notification builders and the account flows. `eventlog/notifications.py:AdminNotificationBuilder.send`
 emails every superuser (batch mode) when `is_communication` and `settings.ADMIN_EMAIL_NOTIFICATION` are set;
 `snpdb/utils.py:LabNotificationBuilder` emails a lab's address, or the lab's members whose `UserSettings` opted into
 discordance or weekly updates, from `settings.DISCORDANCE_EMAIL`; the Monday `discordance-emails-weekly` beat entry in
