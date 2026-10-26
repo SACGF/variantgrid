@@ -1,6 +1,7 @@
 import json
 import time
 from typing import Any, Optional
+from urllib.parse import parse_qsl, urlencode
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -175,7 +176,7 @@ class IntegrationApiMiddleware:
 
         response_body = None
         if status_code >= 400 and not response.streaming:
-            response_body = _trim_for_log(response.content.decode(errors="replace"))
+            response_body = _trim_for_log(_redact_json_text(response.content.decode(errors="replace")))
 
         # A view names the model its calls are about with api_log_model, and the pks it found with
         # log_api_request_objects - a call that fails before finding one keeps only the model
@@ -189,7 +190,7 @@ class IntegrationApiMiddleware:
             user=user if user and user.is_authenticated else None,
             method=request.method,
             path=request.path_info,
-            query_string=request.META.get("QUERY_STRING", ""),
+            query_string=_redact_urlencoded(request.META.get("QUERY_STRING", "")),
             view_name=view_name,
             view_kwargs=resolver_match.kwargs,
             status_code=status_code,
@@ -211,13 +212,31 @@ def _trim_for_log(text: str) -> str:
     return text
 
 
+def _is_redacted_key(key) -> bool:
+    return any(part in str(key).lower() for part in REDACTED_KEY_PARTS)
+
+
 def _redact(data):
     if isinstance(data, dict):
-        return {key: REDACTED if any(part in str(key).lower() for part in REDACTED_KEY_PARTS) else _redact(value)
-                for key, value in data.items()}
+        return {key: REDACTED if _is_redacted_key(key) else _redact(value) for key, value in data.items()}
     if isinstance(data, list):
         return [_redact(value) for value in data]
     return data
+
+
+def _redact_json_text(text: str) -> str:
+    try:
+        return json.dumps(_redact(json.loads(text)))
+    except ValueError:
+        return text
+
+
+def _redact_urlencoded(text: str) -> str:
+    """ A query string or form body, re-encoded only when it has a key to redact """
+    pairs = parse_qsl(text, keep_blank_values=True)
+    if not any(_is_redacted_key(key) for key, _ in pairs):
+        return text
+    return urlencode([(key, REDACTED if _is_redacted_key(key) else value) for key, value in pairs])
 
 
 def _request_body_for_log(request) -> Optional[str]:
@@ -237,8 +256,7 @@ def _request_body_for_log(request) -> Optional[str]:
 
     body = request.body.decode(errors="replace")
     if content_type == "application/json":
-        try:
-            body = json.dumps(_redact(json.loads(body)))
-        except ValueError:
-            pass
+        body = _redact_json_text(body)
+    elif content_type == "application/x-www-form-urlencoded":
+        body = _redact_urlencoded(body)
     return _trim_for_log(body)

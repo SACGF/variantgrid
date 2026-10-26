@@ -79,6 +79,11 @@ def api_request_log_detail(request: HttpRequest, pk: int):
     return render(request, 'api_request_log_detail.html', context=context)
 
 
+# The events browser JS reports (createJSEvent in analysis.js), and the severities it sends
+CLIENT_EVENTS = {("analysis", "javascript_error")}
+CLIENT_EVENT_SEVERITIES = {LogLevel.WARNING, LogLevel.ERROR}
+
+
 @require_POST
 def create_event(request):
     app_name = request.POST.get("app_name")
@@ -89,8 +94,10 @@ def create_event(request):
     if not app_name or not event_name or not severity:
         return HttpResponseBadRequest("Missing required parameters")
 
-    valid_severities = {choice[0] for choice in LogLevel.CHOICES}
-    if severity not in valid_severities:
+    if (app_name, event_name) not in CLIENT_EVENTS:
+        return HttpResponseBadRequest("Invalid event")
+
+    if severity not in CLIENT_EVENT_SEVERITIES:
         return HttpResponseBadRequest("Invalid severity")
 
     event_kwargs = {

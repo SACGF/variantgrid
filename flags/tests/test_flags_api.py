@@ -82,3 +82,30 @@ class FlagsApiTest(TestCase):
         self.assertEqual(self._post(url, {"flag_type": self.flag_type.pk}).status_code, 200)
         self.assertEqual(self._post(url, {"flag_type": admin_type.pk}).status_code, 403)
         self.assertEqual(self.client.get(url, {"history": self.fc.pk}).status_code, 403)
+
+    def test_resolution_must_belong_to_flag_type(self):
+        other_resolution = FlagResolution.objects.exclude(flagtyperesolution__flag_type=self.flag_type).first()
+        data = {"flag_type": self.flag_type.pk, "resolution": other_resolution.pk}
+        self.assertEqual(self._post(self.url, data).status_code, 400)
+
+        self._post(self.url, {"flag_type": self.flag_type.pk})
+        flag_url = reverse("flag_api", kwargs={"flag_id": Flag.objects.get(collection=self.fc).pk})
+        self.assertEqual(self._post(flag_url, {"resolution": other_resolution.pk}).status_code, 400)
+
+    def test_raise_rules(self):
+        """ A user who can raise but not resolve can't raise already closed; an only_one type is raised once """
+        allele_fc = Allele.objects.create().flag_collection_safe
+        url = reverse("flags_api", kwargs={"flag_collection_id": allele_fc.pk})
+        only_one_type = FlagType.objects.create(id="flag_api_test_only_one", context_id="allele", label="Only One",
+                                                description="Only One", raise_permission="U", permission="X",
+                                                only_one=True)
+        closed_resolution = FlagResolution.objects.filter(status=FlagStatus.CLOSED).first()
+        for resolution in [self.flag_type.default_resolution(), closed_resolution]:
+            FlagTypeResolution.objects.create(flag_type=only_one_type, resolution=resolution)
+
+        self.client.force_login(self.other)
+        raise_closed = {"flag_type": only_one_type.pk, "resolution": closed_resolution.pk}
+        self.assertEqual(self._post(url, raise_closed).status_code, 403)
+        self.assertEqual(self._post(url, {"flag_type": only_one_type.pk}).status_code, 200)
+        self.assertEqual(self._post(url, {"flag_type": only_one_type.pk}).status_code, 400)
+        self.assertEqual(Flag.objects.filter(collection=allele_fc, flag_type=only_one_type).count(), 1)

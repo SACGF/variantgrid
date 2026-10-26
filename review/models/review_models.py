@@ -176,10 +176,7 @@ class Review(TimeStampedModel):
         }
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
-        source_object = self.reviewing.source_object
-        if hasattr(source_object, "can_view"):
-            return source_object.can_view(user_or_group)
-        return True
+        return self.reviewing.source_object.can_view(user_or_group)
 
     def check_can_view(self, user):
         if not self.can_view(user):
@@ -263,6 +260,10 @@ class ReviewableModelMixin(models.Model):
         if hasattr(self, "lab"):
             return {self.lab}
         raise NotImplementedError(f"{self} has not implemented 'reviewing_labs' property")
+
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
+        """ Who can read this object's Reviews - nobody unless the model says so """
+        return False
 
     def can_review(self, user: User) -> bool:
         """ Starting or editing a Review requires membership of one of the reviewing labs """

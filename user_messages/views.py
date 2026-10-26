@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
+from django.views.decorators.http import require_POST
 
 from user_messages.forms import ComposeForm
 from user_messages.models import Message
@@ -57,6 +58,7 @@ def compose(request, recipient=None):
     return render(request, 'user_messages/compose.html', {'form': form})
 
 
+@require_POST
 def delete(request, message_id):
     """
     Marks a message as deleted by sender or recipient. The message is not really removed from the
@@ -79,6 +81,7 @@ def delete(request, message_id):
     raise Http404
 
 
+@require_POST
 def undelete(request, message_id):
     """ Recovers a message from trash. """
     user = request.user

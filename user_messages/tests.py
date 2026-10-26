@@ -78,7 +78,9 @@ class MessageViewTest(TestCase):
 
     def test_delete_marks_recipient_deleted(self):
         msg = self._msg()
-        self.client.get(reverse('messages_delete', args=[msg.id]))
+        url = reverse('messages_delete', args=[msg.id])
+        self.assertEqual(405, self.client.get(url).status_code)
+        self.client.post(url)
         msg.refresh_from_db()
         self.assertIsNotNone(msg.recipient_deleted_at)
         self.assertEqual(Message.objects.trash_for(self.bob).count(), 1)

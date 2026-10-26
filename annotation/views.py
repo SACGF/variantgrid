@@ -2,7 +2,7 @@ import itertools
 
 import cdot
 from django.conf import settings
-from django.http.response import HttpResponse
+from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -356,8 +356,14 @@ def view_annotation_version_details(request, annotation_version_id):
     return render(request, "annotation/view_annotation_version_details.html", context)
 
 
+@require_POST
 def create_manual_variant_entry_from_text(request, genome_build_name, variants_text):
+    """ Search offers to create a variant it didn't find, as a form posting here """
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    variants_text = variants_text.strip()
+    if "\n" in variants_text:
+        return HttpResponseBadRequest("Only one variant can be created from search")
+
     mvec = create_manual_variants(request.user, genome_build, variants_text)
     return redirect('watch_manual_variant_entry', pk=mvec.pk)
 

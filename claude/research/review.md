@@ -39,8 +39,9 @@ falling back to raw JSON.
 
 ### Permissions
 
-View: `Review.can_view` defers to `source_object.can_view` if it exists, else allows - Overlap has none, so overlap
-reviews are visible to every logged-in user (matching the overlap pages). Write: `ReviewableModelMixin.can_review` -
+View: `Review.can_view` defers to `source_object.can_view`, which `ReviewableModelMixin` defaults to False - a new
+reviewable model must say who can read its reviews. `Overlap.can_view` allows every logged-in user (matching the
+overlap pages). Write: `ReviewableModelMixin.can_review` -
 the user (admin-checked) belongs to one of `reviewing_labs`. `edit_review` falls back to the detail view for
 non-writers, complete reviews, or `is_review_locked` sources (DiscordanceReport always returns True: new reviews
 happen on Overlaps). Covered by `classification/tests/views/test_overlap_review_permissions.py`.
