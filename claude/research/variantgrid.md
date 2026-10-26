@@ -40,7 +40,8 @@ Postgres connections and a temp `IMPORT_PROCESSING_DIR` (#928, #1856).
 ### A request
 
 `variantgrid/urls.py` mounts the project views, the admin, DRF-spectacular's `/api/schema|docs|redoc`,
-`/api/v1/capabilities`, then loops `APPS_WITH_URLS`, including `<app>/` only when the app is installed and
+`/api/v1/capabilities`, then loops `APPS_WITH_URLS` plus any installed app whose AppConfig sets `variantgrid_urls = True`
+(an app from another repo, e.g. sapath, registering itself), including `<app>/` only when the app is installed and
 `URLS_APP_REGISTER[app]` is truthy - Shariant switches off analysis, pathtests, pedigree and seqauto this way. Inside an
 app, `variantgrid/perm_path.py:path` replaces Django's `path` so a named URL whose `URLS_NAME_REGISTER` entry is False
 (or whose `URLS_NAME_REGISTER_SETTINGS` feature setting is off - `variantgrid/perm_path.py:url_name_enabled`) is

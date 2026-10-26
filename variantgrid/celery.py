@@ -42,13 +42,6 @@ if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
         'schedule': HOUR_SECS,
     }
 
-SAPATH_ENABLED = any(a.startswith("sapath") for a in settings.INSTALLED_APPS)
-if SAPATH_ENABLED and getattr(settings, "SAPATH_HELIX_SHARED_FILE", None):
-    app.conf.beat_schedule['sapath-helix-load-if-changed'] = {
-        'task': 'sapath.tasks.import_helix_task.sapath_helix_load_if_changed',
-        'schedule': HOUR_SECS,  # Check every hour, only update if hash changed
-    }
-
 # Condition text automatch sweep (#1780): publishing flags ConditionTexts (pending_automatch)
 # instead of calling the external Monarch search API in the request; this drains the flags, and
 # skips while a bulk import is ongoing so a sync's worth is handled as one deduped batch afterwards.
