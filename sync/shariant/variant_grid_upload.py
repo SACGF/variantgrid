@@ -292,8 +292,11 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
                 post_duration = time.time() - post_start
                 # results are sent back in an array in the same order they were sent up
                 results = response.json().get('results')
+                if not isinstance(results, list) or len(results) != len(batch):
+                    raise ValueError(f"{sync_run_instance.sync_destination}: sent {len(batch)} records, "
+                                     f"remote returned results: {str(results)[:200]}")
 
-                for record, result in zip(batch, results):
+                for record, result in zip(batch, results, strict=True):
                     rows_uploaded += 1
                     # the remote answers a record it couldn't process with {"internal_error": ...} inside the 200;
                     # an unsuccessful sync record keeps it in the next delta run
