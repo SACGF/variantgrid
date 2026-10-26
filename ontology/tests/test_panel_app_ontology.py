@@ -5,7 +5,11 @@ from genes.models import PanelAppServer
 from genes.panel_app import get_hgnc_pk_from_api_record
 from ontology.enums import OntologyService, OntologyTermStatus
 from ontology.models import OntologyImport, OntologyRelation, OntologyTerm, OntologyTermRelation
-from ontology.panel_app_ontology import _update_gene_relations, hgnc_ontology_terms_by_pk
+from ontology.panel_app_ontology import (
+    PanelAppResult,
+    _update_gene_relations,
+    hgnc_ontology_terms_by_pk,
+)
 
 
 class TestGetHgncPkFromApiRecord(TestCase):
@@ -26,6 +30,15 @@ class TestGetHgncPkFromApiRecord(TestCase):
 
     def test_unparsable_hgnc_id(self):
         self.assertIsNone(get_hgnc_pk_from_api_record({"gene_data": {"hgnc_id": "HGNC:junk"}}))
+
+
+class TestPanelAppResultParse(TestCase):
+    def test_bare_six_digit_number_only_when_no_term_found(self):
+        def ontology_ids(phenotype):
+            return PanelAppResult.parse_data({"phenotypes": [phenotype]}).ontology_ids
+
+        self.assertEqual({"MONDO:0000001"}, ontology_ids("Some disorder MONDO:0000001, onset 200000"))
+        self.assertEqual({"OMIM:600000"}, ontology_ids("Some disorder 600000"))
 
 
 class TestPanelAppHgncResolution(TestCase):

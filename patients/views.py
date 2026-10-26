@@ -94,7 +94,7 @@ def view_patient_contact_tab(request, patient_id):
 
 
 def view_patient_specimens(request, patient_id):
-    patient = Patient.get_for_user(request.user, patient_id)
+    patient = Patient.get_for_user(request.user, patient_id, write=request.method == "POST")
     specimen_formset = None
     if request.method == "POST":
         specimen_formset = forms.PatientSpecimenFormSet(request.POST, instance=patient)
@@ -130,7 +130,7 @@ def _patient_extraction_formset(patient, data=None):
 
 
 def view_patient_extractions(request, patient_id):
-    patient = Patient.get_for_user(request.user, patient_id)
+    patient = Patient.get_for_user(request.user, patient_id, write=request.method == "POST")
     extraction_formset = None
     if request.method == "POST":
         extraction_formset = _patient_extraction_formset(patient, data=request.POST)
