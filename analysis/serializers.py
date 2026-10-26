@@ -49,6 +49,7 @@ from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
 from ontology.models import OntologyTerm
 from ontology.serializers import OntologyTermSerializer
+from snpdb.models.models_columns import VariantGridColumn
 from snpdb.serializers import TimestampField, UserSerializer
 
 
@@ -194,6 +195,13 @@ class FilterNodeItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = FilterNodeItem
         exclude = ("filter_node",)
+
+    def validate_field(self, value):
+        """ The editor only offers grid columns - an import has no grid yet (no parents), so check
+            against every column a grid could have """
+        if not VariantGridColumn.objects.filter(variant_column=value).exists():
+            raise serializers.ValidationError(f"'{value}' is not a variant grid column")
+        return value
 
 
 class DuoNodeSerializer(AnalysisNodeSerializer):

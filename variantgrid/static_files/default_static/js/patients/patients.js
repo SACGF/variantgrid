@@ -64,12 +64,12 @@ function filterPatientGrid(term_type, value, leave_autcomplete_term_type) {
     const msgBox = $("#grid-filter-message");
     if (value) {
         const url = Urls.ontology_term_text(term_type, value);
-        msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'><a href='" + url + "' target='_blank'>" + value + "</a></span>... <a href='javascript:resetGrid()'>show all</a>");
+        msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'><a href='" + url + "' target='_blank'>" + escapeHtml(value) + "</a></span>... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
         termFilter = {term_type: term_type, term: value};
         reloadPatientTable();
     } else {
-        msgBox.html("Error: could not search on <span class='" + term_type.toLowerCase() + "'> value='" + value + "'</span>... <a href='javascript:resetGrid()'>show all</a>");
+        msgBox.html("Error: could not search on <span class='" + term_type.toLowerCase() + "'> value='" + escapeHtml(value) + "'</span>... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
     }
 

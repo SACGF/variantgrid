@@ -118,12 +118,9 @@ def view_contig(request, contig_accession):
         # If multiple builds (eg MT), we'll use user default if they have it, doesn't really matter
         genome_build = builds[0]
         if len(builds) > 1:
-            try:
-                user_settings = UserSettings.get_for_user(request.user)
-                if user_settings.default_genome_build in builds:
-                    genome_build = user_settings.default_genome_build
-            except:
-                pass
+            user_settings = UserSettings.get_for_user(request.user)
+            if user_settings.default_genome_build in builds:
+                genome_build = user_settings.default_genome_build
     else:
         genome_build = None
 

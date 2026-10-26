@@ -3,8 +3,10 @@ Patient.merge - folding one patient into another, and what blocks it
 """
 from datetime import date
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 
+from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.enums import PatientRecordOriginType, Sex
 from patients.models import Patient, PatientModification, Specimen
 
@@ -25,6 +27,15 @@ class PatientMergeTest(TestCase):
         self.assertTrue(patient.specimen_set.filter(reference_id="S1").exists())
         self.assertEqual(patient.patientmodification_set.count(), 2)
         self.assertFalse(Patient.objects.filter(pk=other.pk).exists())
+
+    def test_merge_keeps_others_viewers(self):
+        patient = Patient.objects.create(last_name="Smith")
+        other = Patient.objects.create(last_name="Smith")
+        other_owner = User.objects.create_user(username="merge_other_owner")
+        assign_permission_to_user_and_groups(other_owner, other)
+
+        patient.merge(other, "test", PatientRecordOriginType.INTERNAL_VG)
+        self.assertTrue(patient.can_write(other_owner))
 
     def test_conflicts_block_merge(self):
         patient = Patient.objects.create(last_name="Smith")

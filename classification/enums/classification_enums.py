@@ -21,7 +21,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, TextChoices
 from django.db.models.enums import IntegerChoices
 
-from library.guardian_utils import all_users_group, public_group
+from library.guardian_utils import all_users_group, public_group, user_in_group
 from library.utils import ChoicesEnum
 from snpdb.enums.snpdb_enums import (  # noqa: F401 - re-exported, see module docstring
     AlleleOriginBucket,
@@ -455,9 +455,9 @@ class ShareLevel(ChoicesEnum):
             case _ if self.is_discordant_level:
                 return True
             case ShareLevel.ORGANISATION:
-                return user.groups.filter(name=lab.group_institution).exists()
+                return user_in_group(user, lab.group_institution)
             case ShareLevel.LAB:
-                return user.groups.filter(name=lab.group).exists()
+                return user_in_group(user, lab.group)
             case _:
                 raise ValueError(f"Unhandled share level {self}")
 

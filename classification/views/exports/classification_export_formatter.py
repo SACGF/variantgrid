@@ -15,7 +15,7 @@ from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
 )
-from library.guardian_utils import bot_group
+from library.guardian_utils import bot_group, user_in_group
 from library.log_utils import NotificationBuilder, report_exc_info
 from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.models import GenomeBuild
@@ -322,7 +322,7 @@ class ClassificationExportFormatter(ABC):
 
         # don't report bots downloading
         user = self.classification_filter.user
-        if user.groups.filter(name=bot_group().name):
+        if user_in_group(user, bot_group()):
             return
         end = datetime.now(UTC)
         row_count = self.row_count
