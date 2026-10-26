@@ -72,7 +72,7 @@ class DedupeCohortGenotypesTest(TestCase):
         call_command("one_off_dedupe_cohort_genotypes", stdout=out)
         self.assertEqual([first_id], self._genotype_ids(self.identical_variant))
         self.assertEqual(differing_ids, self._genotype_ids(self.differing_variant))
-        self.assertIn(f"variant {self.differing_variant.pk}: rows {differing_ids}", out.getvalue())
+        self.assertIn("Calls (samples_zygosity) differ for 1 variants", out.getvalue())
         mock_report_message.assert_called_once()
 
         # Counted with the duplicate present, and still right without it: "ERR" once, plus "EEO" from the other VCF
