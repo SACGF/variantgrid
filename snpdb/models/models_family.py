@@ -12,15 +12,15 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from library.utils.json_utils import canonical_filter_key
-from patients.models_enums import Sex
+from patients.enums import Sex
+from snpdb.enums import DuoRelationship
 from snpdb.models.models_cohort import Cohort, CohortSample
-from snpdb.models.models_enums import DuoRelationship
 from snpdb.models.models_vcf import Sample
 
 

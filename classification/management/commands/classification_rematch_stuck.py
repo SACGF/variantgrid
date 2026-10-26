@@ -12,7 +12,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from classification.classification_import import reattempt_variant_matching
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo
 from library.guardian_utils import admin_bot
 
 

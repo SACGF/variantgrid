@@ -3,6 +3,7 @@ from django.test import TestCase
 from classification.enums import CriteriaEvaluation, SpecialEKeys, SubmissionSource, ValidationCode
 from classification.models import EvidenceKeyMap, VCDataDict
 from classification.models.classification import Classification
+from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from classification.tests.models.test_utils import ClassificationTestUtils
 
@@ -60,6 +61,19 @@ class ClassificationTestQuirks(TestCase):
         self.assertTrue(data['contribution'].has_validation_code(ValidationCode.TOO_MANY_VALUES))
         self.assertFalse(data['sample_type'].has_validation_code(ValidationCode.INVALID_VALUE))
         self.assertEqual(data['sequencing_platform'].value, 'Illumina_HiSeq')  # option value, that unfornately has come case
+
+    def test_import_run_only_change_keeps_modified(self):
+        """ Re-importing unchanged data records the import run without bumping modified, which drives exports """
+        _, user = ClassificationTestUtils.lab_and_user()
+        data = {"id": "instx/labby/quirks_import_run", "upsert": {"bp1": True}}
+        BulkClassificationInserter(user=user).insert(dict(data))
+        classification = Classification.objects.get(lab_record_id="quirks_import_run")
+
+        import_run = ClassificationImportRun.objects.create(identifier="quirks_import_run")
+        BulkClassificationInserter(user=user).insert(dict(data, upsert={"bp1": True}), import_run=import_run)
+        reimported = Classification.objects.get(pk=classification.pk)
+        self.assertEqual(reimported.last_import_run, import_run)
+        self.assertEqual(reimported.modified, classification.modified)
 
     def test_verify_source(self):
         form = BulkClassificationInserter.verify_source({'source': SubmissionSource.FORM})

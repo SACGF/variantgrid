@@ -22,16 +22,23 @@ from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.guardian_utils import user_in_group
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text
+from snpdb.enums import (
+    DEFAULT_GRID_LOADING_ANIMATIONS,
+    AlleleOriginFilterDefault,
+    BuiltInFilters,
+    GridLoadingAnimation,
+    TagFilter,
+)
 from snpdb.models.models import AvatarDetails, Lab, Organization, Tag
 from snpdb.models.models_columns import CustomColumn, CustomColumnsCollection
-from snpdb.models.models_enums import AlleleOriginFilterDefault, BuiltInFilters, TagFilter
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -229,21 +236,6 @@ class AllVariantsFilter(models.Model):
         return f"{self.user}/{self.genome_build}: {self.filters}"
 
 
-class GridLoadingAnimation(models.TextChoices):
-    """ DNA "reading" animations shown (randomly) while a node's variant grid loads.
-        Values are the menu ids - the front end (analysis.js) maps these to VGLoaders ids. """
-    FLOWCELL = "flowcell", "Flowcell"
-    RIPPLE = "ripple", "Ripple"
-    PILEUP = "pileup", "Pileup"
-    MATRIX = "matrix", "Matrix"
-
-
-# Shown when a user hasn't chosen (loading_animations is null/empty)
-DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
-                                   GridLoadingAnimation.RIPPLE.value,
-                                   GridLoadingAnimation.PILEUP.value]
-
-
 class SettingsOverride(models.Model):
     """ We want UserSettings to cascade via Org -> Lab -> User
         Where the later levels override if they are non-null """
@@ -365,7 +357,7 @@ class UserSettingsOverride(SettingsOverride):
 
             # if user no longer belongs to the group associated to the lab
             # remove their default lab record
-            if not user.groups.filter(name=group_name).exists():
+            if not user_in_group(user, group_name):
                 self.default_lab = None
 
         if not self.default_lab:

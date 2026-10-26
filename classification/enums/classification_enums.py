@@ -4,10 +4,12 @@ never string literals), ShareLevel (lab -> institution -> logged-in users -> pub
 count toward discordance), CopyScope / CopyAlleleOrigin (how far a value travels when copied from a
 previous classification), EvidenceCategory and EvidenceKeyValueType (the EvidenceKey schema),
 CriteriaEvaluation (ACMG strengths), SubmissionSource, ValidationCode, WithdrawReason and MultiCondition
-(how a classification's multiple condition terms combine). Buckets and option metadata come from
-EvidenceKey rows, not from these enums.
+(how a classification's multiple condition terms combine). Also the classification's blob keys
+(VCBlobKeys), patch handling (WipeMode, ClassificationPatchStatus), ImportedAlleleInfoStatus and
+PHGVSSource for resolving imported variants, and CaseReportStatus. Buckets and option metadata come
+from EvidenceKey rows, not from these enums.
 AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification,
-so are defined in snpdb/models/models_enums.py and re-exported here.
+so are defined in snpdb/enums/snpdb_enums.py and re-exported here.
 """
 import typing
 from dataclasses import dataclass
@@ -19,14 +21,13 @@ from django.contrib.auth.models import User
 from django.db.models import Q, TextChoices
 from django.db.models.enums import IntegerChoices
 
-from library.guardian_utils import all_users_group, public_group
+from library.guardian_utils import all_users_group, public_group, user_in_group
 from library.utils import ChoicesEnum
-from snpdb.models.models_enums import (  # noqa: F401 - re-exported, see module docstring
+from snpdb.enums.snpdb_enums import (  # noqa: F401 - re-exported, see module docstring
     AlleleOriginBucket,
     ClinicalSignificance,
     SomaticClinicalSignificance,
 )
-
 
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
@@ -57,6 +58,15 @@ class OverlapStatus(IntegerChoices):
     TIER_1_VS_TIER_2_DIFFERENCES = 70, "Tier 1 vs Tier 2 differences"  # User group disagrees on importance of Tier 1 vs Tier 2 - can work out how to treat this later
     MAJOR_DIFFERENCES = 80, "Discordance"  # VUS vs Benign
     MEDICALLY_SIGNIFICANT = 90, "Medically significant discordance"  # VUS or lower vs Pathogenic as will require re-reporting
+
+    @property
+    def label_with_difference(self):
+        if self == OverlapStatus.MAJOR_DIFFERENCES:
+            return "Difference"
+        elif self == OverlapStatus.MEDICALLY_SIGNIFICANT:
+            return "Medically significant difference"
+        else:
+            return self.label
 
     @property
     def is_dull(self) -> bool:
@@ -445,9 +455,9 @@ class ShareLevel(ChoicesEnum):
             case _ if self.is_discordant_level:
                 return True
             case ShareLevel.ORGANISATION:
-                return user.groups.filter(name=lab.group_institution).exists()
+                return user_in_group(user, lab.group_institution)
             case ShareLevel.LAB:
-                return user.groups.filter(name=lab.group).exists()
+                return user_in_group(user, lab.group)
             case _:
                 raise ValueError(f"Unhandled share level {self}")
 
@@ -664,3 +674,59 @@ class MultiCondition(TextChoices):
     @property
     def clinvar_label(self):
         return self.label
+
+
+class VCBlobKeys(Enum):
+    VALUE = "value"
+    NOTE = "note"
+    DB_REFS = "db_refs"
+    EXPLAIN = "explain"
+
+
+class WipeMode(Enum):
+    """
+    When wiping out a value from a patch... how do we wipe it
+    """
+    SET_NONE = 'set_none'  # None
+    SET_EMPTY = 'set_empty'  # {}
+    POP = 'pop'  # remove it from the patch dictionary all together
+    ATTRIBUTES_TO_NONE = 'atts_to_none'  # {"value": None, "note": None, "explain": None}
+
+
+class CaseReportStatus(TextChoices):
+    DRAFT = 'D', 'Draft'
+    FINAL = 'F', 'Final'
+    SUPERSEDED = 'S', 'Superseded'
+
+
+class PHGVSSource(TextChoices):
+    VEP = "V", "VEP"  # VariantTranscriptAnnotation.hgvs_p, exact transcript version, latest VariantAnnotationVersion
+    COMPUTED = "C", "Computed"  # biocommons c_to_p from resolved_hgvs
+    CLINGEN = "G", "ClinGen"  # cached ClinGenAllele proteinEffect
+    EVIDENCE = "E", "Evidence"  # a classification's p_hgvs evidence value, parsed
+
+
+class ImportedAlleleInfoStatus(TextChoices):
+    PROCESSING = "P", "Processing"
+    """ The initial status for an ImportedAlleleInfo """
+
+    MATCHED_IMPORTED_BUILD = "I", "Matched Imported Variant"
+    """ We have a variant for the imported build, but not yet lifted it over """
+
+    MATCHED_ALL_BUILDS = "M", "Complete"
+    """ There's a 37 and 38 variant linked (or at least there was an attempted liftover) """
+
+    FAILED = "F", "Failed"
+
+
+class ClassificationPatchStatus(str, Enum):
+    # doesn't capture super subtle actions like publishing when there were outstanding changes
+    # but will capture everything we want to know about for a multi-record import
+    UNKNOWN = "unknown"
+    NEW = "new"
+    UPDATE = "update"
+    NO_CHANGE = "no-change"
+    WITHDRAWN = "withdrawn"
+    DELETED = "deleted"
+    UN_WITHDRAWN = "un-withdrawn"
+    ALREADY_WITHDRAWN = "already-withdrawn"

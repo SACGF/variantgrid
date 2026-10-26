@@ -1,6 +1,6 @@
 from django.test import TestCase, override_settings
 
-from analysis.models import GroupOperation
+from analysis.enums import GroupOperation
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.tests.utils import AnalysisSetupMixin
 

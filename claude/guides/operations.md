@@ -10,7 +10,7 @@ what the command cannot know. Verified against vg-test2 on 2026-09-06.
 |---|---|---|
 | vg-test2 (test.variantgrid.com) | `variantgrid/settings/env/vgtest2.py` | The lab box this repo is usually driven from; per-host rules are the "This box" table in `AGENTS.md` |
 | variantgrid.com | `variantgrid/settings/env/vgaws.py` | Public instance on AWS |
-| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; patients and analysis URLs unregistered; `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only). Labs curate on their own systems (e.g. SA Pathology's VariantGrid) and send classifications in through the API, so Shariant is almost all published records from other labs: manual testing there covers API import, cross-lab viewing, discordance/overlaps and the exports labs download, not local curation |
+| Shariant (test / demo / prod) | `variantgrid/settings/env/shariantcommon.py` + `sharianttest.py` / `shariantdemo.py` / `shariant.py` / `shariantsecurity.py` alongside it | Australian classification sharing; the analysis, pathtests, pedigree and seqauto URL apps unregistered and selected patient, gene and variant pages superuser-only (`URLS_APP_REGISTER` / `URLS_NAME_REGISTER` deny-lists in `shariantcommon.py`, so a new URL is live there unless listed); `VARIANT_GENE_LEVEL_ENABLED = False` (germline small variants only). Labs curate on their own systems (e.g. SA Pathology's VariantGrid) and send classifications in through the API, so Shariant is almost all published records from other labs: manual testing there covers API import, cross-lab viewing, discordance/overlaps and the exports labs download, not local curation |
 | SA Pathology | private repo `variantgrid_sapath` (settings and site-specific apps live there) | Largest production data; clinical use |
 | runx1db | `variantgrid/settings/env/runx1db2.py` | Gene-specific public database |
 | CI | `variantgrid/settings/env/github_actions.py` with `config/ci/settings_config.json` | Also the canonical module for `vg map` |
@@ -56,7 +56,9 @@ the restart after the upgrade would fail; the manual step that installs them reg
 
 Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
 task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.
-`vg status` shows per-queue depth and consumer count from a passive declare.
+`vg status` shows per-queue depth and consumer count from a passive declare. A worker takes several seconds after a restart
+to load Django and register, so a queue whose unit is active but has no consumer is re-read for up to 30 s; one still at
+`0c NO CONSUMER` after that is a real fault - `celery -A variantgrid inspect active_queues` shows what each worker consumes.
 
 Logs: `/var/log/variantgrid/` (`gunicorn.log`, `celery*.log`, `celeryd_beat.log`). Application events are also rows in
 `eventlog/models.py:Event` (severity, app, name, details) - `vg status` lists the last ten ERRORs; `ViewEvent` records page views
@@ -101,7 +103,20 @@ once per process from the checkout and reported by the API docs and `variantgrid
 new major means bumping that setting in the same commit as the tag.
 
 Pushed migrations stay as they are unless the user says an edit is safe (`AGENTS.md`); a data fix that must run on every deployment is a `ManualOperation` in a
-migration, not a note in a PR. Annotation upgrades (new VEP, new columns) are their own procedure: a new
+migration, not a note in a PR.
+
+Every app's migrations start from fresh initials plus a `seed_data` migration (the rows a fresh database starts with),
+with no `replaces`, so a database from before the squash first upgrades through the dead-end branch
+`migration_checkpoint`: its last migration (`manual 0009_migration_checkpoint`) depends on every app's final old
+migration and refuses while manual tasks are outstanding, since their one-off commands are gone here. Back on this
+branch, `manual/squashed_history.py` refuses an old history - `migrate` (`pre_migrate`), the database system check
+(`deployment_check` runs it), and gunicorn and celery workers, which won't start - until the
+one-off `manage.py reset_squashed_migration_history`, run by hand before `scripts/upgrade.sh`, swaps the old
+django_migrations rows for the new initials.
+What the squash removed - the old migrations with their data fixes and SQL, the `ManualOperation`s they registered and
+the one-off commands those ran - is kept at the protected tag `pre_squash_checkpoint`. A breakage that could be a seed
+row, index or data fix some deployment missed starts from #736 and `manual/__manual_readme.md#the-migration-squash`.
+A seed migration is `initial = True` so that reset records it; nothing added after the squash may be. Annotation upgrades (new VEP, new columns) are their own procedure: a new
 `VariantAnnotationVersion` per build via `create_new_variant_annotation_version`, then re-annotation of every variant in
 `AnnotationRun` batches - hours on the big deployments.
 
@@ -133,7 +148,7 @@ instead of plain collectstatic on a dev box.
 |---|---|---|
 | `PRIVATE_DATA_ROOT` | `/opt/variantgrid/data` | uploads (`UPLOAD_DIR`), per-deployment private files; gitignored |
 | `ANNOTATION_BASE_DIR` | `/data/annotation` | VEP code + caches (`ANNOTATION_VEP_BASE_DIR`), fastas, chain files, scratch, somalier |
-| `MEDIA_ROOT` | `/opt/variantgrid/media_root` | user media |
+| `MEDIA_ROOT` | `/opt/variantgrid/media_root` | generated media, served by nginx with no login check: only files behind a `SECRET_KEY`-salted name (graph PNGs, pedigree charts) belong here, which keeps that load off gunicorn; anything that needs a permission check goes in `UPLOAD_DIR` and is served by a view |
 | partition dumps | `/data/database/partition_dumps/<db>/` | pg_dump archives written before a partition is dropped (#1537) |
 
 `vg status` reports free space on each. The root filesystem on vg-test2 is small (about 30 GB) and usually above 85 %;

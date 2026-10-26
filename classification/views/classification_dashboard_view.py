@@ -10,7 +10,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from termsandconditions.decorators import terms_required
 
-from classification.enums import ShareLevel, TriageStatus
+from classification.enums import ShareLevel, TriageNextStep, TriageStatus
 from classification.models import (
     ClinVarExport,
     ConditionText,
@@ -18,7 +18,7 @@ from classification.models import (
     DiscordanceReport,
     DiscordanceReportClassification,
     OverlapContribution,
-    classification_flag_types, TriageNextStep,
+    classification_flag_types,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync

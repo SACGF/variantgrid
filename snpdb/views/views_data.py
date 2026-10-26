@@ -56,6 +56,7 @@ from snpdb.archive import (
     restore_vcf,
     vcf_can_be_archived,
 )
+from snpdb.enums import ImportStatus
 from snpdb.forms import (
     SampleChoiceForm,
     SampleForm,
@@ -79,9 +80,6 @@ from snpdb.models import (
     VariantZygosityCountForVCF,
     VCFLengthStatsCollection,
     get_igv_data,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
 )
 from snpdb.models.models_somalier import DUPLICATE_SAMPLE_RELATEDNESS
 from snpdb.sample_file_path import (
@@ -208,11 +206,16 @@ def view_vcf(request, vcf_id):
         # Banner from _data_archived_banner.html shows the message; cohort stays set if available.
         pass
 
+    has_write_permission = vcf.can_write(request.user)
+    if request.method == 'POST' and not has_write_permission:
+        raise PermissionDenied("You do not have write permission for this VCF")
+
     post = request.POST or None
     vcf_form = forms.VCFForm(post, instance=vcf)
     samples_form = VCFSampleFormSet(post, instance=vcf)
     for form in samples_form.forms:
         form.fields["vcf_sample_name"].disabled = True
+        forms.limit_sample_patient_choices(form, request.user)
     # The VCF's automatic cohort carries the phenotype - it saves with the rest of the vcf-form POST
     cohort_phenotype_form = None
     if cohort:
@@ -248,7 +251,6 @@ def view_vcf(request, vcf_id):
         for info in _get_vcf_infos(vcf):
             messages.add_message(request, messages.INFO, info, extra_tags='import-message')
 
-    has_write_permission = vcf.can_write(request.user)
     if not has_write_permission:
         set_form_read_only(vcf_form)
         for form in samples_form.forms:

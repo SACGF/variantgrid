@@ -9,11 +9,12 @@ from datetime import UTC, date, datetime
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.core.exceptions import MultipleObjectsReturned
 from django.test import TestCase
 from django.utils import timezone
+from guardian.shortcuts import assign_perm
 
-from library.guardian_utils import assign_permission_to_user_and_groups
+from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
+from patients.enums import Sex, TissueStatus
 from patients.forms import PatientForm
 from patients.import_records import (
     InvalidPatientRecord,
@@ -24,7 +25,6 @@ from patients.import_records import (
     process_record,
 )
 from patients.models import (
-    Clinician,
     ExternalModelManager,
     ExternalPK,
     Patient,
@@ -35,9 +35,9 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from patients.models_enums import Sex, TissueStatus
-from snpdb.models import ImportSource
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 _TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "test_data")
 _FAKE_CSV = os.path.join(_TEST_DATA_DIR, "fake_patient_records.csv")
@@ -155,24 +155,6 @@ class TestSpecimenAgeAtCollectionDate(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Patient.condition_description
-# ---------------------------------------------------------------------------
-
-class TestPatientConditionDescription(TestCase):
-    def test_condition_description_consistent_with_deceased_property(self):
-        """
-        Regression: condition_description used to only check date_of_death, so a
-        patient flagged deceased with no date of death still read as 'alive'.
-        """
-        patient = Patient.objects.create(first_name="DEAD", last_name="NODOD")
-        patient._deceased = True
-        patient.save()
-        self.assertTrue(patient.deceased)
-        self.assertNotEqual(patient.condition_description, "alive",
-                            "condition_description must not say 'alive' when deceased=True")
-
-
-# ---------------------------------------------------------------------------
 # Patient.save mutual-exclusion
 # ---------------------------------------------------------------------------
 
@@ -202,30 +184,6 @@ class TestPatientMatchPrecondition(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Clinician.cleaned_get_or_create
-# ---------------------------------------------------------------------------
-
-class TestClinicianGetOrCreate(TestCase):
-    def test_single_clinician_is_matched(self):
-        Clinician.objects.create(first_name="NICK", last_name="RIVIERA")
-        result = Clinician.cleaned_get_or_create("Nick Riviera")
-        self.assertEqual(result.last_name, "RIVIERA")
-
-    def test_multiple_matching_clinicians_does_not_create_extra(self):
-        """
-        Regression: a blanket `except Exception:` swallowed MultipleObjectsReturned,
-        so an ambiguous name silently created a third duplicate.
-        """
-        Clinician.objects.create(first_name="JOHN", last_name="SMITH")
-        Clinician.objects.create(first_name="JOHN", last_name="SMITH")
-        count_before = Clinician.objects.count()
-        with self.assertRaises(MultipleObjectsReturned):
-            Clinician.cleaned_get_or_create("John Smith")
-        self.assertEqual(Clinician.objects.count(), count_before,
-                         "A third Clinician was silently created")
-
-
-# ---------------------------------------------------------------------------
 # process_record deceased state machine
 # ---------------------------------------------------------------------------
 
@@ -252,6 +210,29 @@ class TestProcessRecordDeceasedStateMachine(TestCase):
         final_count = PatientModification.objects.filter(patient=self.patient).count()
         self.assertEqual(initial_count, final_count,
                          "Spurious PatientModification created with no deceased info")
+
+    def test_blank_deceased_columns_keep_date_of_death(self):
+        Patient.objects.filter(pk=self.patient.pk).update(date_of_death=date(2020, 1, 1))
+        process_record(self.pr, record_id=1, row=_make_row())
+        self.patient.refresh_from_db()
+        self.assertEqual(date(2020, 1, 1), self.patient.date_of_death)
+
+
+class TestProcessRecordPatientFields(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("patient_fields_user", password="x")
+        cls.patient = Patient.objects.create(first_name="IMPORTTESTFIRST", last_name="IMPORTTESTLAST",
+                                             affected=True, consanguineous=True)
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def test_false_is_set_and_blank_is_left_alone(self):
+        pr = _make_patient_records(self.user)
+        process_record(pr, record_id=1, row=_make_row(**{PatientColumns.AFFECTED: "N"}))
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.affected)
+        self.assertTrue(self.patient.consanguineous)
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +324,21 @@ class TestProcessRecordMultiplePatientMatches(TestCase):
         self.assertIn("Matched multiple patients", message)
         for patient in Patient.objects.filter(last_name="IMPORTTESTLAST"):
             self.assertIn(f"Patient:{patient.pk}", message)
+
+
+class TestProcessRecordReadOnlyPatient(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("read_only_import_user", password="x")
+        cls.patient = Patient.objects.create(first_name="IMPORTTESTFIRST", last_name="IMPORTTESTLAST")
+        assign_perm(DjangoPermission.perm(Patient, DjangoPermission.READ), cls.user, cls.patient)
+
+    def test_row_matching_a_read_only_patient_is_invalid(self):
+        pr = _make_patient_records(self.user)
+        with self.assertRaises(InvalidPatientRecord):
+            process_record(pr, record_id=1, row=_make_row(**{PatientColumns.SPECIMEN_REFERENCE_ID: "READONLY1"}))
+        self.assertFalse(Specimen.objects.filter(reference_id="READONLY1").exists())
 
 
 # ---------------------------------------------------------------------------

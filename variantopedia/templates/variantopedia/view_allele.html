@@ -317,7 +317,10 @@
                     <td></td>
                     <td>{{ overlap.value_type_label }}</td>
                     <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
+                    <td class="font-weight-bold">{% overlap_state overlap show_link_single_context=False %}</td>
+                    {% comment %}
                     <td class="font-weight-bold"><span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_label }}</td>
+                    {% endcomment %}
                 </tr>
             {% endfor %}
         </tbody>

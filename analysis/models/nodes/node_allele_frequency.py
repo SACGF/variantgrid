@@ -10,7 +10,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import GroupOperation
+from analysis.enums import GroupOperation
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from library.utils import format_percent
 from snpdb.models import Sample

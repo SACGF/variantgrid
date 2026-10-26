@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils.safestring import SafeString
 
 from library.django_utils.admin_utils import ModelAdminBasics, admin_list_column
-from snpdb.models import ProcessingStatus
+from snpdb.enums import ProcessingStatus
 from snpdb.user_settings_manager import UserSettingsManager
 
 from .models import (

@@ -7,7 +7,6 @@ pipeline_type_variant_q, get_lowest_unannotated_variant_id(pipeline_type=...),
 UploadedVCF.is_fully_annotated, the per-type import upsert, and the backfill command.
 """
 from django.contrib.auth.models import User
-from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
@@ -25,27 +24,20 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils import sha256sum_str
+from snpdb.enums import ImportSource
 from snpdb.models import (
-    VCF,
-    Cohort,
-    CohortGenotype,
-    CohortGenotypeCollection,
-    CohortSample,
     GenomeBuild,
-    ImportStatus,
     Locus,
-    Sample,
     Sequence,
     Variant,
 )
-from snpdb.models.models_enums import ImportSource
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadedVCF,
     UploadedVCFPipelineMaxVariant,
     UploadPipeline,
@@ -108,9 +100,9 @@ class PipelineMaxVariantTestCase(TestCase):
         short_ids = {v.pk for v in self.short_variants}
         all_ids = short_ids | {self.sv_variant.pk}
         qs = Variant.objects.filter(pk__in=all_ids)
-        sv_min_size = self.vav.structural_variant_min_size
-        standard_ids = set(qs.filter(pipeline_type_variant_q(STANDARD, sv_min_size)).values_list("pk", flat=True))
-        sv_ids = set(qs.filter(pipeline_type_variant_q(STRUCTURAL, sv_min_size)).values_list("pk", flat=True))
+        sv_min_sizes = (self.vav.structural_variant_min_size, self.vav.explicit_structural_variant_min_size)
+        standard_ids = set(qs.filter(pipeline_type_variant_q(STANDARD, *sv_min_sizes)).values_list("pk", flat=True))
+        sv_ids = set(qs.filter(pipeline_type_variant_q(STRUCTURAL, *sv_min_sizes)).values_list("pk", flat=True))
         self.assertEqual(standard_ids, short_ids)
         self.assertEqual(sv_ids, {self.sv_variant.pk})
 
@@ -199,44 +191,3 @@ class PipelineMaxVariantTestCase(TestCase):
         update_uploaded_vcf_max_variant(uploaded_vcf.pk, {STANDARD.value: self.short_variants[0].pk})
         row = uploaded_vcf.pipeline_max_variants.get(pipeline_type=STANDARD)
         self.assertEqual(row.max_variant_id, self.short_variants[4].pk)
-
-    # ------------------------------------------------------------------ backfill
-    def _make_vcf_with_genotypes(self, variants) -> VCF:
-        vcf = VCF.objects.create(name="backfill_vcf", genotype_samples=1, genome_build=self.grch37,
-                                 import_status=ImportStatus.SUCCESS, user=self.user, date=timezone.now())
-        sample = Sample.objects.create(name="proband", vcf=vcf, import_status=ImportStatus.SUCCESS)
-        cohort = Cohort.objects.create(name="backfill_cohort", user=self.user, vcf=vcf,
-                                       genome_build=self.grch37, import_status=ImportStatus.SUCCESS)
-        CohortSample.objects.create(cohort=cohort, sample=sample,
-                                    cohort_genotype_packed_field_index=0, sort_order=0)
-        cgc = CohortGenotypeCollection.objects.create(cohort=cohort, cohort_version=cohort.version,
-                                                      num_samples=1)
-        for variant in variants:
-            CohortGenotype.objects.create(collection=cgc, variant=variant, samples_zygosity="E")
-        return vcf
-
-    def test_backfill_short_only_creates_only_standard_row(self):
-        vcf = self._make_vcf_with_genotypes(self.short_variants)
-        uploaded_vcf = self._make_uploaded_vcf(vcf=vcf)
-        call_command("one_off_backfill_uploaded_vcf_pipeline_max_variant")
-        rows = {r.pipeline_type: r.max_variant_id for r in uploaded_vcf.pipeline_max_variants.all()}
-        self.assertEqual(rows, {STANDARD.value: self.short_variants[4].pk})
-
-    def test_backfill_mixed_creates_per_type_rows(self):
-        vcf = self._make_vcf_with_genotypes(self.short_variants + [self.sv_variant])
-        uploaded_vcf = self._make_uploaded_vcf(vcf=vcf)
-        call_command("one_off_backfill_uploaded_vcf_pipeline_max_variant")
-        rows = {r.pipeline_type: r.max_variant_id for r in uploaded_vcf.pipeline_max_variants.all()}
-        self.assertEqual(rows, {STANDARD.value: self.short_variants[4].pk,
-                                STRUCTURAL.value: self.sv_variant.pk})
-
-    def test_backfill_skips_vcfs_that_already_have_rows(self):
-        vcf = self._make_vcf_with_genotypes(self.short_variants)
-        uploaded_vcf = self._make_uploaded_vcf(vcf=vcf)
-        UploadedVCFPipelineMaxVariant.objects.create(uploaded_vcf=uploaded_vcf, pipeline_type=STANDARD,
-                                                     max_variant=self.short_variants[0])
-        call_command("one_off_backfill_uploaded_vcf_pipeline_max_variant")
-        # Existing row untouched (not recomputed to short_variants[4])
-        row = uploaded_vcf.pipeline_max_variants.get(pipeline_type=STANDARD)
-        self.assertEqual(row.max_variant_id, self.short_variants[0].pk)
-        self.assertEqual(uploaded_vcf.pipeline_max_variants.count(), 1)

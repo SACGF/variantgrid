@@ -10,11 +10,13 @@ SA Path use gnomad_oe_lof EKey which looks like:
 
 """
 import logging
+from io import BytesIO
 
 import pandas as pd
 
 from genes.models import GeneSymbol, GnomADGeneConstraint, TranscriptVersion
 from library.pandas_utils import df_nan_to_none
+from library.utils.misc_utils import retrieve_http_content
 from snpdb.models import GenomeBuild
 
 
@@ -22,7 +24,7 @@ def store_gnomad_gene_constraint_from_web(cached_web_resource):
     """ https://gnomad.broadinstitute.org/downloads#v4-constraint """
 
     GNOMAD4_GENE_CONSTRAINT_URL = "https://storage.googleapis.com/gcp-public-data--gnomad/release/v4.0/constraint/gnomad.v4.0.constraint_metrics.tsv"
-    df = pd.read_csv(GNOMAD4_GENE_CONSTRAINT_URL, sep='\t')
+    df = pd.read_csv(BytesIO(retrieve_http_content(GNOMAD4_GENE_CONSTRAINT_URL)), sep='\t')
     store_gnomad_gene_constraint_from_df(cached_web_resource, df)
 
 

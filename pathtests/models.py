@@ -6,28 +6,28 @@ from django.db import models
 from django.db.models import Q, QuerySet
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from genes.models import GeneList, GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums import ModificationOperation
 from library.preview_request import PreviewModelMixin
-from pathtests.models_enums import (
+from pathtests.enums import (
     CaseState,
     CaseWorkflowStatus,
     InvestigationType,
     PathologyTestGeneModificationOutcome,
 )
+from patients.enums import PopulationGroup
 from patients.models import (
     TEST_PATIENT_KWARGS,
     Clinician,
     ExternallyManagedModel,
     Patient,
 )
-from patients.models_enums import PopulationGroup
 from seqauto.models import EnrichmentKit, Experiment, SequencingRun
+from snpdb.enums import ImportStatus
 from snpdb.models import Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
 
 
 class PathologyTest(TimeStampedModel):

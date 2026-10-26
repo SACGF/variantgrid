@@ -16,7 +16,7 @@ from django.db.models.deletion import CASCADE, PROTECT
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_variant
 from annotation.annotation_run_files import ANNOTATION_RUN_IMPORT_PROCESSING_PREFIX
@@ -114,13 +114,17 @@ class AnnotationPipelineVersion(TimeStampedModel):
         return f"{self.get_pipeline_type_display()} {self.code_version}{data} ({self.genome_build})"
 
 
-class AnnotationRangeLock(models.Model):
+class AnnotationRangeLock(TimeStampedModel):
     MIN_SIZE_FOR_SUBDIVISION = 1000  # Do we need this?
 
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     min_variant = models.ForeignKey(Variant, related_name='min_variant', on_delete=PROTECT)
     max_variant = models.ForeignKey(Variant, related_name='max_variant', on_delete=PROTECT)
     count = models.IntegerField(null=True)
+
+    class Meta:
+        # #1124: a second lock over the same range would double-annotate it
+        unique_together = ("version", "min_variant", "max_variant")
 
     def __str__(self):
         min_v = self.min_variant_id
@@ -253,8 +257,10 @@ class AnnotationRun(TimeStampedModel):
                                           annotation_range_lock__min_variant__lte=variant.pk,
                                           annotation_range_lock__max_variant__gte=variant.pk)
         for ar in qs.select_related("annotation_range_lock__version").order_by("pk"):
-            sv_min_size = ar.annotation_range_lock.version.structural_variant_min_size
-            if ar.pipeline_type == pipeline_type_for_variant(variant, sv_min_size):
+            vav = ar.annotation_range_lock.version
+            pipeline_type = pipeline_type_for_variant(variant, vav.structural_variant_min_size,
+                                                      vav.explicit_structural_variant_min_size)
+            if ar.pipeline_type == pipeline_type:
                 return ar
         return None
 
@@ -430,7 +436,10 @@ class AnnotationRun(TimeStampedModel):
             return  # no version to name a partition by - delete()'s cascade over the base tables covers it
         annotation_version = self.variant_annotation_version.get_any_annotation_version()
         for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
-            qs = get_queryset_for_annotation_version(klass, annotation_version)
+            if annotation_version:
+                qs = get_queryset_for_annotation_version(klass, annotation_version)
+            else:  # a HISTORICAL version can have no AnnotationVersion - the parent table spans every partition
+                qs = klass.objects.all()
             qs.filter(annotation_run=self).delete()
 
     PIPELINE_TYPE_DESC = {

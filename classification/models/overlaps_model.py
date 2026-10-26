@@ -8,12 +8,10 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import CASCADE, SET_NULL, JSONField, QuerySet
-from django.db.models.enums import IntegerChoices
 from django.urls import reverse
-from django.utils.safestring import mark_safe
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from annotation.models.data_enums import EffectiveDate
+from annotation.enums import EffectiveDate
 from annotation.models.models_clinvar import ClinVarRecord
 from classification.enums import (
     OverlapOverrideStatus,
@@ -22,6 +20,7 @@ from classification.enums import (
     SpecialEKeys,
     TestingContextBucket,
     TestingContextFull,
+    TriageNextStep,
     TriageStatus,
 )
 from classification.enums.overlaps_enums import (
@@ -32,8 +31,8 @@ from classification.enums.overlaps_enums import (
     TriageComment,
     TriageDecision,
 )
-from classification.models.condition_resolved import ConditionResolved
 from classification.models.classification_grouping import ClassificationGrouping
+from classification.models.condition_resolved import ConditionResolved
 from classification.models.evidence_key import EvidenceKeyMap
 from genes.hgvs import HGVSComponents, HGVSDisplay
 from library.django_utils.database_utils import IntegerFieldChoices, TextFieldChoices
@@ -549,39 +548,6 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             return result
         else:
             return []
-
-
-class TriageNextStep(IntegerChoices):
-    NOT_INVOLVED = 0, "Not Involved"
-    PENDING_CALCULATION = 1, "Pending Calculation"
-    AWAITING_OTHER_LAB = 2, "Waiting on Other Lab" # changed text to Waiting on Other, so Awaiting means waiting on you
-    AWAITING_YOUR_TRIAGE = 3, "Awaiting Your Triage"
-    AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED = 4, "Awaiting Your Triage - others have triaged"
-    AWAITING_YOUR_AMEND = 5, "Awaiting Your Amendment"
-    UNANIMOUSLY_COMPLEX = 6, "Unanimously Complex"
-    TO_DISCUSS = 7, "To Discuss"
-
-    @property
-    def user_should_action(self) -> bool:
-        match self:
-            case TriageNextStep.AWAITING_YOUR_TRIAGE: return True
-            case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED: return True
-            case TriageNextStep.AWAITING_YOUR_AMEND: return True
-            case TriageNextStep.TO_DISCUSS: return True
-            case _: return False
-    
-    @property
-    def icon(self):
-        match self:
-            case TriageNextStep.AWAITING_YOUR_TRIAGE:
-                return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
-            case TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED:
-                return mark_safe('<i class="fa-solid fa-clock mr-1" style="opacity:0.6"></i>')
-            case TriageNextStep.AWAITING_YOUR_AMEND:
-                return mark_safe('<i class="fa-solid fa-square-pen mr-1" style="opacity:0.6"></i>')
-            case TriageNextStep.TO_DISCUSS:
-                return mark_safe('<i class="fa-solid fa-comments mr-1" style="opacity:0.6"></i>')
-            case _: return ""
 
 
 class OverlapContributionNextStep(TimeStampedModel):

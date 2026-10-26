@@ -9,7 +9,8 @@ from library.integration_status import (
     IntegrationStatus,
     integration_status_signal,
 )
-from sync.models import SyncDestination, SyncRun, SyncStatus
+from sync.enums import SyncStatus
+from sync.models import SyncDestination, SyncRun
 
 
 def _last_run_created(destination: SyncDestination, statuses=None):

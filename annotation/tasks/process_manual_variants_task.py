@@ -9,10 +9,10 @@ from snpdb.clingen_allele import (
     get_clingen_alleles_from_external_code,
     populate_clingen_alleles_for_variants,
 )
+from snpdb.enums import ClinGenAlleleExternalRecordType, ImportStatus
 from snpdb.models import Variant, VariantCoordinate
-from snpdb.models.models_enums import ClinGenAlleleExternalRecordType, ImportStatus
+from upload.enums import VCFImportInfoSeverity
 from upload.models import SimpleVCFImportInfo
-from upload.models.models_enums import VCFImportInfoSeverity
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 

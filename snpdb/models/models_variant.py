@@ -29,9 +29,9 @@ from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from hgvs.extras.babelfish import VCFCoordinate
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 from pydantic import field_validator
 
 from flags.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
@@ -50,15 +50,10 @@ from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.babelfish import get_genome_babelfish
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ProcessingStatus,
-    SequenceRole,
-)
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 # VCF spec's reference alt (our Variant.REFERENCE_ALT is "=")
@@ -563,12 +558,29 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_internal_canonical_form(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Make sure we only have 1 representation for a variant - symbolic only at or beyond
-            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be """
+            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be, and a
+            symbolic svlen with its canonical sign (canonical_svlen) """
         if not self.is_symbolic:
             return self.as_internal_symbolic(genome_build)
         if self.can_be_made_explicit and abs(self.svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
             return self.as_external_explicit(genome_build)
+        canonical_svlen = self.canonical_svlen(self.alt, self.svlen)
+        if canonical_svlen != self.svlen:
+            return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=self.alt,
+                                     svlen=canonical_svlen)
         return self
+
+    @staticmethod
+    def canonical_svlen(alt: str, svlen: Optional[int]) -> Optional[int]:
+        """ A <DEL>'s svlen is stored negative (VCF 4.3) unless VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE, when
+            every svlen is positive. A <DEL> imported with END but no SVLEN used to come out positive (#1340) """
+        if svlen is None:
+            return None
+        if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+            return abs(svlen)
+        if alt == VCFSymbolicAllele.DEL:
+            return -abs(svlen)
+        return svlen
 
     def as_vcf_coordinate(self, genome_build: GenomeBuild) -> VCFCoordinate:
         """ hgvs's VCF-spec form, for Babelfish, on the contig's RefSeq accession rather than our chrom name.
@@ -1221,7 +1233,6 @@ class LiftoverRun(TimeStampedModel):
             "genome_build": genome_build,
             "conversion_tool": AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
         }
-        # There should have been 1 created in 'one_off_legacy_populate_allele_liftover'
         lr = LiftoverRun.objects.filter(**kwargs).order_by("pk").first()
         if not lr:
             # Otherwise create it

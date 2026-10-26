@@ -2,7 +2,6 @@ import argparse
 import os
 from collections import Counter, defaultdict
 from datetime import timedelta
-from typing import Optional
 
 from django.conf import settings
 from django.core.management import BaseCommand
@@ -23,10 +22,9 @@ from library.django_utils.django_file_utils import (
     get_import_processing_filename,
     remove_import_processing_dir,
 )
+from ontology.enums import GeneDiseaseClassification, OntologyService
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER,
-    GeneDiseaseClassification,
-    OntologyService,
     OntologyTermRelation,
     OntologyVersion,
 )
@@ -469,19 +467,9 @@ class Command(BaseCommand):
 
         print(f"Finished: {timezone.now()}")
 
-    def add_gene_annotation_for_genes(self, gav: GeneAnnotationVersion, gene_ids: set[str]) -> int:
-        """ Writes rows for genes an existing version lacks, eg ones the release gained after it was built.
-            The caller has already matched the release's symbols. Returns the number of rows written """
-        gene_annotation_records, _ = self._build_gene_annotation_records(gav, gene_ids=gene_ids)
-        if gene_annotation_records:
-            self._write_records(gav, gene_annotation_records)
-        return len(gene_annotation_records)
-
-    def _build_gene_annotation_records(self, gav: GeneAnnotationVersion,
-                                       gene_ids: Optional[set[str]] = None) -> tuple[list[tuple], Counter]:
+    def _build_gene_annotation_records(self, gav: GeneAnnotationVersion) -> tuple[list[tuple], Counter]:
         """ One GENE_ANNOTATION_HEADER tuple per gene the release's symbols reach that has any ontology,
-            dbNSFP or gnomAD data. gene_ids restricts to those genes, and then a symbol with no match is the
-            expected case rather than a warning """
+            dbNSFP or gnomAD data """
         traverser = get_ontology_traverser(gav.ontology_version, in_memory=self.in_memory_graph,
                                            call_update_gene_relations=False)
         if self.in_memory_graph:
@@ -490,16 +478,11 @@ class Command(BaseCommand):
         # Keys are uppercased so the HGNC loop's uc_symbol lookup matches the
         # case-insensitive collation that genes_for_symbol() relies on.
         rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gav.gene_annotation_release)
-        if gene_ids is not None:
-            rgsg_qs = rgsg_qs.filter(gene_id__in=gene_ids)
         symbol_to_gene_ids = defaultdict(set)
         for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
             symbol_to_gene_ids[gene_symbol.upper()].add(gene_id)
 
         hgnc_terms = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
-        if gene_ids is not None:
-            hgnc_terms = [ot for ot in hgnc_terms if ot.name.upper() in symbol_to_gene_ids]
-        warn_unmatched = gene_ids is None
 
         missing_genes = Counter()
         # The various annotations are for different genes, so group kwargs by gene
@@ -527,7 +510,7 @@ class Command(BaseCommand):
 
                     annotation_by_gene[gene_id]["gene_disease_supportive_or_below"] = gene_disease_supportive_or_below
                     annotation_by_gene[gene_id]["gene_disease_moderate_or_above"] = gene_disease_moderate_or_above
-            elif warn_unmatched:
+            else:
                 print(f"Warning: {gav.gene_annotation_release} has no match for '{uc_symbol}' ({service_terms})")
                 missing_genes["ontology"] += 1
 
@@ -539,7 +522,7 @@ class Command(BaseCommand):
             if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id.upper()):
                 for gene_id in gene_ids_for_symbol:
                     annotation_by_gene[gene_id]["dbnsfp_gene_id"] = dbnsfp_gene_id
-            elif warn_unmatched:
+            else:
                 print(f"Warning: {gav.gene_annotation_release} has no match for '{gene_symbol_id}' - dbNSFP Gene Annotation")
                 missing_genes["dbnsfp_gene_annotation"] += 1
 
@@ -547,7 +530,7 @@ class Command(BaseCommand):
             if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id.upper()):
                 for gene_id in gene_ids_for_symbol:
                     annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
-            elif warn_unmatched:
+            else:
                 print(f"Warning: {gav.gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
                 missing_genes["gnomad_gene_constraints"] += 1
 
@@ -577,7 +560,7 @@ class Command(BaseCommand):
 
 
 def bad_gene_annotation():
-    """ This is used as a test in annotation/migrations/0068_one_off_manual_fix_bad_gene_annotation """
+    """ Gene annotation versions whose dbNSFP gene data never loaded """
     bad_gene_annotation = []
     for gav in GeneAnnotationVersion.objects.all():
         if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():

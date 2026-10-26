@@ -5,9 +5,9 @@ from analysis.models import Analysis, TagNode, VariantTag
 from analysis.models.nodes.node_utils import update_analysis, update_analysis_tag_node_counts
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import get_variant_allele_for_variant
+from snpdb.enums import ImportSource, TagFilter
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import ImportSource, Tag
-from snpdb.models.models_enums import TagFilter
+from snpdb.models import Tag
 
 
 def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):

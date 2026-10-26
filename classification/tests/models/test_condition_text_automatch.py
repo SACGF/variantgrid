@@ -19,7 +19,8 @@ from classification.models.condition_text_matching import (
 from classification.tasks.condition_text_automatch_task import condition_text_automatch_task
 from genes.models import GeneSymbol
 from library.request_context import set_thread_variable
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
 from snpdb.models import Country, Lab, Organization
 
 

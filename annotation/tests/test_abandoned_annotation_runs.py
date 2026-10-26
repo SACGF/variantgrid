@@ -17,7 +17,7 @@ from annotation.models import (
     VariantAnnotation,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -27,8 +27,9 @@ class CleanUpAbandonedAnnotationRunsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        cls.variant = slowly_create_test_variant("1", 100000, 'A', 'T', grch37)
-        cls.other_variant = slowly_create_test_variant("1", 100001, 'C', 'G', grch37)
+        # One variant per lock: a version can hold only one lock over a given range
+        cls.variants = [slowly_create_test_variant("1", 100000 + i, 'A', 'T', grch37) for i in range(8)]
+        cls.variant, cls.other_variant = cls.variants[:2]
         retire_seeded_annotation_version(grch37)
         cls.vavs = {}
         for vep, status in enumerate(VariantAnnotationVersion.Status, start=2):
@@ -36,9 +37,13 @@ class CleanUpAbandonedAnnotationRunsTestCase(TestCase):
             kwargs.update(status=status, vep=vep)
             cls.vavs[status] = VariantAnnotationVersion.objects.create(**kwargs)
 
+    def setUp(self):
+        self._unlocked_variants = iter(self.variants)
+
     def _lock(self, status):
-        return AnnotationRangeLock.objects.create(version=self.vavs[status], min_variant=self.variant,
-                                                  max_variant=self.variant, count=1)
+        variant = next(self._unlocked_variants)
+        return AnnotationRangeLock.objects.create(version=self.vavs[status], min_variant=variant,
+                                                  max_variant=variant, count=1)
 
     @staticmethod
     def _run(lock=None, pipeline_type=VariantAnnotationPipelineType.STANDARD, **kwargs):
@@ -86,6 +91,14 @@ class CleanUpAbandonedAnnotationRunsTestCase(TestCase):
         self.assertEqual(outcomes["no range lock: deleted"], 1)
         self.assertEqual(outcomes["historical version: deleted"], 2)
         self.assertEqual(outcomes["range locks deleted"], 1)
+
+    def test_clean_up_historical_version_without_annotation_version(self):
+        historical_vav = self.vavs[VariantAnnotationVersion.Status.HISTORICAL]
+        historical_vav.annotationversion_set.all().delete()
+        run = self._run(self._lock(VariantAnnotationVersion.Status.HISTORICAL))
+        outcomes = clean_up_abandoned_annotation_runs()
+        self.assertEqual(outcomes["historical version: deleted"], 1)
+        self.assertFalse(AnnotationRun.objects.filter(pk=run.pk).exists())
 
     def test_dry_run_changes_nothing(self):
         run = self._run(self._lock(VariantAnnotationVersion.Status.HISTORICAL))

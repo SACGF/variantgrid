@@ -33,7 +33,6 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals.cohort_search import search_cohort
         from snpdb.signals.duo_search import search_duo
         from snpdb.signals.genomics_search import contig_search, genome_build_search
-        from snpdb.signals.hgvs_search import search_hgvs
         from snpdb.signals.lab_search import lab_search
         from snpdb.signals.organization_search import organization_search
         from snpdb.signals.quad_search import search_quad
@@ -45,22 +44,6 @@ class SnpdbConfig(AppConfig):
         )
         from snpdb.signals.trio_search import search_trio
         from snpdb.signals.user_search import user_search
-        from snpdb.signals.variant_search import (
-            allele_search,
-            search_allele_id,
-            search_variant_db_snp,
-            search_variant_gene_copy_number,
-            search_variant_gene_fusion,
-            search_variant_gnomad,
-            search_variant_id,
-            search_variant_locus_no_ref,
-            search_variant_locus_with_ref,
-            search_variant_splice_event,
-            search_variant_symbolic,
-            search_variant_variant,
-            variant_cosmic_search,
-            variant_search_vcf,
-        )
         from snpdb.signals.vcf_search import vcf_search
         # pylint: enable=import-outside-toplevel,unused-import
 
@@ -74,10 +57,6 @@ class SnpdbConfig(AppConfig):
             sample_search,
             search_trio,
             user_search,
-            variant_cosmic_search, search_variant_locus_no_ref, search_variant_locus_with_ref, allele_search,
-            variant_search_vcf, search_variant_gnomad, search_variant_variant, search_variant_symbolic,
-            search_variant_db_snp, search_hgvs, search_variant_id, search_allele_id, search_variant_gene_fusion,
-            search_variant_gene_copy_number, search_variant_splice_event,
             vcf_search,
         )
 

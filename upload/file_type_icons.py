@@ -16,7 +16,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
 from library.preview_request import fa_icon_html, svg_symbol_icon_html
-from upload.models.models_enums import UploadedFileTypes
+from upload.enums import UploadedFileTypes
 
 
 @dataclass(frozen=True)

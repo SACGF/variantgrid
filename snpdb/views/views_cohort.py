@@ -26,6 +26,7 @@ from library.django_utils import (
     add_save_message,
 )
 from snpdb import forms
+from snpdb.enums import ImportStatus, ProcessingStatus
 from snpdb.models import (
     Cohort,
     Duo,
@@ -33,10 +34,6 @@ from snpdb.models import (
     Sample,
     Trio,
     UserSettings,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
-    ProcessingStatus,
 )
 from snpdb.views.vcf_cohort_page import sample_membership_rows, vcf_cohort_page_context
 from snpdb.views.views_json import cohort_genotype_json_response
@@ -147,8 +144,10 @@ def cohort_gene_counts(request, cohort_id):
 
     COHORT_CUSTOM_GENE_LIST = f"__QC_COVERAGE_CUSTOM_GENE_LIST__{request.user}"
 
-    # We only want to keep 1 per user
-    custom_text_gene_list, _ = CustomTextGeneList.objects.get_or_create(name=COHORT_CUSTOM_GENE_LIST)
+    # We only want to keep 1 per user. name isn't unique, so concurrent first visits can each create one - use the first
+    custom_text_gene_list = CustomTextGeneList.objects.filter(name=COHORT_CUSTOM_GENE_LIST).order_by("pk").first()
+    if custom_text_gene_list is None:
+        custom_text_gene_list = CustomTextGeneList.objects.create(name=COHORT_CUSTOM_GENE_LIST)
 
     custom_gene_list_form = CustomGeneListForm(request.POST or None,
                                                initial={"custom_gene_list_text": custom_text_gene_list.text})

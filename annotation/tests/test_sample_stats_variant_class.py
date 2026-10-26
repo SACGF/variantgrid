@@ -11,7 +11,7 @@ from django.test import TestCase
 from annotation.fake_data import get_fake_annotation_version
 from annotation.tasks.calculate_sample_stats import calculate_cohort_stats
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import (
     VCF,

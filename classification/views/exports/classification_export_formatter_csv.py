@@ -177,12 +177,8 @@ class ClassificationMeta(ExportRow):
     def __init__(
             self,
             cm: ClassificationModification,
-            discordance_status: DiscordanceReportStatus,
-            pending_clin_sig: Optional[str],
             e_keys: EvidenceKeyMap):
         self.cm = cm
-        self.discordance_status = discordance_status
-        self.pending_clin_sig = pending_clin_sig
         self.e_keys = e_keys
 
     @property
@@ -207,23 +203,6 @@ class ClassificationMeta(ExportRow):
         cc.reference_citations(self.cm)
         return ', '.join(cc.citation_ids())
         # return ', '.join([c.ref_id() for c in sorted(set(cc.citations()), key=lambda c:c.sort_key)])
-
-    @export_column(categories={"transient": True, "discordance": True})
-    def discordance_status(self):
-        if not self.discordance_status:
-            return ''
-        elif self.discordance_status == DiscordanceReportStatus.ON_GOING:
-            return 'active discordance'
-        elif self.discordance_status == DiscordanceReportStatus.CONTINUED:
-            return 'continued discordance'
-        elif self.discordance_status == DiscordanceReportStatus.PENDING_CONCORDANCE:
-            return 'pending concordance'
-        else:
-            return self.discordance_status
-
-    @export_column(categories={"transient": True, "pending_changes": True})
-    def pending_clinical_significance(self):
-        return self.pending_clin_sig
 
 
 @register_classification_exporter("csv")
@@ -323,8 +302,6 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             RowID(cm=vcm, allele_data=allele_data, date_str=self.classification_filter.date_str, message=message).to_csv(export_tweak=self._export_tweak) + \
             ClassificationMeta(
                 cm=vcm,
-                discordance_status=self.classification_filter.is_discordant(vcm),
-                pending_clin_sig=self.grouping_utils.pending_changes_for(vcm),
                 e_keys=self.e_keys
             ).to_csv(export_tweak=self._export_tweak) + \
             self.used_keys.row(classification_modification=vcm, formatter=self.format_details.html_handling.format)

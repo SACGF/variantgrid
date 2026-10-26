@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory
 from library.utils import sha256sum_str
-from snpdb.models import ImportStatus
+from snpdb.enums import ImportStatus
 
 
 def create_custom_text_gene_list(custom_text_gene_list: CustomTextGeneList,

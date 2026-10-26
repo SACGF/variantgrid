@@ -226,7 +226,7 @@ class EvidenceSelectKeyRenamer:
         kwargs = {f"evidence__{self.key}__isnull": False}
         for vc in Classification.objects.filter(**kwargs).iterator():
             self._update_in_dict(vc.evidence)
-            vc.save(update_fields=["evidence"])
+            Classification.objects.filter(pk=vc.pk).update(evidence=vc.evidence)
 
         delta_kwargs = {f"delta__{self.key}__isnull": False}
         published_kwargs = {f"published_evidence__{self.key}__isnull": False}

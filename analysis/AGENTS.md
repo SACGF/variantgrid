@@ -32,7 +32,7 @@ Patterns here:
   copying edges in a clone) sets `node.valid = node.is_valid` itself. Move/connect edits go through `analysis/views/views_json.py:NodeUpdate`.
 - Scheduling is state-driven, not a prebuilt chain: `analysis/tasks/analysis_update_tasks.py:create_and_launch_analysis_tasks`
   (on `scheduling_single_worker`) calls `analysis/tasks/analysis_update_tasks.py:lease_ready_nodes`, which claims DIRTY
-  nodes whose parents are all in `analysis/models/enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
+  nodes whose parents are all in `analysis/enums/analysis_enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
   fails fast with ERROR_WITH_PARENT); each `analysis/tasks/node_update_tasks.py:update_node_task` re-triggers the
   dispatcher when it finishes. `analysis/tasks/analysis_update_tasks.py:dispatch_analysis_backlog` is the periodic sweep.
 - `analysis/scheduler_status.py` is the operator's view of the lease state (the superuser Analysis Status page):
@@ -172,7 +172,8 @@ Patterns here:
   (`analysis.user`): the grid (`analysis/grids.py:VariantGrid._get_permission_user`), the source pickers
   (`analysis/forms/forms_nodes.py:SampleNodeForm.clean_source`), tag / classification / phenotype nodes, template runs.
   So every viewer sees the same analysis, and adding a sample or VCF to it shares it with everyone who can see the
-  analysis. For a deactivated owner, object checks (`has_perm`, `get_for_user`) always fail while guardian's queryset
+  analysis. Someone else with write access can only add sources they can view as well
+  (`analysis/forms/forms_nodes.py:BaseNodeForm.restrict_choices_to_editor`), keeping what the node already has. For a deactivated owner, object checks (`has_perm`, `get_for_user`) always fail while guardian's queryset
   filters still pass, so the analysis keeps showing but can't take new inputs: someone with write access takes it over
   (`analysis/models/models_analysis.py:Analysis.change_owner`, from Analysis Settings or the user admin's lab head
   action), then the nodes reload as the new owner (#2325).
@@ -198,7 +199,10 @@ Gotchas:
   branch would re-queue the load that was just cancelled.
 - `AnalysisNode.save` locks the Analysis row first (`select_for_update`) so concurrent subtree cascades take NodeVersion
   locks in one order; copy `analysis/signals/source_data_invalidation.py:_bump_nodes` or
-  `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump.
+  `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump. Under that lock a bump counts on
+  from the stored version, not the one the request loaded (`AnalysisNode.bump_version`). An edit that doesn't bump (move,
+  name/notes) saves with `update_fields`: a whole-row save writes back the status and count read at request start over
+  the worker's load result (#2444).
 - The Q-object cache is on by default (`ANALYSIS_NODE_CACHE_Q`) and keyed only on NodeVersion pk. A test that changes a
   node and expects a different queryset without saving needs `@override_settings(ANALYSIS_NODE_CACHE_Q=False)`.
 - A small node answers `get_arg_q_dict` with `Q(pk__in=[...])` from `NodeVersion.variant_ids` (issue #546) - for its

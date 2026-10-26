@@ -25,12 +25,11 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
-from classification.enums import SpecialEKeys, SubmissionSource
+from classification.enums import CaseReportStatus, SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_report_models import (
     CaseReport,
     CaseReportClassification,
-    CaseReportStatus,
     ClassificationReportTemplate,
     case_report_finalised_signal,
 )

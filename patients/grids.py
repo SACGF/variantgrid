@@ -11,8 +11,15 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from library.utils import JsonDataType
+from ontology.enums import OntologyService
 from ontology.grids import AbstractOntologyGenesConfig
-from ontology.models import OntologyService, OntologyTerm
+from ontology.models import OntologyTerm
+from patients.enums import (
+    MatchStatus,
+    NucleicAcid,
+    PatientRecordMatchType,
+    TissueStatus,
+)
 from patients.external_references import ExternalReference
 from patients.models import (
     Extraction,
@@ -23,12 +30,6 @@ from patients.models import (
     SpecimenMeasure,
 )
 from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
-from patients.models_enums import (
-    MatchStatus,
-    NucleicAcid,
-    PatientRecordMatchType,
-    TissueStatus,
-)
 from seqauto.models import SequencingSample
 from snpdb.models import Sample
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
@@ -111,10 +112,11 @@ class PatientListColumns(DatatableConfig[Patient]):
     def filter_queryset(self, qs: QuerySet[Patient]) -> QuerySet[Patient]:
         if term_type := self.get_query_param("term_type"):
             term_name = self.get_query_param("term")
-            ontology_term = OntologyTerm.objects.get(name=term_name, ontology_service=OntologyService(term_type))
+            # The grid filters by the displayed name, which may be shared by several terms or no longer exist
+            ontology_terms = OntologyTerm.objects.filter(name=term_name, ontology_service=OntologyService(term_type))
             # Filter to a sub patients list NOT just to certain terms, so that StringAgg will
             # return all the terms for that person
-            patient_id_qs = Patient.objects.filter(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
+            patient_id_qs = Patient.objects.filter(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__in": ontology_terms})
             qs = qs.filter(pk__in=patient_id_qs.values_list("pk", flat=True))
 
         for param, field in self.FILTER_FIELDS.items():

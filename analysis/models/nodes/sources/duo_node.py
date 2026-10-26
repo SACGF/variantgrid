@@ -6,7 +6,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import DuoInheritance
+from analysis.enums import DuoInheritance
 from analysis.models.nodes.family_inheritance import (
     PROBAND,
     AbstractCompHetInheritance,
@@ -28,8 +28,9 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from patients.models_enums import Zygosity
-from snpdb.models import Duo, DuoRelationship
+from patients.enums import Zygosity
+from snpdb.enums import DuoRelationship
+from snpdb.models import Duo
 
 RELATIVE = "relative"
 

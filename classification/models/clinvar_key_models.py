@@ -10,25 +10,12 @@ from typing import Optional
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import QuerySet, TextChoices
-from django_extensions.db.models import TimeStampedModel
+from django.db.models import QuerySet
+from model_utils.models import TimeStampedModel
 
+from classification.enums import ClinVarAssertionMethods, ClinVarCitationsModes
 from library.utils import JsonObjType
 from snpdb.models.models import Lab
-
-
-class ClinVarAssertionMethods(TextChoices):
-    # "yes", "no", "unknown", "not provided", "not applicable"
-    yes = "yes"
-    no = "no"
-    unknown = "unknown"
-    not_provided = "not provided"
-    not_applicable = "not applicable"
-
-
-class ClinVarCitationsModes(TextChoices):
-    all = "all"
-    interpretation_summary_only = "interpret"
 
 
 class ClinVarKey(TimeStampedModel):

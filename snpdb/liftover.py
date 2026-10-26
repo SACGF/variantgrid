@@ -21,13 +21,8 @@ from snpdb.bcftools_liftover import (
     bcftools_liftover_variant_coordinate,
     check_bcftools_can_liftover,
 )
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ImportSource, ProcessingStatus
 from snpdb.models.models_dbsnp import DbSNP
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ImportSource,
-    ProcessingStatus,
-)
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import (
     Allele,
@@ -38,7 +33,8 @@ from snpdb.models.models_variant import (
     VariantCoordinate,
 )
 from snpdb.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
-from upload.models import FileUpload, UploadedFileTypes, UploadedLiftover, UploadPipeline
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedLiftover, UploadPipeline
 from upload.upload_processing import process_upload_pipeline
 
 # VariantCoordinate can be None, with an error string at the end

@@ -13,9 +13,9 @@ from classification.models import Classification, ClassificationModification
 from genes.hgvs import HGVSDisplay
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab, Organization, Variant
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 

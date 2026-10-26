@@ -12,9 +12,9 @@ from django.db.models import Q
 from django.db.models.deletion import CASCADE, PROTECT
 from django.db.models.expressions import Subquery
 from django.db.models.query import QuerySet
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from flags.models.enums import FlagStatus
+from flags.enums import FlagStatus
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.model_utils import ModelUtilsMixin
@@ -591,5 +591,5 @@ class FlagsMixin(models.Model):
         if not flag_collection:
             flag_collection = FlagCollection.objects.create(context=self.flag_type_context())
             self.flag_collection = flag_collection
-            self.save(update_fields=['flag_collection'])
+            type(self).objects.filter(pk=self.pk).update(flag_collection=flag_collection)
         return flag_collection

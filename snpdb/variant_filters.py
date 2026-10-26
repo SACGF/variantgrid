@@ -15,7 +15,7 @@ from django.db.models import Max, Min, Q
 from annotation.models import AnnotationVersion, VariantGeneOverlap, VariantTranscriptAnnotation
 from genes.models import Gene, GeneSymbol
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
-from snpdb.models.models_enums import SequenceRole
+from snpdb.enums import SequenceRole
 from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
 from snpdb.models.models_variant import Sequence, Variant, get_base_and_reference_sequence_ids

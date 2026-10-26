@@ -36,8 +36,8 @@ from classification.views.exports.classification_export_formatter_redcap import 
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from library.log_utils import report_exc_info
+from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -211,7 +211,10 @@ def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:
 
 
 def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
-    vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, classification_id).modification
+    record_ref = ClassificationRef.init_from_str(request.user, classification_id)
+    record_ref.check_exists()
+    record_ref.check_security()
+    vcm: ClassificationModification = record_ref.modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 
     filename_parts = [

@@ -24,15 +24,15 @@ from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import QuerySet, TextChoices
+from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import SafeString
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 from more_itertools import first
 
 from eventlog.models import create_event
@@ -44,7 +44,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder
 from library.preview_request import PreviewModelMixin
 from library.utils import import_class, string_deterministic_hash
-from snpdb.models.models_enums import AlleleOriginBucket, UserAwardKind, UserAwardLevel
+from snpdb.enums import AlleleOriginBucket, LabUserRole, UserAwardKind, UserAwardLevel
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
 
@@ -308,6 +308,10 @@ class Wiki(TimeStampedModel):
             msg = f"You do not have permission to write to wiki {self.pk}"
             raise PermissionDenied(msg)
 
+    def citation_ids(self) -> Optional[list[str]]:
+        """ Overwrite in a wiki that links the citations in its markdown, so a save can show them """
+        return None
+
     @staticmethod
     def get_subclass_by_name(class_name):
         klass = import_class(class_name)
@@ -413,11 +417,6 @@ class Organization(models.Model, PreviewModelMixin):
         if not self.can_write(user):
             msg = f"You do not have WRITE permission for {self.pk}"
             raise PermissionDenied(msg)
-
-
-class LabUserRole(TextChoices):
-    HEAD = "head", "Lab Head"
-    USER = "user", "User"
 
 
 @total_ordering

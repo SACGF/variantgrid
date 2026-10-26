@@ -19,23 +19,33 @@ whole rows, and its input deliberately comes from a different annotation source 
 produced the version.
 """
 import csv
+import gzip
 import io
 import logging
+import os
+import re
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Callable, Optional
 
 import cyvcf2
+from django.core.exceptions import FieldDoesNotExist
 from django.db import connection, transaction
+from django.db.models import BooleanField
 
 from annotation import vep_columns as vep_columns_registry
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from annotation.vep_annotation import get_vep_skipped_variants_filename
 from annotation.vep_field_formatters import EMPTY_VALUES, VEP_SEPARATOR
+from annotation.vep_warnings import parse_skipped_variants_file
 from library.django_utils import get_model_fields
+from library.utils.file_utils import open_handle_gzip
+from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import VARIANT_ID
 from upload.vcf.sql_copy_files import sql_copy_csv_file
 
@@ -52,6 +62,8 @@ CSQ_FORMAT_SEPARATOR = "Format: "
 CSQ_PICK_FIELD = "PICK"
 
 IMPORT_PROGRESS_INTERVAL_SECONDS = 10
+
+BACKFILL_FLAG_PREFIX = "backfilled_"
 
 
 class BackfillColumnError(ValueError):
@@ -166,8 +178,9 @@ def _validate_annotation_columns(columns: Iterable[str]) -> list[str]:
 
 def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion, output_filename: str,
                             targets: list[BackfillTarget] = None, only_missing: bool = False,
-                            not_null_columns: Iterable[str] = None,
-                            min_variant_id: int = None, max_variant_id: int = None) -> int:
+                            not_null_columns: Iterable[str] = None, consequence: Optional[str] = None,
+                            min_variant_id: int = None, max_variant_id: int = None,
+                            pipeline_type: Optional[VariantAnnotationPipelineType] = None) -> int:
     """ Write the variants annotated in this version to a VCF carrying variant_id in INFO, ready to be
         annotated externally. Returns the number of records written.
 
@@ -176,10 +189,18 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
 
         not_null_columns restricts to rows that already have a value for those columns. A source writes
         all of its columns together, so a sibling column being null rules the variant out - #1822's Open
-        Targets score only needed the 465k variants the plugin matched, not the version's 8.4M. """
+        Targets score only needed the 465k variants the plugin matched, not the version's 8.4M.
+
+        consequence restricts to rows whose representative transcript has that SO term - for a VEP plugin
+        that only annotates some consequences, all a --csq import of the PICK'd entry can fill (#2426).
+
+        pipeline_type restricts to the variants that pipeline annotates - STANDARD for a VEP plugin column,
+        so the structural variants the STANDARD VEP command never sees stay out. Gene-level variants have
+        annotation but no coordinate, so are never dumped. """
     annotation_version = variant_annotation_version.get_any_annotation_version()
-    qs = get_variants_qs_for_annotation(annotation_version, annotated=True,
+    qs = get_variants_qs_for_annotation(annotation_version, pipeline_type=pipeline_type, annotated=True,
                                         min_variant_id=min_variant_id, max_variant_id=max_variant_id)
+    qs = qs.exclude(Variant.get_gene_level_q())
     # get_variants_qs_for_annotation(annotated=True) only stops it excluding annotated variants - to dump
     # the ones that *have* annotation for this version we have to join to the partition ourselves.
     # One filter() call, so the multi-valued relation is joined once (a column's __isnull=True on its own
@@ -192,11 +213,57 @@ def dump_annotated_variants(variant_annotation_version: VariantAnnotationVersion
             annotation_filter[f"variantannotation__{target.column}__isnull"] = True
     for column in _validate_annotation_columns(not_null_columns):
         annotation_filter[f"variantannotation__{column}__isnull"] = False
+    if consequence:
+        # consequence is VEP's '&'-joined SO terms
+        annotation_filter["variantannotation__consequence__regex"] = \
+            rf"(^|{VEP_SEPARATOR}){re.escape(consequence)}({VEP_SEPARATOR}|$)"
     qs = qs.filter(**annotation_filter)
 
     # Matched by sequence against the source's file, like the STANDARD dump - an SV stays symbolic
     return write_qs_to_vcf(output_filename, variant_annotation_version.genome_build, qs,
                            structural_variant_min_size=variant_annotation_version.structural_variant_min_size)
+
+
+def _count_vcf_records(vcf_filename: str) -> int:
+    try:
+        with open_handle_gzip(vcf_filename, "rt") as f:
+            return sum(1 for line in f if not line.startswith("#"))
+    except (EOFError, gzip.BadGzipFile) as e:
+        raise BackfillColumnError(f"'{vcf_filename}' is truncated or corrupt: {e}") from e
+
+
+def check_annotated_vcf_complete(dump_vcf_filename: str, annotated_vcf_filename: str) -> int:
+    """ Every dumped record must come back annotated or listed in VEP's --skipped_variants_file: VEP can exit 0
+        having written a short VCF (#1701), and a backfill flagged done over one leaves the rest null for good """
+    dump_count = _count_vcf_records(dump_vcf_filename)
+    annotated_count = _count_vcf_records(annotated_vcf_filename)
+    skipped_count = 0
+    skipped_filename = get_vep_skipped_variants_filename(annotated_vcf_filename)
+    if os.path.exists(skipped_filename):
+        skipped_count = len(parse_skipped_variants_file(skipped_filename))
+    if annotated_count + skipped_count != dump_count:
+        raise BackfillColumnError(f"'{annotated_vcf_filename}' has {annotated_count} records and VEP skipped "
+                                  f"{skipped_count}, but '{dump_vcf_filename}' has {dump_count} - the annotation "
+                                  f"stopped early. Re-run it")
+    return dump_count
+
+
+def validate_backfill_flag(flag: str):
+    """ A VariantAnnotationVersion backfilled_* flag - what readers check to tell an un-backfilled null
+        from a real one """
+    if not flag.startswith(BACKFILL_FLAG_PREFIX):
+        raise BackfillColumnError(f"'{flag}' is not a {BACKFILL_FLAG_PREFIX}* flag")
+    try:
+        field = VariantAnnotationVersion._meta.get_field(flag)
+    except FieldDoesNotExist:
+        raise BackfillColumnError(f"VariantAnnotationVersion has no field '{flag}'") from None
+    if not isinstance(field, BooleanField):
+        raise BackfillColumnError(f"VariantAnnotationVersion.{flag} is not a flag")
+
+
+def mark_backfilled(variant_annotation_version: VariantAnnotationVersion, flag: str):
+    validate_backfill_flag(flag)
+    VariantAnnotationVersion.objects.filter(pk=variant_annotation_version.pk).update(**{flag: True})
 
 
 class _CSQPicker:

@@ -33,6 +33,9 @@ Patterns here:
   ERRORs its unleased incomplete runs: the dispatcher only leases runs on NEW / ACTIVE versions). Runs nothing will
   dispatch - no range lock, or a HISTORICAL version - are cleared by `clean_up_abandoned_annotation_runs`
   (annotation/abandoned_annotation_runs.py:clean_up_abandoned_annotation_runs).
+- Variant pks commit in order (every variant is inserted by the one upload path, `upload/AGENTS.md`), so a new range lock
+  starting above the highest locked pk can't skip a slow-to-commit insert; gaps only come from a deleted lock.
+- Variants left in pk gaps between AnnotationRangeLocks (a deleted lock) are never annotated: `check_annotation_range_lock_gaps` reports them. It probes each gap row by row (`annotation/annotation_versions.py:get_range_lock_gaps_with_variants`), so it is not a deployment check: it skips the gap below the first lock (the first lock starts at the build's lowest unannotated variant) and gives each probe `--probe-timeout` seconds, listing the gaps that exceed it as unchecked.
 - Saving a sub-version creates its partition tables (library/django_utils/django_partition.py:RelatedModelsPartitionModel.save)
   and bumps AnnotationVersion (annotation/models/models_version.py:SubVersionPartition.save → AnnotationVersion.new_sub_version,
   which overwrites the last one if unreferenced); batch creation goes inside SubVersionPartition.defer_new_sub_version.
@@ -42,10 +45,12 @@ Patterns here:
 - Branch on pipeline via annotation/pipelines/__init__.py:PIPELINES (STANDARD, STRUCTURAL_VARIANT, GENE_LEVEL,
   ANNOTSV) and annotation/pipelines/base.py:AnnotationPipelineRunner (dump / annotate / import_results), not on
   pipeline_type. Which variants a type covers is annotation/annotation_pipeline_routing.py:pipeline_type_variant_q
-  (pipeline_type_for_variant for one): a symbolic del/dup/inv under the VariantAnnotationVersion's
-  structural_variant_min_size (pinned from ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, so each version keeps its own) is
-  STANDARD and dumped to VEP as its sequence, anything else symbolic is the SV pipeline, gene-level variants belong to
-  neither VEP pipeline. Branch on the run's pipeline_type, never on variant.is_symbolic.
+  (pipeline_type_for_variant for one): a gene-level variant is GENE_LEVEL before any size rule (it has no size); a
+  symbolic del/dup/inv under the VariantAnnotationVersion's structural_variant_min_size (pinned from
+  ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, so each version keeps its own) is STANDARD and dumped to VEP as its sequence,
+  anything else symbolic is the SV pipeline, an explicit variant whose ref or alt reaches
+  explicit_structural_variant_min_size is the SV pipeline (dumped as its sequence; null on VAVs made before #1708, so
+  they never move one). Branch on the run's pipeline_type, never on variant.is_symbolic.
 - AnnotationRun.status is recomputed from its timestamp/error fields on every save
   (annotation/models/models_annotation_run.py:AnnotationRun.get_status): set dump_start / annotation_end / upload_end, never status.
   Lifecycle: annotation_scheduler makes AnnotationRangeLocks + runs on scheduling_single_worker →
@@ -58,7 +63,11 @@ Patterns here:
   GeneAnnotationRelease (annotation/models/models_version.py:VariantAnnotationVersion.link_gene_annotation_release) →
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
+- Call NCBI E-utilities through `library/entrez.py` (`efetch`, `esearch`, `esummary`, `epost`), keeping Bio only to parse: `Bio.Entrez.efetch` etc.
+  open urllib with no timeout (`Entrez.timeout` is not read), so a stalled NCBI hangs the web worker (#2440).
 - VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id), ahead of a gene-named 'ND4.1' row a pre-cdot import may have left (no genome_builds data), and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.
+- Every VEP value in the inserter is still a string until PostgreSQL parses the COPY CSV, and gnomAD mixes notations
+  ('9.1e-06', '0.25'): picking one of several values (max/min/sort) must convert with float(), or string order wins.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.
@@ -76,6 +85,30 @@ Gotchas:
   get_variant_queryset_for_annotation_version raise DataArchivedError, so check data_archived before assuming rows.
 - annotation_variantannotation partitions are per VAV and huge in production: bulk work goes through COPY / temp
   tables (annotation/backfill_columns.py:import_backfill_vcf, `annotation_backfill_columns`), never per-row ORM updates.
+- Adding a VEP plugin/data file to an existing VAV (backfill instead of a new VAV): the file is a VAV pin
+  (annotation/vep_config.py:vep_component_version_kwargs), so configuring it halts annotation with
+  VEPVersionMismatchError and makes `create_new_variant_annotation_version` mint a full re-annotation until the
+  ACTIVE VAV's new field is stamped to match. Gate the VEPColumnDef on the existing VAV's columns_version and VEP
+  (min_columns_version / min_vep_version, never a columns_version bump), or `annotation_backfill_columns` refuses it.
+  Its `--csq` import reads the PICK'd entry into VariantAnnotation only; VariantTranscriptAnnotation stays null.
+- A backfilled_* flag on the VAV (annotation/models/models_version.py:VariantAnnotationVersion.backfilled_ptc) lets
+  readers tell "not backfilled yet" from a real null: default True, the migration sets False only on VAVs that need
+  the backfill, the command that fills the partition sets it True, and a ManualOperation tests for a False flag.
+  The full recipe (pin stamping, gates, flag, backfill steps and limits) is claude/research/annotation.md
+  "A new column on an existing VariantAnnotationVersion"; UTRAnnotator / AVI / SpliceVault (#2426) is the worked example.
+- The utr_annotator_* and splicevault_* columns of variants annotated before those plugins were switched on are
+  backfilled into VariantAnnotation only, so the variant page shows the representative transcript's values from there
+  (not the transcript rows). A variant not yet backfilled shows nothing, like any other missing value.
+- UTRAnnotator / AVI / SpliceVault and the AlphaGenome splicing custom VCF (#2433) are off in the package defaults. A deployment downloads (and for SpliceVault
+  converts) the files, sets them in its env settings, runs `enable_vep_plugin_backfill` (stamps the pins on the
+  NEW/ACTIVE versions, flags them, prints the backfill; annotation/vep_plugin_backfill.py), restarts annotation_workers,
+  then runs the backfill - setting a file without the command halts the VEP lane on VEPVersionMismatchError.
+- Non-commercial data (annotation/vep_config.py:NON_COMMERCIAL_VEP_CONFIG_KEYS) is cleared from VEPConfig and the pins
+  when ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False, so it never reaches the command line, the pins or the page.
+  Read vep_config through VEPConfig / vep_component_version_kwargs, never genome_build.settings directly.
+- The SpliceVault plugin matches the data file's transcript column against the transcript's stable_id, a versioned NM
+  under --refseq, while Ensembl's file holds unversioned ENST: a RefSeq build configures the copy
+  `splicevault_to_refseq` rewrites to MANE RefSeq (annotation/splicevault.py), which only covers MANE transcripts.
 - annotation/models/models.py:VariantAnnotation.get_variant_annotation_q_list excludes reference (ref == alt) and '.'/'*' alt
   variants; they never get rows, so any "unannotated" count must apply it.
 - annotation/models/models_annotation_run.py:AnnotationRun.get_for_variant matches by range-lock bounds and pipeline_type: a variant

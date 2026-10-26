@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
+from snpdb.enums import ImportStatus, ProcessingStatus, SuperPopulationCode
 from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
 from snpdb.management.commands.somalier_existing_vcfs import batch_by_sample_count
 from snpdb.models import (
@@ -26,8 +27,6 @@ from snpdb.models import (
     CohortGenotype,
     CohortSample,
     GenomeBuild,
-    ImportStatus,
-    ProcessingStatus,
     Sample,
     SomalierAllSamplesRelate,
     SomalierAncestry,
@@ -40,7 +39,6 @@ from snpdb.models import (
     SomalierRelatePairs,
     SomalierSampleExtract,
     SomalierVCFExtract,
-    SuperPopulationCode,
     Zygosity,
 )
 from snpdb.models.models_somalier import get_same_individual_relatedness

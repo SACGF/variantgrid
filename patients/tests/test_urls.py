@@ -16,9 +16,11 @@ from patients.models import (
     PatientRecords,
     Specimen,
 )
-from snpdb.models import ImportSource, Sex
+from snpdb.enums import ImportSource
+from snpdb.models import Sex
 from snpdb.models.models_genome import GenomeBuild
-from upload.models import FileUpload, UploadedFileTypes, UploadedPatientRecords
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadedPatientRecords
 
 
 class Test(URLTestCase):
@@ -39,6 +41,9 @@ class Test(URLTestCase):
 
         emm = ExternalModelManager.objects.get_or_create(name="fake_model_manager", details="blah")[0]
         cls.external_pk = ExternalPK.objects.get_or_create(code="XYZZY", external_type="foo", external_manager=emm)[0]
+        externally_managed_patient = Patient.objects.create(first_name="Ext", last_name="Managed",
+                                                            external_pk=cls.external_pk)
+        assign_permission_to_user_and_groups(cls.user_owner, externally_managed_patient)
 
         dirname = os.path.dirname(__file__)
         filename = os.path.join(dirname, "test_data", "fake_patient_records.csv")
@@ -112,11 +117,12 @@ class Test(URLTestCase):
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
     def testAutocompleteUrls(self):
-        """ Autocompletes w/o permissions """
+        """ An external code is only offered off a record the user can view """
         AUTOCOMPLETE_URLS = [
             ('external_pk_autocomplete', self.external_pk, {"q": self.external_pk.code}),
         ]
-        self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user_non_owner, True)
+        self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user_owner, True)
+        self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
     def testPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_owner)

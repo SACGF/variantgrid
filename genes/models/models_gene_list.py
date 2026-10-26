@@ -13,8 +13,8 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timezone import localtime
-from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
+from model_utils.models import TimeStampedModel
 
 from genes.models.models_gene import Gene, GeneSymbol, GeneSymbolAlias
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease, ReleaseGeneSymbol
@@ -23,8 +23,8 @@ from library.guardian_utils import (
     DjangoPermission,
     assign_permission_to_user_and_groups,
 )
+from snpdb.enums import ImportStatus
 from snpdb.models import Company, Sample, Wiki
-from snpdb.models.models_enums import ImportStatus
 
 
 class GeneListCategory(models.Model):
@@ -269,10 +269,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"
 
     def get_absolute_url(self):
-        url = self.url
-        if url is None:
-            url = reverse('view_gene_list', args=[str(self.id)])
-        return url
+        return reverse('view_gene_list', args=[str(self.id)])
 
     @classmethod
     def get_listing_url(cls):
@@ -351,6 +348,10 @@ class SampleGeneList(TimeStampedModel):
     class Meta:
         unique_together = ('sample', 'gene_list')
         ordering = ['created']
+
+    @staticmethod
+    def filter_for_user(user):
+        return SampleGeneList.objects.filter(sample__in=Sample.filter_for_user(user))
 
     def __str__(self):
         s = f"{self.sample}: {localtime(self.modified)}"

@@ -5,8 +5,8 @@ from django.http import HttpRequest
 from django.urls import reverse
 
 from library.utils import JsonDataType
+from pathtests.enums import CaseState, CaseWorkflowStatus, InvestigationType
 from pathtests.models import Case, PathologyTest, PathologyTestOrder
-from pathtests.models_enums import CaseState, CaseWorkflowStatus, InvestigationType
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 

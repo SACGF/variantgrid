@@ -1,5 +1,4 @@
 import json
-import mimetypes
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -44,6 +43,8 @@ from classification.classification_stats import (
     get_grouped_classification_counts,
 )
 from classification.enums import (
+    ClassificationImportRunStatus,
+    ImportedAlleleInfoStatus,
     LabExternalFilter,
     OverlapStatus,
     OverlapType,
@@ -65,7 +66,6 @@ from classification.models import (
     ConditionResolvedDict,
     DiscordanceReport,
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     Overlap,
     OverlapContribution,
     OverlapContributionNextStep,
@@ -79,7 +79,6 @@ from classification.models.classification_consensus import (
     ConsensusComparison,
     ConsensusGroup,
 )
-from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -99,12 +98,18 @@ from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import HGVSMatcher
 from library.django_utils import get_url_from_view_path, require_superuser
-from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
+from library.django_utils.file_uploads import (
+    filepond_process_response,
+    filepond_upload_receive,
+    serve_attachment,
+)
 from library.django_utils.view_utils import render_ajax_view
 from library.log_utils import log_traceback
 from library.utils import delimited_row
+from library.utils.date_utils import utc_from_timestamp
 from library.utils.file_utils import rm_if_exists
 from snpdb.clingen_allele_api import ClinGenAlleleRegistryAPI
+from snpdb.enums import AlleleOriginBucket
 from snpdb.forms import (
     LabMultiSelectForm,
     LabSelectForm,
@@ -115,7 +120,6 @@ from snpdb.forms import (
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab, Sample, UserSettings, Variant
-from snpdb.models.models_enums import AlleleOriginBucket
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
 from sync.classification_sync_status import classification_sync_status
@@ -126,7 +130,7 @@ from variantopedia.forms import SearchAndClassifyForm
 def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None, discordance_report_id: Optional[int] = None):
 
     if latest_timestamp := request.GET.get('latest_timestamp'):
-        latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
+        latest_timestamp = utc_from_timestamp(float(latest_timestamp))
 
     user: Optional[User] = None
     lab: Optional[Lab] = None
@@ -545,7 +549,9 @@ def view_classification_diff(request):
 
     elif variant_id_str := request.GET.get('variant_compare'):
         ref = ClassificationRef.init_from_str(user=request.user, id_str=variant_id_str)
-        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
+        compare_all = []
+        if allele := ref.record.allele_object:
+            compare_all = ClassificationModification.latest_for_user(user=request.user, allele=allele, published=True)
         # filter out variant we're comparing with, make it last in calculation
         latest_others_for_variant = [vcm for vcm in compare_all if vcm.classification.id != ref.record.id]
         latest_others_for_variant.sort(key=lambda cm: cm.curated_date_check, reverse=True)
@@ -689,6 +695,8 @@ def export_classifications_grid_redcap(request):
 
 @require_POST
 def classification_file_upload(request, classification_id):
+    if not settings.CLASSIFICATION_FILE_ATTACHMENTS:
+        raise PermissionDenied('File attachments are not enabled')
     try:
         classification = get_object_or_404(Classification, pk=classification_id)
         if not classification.can_write(request.user):
@@ -732,7 +740,7 @@ def get_classification_attachment_file_dicts(classification) -> list[dict]:
     return file_dicts
 
 
-def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponse:
+def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponseBase:
     """ Served through a view rather than static files so only users who can view the classification get it """
 
     vc_attachment = get_object_or_404(ClassificationAttachment, pk=pk)
@@ -744,10 +752,7 @@ def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpRes
     else:
         filename = vc_attachment.file.path
 
-    content_type, _ = mimetypes.guess_type(filename)
-    with open(filename, "rb") as f:
-        image_data = f.read()
-    return HttpResponse(image_data, content_type=content_type)
+    return serve_attachment(filename)
 
 
 def view_classification_file_attachment_thumbnail(request, pk):

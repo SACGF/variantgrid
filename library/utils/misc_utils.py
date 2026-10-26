@@ -1,3 +1,4 @@
+import ftplib
 import functools
 import gzip
 import io
@@ -11,7 +12,7 @@ from urllib.parse import urlparse
 
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
-from requests import Session
+from requests import HTTPError, Session
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -128,7 +129,19 @@ _ses = Session()
 _ses.mount("http://", HTTPAdapter(max_retries=_retry))
 _ses.mount("https://", HTTPAdapter(max_retries=_retry))
 
+
+def _is_client_error(e: Exception) -> bool:
+    """ A 4xx (other than 429 Too Many Requests) won't change on retry """
+    if isinstance(e, HTTPError) and e.response is not None:
+        status_code = e.response.status_code
+        return 400 <= status_code < 500 and status_code != 429
+    return False
+
+
 def iter_http_lines(url, timeout=60, attempts=5, backoff=2, encoding="utf-8", session=_ses):
+    """ Streams lines (newline stripped) of a file too big to hold in memory. A dropped connection
+        re-downloads from the start, skipping the lines already yielded """
+    num_yielded = 0
     for n in itertools.count():
         try:
             with session.get(url, stream=True, timeout=timeout) as r:
@@ -139,9 +152,45 @@ def iter_http_lines(url, timeout=60, attempts=5, backoff=2, encoding="utf-8", se
                 elif url.endswith(".gz"):
                     binary = gzip.GzipFile(fileobj=binary)
                 text = io.TextIOWrapper(binary, encoding=encoding)
-                for line in text:
+                for line in itertools.islice(text, num_yielded, None):
                     yield line.rstrip("\n")
+                    num_yielded += 1
             return
+        except Exception as e:
+            if n + 1 >= attempts or _is_client_error(e):
+                raise
+            time.sleep(backoff * 2**n)
+
+
+def retrieve_http_content(url, timeout=60, attempts=5, backoff=2, headers=None, session=_ses) -> bytes:
+    """ Whole body (gunzipped if a .gz url), retried from the start if the connection drops mid-download.
+        For files small enough to hold in memory - Retry on the session only covers connecting, not reading the body """
+    for n in itertools.count():
+        try:
+            r = session.get(url, timeout=timeout, headers=headers)
+            r.raise_for_status()
+            content = r.content
+            if url.endswith(".gz"):
+                content = gzip.decompress(content)
+            return content
+        except Exception as e:
+            if n + 1 >= attempts or _is_client_error(e):
+                raise
+            time.sleep(backoff * 2**n)
+
+
+def retrieve_ftp_content(host, path, attempts=5, backoff=2) -> bytes:
+    """ Whole file (gunzipped if a .gz path) via anonymous FTP, retried from the start on any failure """
+    for n in itertools.count():
+        try:
+            with ftplib.FTP(host) as ftp:
+                ftp.login("anonymous", "anonymous")
+                buffer = io.BytesIO()
+                ftp.retrbinary(f"RETR {path}", buffer.write)
+            content = buffer.getvalue()
+            if path.endswith(".gz"):
+                content = gzip.decompress(content)
+            return content
         except Exception:
             if n + 1 >= attempts:
                 raise

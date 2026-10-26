@@ -3,8 +3,9 @@ import os
 
 from django.core.management.base import BaseCommand, CommandError
 
-from snpdb.models import ProcessingStatus
-from upload.models import UploadedFileTypes, UploadPipeline
+from snpdb.enums import ProcessingStatus
+from upload.enums import UploadedFileTypes
+from upload.models import UploadPipeline
 from upload.uploaded_file_type import retry_upload_pipeline
 
 

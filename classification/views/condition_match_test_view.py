@@ -21,6 +21,7 @@ from genes.models import GeneSymbol
 from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
+from ontology.enums import OntologyTermStatus
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
     OntologyImportSource,
@@ -28,7 +29,6 @@ from ontology.models import (
     OntologyTerm,
     OntologyTermDescendant,
     OntologyTermRelation,
-    OntologyTermStatus,
     OntologyVersion,
 )
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text

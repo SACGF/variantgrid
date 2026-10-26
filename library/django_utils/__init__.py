@@ -18,7 +18,7 @@ from dateutil import parser
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
-from django.db.models import F, JSONField
+from django.db.models import JSONField
 from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
@@ -313,28 +313,6 @@ def qs_highest_pk(qs):
 def highest_pk(model: ModelBase):
     qs = model.objects.all()
     return qs_highest_pk(qs)
-
-
-def bulk_insert_class_data(apps, app_name: str, klass_name_and_data_list: list[tuple[str, list[dict]]]):
-    """ For Django migrations """
-    for klass_name, data in klass_name_and_data_list:
-        klass = apps.get_model(app_name, klass_name)
-        records = []
-        for kwargs in data:
-            records.append(klass(**kwargs))
-        klass.objects.bulk_create(records)
-
-
-def add_new_columns_after(custom_column_qs, new_columns: list[str]):
-    for custom_column in custom_column_qs:
-        ccc = custom_column.custom_columns_collection
-        # Move everything after hpo_terms down
-        after_columns_qs = ccc.customcolumn_set.filter(sort_order__gt=custom_column.sort_order)
-        after_columns_qs.update(sort_order=F("sort_order") + len(new_columns))
-        i = 1
-        for new_column in new_columns:
-            ccc.customcolumn_set.create(column_id=new_column, sort_order=custom_column.sort_order + i)
-            i += 1
 
 
 def chunked_queryset(queryset, chunk_size):

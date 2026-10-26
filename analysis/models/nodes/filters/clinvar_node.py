@@ -6,12 +6,12 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
 
-from analysis.models.enums import NodeMatchInput
+from analysis.enums import NodeMatchInput
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
 from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
 from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
-from snpdb.models.models_enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
+from snpdb.enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
 
 NO_CLINVAR_CALL = 0
 """ ClinVar.highest_pathogenicity for a record ClinVar hasn't given a germline classification on """

@@ -18,9 +18,9 @@ from classification.models import (
 from classification.models.abstract_utils import ConsolidatingMerger
 from classification.models.clinvar_key_models import ClinVarKey
 from library.utils import pretty_collection
+from snpdb.enums import AlleleOriginBucket
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
-from snpdb.models.models_enums import AlleleOriginBucket
 
 """
 This code creates or updates ClinVarExports with the latest data.

@@ -41,9 +41,7 @@ OMIM->gene `mim2gene` edges, deleting any relations from the legacy `OMIM_ALL_FR
 layouts, seven columns behind a `#Format:` comment (`source` column, `mim2gene` rows kept) and five columns with a header
 row (`disease_id`, OMIM rows kept); the loader tells them apart by the first line and raises if the frame comes out
 empty, because a zero-relation import leaves every HPO term without genes (#1862).
-`ontology/management/commands/backfill_phenotype_to_genes.py` repairs a deployment whose import has no relations, in place: it loads the file
-into the import the latest `OntologyVersion` already points at (`OntologyBuilder(existing_import=...)`), so no new
-version or gene annotation build follows. `load_omim`
+`load_omim`
 reads mimTitles.txt as the primary source for OMIM names and aliases and marks gene and removed entries
 `NON_CONDITION`; deployments without an OMIM licence use `load_biomart` instead, which fills the same terms from
 Ensembl BioMart's morbid descriptions. `sync_hgnc` mirrors the genes app's HGNC table into HGNC terms (previous

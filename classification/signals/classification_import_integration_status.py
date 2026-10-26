@@ -4,10 +4,8 @@ from django.conf import settings
 from django.dispatch import receiver
 from django.urls import reverse
 
-from classification.models.classification_import_run import (
-    ClassificationImportRun,
-    ClassificationImportRunStatus,
-)
+from classification.enums import ClassificationImportRunStatus
+from classification.models.classification_import_run import ClassificationImportRun
 from library.integration_status import (
     IntegrationDetail,
     IntegrationStatus,

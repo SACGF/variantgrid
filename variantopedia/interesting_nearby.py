@@ -16,8 +16,8 @@ from annotation.models import (
 from classification.models import Classification
 from genes.models import GeneSymbol
 from library.django_utils import get_field_counts
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import GenomeBuild, Variant, VariantZygosityCountCollection
-from snpdb.models.models_enums import ClinicalSignificance
 
 
 def get_method_summaries(variant, annotation_version, distance=None):

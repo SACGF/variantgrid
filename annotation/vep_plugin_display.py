@@ -1,7 +1,7 @@
 """
 Display parsing for VEP plugin columns stored on VariantAnnotation: ProtVar (protvar_int / protvar_pocket), MaveDB
-and Mastermind links, denovo-db records and gnomAD-SV overlaps. Plugins '&'-join one value per record, so these
-split them back into records (vep_multi_fields_to_list_of_dicts, which the VEP inserter also uses on import).
+and Mastermind links, denovo-db records, UTRAnnotator uORF effects and gnomAD-SV overlaps. Plugins '&'-join one
+value per record, so these split them back into records (vep_multi_fields_to_list_of_dicts, which the VEP inserter also uses on import).
 Functions take a VariantAnnotation or the raw values; VariantAnnotation keeps same-named properties for templates.
 Open Targets is annotation/open_targets.py.
 """
@@ -162,6 +162,30 @@ def vep_multi_fields_to_list_of_dicts(data: dict, fields: Iterable[str]) -> list
                 values_dict[field] = v[i]
         records.append(values_dict)
     return records
+
+
+# UTRAnnotator writes each record's pairs from a Perl hash, so in a different order every time
+_UTR_ANNOTATOR_KEY_ORDER = ["type", "ref_type", "alt_type", "KozakContext", "KozakStrength", "DistanceToCDS",
+                            "ref_StartDistanceToCDS", "CapDistanceToStart", "DistanceToStop", "ref_type_length",
+                            "alt_type_length", "FrameWithCDS", "AltStop", "AltStopDistanceToCDS", "Evidence"]
+
+
+def _utr_annotator_key_sort(key: str) -> tuple[int, str]:
+    try:
+        return _UTR_ANNOTATOR_KEY_ORDER.index(key), key
+    except ValueError:
+        return len(_UTR_ANNOTATOR_KEY_ORDER), key
+
+
+def utr_annotator_effects(utr_annotator_annotation: Optional[str]) -> list[dict[str, str]]:
+    """ UTRAnnotator's 5UTR_annotation: one record per uORF effect, comma separated (which VEP's VCF
+        output turns into '&'), each record 'key=value' pairs joined by ':', keys put in one order so the
+        records read alike """
+    effects = []
+    for record in (utr_annotator_annotation or "").split("&"):
+        if pairs := [p.partition("=") for p in record.split(":") if p]:
+            effects.append({key: value for key, _, value in sorted(pairs, key=lambda p: _utr_annotator_key_sort(p[0]))})
+    return effects
 
 
 def get_gnomad_url(gnomad_variant: str, dataset: str) -> str:

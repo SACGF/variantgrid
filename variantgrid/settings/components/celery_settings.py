@@ -70,7 +70,6 @@ CELERY_TASK_ROUTES = {
     # analysis pool (not the default db_workers) so cache building scales with the rest of the
     # pipeline rather than starving on db_workers and triggering lease-expiry re-dispatch churn.
     "analysis.models.nodes.filters.venn_node.venn_cache_count": ANALYSIS_WORKERS,
-    "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
     # Annotation
@@ -169,7 +168,6 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_reclassification_tasks',
     'classification.tasks.condition_text_automatch_task',
     'classification.tasks.resolved_variant_info_p_hgvs_task',
-    'classification.tasks.transcript_genome_ref_differ_backfill_task',
     'classification.views.classification_email_view',
     'genes.tasks.gene_coverage_tasks',
     'patients.tasks.extraction_matching_tasks',

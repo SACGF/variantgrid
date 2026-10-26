@@ -12,6 +12,7 @@ class MitochondrialTranscriptLinkTest(SimpleTestCase):
             "NM_001754": {4: 101},
             "fake-rna-ND4": {1: 202},
         }
+        self.inserter._missing_transcript_ids = set()
 
     def test_mitochondrial_feature_links_to_cdot_fake(self):
         self.assertEqual(("fake-rna-ND4", 202),

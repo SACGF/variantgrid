@@ -2,7 +2,7 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL
 
-from analysis.models.enums import QuadInheritance
+from analysis.enums import QuadInheritance
 from analysis.models.nodes.family_inheritance import (
     FATHER,
     MOTHER,
@@ -24,7 +24,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import Quad
 
 

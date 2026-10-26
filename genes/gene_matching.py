@@ -76,11 +76,8 @@ class GeneSymbolMatcher:
 
         resolutions = self.resolve_names(valid_names)
         gene_list_gene_symbols = []
-        ambiguous_aliases = []
         for original_name in valid_names:
-            resolution, ambiguous = resolutions[original_name]
-            if ambiguous:
-                ambiguous_aliases.append(str(ambiguous))
+            resolution, _ambiguous = resolutions[original_name]
             gene_list_gene_symbols.append(GeneListGeneSymbol(gene_list=gene_list,
                                                              original_name=original_name,
                                                              gene_symbol_id=resolution.gene_symbol_id,
@@ -91,7 +88,7 @@ class GeneSymbolMatcher:
             GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols, ignore_conflicts=True)
             if all_oversized:
                 append_gene_list_warning(gene_list, format_oversized_warning(all_oversized))
-            for ambiguous_alias in sorted(set(ambiguous_aliases)):
+            for ambiguous_alias in self.ambiguous_alias_warnings(valid_names):
                 append_gene_list_warning(gene_list, ambiguous_alias)
             gene_list.set_modified_to_now()
             # Only the symbols this list added can be unmatched - rematching every HGNC and gene list
@@ -109,16 +106,21 @@ class GeneSymbolMatcher:
         names = tokens.valid
 
         kept_names = set()
+        kept_unmatched = set()
         removed = {}
         for glgs in gene_list.genelistgenesymbol_set.all():
             row_names = {n.upper() for n in (glgs.original_name, glgs.gene_symbol_id) if n}
             if row_names & names:
                 kept_names.update(row_names)
+                if not glgs.gene_symbol_id:
+                    kept_unmatched.add(glgs.original_name)
             else:
                 removed[glgs.pk] = glgs.original_name or glgs.gene_symbol_id
 
         added = sorted(names - kept_names)
         with transaction.atomic():
+            # The warnings describe the text as it stands: rebuilt here so one about a name since removed goes
+            clear_gene_list_warnings(gene_list)
             if removed:
                 gene_list.genelistgenesymbol_set.filter(pk__in=removed).delete()
             if added or tokens.oversized:
@@ -126,7 +128,13 @@ class GeneSymbolMatcher:
                                                    oversized_skipped=tokens.oversized)
             elif removed:
                 gene_list.set_modified_to_now()
+            for ambiguous_alias in self.ambiguous_alias_warnings(kept_unmatched):
+                append_gene_list_warning(gene_list, ambiguous_alias)
         return added, sorted(removed.values())
+
+    def ambiguous_alias_warnings(self, names: Iterable[str]) -> list[str]:
+        """ One message per name that is an alias of several symbols, sorted """
+        return sorted({str(ambiguous) for _resolution, ambiguous in self.resolve_names(names).values() if ambiguous})
 
 
 class ReleaseGeneMatcher:
@@ -290,6 +298,11 @@ def format_oversized_warning(oversized: list[str]) -> str:
     return (f"Skipped {n} oversized {plural} (gene symbols must be ≤ {MAX_GENE_SYMBOL_LENGTH} chars). "
             f"First example: '{preview}...' ({len(example)} chars). "
             f"Check the input is a plain gene list.")
+
+
+def clear_gene_list_warnings(gene_list):
+    gene_list.error_message = None
+    type(gene_list).objects.filter(pk=gene_list.pk).update(error_message=None)
 
 
 def append_gene_list_warning(gene_list, warning: str):

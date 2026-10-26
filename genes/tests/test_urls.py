@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from annotation.fake_data import get_fake_annotation_version
+from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_transcript_version
 from genes.models import (
     CanonicalTranscript,
@@ -19,11 +20,11 @@ from genes.models import (
     PanelAppPanel,
     PanelAppServer,
 )
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
-from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm
+from snpdb.enums import DataState, ImportStatus
 from snpdb.fake_data import create_fake_trio
-from snpdb.models import DataState, ImportStatus
 from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
 
@@ -230,7 +231,6 @@ class Test(URLTestCase):
 
 # TODO: Still to test
 # commented out PRIVATE_GRID_LIST_URLS
-# ('gene_lists/create_custom', views.create_custom_gene_list, name='create_custom_gene_list'),
 # ('view_canonical_transcript_collection/<pk>', views.view_canonical_transcript_collection, name='view_canonical_transcript_collection'),
 # ('qc_coverage/<genome_build_name>', views.qc_coverage, name='genome_build_qc_coverage'),
 # ('gene_coverage_collection_graphs/<genome_build_name>/<slug:gene_id>', views.gene_coverage_collection_graphs, name='gene_coverage_collection_graphs'),

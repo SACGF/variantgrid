@@ -16,7 +16,7 @@ from django.db import models
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
@@ -24,13 +24,13 @@ from annotation.models.models_version import SubVersionPartition
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from library.django_utils.data_archive_mixin import DataArchiveMixin
 from library.utils import first
+from snpdb.enums import AlleleOriginBucket, SomaticClinicalSignificance
 from snpdb.models import (
     Allele,
     GenomeBuild,
     Variant,
 )
 from snpdb.models.models_cached_web_resource import CachedWebResource
-from snpdb.models.models_enums import AlleleOriginBucket, SomaticClinicalSignificance
 
 
 class ClinVarVersion(DataArchiveMixin, SubVersionPartition):

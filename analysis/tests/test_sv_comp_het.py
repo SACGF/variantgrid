@@ -7,8 +7,8 @@ from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase, override_settings
 
+from analysis.enums import DuoInheritance, NodeStatus, QuadInheritance, TrioInheritance
 from analysis.models import Analysis, DuoNode, QuadNode, SampleNode, TrioNode
-from analysis.models.enums import DuoInheritance, NodeStatus, QuadInheritance, TrioInheritance
 from analysis.models.nodes.sources.duo_node import DuoCompHet
 from analysis.models.nodes.sources.quad_node import QuadCompHet
 from analysis.models.nodes.sources.trio_node import CompHet
@@ -16,12 +16,12 @@ from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun, VariantGeneOverlap
 from annotation.models.models import VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
+from genes.enums import AnnotationConsortium
 from genes.fake_data import (
     create_fake_gene_version,
     create_fake_transcript_version,
     insert_transcript_data,
 )
-from genes.models_enums import AnnotationConsortium
 from library.utils import sha256sum_str
 from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant

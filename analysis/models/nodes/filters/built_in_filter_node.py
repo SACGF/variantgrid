@@ -8,7 +8,7 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_counts import get_extra_filters_q
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import ClinVarReviewStatus
-from snpdb.models.models_enums import BuiltInFilters
+from snpdb.enums import BuiltInFilters
 
 
 class BuiltInFilterNode(AnalysisNode):
