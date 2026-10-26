@@ -173,6 +173,11 @@ stays identical: migrations never freeze the names of the code they import.
 A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
 (`manual/operations/manual_operations.py`, example the `ManualOperation.operation_manage` calls in
 `snpdb/migrations/0002_seed_data.py`).
+A one-off fix or backfill - something run once on existing data - is deleted at the next migration checkpoint
+(`manual/__manual_readme.md#one-off-commands`), so make that obvious: name it `one_off_<what_it_fixes>`, declare
+`category = "one-off"`, and keep all its code (queries, recounts, helpers) in the command file and its test, so
+removing it leaves core code unchanged. Calling existing core functions is fine. A core change the fix needs, such
+as a new parameter, belongs in the PR only if the code would keep it once the command is gone.
 
 ### Celery
 A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks. Route
