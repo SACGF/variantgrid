@@ -9,7 +9,7 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
@@ -148,12 +148,18 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="protvar", label="ProtVar", orderable=True, detail=True),
             RichColumn(key="eve", label="EVE", orderable=True, detail=True),
             RichColumn(key="promoter_ai", label="PromoterAI", orderable=True, detail=True),
+            RichColumn(key="utr_annotator", label="UTRAnnotator", orderable=True, detail=True),
+            RichColumn(key="splicevault", label="SpliceVault", orderable=True, detail=True),
+            RichColumn(key="avi", label="AVI", orderable=True, detail=True),
+            RichColumn(key="alphagenome_splicing", label="AlphaGenome splicing", orderable=True, detail=True),
             RichColumn(key="fasta", orderable=True, detail=True),
             RichColumn(key="transcript_blocklist", orderable=True, detail=True),
             RichColumn(key="pick_order", orderable=True, detail=True),
             RichColumn(key="sift_enabled", label="SIFT Enabled", orderable=True, detail=True),
             RichColumn(key="sv_max_size", label="SV Max Size", orderable=True, detail=True),
             RichColumn(key="structural_variant_min_size", label="SV Pipeline Min Size", orderable=True, detail=True),
+            RichColumn(key="explicit_structural_variant_min_size", label="SV Pipeline Min Size (Explicit)",
+                       orderable=True, detail=True),
             RichColumn(key="sv_overlap_min_fraction", label="SV Overlap Min Fraction",
                        orderable=True, detail=True),
             RichColumn(key="vep_args", label="VEP Args", orderable=True, detail=True),

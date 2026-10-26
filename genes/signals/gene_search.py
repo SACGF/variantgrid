@@ -1,7 +1,7 @@
 import re
 
+from genes.enums import AnnotationConsortium
 from genes.models import Gene
-from genes.models_enums import AnnotationConsortium
 from snpdb.search import SearchExample, SearchInputInstance, search_receiver
 
 GENE_PATTERN = re.compile(r"^(?P<prefix>ENSG|GENE\s*(?:ID)?\s*:\s*)(?P<id>\d+)$", re.IGNORECASE)

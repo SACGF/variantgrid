@@ -21,6 +21,7 @@ urlpatterns = [
     path('pathogenicity_thresholds', views.view_pathogenicity_thresholds, name='pathogenicity_thresholds'),
     path('view_annotation_version_details/<int:annotation_version_id>', views.view_annotation_version_details, name='view_annotation_version_details'),
     path('load_cached_web_resource/<pk>', views.load_cached_web_resource, name='load_cached_web_resource'),
+    path('view_cached_web_resource/<pk>', views.view_cached_web_resource, name='view_cached_web_resource'),
 
     path('annotation_version/datatable/<path:genome_build_name>/', DatabaseTableView.as_view(column_class=VariantAnnotationVersionColumns), name='variant_annotation_version_datatable'),
 

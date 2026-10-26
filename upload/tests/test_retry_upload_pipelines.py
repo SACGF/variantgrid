@@ -7,8 +7,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from snpdb.models.models_enums import ImportSource, ProcessingStatus
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline, UploadStep
+from snpdb.enums import ImportSource, ProcessingStatus
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadPipeline, UploadStep
 from upload.tasks.retry_upload_pipelines_task import (
     RETRY_STAGGER_SECONDS,
     WORKER_LOST_MESSAGE,

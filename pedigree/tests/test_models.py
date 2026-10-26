@@ -4,7 +4,7 @@ Tests for pedigree.models — validate(), PedFileRecord.affected, create_automat
 import django.test
 from django.contrib.auth.models import User
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 from pedigree.models import (
     CohortSamplePedFileRecord,
     PedFile,
@@ -14,8 +14,8 @@ from pedigree.models import (
     create_automatch_pedigree,
     validate,
 )
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 
 

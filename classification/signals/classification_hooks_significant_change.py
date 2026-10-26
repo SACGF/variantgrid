@@ -27,7 +27,7 @@ from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
 from library.log_utils import NotificationBuilder
 from library.utils import get_timer
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 
 @receiver(classification_post_publish_signal, sender=Classification)

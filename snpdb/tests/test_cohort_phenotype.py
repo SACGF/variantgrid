@@ -13,8 +13,9 @@ from ontology.tests.test_data_ontology import (
     create_test_ontology_version,
 )
 from patients.phenotype_matcher import PhenotypeMatcher
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import Cohort, GenomeBuild, ImportStatus
+from snpdb.models import Cohort, GenomeBuild
 
 RAISED_TSH = "Raised TSH"
 RAISED_TSH_HPO = "HP:0002925"

@@ -15,7 +15,8 @@ python3 manage.py test --keepdb snpdb.tests.test_variant.VariantTest.test_x # on
 python3 manage.py vg tests --changed                                        # only the modules a change puts at risk
 ```
 
-- `--keepdb` skips re-running hundreds of migrations; always use it. Drop it only when a migration you wrote changes.
+- `--keepdb` skips re-running the migrations; always use it. Drop it only when a migration you wrote changes. A kept DB
+  holding migrations that aren't on disk (another branch's) is recreated automatically.
 - `vg tests --changed` maps changed files to test labels through the
   first-party import graph and prints `manage.py test` args: a changed module selects every test module that
   transitively imports it, templates / JS / `urls.py` select the app's `tests.test_urls`, a migration selects the
@@ -39,6 +40,15 @@ python3 manage.py vg tests --changed                                        # on
 - Every app package needs an `__init__.py`: `manage.py test <app>.tests` fails at discovery with
   `expected str ... not NoneType` when the app is an implicit namespace package.
 - `TEST_RUNNER` is `variantgrid/test_runner.py:VariantGridTestRunner` (see External services below).
+- Concurrent suites on one box (several worktrees or agents) each need their own test database, or they fight
+  over `test_snpdb` and its clones. Give each run a gitignored module `variantgrid/settings/env_developers/<name>.py`
+  holding `from variantgrid.settings.env.vgtest2 import *` (the box's settings file) and
+  `DATABASES['default'].setdefault('TEST', {})['NAME'] = 'test_<name>'` (a box's settings may have no `TEST` key), and run with
+  `DJANGO_SETTINGS_MODULE=variantgrid.settings.env_developers.<name>`. The module has to live under
+  `variantgrid.settings`: `variantgrid/__init__.py` imports celery, which reads settings while the settings module
+  is still importing, so a module anywhere else fails with a missing attribute. Drop the `test_<name>*`
+  databases afterwards. A fresh worktree also needs `manage.py collectstatic_js_reverse` before its first run
+  (the suite fails without the generated `reverse.js`).
 
 ## Fixture builders
 
@@ -95,7 +105,7 @@ one implementation. `snpdb/tests/test_create_fake_data.py` runs `create_fake_dat
 - By hand: `analysis = Analysis(genome_build=grch37); analysis.set_defaults_and_save(user)` (needs an `AnnotationVersion` for the build). Nodes are plain creates, `SampleNode.objects.create(analysis=analysis, sample=sample)`, `TrioNode.objects.create(analysis=..., trio=..., inheritance=...)`; chain with `child.add_parent(parent)` then `child.save()` (see `_create_child_node` in `analysis/tests/test_models.py`).
 - `analysis/tests/inheritance_node_mixin.py:InheritanceNodeTestsMixin` → shared inheritance-mode assertions for `TrioNode` / `QuadNode`; subclass sets `INHERITANCE`, `NODE_CLASS`, `REQUIRE_PARENT_ZYGOSITY`, `SHARED_ZYGOSITIES` and calls `cls.create_shared_variants(cgc)`. `DuoNode` has its own `analysis/tests/test_duo_node.py` - one parent means a different mode set and a `parent`-keyed zygosity table.
 - Tags: `Tag.objects.get_or_create(pk="artefact")[0]` then `VariantTag.objects.create(genome_build=, analysis=, variant=, tag=, user=)` (`analysis/tests/test_variant_tags.py`). `analysis/fake_data/variant_tags.py:FakeVariantTags` is the `create_fake_data tags` step for dev boxes.
-- `snpdb/tests/utils/tag_testing_utils.py:create_classify_queue_tag(tag_id="ToDo", bucket=AlleleOriginBucket.UNKNOWN)` → a live `Tag` with `requires_classification` set, for anything about the classify queue: the to-do lists, the "New Classification" buttons, tag resolution. The default bucket is "Both"; pass `AlleleOriginBucket.SOMATIC` for the somatic path. Name the tag for the property under test rather than reaching for the seeded `settings.TAG_REQUIRES_CLASSIFICATION` name.
+- `snpdb/tests/utils/tag_testing_utils.py:create_classify_queue_tag(tag_id="ToDo", bucket=AlleleOriginBucket.UNKNOWN)` → a live `Tag` with `requires_classification` set, for anything about the classify queue: the to-do lists, the "New Classification" buttons, tag resolution. The default bucket is "Both"; pass `AlleleOriginBucket.SOMATIC` for the somatic path. Name the tag for the property under test rather than reaching for the seeded `RequiresClassification` tag.
 
 ### Mocks and recorded data
 - `snpdb/tests/utils/mock_clingen_api.py:MockClinGenAlleleRegistryAPI` / `MockServerErrorClinGenAlleleRegistryAPI` (always 502); `genes/tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher`; `classification/tests/utils/data_utils.py:ConditionMock` (its `setUp` is flagged FIXME - build ontology data with `create_ontology_test_data` instead); `mme/tests/fakes.py` `Fake*` dataclasses for MME profiles without the DB.

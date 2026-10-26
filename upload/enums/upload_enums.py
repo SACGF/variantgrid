@@ -1,0 +1,73 @@
+"""
+Enums for the upload pipeline: UploadedFileTypes (which importer handles a FileUpload), UploadStepTaskType
+and UploadStepOrigin (how an UploadStep runs and who added it), VCFPipelineStage (the stage a step waits for),
+VCFImportInfoSeverity, and ModifiedImportedVariantOperation (why an imported VCF record changed on the way in).
+Stored codes: add values, never change one.
+"""
+from django.db import models
+
+
+class UploadedFileTypes(models.TextChoices):
+    ANALYSIS = 'N', 'Analysis'
+    BED = 'B', 'BED'
+    CLINVAR = 'L', 'Clinvar'
+    DRAGEN_TSO500_ALL_FUSIONS = 'F', 'DRAGEN TSO500 AllFusions'
+    # The pair-level summary written beside the two arm directories - the pair's patient chain and
+    # measures, @see upload.tasks.import_dragen_tso500_combined_variant_output_task
+    DRAGEN_TSO500_COMBINED_VARIANT_OUTPUT = 'C', 'DRAGEN TSO500 Combined Variant Output'
+    # Per-library QC beside the CombinedVariantOutput - one row per library per category
+    # (@see upload.tasks.import_dragen_tso500_metrics_output_task)
+    DRAGEN_TSO500_METRICS_OUTPUT = 'Q', 'DRAGEN TSO500 Metrics Output'
+    GENE_LIST = 'G', 'Gene List'
+    GENE_COVERAGE = 'O', 'Gene Coverage'
+    LIFTOVER = 'I', 'Liftover'
+    MANUAL_VARIANT_ENTRY = 'M', 'Manual Variant Entry'
+    PED = 'P', 'Pedigree'
+    PATIENT_RECORDS = 'R', 'Patient Records'
+    VARIANT_CLASSIFICATIONS = 'S', 'Variant Classifications'
+    VARIANT_TAGS = "A", "Variant Tags"
+    VCF = 'V', 'VCF'
+    VCF_INSERT_VARIANTS_ONLY = 'Y', 'VCF - Insert variants only (no samples etc)'
+    # Gene-level variants skip the bcftools stages, which all need a reference base they have no
+    # coordinate for - @see snpdb.gene_level_variants
+    GENE_LEVEL_INSERT_VARIANTS_ONLY = 'y', 'VCF - Insert gene-level variants only'
+    # A CNV caller's VCF of whole-gene calls - the records name a gene, not a coordinate
+    GENE_LEVEL_CNV_VCF = 'c', 'VCF - Gene-level copy number'
+    # SpliceGirl's splice calls, written as <DEL>s - @see upload.tasks.import_splicegirl_vcf_task
+    GENE_LEVEL_SPLICE_VCF = 's', 'VCF - Gene-level splice'
+    # Need to separate these as Variant needs to be imported using VCF (for normalization etc)
+    WIKI_GENE = "w", "Gene Wiki records"
+    WIKI_VARIANT = "W", "Variant Wiki records"
+
+
+class UploadStepTaskType(models.TextChoices):
+    CELERY = 'C', 'Celery'
+    SQL = 'Q', 'SQL'
+    TOOL = 'T', 'Tool'
+
+
+class VCFPipelineStage(models.TextChoices):
+    """ Some jobs can only run when we've moved to a certain stage of the pipeline """
+
+    # pre data insertion used to be 'Insert Unknown Variants' - just change label so we don't need to migrate all the tables
+    PRE_DATA_INSERTION = 'U', 'Pre-Data Insertion'
+    DATA_INSERTION = 'D', 'Data Insertion'
+    ANNOTATION_COMPLETE = 'A', 'Annotation Complete'
+    FINISH = 'F', 'Finish'
+
+
+class VCFImportInfoSeverity(models.TextChoices):
+    WARNING = 'W', 'WARNING'
+    ERROR = 'E', 'ERROR'
+
+
+class UploadStepOrigin(models.TextChoices):
+    USER_ADDITION = 'A', "User Addition"
+    IMPORT_TASK_FACTORY = 'I', "Import Task Factory"
+
+
+class ModifiedImportedVariantOperation(models.TextChoices):
+    NORMALIZATION = 'N', "Normalisation"
+    RMDUP = 'R', "Removed Duplicate"
+    SHARED_LOCUS = 'L', "Shared Locus - allele depths summed"
+    MERGED_RECORDS = 'M', "Merged Records - multiple VCF records became one variant"

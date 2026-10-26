@@ -167,7 +167,7 @@ class Command(BaseCommand):
             if class_change := data_fixer.fix_classification_data("classification", classification.evidence):
                 changes.append(class_change)
                 if apply_remaining:
-                    classification.save(update_fields=["evidence"])
+                    Classification.objects.filter(pk=classification.pk).update(evidence=classification.evidence)
 
             for cm in classification.classificationmodification_set.order_by('created').all():
                 modifying_mod = False

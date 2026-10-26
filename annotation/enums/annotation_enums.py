@@ -116,6 +116,7 @@ class ColumnAnnotationCategory(models.TextChoices):
 
 
 class VEPPlugin(models.TextChoices):
+    AVI = 'i', 'AVI'
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
     EVE = 'E', 'EVE'
@@ -130,9 +131,12 @@ class VEPPlugin(models.TextChoices):
     PROTVAR = 'p', 'ProtVar'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
+    SPLICEVAULT = 't', 'SpliceVault'
+    UTR_ANNOTATOR = 'u', 'UTRAnnotator'
 
 
 class VEPCustom(models.TextChoices):
+    ALPHAGENOME_SPLICING = 'a', 'AlphaGenome_splicing'
     GNOMAD_2 = 'g', 'gnomAD2'
     GNOMAD_3 = 'n', 'gnomAD3'
     GNOMAD_4 = 'o', 'gnomAD4'

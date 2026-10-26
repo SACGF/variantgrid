@@ -11,6 +11,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import TextField
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 
+from genes.enums import GeneCopyNumberEventKind
 from genes.models.models_gene import HGNC, Gene, GeneSymbol
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 
@@ -88,40 +89,6 @@ class GeneLevelId(models.Model):
             if gene_level_id := GeneLevelId.objects.filter(symbol_str=symbol_str).first():
                 return gene_level_id
         raise IntegrityError(f"Could not allocate a GeneLevelId id for '{symbol_str}'")
-
-
-class GeneCopyNumberEventKind(models.TextChoices):
-    """ Which way a whole-gene copy number call went. GAIN rather than amplification because the
-        threshold that makes a gain an amplification is the lab's, not ours - identity never encodes
-        one, and the copy ratio stays per-sample on CohortGenotype. """
-
-    GAIN = "G", "Gain"
-    LOSS = "L", "Loss"
-
-    @property
-    def alt_kind(self) -> str:
-        """ The GeneLevelSymbolicAlt this kind's Variant alt is written with """
-        return GENE_COPY_NUMBER_ALT_KINDS[self]
-
-    @property
-    def canonical_word(self) -> str:
-        """ 'amplification' is what the reports say; 'gain' is what we store """
-        return GENE_COPY_NUMBER_CANONICAL_WORDS[self]
-
-    @staticmethod
-    def from_alt_kind(alt_kind: str) -> Optional['GeneCopyNumberEventKind']:
-        return GENE_COPY_NUMBER_KINDS_BY_ALT.get(alt_kind)
-
-
-GENE_COPY_NUMBER_ALT_KINDS = {
-    GeneCopyNumberEventKind.GAIN: GeneLevelSymbolicAlt.GAIN,
-    GeneCopyNumberEventKind.LOSS: GeneLevelSymbolicAlt.LOSS,
-}
-GENE_COPY_NUMBER_KINDS_BY_ALT = {alt_kind: kind for kind, alt_kind in GENE_COPY_NUMBER_ALT_KINDS.items()}
-GENE_COPY_NUMBER_CANONICAL_WORDS = {
-    GeneCopyNumberEventKind.GAIN: "amplification",
-    GeneCopyNumberEventKind.LOSS: "loss",
-}
 
 
 def gene_copy_number_canonical_str(gene: GeneLevelId, kind: str) -> str:

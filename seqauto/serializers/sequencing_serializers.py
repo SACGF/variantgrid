@@ -12,6 +12,7 @@ from library.django_utils.change_tracking import (
 from patients.external_references import resolve_reference
 from patients.models import Extraction
 from patients.serializers import ExternalReferenceField
+from seqauto.enums import PairedEnd
 from seqauto.models import (
     Aligner,
     AlignmentFile,
@@ -19,7 +20,6 @@ from seqauto.models import (
     Fastq,
     Flagstats,
     JointCalledVCF,
-    PairedEnd,
     SampleSheet,
     Sequencer,
     SequencerModel,
@@ -34,8 +34,8 @@ from seqauto.models import (
 from seqauto.sequencing_files.sample_sheet import current_sample_sheet_data_changed
 from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from seqauto.signals.signals_list import sequencing_run_created_signal
+from snpdb.enums import SampleFileType
 from snpdb.models import Manufacturer
-from snpdb.models.models_enums import SampleFileType
 
 
 class ManufacturerSerializer(serializers.ModelSerializer):

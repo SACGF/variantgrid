@@ -18,9 +18,3 @@ def _read(filename: str) -> str:
 
 def generic_case_template() -> str:
     return _read(GENERIC_CASE_TEMPLATE_FILENAME)
-
-
-def generic_json_template() -> str:
-    """ Nothing has a json_template any more (@see report/renderers.py:render_json) - this survives
-        only because the pushed migration 0179_default_case_report_template imports it """
-    return ""

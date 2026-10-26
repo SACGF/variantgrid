@@ -1,15 +1,15 @@
 function getEvidenceHover(geneSymbol, evidence, confidence) {
     const container = $("<div />");
-    const geneTitle = $("<h3>" + geneSymbol + "</h3>").addClass(confidence);
+    const geneTitle = $("<h3 />").text(geneSymbol).addClass(confidence);
     container.append(geneTitle);
     const modeOfInheritance = evidence["mode_of_inheritance"];
     if (modeOfInheritance) {
-        const mohDiv = $("<div />").append("<b>Mode of inheritance</b> " + modeOfInheritance);
+        const mohDiv = $("<div />").append("<b>Mode of inheritance</b> ").append(document.createTextNode(modeOfInheritance));
         container.append(mohDiv);
     }
     const penetrance = evidence["penetrance"];
     if (penetrance) {
-        const penetranceDiv = $("<div />").append("<b>Penetrance</b> " + penetrance);
+        const penetranceDiv = $("<div />").append("<b>Penetrance</b> ").append(document.createTextNode(penetrance));
         container.append(penetranceDiv);
     }
 

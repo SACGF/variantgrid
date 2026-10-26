@@ -5,7 +5,12 @@ from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
-from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums import (
+    ClassificationGroupingPathogenicDifference,
+    ShareLevel,
+    SpecialEKeys,
+    SubmissionSource,
+)
 from classification.models import (
     AlleleOriginGrouping,
     Classification,
@@ -13,11 +18,10 @@ from classification.models import (
     ClassificationGroupingEntry,
     ClassificationModification,
 )
-from classification.models.classification_grouping import ClassificationGroupingPathogenicDifference
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.utils import strip_json
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 class ClassificationGroupingCountsTestCase(TestCase):

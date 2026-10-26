@@ -12,15 +12,16 @@ from eventlog.models import create_event
 from library.log_utils import log_traceback
 from library.utils import full_class_name
 from seqauto.signals.signals_list import backend_vcf_import_success_signal
+from snpdb.enums import ImportStatus, VariantOrigin
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
-from snpdb.models.models_enums import ImportStatus, VariantOrigin
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from snpdb.tasks.somalier_tasks import somalier_vcf_id
 from snpdb.variant_zygosity_count import (
     create_variant_zygosity_counts,
     update_all_variant_zygosity_counts_for_vcf,
 )
+from upload.enums import UploadStepTaskType, VCFPipelineStage
 from upload.models import (
     ModifiedImportedVariants,
     SimpleVCFImportInfo,
@@ -29,8 +30,6 @@ from upload.models import (
     UploadedVCFPendingAnnotation,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.signals.signals import vcf_import_success_signal
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask

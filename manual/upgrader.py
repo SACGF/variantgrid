@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 import requests
 from django.conf import settings
-from django.core.management import call_command, get_commands
+from django.core.management import CommandError, call_command, get_commands
 from django.db import connections
 
 from library.constants import MINUTE_SECS
@@ -240,11 +240,12 @@ class GitPullStep(UpgradeStep):
 
 
 class ManageStep(UpgradeStep):
-    """ A management command, run in this process """
+    """ A management command, run in this process. call_command skips the system checks unless asked """
 
-    def __init__(self, args: list[str]):
+    def __init__(self, args: list[str], run_checks: bool = False):
         super().__init__()
         self.args = args
+        self.run_checks = run_checks
 
     def __str__(self):
         return "python3 manage.py " + shlex.join(self.args)
@@ -253,7 +254,7 @@ class ManageStep(UpgradeStep):
         print_cyan(str(self))
         print_purple("-----------")
         try:
-            call_command(*self.args)
+            call_command(*self.args, skip_checks=not self.run_checks)
         finally:
             print_purple("-----------")
         return StepResult.success()
@@ -312,7 +313,8 @@ class Upgrader:
     def standard_steps(self) -> list[UpgradeStep]:
         return [
             GitPullStep().using(key="g", task_id="git*pull"),
-            ManageStep(["migrate"]).using(key="m", task_id="manage*migrate"),
+            # Checks as 'manage.py migrate' runs them: a database or checkout it can't migrate fails with the reason
+            ManageStep(["migrate"], run_checks=True).using(key="m", task_id="manage*migrate"),
             ManageStep(["collectstatic_js_reverse"]).using(key="r", task_id="manage*collectstatic_js_reverse"),
             # collectstatic without warning for conflicting files has been an issue for 6 years
             # see https://code.djangoproject.com/ticket/26583 maybe it'll get fixed soon? For now (since we've never had
@@ -389,6 +391,9 @@ class Upgrader:
                 result = StepResult.success()
             else:
                 result = StepResult.failure(f"Exited with code {e.code}")
+        except CommandError as e:  # A message for the operator (SystemCheckError too) - no traceback
+            print_red(str(e))
+            result = StepResult.failure(f"{type(e).__name__}: {e}")
         except Exception as e:
             traceback.print_exc()
             result = StepResult.failure(f"{type(e).__name__}: {e}")

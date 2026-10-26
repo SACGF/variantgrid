@@ -44,13 +44,8 @@ from library.django_utils.model_utils import ArrayLength
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import get_timer
-from ontology.models import (
-    OntologyRelation,
-    OntologyService,
-    OntologySnake,
-    OntologyTerm,
-    OntologyTermRelation,
-)
+from ontology.enums import OntologyService
+from ontology.models import OntologyRelation, OntologySnake, OntologyTerm, OntologyTermRelation
 from ontology.monarch_search import monarch_condition_text_search
 from ontology.ontology_matching import (
     IGNORE_TERMS,
@@ -1237,7 +1232,8 @@ def apply_condition_resolution(classification: Classification, new_condition_res
                 data=new_condition_resolution,
                 flag_type=classification_flag_types.condition_resolution,
             )
-            classification.save(update_fields=['condition_resolution'])
+            Classification.objects.filter(pk=classification.pk).update(
+                condition_resolution=classification.condition_resolution)
 
             condition_set_signal.send(sender=Classification, classification=classification,
                                       condition=new_condition)

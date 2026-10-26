@@ -5,8 +5,15 @@ We implement only the small subset of endpoints we use: ``process`` (uploads)
 and ``revert`` (delete just-uploaded). Existing files are seeded into FilePond
 through the ``files`` instance option using the ``"local"`` server-file type,
 so the ``load`` endpoint is not required.
+
+serve_attachment returns an uploaded attachment: images and PDFs display in the browser, anything else
+downloads, so an uploaded page is never rendered on the site.
 """
-from django.http import HttpResponse
+import os
+
+from django.http import FileResponse, HttpResponse
+
+INLINE_ATTACHMENT_EXTENSIONS = {'.png', '.gif', '.jpg', '.jpeg', '.pdf'}
 
 
 def filepond_upload_receive(request, field_name="filepond"):
@@ -37,3 +44,10 @@ def filepond_process_response(file_id) -> HttpResponse:
     return HttpResponse(str(file_id), content_type="text/plain")
 
 
+
+
+def serve_attachment(filename: str) -> FileResponse:
+    """ Images and PDFs display inline, every other type downloads """
+    _, ext = os.path.splitext(filename)
+    as_attachment = ext.lower() not in INLINE_ATTACHMENT_EXTENSIONS
+    return FileResponse(open(filename, "rb"), as_attachment=as_attachment)

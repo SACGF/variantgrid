@@ -2,7 +2,7 @@ import uuid
 
 import pandas as pd
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 from pedigree.ped.ped_file_utils import PED_COLUMNS
 
 

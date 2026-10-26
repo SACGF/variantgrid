@@ -15,16 +15,16 @@ from django.db import connection, models, transaction
 from django.db.models import QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
+from analysis.enums import NodeErrorSource, NodeStatus
 from analysis.exceptions import (
     NodeNotFoundException,
     NodeOutOfDateException,
     NodeParentNotReadyException,
     NonFatalNodeError,
 )
-from analysis.models.enums import NodeErrorSource, NodeStatus
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
@@ -38,7 +38,8 @@ from analysis.models.nodes.node_version import NodeCache, NodeTask, NodeVersion
 from library.constants import MINUTE_SECS
 from library.django_utils.django_postgres import get_backend_pid
 from library.django_utils.model_utils import get_model_content_type_dict
-from snpdb.models import AlleleSource, BuiltInFilters, Variant, Wiki
+from snpdb.enums import BuiltInFilters
+from snpdb.models import AlleleSource, Variant, Wiki
 from snpdb.views.datatable_view import RichColumn
 
 # How long a node's lease is good for. The window is (re)started when a worker claims the node for
@@ -102,7 +103,6 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
 
     UPDATE_TASK = "analysis.tasks.node_update_tasks.update_node_task"
     NODE_CACHE_TASK = "analysis.tasks.node_update_tasks.node_cache_task"
-    WAIT_FOR_CACHE_TASK = "analysis.tasks.node_update_tasks.wait_for_cache_task"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -156,13 +156,12 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
             if parent := self.get_unmodified_single_parent_node():
                 return parent.get_cache_task_args_set(force_cache=force_cache)
 
-            node_cache, created = NodeCache.get_or_create_for_node(self)
+            _node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
                 task_args_set.add((self.NODE_CACHE_TASK, (self.pk, self.version)))
-            # else: cache is already being built by another node - do NOT add WAIT_FOR_CACHE_TASK.
-            #       The scheduler's dependency gate (_node_ready_to_lease) holds this node back while
-            #       that cache is actively building (PROCESSING); node_cache_task re-triggers the
-            #       dispatcher on completion (issue #346).
+            # else: cache is already being built by another node. The scheduler's dependency gate
+            #       (_node_ready_to_lease) holds this node back while that cache is actively building
+            #       (PROCESSING); node_cache_task re-triggers the dispatcher on completion (issue #346).
         return task_args_set
 
     def get_parent_subclasses_and_errors(self):
@@ -317,6 +316,11 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
         return NodeStatus.is_ready(self.status)
 
     def bump_version(self):
+        """ Called by save() under the Analysis lock. A node loaded before the lock was taken may be behind
+            the stored version (another save or reload_analysis_nodes bumped it), so count on from the
+            stored one - reusing a version would reuse its NodeVersion, and the Q cache/counts of the old config """
+        if not (self._saved_by_parent or self._state.adding or self.pk is None):
+            self.version = AnalysisNode.objects.filter(pk=self.pk).values_list("version", flat=True).get()
         self.version += 1
         self.status = NodeStatus.DIRTY
         self.count = None
@@ -551,10 +555,9 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
                 # takes a FOR KEY SHARE lock on the referenced analysisnode row. Without this, two concurrent
                 # saves over overlapping subtrees grab those row locks in opposite orders and deadlock.
                 Analysis.objects.select_related(None).select_for_update().get(pk=self.analysis_id)
-            result = self._save(*args, **kwargs)
+            self._save(*args, **kwargs)
             if not self._saved_by_parent:
                 Analysis.objects.filter(pk=self.analysis_id).update(modified=timezone.now())
-            return result
 
     def _validity_inputs_changed(self) -> bool:
         """ valid is stored at save time - recomputing it (get_errors) costs queries for the node, its
@@ -719,6 +722,8 @@ class AnalysisEdge(NodeAuditLogMixin, models.Model):
         return f"{self.parent_id} -> {self.child_id}"
 
     def save(self, *args, **kwargs):
+        if self.parent.analysis_id != self.child.analysis_id:
+            raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - they are in different analyses")
         dag = AnalysisDag.for_node(self.parent_id)
         if self.parent_id == self.child_id or self.child_id in dag.ancestor_ids(self.parent_id):
             raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - it would create a cycle")

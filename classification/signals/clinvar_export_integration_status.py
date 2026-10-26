@@ -1,9 +1,7 @@
 from django.dispatch import receiver
 
-from classification.models.clinvar_export_models import (
-    ClinVarExportBatch,
-    ClinVarExportBatchStatus,
-)
+from classification.enums import ClinVarExportBatchStatus
+from classification.models.clinvar_export_models import ClinVarExportBatch
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.models.clinvar_key_models import ClinVarKey
 from library.integration_status import (

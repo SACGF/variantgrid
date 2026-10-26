@@ -3,7 +3,7 @@ import gzip
 from django.core.management.base import BaseCommand
 
 from genes.cached_web_resource.refseq import store_transcript_sequence_info_fasta
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 
 
 class Command(BaseCommand):
@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
         Companion to the "RefSeq Sequence Info" CachedWebResource, which only provides the *latest*
         version of each transcript. Historical classifications often cite older versions - fetching those
-        one at a time from NCBI Entrez is slow and rate-limited (see fix_variant_matching --extra), so we
+        one at a time from NCBI Entrez is slow and rate-limited, so we
         can persist the fetched stragglers to a supplementary FASTA and reload them here on future deploys.
     """
     category = "import"

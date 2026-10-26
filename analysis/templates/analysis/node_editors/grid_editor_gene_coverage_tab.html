@@ -63,15 +63,10 @@
                 {% for gene_list in gene_lists %}
                     <div class="editor-section-title">{{ gene_list }}</div>
 
-                        {% if gene_list.url or not gene_list.category.hidden %}
-                            <a href="{{ gene_list.get_absolute_url  }}" target="_blank">
-                                {% if gene_list.url %}
-                                    {{ gene_list.url }}
-                                {% else %}
-                                    view gene list
-                                {% endif %}
-                            </a>
+                        {% if not gene_list.category.hidden %}
+                            <a href="{{ gene_list.get_absolute_url }}" target="_blank">view gene list</a>
                         {% endif %}
+                        {% if gene_list.url %}{{ gene_list.url|urlize }}{% endif %}
 
                     <table id="gene-lists-genes-datatable-{{ gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'analysis_node_gene_list_genes_datatable' analysis_id=node.analysis_id node_id=node.pk version=node.version gene_list_id=gene_list.pk %}"></table>
                 {% endfor %}

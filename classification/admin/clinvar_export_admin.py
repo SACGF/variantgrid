@@ -8,11 +8,11 @@ from django.db.models.functions import Cast, Length
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 
+from classification.enums import ClinVarExportBatchStatus
 from classification.models import (
     ClinVarAllele,
     ClinVarExport,
     ClinVarExportBatch,
-    ClinVarExportBatchStatus,
     ClinVarExportRequest,
     ClinVarExportSubmission,
 )

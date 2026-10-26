@@ -6,8 +6,8 @@ from django.conf import settings
 from django.db.models import Q
 from hgvs.exceptions import HGVSDataNotAvailableError
 
+from genes.enums import MANEStatus
 from genes.models import MANE, NoTranscript, TranscriptVersion, TranscriptVersionSequenceInfo
-from genes.models_enums import MANEStatus
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
 

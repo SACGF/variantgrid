@@ -9,7 +9,7 @@ from django.test.utils import CaptureQueriesContext
 
 from analysis.grids import VariantGrid
 from analysis.tests.test_grid_export import GridExportTestCase
-from snpdb.models.models_enums import BuiltInFilters
+from snpdb.enums import BuiltInFilters
 from snpdb.views.datatable_view import datatable_response
 
 

@@ -18,18 +18,17 @@ from rest_framework.test import APITestCase
 
 from analysis.models import AnalysisTemplate
 from annotation.fake_data import get_fake_annotation_version
+from snpdb.enums import ImportSource, ProcessingStatus
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CachedGeneratedFile, GenomeBuild
-from snpdb.models.models_enums import ImportSource, ProcessingStatus
+from upload.enums import UploadedFileTypes, VCFImportInfoSeverity
 from upload.models import (
     FileUpload,
     SimpleVCFImportInfo,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
 )
-from upload.models.models_enums import VCFImportInfoSeverity
 
 METRICS_OUTPUT_ORIG = os.path.join(settings.BASE_DIR, "upload", "test_data", "tso500",
                                    "MetricsOutput_orig.tsv")
@@ -364,6 +363,21 @@ class UploadStatusAPITest(UploadAPITestBase):
         response = self.client.get(reverse("api_upload_status",
                                            kwargs={"file_upload_id": file_upload.pk}))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_status_by_sha256_only_finds_the_users_own_upload(self):
+        """ Someone else's newer upload of the same content neither hides the user's own nor answers for it """
+        own_upload = self._create_vcf_upload("status_shared_content")
+        others_upload = self._create_vcf_upload("status_shared_content")
+        others_upload.user = self.other_user
+        others_upload.save()
+        url = reverse("api_upload_status_sha256", kwargs={"sha256_hash": own_upload.sha256_hash})
+
+        self.client.force_authenticate(user=self.owner)
+        self.assertEqual(self.client.get(url).json()["file_upload_id"], own_upload.pk)
+
+        third_user = User.objects.create_user(username="api_third", password="x")
+        self.client.force_authenticate(user=third_user)
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
 
 
 class AnnotatedDownloadAPITest(UploadAPITestBase):

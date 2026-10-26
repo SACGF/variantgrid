@@ -4,23 +4,29 @@ from dataclasses import dataclass
 from functools import cache, cached_property
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
+from annotation.enums import CitationSource
 from annotation.models import CitationFetchRequest
-from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
-from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
+from classification.enums import (
+    ClinVarCitationsModes,
+    EvidenceKeyValueType,
+    ShareLevel,
+    SpecialEKeys,
+)
 from classification.enums.classification_enums import MultiCondition
 from classification.enums.clinvar_export_enums import ClinVarExportStatus
 from classification.models.classification import Classification, ClassificationModification
-from classification.models.clinvar_key_models import ClinVarCitationsModes, ClinVarKey
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagType
 from genes.hgvs import HGVSComponents
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDiffs, JsonObjType, html_to_text, invalidate_cached_property
-from ontology.models import OntologyService, OntologyTerm, OntologyTermStatus
+from ontology.enums import OntologyService, OntologyTermStatus
+from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import AlleleOriginBucket
 from uicore.json.validated_json import JSON_MESSAGES_EMPTY, JsonMessages, ValidatedJson
 
 """

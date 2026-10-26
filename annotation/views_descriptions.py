@@ -12,6 +12,7 @@ from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import VEPConfig
 from library.constants import WEEK_SECS
 from library.unit_percent import get_allele_frequency_formatter
+from snpdb.enums import ColumnAnnotationLevel
 from snpdb.grid_columns.composite_examples import (
     COMPOSITE_EXAMPLE_ROWS,
     SAMPLE_EXAMPLE_COPY_NUMBER,
@@ -27,7 +28,7 @@ from snpdb.grids import (
     get_standard_overrides,
     variant_grid_client_extra,
 )
-from snpdb.models import ColumnAnnotationLevel, UserSettings, VariantGridColumn
+from snpdb.models import UserSettings, VariantGridColumn
 from snpdb.views.datatable_view import CellData, RichColumn, rich_column_json
 
 # Composite sections lead the page in the order the level cards below them run

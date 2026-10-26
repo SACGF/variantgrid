@@ -6,10 +6,11 @@ Start with:
 - models/classification_evidence_normalise.py — normalise_evidence_cell: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
 - models/condition_resolved.py (ConditionResolved), models/classification_consensus.py (copying content between records).
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
-- enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/models/models_enums.py (re-exported by classification.enums; import them from snpdb).
+- enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/enums/snpdb_enums.py (re-exported by classification.enums; import them from snpdb).
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
   Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
-  not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
+  not tied to an annotation version: rerun `recalc_resolved_variant_info_p_hgvs` after a new VEP version becomes the latest or transcript sequences land.
+  Matching runs before VEP annotates a new variant, so a completed VEP annotation run of the latest version recomputes the non-VEP rows on its range lock's variants (`classification/signals/classification_hooks_p_hgvs.py`, #2421).
   Pages and grids show it, never the `p_hgvs` evidence, by passing it to `HGVSDisplay(p_hgvs=...)` from the same build as the c.HGVS (an imported c.HGVS takes the imported build's: `ImportedAlleleInfo.imported_hgvs_display`); `to_json` and the `p_hgvs` template tag put it inline after the c. nomen, short with the full form as tooltip, gated on `CLASSIFICATION_GRID_SHOW_PHGVS` (#19).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
@@ -43,6 +44,8 @@ Patterns here:
   services/overlap_calculator.py onto the enums/classification_enums.py:OverlapStatus ladder
   (enums/classification_enums.py:OverlapStatus.is_discordant is the threshold), and only records at a
   ShareLevel.is_discordant_level (logged_in_users, public) count.
+- Sample names on records shared by other labs are de-identified, so showing them across labs is fine - don't hide them
+  as patient data.
 - ClinicalContext, DiscordanceStatus and DiscordanceReport are a legacy path: rendered for existing rows
   and behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
   Bucketing on that legacy path comes from the
@@ -101,7 +104,8 @@ Gotchas:
   a live calculation, never stored.
 - Bulk-import guard: while a ClassificationImportRun is ONGOING, per-classification work (grouping, common-variant filters,
   clinical-context recalc) is skipped and caught up on classification_imports_complete_signal
-  (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). An abandoned ONGOING run silently stalls all of it.
+  (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). A run not added to for MAX_IMPORT_AGE (5 minutes) is closed as UNFINISHED by the next import or the
+  `close_abandoned_classification_import_runs_task` beat, so an abandoned run stalls that work for minutes, not until the next import.
 - /classification/api/* holds DRF views (views/classification_view.py:ClassificationView is the model), which the login
   middleware skips so token and basic auth reach DRF's IsAuthenticated. A plain Django view under that prefix still needs a
   session login - the path exempts nothing.
@@ -176,8 +180,7 @@ Gotchas:
 - A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
   runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
   before any HGVS conversion. A gene-level value keeps its spaces - `tidy_hgvs_whitespace` strips them from an HGVS
-  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; a stored record holding
-  `EGFRamplification` is put right by `gene_level_strings_respace`. What takes that path is the *shape* of the
+  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes. What takes that path is the *shape* of the
   value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
   gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
   HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
@@ -213,7 +216,7 @@ Gotchas:
   the `TSO500_*_CALL_BANDS` settings - the policy is on the form so a scientist who disagrees can ask for it to change.
   A case with no such measure falls back to `default`, and a draft's own answer wins over both. The keys are hand
   written in admin, so `validate_case_fields` fails the save on an unknown measure or rule.
-- A bool `case_field` carries `qc` (a `seqauto/models/models_enums.py:LIBRARY_QC_CONTEXT_KEYS` value) instead of `measure`
+- A bool `case_field` carries `qc` (a `seqauto/enums/seqauto_enums.py:LIBRARY_QC_CONTEXT_KEYS` value) instead of `measure`
   where the flag means "did the caller's library QC pass for that category" - the Amplifications / Variants / Fusions
   flags. Its `tick_when` rules are `{"passed": true|false}` and `{"completed": false}` against the category's
   `seqauto/models/models_seqauto.py:LibraryQC` row (`classification/models/classification_report_models.py:library_qc_tick`;

@@ -9,9 +9,9 @@ from classification.models.classification import Classification
 from library.git import Git
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.enums import ImportSource
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Allele, Variant
-from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 
 

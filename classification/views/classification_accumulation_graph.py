@@ -18,8 +18,8 @@ from classification.models import (
 )
 from flags.models import FlagComment
 from library.utils import IterableStitcher, IterableTransformer, delimited_row
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab
-from snpdb.models.models_enums import AlleleOriginBucket
 
 
 @total_ordering
@@ -328,7 +328,8 @@ def _iter_report_list(
         allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
         ):
 
-    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs, time_step=time_step)
+    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs, time_step=time_step,
+                                          allele_origin_buckets=allele_origin_buckets)
     report_data = cag.report()
 
     valid_labs = set()

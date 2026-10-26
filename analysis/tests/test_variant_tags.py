@@ -12,9 +12,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import localtime
 
+from analysis.enums import TagNodeInput, TagNodeMode
 from analysis.grids import get_analysis_log_entry_summary
-from analysis.models import Analysis, TagNode, TagNodeInput, VariantTag
-from analysis.models.enums import TagNodeMode
+from analysis.models import Analysis, TagNode, VariantTag
 from analysis.models.nodes.filters.merge_node import MergeNode
 from analysis.models.nodes.node_version import NodeVersion
 from analysis.models.nodes.sources.cohort_node import CohortNode

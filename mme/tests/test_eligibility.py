@@ -7,13 +7,14 @@ from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification, ClassificationModification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from mme.client import submit
-from mme.models import MMESubmission, MMESubmissionStatus
+from mme.enums import MMESubmissionStatus
+from mme.models import MMESubmission
 from mme.serializers.patient_profile import (
     assert_mme_eligible,
     build_patient_profile,
     mme_eligible_classifications,
 )
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}
 

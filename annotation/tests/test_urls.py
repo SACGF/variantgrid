@@ -2,15 +2,16 @@ import unittest
 
 from django.contrib.auth.models import User
 
+from annotation.enums import CitationSource
 from annotation.fake_data import (
     create_fake_clinvar_data,
     create_fake_variant_annotation,
     get_fake_annotation_version,
 )
 from annotation.models import AnnotationRun, Citation, ClinVar, HumanProteinAtlasTissueSample
-from annotation.models.models_citations import CitationSource
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
+from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -31,6 +32,8 @@ class Test(URLTestCase):
 
         cls.human_protein_atlas_tissue_sample = HumanProteinAtlasTissueSample.objects.get_or_create(name="foo")[0]
         cls.annotation_run_column = AnnotationRun.objects.create(status="Complete")
+        # No post_save handler listens for this name, so no loader task is started
+        cls.cached_web_resource = CachedWebResource.objects.create(name="test_cached_web_resource")
 
         create_fake_clinvar_data(cls.annotation_version_grch37.clinvar_version)
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
@@ -58,6 +61,7 @@ class Test(URLTestCase):
             ("view_annotation_descriptions", {}, 200),
             ("view_annotation_version_details", {"annotation_version_id": self.annotation_version_grch37.pk}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
+            ("view_cached_web_resource", {"pk": self.cached_web_resource.pk}, 200),
             # API
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),
         ]

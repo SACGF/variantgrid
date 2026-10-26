@@ -2,6 +2,7 @@
 from django.test import TestCase
 
 from annotation.fake_data import get_fake_annotation_version
+from genes.enums import HGNCStatus
 from genes.gene_splice import (
     SPLICE_STRING_PATTERN,
     SpliceEventResolver,
@@ -13,7 +14,6 @@ from genes.gene_splice import (
     resolve_splice_string,
 )
 from genes.models import HGNC, GeneLevelId, GeneSymbol, HGNCImport, SpliceEvent
-from genes.models_enums import HGNCStatus
 from genes.tests.gene_level_test_utils import create_splice_event_variant, make_release_gene
 from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate

@@ -10,12 +10,8 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.safestring import mark_safe
 from requests import Response
 
-from classification.models import (
-    Classification,
-    ClassificationModification,
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
-)
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import Classification, ClassificationModification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from genes.hgvs import HGVSDiff, HGVSDisplay, hgvs_diff_description
 from library.django_utils import get_url_from_view_path, require_superuser

@@ -5,7 +5,8 @@ from time import sleep
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import (
@@ -13,17 +14,18 @@ from classification.tasks.classification_import_process_variants_task import (
 )
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
-from snpdb.models import ImportSource, Variant
+from snpdb.enums import ImportSource
+from snpdb.models import Variant
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantHash, VariantPKLookup
 from snpdb.vcf_utils import get_contigs_header_lines, write_vcf_from_variant_coordinates
-from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
-from upload.models.models_enums import (
+from upload.enums import (
     UploadedFileTypes,
     UploadStepOrigin,
     UploadStepTaskType,
     VCFPipelineStage,
 )
+from upload.models import FileUpload, UploadedClassificationImport, UploadPipeline, UploadStep
 from upload.upload_processing import process_upload_pipeline
 
 # MAX_VCF_FIELD_LENGTH = 131072
@@ -31,7 +33,6 @@ MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indica
 
 # FileUpload.name - what the upload listing shows for a classification import. The two pipelines an
 # import can run need different names or the listing shows the same row twice
-# (upload/migrations/0045_rename_gene_level_api_uploads.py renamed historical records)
 API_UPLOAD_NAME = 'Variants from API'
 GENE_LEVEL_API_UPLOAD_NAME = 'Gene-level Variants from API'
 

@@ -1,10 +1,7 @@
-from django.db.models import Count
-
 from annotation.abandoned_annotation_runs import (
     abandoned_annotation_runs_by_reason,
     incomplete_annotation_runs_qs,
 )
-from annotation.annotation_versions import get_range_lock_gaps_with_variants
 from annotation.enums import AnnotationStatus
 from annotation.models import (
     AnnotationRangeLock,
@@ -75,28 +72,7 @@ def check_gene_annotation_versions() -> dict:
 
 
 def check_variant_annotation_runs_status() -> dict:
-    MAX_GAPS_SHOWN = 10
-    # I am going to make this a warning for a while - before making it an error
-    ARL_DUPE_ERROR = False
-    # see https://github.com/SACGF/variantgrid_shariant/issues/177
-    arl_qs = AnnotationRangeLock.objects.values('version_id', 'min_variant_id', 'max_variant_id')
-    arl_qs = arl_qs.annotate(id_count=Count('id')).filter(id_count__gt=1)
-    arl_message = "Remove duplicate AnnotationRangeLock objects"
-    has_dupes = arl_qs.exists()
-    if ARL_DUPE_ERROR:
-        arl_data = {
-            "valid": has_dupes,
-            "fix": arl_message,
-        }
-    else:
-        arl_data = {
-            "valid": True,  # Just a warning
-        }
-        if has_dupes:
-            arl_data["warning"] = arl_message + " (this is a just a warning but will become an error in the future)"
-    annotation_status = {
-        "AnnotationRangeLock duplicates": arl_data,
-    }
+    annotation_status = {}
 
     for reason, qs in abandoned_annotation_runs_by_reason(incomplete_annotation_runs_qs()).items():
         abandoned_data = {
@@ -116,20 +92,5 @@ def check_variant_annotation_runs_status() -> dict:
         if num_not_success:
             anno_data["warning"] = f"There are {num_not_success} annotation runs for {vav} with status error/incomplete"
         annotation_status[f"variant_annotation_latest_{genome_build}"] = anno_data
-        if vav is None:
-            continue
-
-        gap_data = {
-            "valid": True,  # Just a warning
-        }
-        if gaps := get_range_lock_gaps_with_variants(vav):
-            gap_ranges = ", ".join(f"{min_id}-{max_id}" for min_id, max_id in gaps[:MAX_GAPS_SHOWN])
-            if len(gaps) > MAX_GAPS_SHOWN:
-                gap_ranges += f" (and {len(gaps) - MAX_GAPS_SHOWN} more)"
-            gap_data["warning"] = (f"{vav} has {len(gaps)} gap(s) between AnnotationRangeLocks holding variants "
-                                   f"that will never be annotated (variant pk ranges: {gap_ranges}). "
-                                   "Create an AnnotationRangeLock over each gap's variants and the annotation "
-                                   "scheduler will create its runs.")
-        annotation_status[f"variant_annotation_range_lock_gaps_{genome_build}"] = gap_data
 
     return annotation_status

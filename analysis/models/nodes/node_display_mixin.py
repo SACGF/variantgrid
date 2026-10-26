@@ -1,7 +1,7 @@
 """ NodeDisplayMixin - how an AnalysisNode is drawn: its name, label, icon and chips on the DAG card, CSS
     classes and ids, the method summary and the args its editor and grid pages render with.
     The NodeIcon / NodeChip value types are in node_display.py. """
-from analysis.models.enums import AnalysisTemplateType
+from analysis.enums import AnalysisTemplateType
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 
 

@@ -25,6 +25,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls.base import resolve, reverse
 
 from analysis.analysis_templates import get_sample_analysis
+from analysis.enums import AnalysisTemplateType, NodeStatus
 from analysis.grid_export import (
     format_items_iterator,
     get_canonical_transcript_collection_filename_part,
@@ -32,8 +33,7 @@ from analysis.grid_export import (
     node_grid_get_export_iterator,
 )
 from analysis.grids import ExportVariantGrid, VariantGrid
-from analysis.models import Analysis, AnalysisTemplate, AnalysisTemplateType, AnalysisVariable
-from analysis.models.enums import NodeStatus
+from analysis.models import Analysis, AnalysisTemplate, AnalysisVariable
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
@@ -52,6 +52,7 @@ from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import percent_encode_info_value
+from snpdb.enums import CohortGenotypeCollectionType, VCFInfoTypes
 from snpdb.fake_data import create_fake_cohort
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import (
@@ -65,7 +66,6 @@ from snpdb.models import (
     VCFInfo,
 )
 from snpdb.models.models_cohort import CohortGenotypeCollection
-from snpdb.models.models_enums import CohortGenotypeCollectionType, VCFInfoTypes
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
 

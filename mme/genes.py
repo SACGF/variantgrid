@@ -24,9 +24,9 @@ from typing import Optional
 from django.conf import settings
 
 from classification.enums.classification_enums import SpecialEKeys
+from genes.enums import AnnotationConsortium
 from genes.models import GeneSymbol, GeneVersion
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
-from genes.models_enums import AnnotationConsortium
 from library.constants import HOUR_SECS
 
 # settings.MME_GENE_ID_PREFERENCE - which form goes in the outbound `gene.id`

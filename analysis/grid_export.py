@@ -13,7 +13,7 @@ from library.django_utils import get_model_fields
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import VCFWriter
 from library.utils import StashFile, iter_fixed_chunks
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import Sample, VariantGridColumn
 from snpdb.vcf_export_columns import COLUMN_VCF_INFO
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs

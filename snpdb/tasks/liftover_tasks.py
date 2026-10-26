@@ -8,9 +8,9 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.enums import AlleleConversionTool, ImportSource
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, GenomeBuild, ImportSource
-from snpdb.models.models_enums import AlleleConversionTool
+from snpdb.models import Allele, GenomeBuild
 from snpdb.models.models_variant import Variant
 
 

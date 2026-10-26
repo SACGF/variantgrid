@@ -12,13 +12,15 @@ from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
-from analysis.models.enums import NodeStatus, SetOperations
+from analysis.enums import NodeStatus, SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.models.nodes.node_version import NodeVersion
+from library.django_utils.database_utils import advisory_lock
 from library.django_utils.django_partition import temporary_db_table
-from snpdb.models import ProcessingStatus, VariantCollection, VariantCollectionRecord
+from snpdb.enums import ProcessingStatus
+from snpdb.models import VariantCollection, VariantCollectionRecord
 
 
 class VennNode(AnalysisNode):
@@ -276,9 +278,20 @@ def venn_cache_count(vennode_cache_id):
         vennode_cache = VennNodeCache.objects.get(pk=vennode_cache_id)
     except VennNodeCache.DoesNotExist:
         return  # obsolete
-    vc = vennode_cache.variant_collection
-    if vc is None:
+    if vennode_cache.variant_collection_id is None:
         return  # Collection was regenerated elsewhere - a newer task will build the replacement
+
+    # A re-leased Venn (or a sibling sharing these parents) emits this again while a build may still be running.
+    # Wait for that one rather than truncating under it - the lock goes with a dead worker's connection
+    with advisory_lock("venn_cache_count", vennode_cache.variant_collection_id):
+        _build_venn_cache(vennode_cache)
+
+
+def _build_venn_cache(vennode_cache: VennNodeCache):
+    try:
+        vc = VariantCollection.objects.get(pk=vennode_cache.variant_collection_id)
+    except VariantCollection.DoesNotExist:
+        return  # Discarded while we waited for the lock
     if vc.status == ProcessingStatus.SUCCESS:
         return  # Idempotent: already built (eg by a sibling Venn's chain that shares these parents)
 

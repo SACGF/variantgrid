@@ -37,6 +37,7 @@ from genes.models import (
     Transcript,
     TranscriptParts,
     TranscriptVersion,
+    TranscriptVersionSequenceInfo,
 )
 from genes.transcripts_utils import transcript_is_lrg
 from library.cache import timed_cache
@@ -52,9 +53,10 @@ from snpdb.clingen_allele import (
 from snpdb.clingen_allele_api import (
     ClinGenAlleleRegistryAPI,
     ClinGenAlleleRegistryUnavailableException,
+    ClinGenAlleleTooLargeException,
 )
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.models import ClinGenAllele, Variant
-from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
 
@@ -151,6 +153,60 @@ class VariantResolvingError(ValueError):
         super().__init__(message)
 
 
+def clingen_allele_c_hgvs_variant(clingen_allele: ClinGenAllele, hgvs_converter, transcript_accession) -> Optional[HGVSVariant]:
+    """ ClinGen's c.HGVS for this transcript, with reference bases from our transcript sequence (ClinGen's are wrong, #493) """
+    hgvs_variant = None
+    raw_hgvs_string, t_data = clingen_allele.get_raw_hgvs_and_data(transcript_accession)
+    if raw_hgvs_string:  # Has for this transcript version
+        hgvs_variant = hgvs_converter.create_hgvs_variant(raw_hgvs_string)
+        # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
+        if hgvs_variant.kind == "n":
+            if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:
+                hgvs_variant.kind = 'c'
+
+        if not hgvs_variant.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
+            hgvs_variant.gene = t_data.get("geneSymbol")
+
+        if hgvs_variant.mutation_type in {"dup", "del", "delins"}:
+            # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
+            coord = t_data["coordinates"][0]
+            if "startIntronOffset" in coord:
+                # We have to accept these - as we get so many but we can't add on the bases
+                msg = "A coding DNA reference sequence does not contain intron or 5' and 3' gene "\
+                      "flanking sequences and can therefore not be used as a reference to describe " \
+                      "variants in these regions"
+                if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                    raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                else:
+                    logging.warning(msg)
+            elif transcript_accession.startswith("LRG_"):
+                logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
+                                "bases which may be wrong")
+            else:
+                try:
+                    if tvsi := TranscriptVersionSequenceInfo.get(transcript_accession):
+                        if hgvs_variant.mutation_type == "dup":
+                            ref_end = coord["end"]
+                            ref_start = ref_end - len(coord["allele"])
+                        else:
+                            ref_start = coord["start"]
+                            ref_end = coord["end"]
+                        hgvs_variant.ref_allele = tvsi.sequence[ref_start:ref_end]
+                    else:
+                        msg = f"Could not retrieve reference allele for '{transcript_accession}'"
+                        if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                            raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                        else:
+                            logging.warning(msg)
+                except NoTranscript as e_no_transcript:
+                    if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                        raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
+                    else:
+                        logging.warning(e_no_transcript)
+
+    return hgvs_variant
+
+
 class HGVSMatcher:
     # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
 
@@ -204,7 +260,7 @@ class HGVSMatcher:
                 match_ref_allele = True
 
             transcript_accession = self.get_transcript_accession(cleaned_hgvs)
-            normalized_hgvs = ca.get_c_hgvs_variant(self.hgvs_converter, transcript_accession)
+            normalized_hgvs = clingen_allele_c_hgvs_variant(ca, self.hgvs_converter, transcript_accession)
             no_gene_generated = self.hgvs_converter.c_hgvs_remove_gene_symbol(str(normalized_hgvs))
             originally_normalized = HgvsOriginallyNormalized(original_hgvs=self.create_hgvs_variant(cleaned_hgvs),
                                                              normalized_hgvs=self.create_hgvs_variant(no_gene_generated))
@@ -531,7 +587,7 @@ class HGVSMatcher:
 
         # Use ClinGen - will raise exception if it can't get it
         if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
-            if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, lrg_identifier):
+            if hgvs_variant := clingen_allele_c_hgvs_variant(ca, self.hgvs_converter, lrg_identifier):
                 return HGVSConverterResult(hgvs_variant=hgvs_variant,
                                            converter_info=HGVSConverterInfo(
                                                used_converter_type=HGVSConverterType.CLINGEN_ALLELE_REGISTRY,
@@ -586,7 +642,7 @@ class HGVSMatcher:
                             if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self,
                                                                                require_allele_id=False,
                                                                                clingen_api=clingen_api):
-                                if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, transcript_version.accession):
+                                if hgvs_variant := clingen_allele_c_hgvs_variant(ca, self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use biocommons or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
@@ -603,6 +659,8 @@ class HGVSMatcher:
                             clingen_unavailable = True
                             logging.error(error_message, cgaue)
                             hgvs_methods[hgvs_method] = str(cgaue)
+                        except ClinGenAlleleTooLargeException as cgatle:
+                            hgvs_methods[hgvs_method] = str(cgatle)  # Expected for large SVs, so not logged
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)

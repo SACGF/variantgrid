@@ -32,12 +32,12 @@ from typing import Optional
 import cyvcf2
 from django.conf import settings
 
+from genes.enums import GeneCopyNumberEventKind
 from genes.gene_copy_number import (
     ResolvedGeneCopyNumberEvent,
     create_gene_copy_number_events_for_variants,
 )
 from genes.gene_level_resolver import GeneLevelNameResolver
-from genes.models import GeneCopyNumberEventKind
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.genomics.vcf_writer import VCFInfoHeader

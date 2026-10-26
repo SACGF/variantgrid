@@ -12,8 +12,8 @@ from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
 from patients.models import Patient
+from snpdb.enums import TagFilter
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import TagFilter
 from snpdb.models.models_user_settings import TagConfigCollection, UserSettings
 from snpdb.utils import get_tag_quick_tags, get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol

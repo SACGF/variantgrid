@@ -1,13 +1,19 @@
 """
 AnalysisNode.save stores `valid` and cascades version bumps to every descendant - what each save has to
-query (#2200).
+query (#2200) - and doesn't write back what a concurrent reload or load changed (#2444).
 """
+import json
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 
+from analysis.enums import NodeStatus
 from analysis.models import Analysis, AnalysisNode, SampleNode, ZygosityNode
+from analysis.models.nodes.node_utils import reload_analysis_nodes
 from annotation.fake_data import get_fake_annotation_version
 from snpdb.fake_data import create_fake_trio
 from snpdb.models import GenomeBuild
@@ -81,3 +87,30 @@ class TestNodeSave(TestCase):
         self._create_chain(2)
         copy = Analysis.objects.get(pk=self.analysis.pk).clone()
         self.assertEqual([True, True, True], list(copy.analysisnode_set.values_list("valid", flat=True)))
+
+    @patch("analysis.models.nodes.node_utils.update_analysis")
+    def test_stale_save_counts_on_from_stored_version(self, _update_analysis):
+        """ A node loaded before a reload bumped it must not reuse the reload's version (and its NodeVersion) """
+        leaf_id = self._create_chain(1)[-1].pk
+        stale = ZygosityNode.objects.get(pk=leaf_id)
+        reload_analysis_nodes(self.analysis.pk)
+        reloaded_version = ZygosityNode.objects.get(pk=leaf_id).version
+        self.assertGreater(reloaded_version, stale.version)
+
+        stale.queryset_dirty = True
+        stale.save()
+        self.assertEqual(reloaded_version + 1, ZygosityNode.objects.get(pk=leaf_id).version)
+
+    def test_move_keeps_load_result(self):
+        """ The worker finishes the load between the request reading the node and saving its new position """
+        leaf_id = self._create_chain(1)[-1].pk
+        stale = ZygosityNode.objects.get(pk=leaf_id)
+        AnalysisNode.objects.filter(pk=leaf_id).update(status=NodeStatus.READY, count=5)
+
+        self.client.force_login(self.analysis.user)
+        url = reverse("node_update", kwargs={"analysis_id": self.analysis.pk, "node_id": leaf_id})
+        with patch("analysis.views.views_json.get_node_subclass_or_non_fatal_exception", return_value=stale):
+            response = self.client.post(url, {"op": "move", "params": json.dumps({"x": 300, "y": 400})})
+        self.assertEqual(response.status_code, 200)
+        node = AnalysisNode.objects.get(pk=leaf_id)
+        self.assertEqual((300, 400, NodeStatus.READY, 5), (node.x, node.y, node.status, node.count))

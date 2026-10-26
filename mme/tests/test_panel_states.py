@@ -4,13 +4,15 @@ teaches a curator nothing. """
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from guardian.shortcuts import assign_perm
 
 from classification.enums.classification_enums import ShareLevel
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.django_utils.unittest_utils import URLTestCase
+from library.guardian_utils import DjangoPermission
 from mme.models import MMEInboundMatch, MMEInboundQuery
 from mme.tests.fakes import make_classification
-from snpdb.models.models_enums import ClinicalSignificance
+from snpdb.enums import ClinicalSignificance
 
 NODES = {"testnode": {"base_url": "https://node.test", "token": "secret-token", "api_version": "1.1"}}
 
@@ -37,6 +39,17 @@ class PanelStateTestCase(URLTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Share with MatchMaker Exchange (VUS and above)")
         self.assertContains(response, "testnode")
+
+    def test_creating_a_draft_needs_write(self):
+        classification = make_classification(self.lab, self.user)
+        reader = User.objects.create_user(username="mme_panel_reader")
+        published = classification.classificationmodification_set.get(is_last_published=True)
+        assign_perm(DjangoPermission.perm(published, DjangoPermission.READ), reader, published)
+        self.client.force_login(reader)
+        url = reverse("mme_classification_panel", kwargs={"classification_id": classification.pk})
+        response = self.client.post(url, {"node_id": "testnode"})
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(classification.mmesubmission_set.exists())
 
     def test_benign_names_clinvar_as_the_right_channel(self):
         response = self._get(make_classification(

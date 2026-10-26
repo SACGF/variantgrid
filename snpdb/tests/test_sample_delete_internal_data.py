@@ -12,10 +12,10 @@ from annotation.models import (
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort
 from snpdb.models import GenomeBuild, SampleLocusCount, SampleStatsCodeVersion
 from snpdb.models.models_cohort_stats import CohortGenotypeStats
-from snpdb.models.models_enums import ImportStatus
 
 
 class SampleDeleteInternalDataTest(TestCase):

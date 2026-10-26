@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.shortcuts import render
 from django.urls.base import reverse
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from guardian.shortcuts import get_objects_for_group
@@ -25,12 +25,10 @@ from library.guardian_utils import DjangoPermission
 from library.utils import rgb_invert
 from ontology.models import OntologyTerm
 from patients.models import Patient
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     GenomeBuild,
     Sample,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
 )
 
 
@@ -78,9 +76,9 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
         if request.user.is_authenticated:  # Only display links to logged in users
             url = reverse('view_gene_symbol', kwargs={"gene_symbol": gene_symbol})
-            gene_symbol_text = f'<a class="{gene_classes}" href="{url}">{gene_symbol}</a>'
+            gene_symbol_text = format_html('<a class="{}" href="{}">{}</a>', gene_classes, url, gene_symbol)
         else:
-            gene_symbol_text = f"<span class='{gene_classes}'>{gene_symbol}</span>"
+            gene_symbol_text = format_html("<span class='{}'>{}</span>", gene_classes, gene_symbol)
 
         if highlight:
             highlight_gene_labels.append(gene_symbol_text)
@@ -148,7 +146,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(patient.get_ontology_term_ids())
 
                     def format_ontology(ontology_term):
-                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
+                        return format_html("<div title='{}'>{}</div>", ontology_term, ontology_term.name)
 
                     for ontology_name, terms_qs in terms_dict.items():
                         ontology_text = " ".join(map(format_ontology, terms_qs))

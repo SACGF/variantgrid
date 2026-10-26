@@ -30,9 +30,18 @@ from annotation.models import AnnotationVersion, ManualVariantEntryCollection, V
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
+from patients.enums import GnomADPopulation, Sex
 from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
-from patients.models_enums import GnomADPopulation, Sex
+from snpdb.enums import (
+    AlleleConversionTool,
+    DuoRelationship,
+    ImportSource,
+    ImportStatus,
+    ProcessingStatus,
+    SuperPopulationCode,
+    VariantOrigin,
+)
 from snpdb.grid_columns.custom_columns import (
     get_variant_grid_columns,
     get_variantgrid_extra_annotate,
@@ -40,30 +49,23 @@ from snpdb.grid_columns.custom_columns import (
 from snpdb.models import (
     VCF,
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
     ClinGenAllele,
     Cohort,
     CohortGenotypeStats,
     CustomColumnsCollection,
     Duo,
-    DuoRelationship,
     GenomeBuild,
     GenomicIntervalsCollection,
-    ImportSource,
-    ImportStatus,
     LiftoverRun,
-    ProcessingStatus,
     Quad,
     Sample,
-    SuperPopulationCode,
     TagConfigCollection,
     Trio,
     UserGridConfig,
     UserSettings,
     Variant,
     VariantAllele,
-    VariantOrigin,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q

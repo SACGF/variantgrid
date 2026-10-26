@@ -3,9 +3,9 @@ from typing import Union
 from django.contrib.auth.models import Group, User
 from django.db import models
 from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Exists, Max, OuterRef, Q, QuerySet
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from analysis.models.enums import TagLocation
+from analysis.enums import TagLocation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_version import NodeVersion

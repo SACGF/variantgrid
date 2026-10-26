@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_vep_version
 from annotation.models import VariantAnnotationVersion
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 from snpdb.models.models_partition_archive import PartitionArchive
 

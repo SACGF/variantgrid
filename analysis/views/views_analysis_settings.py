@@ -13,8 +13,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from analysis import forms
+from analysis.enums import AnalysisTemplateType
 from analysis.models import AnalysisLock
-from analysis.models.enums import AnalysisTemplateType
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.node_counts import get_node_counts_mine_and_available
 from analysis.models.nodes.node_version import NodeVersion

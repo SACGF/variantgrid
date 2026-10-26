@@ -10,6 +10,7 @@ Read-only: nothing here writes to the database, the broker or the filesystem.
 import shutil
 import socket
 import subprocess
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -39,6 +40,8 @@ from variantgrid.celery import app as celery_app
 SCALE_TABLES = ("snpdb_variant", "snpdb_allele", "snpdb_locus", "snpdb_sample", "snpdb_vcf",
                 "classification_classification", "analysis_analysis", "analysis_varianttag", "annotation_annotationrun")
 RECENT_ERRORS = 10
+QUEUE_CONSUMER_WAIT_SECONDS = 30
+QUEUE_CONSUMER_POLL_SECONDS = 2
 
 
 @dataclass
@@ -71,7 +74,7 @@ def gather_status() -> Status:
     _section(status, "db", _db)
     _section(status, "builds", _builds)
     _section(status, "services", _services)
-    _section(status, "queues", lambda: broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES]))
+    _section(status, "queues", lambda: _queues(status.services))
     _section(status, "annotation_runs", _annotation_runs)
     _section(status, "annotation_runs_abandoned", _annotation_runs_abandoned)
     _section(status, "manual_outstanding", _manual_outstanding)
@@ -139,6 +142,28 @@ def broker_queue_depths(queue_names) -> dict[str, dict]:
     return queues
 
 
+def task_queue_name(task_name: str) -> str:
+    """ The queue a task is routed to: its CELERY_TASK_ROUTES entry, else the default queue """
+    route = settings.CELERY_TASK_ROUTES.get(task_name) or {}
+    return route.get("queue", settings.CELERY_TASK_DEFAULT_QUEUE)
+
+
+def _queues(services: dict[str, str]) -> dict[str, dict]:
+    """ A worker restarted moments ago is still loading Django and has not registered as a consumer yet, so a queue
+        whose unit is active but shows none is re-read for up to QUEUE_CONSUMER_WAIT_SECONDS before it is reported. """
+    queues = broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES])
+    deadline = time.monotonic() + QUEUE_CONSUMER_WAIT_SECONDS
+    while (awaiting := _awaiting_consumer(queues, services)) and time.monotonic() < deadline:
+        time.sleep(QUEUE_CONSUMER_POLL_SECONDS)
+        queues.update(broker_queue_depths(awaiting))
+    return queues
+
+
+def _awaiting_consumer(queues: dict[str, dict], services: dict[str, str]) -> list[str]:
+    return [name for name, info in queues.items()
+            if info.get("consumers") == 0 and services.get(f"celeryd_{name}") == "active"]
+
+
 def _annotation_runs() -> dict[str, int]:
     historical = VariantAnnotationVersion.Status.HISTORICAL
     in_flight = incomplete_annotation_runs_qs().filter(annotation_range_lock__isnull=False).exclude(
@@ -202,7 +227,8 @@ def render_status(status: Status) -> str:
                      + (f"  DOWN: {', '.join(down)}" if down else ""))
     if status.queues:
         lines.append("queues: " + ", ".join(
-            f"{name} {info['messages']}q/{info['consumers']}c" if "messages" in info else f"{name} {info['error']}"
+            f"{name} {info['messages']}q/{info['consumers']}c" + (" NO CONSUMER" if info["consumers"] == 0 else "")
+            if "messages" in info else f"{name} {info['error']}"
             for name, info in status.queues.items()))
     lines.append("annotation runs in flight: " + (", ".join(f"{k} {v}" for k, v in status.annotation_runs.items()) or "none"))
     if status.annotation_runs_abandoned:

@@ -96,7 +96,9 @@
                         can only match an overlapping gnomAD-SV call. From {{ structural_variant_min_size }} a
                         variant is annotated as a structural variant: gene overlaps, gnomAD-SV
                         {% if annotsv_enabled %}and AnnotSV{% endif %}, without the per-base scores (eg SpliceAI,
-                        CADD, dbNSFP) that only exist for short variants.
+                        CADD, dbNSFP) that only exist for short variants. That includes a variant stored as its
+                        sequence (an insertion or complex substitution) whose reference or alternate allele is
+                        {{ structural_variant_min_size }} or longer.
                     </dd>
                     {% if vep_sv_max_size %}
                         <dt>Not annotated by VEP over {{ vep_sv_max_size }}</dt>

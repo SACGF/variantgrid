@@ -1,8 +1,9 @@
+import json
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Union, Type
-import json
+from typing import Type, Union
+
 import django.dispatch
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
@@ -17,12 +18,12 @@ from django.db.models import (
     JSONField,
     ManyToManyField,
     QuerySet,
-    TextChoices,
     TextField,
 )
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
+from review.enums import QuestionValueType, ReviewMedium, ReviewParticipants
 from snpdb.models import Lab
 from uicore.widgets.describe_difference_widget import DifferenceResolution
 
@@ -35,31 +36,10 @@ on the review's topic.
 """
 
 
-class QuestionValueType(TextChoices):
-    """
-    The question type in a review topic, currently only supports disagreement, but we could support more in future
-    """
-    Disagreement = 'D', "Disagreement"
-
-
 @dataclass(frozen=True)
 class QuestionOption:
     key: str
     label: str
-
-
-# TODO are we ReviewMedium or ReviewMethod or something else?
-# TODO should these options be made configurable, or based on the topic?
-class ReviewMedium(TextChoices):
-    email = "email", "Email"
-    phone = "phone", "Phone"
-    video = "mtm", "Multidisciplinary Team Meeting"
-
-
-class ReviewParticipants(TextChoices):
-    curation = "curation", "Curation Scientists"
-    clinicians = "clinicians", "Clinicians"
-    external_experts = "external_experts", "External Experts"
 
 
 @dataclass(frozen=True)
@@ -234,6 +214,7 @@ class Review(TimeStampedModel):
                 return [ValueOther.from_str(method, ReviewMedium)]
             else:
                 return sorted(ValueOther.from_str(m, ReviewMedium) for m in method)
+        return []
 
     @property
     def participants(self) -> list[ValueOther]:
@@ -243,20 +224,18 @@ class Review(TimeStampedModel):
 
     @property
     def answers(self) -> list[ReviewAnswer]:
-        if answers := self.meeting_meta.get("answers", {}):
-            answer_list = []
-            for key, answer in answers.items():
-                # TODO, put safety if no question can be found
-                if question := ReviewQuestion.objects.get(topic=self.topic, key=key):
-                    answer_list.append(
-                        ReviewAnswer(
-                            question=question,
-                            details=answer.get("details"),
-                            resolution=DifferenceResolution(answer.get("resolution"))
-                        )
-                    )
-            return answer_list
-        return []
+        answers = self.meeting_meta.get("answers") or {}
+        # a question deleted in the admin (rather than disabled) drops out of historical reviews
+        questions = ReviewQuestion.objects.filter(topic=self.topic, key__in=answers.keys()).in_bulk()
+        return [
+            ReviewAnswer(
+                question=question,
+                details=answer.get("details"),
+                resolution=DifferenceResolution(answer.get("resolution"))
+            )
+            for key, answer in answers.items()
+            if (question := questions.get(key))
+        ]
 
     @cached_property
     def post_review_data_formatted(self) -> str:

@@ -107,7 +107,8 @@ def dashboard(request):
 
     context = {'git': Git(settings.BASE_DIR),
                'sample_enrichment_kits_df': sample_enrichment_kits_df,
-               "latest_sequencing_vcfs": latest_sequencing_vcfs}
+               "latest_sequencing_vcfs": latest_sequencing_vcfs,
+               "show_tag_stats_graph": settings.VIEW_DASHBOARD_TAG_STATS_GRAPH}
     return render(request, "variantopedia/dashboard.html", context)
 
 

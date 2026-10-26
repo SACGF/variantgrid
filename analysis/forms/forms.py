@@ -12,24 +12,24 @@ from django.db import models, transaction
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
+from analysis.enums import (
+    AnalysisTemplateType,
+    AnalysisType,
+    CandidateStatus,
+    DuoSample,
+    NodeStatus,
+    QuadSample,
+    SNPMatrix,
+    TrioSample,
+)
 from analysis.models import (
     Analysis,
     AnalysisNode,
     AnalysisTemplate,
     AnalysisTemplateVersion,
     AutoLaunchAnalysisTemplate,
-    CandidateStatus,
     FilterNodeItem,
     NodeGraphType,
-)
-from analysis.models.enums import (
-    AnalysisTemplateType,
-    AnalysisType,
-    DuoSample,
-    NodeStatus,
-    QuadSample,
-    SNPMatrix,
-    TrioSample,
 )
 from analysis.models.nodes.node_types import (
     get_node_class_choices,
@@ -43,7 +43,7 @@ from library.django_utils import get_models_dict_by_column
 from library.django_utils.autocomplete_utils import ModelSelect2, Select2Multiple
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models_enums import SampleSourceLevel, Sex
+from patients.enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
 from snpdb.forms import UserSettingsGenomeBuildMixin
 from snpdb.models import (

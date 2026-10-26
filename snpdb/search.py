@@ -5,7 +5,7 @@ SearchInput.search runs every receiver visible to the input and SearchResponsesC
 merges their SearchResponses (single_preferred_result is the auto-jump). SearchReceiver owns the
 shared behaviour - admin gating, preview_enabled, the regex pattern, result caps, error capture,
 timing and the variant-to-allele conversion under settings.PREFER_ALLELE_LINKS. Receivers live in
-each app's signals/ package (snpdb/signals/variant_search.py is the largest).
+each app's signals/ package (variantopedia/signals/variant_search.py is the largest).
 """
 import itertools
 import logging
@@ -114,27 +114,6 @@ class SearchInput:
         """ Runs every registered SearchReceiver visible to this input. SearchReceiver.search captures errors """
         return [receiver.search(self) for receiver in search_registry.receivers if receiver.visible_to(self)]
 
-    def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
-        """ Shariant wants to restrict search to only classified variants """
-
-        from annotation.annotation_version_querysets import (
-            get_variant_queryset_for_annotation_version,
-        )
-        from annotation.models import AnnotationVersion
-        from classification.models import Classification
-
-        # Search receivers filter Variants by locus/position/pk/alt and don't join to annotation
-        # partitions, so a plain queryset returns identical results without the partition transformer.
-        if annotation_version := AnnotationVersion.latest_or_none(genome_build, context="Search"):
-            variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
-        else:
-            variant_qs = Variant.objects.all()
-        variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
-        if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not self.user.is_superuser:
-            variant_qs = variant_qs.filter(Classification.objects.published_variant_q(self.user, genome_build))
-
-        return variant_qs
-
     @cached_property
     def genome_builds(self) -> set[GenomeBuild]:
         """
@@ -177,9 +156,6 @@ class SearchInputInstance:
     @property
     def genome_build_preferred(self) -> GenomeBuild:
         return self.search_input.genome_build_preferred
-
-    def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
-        return self.search_input.get_visible_variants(genome_build=genome_build)
 
     @property
     def search_words(self) -> list[str]:

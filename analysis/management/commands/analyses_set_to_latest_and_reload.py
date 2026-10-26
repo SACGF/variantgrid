@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db.models import F
 
-from analysis.models import NodeStatus
+from analysis.enums import NodeStatus
 from analysis.models.models_analysis import Analysis
 from annotation.models.models_annotation_version import AnnotationVersion
 

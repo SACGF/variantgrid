@@ -26,8 +26,8 @@ from classification.views.exports.classification_export_utils import CHGVSData
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
 from ontology.models import OntologyTerm
-from snpdb.models import AlleleOriginFilterDefault, GenomeBuild
-from snpdb.models.models_enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket, AlleleOriginFilterDefault
+from snpdb.models import GenomeBuild
 
 
 class TestingContextMode(StrEnum):

@@ -3,8 +3,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import QuadInheritance
 from analysis.models import Analysis, QuadNode
-from analysis.models.enums import QuadInheritance
 from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin
 from annotation.fake_data import get_fake_annotation_version
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_quad, make_cohort_genotype

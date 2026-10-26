@@ -29,7 +29,7 @@ from classification.reclassification_analytics.results import EvidenceMovement
 from classification.reclassification_analytics.survival import life_table
 from classification.tests.models.test_utils import ClassificationTestUtils
 from flags.models import Flag
-from snpdb.models.models_enums import AlleleOriginBucket, ClinicalSignificance
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 
 
 class ReclassificationEventTestCase(TestCase):

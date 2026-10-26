@@ -6,6 +6,7 @@ bleach
 biopython>=1.81
 cdot>=0.2.31
 celery
+certifi>=2026.10.19  # transitive (requests): drops the compromised eMudhra emSign roots
 dataclasses-json==0.6.7  # pinned for omniimporter
 crispy-bootstrap4
 cryptography>=50.0.0
@@ -19,9 +20,7 @@ django-axes[ipware]
 django_cache_memoize
 django-compressor
 django_crispy_forms
-django_dag  # only imported by old seqauto/annotation migrations - remove after squashing (#736)
 django_datetime_utc
-django-extensions
 django-guardian
 django-js-reverse
 django_json_widget
@@ -37,7 +36,7 @@ drf-spectacular-sidecar
 easy_thumbnails
 fontawesomefree==6.4.0
 gunicorn
-hgvs @ git+https://github.com/biocommons/hgvs@13289ab3b9db3c751918906c543991c74917ff61  # main until a release has biocommons/hgvs#899, #901, #902 and #911 (#2103)
+hgvs @ git+https://github.com/davmlaw/hgvs@56f73505c9c0db5af31a434ff62c8a3fe8679a43  # fork: biocommons main fadc43877 (until a release has biocommons/hgvs#899, #901, #902 and #911, #2103) plus the dup/inv guard near the start of a contig (davmlaw/dave-admin#247) - back to biocommons once merged
 html2docx
 ijson
 kombu
@@ -49,11 +48,11 @@ mozilla_django_oidc
 nameparser
 nltk>=3.10.0
 numpy
-oauthlib
+oauthlib>=4.0.0
 openpyxl  # pandas read_excel (SA Pathology somatic xlsx import)
 pandas
 ped_parser
-pillow>=12.3.0
+pillow>=13.0.0
 pronto>=2.4.7
 psycopg[binary]
 pyBigWig>=0.3.22

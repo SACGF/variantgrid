@@ -1,5 +1,10 @@
 """ annotation/annotation_versions.py:get_range_lock_gaps_with_variants - variants left between AnnotationRangeLocks """
+from unittest.mock import patch
+
+from django.db.models import QuerySet
+from django.db.utils import OperationalError
 from django.test import TestCase
+from psycopg.errors import QueryCanceled
 
 from annotation.annotation_versions import get_range_lock_gaps_with_variants
 from annotation.models import AnnotationRangeLock, VariantAnnotationVersion
@@ -18,7 +23,7 @@ class RangeLockGapsTestCase(TestCase):
             return slowly_create_test_variant("1", position, 'A', 'T', genome_build)
 
         # Variants are created in pk order
-        create_variant(100000)  # Unlocked, before the first lock
+        create_variant(100000)  # Unlocked, before the first lock - not probed
         cls.locked_1 = create_variant(100010)
         create_variant(100020, genome_build=grch38)
         cls.locked_2 = create_variant(100030)
@@ -34,9 +39,16 @@ class RangeLockGapsTestCase(TestCase):
         self._make_lock(self.locked_3, self.locked_3)
 
         gaps = get_range_lock_gaps_with_variants(self.vav)
-        expected = [
-            (1, self.locked_1.pk - 1),
-            (self.locked_2.pk + 1, self.locked_3.pk - 1),
-        ]
-        self.assertEqual(gaps, expected)
+        self.assertEqual(gaps.with_variants, [(self.locked_2.pk + 1, self.locked_3.pk - 1)])
+        self.assertEqual(gaps.unchecked, [])
+
+    def test_probe_timeout_reports_unchecked(self):
+        self._make_lock(self.locked_1, self.locked_1)
+        self._make_lock(self.locked_3, self.locked_3)
+
+        with patch.object(QuerySet, "first", side_effect=OperationalError("timeout")) as mock_first:
+            mock_first.side_effect.__cause__ = QueryCanceled()
+            gaps = get_range_lock_gaps_with_variants(self.vav, probe_timeout_seconds=1)
+        self.assertEqual(gaps.with_variants, [])
+        self.assertEqual(gaps.unchecked, [(self.locked_1.pk + 1, self.locked_3.pk - 1)])
 
