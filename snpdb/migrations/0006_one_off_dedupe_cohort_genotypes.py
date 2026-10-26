@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('manual', '0001_initial'),
-        ('snpdb', '0004_alphagenome_splicing_column'),
+        ('snpdb', '0005_test_variantgrid_site'),
     ]
 
     operations = [
-        ManualOperation.operation_manage(["dedupe_cohort_genotypes"], test=_test_has_cohort_genotypes),
+        ManualOperation.operation_manage(["one_off_dedupe_cohort_genotypes"], test=_test_has_cohort_genotypes),
     ]

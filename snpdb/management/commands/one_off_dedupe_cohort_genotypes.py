@@ -8,7 +8,7 @@ subtracted.
 A row whose genotype differs from the lowest id row is left in place and reported as a warning: one VCF giving the
 same variant two genotypes is an import / normalisation bug, and picking one would silently drop a call. Each
 collection's partition is searched and fixed on its own, in its own transaction. --dry-run reports without writing.
-Registered as a deploy-time ManualOperation (snpdb/migrations/0005_dedupe_cohort_genotypes.py).
+Registered as a deploy-time ManualOperation (snpdb/migrations/0006_one_off_dedupe_cohort_genotypes.py).
 """
 from collections import defaultdict
 from dataclasses import dataclass, field

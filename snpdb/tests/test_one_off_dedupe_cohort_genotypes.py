@@ -56,17 +56,17 @@ class DedupeCohortGenotypesTest(TestCase):
         vzc = VariantZygosityCount.objects.get(collection=self.collection, variant=variant)
         return vzc.ref_count, vzc.het_count, vzc.hom_count
 
-    @mock.patch("snpdb.management.commands.dedupe_cohort_genotypes.report_message")
+    @mock.patch("snpdb.management.commands.one_off_dedupe_cohort_genotypes.report_message")
     def test_deletes_identical_and_warns_differing(self, mock_report_message):
         first_id, _identical_id = self._genotype_ids(self.identical_variant)
         differing_ids = self._genotype_ids(self.differing_variant)
 
-        call_command("dedupe_cohort_genotypes", "--dry-run", stdout=StringIO())
+        call_command("one_off_dedupe_cohort_genotypes", "--dry-run", stdout=StringIO())
         self.assertEqual(2, len(self._genotype_ids(self.identical_variant)))
         mock_report_message.assert_not_called()
 
         out = StringIO()
-        call_command("dedupe_cohort_genotypes", stdout=out)
+        call_command("one_off_dedupe_cohort_genotypes", stdout=out)
         self.assertEqual([first_id], self._genotype_ids(self.identical_variant))
         self.assertEqual(differing_ids, self._genotype_ids(self.differing_variant))
         self.assertIn(f"variant {self.differing_variant.pk}: rows {differing_ids}", out.getvalue())
