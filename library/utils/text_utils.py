@@ -100,10 +100,7 @@ def delimited_row(data: list, delimiter: str = ',', include_new_line=True, **kwa
     # https://docs.python.org/3/library/csv.html#csv.writer
     # If csvfile is a file object, it should be opened with newline=''
     out = io.StringIO(newline='')
-    if delimiter == '\t':
-        writer = csv.writer(out, delimiter=delimiter, **kwargs)
-    else:
-        writer = csv.writer(out, delimiter=delimiter, **kwargs)
+    writer = csv.writer(out, delimiter=delimiter, **kwargs)
     writer.writerow(data)
     text = out.getvalue()
     if not include_new_line:

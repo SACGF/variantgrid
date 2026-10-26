@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
-from functools import cached_property, reduce, total_ordering
+from functools import cached_property, reduce
 from operator import __and__
 from typing import Any, Optional, TypeVar, Union
 
@@ -24,7 +24,6 @@ from library.utils import ChoicesEnum
 flag_collection_extra_info_signal = django.dispatch.Signal()  # args: "flag_infos", "user"
 
 
-@total_ordering
 class FlagPermissionLevel(str, ChoicesEnum):
     NO_PERM = '0'
     USERS = 'U'
@@ -44,8 +43,18 @@ class FlagPermissionLevel(str, ChoicesEnum):
             return 4
         return 0
 
+    # str defines every comparison (by letter), so all four are overridden to compare by level
     def __lt__(self, other):
         return self.level < other.level
+
+    def __le__(self, other):
+        return self.level <= other.level
+
+    def __gt__(self, other):
+        return self.level > other.level
+
+    def __ge__(self, other):
+        return self.level >= other.level
 
 
 class FlagResolution(TimeStampedModel, ModelUtilsMixin):

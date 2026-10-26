@@ -20,7 +20,6 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from library.django_utils.database_utils import queryset_to_sql
 from library.django_utils.major_operation import planner_join_collapse_limit
 from library.log_utils import log_traceback
-from library.utils import add_exception_note
 from snpdb.enums import ProcessingStatus
 from snpdb.models import Contig, VariantCollection
 from snpdb.variant_collection import write_sql_to_variant_collection
@@ -87,7 +86,7 @@ def annotate_and_filter_queryset(qs: QuerySet, a_kwargs: dict, arg_q_dict: dict)
             try:
                 qs = qs.filter(q)
             except FieldError as fe:
-                add_exception_note(fe, f"annotation kwarg: {k}: {q=}.")
+                fe.add_note(f"annotation kwarg: {k}: {q=}.")
                 raise
 
     q_list = []

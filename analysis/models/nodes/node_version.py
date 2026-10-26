@@ -15,7 +15,6 @@ from django.dispatch import receiver
 from model_utils.models import TimeStampedModel
 
 from analysis.models.nodes.node_counts import get_node_extra_filters_q
-from library.django_utils import thread_safe_unique_together_get_or_create
 from snpdb.models import VariantCollection
 
 if TYPE_CHECKING:
@@ -90,8 +89,8 @@ class NodeCache(models.Model):
     def get_or_create_for_node(node: "AnalysisNode") -> tuple['NodeCache', bool]:
         variant_collection = VariantCollection.objects.create(name=f"NodeCache {node.node_version}")
         defaults = {"variant_collection": variant_collection}
-        node_cache, created = thread_safe_unique_together_get_or_create(NodeCache, node_version=node.node_version,
-                                                                        defaults=defaults)
+        node_cache, created = NodeCache.objects.get_or_create(node_version=node.node_version,
+                                                              defaults=defaults)
         if not created:
             variant_collection.delete()
         return node_cache, created

@@ -32,12 +32,11 @@ class FastaFileWrapper:
         if self.convert_chrom_func:
             contig = self.convert_chrom_func(contig)
 
-        try:
-            return FastaFileContigWrapper(self.fasta_file, contig)
-        except KeyError as exc:
+        if contig not in self.fasta_file:
             if contig != original_contig:
                 failed_lookup = f"'{contig}' (originally: '{original_contig}')"
             else:
                 failed_lookup = f"'{original_contig}'"
             msg = f"Error loading HGVS: contig {failed_lookup} not in the ref genome '{self.fasta_filename}'"
-            raise KeyError(msg) from exc
+            raise KeyError(msg)
+        return FastaFileContigWrapper(self.fasta_file, contig)
