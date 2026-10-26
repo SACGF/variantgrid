@@ -10,7 +10,7 @@ from annotation.clinvar_xml_parser import (
     ClinVarXmlParserOutput,
 )
 from annotation.models import ClinVarRecord
-from library.entrez import eutils_request
+from library.entrez import efetch
 from library.utils.xml_utils import PP, parser_path
 from snpdb.enums import AlleleOriginBucket
 
@@ -48,8 +48,8 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
             vcv = f"0{vcv}"
         vcv = f"VCV{vcv}"
 
-        response = eutils_request("efetch", db="clinvar", rettype="vcv", id=vcv)
-        parsed_results = cls.load_from_input(io.BytesIO(response.content))
+        vcv_xml = efetch("clinvar", vcv, rettype="vcv")
+        parsed_results = cls.load_from_input(io.BytesIO(vcv_xml.encode()))
 
         return ClinVarXmlParserOutput(
             all_records=parsed_results,

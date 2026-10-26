@@ -34,13 +34,12 @@ def _response(status_code: int, text: str) -> Response:
 class RefSeqFetchErrorTest(SimpleTestCase):
     def test_entrez_error_body_raises_no_transcript(self):
         """ NoTranscript is reported to the user by raise_bad_or_missing_transcript, a bare ValueError was a 500 """
-        with mock.patch("genes.transcript_sequence_retrieval.eutils_request",
-                        return_value=_response(200, "Error: F a i l e d")):
+        with mock.patch("genes.transcript_sequence_retrieval.efetch", return_value="Error: F a i l e d"):
             with self.assertRaises(NoTranscript):
                 TranscriptSequenceFetcher().fetch_refseq("NM_000001.1")
 
     def test_400_raises_bad_transcript(self):
-        with mock.patch("genes.transcript_sequence_retrieval.eutils_request",
+        with mock.patch("genes.transcript_sequence_retrieval.efetch",
                         side_effect=HTTPError(response=_response(400, ""))):
             with self.assertRaises(BadTranscript):
                 TranscriptSequenceFetcher().fetch_refseq("NM_000001.1")

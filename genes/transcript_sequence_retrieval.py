@@ -7,11 +7,11 @@ an implementation that serves recorded sequences (@see genes.tests.utils.mock_tr
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from io import BytesIO, StringIO
+from io import StringIO
 from typing import Optional
 
 import requests
-from Bio import Entrez, SeqIO
+from Bio import SeqIO
 from django.conf import settings
 from django.utils.module_loading import import_string
 
@@ -19,7 +19,7 @@ from genes.enums import AnnotationConsortium
 from genes.transcript_errors import BadTranscript, NoTranscript
 from genes.transcript_parts import get_transcript_id_and_version
 from library.constants import MINUTE_SECS
-from library.entrez import eutils_request
+from library.entrez import efetch, epost
 from library.utils import get_single_element, iter_fixed_chunks
 from snpdb.models import GenomeBuild
 
@@ -68,12 +68,11 @@ class TranscriptSequenceFetcher:
 
     def fetch_refseq(self, transcript_accession: str) -> FetchedTranscriptSequence:
         try:
-            response = eutils_request("efetch", db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
+            api_response = efetch('nuccore', transcript_accession, rettype='gb', retmode='text')
         except requests.HTTPError as e:
             if e.response is not None and e.response.status_code == 400:
                 raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found") from e
             raise e
-        api_response = response.text
         with StringIO(api_response) as f:
             if api_response.startswith("Error:"):
                 error_message = api_response[6:]
@@ -126,19 +125,10 @@ class TranscriptSequenceFetcher:
         for id_list in iter_fixed_chunks(transcript_accessions, entrez_batch_size):
             id_param = ",".join(id_list)
             try:
-                epost_response = eutils_request("epost", db="nuccore", id=id_param)
-                search_results = Entrez.read(BytesIO(epost_response.content))
-                fetch_response = eutils_request(
-                    "efetch",
-                    timeout=MINUTE_SECS,
-                    db="nuccore",
-                    rettype="gb",
-                    retmode="text",
-                    webenv=search_results["WebEnv"],
-                    query_key=search_results["QueryKey"],
-                    idtype="acc",
-                )
-                for record in SeqIO.parse(StringIO(fetch_response.text), "genbank"):
+                posted = epost("nuccore", id_list)
+                genbank = efetch("nuccore", rettype="gb", retmode="text", webenv=posted["WebEnv"],
+                                 query_key=posted["QueryKey"], idtype="acc", timeout=MINUTE_SECS)
+                for record in SeqIO.parse(StringIO(genbank), "genbank"):
                     # Store raw data so that we can retrieve more stuff from it later
                     s = StringIO()
                     SeqIO.write(record, s, "genbank")

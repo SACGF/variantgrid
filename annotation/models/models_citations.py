@@ -9,7 +9,7 @@ from datetime import timedelta
 from functools import cached_property
 from typing import Any, Optional, Union
 
-from Bio import Entrez, Medline
+from Bio import Medline
 from django.db import models
 from django.db.models import TextField
 from django.urls import reverse
@@ -17,7 +17,7 @@ from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
 from annotation.enums import CitationSource, EntrezDbType
-from library.entrez import eutils_request
+from library.entrez import efetch, esearch, esummary
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import JsonObjType, first
@@ -633,8 +633,8 @@ class CitationFetchRequest:
         """
         request_ids = [citation_id.index for citation_id in ids]
         try:
-            response = eutils_request("efetch", db=entrez_db, id=request_ids, rettype='medline', retmode='text')
-            records = list(Medline.parse(io.StringIO(response.text)))
+            medline = efetch(entrez_db, request_ids, rettype='medline', retmode='text')
+            records = list(Medline.parse(io.StringIO(medline)))
             for record in records:
                 normal_id: CitationIdNormalized
                 if entrez_db == EntrezDbType.PUBMED:
@@ -677,11 +677,9 @@ class CitationFetchRequest:
         """
         for bookshelf_rid in ids:
             try:
-                response = eutils_request("esearch", db=EntrezDbType.BOOKSHELF, term=bookshelf_rid.index, retmax=50)
-                search_results = Entrez.read(io.BytesIO(response.content))
+                search_results = esearch(EntrezDbType.BOOKSHELF, bookshelf_rid.index, retmax=50)
                 if id_list := search_results['IdList']:
-                    response = eutils_request("esummary", db=EntrezDbType.BOOKSHELF, id=id_list)
-                    results = Entrez.read(io.BytesIO(response.content))
+                    results = esummary(EntrezDbType.BOOKSHELF, id_list)
 
                     for record in results:
                         rid = record["RID"]

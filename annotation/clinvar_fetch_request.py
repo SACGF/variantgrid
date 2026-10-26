@@ -105,7 +105,7 @@ class ClinVarFetchRequest:
         return clinvar_record_collection
 
     def _load_from_clinvar(self) -> ClinVarXmlParserOutput:
-        # eutils_request retries server errors, but ClinVar has also been providing 400s (Bad Request) when
+        # library.entrez retries server errors, but ClinVar has also been providing 400s (Bad Request) when
         # the request is fine
         attempt_count = 2
         while True:
