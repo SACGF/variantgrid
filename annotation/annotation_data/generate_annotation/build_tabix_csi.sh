@@ -7,9 +7,10 @@
 # same columns.
 #
 # Usage: build_tabix_csi.sh [--dry-run] [--jobs N] [--min-shift N] [dir ...]
-#   dirs default to /data/annotation/VEP/annotation_data/{GRCh37,GRCh38}; every <file>.tbi there without a
-#   <file>.csi is indexed, JOBS at a time (default 2), at low CPU and I/O priority. Each build reads the whole file
-#   (about 70 MB/s per job), so budget hours for the 300 GB of GRCh38 sources. Progress goes to build_tabix_csi.log
+#   dirs default to ${VEP_ANNOTATION_DIR}/annotation_data/{GRCh37,GRCh38,T2T-CHM13v2.0}, VEP_ANNOTATION_DIR being the
+#   settings' ANNOTATION_VEP_BASE_DIR as for the sibling scripts here. Every <file>.tbi there without a <file>.csi is
+#   indexed, JOBS at a time (default 2), at low CPU and I/O priority. Each build reads the whole file (about 70 MB/s
+#   per job), so budget hours for the 300 GB of GRCh38 sources. Progress goes to build_tabix_csi.log
 #   in each dir. Safe to re-run: existing .csi files are skipped and a failed build leaves no .csi behind.
 #   --min-shift sets the bin size, 2^N bp. The default 12 (4 kb) keeps about 85% of the gain of 10 (1 kb) for a
 #   quarter of the index, which htslib holds in memory in every VEP process (+0.34 GB vs +1.4 GB for 20 files).
@@ -21,12 +22,20 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY_RUN=1;;
     --jobs) JOBS=$2; shift;;
     --min-shift) MIN_SHIFT=$2; shift;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0;;
     *) DIRS+=("$1");;
   esac
   shift
 done
-[ ${#DIRS[@]} -eq 0 ] && DIRS=(/data/annotation/VEP/annotation_data/GRCh37 /data/annotation/VEP/annotation_data/GRCh38)
+if [ ${#DIRS[@]} -eq 0 ]; then
+  if [ -z "${VEP_ANNOTATION_DIR:-}" ]; then
+    echo "Set VEP_ANNOTATION_DIR (the settings' ANNOTATION_VEP_BASE_DIR) or pass the annotation dirs" >&2
+    exit 1
+  fi
+  for build in GRCh37 GRCh38 T2T-CHM13v2.0; do
+    [ -d "${VEP_ANNOTATION_DIR}/annotation_data/$build" ] && DIRS+=("${VEP_ANNOTATION_DIR}/annotation_data/$build")
+  done
+fi
 
 # tabix arguments equivalent to the .tbi's own column settings (format 2 = VCF preset; the UCSC flag = 0-based)
 tabix_args_from_tbi() {
