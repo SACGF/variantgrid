@@ -113,6 +113,9 @@ Gotchas:
   variants; they never get rows, so any "unannotated" count must apply it.
 - annotation/models/models_annotation_run.py:AnnotationRun.get_for_variant matches by range-lock bounds and pipeline_type: a variant
   inside a lock's range with no annotation row reads as "in progress", not "missing".
+- VEP `--fork` re-forks children every buffer and ships their results back over a socket, so with the pipeline's
+  small `ANNOTATION_VEP_BUFFER_SIZE` it costs CPU rather than saving it; spare cores go into `annotation_workers`
+  `--concurrency` instead (the comment on `ANNOTATION_VEP_FORK` in `variantgrid/settings/components/annotation_settings.py`, #2477).
 - The OpenTargets VEP plugin defaults to lead_variants_only=1, which returns only the credible sets a variant leads —
   annotation/vep_annotation.py passes lead_variants_only=0 so a variant that is merely a member still gets its GWAS L2G
   score. The open_targets_* columns are '&'-joined parallel arrays zipped by

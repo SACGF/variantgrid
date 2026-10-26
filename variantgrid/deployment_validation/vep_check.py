@@ -4,12 +4,26 @@ import os
 from django.conf import settings
 
 from annotation.annotation_versions import vav_diff_vs_kwargs
+from annotation.celery_utils import annotation_worker_slots
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from annotation.vep_plugin_backfill import vep_mismatch_fix
 from snpdb.models import GenomeBuild
 
 INSTALL_VEP = "https://github.com/SACGF/variantgrid/wiki/Install-VEP"
+
+
+def vep_pool_oversubscription(worker_slots: int, fork: int, cpu_count: int) -> str | None:
+    """ #2477: annotation_workers concurrency x ANNOTATION_VEP_FORK is how many CPU-bound VEPs the dispatcher runs
+        at once when there is a backlog; more than the box has cores slows every run (and the web server) rather
+        than finishing any sooner. None when the pool fits. """
+    vep_processes = worker_slots * max(fork or 1, 1)
+    if vep_processes <= cpu_count:
+        return None
+    return (f"annotation_workers concurrency ({worker_slots}) x ANNOTATION_VEP_FORK ({fork}) = {vep_processes} "
+            f"VEP processes for {cpu_count} cores - lower --concurrency in config/celery/celeryd_annotation_workers.env "
+            f"or ANNOTATION_VEP_FORK")
+
 
 def check_vep() -> dict:
     vep_data = {}
@@ -71,5 +85,12 @@ def check_vep() -> dict:
             "valid": run_vep_ok,
             "fix": f"Try 'vep_version --genome-build={genome_build}' management command {INSTALL_VEP}",
         }
+
+    # A warning, not invalid: an oversubscribed pool still finishes, slowly
+    pool_check = {"valid": True}
+    if warning := vep_pool_oversubscription(annotation_worker_slots(), settings.ANNOTATION_VEP_FORK,
+                                            os.cpu_count() or 1):
+        pool_check["warning"] = warning
+    vep_data["vep_pool_fits_cores"] = pool_check
 
     return vep_data

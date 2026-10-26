@@ -167,6 +167,12 @@ and many more variants and samples.
   parallel and one failure only loses its own batch: `snpdb/liftover.py:create_liftover_pipelines` and
   `snpdb/tasks/liftover_tasks.py:liftover_allele_batch` (`settings.LIFTOVER_BATCH_SIZE`) are the pattern. Two reasons, both
   weighed by the owner: cap resource usage, and limit how much one error destroys.
+- **VEP parallelism is the worker pool, not `--fork`.** The dispatcher fills every `annotation_workers` slot while
+  there is a backlog, so `--concurrency` × `ANNOTATION_VEP_FORK` CPU-bound VEPs run at once: keep that at or under the
+  box's cores (`deployment_check` warns) and raise `--concurrency` in `config/celery/celeryd_annotation_workers.env`
+  (~0.4 GB a standard run) before forking, which re-forks per buffer and costs ~30% more CPU per variant - the
+  reasoning is on the setting in `variantgrid/settings/components/annotation_settings.py` (#2477). The annotation runs
+  grid's Variants/s column is where a new plugin's cost shows up.
 - **Aggregate in SQL, not Python.** Grouping, deduplicating or merging tags, genotypes or annotations belongs in
   `annotate()` / `Count` / `Min` + `update()` / `delete()` on a queryset. Streaming rows into a `set`, `dict` or `Counter` is a
   design error at these sizes, in management commands as much as in views.

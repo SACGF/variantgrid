@@ -429,6 +429,15 @@ class AnnotationRun(TimeStampedModel):
     def genome_build(self):
         return self.annotation_range_lock.version.genome_build
 
+    @property
+    def annotation_variants_per_second(self) -> float | None:
+        """ Throughput of the annotation phase (dump_count over annotation_start..annotation_end): the number to
+            compare across runs after a new plugin or data file (#2477). None until VEP has finished. """
+        if not (self.dump_count and self.annotation_start and self.annotation_end):
+            return None
+        seconds = (self.annotation_end - self.annotation_start).total_seconds()
+        return self.dump_count / seconds if seconds > 0 else None
+
     def delete_related_objects(self):
         from annotation.annotation_version_querysets import get_queryset_for_annotation_version
 

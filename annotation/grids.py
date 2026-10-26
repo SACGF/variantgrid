@@ -1,7 +1,8 @@
 from datetime import timedelta
 from typing import Any
 
-from django.db.models import ExpressionWrapper, F, QuerySet, fields
+from django.db.models import Case, ExpressionWrapper, F, QuerySet, When, fields
+from django.db.models.functions import Extract
 
 from annotation.models import (
     AnnotationRun,
@@ -34,6 +35,10 @@ class AnnotationRunColumns(DatatableConfig[AnnotationRun]):
         if data_version := row["pipeline_version__data_version"]:
             return f"{code_version}/{data_version}"
         return code_version
+
+    @staticmethod
+    def format_rate(cell: CellData):
+        return f"{cell.value:.1f}" if cell.value is not None else "-"
 
     @staticmethod
     def format_timedelta(cell: CellData):
@@ -72,6 +77,8 @@ class AnnotationRunColumns(DatatableConfig[AnnotationRun]):
             RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn(key="dump_duration", renderer=self.format_timedelta, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn(key="annotation_duration", renderer=self.format_timedelta, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
+            RichColumn(key="annotation_rate", label="Variants/s", renderer=self.format_rate,
+                       order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn(key="upload_duration", renderer=self.format_timedelta, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
 
             RichColumn(key=None, name='preview', label='Data',
@@ -87,6 +94,12 @@ class AnnotationRunColumns(DatatableConfig[AnnotationRun]):
             dump_duration=ExpressionWrapper(F('dump_end') - F('dump_start'), output_field=fields.DurationField()))
         qs = qs.annotate(
             annotation_duration=ExpressionWrapper(F('annotation_end') - F('annotation_start'), output_field=fields.DurationField()))
+        # #2477: VEP throughput per run, so a new plugin or data file shows as a drop here on the next deployment
+        qs = qs.annotate(annotation_rate=Case(
+            When(annotation_end__gt=F('annotation_start'), dump_count__gt=0,
+                 then=ExpressionWrapper(F('dump_count') / Extract(F('annotation_duration'), 'epoch'),
+                                        output_field=fields.FloatField())),
+            output_field=fields.FloatField()))
         qs = qs.annotate(
             upload_duration=ExpressionWrapper(F('upload_end') - F('upload_start'), output_field=fields.DurationField()))
         return qs

@@ -114,6 +114,9 @@
                     {% labelled hint="tiny" label="Dump End" %}{% timestamp annotation_run.dump_end show_seconds=True %}{% endlabelled %}
                     {% labelled hint="tiny" label="Annotation Start" %}{% timestamp annotation_run.annotation_start show_seconds=True %}{% endlabelled %}
                     {% labelled hint="tiny" label="Annotation End" %}{% timestamp annotation_run.annotation_end show_seconds=True %}{% endlabelled %}
+                    {% if annotation_run.annotation_variants_per_second %}
+                        {% labelled hint="tiny" label="Annotation Rate" %}{{ annotation_run.annotation_variants_per_second|floatformat:1 }} variants/s{% endlabelled %}
+                    {% endif %}
                     {% labelled hint="tiny" label="Upload Start" %}{% timestamp annotation_run.upload_start show_seconds=True %}{% endlabelled %}
                     {% labelled hint="tiny" label="Upload End" %}{% timestamp annotation_run.upload_end show_seconds=True %}{% endlabelled %}
                 </div>

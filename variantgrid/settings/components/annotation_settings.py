@@ -27,11 +27,15 @@ ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts"
 # comfortably below installed RAM.
 ANNOTATION_VEP_MEMORY_LIMIT_GB = 4
 
-# I've had VEP hang on me when running --fork so by default we run in small batches
-# This causes a small amount of overhead obtaining an AnnotationRangeLock
-# If you get ERROR: Forked process(es) died: read-through of cross-process communication detected
-# You may want to reduce ANNOTATION_VEP_BUFFER_SIZE below
-# @see https://github.com/Ensembl/ensembl-vep/issues/150
+# #2477: CPU-bound VEP processes in flight = annotation_workers --concurrency x ANNOTATION_VEP_FORK, since the
+# dispatcher fills every slot while there is a backlog. Keep that at or under the box's cores (deployment_check
+# warns), and raise the pool's --concurrency (config/celery/celeryd_annotation_workers.env) before forking: VEP forks
+# fresh children for every buffer (Runner::_forked_buffer_to_output), each taking at most buffer_size / (2 x fork)
+# variants and sending its results and transcript cache back through a socket, so with the small buffers below
+# fork is mostly overhead - 32% more CPU per variant measured at --fork 4 --buffer_size 5000, far worse at 100 -
+# and only pays off on cores that would otherwise sit idle. Forking has also hung VEP
+# (https://github.com/Ensembl/ensembl-vep/issues/150); "Forked process(es) died: read-through of cross-process
+# communication detected" means reduce ANNOTATION_VEP_BUFFER_SIZE.
 ANNOTATION_VEP_FORK = 1
 _VARIANT_ANNOTATION_PIPELINE_STANDARD = "S"
 _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT = "C"
