@@ -256,6 +256,7 @@ class PreviewData:
     obj: Optional[Any] = None
     can_liftover: bool = False  # liftover may add this object to another genome build, see PreviewModelMixin.preview_can_liftover
     is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
+    internal_url_post: bool = False  # internal_url performs the operation, so it's followed with a POST not a link
     is_error: bool = False
     # If you add any fields, be sure to modify __hash__ below...
 
@@ -362,6 +363,8 @@ class PreviewData:
     def html_element(self) -> str:
         if self.is_error:
             return "span"
+        if self.internal_url_post:
+            return "button"
         return "a"
 
     @property
@@ -403,6 +406,7 @@ class PreviewData:
             self.obj,
             self.can_liftover,
             self.is_operation,
+            self.internal_url_post,
         )
         return hash(tuple(f for f in fields if f is not None))
 

@@ -4,12 +4,12 @@ import cdot
 from django.conf import settings
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_POST
 
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.enums import VariantAnnotationPipelineType
-from annotation.manual_variant_entry import check_can_create_variants, create_manual_variants
+from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
@@ -354,21 +354,16 @@ def view_annotation_version_details(request, annotation_version_id):
     return render(request, "annotation/view_annotation_version_details.html", context)
 
 
-@require_http_methods(["GET", "POST"])
+@require_POST
 def create_manual_variant_entry_from_text(request, genome_build_name, variants_text):
-    """ Search offers to create a variant it didn't find: GET asks to confirm, POST creates it """
-    check_can_create_variants(request.user)
+    """ Search offers to create a variant it didn't find, as a form posting here """
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     variants_text = variants_text.strip()
     if "\n" in variants_text:
         return HttpResponseBadRequest("Only one variant can be created from search")
 
-    if request.method == "POST":
-        mvec = create_manual_variants(request.user, genome_build, variants_text)
-        return redirect('watch_manual_variant_entry', pk=mvec.pk)
-
-    context = {"genome_build": genome_build, "variants_text": variants_text}
-    return render(request, "annotation/create_manual_variant_entry_from_text.html", context)
+    mvec = create_manual_variants(request.user, genome_build, variants_text)
+    return redirect('watch_manual_variant_entry', pk=mvec.pk)
 
 
 def view_clinvar_records_detail(request, clinvar_variation_id: int, min_stars: int):

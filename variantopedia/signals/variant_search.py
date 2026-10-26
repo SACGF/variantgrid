@@ -88,7 +88,8 @@ class VariantExtra:
             title="Click to create and annotate this variant",
             internal_url=internal_url,
             genome_builds={genome_build},
-            is_operation=True
+            is_operation=True,
+            internal_url_post=True,
         )
 
     @staticmethod

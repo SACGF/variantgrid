@@ -186,7 +186,8 @@
                             {% with preview=search_result.preview %}
                                 {% comment %}The below anchor is used to jump to results of a certain kind{% endcomment %}
                                 <{{ preview.html_element }} {% ifchanged preview.category %}id="results-{{ preview.category|id_safe }}"{% endifchanged %}
-                                        class="list-group-item list-group-item-action list-group-item-{{ search_result.error_severity|severity_bs }} result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}"
+                                        class="list-group-item list-group-item-action list-group-item-{{ search_result.error_severity|severity_bs }} result-{{ preview.category|id_safe }}"
+                                        {% if preview.internal_url_post %}type="submit" form="search-result-post-{{ forloop.counter }}"{% else %}href="{{ preview.internal_url }}"{% endif %}
                                         {% comment %}used to lower opacity of mismatched search results, but got confusing when they weren't duplicates of the correct search{% endcomment %}
                                         {% comment %}style="{% if search_result.genome_build_mismatch %}opacity:0.5{% endif %}"{% endcomment %}
                                         >
@@ -254,6 +255,12 @@
                             {% endwith %}
                         {% endfor %}
                     </ul>
+                    {% comment %}Results that create something POST, from forms kept outside the list-group so its item borders join up{% endcomment %}
+                    {% for search_result in search_results.results %}
+                        {% if search_result.preview.internal_url_post %}
+                            <form id="search-result-post-{{ forloop.counter }}" method="post" action="{{ search_result.preview.internal_url }}">{% csrf_token %}</form>
+                        {% endif %}
+                    {% endfor %}
                 {% endif %}
             </div>
         {% endif %}
