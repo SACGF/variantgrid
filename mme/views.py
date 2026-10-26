@@ -90,6 +90,7 @@ def mme_classification_panel(request: HttpRequest, classification_id: int):
     eligible = state["eligible"]
 
     if request.method == "POST":
+        classification.check_can_write(request.user)
         if not eligible:
             raise Http404("Classification is not eligible for MatchMaker Exchange")
         node_id = request.POST.get("node_id")
