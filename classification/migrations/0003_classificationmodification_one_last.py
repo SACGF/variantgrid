@@ -4,7 +4,7 @@ from django.db import migrations, models
 from django.db.models import Count
 
 
-def _keep_newest_flagged(apps, _schema_editor):
+def _keep_newest_flagged(apps, schema_editor):
     """ Concurrent patches/publishes could leave a record with two last edited or last published modifications,
         keep the flag on the newest so the constraints can be added """
     ClassificationModification = apps.get_model("classification", "ClassificationModification")
@@ -15,6 +15,8 @@ def _keep_newest_flagged(apps, _schema_editor):
             flagged = ClassificationModification.objects.filter(classification_id=classification_id, **{flag: True})
             newest = flagged.order_by("-created", "-pk").first()
             flagged.exclude(pk=newest.pk).update(**{flag: False})
+    # A modification cleared for both flags is updated twice, which queues deferred FK checks that block the index
+    schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 class Migration(migrations.Migration):
