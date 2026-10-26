@@ -76,9 +76,6 @@ Gotchas:
   scheduler and the dispatcher's VEP lane skip it, while the import lane keeps draining. Only
   annotation/tasks/annotate_variants.py:recheck_vep_version clears it, and get_vep_version is lru_cached per worker
   process, so the re-check clears only its own process's cache - restart annotation_workers to re-run the same VAV.
-- The web never runs VEP: the /annotation/ build page reads the version a worker cached
-  (annotation/vep_annotation.py:get_cached_vep_variant_annotation_version_kwargs) and otherwise queues
-  annotation/tasks/annotate_variants.py:cache_vep_version_task on annotation_workers.
 - After VEP or the bulk import, write the run with annotation/models/models_annotation_run.py:AnnotationRun.save_if_owner (conditional
   UPDATE on task_id): a lease that expired mid-VEP means another attempt owns the row and plain save() clobbers it
   (annotation/tasks/annotate_variants.py:AnnotationRunLeaseHeartbeat).

@@ -21,7 +21,6 @@ from annotation.models.models_gene_annotation import (
 )
 from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
 from annotation.pipelines import vep_pipeline_types
-from annotation.tasks.annotate_variants import request_vep_version
 from annotation.vep_annotation import (
     get_cached_vep_variant_annotation_version_kwargs,
     get_vep_command,
@@ -113,13 +112,14 @@ def annotation_build_detail(request, genome_build_name):
             out_of_sync_with_current_vep = "Not created"
         else:
             vav = av.variant_annotation_version
-            vep_vav_kwargs = get_cached_vep_variant_annotation_version_kwargs(vav.genome_build)
-            if vep_vav_kwargs is None:
-                out_of_sync_with_current_vep = request_vep_version(vav.genome_build)
-            elif diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
-                out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
-            else:
-                sync_with_current_vep = "In sync with current VEP"
+            try:
+                vep_vav_kwargs = get_cached_vep_variant_annotation_version_kwargs(vav.genome_build)
+                if diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
+                    out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
+                else:
+                    sync_with_current_vep = "In sync with current VEP"
+            except Exception as e:
+                out_of_sync_with_current_vep = f"Couldn't read the installed VEP's version: {e}"
 
         annotation_details["sync_with_current_vep"] = sync_with_current_vep
         annotation_details["out_of_sync_with_current_vep"] = out_of_sync_with_current_vep

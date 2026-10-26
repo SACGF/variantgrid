@@ -7,7 +7,6 @@ import celery
 from celery import chain
 from celery.canvas import Signature
 from django.conf import settings
-from django.core.cache import cache
 from django.db import connection, transaction
 from django.db.models import F
 from django.utils import timezone
@@ -22,20 +21,13 @@ from annotation.signals.manual_signals import (
 )
 from annotation.vep_annotation import (
     VEPVersionMismatchError,
-    cache_vep_version,
     get_vep_version,
     vep_check_command_line_version_match,
 )
-from annotation.vep_config import VEPConfig
 from eventlog.models import create_event
-from library.constants import MINUTE_SECS
 from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback, report_message
-from snpdb.models.models_genome import GenomeBuild
-
-# How long a request for a worker to cache the VEP version (or the error it failed with) holds off another
-_VEP_VERSION_REQUEST_TTL = 10 * MINUTE_SECS
 
 # #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
 # (which imports this module). Mirror of analysis _trigger_rescheduling (#346).
@@ -352,36 +344,6 @@ def recheck_vep_version(variant_annotation_version_id):
     vav.clear_vep_version_mismatch()
     create_event(None, "Annotation unblocked", f"{vav}: VEP version check passed", severity=LogLevel.INFO)
     _trigger_dispatch(vav.pk)
-
-
-def _vep_version_request_cache_key(genome_build: GenomeBuild) -> str:
-    return f"vep_version_request_{genome_build.name}"
-
-
-def request_vep_version(genome_build: GenomeBuild) -> str:
-    """ For a build with no cached VEP version (get_cached_vep_variant_annotation_version_kwargs): queue an
-        annotation worker to cache it - at most once per _VEP_VERSION_REQUEST_TTL - and return a status
-        message for the page """
-    cache_key = _vep_version_request_cache_key(genome_build)
-    if cache.add(cache_key, "", _VEP_VERSION_REQUEST_TTL):
-        cache_vep_version_task.si(genome_build.name).apply_async()
-    if error := cache.get(cache_key):
-        return f"Couldn't read the installed VEP's version: {error}"
-    return "Reading the installed VEP's version on an annotation worker - reload shortly"
-
-
-@celery.shared_task
-def cache_vep_version_task(genome_build_name):
-    """ Runs VEP (unless this process already has) to cache its version for the web, which never runs it """
-    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    annotation_consortium = VEPConfig(genome_build).annotation_consortium
-    cache_key = _vep_version_request_cache_key(genome_build)
-    try:
-        cache_vep_version(genome_build, annotation_consortium, get_vep_version(genome_build, annotation_consortium))
-    except Exception as e:
-        cache.set(cache_key, str(e) or e.__class__.__name__, _VEP_VERSION_REQUEST_TTL)
-        raise
-    cache.delete(cache_key)
 
 
 @celery.shared_task
