@@ -25,6 +25,7 @@ from annotation.vep_annotation import (
     get_cached_vep_variant_annotation_version_kwargs,
     get_vep_command,
 )
+from annotation.vep_plugin_backfill import vep_mismatch_fix
 from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     CdotDataVersion,
@@ -116,6 +117,7 @@ def annotation_build_detail(request, genome_build_name):
                 vep_vav_kwargs = get_cached_vep_variant_annotation_version_kwargs(vav.genome_build)
                 if diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
                     out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
+                    annotation_details["vep_sync_fix"] = vep_mismatch_fix(vav, vep_vav_kwargs)
                 else:
                     sync_with_current_vep = "In sync with current VEP"
             except Exception as e:

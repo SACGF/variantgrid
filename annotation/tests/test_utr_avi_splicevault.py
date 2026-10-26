@@ -28,9 +28,12 @@ from annotation.models.models_annotation_run import AnnotationRangeLock, Annotat
 from annotation.vep_annotation import get_vep_command
 from annotation.vep_config import vep_component_version_kwargs
 from annotation.vep_plugin_backfill import (
+    ENABLE_COMMAND,
+    SOURCE_PINS,
     backfill_fork,
     backfill_source_columns,
     backfill_vep_command,
+    vep_mismatch_fix,
 )
 from annotation.vep_plugin_display import utr_annotator_effects
 from genes.enums import AnnotationConsortium
@@ -251,6 +254,14 @@ class PluginPinStampTests(TestCase):
         vav.refresh_from_db()
         self.assertEqual(vav.splicevault, "SpliceVault_data_hg19.refseq_mane.tsv.gz")
         self.assertTrue(vav.backfilled_utr_avi_splicevault)
+
+    def test_mismatch_fix_stamps_pins_only_when_nothing_else_differs(self):
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE, annotated=False)
+        with override_settings(**_settings_with_plugins()):
+            component_kwargs = vep_component_version_kwargs(settings.ANNOTATION[settings.BUILD_GRCH38])
+            pins = {pin_field: component_kwargs[pin_field] for pin_field in SOURCE_PINS}
+            self.assertIn(ENABLE_COMMAND, vep_mismatch_fix(vav, pins))
+            self.assertIn("create_new_variant_annotation_version", vep_mismatch_fix(vav, {**pins, "vep": 117}))
 
     def test_backfill_note_imports_only_the_plugins_each_build_covers(self):
         """ AVI is configured on GRCh37 too, but has no GRCh37 columns """

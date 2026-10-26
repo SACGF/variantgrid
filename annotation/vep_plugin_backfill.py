@@ -6,7 +6,7 @@ the backfill steps.
 
 Entry points: stamp_plugin_pins (the migration and `manage.py enable_vep_plugin_backfill`), backfill_steps /
 backfill_note (the ManualOperation note and the command's output, with the backfill's VEP command line built by
-backfill_vep_command). Functions take the model classes, so the migration
+backfill_vep_command), enable_plugins_fix / vep_mismatch_fix (what the mismatch warnings tell the admin to run). Functions take the model classes, so the migration
 passes its historical ones; nothing here imports annotation.models.
 """
 import os
@@ -33,6 +33,7 @@ SOURCE_PINS: dict[str, VEPSource] = {
     "alphagenome_splicing": VEPCustom.ALPHAGENOME_SPLICING,
 }
 BACKFILL_FLAG = "backfilled_utr_avi_splicevault"
+ENABLE_COMMAND = "python3 manage.py enable_vep_plugin_backfill"
 ACTIVE_STATUSES = ("NEW", "ACTIVE")  # HISTORICAL versions are never looked up by config again
 # Flags that only add CSQ fields the backfill doesn't import. Dropping them leaves the PICK'd entry the same and runs
 # VEP ~1.5x faster
@@ -64,6 +65,41 @@ def source_columns(vav, vep_source: VEPSource) -> list:
                                   columns_version=vav.columns_version, vep_version=vav.vep)
 
 
+def settings_pin_changes(vav) -> dict[str, tuple]:
+    """ pin field -> (version's pin, live settings' pin) for each source whose settings file the version doesn't pin.
+        Reads settings only, so a web node gives the same answer as an annotation node """
+    build_settings = settings.ANNOTATION.get(vav.genome_build_id)
+    if build_settings is None:
+        return {}
+    pins = vep_component_version_kwargs(build_settings)
+    return {pin_field: (getattr(vav, pin_field), pins[pin_field]) for pin_field in source_pin_fields(type(vav))
+            if getattr(vav, pin_field) != pins[pin_field]}
+
+
+def _enable_fix(pin_fields) -> str:
+    return (f"{', '.join(pin_fields)} set in settings but not pinned on this version, so every VEP run against it "
+            f"fails the version check. Stop annotation_workers, run '{ENABLE_COMMAND} --dry-run' then "
+            f"'{ENABLE_COMMAND}' to stamp the pins, restart the celery workers and gunicorn, and run the backfill "
+            f"steps it prints for variants already annotated (#2426, #2433)")
+
+
+def enable_plugins_fix(vav) -> Optional[str]:
+    """ What to run when settings switch on a plugin / custom VCF this version doesn't pin, else None """
+    if vav.status in ACTIVE_STATUSES and (changes := settings_pin_changes(vav)):
+        return _enable_fix(changes)
+    return None
+
+
+def vep_mismatch_fix(vav, vep_vav_kwargs: dict) -> str:
+    """ What to run when vav differs from vep_vav_kwargs (get_vep_variant_annotation_version_kwargs): stamping
+        the plugin pins when only those differ, otherwise a new version """
+    mismatched = [k for k, v in vep_vav_kwargs.items() if getattr(vav, k) != v]
+    if vav.status in ACTIVE_STATUSES and mismatched and set(mismatched) <= SOURCE_PINS.keys():
+        return _enable_fix(mismatched)
+    return ("Upgrade via 'python3 manage.py create_new_variant_annotation_version "
+            f"--genome-build={vav.genome_build_id}'")
+
+
 def stamp_plugin_pins(variant_annotation_version_model, annotation_range_lock_model,
                       genome_build_name: Optional[str] = None, dry_run: bool = False) -> list[PinStamp]:
     """ Sets each NEW/ACTIVE version's pins to what live settings pass VEP. A pin that changes to a file whose
@@ -73,21 +109,15 @@ def stamp_plugin_pins(variant_annotation_version_model, annotation_range_lock_mo
     if genome_build_name:
         qs = qs.filter(genome_build_id=genome_build_name)
 
-    pin_fields = source_pin_fields(variant_annotation_version_model)
     stamps = []
     for vav in qs.order_by("genome_build_id", "pk"):
-        build_settings = settings.ANNOTATION.get(vav.genome_build_id)
-        if build_settings is None:
+        if vav.genome_build_id not in settings.ANNOTATION:
             continue  # Build no longer configured on this deployment
-        pins = vep_component_version_kwargs(build_settings)
-        stamp = PinStamp(variant_annotation_version=vav)
+        stamp = PinStamp(variant_annotation_version=vav, changed_pins=settings_pin_changes(vav))
         newly_covered = False
-        for pin_field in pin_fields:
-            old, new = getattr(vav, pin_field), pins[pin_field]
-            if old != new:
-                stamp.changed_pins[pin_field] = (old, new)
-                setattr(vav, pin_field, new)
-                newly_covered |= bool(new and source_columns(vav, SOURCE_PINS[pin_field]))
+        for pin_field, (_old, new) in stamp.changed_pins.items():
+            setattr(vav, pin_field, new)
+            newly_covered |= bool(new and source_columns(vav, SOURCE_PINS[pin_field]))
         if newly_covered and annotation_range_lock_model.objects.filter(version=vav).exists():
             setattr(vav, BACKFILL_FLAG, False)
         if stamp.changed_pins and not dry_run:

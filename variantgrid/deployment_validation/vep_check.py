@@ -6,6 +6,7 @@ from django.conf import settings
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
+from annotation.vep_plugin_backfill import vep_mismatch_fix
 from snpdb.models import GenomeBuild
 
 INSTALL_VEP = "https://github.com/SACGF/variantgrid/wiki/Install-VEP"
@@ -52,12 +53,11 @@ def check_vep() -> dict:
                 run_vep_ok = True
                 if vav:
                     # we only bother reporting diff vs latest if we can even run VEP (as they have bigger problems then)
-                    # This is only a warning as may not be an actual error - may want to just leave as old version
                     diff = vav_diff_vs_kwargs(vav, vep_vav_kwargs)
                     warning = None
                     if diff:
-                        warning = "Latest VariantAnnotationVersion doesn't match current VEP settings " + \
-                                  f"(warning only as this may be what you want). {diff=} Upgrade via '{create_vav_cmd}'"
+                        warning = "Latest VariantAnnotationVersion doesn't match current VEP settings. " + \
+                                  f"{diff=} {vep_mismatch_fix(vav, vep_vav_kwargs)}"
                     vep_data[f"latest_variant_annotation_{genome_build}_matches_current_vep"] = {
                         "valid": True,
                         "warning": warning,

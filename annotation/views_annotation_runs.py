@@ -19,6 +19,7 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     subdivide_annotation_run_range,
 )
+from annotation.vep_plugin_backfill import enable_plugins_fix
 from library.django_utils import get_field_counts, require_superuser
 from snpdb.models import GenomeBuild, JobsControl
 from variantgrid.celery import app
@@ -78,6 +79,7 @@ def variant_annotation_runs(request):
     genome_build_field_counts = defaultdict(dict)
     genome_build_summary = defaultdict(dict)
     genome_build_summary_combined = defaultdict(dict)
+    vep_mismatch_fixes = {}
 
     if request.method == "POST":
         if "unpause-jobs" in request.POST:
@@ -190,6 +192,8 @@ def variant_annotation_runs(request):
             genome_build_summary[genome_build.pk][vav.pk] = summary_by_type
             genome_build_summary_combined[genome_build.pk][vav.pk] = combined_summary
             genome_build_field_counts[genome_build.pk][vav] = field_counts_by_type
+            if vav.vep_version_mismatch_date:
+                vep_mismatch_fixes[vav.pk] = enable_plugins_fix(vav)
 
     current_variant_annotation_versions = VariantAnnotationVersion.latest_for_all_builds()
     new_variant_annotation_versions = VariantAnnotationVersion.objects.filter(
@@ -254,6 +258,7 @@ def variant_annotation_runs(request):
         "genome_build_summary_combined": dict(genome_build_summary_combined),
         "genome_build_field_counts": dict(genome_build_field_counts),
         "pipeline_type_labels": dict(VariantAnnotationPipelineType.choices),
+        "vep_mismatch_fixes": vep_mismatch_fixes,
         "current_variant_annotation_versions": current_variant_annotation_versions,
         "new_variant_annotation_versions": new_variant_annotation_versions,
         "historical_variant_annotation_versions": historical_variant_annotation_versions,

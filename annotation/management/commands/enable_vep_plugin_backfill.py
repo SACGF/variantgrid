@@ -1,7 +1,7 @@
 """
-Switch on UTRAnnotator / AVI / SpliceVault (#2426) and AlphaGenome splicing (#2433) for the VariantAnnotationVersions
-in use, after setting their files in settings.ANNOTATION[build]["vep_config"]: stamps the pins, flags versions for the
-backfill and prints its steps. @see annotation/vep_plugin_backfill.py
+Switch on a VEP plugin / custom VCF (those in vep_plugin_backfill.SOURCE_PINS, first #2426 and #2433) for the
+VariantAnnotationVersions in use, after setting its file in settings.ANNOTATION[build]["vep_config"]: stamps the pins,
+flags versions for the backfill and prints its steps. @see annotation/vep_plugin_backfill.py
 """
 from django.core.management.base import BaseCommand, CommandError
 
@@ -26,8 +26,8 @@ _VEP_RUN_NOT_IMPORTED = [AnnotationStatus.EXTERNAL_DUMP_COMPLETED, AnnotationSta
 
 class Command(BaseCommand):
     category = "ops"
-    help = ("Stamp UTRAnnotator / AVI / SpliceVault / AlphaGenome splicing pins from settings on the versions in use "
-            "and print the backfill")
+    help = ("Switch on VEP plugin / custom VCF files newly set in settings for the VariantAnnotationVersions in use, "
+            "without a new version: stamps their pins and prints the backfill for variants already annotated")
 
     def add_arguments(self, parser):
         parser.add_argument("--genome-build", help="Default: every build with annotation")

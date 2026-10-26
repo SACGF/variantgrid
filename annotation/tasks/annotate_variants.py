@@ -24,6 +24,7 @@ from annotation.vep_annotation import (
     get_vep_version,
     vep_check_command_line_version_match,
 )
+from annotation.vep_plugin_backfill import enable_plugins_fix
 from eventlog.models import create_event
 from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from library.enums.log_level import LogLevel
@@ -322,9 +323,16 @@ def _latch_vep_version_mismatch(vav: VariantAnnotationVersion, e: VEPVersionMism
     if vav.latch_vep_version_mismatch(str(e)):
         report_message(message=f"Annotation blocked {vav}", level='error',
                        extra_data={'output': str(e), 'error': tb})
-        create_event(None, "Annotation blocked", f"{vav}: {e}", severity=LogLevel.ERROR)
+        create_event(None, "Annotation blocked", _vep_mismatch_details(vav, e), severity=LogLevel.ERROR)
     else:
         logging.warning("AnnotationRun failed against already-blocked %s: %s", vav, e)
+
+
+def _vep_mismatch_details(vav: VariantAnnotationVersion, e: VEPVersionMismatchError) -> str:
+    details = f"{vav}: {e}"
+    if plugins_fix := enable_plugins_fix(vav):
+        details += f"\n{plugins_fix}"
+    return details
 
 
 @celery.shared_task
@@ -338,7 +346,7 @@ def recheck_vep_version(variant_annotation_version_id):
         vep_check_command_line_version_match(vav)
     except VEPVersionMismatchError as e:
         VariantAnnotationVersion.objects.filter(pk=vav.pk).update(vep_version_mismatch_reason=str(e))
-        create_event(None, "Annotation still blocked", f"{vav}: {e}", severity=LogLevel.WARNING)
+        create_event(None, "Annotation still blocked", _vep_mismatch_details(vav, e), severity=LogLevel.WARNING)
         return
 
     vav.clear_vep_version_mismatch()
