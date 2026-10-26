@@ -183,7 +183,7 @@ class AnnotationRunCleanupTestCase(TestCase):
 
     def test_queryset_delete_removes_output_files(self):
         # post_delete rather than a delete() override, so a bulk delete (eg
-        # subdivide_annotation_range_lock) cannot silently orphan the files.
+        # subdivide_annotation_run_range) cannot silently orphan the files.
         with tempfile.TemporaryDirectory() as tmp_dir, \
                 override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
             run, paths, annotsv_dir = self._run_with_output(

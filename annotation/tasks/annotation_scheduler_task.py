@@ -7,6 +7,7 @@ from uuid import uuid4
 import celery
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 
@@ -109,42 +110,32 @@ def annotation_scheduler(status: str = None):
     if status == VariantAnnotationVersion.Status.HISTORICAL:
         raise ValueError("annotation_scheduler must not be run against HISTORICAL VariantAnnotationVersions")
 
-    LOCK_EXPIRE = 60 * 5  # 5 minutes
-    lock_id = "annotation-scheduler-lock"
-
-    # cache.add fails if the key already exists
-    acquire_lock = lambda: cache.add(lock_id, "true", LOCK_EXPIRE)
-    release_lock = lambda: cache.delete(lock_id)
-
+    # No lock of its own: scheduling_single_worker has concurrency 1, which is what serialises this with the
+    # dispatcher (and with the next scheduler kick from an upload)
     try:
-        if acquire_lock():
-            try:
-                logging.info("Got the lock for annotation scheduler (status=%s)", status)
-                for genome_build in GenomeBuild.builds_with_annotation():
-                    annotation_version = AnnotationVersion.latest(genome_build, status=status, validate=False)
-                    if annotation_version is None:
-                        continue
-                    variant_annotation_version = annotation_version.variant_annotation_version
-                    if blocker := variant_annotation_version.get_annotation_run_blocker():
-                        # #1679: runs would only fail - make no range locks. Still kick the dispatcher
-                        # below so the import lane drains.
-                        logging.warning("annotation_scheduler: skipping %s - %s", variant_annotation_version, blocker)
-                    else:
-                        while True:
-                            range_lock = _handle_variant_annotation_version(variant_annotation_version)
-                            if range_lock is None:
-                                break
-                    # #2667: scheduler only creates pending state - the dispatcher decides what launches
-                    # (capacity-limited, merging the backlog first). Kick it for this VAV. The dispatcher
-                    # also fires the #1646 count tasks, so it is the single place that keeps counts moving.
-                    dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
-            finally:
-                logging.info("Releasing lock")
-                release_lock()
-        else:
-            logging.info("Someone else has %s", lock_id)
-    except:
+        for genome_build in GenomeBuild.builds_with_annotation():
+            annotation_version = AnnotationVersion.latest(genome_build, status=status, validate=False)
+            if annotation_version is None:
+                continue
+            variant_annotation_version = annotation_version.variant_annotation_version
+            if blocker := variant_annotation_version.get_annotation_run_blocker():
+                # #1679: runs would only fail - make no range locks. Still kick the dispatcher
+                # below so the import lane drains.
+                logging.warning("annotation_scheduler: skipping %s - %s", variant_annotation_version, blocker)
+            else:
+                pipeline_versions = _scheduled_pipeline_versions(genome_build)
+                _create_missing_runs(variant_annotation_version, pipeline_versions)
+                while True:
+                    range_lock = _handle_variant_annotation_version(variant_annotation_version, pipeline_versions)
+                    if range_lock is None:
+                        break
+            # #2667: scheduler only creates pending state - the dispatcher decides what launches
+            # (capacity-limited, merging the backlog first). Kick it for this VAV. The dispatcher
+            # also fires the #1646 count tasks, so it is the single place that keeps counts moving.
+            dispatch_annotation_runs.si(variant_annotation_version.pk).apply_async()
+    except Exception:
         log_traceback()
+        raise
 
 
 def _scheduled_pipeline_versions(
@@ -269,28 +260,32 @@ def _dispatch_counts(vav: VariantAnnotationVersion, now):
     count_annotation_runs.apply_async((run_ids, token))  # @UndefinedVariable
 
 
-def _handle_variant_annotation_version(variant_annotation_version):
-    # If we crash in the wrong place, we may end up with unassigned range locks (need 1 of each type)
+def _create_missing_runs(variant_annotation_version, pipeline_versions):
+    """ Create the runs missing from existing locks: how a newly enabled pipeline backfills, a versioned one
+        re-runs after its tool is upgraded (#720), and a deleted run comes back - "no run at the version we
+        schedule against" is one query covering all of them. Turning eg
+        ANNOTATION_ANNOTSV_ENABLED on, or promoting a new AnnotSV, creates its run for every existing lock.
+        Cheap: most locks hold no SVs, and the count lane finishes those without ever dispatching them.
+
+        Scans every lock of the version, so it runs once per scheduler invocation - locks the scheduler
+        makes itself get all their runs in _handle_range_lock. """
     arl_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
-    pipeline_versions = _scheduled_pipeline_versions(variant_annotation_version.genome_build)
-    # #720: also how a newly-enabled pipeline backfills, and how a versioned one re-runs after its tool is
-    # upgraded - "no run at the version we schedule against" is one query covering both. Turning eg
-    # ANNOTATION_ANNOTSV_ENABLED on, or promoting a new AnnotSV, creates its run for every existing lock.
-    # Cheap: most locks hold no SVs, and the count lane finishes those without ever dispatching them.
     for pipeline_type, pipeline_version in pipeline_versions.items():
-        # Look for missing any AnnotationRun for this lock
         for range_lock in arl_qs.exclude(annotationrun__pipeline_type=pipeline_type,
                                          annotationrun__pipeline_version=pipeline_version):
-            logging.warning("Assigned orphaned annotation range lock: %s, run type: %s",
+            logging.warning("Creating missing run for annotation range lock: %s, run type: %s",
                             range_lock, VariantAnnotationPipelineType(pipeline_type).label)
             _handle_range_lock(range_lock, {pipeline_type: pipeline_version})
 
+
+def _handle_variant_annotation_version(variant_annotation_version, pipeline_versions):
     range_lock, unannotated_count = get_annotation_range_lock_and_unannotated_count(variant_annotation_version,
                                                                                     settings.ANNOTATION_VEP_BATCH_MIN,
                                                                                     settings.ANNOTATION_VEP_BATCH_MAX)
     if range_lock is not None:
-        range_lock.save()
-        _handle_range_lock(range_lock, pipeline_versions)
+        with transaction.atomic():
+            range_lock.save()
+            _handle_range_lock(range_lock, pipeline_versions)
     else:
         if unannotated_count:
             logging.warning("Unannotated variants but couldn't get a lock.")
@@ -686,25 +681,63 @@ def _reset_run_for_redispatch(annotation_run: AnnotationRun):
     annotation_run.save()  # get_status() -> CREATED, or ANNOTATION_COMPLETED for a resume-upload run
 
 
-def subdivide_annotation_range_lock(arl: AnnotationRangeLock,
-                                    minimum_size=AnnotationRangeLock.MIN_SIZE_FOR_SUBDIVISION) -> AnnotationRangeLock:
-    """ Sometimes we have an annotation run crash or timeout etc, this splits it in half so we can try again
-        With a smaller run
+def _pipeline_types_depending_on(pipeline_type) -> set[VariantAnnotationPipelineType]:
+    """ pipeline_type and every type that (transitively) needs its rows - the runs to redo after it is redone """
+    pipeline_types = {VariantAnnotationPipelineType(pipeline_type)}
+    while dependents := {pt for pt, p in PIPELINES.items()
+                         if p.depends_on in pipeline_types and pt not in pipeline_types}:
+        pipeline_types |= dependents
+    return pipeline_types
 
-        Range lock passed in becomes bottom half of original range
-        Returns new range lock for top half of original range
-    """
 
+def subdivide_annotation_run_range(annotation_run: AnnotationRun,
+                                   minimum_size=AnnotationRangeLock.MIN_SIZE_FOR_SUBDIVISION) -> AnnotationRun:
+    """ Sometimes an annotation run crashes or times out (eg too many transcripts), this splits its range
+        lock in half so it can be retried as 2 smaller runs.
+
+        The lock becomes the bottom half of its range and a new lock takes the top half. The run is replaced
+        by a fresh one per half, as are the runs of pipelines that depend on its rows (AnnotSV on an SV run).
+        The lock's other runs stay on the bottom half - a FINISHED one keeps its annotation - and each gets
+        a fresh run on the top half, which finishes empty where they already annotated it.
+
+        Returns the run replacing annotation_run on the bottom half """
+    arl = annotation_run.annotation_range_lock
     size = int(arl.max_variant_id) - int(arl.min_variant_id)
     if size < minimum_size:
         raise ValueError(f"Cannot subdivide {arl} below minimum size of {minimum_size}")
 
-    logging.info("Subdividing %s", arl)
+    replaced_pipeline_types = _pipeline_types_depending_on(annotation_run.pipeline_type)
+    with transaction.atomic():
+        arl = AnnotationRangeLock.objects.select_for_update().get(pk=arl.pk)
+        runs = list(arl.annotationrun_set.select_for_update())
+        replaced_runs = [run for run in runs if run.pipeline_type in replaced_pipeline_types]
+        kept_runs = [run for run in runs if run.pipeline_type not in replaced_pipeline_types]
+        if in_flight := [run for run in kept_runs if run.is_in_flight()]:
+            raise ValueError(f"Cannot subdivide {arl} while other runs on it are in progress: {in_flight}")
 
-    # Delete all existing annotation runs
-    res = arl.annotationrun_set.all().delete()
-    logging.info("Deleted attached annotation runs: %s", res)
+        logging.info("Subdividing %s", arl)
+        res = AnnotationRun.objects.filter(pk__in=[run.pk for run in replaced_runs]).delete()
+        logging.info("Deleted replaced annotation runs: %s", res)
 
+        new_lock = _split_range_lock(arl)
+        # A pending run's pre-count (#1646) was of the whole range
+        AnnotationRun.objects.filter(pk__in=[run.pk for run in kept_runs],
+                                     status=AnnotationStatus.CREATED).update(count=None)
+        bottom_half_run = None
+        for run in replaced_runs:
+            new_run = AnnotationRun.objects.create(annotation_range_lock=arl, pipeline_type=run.pipeline_type,
+                                                   pipeline_version=run.pipeline_version)
+            if run.pk == annotation_run.pk:
+                bottom_half_run = new_run
+        for run in replaced_runs + kept_runs:
+            AnnotationRun.objects.create(annotation_range_lock=new_lock, pipeline_type=run.pipeline_type,
+                                         pipeline_version=run.pipeline_version)
+    return bottom_half_run
+
+
+def _split_range_lock(arl: AnnotationRangeLock) -> AnnotationRangeLock:
+    """ Shrinks arl to the bottom half of its range, returns a new lock for the top half """
+    size = int(arl.max_variant_id) - int(arl.min_variant_id)
     half_size = size / 2
     halfway_point = int(arl.min_variant_id) + half_size
     first_at_or_above_halfway = Variant.objects.filter(pk__gte=halfway_point).order_by("pk").first()

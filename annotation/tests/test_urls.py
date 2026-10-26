@@ -13,6 +13,7 @@ from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class Test(URLTestCase):
@@ -46,6 +47,7 @@ class Test(URLTestCase):
 
         cls.clinvar_id = clinvar.pk
         cls.variant_string = str(variant)
+        cls.unannotated_variant_string = str(slowly_create_test_variant("1", 123456, 'A', 'G', cls.grch37))
         cls.pubmed_citations = "&".join(str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2])
         cls.citations_ids_list = "/".join(str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2])
         cls.citations_ids_list_pubmed = pubmed_citation
@@ -64,6 +66,8 @@ class Test(URLTestCase):
             ("view_cached_web_resource", {"pk": self.cached_web_resource.pk}, 200),
             # API
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),
+            ("api_variant_annotation", {"genome_build_name": self.grch37.name,
+                                        "variant_string": self.unannotated_variant_string}, 404),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
 

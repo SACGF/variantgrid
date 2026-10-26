@@ -22,8 +22,8 @@ from annotation.models.models_gene_annotation import (
 from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
 from annotation.pipelines import vep_pipeline_types
 from annotation.vep_annotation import (
+    get_cached_vep_variant_annotation_version_kwargs,
     get_vep_command,
-    get_vep_variant_annotation_version_kwargs,
 )
 from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
@@ -112,11 +112,14 @@ def annotation_build_detail(request, genome_build_name):
             out_of_sync_with_current_vep = "Not created"
         else:
             vav = av.variant_annotation_version
-            vep_vav_kwargs = get_vep_variant_annotation_version_kwargs(vav.genome_build)
-            if diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
-                out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
-            else:
-                sync_with_current_vep = "In sync with current VEP"
+            try:
+                vep_vav_kwargs = get_cached_vep_variant_annotation_version_kwargs(vav.genome_build)
+                if diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
+                    out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
+                else:
+                    sync_with_current_vep = "In sync with current VEP"
+            except Exception as e:
+                out_of_sync_with_current_vep = f"Couldn't read the installed VEP's version: {e}"
 
         annotation_details["sync_with_current_vep"] = sync_with_current_vep
         annotation_details["out_of_sync_with_current_vep"] = out_of_sync_with_current_vep
@@ -151,7 +154,6 @@ def annotation_build_detail(request, genome_build_name):
         if clinvar_counts:
             annotation_details["clinvar"] = f"{clinvar_counts} ClinVar records"
 
-        clinvar_counts = av.get_clinvar().count()
         annotation_sub_components = [sync_with_current_vep, reference_ok,
                                      genes_and_transcripts, gene_annotation_release, clinvar_counts]
         if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:

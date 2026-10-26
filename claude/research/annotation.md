@@ -54,8 +54,9 @@ GeneAnnotationVersion built for the same GeneAnnotationRelease as the VAV, and t
 
 Annotation is scheduled by variant pk range. `annotation/tasks/annotation_scheduler_task.py:annotation_scheduler`
 (beat, and kicked by `upload/tasks/vcf/import_vcf_tasks.py:CheckStartAnnotationTask` after a VCF's variants are
-inserted) runs on `scheduling_single_worker` under a cache lock and, for each annotated build's latest VAV of the
-requested status, loops `annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version` until
+inserted) runs on `scheduling_single_worker` (one process, which is what serialises it with the dispatcher) and, for each
+annotated build's latest VAV of the requested status, creates any runs missing from existing locks once
+(`annotation/tasks/annotation_scheduler_task.py:_create_missing_runs`), then loops `annotation/tasks/annotation_scheduler_task.py:_handle_variant_annotation_version` until
 `annotation/annotation_versions.py:get_annotation_range_lock_and_unannotated_count` finds no more unannotated variants.
 That function walks pk blocks above the highest existing lock (never a sort-and-limit over the whole table, which does
 not scale) and returns an `annotation/models/models_annotation_run.py:AnnotationRangeLock` of at least
@@ -76,7 +77,7 @@ it sweeps the latest NEW and ACTIVE VAV per build, reclaims stalled runs, fills 
 (`annotation/tasks/annotation_scheduler_task.py:count_annotation_runs` pre-counts each run so an empty one finishes
 without a dump), merges consecutive pending locks into bigger batches once workers are busy
 (`annotation/annotation_versions.py:merge_pending_range_locks`, the inverse of
-`annotation/tasks/annotation_scheduler_task.py:subdivide_annotation_range_lock`), and leases up to the free capacity
+`annotation/tasks/annotation_scheduler_task.py:subdivide_annotation_run_range`), and leases up to the free capacity
 with `annotation/tasks/annotation_scheduler_task.py:_lease_and_launch_run`. Leases (`leased_by`, `lease_expires`) are
 written only on `scheduling_single_worker`, so they serialise without row-lock gymnastics.
 

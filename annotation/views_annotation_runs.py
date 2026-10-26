@@ -17,7 +17,7 @@ from annotation.tasks.annotate_variants import annotation_run_retry, recheck_vep
 from annotation.tasks.annotation_scheduler_task import (
     annotation_scheduler,
     dispatch_annotation_runs,
-    subdivide_annotation_range_lock,
+    subdivide_annotation_run_range,
 )
 from library.django_utils import get_field_counts, require_superuser
 from snpdb.models import GenomeBuild, JobsControl
@@ -336,20 +336,12 @@ def subdivide_annotation_run(request, annotation_run_id):
     """ Sometimes runs fail w/out of memory etc (perhaps due to too many transcripts) - be able to subdivide """
 
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
-    pipeline_type = annotation_run.pipeline_type
-    pipeline_version = annotation_run.pipeline_version  # #720: the halves stay on the version this run had
-    old_range_lock = annotation_run.annotation_range_lock
-    version_id = old_range_lock.version_id
-
-    # subdivide_annotation_range_lock deletes the run(s) on this lock, shrinks it to the bottom half and
-    # returns a new lock for the top half. Create a fresh CREATED run per half (each with its lock set,
-    # so no rangeless run is ever committed - #1654) and hand back to the dispatcher.
-    new_range_lock = subdivide_annotation_range_lock(old_range_lock)
-    bottom_half_run = AnnotationRun.objects.create(annotation_range_lock=old_range_lock,
-                                                   pipeline_type=pipeline_type,
-                                                   pipeline_version=pipeline_version)
-    AnnotationRun.objects.create(annotation_range_lock=new_range_lock, pipeline_type=pipeline_type,
-                                 pipeline_version=pipeline_version)
+    version_id = annotation_run.annotation_range_lock.version_id
+    try:
+        bottom_half_run = subdivide_annotation_run_range(annotation_run)
+    except ValueError as e:
+        messages.add_message(request, messages.ERROR, str(e), extra_tags='import-message')
+        return redirect(annotation_run)
     dispatch_annotation_runs.si(version_id).apply_async()
 
     # The original run was deleted by the subdivision - land on the bottom-half replacement.

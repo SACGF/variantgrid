@@ -63,7 +63,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
         if not dump_count:
             annotation_run.annotated_count = 0
             annotation_run.annotation_end = timezone.now()
-            annotation_run.save()
+            self.save_if_owner(annotation_run)
             return
 
         annotsv_dir = get_annotsv_dir(annotation_run)
@@ -73,7 +73,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
                                   annotation_run.genome_build, annotation_run.annotation_consortium)
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)
-        annotation_run.save()
+        self.save_if_owner(annotation_run)
 
         # #1658: register AnnotSV with the lease heartbeat so a reclaim kills it rather than letting the
         # losing worker run to completion against a range the new attempt now owns.
@@ -103,7 +103,7 @@ class AnnotSVRunner(AnnotationPipelineRunner):
 
         annotation_run.vcf_annotated_filename = tsv_filename
         annotation_run.annotation_end = timezone.now()
-        annotation_run.save()
+        self.save_if_owner(annotation_run)
 
     def import_results(self, annotation_run):
         annotation_run.upload_start = timezone.now()

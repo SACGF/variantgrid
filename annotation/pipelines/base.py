@@ -109,7 +109,7 @@ class AnnotationPipelineRunner(abc.ABC):
         vcf_dump_filename = annotation_run.get_dump_filename(dump_dir=dump_dir, task_token=task_token)
         annotation_run.dump_start = timezone.now()
         annotation_run.vcf_dump_filename = vcf_dump_filename
-        annotation_run.save()
+        self.save_if_owner(annotation_run)
 
         logging.info("Dumping %s variants for %s", self.pipeline_type, annotation_run)
         if os.path.exists(vcf_dump_filename):
@@ -124,8 +124,17 @@ class AnnotationPipelineRunner(abc.ABC):
 
         annotation_run.dump_count = vcf_dump_count
         annotation_run.dump_end = timezone.now()
-        annotation_run.save()
+        self.save_if_owner(annotation_run)
         return vcf_dump_count
+
+    @staticmethod
+    def save_if_owner(annotation_run):
+        """ Saves during dump / annotate, which can outlive the lease: raises rather than write over the run a
+            reclaim handed to another attempt (#1658). An external dump holds no task_id, which matches the
+            unleased run. """
+        if not annotation_run.save_if_owner(annotation_run.task_id):
+            raise RuntimeError(f"AnnotationRun {annotation_run.pk} was reclaimed - task {annotation_run.task_id} "
+                               "no longer owns it")
 
     @abc.abstractmethod
     def annotate(self, annotation_run, lease_heartbeat=None):
