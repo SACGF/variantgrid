@@ -6,9 +6,12 @@ from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource, VCB
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.models.classification_utils import ClassificationJsonParams
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot, all_users_group
 from snpdb.models.models import CodeVersion, Lab
+from snpdb.models.models_genome import GenomeBuild, GenomeBuildPatchVersion
+from snpdb.models.models_variant import Allele
 
 
 class ClassificationTestCaseModifications(TestCase):
@@ -353,3 +356,36 @@ class ClassificationTestCaseModifications(TestCase):
 
         self.assertEqual(list(ClassificationModification.latest_for_user(user)), [unpublished])
         self.assertEqual(list(ClassificationModification.latest_for_user(other_user)), [published])
+
+    @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
+    def test_latest_for_user_allele_without_variant(self):
+        """ Records are linked to their allele through ImportedAlleleInfo - most never have Classification.variant set """
+        lab, user = ClassificationTestUtils.lab_and_user()
+        allele = Allele.objects.create()
+        allele_info = ImportedAlleleInfo.objects.create(
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(
+                GenomeBuild.grch37()),
+            imported_c_hgvs="NM_001145661.2:c.4G>A", allele=allele)
+        vc = Classification.create(user=user, lab=lab, data={'foo': {'value': 'bar'}},
+                                   save=True, source=SubmissionSource.API)
+        vc.publish_latest(user=user)
+        Classification.objects.filter(pk=vc.pk).update(allele_info=allele_info, variant=None)
+
+        self.assertEqual(list(ClassificationModification.latest_for_user(user, allele=allele, published=True)),
+                         [vc.last_published_version])
+        self.assertFalse(ClassificationModification.latest_for_user(user, allele=Allele.objects.create()).exists())
+
+    @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
+    def test_patch_applies_on_committed_evidence(self):
+        """ A save patch on a stale instance builds on what another patch committed instead of overwriting it """
+        lab, user = ClassificationTestUtils.lab_and_user()
+        vc = Classification.create(user=user, lab=lab, data={'foo': {'value': 'a'}},
+                                   save=True, source=SubmissionSource.API)
+        stale = Classification.objects.get(pk=vc.pk)
+        vc.patch_value(patch={'foo': {'value': 'b'}}, user=user, source=SubmissionSource.API, save=True)
+        stale.patch_value(patch={'bar': {'value': 'c'}}, user=user, source=SubmissionSource.FORM, save=True)
+
+        vc.refresh_from_db()
+        self.assertEqual(vc.get('foo'), 'b')
+        self.assertEqual(vc.get('bar'), 'c')
+        self.assertEqual(ClassificationModification.objects.filter(classification=vc, is_last_edited=True).count(), 1)

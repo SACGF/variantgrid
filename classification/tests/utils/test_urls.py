@@ -85,6 +85,7 @@ class Test(URLTestCase):
             # ('classification_diff', {"GET_PARAMS": {"record_ids": f"[{classification.pk}]"}}, 200),
             # ('classification_csv', record_kwargs, 200),
             # ('view_template_report', record_kwargs, 200),
+            ('classification_csv', classification_kwargs, 200),
             ('classification_history', classification_kwargs, 200),
             ('view_classification', classification_kwargs, 200),
             ('view_classification_lab_record',

@@ -328,7 +328,8 @@ def _iter_report_list(
         allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
         ):
 
-    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs, time_step=time_step)
+    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs, time_step=time_step,
+                                          allele_origin_buckets=allele_origin_buckets)
     report_data = cag.report()
 
     valid_labs = set()

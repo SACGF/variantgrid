@@ -211,7 +211,10 @@ def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:
 
 
 def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
-    vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, classification_id).modification
+    record_ref = ClassificationRef.init_from_str(request.user, classification_id)
+    record_ref.check_exists()
+    record_ref.check_security()
+    vcm: ClassificationModification = record_ref.modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 
     filename_parts = [
