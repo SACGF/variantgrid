@@ -8,7 +8,6 @@ from library.preview_request import preview_view
 from snpdb.grids import (
     AlleleLiftoverFailureColumns,
     CohortListColumns,
-    CohortSampleListColumns,
     CustomColumnsCollectionColumns,
     DuosListColumns,
     GenomicIntervalsListColumns,
@@ -128,7 +127,6 @@ urlpatterns = [
     path('lab/members_tab/<int:pk>', views_lab.lab_members_tab, name='lab_members_tab'),
     path('lab/members/add/<int:pk>', views_lab.lab_add_member, name='lab_add_member'),
     path('lab/members/remove/<int:pk>', views_lab.lab_remove_member, name='lab_remove_member'),
-    path('clinvar_key/<str:pk>', views_lab.view_clinvar_key, name='clinvar_key'),
     path('organization/<int:organization_id>', views_lab.view_organization, name='view_organization'),
     path('help_static_page/<path:page_name>', views.help_static_page, name='help_static_page'),
     path('genomic_intervals_graph/<int:genomic_intervals_collection_id>', views_graphs.genomic_intervals_graph, name='genomic_intervals_graph'),
@@ -155,7 +153,6 @@ urlpatterns = [
 
     # Grids
     path('cohort/datatable/', DatabaseTableView.as_view(column_class=CohortListColumns), name='cohort_datatable'),
-    path('cohort_sample/datatable/<int:cohort_id>/', DatabaseTableView.as_view(column_class=CohortSampleListColumns), name='cohort_sample_datatable'),
     path('sample/list/datatable/', DatabaseTableView.as_view(column_class=SamplesListColumns),
          name='samples_list_datatable'),
     path('sample/skipped_annotation/datatable/<int:sample_id>/',

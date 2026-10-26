@@ -14,12 +14,14 @@ from django.utils.timesince import timesince
 from rest_framework.exceptions import NotFound
 
 from analysis.exceptions import NodeConfigurationException
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
+from genes.enums import PanelAppConfidence
 from genes.models import (
     ActiveSampleGeneList,
     CustomTextGeneList,
@@ -28,12 +30,11 @@ from genes.models import (
     PanelAppPanelLocalCache,
     SampleGeneList,
 )
-from genes.models_enums import PanelAppConfidence
 from genes.panel_app import get_panel_app_local_cache
 from pathtests.models import PathologyTestVersion
 from patients.models import Patient
+from snpdb.enums import ImportStatus
 from snpdb.models import Contig, Sample
-from snpdb.models.models_enums import ImportStatus
 
 
 class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):

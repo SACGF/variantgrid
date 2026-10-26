@@ -5,11 +5,6 @@
 <style>
     .sort_placeholder {height: 15px; border: red 3px solid;}
     .list_placeholder { font-weight: bolder; }
-    .columns-list { border: #aaaaaa 2px solid; margin: 5px; float: left; border-radius: 4px; }
-    .columns-list ul {
-        height: 100%;
-        list-style: none;
-    }
     
     div#node-counts-widget {
         padding-top: 10px;
@@ -68,6 +63,10 @@
         /* Need somewhere to drag to if empty */
         min-height: 100px;
         user-select: none;
+    }
+
+    .node-counts-read-only .list-group {
+        opacity: 0.6;
     }
 
     #available_tags_sortable {
@@ -141,14 +140,16 @@
                 nodeCountInput.appendTo(nodeCountsForm);
             }
 		});
-		nodeCountsForm.ajaxForm(options); 
+		nodeCountsForm.ajaxForm(options);
+		{% if has_write_permission %}
 		setupNodeCountsWidget();
+		{% endif %}
 	});
 </script>
 <form id="analysis-node-counts-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
 
-    <div class="container no-gutters">
+    <div class="container no-gutters{% if not has_write_permission %} node-counts-read-only{% endif %}">
     {% if is_analysis %}
         <div class="row">
             <div class="col">

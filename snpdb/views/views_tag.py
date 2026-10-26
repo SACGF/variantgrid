@@ -1,8 +1,10 @@
 import logging
+import re
 
 from django.contrib import messages
 from django.http.response import (
     HttpResponse,
+    HttpResponseBadRequest,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
@@ -41,6 +43,7 @@ from snpdb.tag_operations import (
 from snpdb.utils import get_tag_styles_and_colors
 
 TAG_OPERATION_HISTORY_LIMIT = 50
+RGB_PATTERN = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def _get_tag_operation_history() -> list[dict]:
@@ -232,9 +235,11 @@ def view_tag_config_collection(request, tag_config_collection_id):
 
 @require_POST
 def set_tag_color(request, tag_config_collection_id):
-    tcc = TagConfigCollection.get_for_user(request.user, pk=tag_config_collection_id)
+    tcc = TagConfigCollection.get_for_user(request.user, pk=tag_config_collection_id, write=True)
     tag = request.POST['tag']
     rgb = request.POST['rgb']
+    if not RGB_PATTERN.fullmatch(rgb):
+        return HttpResponseBadRequest("rgb must be '#rrggbb'")
     tc = tcc.tagconfig_set.get_or_create(tag_id=tag)[0]
     tc.rgb = rgb
     tc.save()

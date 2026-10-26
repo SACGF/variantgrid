@@ -1,9 +1,10 @@
 from django.test import TestCase
 
+from classification.enums import ClinVarResponseOutcome
 from classification.models import ClinVarExportRequest
 from classification.models.clinvar_export_models import ClinVarExportBatch
-from classification.models.clinvar_export_sync import ClinVarExportSync, ClinVarResponseOutcome
-from snpdb.models import ClinVarKey
+from classification.models.clinvar_export_sync import ClinVarExportSync
+from classification.models.clinvar_key_models import ClinVarKey
 
 
 class TestClinVarExportSync(TestCase):

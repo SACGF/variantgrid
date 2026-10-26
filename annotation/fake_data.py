@@ -14,28 +14,28 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
-from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import (
-    AnnotationRangeLock,
-    AnnotationRun,
-    AnnotationVersion,
+from annotation.enums import AnnotationStatus, CitationSource, PathogenicityImpact
+from annotation.models import ClinVarReviewStatus
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_citations import CitationIdNormalized
+from annotation.models.models_clinvar import (
     ClinVar,
     ClinVarCitation,
     ClinVarCitationsCollection,
     ClinVarVersion,
+)
+from annotation.models.models_gene_annotation import (
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
-    SubVersionPartition,
-    VariantAnnotation,
-    VariantAnnotationVersion,
 )
-from annotation.models.models_citations import CitationIdNormalized, CitationSource
-from annotation.models.models_enums import AnnotationStatus
+from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
 from annotation.vep_config import VEPConfig
+from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
+from genes.models.models_gene_annotation_release import GeneAnnotationRelease
 from library.django_utils.django_partition import temporary_db_table
 from library.fake_data import FakeData, FakeDataContext, register
 from library.genomics.vcf_enums import VariantClass
@@ -142,6 +142,12 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
             "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
         })
 
+    # The fixtures were generated without UTRAnnotator, AVI, SpliceVault or AlphaGenome splicing, so their CSQ fields
+    # would be missing (#2426, #2433)
+    for build_name in (settings.BUILD_GRCH37, settings.BUILD_GRCH38):
+        TEST_ANNOTATION[build_name]["vep_config"].update({"utr_annotator": None, "avi": None, "splicevault": None,
+                                                          "alphagenome_splicing": None})
+
     ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
     ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version
     ANNOTATION_COLUMNS[settings.BUILD_GRCH38]["columns_version"] = columns_version
@@ -174,8 +180,8 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in fake_version or f.name == "vep_version_mismatch_reason":
-            continue  # already set, or not a VEP pin (#1679 latch)
+        if f.name in fake_version or f.name in ("vep_version_mismatch_reason", "explicit_structural_variant_min_size"):
+            continue  # already set, or not a VEP pin (#1679 latch, #1708 set on creation)
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
@@ -233,6 +239,7 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
         vav_kwargs["gene_annotation_release"] = gene_annotation_release
         vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
         vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
+        vav_defaults["explicit_structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
         variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
             genome_build=genome_build,
             status=VariantAnnotationVersion.Status.ACTIVE,

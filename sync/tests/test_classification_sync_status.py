@@ -10,7 +10,7 @@ from genes.fake_data import create_gene_level_variant
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import Lab, VariantCoordinate
 from sync.classification_sync_status import ClassificationSyncState, classification_sync_status
-from sync.models.enums import SyncStatus
+from sync.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.variant_grid_upload import VariantGridUploadSyncer

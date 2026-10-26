@@ -23,7 +23,8 @@ from library.genomics.vcf_writer import (
     symbolic_alt_info,
 )
 from library.utils import open_file_or_filename, open_handle_gzip
-from snpdb.models import GenomeFasta, Sequence, SequenceRole, Variant, VariantCoordinate
+from snpdb.enums import SequenceRole
+from snpdb.models import GenomeFasta, Sequence, Variant, VariantCoordinate
 
 VCF_HEADER_FILTER_ID_PATTERN = re.compile(r'^##FILTER=<ID=([^,>]+)')
 VCF_HEADER_SOURCE_PATTERN = re.compile(r'^##source=(.*)$')

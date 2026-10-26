@@ -9,7 +9,7 @@ import csv
 import json
 import os
 import tempfile
-import zipfile
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from unittest import mock
 from urllib.parse import urlencode
@@ -25,6 +25,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls.base import resolve, reverse
 
 from analysis.analysis_templates import get_sample_analysis
+from analysis.enums import AnalysisTemplateType, NodeStatus
 from analysis.grid_export import (
     format_items_iterator,
     get_canonical_transcript_collection_filename_part,
@@ -32,8 +33,7 @@ from analysis.grid_export import (
     node_grid_get_export_iterator,
 )
 from analysis.grids import ExportVariantGrid, VariantGrid
-from analysis.models import Analysis, AnalysisTemplate, AnalysisTemplateType, AnalysisVariable
-from analysis.models.enums import NodeStatus
+from analysis.models import Analysis, AnalysisTemplate, AnalysisVariable
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.sample_node import SampleNode
@@ -52,6 +52,7 @@ from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
 from library.django_utils.grid_export import EXPORT_ROWS_PER_CHUNK, grid_export_csv
 from library.genomics.vcf_writer import percent_encode_info_value
+from snpdb.enums import CohortGenotypeCollectionType, VCFInfoTypes
 from snpdb.fake_data import create_fake_cohort
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from snpdb.models import (
@@ -65,7 +66,6 @@ from snpdb.models import (
     VCFInfo,
 )
 from snpdb.models.models_cohort import CohortGenotypeCollection
-from snpdb.models.models_enums import CohortGenotypeCollectionType, VCFInfoTypes
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 from upload.tso500.dragen_all_fusions_parser import FUSION_OBSERVATIONS_INFO
 
@@ -361,7 +361,7 @@ class TestNodeExportLaunch(GridExportTestCase):
             with a different MEDIA_ROOT - is dropped so the next request generates it again """
         first = self._launch_export()
         CachedGeneratedFile.objects.filter(pk=first.pk).update(task_status="SUCCESS",
-                                                               filename="/gone/annotated.csv.zip")
+                                                               filename="/gone/annotated.csv")
         second = self._launch_export()
         self.assertNotEqual(first.pk, second.pk)
         self.assertFalse(CachedGeneratedFile.objects.filter(pk=first.pk).exists())
@@ -412,7 +412,7 @@ class TestNodeExportLaunch(GridExportTestCase):
             so the poll has to tell them the file is gone rather than blowing up making its URL """
         cgf = self._launch_export()
         CachedGeneratedFile.objects.filter(pk=cgf.pk).update(task_status="SUCCESS",
-                                                             filename="/gone/annotated.csv.zip")
+                                                             filename="/gone/annotated.csv")
         url = reverse("cached_generated_file_check", kwargs={"cgf_id": cgf.pk})
         data = self.client.get(url).json()
         self.assertEqual(data["status"], "FAILURE")
@@ -666,7 +666,7 @@ class TestAnnotatedSampleExport(GridExportTestCase):
         return node
 
     def test_export_task_writes_every_column_and_drops_the_superseded_file(self):
-        superseded_cgf = self._cgf(self._superseded_annotation_version(), filename="/nowhere/old.csv.zip")
+        superseded_cgf = self._cgf(self._superseded_annotation_version(), filename="/nowhere/old.csv")
         cgf = self._cgf(self.annotation_version, task_id=self.FAKE_TASK_ID)
         analysis = get_sample_analysis(self.sample, self.template, annotation_version=self.annotation_version)
         node = self._ready_output_node(analysis)
@@ -678,10 +678,9 @@ class TestAnnotatedSampleExport(GridExportTestCase):
                 cgf.refresh_from_db()
                 self.assertEqual(cgf.task_status, "SUCCESS", cgf.exception)
                 self.assertIn(f"_annotated_v{self.annotation_version.pk}_", cgf.filename)
-                with zipfile.ZipFile(cgf.filename) as zipf:
-                    csv_name = zipf.namelist()[0]
-                    with zipf.open(csv_name) as f:
-                        rows = list(csv.reader(f.read().decode().splitlines()))
+                self.assertTrue(cgf.filename.endswith(".csv"), "plain CSV, served gzipped by nginx #2368")
+                with open(cgf.filename, encoding="utf-8") as f:
+                    rows = list(csv.reader(f))
         self.assertEqual(len(rows) - 1, node.count)
         self.assertIn(VariantGridColumn.objects.get(pk="spliceai_max_ds").label, rows[0],
                       "every annotated column, whatever the template's collection holds")
@@ -689,7 +688,7 @@ class TestAnnotatedSampleExport(GridExportTestCase):
 
     def test_annotated_download_files_follow_the_annotation_version(self):
         with tempfile.TemporaryDirectory() as media_root:
-            filename = os.path.join(media_root, "annotated.csv.zip")
+            filename = os.path.join(media_root, "annotated.csv")
             with open(filename, "w", encoding="utf-8") as f:
                 f.write("x")
             cgf = self._cgf(self.annotation_version, filename=filename, task_status="SUCCESS")
@@ -701,3 +700,28 @@ class TestAnnotatedSampleExport(GridExportTestCase):
                 newer.save()  # annotation_date is auto_now, so this is now the build's latest
                 self.assertIsNone(get_annotated_download_files_cgf(self.GENERATOR, self.sample)["csv"],
                                   "offered for generating against the new version, not served from the old")
+
+
+@dataclass(frozen=True)
+class _LabelledSample:
+    name: str
+    vcf: str
+
+
+class SampleColumnLabelsTest(SimpleTestCase):
+    """ One specimen in a small variant and a CNV VCF is two samples with one name #2209 """
+
+    def test_shared_name_adds_the_vcf(self):
+        dna = _LabelledSample("specimen_1", "specimen_1.hard-filtered.vcf")
+        cnv = _LabelledSample("specimen_1", "specimen_1.cnv.vcf")
+        other = _LabelledSample("specimen_2", "specimen_2.hard-filtered.vcf")
+        self.assertEqual(VariantGrid._get_sample_labels([dna, cnv, other]),
+                         {dna: "specimen_1 (specimen_1.hard-filtered.vcf)",
+                          cnv: "specimen_1 (specimen_1.cnv.vcf)",
+                          other: "specimen_2"})
+
+    def test_formatter_labels_are_compared_not_names(self):
+        a = _LabelledSample("a", "a.vcf")
+        b = _LabelledSample("b", "b.vcf")
+        self.assertEqual(VariantGrid._get_sample_labels([a, b], lambda _sample: "proband"),
+                         {a: "proband (a.vcf)", b: "proband (b.vcf)"})

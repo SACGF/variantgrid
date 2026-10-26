@@ -1,7 +1,8 @@
 """
 First-party import graph built from the AST, without importing anything. Used by test selection
 (which test modules transitively import a changed module), by `vg map` to rank fan-in, and by
-`vg imports cycles`, which fails on any cycle among the imports that run at module load.
+`vg imports cycles`, which fails on any cycle among the imports that run at module load - including the
+package __init__ files Python runs before a submodule.
 
 `from a.b import c` resolves to the module `a.b.c` when that module exists, otherwise to `a.b` (c is a
 symbol). Relative imports are resolved against the importing package. Third-party imports are dropped.
@@ -171,9 +172,27 @@ def build_import_graph(module_load_only: bool = False) -> ImportGraph:
                     if target:
                         graph.add_edge(module, target)
 
+    if module_load_only:
+        _add_parent_package_edges(graph)
     if not module_load_only and fresh_cache != cache:
         _save_cache(fresh_cache)
     return graph
+
+
+def _add_parent_package_edges(graph: ImportGraph):
+    """ Importing a.b.c runs a/__init__ and a/b/__init__ first, so a re-exporting package __init__ can close a cycle
+        no import statement names. A package the importer sits inside is already initialising, so it adds no edge """
+    for importer, targets in list(graph.imports.items()):
+        own_packages = set(_parent_packages(importer)) | {importer}
+        for target in list(targets):
+            for package in _parent_packages(target):
+                if package not in own_packages and package in graph.modules:
+                    graph.add_edge(importer, package)
+
+
+def _parent_packages(module: str) -> list[str]:
+    parts = module.split(".")
+    return [".".join(parts[:i]) for i in range(1, len(parts))]
 
 
 def _is_production_module(module: str) -> bool:

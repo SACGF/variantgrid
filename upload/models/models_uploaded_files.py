@@ -10,21 +10,16 @@ from django.dispatch import receiver
 
 from analysis.models.models_analysis import Analysis
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
+from annotation.models.models_clinvar import ClinVarVersion
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from classification.models import ClassificationImport
 from genes.models import GeneCoverageCollection, GeneList
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
-from snpdb.models import (
-    GenomeBuild,
-    GenomicIntervalsCollection,
-    ImportedWikiCollection,
-    ImportStatus,
-    Sample,
-)
-from snpdb.models.models_enums import ProcessingStatus
+from snpdb.enums import ImportStatus, ProcessingStatus
+from snpdb.models import GenomeBuild, GenomicIntervalsCollection, ImportedWikiCollection, Sample
 from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
 from upload.models.models import FileUpload, UploadData

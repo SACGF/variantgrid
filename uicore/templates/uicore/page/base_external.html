@@ -1,4 +1,5 @@
 {% load static %}
+<!DOCTYPE html>
 
 <html lang="en">
 <head>
@@ -38,7 +39,7 @@
             captureUnhandledRejections: true,
             payload: {
                 environment: "{{ rollbar_environment | safe }}",
-                {% if user %}
+                {% if user.is_authenticated %}
                 person: {
                     id: {{ user.id }},
                     username: '{{ user.username }}',
@@ -55,6 +56,9 @@
     <!-- JQuery , had to move to the top for the sake of autocomplete -->
     <script src="{% static 'js/lib/jquery-3.7.1/jquery-3.7.1.min.js' %}"></script>
 
+    <!-- global.js reads the CSRF token and its own cookies with js.cookie -->
+    <script src="{% static 'js/lib/js.cookie-3.0.1/js.cookie-3.0.1.min.js' %}"></script>
+
     <!-- Needed by code that calls ajaxForm -->
     <script src="{% static 'js/lib/jquery.form-4.3.0/jquery.form-4.3.0.min.js' %}"></script>
 
@@ -70,9 +74,8 @@
     <link href="{% static 'css/chosen.min.css' %}" rel="stylesheet">
     <script src="{% static 'js/lib/chosen-1.8.7/chosen-1.8.7.jquery.js' %}"></script>
 
-    <!-- Used to show time as time ago, handy to use JavaScript for dates as we get timezone sorted -->
+    <!-- Formats timestamps in the browser's timezone, and "time ago" text (fromNow) -->
     <script src="{% static 'js/lib/moment-2.30.1/moment-2.30.1.min.js' %}"></script>
-    <script src="{% static 'js/lib/jquery.timeago-1.6.7/jquery.timeago-1.6.7.js' %}"></script>
 
     <!-- Used by flag dialogs to show loading -->
     <script src="{% static 'js/lib/loadingoverlay-2.1.6/loadingoverlay-2.1.6.min.js' %}"></script>
@@ -89,9 +92,7 @@
     <script src="{% static 'js/vc_settings.js' %}"></script>
     <script src="{% static 'js/vc_keys.js' %}"></script>
     <script src="{% static 'js/vc_links.js' %}"></script>
-    <script src="{% static 'js/vc_form.js' %}"></script>
     <script src="{% static 'js/flags.js' %}"></script>
-    <script src="{% static 'js/vc_diff.js' %}"></script>
     <script src="{% static 'js/age_widget.js' %}"></script>
     <script src="{% static 'js/scientific_number_widget.js' %}"></script>
 

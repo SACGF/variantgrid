@@ -2,7 +2,8 @@ from time import sleep
 
 from django.core.management.base import BaseCommand
 
-from analysis.models import AnalysisNode, NodeStatus
+from analysis.enums import NodeStatus
+from analysis.models import AnalysisNode
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_utils import update_analysis
 

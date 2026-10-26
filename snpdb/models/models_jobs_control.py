@@ -2,7 +2,7 @@ from typing import NamedTuple, Optional
 
 from django.db import models, transaction
 from django.utils import timezone
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 __all__ = ["JobsControl", "BootRegistration"]
 

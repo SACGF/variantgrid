@@ -1,0 +1,42 @@
+{% load tag_config_tags %}
+{% if url_name_visible.variant_tags %}
+<div class="container mt-4">
+    <h4>Tags</h4>
+
+    <div id="variant-tags-datatable-wrapper" class="{% if not has_tags %}hidden{% endif %}">
+        {% tag_config_collection_link %}
+        <div class="form-check m-2">
+            <label class="form-check-label">
+                <input id="show-resolved-variant-tags" class="form-check-input" type="checkbox"
+                       {% if show_resolved_tags %}checked{% endif %} />
+                Show resolved
+            </label>
+        </div>
+        <script>
+            $("#show-resolved-variant-tags").change(function() {
+                SHOW_RESOLVED_TAGS = $(this).is(":checked");
+                $('#variant-tags-datatable').DataTable().ajax.reload();
+            });
+        </script>
+        <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_counts_datatable' variant.pk %}"
+               data-datatable-data="variantTagsShowResolvedFilter"></table>
+    </div>
+
+    {% if view_variant %}
+    {% comment %} Disable creating tags when loading via analysis grid. {% endcomment %}
+    <div class="d-flex">
+        <div>
+            <a href="javascript:variantDetailsShowTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button d-inline-block"></div>&nbsp;Add Tag</a>
+        </div>
+        <form id="variant-tag-form" class="hidden flex-row flex-grow">
+            {% csrf_token %}
+            <label class="sr-only" for="{{ tag_form.tag.id_for_label }}">{{ tag_form.tag.label }}</label>
+            {{ tag_form.tag }}
+            {{ tag_form.media }}
+        </form>
+    </div>
+    {% else %}
+        Please create new tags in the grid, not on this page.
+    {% endif %}
+</div>
+{% endif %}

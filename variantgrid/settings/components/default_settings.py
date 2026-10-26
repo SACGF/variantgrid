@@ -66,7 +66,7 @@ ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
 # Only applies when DISCORDANCE_ENABLED is True. When False, classifications from
-# labs flagged as research (Lab.research) do not participate in discordance detection.
+# labs flagged as research (LabClassificationSettings.research) do not participate in discordance detection.
 DISCORDANCE_RESEARCH_ENABLED = True
 
 ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
@@ -402,7 +402,6 @@ BEACON_QUERY_NODES = {
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
-VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
 # Uploaded VCFs have their first SNVs' REF bases checked against the build they're imported as (#2030). A wrong
@@ -532,7 +531,6 @@ PUBLIC_SAMPLE_GENE_MATRIX_GENE_LIST_ID = None  # Sample gene matrix of these gen
 PUBLIC_SAMPLE_GENE_MATRIX_SHOW_PRIVATE_SAMPLES = False  # True = show all samples
 PUBLIC_SAMPLE_GENE_MATRIX_TYPE = 'Damage'
 PUBLIC_SAMPLE_GENE_MATRIX_HIGHLIGHT_GENE_SYMBOLS = []
-PUBLIC_LAB_LOCATION_PAGE_VISIBLE = False
 
 PROCESSED_BED_FILES_DIR = os.path.join(PRIVATE_DATA_ROOT, 'processed_bed_files')
 INTERSECT_BED_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'intersect_bed_and_upload_variant_collection.sh')
@@ -657,7 +655,6 @@ CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during
 CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
 CLASSIFICATION_AUTOFUZZ_AGE = False
 
-CLASSIFICATION_DASHBOARD_SIZE = 50
 CLASSIFICATION_RECLASSIFICATION_EMAIL = True
 CLASSIFICATION_RECLASSIFICATION_ANALYTICS_INTERNAL_ONLY = False  # Reclassification analytics only counts internal labs (Lab.external=False)
 CLASSIFICATION_RECLASSIFICATION_ANALYTICS_NON_ADMIN = False  # Every user can view reclassification analytics, not only admins
@@ -672,8 +669,8 @@ CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = True  # Toggle to show only internal/e
 CLASSIFICATION_GRID_FADE_NON_SHARED = False  # Fade grid rows and record summaries that haven't been shared, for deployments where sharing is the point
 CLASSIFICATION_GRID_SUMMARY_COUNTS = True  # Clinical significance counts above the gene / allele / variant classification grids
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
-CLASSIFICATION_NEW_GROUPING = False
-CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where Lab.research=True
+CLASSIFICATION_GENE_CONSENSUS = True  # Offer gene content curated on other records in the gene (create page, Classify & Report, Gene Content card)
+CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where LabClassificationSettings.research=True
 RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
@@ -718,7 +715,6 @@ ISSUE_TRACKER_TEXT = "GitHub issue tracker"
 USER_SETTINGS_SHOW_GROUPS = True
 
 SQL_BATCH_INSERT_SIZE = 50000
-SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
 # Bump when cutting the vg<major>.0 release tag; VARIANTGRID_VERSION counts commits on from the latest vg<major>.* tag
 VARIANTGRID_MAJOR_VERSION = 4
@@ -837,9 +833,6 @@ STORAGES = {
 # django_secret_key.txt in this dir (which is hidden via .gitignore)
 SECRET_KEY = get_or_create_django_secret_key(SETTINGS_DIR)
 
-# Seed data only: the classify queue tag a fresh install is created with (tags can't have spaces).
-# What behaves as a queue tag is Tag.requires_classification, set per tag on the tag settings page
-TAG_REQUIRES_CLASSIFICATION = "RequiresClassification"
 
 TEMPLATES = [
     {
@@ -959,7 +952,7 @@ SPECTACULAR_SETTINGS = {
     ],
     # Several predictors share the same Tolerated/Damaging choice set - use one canonical enum name
     'ENUM_NAME_OVERRIDES': {
-        'ToleratedDamagingPredictionEnum': 'annotation.models.damage_enums.ToleratedDamagingPrediction.CHOICES',
+        'ToleratedDamagingPredictionEnum': 'annotation.enums.ToleratedDamagingPrediction.CHOICES',
     },
 }
 
@@ -1032,9 +1025,7 @@ INSTALLED_APPS = [
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'user_messages',
-    'django_dag',  # only for old seqauto/annotation migrations - remove after squashing (#736)
     'django_js_reverse',
-    'django_extensions',
     'easy_thumbnails',
     'fontawesomefree',
     'guardian',
@@ -1172,6 +1163,9 @@ LOGGING = {
         },
     }
 }
+if UNIT_TEST:
+    # Tests asserting a 4xx would each print the request's traceback - 5xx are logged at ERROR so still show
+    LOGGING['loggers']['django.request'] = {'level': 'ERROR'}
 
 # Instead of @login_required, LoginRequiredMiddleware requires login everywhere. A view opts out with
 # @login_not_required (django.contrib.auth.decorators); DRF views are already marked, and check auth at view time.
@@ -1193,7 +1187,9 @@ SOMALIER = {
     "report_base_dir": os.path.join(MEDIA_ROOT, "somalier"),  # Static files served by Nginx
     "annotation_base_dir": os.path.join(ANNOTATION_BASE_DIR, "somalier"),
     "annotation": {  # All annotation paths relative to "annotation_base_dir"
-        "command": "somalier",
+        # brentp/somalier master at edf6c917 (the --unknown half of brentp/somalier#163), built statically
+        # and hosted on variantgrid.com until a release includes it - 'download_annotation_data' fetches it
+        "command": "somalier-0.3.5-edf6c91",
         "ancestry_labels": "ancestry-labels-1kg.tsv",
         "ancestry_somalier_dir": "1kg-somalier",
         "sites": {
@@ -1202,13 +1198,13 @@ SOMALIER = {
             "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
-    # A somalier before v0.3.5 reads a record against its own alphabetically sorted site alleles rather
-    # than the record's REF/ALT (https://github.com/brentp/somalier/issues/163), so we write the AD pair
-    # in the site's order. Turn this off for v0.3.5+, where relate is instead handed the sites VCF and
-    # reads REF/ALT from it (older ones have no --sites, so the two move together) - deployment_check's
-    # somalier_allele_order tells you which way this should be set, and the extracts need rebuilding
-    # with 'somalier_existing_vcfs --clear' whenever it changes
-    "compensate_allele_order": True,
+    # somalier reads a record against its own alphabetically sorted site alleles rather than the record's
+    # REF/ALT (https://github.com/brentp/somalier/issues/163). Up to v0.3.5 that inflates relatedness under
+    # --unknown, so we write the AD pair in the site's order instead; the build above fixes it given the
+    # sites VCF at relate time, and compensating it then turns ancestry inside out. deployment_check's
+    # somalier_allele_order says which way this must be set for the installed binary, and the extracts
+    # need rebuilding with 'somalier_existing_vcfs --clear' whenever it changes
+    "compensate_allele_order": False,
     "ancestry_enabled": True,  # The expensive stage - it reads all 2,504 1kg .somalier files each run
     # Max query samples per 'somalier ancestry' call when somalier_existing_vcfs backfills - one call fits the
     # 1kg background once for all of them, and a bad .somalier file only fails its own batch
@@ -1329,6 +1325,8 @@ VIEW_GENE_HOTSPOT_GRAPH = True
 VIEW_GENE_HOTSPOT_GRAPH_PREFER_CANONICAL_WITH_DIFF_VERSION = True
 VIEW_GENE_WIKI = True
 
+VIEW_DASHBOARD_TAG_STATS_GRAPH = True  # Tag events by month slide on the dashboard
+
 TIPS_ENABLED = True  # Show feature tips in loading screens / blank grids
 
 # User awards (#1819): admin-given kudos plus computed badges, shown on the profile pages.
@@ -1390,7 +1388,9 @@ def get_keycloak_sync_secrets() -> dict:
     """
     KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
     """
-    return get_secrets("KEYCLOAK", ["username", "password", "host", "oauth_url", "client_id"])
+    keycloak_secrets = get_secrets("KEYCLOAK", ["username", "password", "host", "oauth_url", "client_id"])
+    keycloak_secrets["allow_http"] = get_secret("KEYCLOAK.allow_http", mandatory=False)
+    return keycloak_secrets
 
 
 def get_shariant_sync_secrets() -> dict:
@@ -1404,7 +1404,8 @@ def get_shariant_sync_secrets() -> dict:
     if set(sync.keys()) == set(sync_fields):
         raise ValueError("Old secret 'SYNC' detected - need to use SyncDestination.config['sync_details'] as keys")
 
-    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password"]
+    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password",
+                       "allow_http"]
     return {sd: get_secrets(f"SYNC.{sd}", sync_all_fields, False) for sd in sync}
 
 

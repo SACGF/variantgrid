@@ -1,20 +1,20 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.utils.timezone import localdate
+from django.utils.timezone import now
 
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ClinVarVersion, ManualVariantEntryCollection
+from annotation.models.models_clinvar import ClinVarVersion
+from annotation.models.models_manual_variant import ManualVariantEntryCollection
 from classification.models.classification import ClassificationImport
-from snpdb.models import VCF, ImportedWikiCollection, ImportSource
-from snpdb.models.models_enums import AlleleConversionTool
+from snpdb.enums import AlleleConversionTool, ImportSource
+from snpdb.models import VCF, ImportedWikiCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import LiftoverRun
-from upload.uploaded_file_type import get_upload_data_for_uploaded_file, reloads_vcf_in_place
+from upload.enums import UploadedFileTypes
 from upload.models import (
     FileUpload,
     UploadedClassificationImport,
     UploadedClinVarVersion,
-    UploadedFileTypes,
     UploadedLiftover,
     UploadedManualVariantEntryCollection,
     UploadedVariantTags,
@@ -22,6 +22,7 @@ from upload.models import (
     UploadedWikiCollection,
     UploadPipeline,
 )
+from upload.uploaded_file_type import get_upload_data_for_uploaded_file, reloads_vcf_in_place
 
 
 class UploadDataTestCase(TestCase):
@@ -43,7 +44,7 @@ class UploadDataTestCase(TestCase):
         UploadedVCF.objects.create(file_upload=pipeline.file_upload, upload_pipeline=pipeline)
 
     def _vcf(self, name: str) -> VCF:
-        return VCF.objects.create(name=name, date=localdate(), user=self.user,
+        return VCF.objects.create(name=name, date=now(), user=self.user,
                                   genotype_samples=0, genome_build=self.grch37)
 
 

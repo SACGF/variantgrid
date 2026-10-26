@@ -19,7 +19,9 @@ class VariantTypesTest(SimpleTestCase):
         self.assertEqual("Symbolic <DEL>/<DUP>/<INV> + SVLEN", bands[1]["stored_as"])
         self.assertEqual("Standard Short Variant (given to VEP as its sequence)", bands[1]["pipeline"])
         self.assertEqual("Structural Variant", bands[2]["pipeline"])
-        self.assertEqual([("Any size", "")], [(b["name"], b["range"]) for b in groups["Insertion, complex substitution"]])
+        # Stored as sequence at any size, so only the annotation threshold splits them (#1708)
+        self.assertEqual([("Short", "< 1 kb"), ("SV", "≥ 1 kb")],
+                         [(b["name"], b["range"]) for b in groups["Insertion, complex substitution"]])
 
     @override_settings(ANNOTATION_VEP_SV_MAX_SIZE=10_000_000)
     def test_vep_sv_max_size_splits_structural_variants(self):
@@ -33,9 +35,11 @@ class VariantTypesTest(SimpleTestCase):
         self.assertEqual([("SV", "≤ 10 Mb"), ("Large SV", "> 10 Mb")], [(b["name"], b["range"]) for b in cnv_bands])
 
     @override_settings(VARIANT_SYMBOLIC_ALT_ENABLED=False)
-    def test_no_symbolic_storage_is_one_band(self):
+    def test_no_symbolic_storage_splits_at_annotation_threshold(self):
         groups = {g["kind"]: g["bands"] for g in get_variant_type_rows()}
-        self.assertEqual(["Any size"], [b["name"] for b in groups["Deletion, duplication, inversion"]])
+        bands = groups["Deletion, duplication, inversion"]
+        self.assertEqual(["Short", "SV"], [b["name"] for b in bands])
+        self.assertEqual("Structural Variant (given to VEP as its sequence)", bands[1]["pipeline"])
 
     def test_format_bp(self):
         self.assertEqual(["50 bp", "1 kb", "1.5 kb", "55.12 kb", "10 Mb", "224.23 Mb"],

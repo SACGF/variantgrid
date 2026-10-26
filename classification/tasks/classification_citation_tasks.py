@@ -8,11 +8,8 @@ Entry points: `prefetch_classification_citations` (celery task) and `classificat
 """
 import celery
 
-from annotation.models.models_citations import (
-    CitationFetchRequest,
-    CitationIdNormalized,
-    CitationSource,
-)
+from annotation.enums import CitationSource
+from annotation.models.models_citations import CitationFetchRequest, CitationIdNormalized
 from classification.models.classification import ClassificationModification
 from library.utils import batch_iterator
 

@@ -22,16 +22,14 @@ from genes.panel_app import (
 from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
+from ontology.enums import OntologyService, OntologyTermStatus, PanelAppClassification
 from ontology.models import (
     OntologyIdNormalized,
     OntologyImport,
     OntologyImportSource,
     OntologyRelation,
-    OntologyService,
     OntologyTerm,
     OntologyTermRelation,
-    OntologyTermStatus,
-    PanelAppClassification,
 )
 from ontology.models.models_ontology import gene_relations_read_signal
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
@@ -79,6 +77,7 @@ class PanelAppResult:
             for result in db_ref_regexes.search(phenotype_row):
                 if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
                     all_terms.add(result.id_fixed)
+                    found_term = True
             if not found_term:
                 # just look for abandoned 6-digit numbers
                 for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
@@ -180,11 +179,6 @@ def _update_gene_relations(gene_symbol: str,
             response_hash = md5sum_str(str(results_json))
             ontology_builder.ensure_hash_changed(data_hash=response_hash)
 
-            OntologyTermRelation.objects.filter(
-                dest_term_id=hgnc_term.id,
-                relation=OntologyRelation.PANEL_APP_AU
-            ).delete()
-
             by_ontology_id = defaultdict(list)
 
             for panel_app_result_json in results_json:
@@ -194,6 +188,13 @@ def _update_gene_relations(gene_symbol: str,
                         by_ontology_id[ontology_id].append(parsed_result)
 
             with transaction.atomic():
+                # Locking the gene's term serialises concurrent refreshes of the same gene
+                OntologyTerm.objects.select_for_update().get(pk=hgnc_term.pk)
+                OntologyTermRelation.objects.filter(
+                    dest_term_id=hgnc_term.id,
+                    relation=OntologyRelation.PANEL_APP_AU
+                ).delete()
+
                 for ontology_id, parsed_results in by_ontology_id.items():
                     full_id = OntologyIdNormalized.normalize(ontology_id).full_id
 

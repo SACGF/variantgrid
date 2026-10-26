@@ -10,7 +10,8 @@ from collections import Counter
 
 from django.core.management.base import BaseCommand
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME
 from upload.models import UploadedClassificationImport, UploadPipeline
 

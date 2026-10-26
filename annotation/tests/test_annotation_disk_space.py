@@ -17,6 +17,7 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotsv_dir
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -29,7 +30,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import get_runner
 from annotation.pipelines.vep import VEPRunner
 from annotation.signals.annotation_run_cleanup import remove_annotation_run_output
@@ -46,7 +46,7 @@ from annotation.tasks.annotation_scheduler_task import (
     dispatch_annotation_runs,
     has_free_disk_for_annotation,
 )
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.utils.file_utils import DiskUsage
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

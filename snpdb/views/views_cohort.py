@@ -14,11 +14,11 @@ from annotation.forms import GeneCountTypeChoiceForm
 from annotation.models import (
     AnnotationVersion,
 )
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_gene_counts import (
     CohortGeneCounts,
     GeneCountType,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, GeneAndTranscriptForm, UserGeneListForm
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory
@@ -26,18 +26,14 @@ from library.django_utils import (
     add_save_message,
 )
 from snpdb import forms
+from snpdb.enums import ImportStatus, ProcessingStatus
 from snpdb.models import (
     Cohort,
     Duo,
     Quad,
     Sample,
     Trio,
-    UserGridConfig,
     UserSettings,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
-    ProcessingStatus,
 )
 from snpdb.views.vcf_cohort_page import sample_membership_rows, vcf_cohort_page_context
 from snpdb.views.views_json import cohort_genotype_json_response
@@ -58,9 +54,7 @@ def cohorts(request):
         else:
             add_save_message(request, valid, "Cohort", created=True)
 
-    show_group_data = UserGridConfig.get(request.user, 'Cohorts').show_group_data
-    context = {"form": form, "show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/cohorts.html', context)
+    return render(request, 'snpdb/patients/cohorts.html', {"form": form})
 
 
 def view_cohort(request, cohort_id):
@@ -150,8 +144,10 @@ def cohort_gene_counts(request, cohort_id):
 
     COHORT_CUSTOM_GENE_LIST = f"__QC_COVERAGE_CUSTOM_GENE_LIST__{request.user}"
 
-    # We only want to keep 1 per user
-    custom_text_gene_list, _ = CustomTextGeneList.objects.get_or_create(name=COHORT_CUSTOM_GENE_LIST)
+    # We only want to keep 1 per user. name isn't unique, so concurrent first visits can each create one - use the first
+    custom_text_gene_list = CustomTextGeneList.objects.filter(name=COHORT_CUSTOM_GENE_LIST).order_by("pk").first()
+    if custom_text_gene_list is None:
+        custom_text_gene_list = CustomTextGeneList.objects.create(name=COHORT_CUSTOM_GENE_LIST)
 
     custom_gene_list_form = CustomGeneListForm(request.POST or None,
                                                initial={"custom_gene_list_text": custom_text_gene_list.text})
@@ -205,9 +201,7 @@ def cohort_gene_counts_matrix(request, cohort_id, gene_count_type_id, gene_list_
 
 
 def trios(request):
-    show_group_data = UserGridConfig.get(request.user, 'Trios').show_group_data
-    context = {"show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/trios.html', context)
+    return render(request, 'snpdb/patients/trios.html')
 
 
 def view_trio(request, pk):
@@ -218,9 +212,7 @@ def view_trio(request, pk):
 
 
 def quads(request):
-    show_group_data = UserGridConfig.get(request.user, 'Quads').show_group_data
-    context = {"show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/quads.html', context)
+    return render(request, 'snpdb/patients/quads.html')
 
 
 def view_quad(request, pk):
@@ -231,9 +223,7 @@ def view_quad(request, pk):
 
 
 def duos(request):
-    show_group_data = UserGridConfig.get(request.user, 'Duos').show_group_data
-    context = {"show_group_data": show_group_data}
-    return render(request, 'snpdb/patients/duos.html', context)
+    return render(request, 'snpdb/patients/duos.html')
 
 
 def view_duo(request, pk):

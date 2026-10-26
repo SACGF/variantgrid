@@ -9,20 +9,14 @@ from django.conf import settings
 from django.db.models import Max
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
-from annotation.models.models import VariantAnnotationVersion
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
-from upload.models import (
-    ModifiedImportedVariant,
-    ModifiedImportedVariantOperation,
-    SimpleVCFImportInfo,
-    UploadStep,
-    UploadStepTaskType,
-    VCFPipelineStage,
-)
+from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, VCFPipelineStage
+from upload.models import ModifiedImportedVariant, SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.sql_copy_files import write_sql_copy_csv
 
@@ -69,8 +63,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
         return self.upload_pipeline.genome_build
 
     @cached_property
-    def structural_variant_min_size(self) -> int:
-        return VariantAnnotationVersion.latest_structural_variant_min_size(self.genome_build)
+    def pipeline_routing_sizes(self) -> tuple[int, Optional[int]]:
+        return VariantAnnotationVersion.latest_pipeline_routing_sizes(self.genome_build)
 
     def get_ref_alt_svlen(self, variant: cyvcf2.Variant) -> tuple[str, str, Optional[int]]:
         """ Ensures SVLEN fits symbolic alt, some callers eg Manta (non-Dragen) write positive SVLEN for dels
@@ -90,7 +84,7 @@ class AbstractBulkVCFProcessor(abc.ABC):
         if non_ref_variant_ids:
             base_qs = Variant.objects.filter(pk__in=non_ref_variant_ids)
             for pipeline_type in blocking_pipeline_types():
-                q = pipeline_type_variant_q(pipeline_type, self.structural_variant_min_size)
+                q = pipeline_type_variant_q(pipeline_type, *self.pipeline_routing_sizes)
                 data = base_qs.filter(q).aggregate(m=Max("pk"))
                 max_returned_variant_id = data["m"]
                 if max_returned_variant_id is not None:

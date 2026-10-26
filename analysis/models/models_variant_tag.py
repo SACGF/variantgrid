@@ -3,11 +3,16 @@ from typing import Union
 from django.contrib.auth.models import Group, User
 from django.db import models
 from django.db.models import CASCADE, PROTECT, SET_NULL, Count, Exists, Max, OuterRef, Q, QuerySet
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from analysis.models.enums import TagLocation
+from analysis.enums import TagLocation
 from analysis.models.models_analysis import Analysis
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeVersion
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_version import NodeVersion
+from annotation.canonical_annotation import (
+    get_canonical_c_hgvs,
+    get_canonical_transcript_annotation,
+)
 from classification.models import Classification
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models import Patient
@@ -122,12 +127,12 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
     @property
     def canonical_c_hgvs(self):
-        return self.variant.get_canonical_c_hgvs(self.genome_build)
+        return get_canonical_c_hgvs(self.variant, self.genome_build)
 
     @property
     def gene_symbol(self):
         gs = None
-        if cta := self.variant.get_canonical_transcript_annotation(self.genome_build):
+        if cta := get_canonical_transcript_annotation(self.variant, self.genome_build):
             if tv := cta.transcript_version:
                 gs = tv.gene_version.gene_symbol
         return gs

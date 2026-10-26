@@ -1,4 +1,3 @@
-import mimetypes
 
 from django.conf import settings
 from django.db.models import Prefetch, Q
@@ -7,11 +6,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from library.django_utils import add_save_message, set_form_read_only
-from library.django_utils.file_uploads import filepond_process_response, filepond_upload_receive
+from library.django_utils.file_uploads import (
+    filepond_process_response,
+    filepond_upload_receive,
+    serve_attachment,
+)
 from library.log_utils import log_traceback
 from library.utils.file_utils import rm_if_exists
 from ontology.forms import HGNCForm, HPOForm, MONDOForm, OMIMForm
 from patients import forms
+from patients.enums import MatchStatus
 from patients.forms import PatientContactForm, PatientSearchForm
 from patients.models import (
     Extraction,
@@ -23,7 +27,6 @@ from patients.models import (
     Specimen,
 )
 from patients.models.models_phenotype import TextPhenotypeMatch
-from patients.models_enums import MatchStatus
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC, SequencingSample
 from seqauto.qc.library_qc_summary import summarise_library_qc
 from snpdb.models import Sample
@@ -91,7 +94,7 @@ def view_patient_contact_tab(request, patient_id):
 
 
 def view_patient_specimens(request, patient_id):
-    patient = Patient.get_for_user(request.user, patient_id)
+    patient = Patient.get_for_user(request.user, patient_id, write=request.method == "POST")
     specimen_formset = None
     if request.method == "POST":
         specimen_formset = forms.PatientSpecimenFormSet(request.POST, instance=patient)
@@ -127,7 +130,7 @@ def _patient_extraction_formset(patient, data=None):
 
 
 def view_patient_extractions(request, patient_id):
-    patient = Patient.get_for_user(request.user, patient_id)
+    patient = Patient.get_for_user(request.user, patient_id, write=request.method == "POST")
     extraction_formset = None
     if request.method == "POST":
         extraction_formset = _patient_extraction_formset(patient, data=request.POST)
@@ -316,10 +319,7 @@ def view_patient_file_attachment(request, patient_attachment_id, thumbnail=False
     else:
         filename = patient_attachment.file.path
 
-    content_type, _ = mimetypes.guess_type(filename)
-    with open(filename, "rb") as f:
-        image_data = f.read()
-    return HttpResponse(image_data, content_type=content_type)
+    return serve_attachment(filename)
 
 
 def view_patient_file_attachment_thumbnail(request, patient_attachment_id):

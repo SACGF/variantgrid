@@ -52,7 +52,7 @@ computed, for overlap queries.
 ### Linking a Variant to an Allele
 
 `Allele` is the build-independent hub; `VariantAllele` is the per-build link with an `origin`
-(`snpdb/models/models_enums.py:AlleleOrigin`: imported, imported-normalised, liftover) and the `allele_linking_tool`
+(`snpdb/enums/snpdb_enums.py:AlleleOrigin`: imported, imported-normalised, liftover) and the `allele_linking_tool`
 that made it (`AlleleConversionTool`). `snpdb/clingen_allele.py:populate_clingen_alleles_for_variants` is the batch
 path: variants that fail `Variant.can_have_clingen_allele` (gene-level, an alt that cannot form g.HGVS, or larger than
 `ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE`, with `<DUP>` counted double for a registry bug) get a bare `Allele`
@@ -83,7 +83,9 @@ Liftover is per Allele, not per Variant: the goal is a Variant in every annotate
 cursor is held open for the hours a big run takes and alleles lifted over by earlier batches drop out), holds one batch
 of `settings.LIFTOVER_BATCH_SIZE` in memory and writes one VCF per (batch, tool, destination build). The celery entry
 `snpdb/tasks/liftover_tasks.py:liftover_alleles` fans out `snpdb/tasks/liftover_tasks.py:liftover_allele_batch` per pk
-range, and each batch re-queries `Allele.missing_variants_for_build` so a failure only loses its own batch.
+range, and each batch re-queries `Allele.missing_variants_for_build` so a failure only loses its own batch. The Allele
+admin action queues `snpdb/tasks/liftover_tasks.py:liftover_selected_allele_batch` per `LIFTOVER_BATCH_SIZE` of the
+selected ids instead (ids, as a selection isn't a pk range); each links ClinGen alleles and retries every tool.
 
 `snpdb/liftover.py:_get_build_liftover_dicts` chooses the method per allele, stopping at the first that works:
 `snpdb/liftover.py:_liftover_using_existing_contig` when the contig is shared between builds (MT), which just creates the
@@ -101,7 +103,7 @@ which sets each `AlleleLiftover.status` and merges alleles into the lowest pk wh
 linked elsewhere (`BulkAlleleLinkingVCFProcessor.merge_alleles`), so `merge(a, b)` and `merge(b, a)` racing agree.
 
 `LiftoverRun` has no status of its own; status is per allele on `snpdb/models/models_variant.py:AlleleLiftover` using
-`snpdb/models/models_enums.py:ProcessingStatus`. `AlleleLiftover.get_failed_conversion_tools` is read once per batch
+`snpdb/enums/snpdb_enums.py:ProcessingStatus`. `AlleleLiftover.get_failed_conversion_tools` is read once per batch
 so a tool that already failed an allele is not retried, and `LiftoverRun.get_clingen_auto_fail_liftover_run` collects the
 "known to fail before we start" cases into one run per build so the failure is still recorded.
 
@@ -139,7 +141,7 @@ faster for one sample and regex faster for wide cohorts (#1494). `Cohort.get_any
 
 ### VCF and Sample lifecycle
 
-`snpdb/models/models_vcf.py:VCF.import_status` and `Sample.import_status` share `snpdb/models/models_enums.py:ImportStatus`.
+`snpdb/models/models_vcf.py:VCF.import_status` and `Sample.import_status` share `snpdb/enums/snpdb_enums.py:ImportStatus`.
 Permissions cascade from the VCF: `Sample.can_view` is the VCF's answer or a sample-level guardian grant, and
 `Sample.filter_for_user` ORs both; `VCF.filter_for_user` also hides `ImportStatus.DELETION_STATES` and, by default,
 archived VCFs. Deleting from the UI is `snpdb/tasks/soft_delete_tasks.py:soft_delete_vcfs`, which marks rows and queues
@@ -208,8 +210,8 @@ admits only Variant searches) and `SearchReceiver.search` returns a `SearchRespo
 `settings.PREFER_ALLELE_LINKS` the conversion of variant hits into allele hits.
 `SearchInput.get_visible_variants` restricts to a build's contigs and, on Shariant, to classified variants.
 `SearchResultMatchStrength` decides whether the UI jumps straight to a single result. The variant receivers live in
-`snpdb/signals/variant_search.py` (locus, dbSNP, gnomAD, HGVS via `snpdb/signals/variant_search.py:_search_hgvs`, ids,
-fusions as lookup only); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
+`variantopedia/signals/variant_search.py` (locus, dbSNP, gnomAD, ids, fusions as lookup only) and
+`variantopedia/signals/hgvs_search.py` (HGVS, via `variantopedia/signals/hgvs_search.py:_search_hgvs`); the rest of the app registers cohort, trio, duo, quad, sample, VCF, lab, organisation and user
 searches from `snpdb/signals/`.
 
 ## Why it is shaped this way
@@ -241,8 +243,8 @@ searches from `snpdb/signals/`.
 - `GenomeFasta.get_for_genome_build` uses `get_or_create`, so an empty row created once is returned forever with its
   index never loaded.
 - `AlleleLiftover.BULK_UPDATE_BATCH_SIZE` is 1000 because `bulk_update` writes one CASE arm per row.
-- Search must never mint a fusion identity; `snpdb/signals/variant_search.py:search_variant_gene_fusion` is lookup only.
+- Search must never mint a fusion identity; `variantopedia/signals/variant_search.py:search_variant_gene_fusion` is lookup only.
 - Client-side grid renderers add links; they never convert data (`snpdb/grids.py:get_standard_overrides`).
 - `snpdb/forms.py:VCFForm` hides unused sample-field columns, so not every model field is on the form.
-- `ManualVariantEntry` lives in annotation (`annotation/models/models.py:ManualVariantEntryCollection`); snpdb only
+- `ManualVariantEntry` lives in annotation (`annotation/models/models_manual_variant.py:ManualVariantEntryCollection`); snpdb only
   supplies its form, view and grid.

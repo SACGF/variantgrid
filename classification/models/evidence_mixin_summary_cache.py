@@ -1,18 +1,15 @@
 import datetime
+import warnings
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Self
 
 from dataclasses_json import DataClassJsonMixin
 
-from classification.enums import (
-    AlleleOriginBucket,
-    ClassificationResultValue,
-    SpecialEKeys,
-    TestingContextBucket,
-)
+from classification.enums import ClassificationResultValue, SpecialEKeys, TestingContextBucket
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
+from snpdb.enums import AlleleOriginBucket
 
 
 @dataclass(frozen=True)
@@ -82,7 +79,10 @@ class ClassificationSummaryCacheObj(DataClassJsonMixin):
         for man_sub_field in ["pathogenicity", "somatic", "date"]:
             if man_sub_field not in data_copy:
                 data_copy[man_sub_field] = {}
-        return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
+        # A summary written before a field existed (or an empty one) is expected to decode with None for it
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Missing value of non-optional type", category=RuntimeWarning)
+            return ClassificationSummaryCacheObj.from_dict(data_copy, infer_missing=True)
 
 
 class ClassificationSummaryCalculator:

@@ -5,6 +5,7 @@ from classification.enums.classification_enums import SpecialEKeys, ValidationCo
 from classification.models import PatchMeta
 from classification.models.classification import Classification, classification_validation_signal
 from classification.models.classification_utils import ValidationMerger
+from library.guardian_utils import user_in_group
 
 
 @receiver(classification_validation_signal, sender=Classification)
@@ -27,7 +28,7 @@ def assign_classification_user(sender, **kwargs) -> ValidationMerger:  # pylint:
         if user:
             # this check might be done before the record permissions have been set
             # so check for lab or ability to write to the record
-            if not (user.groups.filter(id=record.lab.group.id).exists() or record.can_write(user_or_group=user)):
+            if not (user_in_group(user, record.lab.group) or record.can_write(user_or_group=user)):
                 message = f"User does not belong to lab {record.lab.name} so can't be owner of this record"
                 vm.add_message(
                     key=SpecialEKeys.OWNER,

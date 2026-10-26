@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 from django.http.response import HttpResponse
 
+from analysis.enums import SetOperations
 from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import (
     AlleleFrequencyNodeForm,
@@ -31,7 +32,6 @@ from analysis.forms.forms_nodes import (
 )
 from analysis.grids import VariantGrid
 from analysis.models import MOINode, OntologyTerm, TagNode
-from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
@@ -58,7 +58,7 @@ from analysis.views.nodes.node_view import NodeView
 from analysis.views.views_json import get_patient_gene_disease_data
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk, resolve_field_path
-from patients.models_enums import SampleSourceLevel
+from patients.enums import SampleSourceLevel
 from patients.sample_grouping import get_patient_for_source
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -325,19 +325,6 @@ class TissueNodeView(NodeView):
     form_class = TissueNodeForm
 
 
-class ZygosityTableMixin:
-    """Adds zygosity table data and initial visibility setting to context."""
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user_settings = UserSettings.get_for_user(self.request.user)
-        context["zygosity_table_data"] = self.model.get_zygosity_table_data()
-        context["initially_show_zygosity_table"] = user_settings.initially_show_zygosity_table
-        # The mosaic AF slider reads as a percent wherever the grid's AF columns do
-        context["af_show_in_percent"] = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        return context
-
-
 def _source_visible_to_user(source, user) -> bool:
     """ The editors AJAX their family member details from the REST API, which applies the same
         permission filter - it 404s for eg a Trio whose cohort import failed """
@@ -346,49 +333,38 @@ def _source_visible_to_user(source, user) -> bool:
     return type(source).filter_for_user(user).filter(pk=source.pk).exists()
 
 
-class TrioNodeView(ZygosityTableMixin, NodeView):
+class FamilyNodeView(NodeView):
+    """ Duo/Trio/Quad editors - the family picker, and the zygosity table for every inheritance mode """
+
+    def get_form_kwargs(self):
+        form_kwargs = super().get_form_kwargs()
+        form_kwargs["genome_build"] = self.object.analysis.genome_build
+        return form_kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_settings = UserSettings.get_for_user(self.request.user)
+        context["source_loadable"] = _source_visible_to_user(self.object.family, self.request.user)
+        context["zygosity_table_data"] = self.model.get_zygosity_table_data()
+        context["initially_show_zygosity_table"] = user_settings.initially_show_zygosity_table
+        # The mosaic AF slider reads as a percent wherever the grid's AF columns do
+        context["af_show_in_percent"] = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        return context
+
+
+class TrioNodeView(FamilyNodeView):
     model = TrioNode
     form_class = TrioNodeForm
 
-    def get_form_kwargs(self):
-        form_kwargs = super().get_form_kwargs()
-        form_kwargs["genome_build"] = self.object.analysis.genome_build
-        return form_kwargs
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["trio_loadable"] = _source_visible_to_user(self.object.trio, self.request.user)
-        return context
-
-
-class QuadNodeView(ZygosityTableMixin, NodeView):
+class QuadNodeView(FamilyNodeView):
     model = QuadNode
     form_class = QuadNodeForm
 
-    def get_form_kwargs(self):
-        form_kwargs = super().get_form_kwargs()
-        form_kwargs["genome_build"] = self.object.analysis.genome_build
-        return form_kwargs
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["quad_loadable"] = _source_visible_to_user(self.object.quad, self.request.user)
-        return context
-
-
-class DuoNodeView(ZygosityTableMixin, NodeView):
+class DuoNodeView(FamilyNodeView):
     model = DuoNode
     form_class = DuoNodeForm
-
-    def get_form_kwargs(self):
-        form_kwargs = super().get_form_kwargs()
-        form_kwargs["genome_build"] = self.object.analysis.genome_build
-        return form_kwargs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["duo_loadable"] = _source_visible_to_user(self.object.duo, self.request.user)
-        return context
 
 
 class VennNodeView(NodeView):

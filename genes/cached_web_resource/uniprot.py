@@ -1,14 +1,13 @@
-import ftplib
-import gzip
 import logging
 from collections import defaultdict
-from io import BytesIO, TextIOWrapper
+from io import StringIO
 
 from Bio import SwissProt
 
-from annotation.models import CachedWebResource
 from genes.models import UniProt
 from genes.models.models_gene import HGNC
+from library.utils.misc_utils import retrieve_ftp_content
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 FUNCTION_KEY = "FUNCTION: "
 TISSUE_SPEC_KEY = "TISSUE SPECIFICITY: "
@@ -20,15 +19,9 @@ JOIN_STRING = " | "  # What's used to merge multiple entries together
 
 def store_uniprot_from_web(cached_web_resource: CachedWebResource):
     logging.info("Downloading 'uniprot_sprot_human.dat.gz' via FTP")
-    ftp = ftplib.FTP("ftp.uniprot.org")
-    ftp.login("anonymous", "anonymous")
-    buffer = BytesIO()
-    ftp.retrbinary('RETR /pub/databases/uniprot/current_release/knowledgebase/taxonomic_divisions/uniprot_sprot_human.dat.gz', buffer.write)
-    buffer.seek(0)
-
-    with gzip.GzipFile(fileobj=buffer) as f:
-        text_f = TextIOWrapper(f)
-        store_uniprot(cached_web_resource, text_f)
+    content = retrieve_ftp_content("ftp.uniprot.org",
+                                   "/pub/databases/uniprot/current_release/knowledgebase/taxonomic_divisions/uniprot_sprot_human.dat.gz")
+    store_uniprot(cached_web_resource, StringIO(content.decode("utf-8")))
 
 
 def store_uniprot(cached_web_resource: CachedWebResource, file_object):

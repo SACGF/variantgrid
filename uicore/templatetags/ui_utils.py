@@ -470,20 +470,6 @@ def severity_bs(severity: LogLevel) -> str:
 
 
 @register.filter()
-def danger_badge(count: Optional[int]) -> str:
-    """
-    If count is None, does nothing
-    If count is 0, shows a success badge with 0 in it
-    If count is anything else, shown in a danger badge
-    """
-    if count is None:
-        return ""
-    if count == 0:
-        return SafeString(' <span class="d-inline-block ml-1 badge badge-success">0</span>')
-    return SafeString(f' <span class="d-inline-block ml-1 badge badge-danger">{count}</span>')
-
-
-@register.filter()
 def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
     """ count is usually a number, but can be a short label such as "hidden: 1" """
     if count is None:
@@ -494,16 +480,7 @@ def badge(count: Union[int, str, None], status: Optional[str] = None) -> str:
     render_status = status
     if count == 0:
         render_status = "info"
-    return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
-
-
-@register.filter()
-def success_badge(count: Optional[int]) -> str:
-    if count is None:
-        return ""
-    if count == 0:
-        return SafeString(' <span class="d-inline-block ml-1 badge badge-secondary">0</span>')
-    return SafeString(f' <span class="d-inline-block ml-1 badge badge-success">{count}</span>')
+    return html.format_html(' <span class="d-inline-block ml-1 badge badge-{}">{}</span>', render_status, count)
 
 
 @register.filter()
@@ -545,7 +522,7 @@ def value(value: Any, no_value: Optional[str] = None) -> str:
     if isinstance(value, bool):
         return boolean(value)
     if not value:
-        return SafeString(f'<span class="no-value">{no_value or value}</span>')
+        return html.format_html('<span class="no-value">{}</span>', no_value or value)
     elif isinstance(value, int):
         return f'{value:,}'
     else:
@@ -594,7 +571,7 @@ def segmented_text(text: str, divider: str = ':') -> str:
     for segment in parts[:-1]:
         output.append(f"<span class='text-monospace text-small text-muted'>{escape(segment)}</span>")
         output.append(f"<span class='text-monospace text-muted'>{escape(divider)}</span>")
-    output.append(parts[-1])
+    output.append(escape(parts[-1]))
     output_str = "".join(output)
     return SafeString(f"<span>{output_str}</span>")
 

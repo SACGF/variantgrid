@@ -2,17 +2,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from analysis.models import VariantTag
-from snpdb.models import (
-    Allele,
-    AlleleConversionTool,
-    AlleleLiftover,
-    AlleleOrigin,
-    GenomeBuild,
-    LiftoverRun,
-    ProcessingStatus,
-    Tag,
-    VariantAllele,
-)
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models import Allele, AlleleLiftover, GenomeBuild, LiftoverRun, Tag, VariantAllele
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 

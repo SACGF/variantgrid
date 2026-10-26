@@ -9,14 +9,7 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast, Lower
 from django.http import HttpRequest
 
-from classification.enums import (
-    AlleleOriginBucket,
-    ClinicalSignificance,
-    EvidenceCategory,
-    LabExternalFilter,
-    ShareLevel,
-    SpecialEKeys,
-)
+from classification.enums import EvidenceCategory, LabExternalFilter, ShareLevel, SpecialEKeys
 from classification.models import (
     ClassificationModification,
     DiscordanceReport,
@@ -24,11 +17,13 @@ from classification.models import (
     ImportedAlleleInfo,
 )
 from classification.models.classification_utils import classification_gene_symbol_filter
-from flags.models import FlagCollection, FlagStatus
+from flags.enums import FlagStatus
+from flags.models import FlagCollection
 from genes.hgvs import HGVSDisplay
 from genes.models import TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm
+from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Lab, UserSettings, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -196,7 +191,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key='published_evidence__gene_symbol__value',
                 name='gene_symbol',
                 label='Gene Symbol',
-                client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.GENE_SYMBOL }")',
+                client_renderer='VCTable.evidence_key',
+                client_renderer_kwargs={"key": SpecialEKeys.GENE_SYMBOL},
                 orderable=True
             ),
             RichColumn(

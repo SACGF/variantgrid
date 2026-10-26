@@ -13,28 +13,33 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classification.enums import (
-    AlleleOriginBucket,
+    ClassificationGroupingSearchTermType,
+    ClassificationResultValue,
     EvidenceCategory,
     LabExternalFilter,
     ShareLevel,
-    TriageDecision, TriageStatus, TestingContextBucket, ClassificationResultValue,
+    TestingContextBucket,
+    TriageDecision,
+    TriageStatus,
 )
 from classification.models import (
+    IN_REVIEW_VALUE,
     Classification,
     ClassificationGrouping,
     ClassificationGroupingEntry,
     ClassificationGroupingSearchTerm,
-    ClassificationGroupingSearchTermType,
     ClassificationModification,
     DiscordanceReport,
     EvidenceKeyMap,
-    ImportedAlleleInfo, OverlapContribution, IN_REVIEW_VALUE,
+    ImportedAlleleInfo,
+    OverlapContribution,
 )
 from genes.hgvs import HGVSDisplay
 from genes.models import GeneSymbol, TranscriptVersion
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.utils import JsonDataType
 from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
+from snpdb.enums import AlleleOriginBucket
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import GenomeBuild, Variant
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
@@ -84,7 +89,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "classification_count": row.get('classification_count'),
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
-            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__research')),
+            "research": settings.CLASSIFICATION_DISTINGUISH_RESEARCH and bool(row.get('lab__classification_settings__research')),
             "research_icon": settings.RESEARCH_ICON,
             "share_level": row.get('share_level'),
             "allele_origin_bucket": row.get('allele_origin_grouping__allele_origin_bucket'),
@@ -431,8 +436,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         genome_build_preferred = first(self.genome_build_prefs)
 
         self.grouping_value_type_overlaps = {}
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('classificationGroupingDetailUrl',
-                                                                       expected_height=108)
+        self.set_expand_ajax('classificationGroupingDetailUrl', expected_height=108)
         self.rich_columns = [
             RichColumn(
                 key='lab',
@@ -458,7 +462,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
-                    'lab__research',
+                    'lab__classification_settings__research',
 					'allele_origin_grouping__allele_origin_bucket',
                     'share_level',
                     'dirty'

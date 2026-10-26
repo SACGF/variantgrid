@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from functools import cached_property
 from typing import Optional, Set
@@ -9,10 +10,11 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.utils import html
 from django.utils.safestring import SafeString
+from django.utils.timezone import now
 
-from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus
+from classification.enums import OverlapStatus, SpecialEKeys, OverlapOverrideStatus, TriageNextStep
 from classification.models import ClassificationGrouping, Overlap, OverlapType, \
-    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, TriageNextStep, EvidenceKey, \
+    ClassificationResultValue, OverlapContributionStatus, OverlapContributionNextStep, EvidenceKey, \
     EvidenceKeyMap, IN_REVIEW_VALUE
 from classification.services.overlap_calculator import OVERLAP_CLIN_SIG_ENABLED
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -142,6 +144,16 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         # only display single context overlaps, but later we merge with cross context data
         qs = qs.filter(overlap_type=OverlapType.SINGLE_CONTEXT)
+
+        if since_days_str := self.get_query_param("since"):
+            try:
+                since_days = int(since_days_str)
+                modified_since = now() - timedelta(days=since_days)
+                qs = qs.filter(overlap_status_change_timestamp__gte=modified_since)
+            except ValueError:
+                pass
+
+
 
         next_step = self.get_query_param("skew_status")
 
@@ -288,8 +300,11 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         max_overlap_status = None
         next_step = self.get_query_param("skew_status")
-        if next_step == _SpecialNextStep.SOLVED:  # solved overlaps
-            if not overlap.overlap_override_status and overlap.overlap_max_ever_status > overlap.overlap_status:
+        if next_step in (_SpecialNextStep.SOLVED, _SpecialNextStep.ALL_OVERLAPS):  # solved overlaps
+            if not overlap.overlap_override_status and \
+                overlap.overlap_max_ever_status > overlap.overlap_status and \
+                    overlap.overlap_max_ever_status.is_attention and \
+                    not overlap.overlap_status.is_attention:
                 max_overlap_status = overlap.overlap_max_ever_status
 
         context = {
@@ -313,7 +328,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
 
         self.csv_name = "overlaps"
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('overlap', expected_height=108)
+        self.set_expand_ajax('overlap', expected_height=108)
         self.rich_columns = [
 
             RichColumn(
@@ -321,7 +336,7 @@ class OverlapColumns(DatatableConfig[ClassificationGrouping]):
                 label="c.HGVS",
                 # sort_keys=["latest_allele_info__grch38__genomic_sort"],
                 renderer=self.render_hgvs,
-                client_renderer=RichColumn.client_renderer_repeat({'formatter': 'VCTable.hgvs', 'groupCSS': 'd-inline'})
+                **RichColumn.client_renderer_repeat('VCTable.hgvs', group_css='d-inline')
             ),
 
             RichColumn(

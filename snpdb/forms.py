@@ -15,30 +15,35 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
 from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
+from annotation.enums import ManualVariantEntryType
 from annotation.models import ManualVariantEntry
-from annotation.models.models_enums import ManualVariantEntryType
-from classification.enums import AlleleOriginBucket
 from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from patients.models import Extraction, Patient, Specimen
 from snpdb import models
-from snpdb.models import (
+from snpdb.enums import (
     DEFAULT_GRID_LOADING_ANIMATIONS,
+    AlleleOriginBucket,
+    GridLoadingAnimation,
+    ImportStatus,
+    SampleFileType,
+    VariantOrigin,
+)
+from snpdb.models import (
     TAG_ALLELE_ORIGIN_CHOICES,
     VCF,
     Cohort,
     CustomColumnsCollection,
     GenomicIntervalsCollection,
-    GridLoadingAnimation,
-    ImportStatus,
     LabUserSettingsOverride,
     OrganizationUserSettingsOverride,
     Project,
@@ -49,10 +54,8 @@ from snpdb.models import (
     UserContact,
     UserSettings,
     UserSettingsOverride,
-    VariantOrigin,
 )
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision
@@ -202,8 +205,8 @@ class LabForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = Lab
         # fields = '__all__'
-        exclude = ("classification_config", "css_class", "research")
-        read_only = ("name", "external", "group_name", "organization", "upload_location", "upload_automatic", "upload_instructions", "clinvar_key")
+        exclude = ("css_class", )
+        read_only = ("name", "external", "group_name", "organization")
         widgets = {
             "name": TextInput(),
             "city": TextInput(),
@@ -215,18 +218,14 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "url": TextInput(),
             "css_class": TextInput(),
             "group_name": TextInput(),
-            "upload_location": TextInput(),
             "email": EmailInput(),
             "slack_webhook": URLInput()
         }
         labels = {
             "email": "Group Email",
             "url": "URL",
-            "clinvar_key": "ClinVar Key",
             "group_name": "Group Name",
             "organization": "Organisation",  # really need to do translations, even if just en-US vs en-UK
-            "upload_location": "Upload Location",
-            "upload_auto_pattern": "Upload Auto Pattern",
             "slack_webhook": "Slack Webhook",
             "contact_name": "Contact Name",
             "contact_email": "Contact Email",
@@ -245,10 +244,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "contact_name": "Name of contact person available for other labs to contact (if applicable)",
             "contact_email": "Email address to be provided to other labs when needing to communicate",
             "contact_phone": "Phone number to be provided to other labs when needing to communicate",
-            "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
-            "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",
-            "clinvar_key": "Required to submit to ClinVar. Ask the admins if your lab is ready to submit.",
             "mme_enabled": "Opt this lab into MatchMaker Exchange, a federated rare-disease "
                            "patient-matching network. Classifications of VUS and above that are "
                            "shared at '3rd Party Databases' level become candidate genes other "
@@ -370,6 +366,16 @@ EXTRACTION_MATCH_FIELDS = ('extraction_reference', 'extraction_match_status',
                            'extraction_match_error', 'extraction_match_date')
 
 
+def limit_sample_patient_choices(form, user):
+    """ Sample patient/extraction choices are the ones the user can see (as the autocompletes offer),
+        plus whatever the sample already links to """
+    sample = form.instance
+    form.fields["patient"].queryset = Patient.objects.filter(
+        Q(pk__in=Patient.filter_for_user(user).values("pk")) | Q(pk=sample.patient_id))
+    form.fields["extraction"].queryset = Extraction.objects.filter(
+        Q(pk__in=Extraction.filter_for_user(user).values("pk")) | Q(pk=sample.extraction_id))
+
+
 class SampleForm(forms.ModelForm, ROFormMixin):
     genome_build = forms.CharField()  # From VCF.genome_build
     uploaded_by = forms.CharField()  # From VCF.user
@@ -396,6 +402,7 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
         self.fields['uploaded_by'].initial = self.instance.vcf.user
         self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
+        limit_sample_patient_choices(self, user)
 
     def _field_order(self) -> list[str]:
         """ Extraction matching goes last - it's system bookkeeping below the fields people edit """

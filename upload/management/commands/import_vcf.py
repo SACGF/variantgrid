@@ -5,7 +5,7 @@ import logging
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
 from upload.upload_metadata import GENOME_BUILD, SOURCE
 from upload.upload_processing import process_vcf_file
 

@@ -4,17 +4,16 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from library.guardian_utils import admin_bot
+from snpdb.enums import AlleleConversionTool, ImportSource, ProcessingStatus
 from snpdb.models import AlleleLiftover, LiftoverRun
-from snpdb.models.models_enums import AlleleConversionTool, ImportSource, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
+from upload.enums import UploadedFileTypes, UploadStepTaskType
 from upload.models import (
     FileUpload,
-    UploadedFileTypes,
     UploadedLiftover,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
 )
 from upload.tasks.vcf.import_vcf_tasks import LiftoverCreateVCFTask
 

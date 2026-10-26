@@ -8,13 +8,13 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
+from genes.enums import AnnotationConsortium, MANEStatus
 from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.hgvs import HGVSMatcher
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.models import MANE, TranscriptVersion
-from genes.models_enums import AnnotationConsortium, MANEStatus
 from snpdb.models import GenomeBuild
-from snpdb.signals.variant_search import _get_search_hgvs_gene_symbol_transcripts
+from variantopedia.signals.hgvs_search import _get_search_hgvs_gene_symbol_transcripts
 
 
 def _make_transcript_version(genome_build, accession, gene_symbol, annotation_consortium,

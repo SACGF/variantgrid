@@ -3,7 +3,7 @@ import json
 from celery.result import AsyncResult
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.http.response import JsonResponse
+from django.http.response import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
@@ -15,6 +15,7 @@ from snpdb.models import (
     CustomColumnsCollection,
     Sample,
     TagConfigCollection,
+    VariantZygosityCountCollection,
 )
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_vcf
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
@@ -114,13 +115,14 @@ def vcf_populate_clingen_alleles(request, vcf_id):
 
 @require_POST
 def vcf_change_zygosity_count(request, vcf_id, vzcc_id, operation):
-    vcf = VCF.get_for_user(request.user, vcf_id)
-    if not vcf.can_write(request.user):
-        raise PermissionError(f"You do not have write permission on VCF pk={vcf_id}")
+    VCF.get_for_user(request.user, vcf_id, write=True)
+    vzcc = get_object_or_404(VariantZygosityCountCollection, pk=vzcc_id)
 
     OPERATION = {"add": "+", "del": "-"}
+    if operation not in OPERATION:
+        return HttpResponseBadRequest("operation must be 'add' or 'del'")
     operation = OPERATION[operation]
-    task = update_variant_zygosity_count_for_vcf_task.si(vzcc_id, vcf_id, operation)
+    task = update_variant_zygosity_count_for_vcf_task.si(vzcc.pk, vcf_id, operation)
     task.apply_async()
     return JsonResponse({})
 

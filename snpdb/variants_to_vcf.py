@@ -147,9 +147,9 @@ def somalier_alleles_flipped(ref: str, alt: str) -> bool:
         We compensate in the AD pair, which is the field somalier misreads and the only reason this
         file exists; REF, ALT and GT stay as they should be. Only a VCF with no depths to write has
         to carry it in the genotype instead. 0.3.5 only fixed the per-sample counts relate reports
-        (given --sites), not the pairs, so it still needs this. settings.SOMALIER["compensate_allele_order"]
-        is there for a somalier that fixes extract - deployment_check says which way it should be set
-        for the installed binary. """
+        (given --sites), not the pairs, so it needs this; the build we host (edf6c917) doesn't, and
+        compensating it turns ancestry inside out. settings.SOMALIER["compensate_allele_order"] says
+        which - deployment_check says which way it should be set for the installed binary. """
     if not settings.SOMALIER["compensate_allele_order"]:
         return False
     return alt < ref

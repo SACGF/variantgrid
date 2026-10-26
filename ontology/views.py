@@ -4,10 +4,10 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import TemplateView
 
 from library.utils import LimitedCollection
+from ontology.enums import OntologyService
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER,
     OntologyRelation,
-    OntologyService,
     OntologySnake,
     OntologyTerm,
     OntologyTermRelation,

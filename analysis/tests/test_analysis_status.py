@@ -8,9 +8,9 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from analysis.enums import NodeStatus
 from analysis.models import AllVariantsNode, Analysis, AnalysisNode, NodeTask
-from analysis.models.enums import NodeStatus
-from analysis.models.nodes.analysis_node import NodeVersion
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.scheduler_status import get_analyses_with_work, get_scheduler_status
 from analysis.tests.utils import AnalysisSetupMixin
 

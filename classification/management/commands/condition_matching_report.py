@@ -7,7 +7,8 @@ from django.core.management import BaseCommand
 from classification.models import ConditionTextMatch
 from genes.models import GeneSymbol
 from library.utils import ExportRow, delimited_row, export_column
-from ontology.models import OntologyService, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService
+from ontology.models import OntologySnake, OntologyTerm
 
 
 @dataclass

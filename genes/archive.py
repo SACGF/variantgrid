@@ -14,7 +14,7 @@ from eventlog.models import create_event
 from genes.models import GeneCoverageCollection
 from genes.tasks.gene_coverage_tasks import reload_gene_coverage_collection
 from snpdb.archive import ArchivePreconditionError
-from snpdb.models import DataState
+from snpdb.enums import DataState
 
 
 def archive_gene_coverage_collection(gcc: GeneCoverageCollection, user: User, reason: str = "") -> None:

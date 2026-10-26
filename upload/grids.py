@@ -8,19 +8,19 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
+from snpdb.enums import ProcessingStatus
 from snpdb.grids import AbstractSkippedAnnotationColumns
-from snpdb.models import GenomeBuild, ProcessingStatus
+from snpdb.models import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
+from upload.enums import UploadedFileTypes, VCFPipelineStage
 from upload.file_type_icons import file_type_icon_html
 from upload.models import (
     FileUpload,
     ModifiedImportedVariant,
-    UploadedFileTypes,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
-    VCFPipelineStage,
 )
 from upload.uploaded_file_type import get_upload_data_by_file_upload_id
 from upload.views.views_json import get_remaining_annotation_runs
@@ -183,8 +183,7 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.scroll_x = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('upload_step_detail',
-                                                                       expected_height=120)
+        self.set_expand_ajax('upload_step_detail', expected_height=120)
         self.rich_columns = [
             RichColumn(key='sort_order', orderable=True),
             RichColumn(key='id', orderable=True),

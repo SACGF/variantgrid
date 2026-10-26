@@ -1,7 +1,7 @@
 """
 django-guardian plumbing: DjangoPermission builds the `app.read_model` / `app.write_model` permission
 strings, the standard groups (all_users_group, public_group, bot_group) and the `admin_bot` system
-user are looked up here, and assign_permission_to_user_and_groups grants a new object's read/write
+user are looked up here, user_in_group / user_in_group_or_superuser are the group-membership checks, and assign_permission_to_user_and_groups grants a new object's read/write
 perms from the user's UserSettings initial groups (the one sanctioned import of snpdb from library).
 Models check permissions through library/django_utils/guardian_permissions_mixin.py, not directly here.
 """
@@ -22,6 +22,15 @@ def is_superuser(user):
     Can use this as the func in @user_passes_test annotation
     """
     return user.is_superuser
+
+
+def user_in_group(user: User, group: Union[Group, str]) -> bool:
+    group_name = group.name if isinstance(group, Group) else group
+    return user.groups.filter(name=group_name).exists()
+
+
+def user_in_group_or_superuser(user: User, group: Union[Group, str]) -> bool:
+    return user.is_superuser or user_in_group(user, group)
 
 
 def all_users_group():
@@ -58,41 +67,6 @@ def bot_group() -> Group:
 def add_public_group_read_permission(obj):
     read_perm = DjangoPermission.perm(obj, DjangoPermission.READ)
     assign_perm(read_perm, public_group(), obj)
-
-
-def _group_general_score(group_name):
-    if group_name == settings.PUBLIC_GROUP_NAME:
-        return 4
-    if group_name == settings.LOGGED_IN_USERS_GROUP_NAME:
-        return 3
-    if '/' not in group_name:
-        return 2
-    return 1
-
-
-def highest_group(group_names):
-    highest_score = 0
-    highest_group_name = None
-
-    for name in group_names:
-        score = _group_general_score(name)
-        if score > highest_score:
-            highest_score = score
-            highest_group_name = name
-    return highest_group_name
-
-
-def groups_map(klass, ids, id_field='id'):
-    id_to_group = {}
-    if ids:
-        if hasattr(ids[0], id_field):
-            ids = [obj.id for obj in ids]
-
-        objs = klass.objects.filter(pk__in=ids).only(id_field)
-        for obj in objs:
-            id_to_group[obj.id] = set(get_groups_with_perms(obj).values_list('name', flat=True))
-
-    return id_to_group
 
 
 class DjangoPermission:

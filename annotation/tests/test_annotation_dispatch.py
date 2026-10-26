@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotated_filename
 from annotation.annotation_versions import _absorb_range_lock, merge_pending_range_locks
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
@@ -33,7 +34,6 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.pipelines import enabled_pipeline_types, get_runner
 from annotation.pipelines import vep as vep_pipeline
 from annotation.pipelines.vep import VEPRunner
@@ -60,7 +60,7 @@ from annotation.tasks.annotation_scheduler_task import (
     reclaim_stalled_annotation_runs,
 )
 from annotation.vep_annotation import VEPVersionMismatchError, get_vep_skipped_variants_filename
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from snpdb.models import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant

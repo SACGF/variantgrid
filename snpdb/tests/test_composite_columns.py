@@ -1,20 +1,18 @@
 """
-Composite grid columns - the cell, the members riding along hidden, and the migration helper that
-collapses a collection onto them.
+Composite grid columns - the cell, and the members riding along hidden.
 
-@see snpdb.models.models_columns.CompositeColumnMember, snpdb/migrations/0238_composite_columns.py
+@see snpdb.models.models_columns.CompositeColumnMember
 """
 import re
 
-from django.apps import apps
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test.client import Client
 from django.urls.base import reverse
 
+from annotation.enums import Pathogenicity
 from annotation.fake_data import get_fake_annotation_version
-from annotation.models.models_enums import Pathogenicity
-from library.django_utils.composite_columns import collapse_into_composite
+from snpdb.enums import ColumnAnnotationLevel
 from snpdb.grid_columns.custom_columns import (
     DBNSFP_NOTE,
     get_all_variant_grid_columns,
@@ -28,7 +26,6 @@ from snpdb.models import (
     CustomColumnsCollection,
     VariantGridColumn,
 )
-from snpdb.models.models_enums import ColumnAnnotationLevel
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import CellData
 
@@ -191,57 +188,6 @@ class ChoiceFieldColumnTest(TestCase):
         cell = CellData(all_data={"variantannotation__annotsv_acmg_class": Pathogenicity.LIKELY_PATHOGENIC},
                         key="variantannotation__annotsv_acmg_class")
         self.assertEqual("Likely pathogenic", rich_column.renderer(cell))
-
-
-class CollapseIntoCompositeTest(TestCase):
-    """ The migration helper - every collection, user and system, comes through it """
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.user = User.objects.get_or_create(username="test_collapse_into_composite")[0]
-
-    def _collection(self, column_ids: list[str]) -> CustomColumnsCollection:
-        ccc = CustomColumnsCollection.objects.create(name=f"test {column_ids}", user=self.user)
-        ccc.customcolumn_set.all().delete()
-        for sort_order, column_id in enumerate(column_ids):
-            CustomColumn.objects.create(custom_columns_collection=ccc, column_id=column_id,
-                                        sort_order=sort_order)
-        ccc.refresh_from_db()
-        return ccc
-
-    def _collapse(self, ccc, composite_id="spliceai") -> list[str]:
-        collapse_into_composite(apps, composite_id)
-        ccc.refresh_from_db()
-        return list(ccc.customcolumn_set.order_by("sort_order").values_list("column_id", flat=True))
-
-    def test_run_of_members_becomes_the_composite_at_the_runs_position(self):
-        ccc = self._collection(["gene_symbol", "spliceai_max_ds", "spliceai_pred_ds_ag",
-                                "spliceai_pred_dp_ag", "hgvs_c"])
-        version = ccc.version_id
-        self.assertEqual(["gene_symbol", "spliceai", "hgvs_c"], self._collapse(ccc))
-        self.assertGreater(ccc.version_id, version, "The node grid definition cache is keyed on it")
-
-    def test_lone_member_becomes_the_composite(self):
-        ccc = self._collection(["gene_symbol", "spliceai_pred_dp_dl"])
-        self.assertEqual(["gene_symbol", "spliceai"], self._collapse(ccc))
-
-    def test_composite_already_present_loses_the_stray_members(self):
-        ccc = self._collection(["spliceai", "gene_symbol", "spliceai_pred_ds_al"])
-        self.assertEqual(["spliceai", "gene_symbol"], self._collapse(ccc))
-
-    def test_collection_without_the_group_is_untouched(self):
-        ccc = self._collection(["gene_symbol", "hgvs_c"])
-        version = ccc.version_id
-        self.assertEqual(["gene_symbol", "hgvs_c"], self._collapse(ccc))
-        self.assertEqual(version, ccc.version_id, "Nothing changed, so nothing to invalidate")
-
-    def test_is_idempotent(self):
-        ccc = self._collection(["spliceai_max_ds", "gene_symbol"])
-        self.assertEqual(["spliceai", "gene_symbol"], self._collapse(ccc))
-        version = ccc.version_id
-        self.assertEqual(["spliceai", "gene_symbol"], self._collapse(ccc))
-        self.assertEqual(version, ccc.version_id)
 
 
 class CustomColumnsArrangePageTest(TestCase):

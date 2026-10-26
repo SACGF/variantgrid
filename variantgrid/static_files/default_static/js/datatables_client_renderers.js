@@ -153,12 +153,12 @@ $(window).on('resize', closeRowActionsMenus);
 document.addEventListener('scroll', closeRowActionsMenus, true);
 
 
-// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse
-function renderIconFlag(settings, data, type, row) {
+// Server sends a boolean - only draw an icon when it's set, so the grid stays sparse. kwargs: {cssClass, title}
+function renderIconFlag(data, type, row, ctx) {
     if (!data) {
         return '';
     }
-    return $('<div>', {class: settings.cssClass, title: settings.title}).prop('outerHTML');
+    return $('<div>', {class: ctx.kwargs.cssClass, title: ctx.kwargs.title}).prop('outerHTML');
 }
 
 
@@ -234,23 +234,32 @@ $(document).on('click', '.sequencing-run-vcfs-toggle', function(e) {
 });
 
 
-// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter
+// Variant tags grid (@see VariantTagsColumns) - the tag colour CSS comes from render_tag_styles_and_formatter.
+// The variant is named the way the variant grid's Variant cell names it - the data carries the same keys
 function renderVariantTagVariant(data, type, row) {
     if (!data || !data.variant_string) {
         return '';
     }
     const dom = $('<div>');
+    const label = VariantGridFormat.representativeVariantLabel(data.variant_id, data);
+    const labelAttrs = {class: 'rv-label', title: label.title, html: label.html};
     if (data.url) {
-        $('<a>', {href: data.url, target: '_blank', text: data.variant_string}).appendTo(dom);
+        $('<a>', {...labelAttrs, href: data.url, target: '_blank'}).appendTo(dom);
     } else {
-        $('<span>', {text: data.variant_string}).appendTo(dom);
+        $('<span>', labelAttrs).appendTo(dom);
+    }
+    const badge = VariantGridFormat.variantKindBadge(data["alt__seq"], data["svlen"],
+                                                     data["locus__contig__name"], data["locus__position"]);
+    if (badge) {
+        dom.append(' ').append(badge);
     }
     if (data.classify_url) {
         $('<a>', {
             href: data.classify_url,
             target: '_blank',
-            class: 'btn btn-primary btn-sm new-classification-button',
-            text: 'New Classification'
+            class: 'btn btn-outline-primary new-classification-button',
+            title: 'New Classification',
+            html: '<i class="fas fa-plus-circle"></i> Classify'
         }).appendTo(dom);
     }
     return dom.prop('outerHTML');
@@ -300,18 +309,6 @@ function renderGeneSymbolNewWindow(data, type, row) {
             text: geneSymbol
         }).appendTo(dom);
     });
-    return dom.prop('outerHTML');
-}
-
-
-// Cohort page sample pickers - the checkbox is what add/remove to cohort reads
-function renderCohortSampleCheckbox(data, type, row) {
-    if (!data || !data.text) {
-        return '<span class="no-value">-</span>';
-    }
-    const dom = $('<span>');
-    $('<input>', {type: 'checkbox', class: 'sample-checkbox', sample_id: data.text}).appendTo(dom);
-    $('<a>', {href: data.url, class: 'hover-link ml-1', text: data.text}).appendTo(dom);
     return dom.prop('outerHTML');
 }
 

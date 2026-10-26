@@ -92,7 +92,7 @@ class Command(BaseCommand):
                             submission_source=SubmissionSource.API,
                             import_run=import_run,
                         )
-                        import_run.increment_status(response.status)
+                        import_run.increment_status(response)
                         count = count + 1
                         if max_records is not None and count >= max_records:
                             break

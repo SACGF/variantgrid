@@ -15,8 +15,9 @@ from datetime import datetime
 from django.conf import settings
 from django.db.models import Count, Exists, Min, OuterRef, Q, QuerySet, Subquery
 
-from analysis.models.enums import NodeStatus
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeTask
+from analysis.enums import NodeStatus
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_version import NodeTask
 from analysis.tasks.analysis_update_tasks import _live_lease_q
 from library.vg.status import broker_queue_depths
 

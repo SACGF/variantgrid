@@ -221,7 +221,7 @@ formats on an existing VCF) and everything downstream must be safe to run twice 
 Steps are rows, not celery state, because an import outlives any one worker process: the page at
 `upload/views/views.py:view_upload_pipeline` and `APIUploadStatusView` read progress straight from `UploadStep`, a
 crashed worker leaves a row that says where it died, and retry can reason about what to delete. The stage/dependency
-split (`upload/models/models_enums.py:VCFPipelineStage`) is what lets steps be created during the run - by preprocess
+split (`upload/enums/upload_enums.py:VCFPipelineStage`) is what lets steps be created during the run - by preprocess
 for each chunk, by the header task per sample - and still be scheduled correctly, since the scheduler only ever asks
 "is anything in this stage still open" rather than following a fixed list.
 
@@ -240,7 +240,8 @@ Normalisation history is kept as `ModifiedImportedVariant` because users search 
 file, not the left-aligned one: `ModifiedImportedVariant.get_variant_for_unnormalized_variant` and
 `get_other_loci_variants_by_multiallelic` answer "where did my variant go", and `ModifiedImportedVariants.get_for_pipeline`
 hangs the collection off the normalize sub-step so the tool version is recorded with it. Legacy rows
-hold vt-format `OLD_VARIANT` strings, which `_vt_split_old_variant` parses, so the model reads both.
+hold vt-format `OLD_VARIANT` strings; lookups go through `old_variant_formatted`, which has the same
+`chrom:pos:ref/alt` shape for both tools, so those rows are still found.
 
 ## Traps
 

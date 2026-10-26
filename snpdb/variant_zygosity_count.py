@@ -133,26 +133,24 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
             logging.info("VCF %s has no cohort genotype collection", vcf)
             return
 
-        # Want to be able to throw exceptions here
-        if operation == '+':
-            vzcv, created = VariantZygosityCountForVCF.objects.get_or_create(collection=collection, vcf=vcf)
-            if created:
-                if vzcv.deleted is not None:
-                    logging.warning("VCF pk=%d, collection=%s (Add) existing non-deleted VariantZygosityCountForVCF. Skipping",
-                                    vcf.pk, collection.name)
-                    return
-                vzcv.count_complete = None
-                vzcv.deleted = None
-                vzcv.save()
-        else:
+        # Locking the record serialises concurrent adds/subtracts of the same VCF, so the check and the
+        # count UPDATE see the same state
+        with transaction.atomic():
+            if operation == '+':
+                VariantZygosityCountForVCF.objects.get_or_create(collection=collection, vcf=vcf)
             try:
-                vzcv = VariantZygosityCountForVCF.objects.get(collection=collection, vcf=vcf)
+                vzcv = VariantZygosityCountForVCF.objects.select_for_update().get(collection=collection, vcf=vcf)
             except VariantZygosityCountForVCF.DoesNotExist:
                 logging.warning("No VariantZygosityCountForVCF for VCF pk=%d (%s)",
                                 vcf.pk, vcf.get_import_status_display())
                 return  # no need to do anything
 
-            if skip_if_cannot_delete:
+            if operation == '+':
+                if vzcv.count_complete is not None and vzcv.deleted is None:
+                    logging.warning("VCF pk=%d, collection=%s (Add) already counted. Skipping",
+                                    vcf.pk, collection.name)
+                    return
+            elif skip_if_cannot_delete:
                 try:
                     vzcv.check_can_delete()
                 except ValueError as e:
@@ -162,24 +160,22 @@ def update_variant_zygosity_count_for_vcf(collection: VariantZygosityCountCollec
             else:
                 vzcv.check_can_delete()
 
-        use_cohort_genotype_collection = vzcv and not vzcv.is_split_to_sample_counts
-        if use_cohort_genotype_collection:
-            logging.info("Updating from Cohort Zygosity Collection %d", cohort_genotype_collection.pk)
-            sql, params = _get_update_sql_and_params(collection, vcf, operation)
-            now = timezone.now()
-            with transaction.atomic():
+            if not vzcv.is_split_to_sample_counts:
+                logging.info("Updating from Cohort Zygosity Collection %d", cohort_genotype_collection.pk)
+                sql, params = _get_update_sql_and_params(collection, vcf, operation)
                 run_sql(sql, params)
                 if operation == '+':
-                    vzcv.count_complete = now
+                    vzcv.count_complete = timezone.now()
+                    vzcv.deleted = None
                 else:
-                    vzcv.deleted = now
+                    vzcv.deleted = timezone.now()
                 vzcv.save()
                 collection.bump_data_version()
-        else:
-            logging.info("Updating from sample...")
+                return
 
-            for sample in vcf.sample_set.all():
-                update_variant_zygosity_count_for_sample(collection, sample, operation)
+        logging.info("Updating from sample...")
+        for sample in vcf.sample_set.all():
+            update_variant_zygosity_count_for_sample(collection, sample, operation)
 
     except:
         tb = get_traceback()
@@ -197,13 +193,13 @@ def update_all_variant_zygosity_counts_for_sample(sample, operation):
 def update_variant_zygosity_count_for_sample(collection: VariantZygosityCountCollection, sample: Sample, operation):
     try:
         check_valid_count_ops(operation)
-        logging.info("update_variant_zygosity_count_for_sample(%d, %s)", sample, operation)
+        logging.info("update_variant_zygosity_count_for_sample(%s, %s)", sample, operation)
         if _sample_excluded_from_variant_zygosity_count(sample):
             logging.info("Sample %s matches VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX - skipping",
                          sample)
             return
         try:
-            gvzcp = VariantZygosityCountForVCF.objects.get(vcf=sample.vcf)  # throws DoesNotExist if not there
+            gvzcp = VariantZygosityCountForVCF.objects.get(collection=collection, vcf=sample.vcf)  # throws DoesNotExist if not there
             if operation == '+':
                 msg = f"Attempting to count for sample ({sample}) which has already had vcf ({sample.vcf}) counted!"
                 raise ValueError(msg)

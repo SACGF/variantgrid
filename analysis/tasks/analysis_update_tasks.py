@@ -12,13 +12,16 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
-from analysis.models import Analysis, AnalysisEdge, AnalysisNode, NodeStatus, NodeTask
-from analysis.models.nodes.analysis_node import LEASE_SECONDS, NodeCache, NodeVersion
+from analysis.enums import NodeStatus
+from analysis.models import Analysis, AnalysisEdge, AnalysisNode, NodeTask
+from analysis.models.nodes.analysis_node import LEASE_SECONDS
 from analysis.models.nodes.node_utils import get_hidden_error_node_statuses, get_nodes_by_id
+from analysis.models.nodes.node_version import NodeCache, NodeVersion
 from analysis.tasks.node_update_tasks import MAX_NODE_ATTEMPTS
 from library.log_utils import log_traceback, report_message
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models import JobsControl, ProcessingStatus
+from snpdb.enums import ProcessingStatus
+from snpdb.models import JobsControl
 
 
 @celery.shared_task

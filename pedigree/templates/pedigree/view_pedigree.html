@@ -86,7 +86,12 @@
 		</div>
 		
 		<p>
-		<b>Ped file:</b><a href="{% url 'view_ped_file' pedigree.ped_file_family.ped_file.pk %}">{{ pedigree.ped_file_family.ped_file }}</a>
+		<b>Ped file:</b>
+        {% if can_view_ped_file %}
+            <a href="{% url 'view_ped_file' pedigree.ped_file_family.ped_file.pk %}">{{ pedigree.ped_file_family.ped_file }}</a>
+        {% else %}
+            {{ pedigree.ped_file_family.ped_file }}
+        {% endif %}
 
         {{ formset.management_form }}
         {{ formset.non_form_errors }}

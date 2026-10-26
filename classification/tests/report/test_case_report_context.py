@@ -4,7 +4,6 @@ from django.test import TestCase
 from django.utils import timezone
 
 from classification.enums import SpecialEKeys
-from classification.enums.classification_enums import SomaticClinicalSignificance
 from classification.report.case_report_context import (
     Alteration,
     ReportContext,
@@ -24,6 +23,7 @@ from classification.tests.report.fake_report_variants import (
     fake_report_variant,
     fake_sample,
 )
+from snpdb.enums import SomaticClinicalSignificance
 
 TIER_1 = SomaticClinicalSignificance.TIER_1
 TIER_2 = SomaticClinicalSignificance.TIER_2

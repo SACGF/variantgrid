@@ -2,80 +2,19 @@
 {% load js_tags %}
 <div class='wiki-tag'>
 <script src="{% static 'js/lib/toastui/toastui-editor-all.min.js' %}"></script>
-<!-- Editor's Dependecy Style -->
-  <link
-    rel="stylesheet"
-    href="{% static 'js/lib/codemirror/5.48.4/codemirror.min.css' %}"
-  />
-  <!-- Editor's Style -->
-  <link rel="stylesheet" href="{% static 'js/lib/toastui/toastui-editor.min.css' %}" />
+<link rel="stylesheet" href="{% static 'js/lib/toastui/toastui-editor.min.css' %}" />
+<script src="{% static 'js/snpdb/wiki_tag.js' %}"></script>
 <script>
-function initWiki() {
-    const wikiId = $("#wiki-{{ uuid }}");
-    const wikiSaveButton = $(".wiki-save", wikiId);
-
-    let events = {};
-    {% if has_write_permission %}
-    events['change'] = function() { wikiSaveButton.show(); };
-    {% endif %}
-
-    const editor = new toastui.Editor({
-        el: document.querySelector('.editSection', wikiId),
-        previewStyle: 'vertical',
-        initialValue: {{ wiki.markdown|jsonify }},
-        initialEditType: 'wysiwyg',
-        height: '300px',
-        events: events,
-        usageStatistics: false,
-    });
-
-    $(".show-wiki-link", wikiId).hide();
-    $(".editSection", wikiId).show();
-
-    wikiSaveButton.click(function() {
-        const wikiContent = editor.getMarkdown();
-        const data = 'markdown=' + encodeURIComponent(wikiContent);
-        const saveMessage = $(".saving-message", wikiId);
-        wikiSaveButton.hide();
-        saveMessage.show();
-        
-        function showMessage(message) {
-            saveMessage.hide();
-            $(".saved-message", wikiId).html(message).fadeIn('fast').delay(2000).fadeOut('fast');
-        }
-        
-        $.ajax({
-            type: "POST",
-            data: data,
-            url: "{% url 'wiki_save' class_name unique_keyword unique_value %}",
-            success: function(data)
-            {
-                // Should get back an empty response. If we get anything, it's a 302 so reload to go to login screen
-                if (data.length) {
-                    function loggedInHandler() {
-                        console.log("Warning expected 0 content response got back: " + data.length)
-                    }
-                    function loggedOutHandler() {
-                        saveMessage.empty();
-                        let message = createMessage("error", "You have been logged out and your wiki edit was NOT SAVED. Please copy/paste your change, reload this page, login, then re-enter your wiki entry.");
-                        saveMessage.append(message).get(0).scrollIntoView();
-                    }
-                    checkLoggedIn(loggedInHandler, loggedOutHandler);
-                } else {
-                    showMessage("Save Successful");
-                }
-            },
-            error: function(data) {
-                showMessage("Save Failed");
-            }
-        });
-    });
-}
-
 $(document).ready(function() {
-    {%  if wiki.pk %}
-        initWiki();
-    {% endif %}
+    initWikiTag({
+        wikiDomId: "wiki-{{ uuid }}",
+        markdown: {{ wiki.markdown|jsonify }},
+        hasWritePermission: {{ has_write_permission|jsonify }},
+        exists: {{ wiki.pk|yesno:"true,false" }},
+        className: {{ class_name|jsonify }},
+        uniqueKeyword: {{ unique_keyword|jsonify }},
+        uniqueValue: {{ unique_value|jsonify }},
+    });
 });
 </script>
 
@@ -85,7 +24,7 @@ $(document).ready(function() {
     <span class="hidden saved-message"></span>
     <button class='btn btn-outline-primary hidden wiki-save'>save wiki</button>
     {% if has_write_permission %}
-        <a class='btn btn-outline-primary show-wiki-link' href="javascript:initWiki()">Create wiki entry</a>
+        <a class='btn btn-outline-primary show-wiki-link' href="#">Create wiki entry</a>
     {% endif %}
 </div>
 </div>

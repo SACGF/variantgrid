@@ -6,8 +6,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from snpdb.models import ImportSource
-from upload.models import FileUpload, UploadedFileTypes
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload
 from upload.vcf.vcf_import import (
     GenomeBuildDetectionException,
     GenomeBuildMismatchException,

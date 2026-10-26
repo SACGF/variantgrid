@@ -7,7 +7,7 @@ from launching a flood of these concurrently and thrashing Postgres, we:
   * lower the DB ``statement_timeout`` for the duration of the operation so runaway queries die sooner
 
 ``planner_join_collapse_limit`` is the other per-connection knob for expensive work: the analysis node
-Variant queries wrap themselves in it (@see ``analysis.models.nodes.analysis_node.node_query_planner_settings``).
+Variant queries wrap themselves in it (@see ``analysis.models.nodes.node_query_mixin.node_query_planner_settings``).
 
 Wrap expensive work in the ``major_operation`` context manager. It raises
 ``TooManyMajorOperationsError`` when the per-user limit is exceeded - callers decide how to respond

@@ -6,22 +6,10 @@ from typing import Optional, Union
 
 from django.template import Library
 
-from ontology.models import (
-    GeneDiseaseClassification,
-    OntologyService,
-    OntologySnake,
-    OntologyTerm,
-    OntologyTermRelation,
-    PanelAppClassification,
-)
-from ontology.ontology_matching import OntologyMatch
+from ontology.enums import GeneDiseaseClassification, OntologyService, PanelAppClassification
+from ontology.models import OntologySnake, OntologyTerm, OntologyTermRelation
 
 register = Library()
-
-
-@register.inclusion_tag("ontology/tags/ontology_match.html")
-def ontology_meta(data: OntologyMatch):
-    return {"ontology": data}
 
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")

@@ -6,7 +6,7 @@ variants, local computation over gene fusions - so the enum value stored on Anno
 into this registry, and the tasks, scheduler and import ask the PipelineDef or its runner rather than
 branching on the type themselves. Adding a tool is adding an entry here.
 """
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.pipelines.annotsv import AnnotSVRunner
 from annotation.pipelines.base import AnnotationPipelineRunner, PipelineDef
 from annotation.pipelines.gene_level import GeneLevelRunner
