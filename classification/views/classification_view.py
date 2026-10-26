@@ -13,11 +13,11 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, HTTP_500_IN
 from rest_framework.views import APIView
 
 from classification.classification_stats import get_lab_gene_counts
-from classification.enums import ClinicalSignificance
 from classification.models import ClassificationJsonParams, ClassificationRef
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.utils import empty_to_none, force_json
+from snpdb.enums import ClinicalSignificance
 from snpdb.models import Lab
 
 
@@ -107,7 +107,7 @@ class ClassificationView(APIView):
                 result = importer.insert(record_data, import_run=classification_import_run)
                 result.notify_if_required()
                 if classification_import_run:
-                    classification_import_run.increment_status(result.status)
+                    classification_import_run.increment_status(result)
                 per_json_data.append(result)
 
             if classification_import_run:

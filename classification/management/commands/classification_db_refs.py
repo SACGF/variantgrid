@@ -1,8 +1,8 @@
 from django.core.management import BaseCommand
 
 from annotation.regexes import DbRegexes, db_ref_regexes
-from classification.enums import EvidenceKeyValueType
-from classification.models import Classification, EvidenceKeyMap, VCBlobKeys, VCDataDict
+from classification.enums import EvidenceKeyValueType, VCBlobKeys
+from classification.models import Classification, EvidenceKeyMap, VCDataDict
 from library.utils import JsonDiffs
 
 
@@ -51,7 +51,7 @@ class Command(BaseCommand):
             has_changes = fix_evidence(c.evidence)
             if has_changes:
                 if should_update:
-                    c.save(update_fields=['evidence'])
+                    Classification.objects.filter(pk=c.pk).update(evidence=c.evidence)
                 change_count += 1
 
             for cm in c.classificationmodification_set.filter(published=True).all():

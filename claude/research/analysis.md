@@ -26,8 +26,8 @@ to `analysis/models/nodes/analysis_node.py:AnalysisNode._save`, which recomputes
 when `parents_changed` or `queryset_dirty` - calls `analysis/models/nodes/analysis_node.py:AnalysisNode.bump_version`
 (version+1, DIRTY, count/errors/cloned_from cleared) and then recursively saves every child with `queryset_dirty=True`,
 so a whole subtree bumps in one transaction. The save ends by `get_or_create`ing the
-`analysis/models/nodes/analysis_node.py:NodeVersion` for the new number; everything scoped to a version (the Redis Q
-cache key, `analysis/models/nodes/analysis_node.py:NodeCache`, `analysis/models/nodes/analysis_node.py:NodeTask`, column
+`analysis/models/nodes/node_version.py:NodeVersion` for the new number; everything scoped to a version (the Redis Q
+cache key, `analysis/models/nodes/node_version.py:NodeCache`, `analysis/models/nodes/node_version.py:NodeTask`, column
 summaries) hangs off that row and cascades away when
 `analysis/tasks/node_update_tasks.py:delete_analysis_old_node_versions` deletes every NodeVersion that is not its node's
 latest.
@@ -107,7 +107,7 @@ sibling Venn over the same parents reuses an in-flight build. `analysis/models/n
 raises: the node's Q always comes from `_get_node_cache_arg_q_dict` as `variantcollectionrecord__variant_collection__in`.
 
 `analysis/models/nodes/filters/intersection_node.py:IntersectionNode` is the only user of the generic
-`analysis/models/nodes/analysis_node.py:NodeCache`: `use_cache` is true for a selected BED collection or a long pasted
+`analysis/models/nodes/node_version.py:NodeCache`: `use_cache` is true for a selected BED collection or a long pasted
 variant list, `analysis/models/nodes/analysis_node.py:AnalysisNode.get_cache_task_args_set` creates the NodeCache (or
 finds the parent's, for a pass-through node) and the chained `analysis/tasks/node_update_tasks.py:node_cache_task` calls
 `analysis/models/nodes/filters/intersection_node.py:IntersectionNode.write_cache`, which streams the parent queryset as a
@@ -189,7 +189,7 @@ allele-frequency Qs under that alias so `annotate_and_filter_queryset` joins the
 folds in the collection pk (and the sub-cohort any-sample-called VariantCollection of #1551, which turns a regex
 exclusion into a hash join) so a reloaded VCF invalidates the cached Q.
 `analysis/models/nodes/sources/sample_node.py:SampleNode` is one sample or, at extraction/specimen/patient level
-(`patients/models_enums.py:SampleSourceLevel`, offered per `ANALYSIS_SAMPLE_NODE_LEVELS`), every sample of a grouping object: a single sample degenerates to the alias path, a group
+(`patients/enums/patients_enums.py:SampleSourceLevel`, offered per `ANALYSIS_SAMPLE_NODE_LEVELS`), every sample of a grouping object: a single sample degenerates to the alias path, a group
 UNIONs one subquery per sample via `analysis/models/nodes/cohort_mixin.py:get_samples_pk_q`,
 each annotated with only its own VCF's join. Per-sample overrides live in
 `analysis/models/nodes/sources/sample_node.py:SampleNodeSampleFilter`. Downstream nodes that need "the sample" get it
@@ -200,7 +200,9 @@ the field when exactly one proband sample is upstream, and the proband patient w
 `analysis/models/nodes/sources/cohort_node.py:CohortNode` filters by het/hom counts, a simple zygosity, or per-sample
 zygosities (`CohortNodeZygosityFiltersCollection`), and adds the ref/het/hom count columns. Trio, duo and quad share
 `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin` (inheritance-versus-family checks, waivable as
-warnings) and one `AbstractFamilyInheritance` strategy object per mode, built by the node's `_inheritance_factory`;
+warnings, plus every node method that only needs to know which field holds the family) and one
+`AbstractFamilyInheritance` strategy object per mode, built by the node's `_inheritance_factory`. The modes are written
+once against the node's `analysis/models/nodes/family_inheritance.py:FamilyShape` (#2269);
 `analysis/models/nodes/sources/trio_node.py:TrioNode`, `analysis/models/nodes/sources/duo_node.py:DuoNode` (#1829, a
 proband and one relative - a parent, or a sibling (#1861) - with Denovo becoming "absent in parent", which along with
 the mosaic mode errors when there is no parent to read) and `analysis/models/nodes/sources/quad_node.py:QuadNode`
@@ -228,10 +230,10 @@ The per-gene page (`analysis/views/views_karyomapping.py:trio_karyomapping`) bin
 
 ## Why it is shaped this way
 
-A node is a filter, not a result set. `analysis/models/nodes/analysis_node.py:AnalysisNode.get_arg_q_dict` composes the
+A node is a filter, not a result set. `analysis/models/nodes/node_query_mixin.py:NodeQueryMixin.get_arg_q_dict` composes the
 parent's `{alias: {hash: Q}}` dict with the node's own (`merge_arg_q_dicts`; the hash lets
 `analysis/models/nodes/filters/merge_node.py:MergeNode` factor common filters out of an OR), and
-`analysis/models/nodes/analysis_node.py:annotate_and_filter_queryset` applies each annotation alias then the Qs that
+`analysis/models/nodes/node_query_mixin.py:annotate_and_filter_queryset` applies each annotation alias then the Qs that
 depend on it, then the alias-less Qs, so a chain of ten nodes is one SQL statement with each genotype partition joined
 once. Materialising every node would mean writing millions of pks per edit on a 7.4M-variant cohort; composing means an
 edit costs one count query per dirty node and the grid's page query is the same plan the count ran. The exceptions
@@ -244,18 +246,18 @@ phenotype node costs seconds and the grid asks for it on every page; it is never
 nodes. `cloned_from` is the fourth tier: a template run's nodes point at the snapshot's NodeVersions and reuse their
 counts and grid cache until either side is edited, which is why `bump_version` clears it.
 
-Explicit-pk substitution (#546): `analysis/models/nodes/analysis_node.py:AnalysisNode.get_arg_q_dict` answers with
+Explicit-pk substitution (#546): `analysis/models/nodes/node_query_mixin.py:NodeQueryMixin.get_arg_q_dict` answers with
 `Q(pk__in=[...])` from `NodeVersion.variant_ids` when the node stored its pks at load, so a MergeNode or a Venn over
 three 200-variant parents becomes a bitmap-or over the pk index instead of three nested subqueries, and the node's own
 grid page is a pk lookup rather than its filter chain under 50 joins. The check sits ahead of the Redis Q cache, which
-holds the real filter the load ran. Large nodes stay as `analysis/models/nodes/analysis_node.py:queryset_to_pk_in_q`, a RawSQL semi-join that also keeps the
+holds the real filter the load ran. Large nodes stay as `analysis/models/nodes/node_query_mixin.py:queryset_to_pk_in_q`, a RawSQL semi-join that also keeps the
 dict picklable for Redis (a live `TransformerQuerySet` inside a Q is not, #240). The list is stored at load, after the
 count, so "small" and "these pks" agree by construction; `analysis/tests/test_explicit_pk_substitution.py` pins the
 two paths to the same answer.
 
 Scheduling is single-worker and state-driven (#346) so that no task waits on another: a celery chord built from a
 toposort at edit time deadlocks, its waiting tasks occupying every worker while the parents they wait for cannot get
-one. `analysis/tasks/node_update_tasks.py:wait_for_node` and `wait_for_cache_task` are not part of dispatch. The only
+one. `analysis/tasks/node_update_tasks.py:wait_for_node` is not part of dispatch. The only
 cross-node dependency is "parents settled", read from the database by the one
 dispatcher on `scheduling_single_worker`, so leases are written by one process and need no row-lock gymnastics, and a
 finished node kicks the dispatcher rather than its children. The lease (`NodeTask.lease_expires`, restarted at claim)

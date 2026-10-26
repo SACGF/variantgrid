@@ -3,7 +3,9 @@ from collections import Counter, defaultdict
 
 from celery.app.task import Task
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.enums import MolecularConsequenceColors
+from annotation.gene_count_variants import gene_count_classification_qs, gene_count_variant_queryset
+from annotation.models.models import VariantAnnotation
 from annotation.models.models_gene_counts import (
     CohortGeneCounts,
     GeneCountType,
@@ -12,15 +14,14 @@ from annotation.models.models_gene_counts import (
     GeneValueCountCollection,
     SampleAnnotationVersionVariantSource,
 )
-from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
-from classification.models import Classification
+from annotation.models.models_version import VariantAnnotationVersion
 from eventlog.models import create_event
 from genes.models import Gene, GeneVersion
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
-from patients.models_enums import Zygosity
-from snpdb.models.models_enums import ProcessingStatus
+from patients.enums import Zygosity
+from snpdb.enums import ProcessingStatus
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
@@ -102,7 +103,7 @@ class CohortSampleGeneDamageCountTask(Task):
     def _get_gene_value_counts(cls, cohort_gene_counts, gene_values, variant_annotation_version, update_gene_id):
         cohort = cohort_gene_counts.cohort
         cohort_genotype_collection = cohort.cohort_genotype_collection
-        qs = cohort_gene_counts.gene_count_type.get_variant_queryset(variant_annotation_version)
+        qs = gene_count_variant_queryset(cohort_gene_counts.gene_count_type, variant_annotation_version)
         qs = qs.filter(cohortgenotype__collection=cohort_genotype_collection)
         if update_gene_id:
             gene = Gene.objects.get(pk=update_gene_id)
@@ -179,10 +180,10 @@ class CohortSampleClassificationGeneDamageCountTask(CohortSampleGeneDamageCountT
     def _get_gene_value_counts(cls, cohort_gene_counts, gene_values, variant_annotation_version, update_gene_id):
         # There are way less Classifications, and each has a sample, so handle this per-sample
         # As it's classified for this sample, we know the builds are the same (hence can use variant not allele)
-        vc_qs = cohort_gene_counts.gene_count_type.get_classification_qs()
+        vc_qs = gene_count_classification_qs(cohort_gene_counts.gene_count_type)
         if update_gene_id:
             gene = Gene.objects.get(pk=update_gene_id)
-            vc_qs = vc_qs.filter(Classification.get_q_for_gene(gene))
+            vc_qs = vc_qs.for_gene(gene)
 
         sample_gene_value_counts = defaultdict(lambda: defaultdict(Counter))
 

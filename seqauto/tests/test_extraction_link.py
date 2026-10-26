@@ -10,8 +10,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.models import Extraction, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
+from seqauto.enums import DataGeneration
 from seqauto.models import (
     Aligner,
     AlignmentFile,
@@ -27,7 +28,6 @@ from seqauto.models import (
     VariantCaller,
     VCFFromSequencingRun,
 )
-from seqauto.models.models_enums import DataGeneration
 from seqauto.serializers.sequencing_serializers import SampleSheetSerializer
 from snpdb.models import VCF, Sample
 from upload.models import BackendVCF, FileUpload, UploadedVCF

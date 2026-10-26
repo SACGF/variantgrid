@@ -9,10 +9,8 @@ class GenesConfig(AppConfig):
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
 
-        from annotation.models.models import CachedWebResource
-        from genes.models import CachedThirdPartyGeneList
-
         from genes import user_awards  # noqa: F401  # registers award definitions on import
+        from genes.models import CachedThirdPartyGeneList
         from genes.signals.gene_search import gene_search, gene_version_search
         from genes.signals.gene_symbol_search import gene_symbol_alias_search
         from genes.signals.manual_signals import (
@@ -24,13 +22,12 @@ class GenesConfig(AppConfig):
             panel_app_australia_panels_post_save_handler,
             panel_app_england_panels_post_save_handler,
             pfam_post_save_handler,
-            refseq_gene_info_post_save_handler,
             refseq_gene_pub_med_count_post_save_handler,
-            refseq_gene_summary_post_save_handler,
             refseq_sequence_info_post_save_handler,
             uniprot_post_save_handler,
         )
         from genes.signals.transcript_search import search_transcript
+        from snpdb.models.models_cached_web_resource import CachedWebResource
         from snpdb.search import search_registry
         # pylint: enable=import-outside-toplevel,unused-import
 
@@ -43,8 +40,6 @@ class GenesConfig(AppConfig):
         post_save.connect(panel_app_england_panels_post_save_handler, sender=CachedWebResource)
         post_save.connect(panel_app_australia_panels_post_save_handler, sender=CachedWebResource)
         post_save.connect(pfam_post_save_handler, sender=CachedWebResource)
-        post_save.connect(refseq_gene_summary_post_save_handler, sender=CachedWebResource)
-        post_save.connect(refseq_gene_info_post_save_handler, sender=CachedWebResource)
         post_save.connect(refseq_sequence_info_post_save_handler, sender=CachedWebResource)
         post_save.connect(refseq_gene_pub_med_count_post_save_handler, sender=CachedWebResource)
         post_save.connect(uniprot_post_save_handler, sender=CachedWebResource)

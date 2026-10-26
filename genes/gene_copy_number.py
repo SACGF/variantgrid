@@ -17,17 +17,13 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from genes.enums import GeneCopyNumberEventKind
 from genes.gene_level_resolver import (
     GeneLevelNameResolver,
     GeneLevelResolution,
     unknown_gene_reason,
 )
-from genes.models import (
-    GeneCopyNumberEvent,
-    GeneCopyNumberEventKind,
-    GeneLevelId,
-    gene_copy_number_canonical_str,
-)
+from genes.models import GeneCopyNumberEvent, GeneLevelId, gene_copy_number_canonical_str
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.gene_level_variants import (

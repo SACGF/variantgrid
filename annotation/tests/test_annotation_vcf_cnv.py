@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from io import StringIO
 from unittest.mock import patch
 
 from django.conf import settings
@@ -9,10 +10,11 @@ from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
+from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
-from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.sv_conservation import (
     ConservationTrack,
     conservation_sidecar_filename,
@@ -195,75 +197,3 @@ class TestAnnotationVCFCNV4(TestAnnotationVCFCNV):
                                                       vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH37)
         with self.assertRaises(FileNotFoundError):
             import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
-
-    def _import_grch37_run(self) -> AnnotationRun:
-        genome_build = GenomeBuild.get_name_or_alias('GRCh37')
-        vav = self.variant_annotation_versions_by_build[genome_build.name]
-        annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
-        annotation_range_lock.save()
-        annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
-                                                      pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
-                                                      vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH37)
-        import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
-        return annotation_run
-
-    def test_backfill_sv_conservation(self):
-        """ #1657: the backfill re-scores rows the pyBigWig stage wrote - correcting a value the
-            off-by-one window got wrong and filling one a failed sidecar left null, while leaving a
-            value that already agrees (and any run VEP scored itself) alone. """
-        self._write_conservation_sidecar(self.TEST_ANNOTATION_VCF_GRCH37, self.CONSERVATION_GRCH37)
-        annotation_run = self._import_grch37_run()
-        annotation_run.sv_conservation_pybigwig = True  # our stage wrote these columns, not VEP
-        annotation_run.save()
-
-        va = VariantAnnotation.objects.get(variant_id=202)
-        va.phylop_100_way_vertebrate = 3.5      # what the off-by-one window scored
-        va.phastcons_100_way_vertebrate = None  # what a failed sidecar left
-        va.save()
-
-        scored = {202: {"phylop_100_way_vertebrate": 9.873, "phastcons_100_way_vertebrate": 1.0,
-                        "phylop_46_way_mammalian": 2.894, "phastcons_46_way_mammalian": 1.0}}
-        with patch("annotation.management.commands.backfill_sv_conservation.score_sv_variants",
-                   return_value=scored) as mock_score:
-            call_command("backfill_sv_conservation", "--genome-build", "GRCh37")
-
-        va.refresh_from_db()
-        self.assertAlmostEqual(va.phylop_100_way_vertebrate, 9.873, places=3)
-        self.assertAlmostEqual(va.phastcons_100_way_vertebrate, 1.0)
-
-        vav = self.variant_annotation_versions_by_build['GRCh37']
-        vav.refresh_from_db()
-        self.assertTrue(vav.backfilled_sv_conservation)
-
-        # A run VEP scored itself already holds VEP's values - the backfill doesn't re-score it
-        annotation_run.sv_conservation_pybigwig = False
-        annotation_run.save()
-        with patch("annotation.management.commands.backfill_sv_conservation.score_sv_variants",
-                   return_value=scored) as mock_score:
-            call_command("backfill_sv_conservation", "--genome-build", "GRCh37")
-        mock_score.assert_not_called()
-
-    def test_recalculate_symbolic_hgvs(self):
-        """ #1571: rows imported before symbolic DEL/DUP/INV resolved from coordinates hold a
-            placeholder message - the backfill turns those into real HGVS """
-        self._write_conservation_sidecar(self.TEST_ANNOTATION_VCF_GRCH37, self.CONSERVATION_GRCH37)
-        self._import_grch37_run()
-
-        va = VariantAnnotation.objects.get(variant_id=202)
-        expected_hgvs_g = va.hgvs_g
-        va.hgvs_g = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
-        va.hgvs_c = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
-        va.save()
-
-        untouched = VariantAnnotation.objects.get(variant_id=203)
-        untouched_hgvs_g = untouched.hgvs_g
-
-        call_command("one_off_recalculate_symbolic_hgvs", "--genome-build", "GRCh37")
-
-        va.refresh_from_db()
-        self.assertEqual(expected_hgvs_g, va.hgvs_g)
-        # No local transcript sequences in the fixture, so c.HGVS resolves to blank rather than the message
-        self.assertIsNone(va.hgvs_c)
-
-        untouched.refresh_from_db()
-        self.assertEqual(untouched_hgvs_g, untouched.hgvs_g)

@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 
 from django.http.response import JsonResponse
@@ -29,7 +30,7 @@ class NodeJSONViewMixin(View, ABC):
             data = self._get_data(request, *args, node=node, **kwargs)
             status = HTTP_200_OK
         except NonFatalNodeError as e:
-            log_traceback()
+            log_traceback(level=logging.INFO)  # The message goes back to the client
             data = {"message": str(e),
                     "non_fatal": True}
             status = e.status

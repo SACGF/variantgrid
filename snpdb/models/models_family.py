@@ -12,15 +12,15 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewModelMixin, SvgSymbolPreviewIconMixin
 from library.utils.json_utils import canonical_filter_key
-from patients.models_enums import Sex
+from patients.enums import Sex
+from snpdb.enums import DuoRelationship
 from snpdb.models.models_cohort import Cohort, CohortSample
-from snpdb.models.models_enums import DuoRelationship
 from snpdb.models.models_vcf import Sample
 
 
@@ -128,7 +128,7 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     preview_icon_symbol = "node-icon-trio"  # TrioNode wears this too - see get_node_class_icon
     MEMBER_FIELDS = ("mother", "father", "proband")
-    # Inheritance modes calculate_cohort_stats precomputes counts for
+    # Inheritance modes calculate_trio_stats precomputes counts for
     STATS_INHERITANCE_MODES = ("denovo", "autosomal_recessive", "autosomal_dominant", "x_linked_recessive", "compound_het")
 
     @classmethod
@@ -142,8 +142,11 @@ class Trio(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
         """ The key a mode's cohort stats bucket is stored under - the writer and the readers both
             come through here so they can't drift apart. autosomal_dominant's predicate branches on
             which parents are affected, so those flags belong in its key: editing them misses the
-            old bucket and recomputes, rather than reading one built for the previous flags. """
-        key = {"inheritance": mode}
+            old bucket and recomputes, rather than reading one built for the previous flags.
+            A cohort can have several trios, so the key names the members (#2327), and a trio on a sub
+            cohort shares its parent's CGC, so its keys carry the sub cohort's scope. """
+        key = {**self.cohort.stats_filter_scope, "inheritance": mode,
+               "trio": [self.mother_id, self.father_id, self.proband_id]}
         if mode == "autosomal_dominant":
             key["mother_affected"] = bool(self.mother_affected)
             key["father_affected"] = bool(self.father_affected)
@@ -196,10 +199,6 @@ class Quad(ParentsMixin, FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMix
 
     def get_listing_url(self):
         return reverse('quads')
-
-    @property
-    def sibling_details(self):
-        return _member_details(self.sibling, self.sibling_affected)
 
 
 class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPreviewIconMixin, PreviewModelMixin,
@@ -265,7 +264,3 @@ class Duo(FamilyGroupMixin, GuardianPermissionsAutoInitialSaveMixin, SvgSymbolPr
         if affected := super().get_preview_icon_css_class():
             css_classes.append(affected)
         return " ".join(css_classes)
-
-    @property
-    def relative_details(self):
-        return _member_details(self.relative, self.relative_affected)

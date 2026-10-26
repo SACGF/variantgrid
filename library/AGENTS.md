@@ -10,6 +10,11 @@ Patterns here:
   needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
   are examples); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
   the check, so delete it when you remove the import.
+- Timestamped models inherit `model_utils.models.TimeStampedModel` (pylint bans the `django_extensions` one). Its
+  `save()` adds `modified` to any `update_fields`, so a write that must leave `modified` alone (an internal fix, an
+  import run with no data change) goes through `QuerySet.update()` / `bulk_update()` - `modified` drives exports and
+  dashboards. Inside a tracked API call, record that row with `ChangeCollector.record`
+  (`library/django_utils/change_tracking.py`).
 - Give a new user-owned model permissions by inheriting
   `library/django_utils/guardian_permissions_mixin.py:GuardianPermissionsAutoInitialSaveMixin` before `models.Model`;
   it needs a `user` field and calls `library/guardian_utils.py:assign_permission_to_user_and_groups` on first save,
@@ -43,7 +48,7 @@ Patterns here:
   (`batch_iterator`, `group_by_key`, `first`, `get_single_element`, `sorted_nicely`, `invert_dict`, `LazyAttribute`) ·
   `text_utils.py` (`pretty_label`, `limit_str`, `format_percent`) · `html_utils.py` (`html_id_safe`, `sanitize_html`,
   `html_to_text`) · `json_utils.py` (`force_json`, `strip_json`, `JsonDiffs`) · `hash_utils.py` (`md5sum_str`,
-  `sha256sum_str`, `stable_dict_hash`) · `file_utils.py` (`open_handle_gzip`, `mk_path_for_file`, `name_from_filename`) ·
+  `sha256sum_str`, `file_sha256sum`, `stable_dict_hash`) · `file_utils.py` (`open_handle_gzip`, `mk_path_for_file`, `name_from_filename`) ·
   `date_utils.py` (`calculate_age`, `parse_yymm`) · `diff_utils.py` (`diff_text`, `MultiDiff`) · `export_utils.py`
   (`ExportRow`, `export_column`) · `class_utils.py` (`import_class`, `get_all_subclasses`) · `os_utils.py`
   (`execute_cmd`) · `timer_utils.py` (`get_timer`) · `misc_utils.py` (`empty_to_none`, `ChoicesEnum`, `iter_http_lines`)
@@ -55,9 +60,13 @@ Gotchas:
 - `library/django_utils/django_object_managers.py:ObjectManagerCachingImmutable` caches `.get()` results
   process-wide forever and `ObjectManagerCachingRequest` per request; both are plain managers under
   `settings.UNIT_TEST`, so tests see queries production never runs (GenomeBuild, GeneSymbol, FlagType, Allele, Lab,
-  Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place.
+  Organization, ResolvedVariantInfo). Put a caching manager only on tables never updated in place. The key is the
+  `get()` arguments only, not the queryset's filters: `X.objects.filter(a).get(b)` and every no-argument
+  `.filter(...).get()` share a key, so on these models call `X.objects.get(**lookup)` directly.
 - `library/guardian_utils.py:assign_permission_to_user_and_groups` imports `snpdb.models.UserSettings` inside the
-  function: `library` depends on `snpdb` at runtime, and that inline import is the one sanctioned cycle-break here.
+  function: `library` depends on `snpdb` at runtime. Every import of an app from `library` (four inside functions,
+  plus `log_utils` -> eventlog and `preview_request` -> genes/variantgrid at module level) is listed in
+  `.importlinter`'s `ignore_imports`; a new one needs an entry there and the cycle flagged.
 - `library/guardian_utils.py:assign_permission_to_user_and_groups` resolves the two `Permission` rows in one
   query and writes through guardian's `assign_perm_to_many(..., ignore_conflicts=True)` rather than a
   `get_or_create` per row - a VCF import pays it per sample. Add a permission holder by extending the bulk write,

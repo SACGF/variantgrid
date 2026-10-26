@@ -3,6 +3,11 @@ from django.test import TestCase
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.annotation_version_querysets import get_queryset_for_annotation_version
+from annotation.canonical_annotation import (
+    get_canonical_c_hgvs,
+    get_canonical_transcript_annotation,
+)
+from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
 from annotation.models import (
@@ -14,15 +19,12 @@ from annotation.models import (
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.damage_enums import PathogenicityImpact
-from classification.models.classification_variant_info_models import (
-    ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
-)
+from classification.enums import ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from genes.enums import AnnotationConsortium, GeneCopyNumberEventKind, HGNCStatus
 from genes.fake_data import create_fake_gene_version, insert_transcript_data
 from genes.models import (
     HGNC,
-    GeneCopyNumberEventKind,
     GeneFusion,
     GeneLevelId,
     GeneSymbol,
@@ -33,7 +35,6 @@ from genes.models import (
     Transcript,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, HGNCStatus
 from genes.tests.gene_fusion_test_utils import create_gene_fusion, create_gene_fusion_for_ids
 from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,
@@ -113,15 +114,17 @@ class GeneLevelAnnotationTest(TestCase):
         return annotation_run
 
     def test_pipeline_type_claims_gene_level_only(self):
-        variant_qs = Variant.objects.filter(pipeline_type_variant_q(VariantAnnotationPipelineType.GENE_LEVEL,
-                                                                 self.vav.structural_variant_min_size))
+        q = pipeline_type_variant_q(VariantAnnotationPipelineType.GENE_LEVEL, self.vav.structural_variant_min_size,
+                                    self.vav.explicit_structural_variant_min_size)
+        variant_qs = Variant.objects.filter(q)
         self.assertIn(self.gene_fusion.variant, list(variant_qs))
 
     def test_vep_pipelines_do_not_claim_gene_level(self):
         """ svlen=0 makes a fusion look symbolic, so both VEP types have to subtract it explicitly """
         for pipeline_type in (VariantAnnotationPipelineType.STANDARD,
                               VariantAnnotationPipelineType.STRUCTURAL_VARIANT):
-            q = pipeline_type_variant_q(pipeline_type, self.vav.structural_variant_min_size)
+            q = pipeline_type_variant_q(pipeline_type, self.vav.structural_variant_min_size,
+                                        self.vav.explicit_structural_variant_min_size)
             variant_qs = Variant.objects.filter(q)
             self.assertNotIn(self.gene_fusion.variant, list(variant_qs), pipeline_type)
 
@@ -137,8 +140,8 @@ class GeneLevelAnnotationTest(TestCase):
             from the representative annotation rather than a transcript row """
         self._run_annotation()
         variant = self.gene_fusion.variant
-        self.assertIsNone(variant.get_canonical_transcript_annotation(self.genome_build))
-        self.assertEqual("CD74::ROS1", variant.get_canonical_c_hgvs(self.genome_build))
+        self.assertIsNone(get_canonical_transcript_annotation(variant, self.genome_build))
+        self.assertEqual("CD74::ROS1", get_canonical_c_hgvs(variant, self.genome_build))
 
     def test_hgvs_g_is_not_regenerated(self):
         """ The matcher fallback has no coordinate to work from, so it must not be reached """
@@ -212,16 +215,15 @@ class GeneLevelAnnotationTest(TestCase):
         self.assertEqual(0, annotation_run.dump_count)
 
     def test_rerunnable(self):
-        """ A second run over the same range finds the variants already annotated, so it writes nothing """
-        first_run = self._run_annotation()
-        self._run_annotation()
+        """ Running again over the same range (a retry re-runs the one AnnotationRun a lock holds per
+            pipeline type) finds the variants already annotated, so it writes nothing """
+        annotation_run = self._run_annotation()
+        annotate_gene_level_run(annotation_run)
         self.assertEqual(1, VariantAnnotation.objects.filter(version=self.vav,
                                                              variant=self.gene_fusion.variant).count())
         self.assertEqual(2, VariantGeneOverlap.objects.filter(version=self.vav,
                                                               variant=self.gene_fusion.variant).count(),
                          "one row per partner, not one per run")
-        self.assertEqual(first_run, VariantAnnotation.objects.get(
-            version=self.vav, variant=self.gene_fusion.variant).annotation_run)
 
     def test_rows_go_into_the_version_partition(self):
         """ Written to the base table they inherit from, they are invisible to every annotation

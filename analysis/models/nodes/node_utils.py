@@ -17,29 +17,25 @@ from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from celery.contrib.abortable import AbortableAsyncResult
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import F, QuerySet
 from django.db.models.query_utils import Q
 from django.utils import timezone
 
+from analysis.enums import NodeErrorSource, NodeStatus
 from analysis.exceptions import NonFatalNodeError
-from analysis.models import Analysis, NodeStatus
-from analysis.models.enums import NodeErrorSource
-from analysis.models.nodes.analysis_node import (
-    AnalysisEdge,
-    AnalysisNode,
-    NodeTask,
-    NodeVersion,
-    node_query_planner_settings,
-)
+from analysis.models import Analysis
+from analysis.models.nodes.analysis_node import AnalysisEdge, AnalysisNode
 from analysis.models.nodes.node_counts import (
     get_tag_node_counts_dict,
     get_tagged_variant_ids_by_label,
 )
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
+from analysis.models.nodes.node_version import NodeTask, NodeVersion
 from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
 from library.utils import add_exception_note
 from library.utils.collection_utils import toposort_groups
-from snpdb.models.models_enums import TagFilter
+from snpdb.enums import TagFilter
 from variantgrid.celery import app
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
@@ -254,21 +250,24 @@ def reload_analysis_nodes(analysis_id, only_errors=False):
             "version": F("version") + 1,
             "appearance_version": F("appearance_version") + 1,
         }
-        if valid_nodes:
-            nodes_qs.filter(pk__in=valid_nodes).update(valid=True, **update_kwargs)
-        if invalid_nodes:
-            nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, **update_kwargs)
-        for error_status, node_ids in hidden_error_nodes_by_status.items():
-            nodes_qs.filter(pk__in=node_ids).update(valid=False, **(update_kwargs | {"status": error_status}))
+        # The Analysis lock AnalysisNode.save takes, so a node save never bumps from a version this has moved past
+        with transaction.atomic():
+            Analysis.objects.select_related(None).select_for_update().get(pk=analysis_id)
+            if valid_nodes:
+                nodes_qs.filter(pk__in=valid_nodes).update(valid=True, **update_kwargs)
+            if invalid_nodes:
+                nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, **update_kwargs)
+            for error_status, node_ids in hidden_error_nodes_by_status.items():
+                nodes_qs.filter(pk__in=node_ids).update(valid=False, **(update_kwargs | {"status": error_status}))
 
-        node_versions = []
-        reloaded_qs = nodes_qs.filter(pk__in=valid_nodes + invalid_nodes + hidden_error_nodes)
-        for node_id, version in reloaded_qs.values_list("pk", "version"):
-            node_versions.append(NodeVersion(node_id=node_id, version=version))
-        if node_versions:
-            NodeVersion.objects.bulk_create(node_versions, ignore_conflicts=True)
+            node_versions = []
+            reloaded_qs = nodes_qs.filter(pk__in=valid_nodes + invalid_nodes + hidden_error_nodes)
+            for node_id, version in reloaded_qs.values_list("pk", "version"):
+                node_versions.append(NodeVersion(node_id=node_id, version=version))
+            if node_versions:
+                NodeVersion.objects.bulk_create(node_versions, ignore_conflicts=True)
 
-        Analysis.objects.filter(pk=analysis_id).update(modified=timezone.now())
+            Analysis.objects.filter(pk=analysis_id).update(modified=timezone.now())
         end = time.time()
         logging.info("%d saves took %.2f secs", num_nodes, end-start)
         return update_analysis(analysis_id)

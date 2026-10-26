@@ -10,14 +10,13 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
+from upload.enums import UploadedFileTypes, UploadStepTaskType
 from upload.models import (
     FileUpload,
     ProcessingStatus,
-    UploadedFileTypes,
     UploadPipeline,
     UploadStep,
-    UploadStepTaskType,
 )
 from upload.tasks.vcf.import_vcf_tasks import PreprocessVCFTask
 

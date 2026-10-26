@@ -15,16 +15,16 @@ from django.db.models import CASCADE, Count, Q, QuerySet
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
+from patients.enums import Sex
 from patients.models.models_patient import Patient
-from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_trio_ped, write_unrelated_ped
+from snpdb.enums import ImportStatus, ProcessingStatus, SuperPopulationCode
 from snpdb.models.models_cohort import Cohort
-from snpdb.models.models_enums import ImportStatus, ProcessingStatus, SuperPopulationCode
 from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample
@@ -144,11 +144,6 @@ class SomalierAncestryBatch(AbstractSomalierModel):
         return Sample.objects.filter(vcf__somaliervcfextract__somalierancestryrun__batch=self,
                                      no_dna_control=False).order_by("pk")
 
-    @property
-    def url(self):
-        report_dir = self.get_report_dir()
-        return self.media_url(os.path.join(report_dir, "somalier-ancestry.somalier-ancestry.html"))
-
 
 @receiver(pre_delete, sender=SomalierAncestryBatch)
 def somalier_ancestry_batch_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
@@ -159,18 +154,13 @@ def somalier_ancestry_batch_pre_delete_handler(sender, instance, **kwargs):  # p
 
 
 class SomalierAncestryRun(AbstractSomalierModel):
-    """ A VCF's ancestry stage. Its report is the batch's, which covers every VCF run alongside it """
+    """ A VCF's ancestry stage. The batch's somalier report covers every VCF run alongside it, so pages show
+        this VCF's SomalierAncestry rows rather than linking the report """
     vcf_extract = models.OneToOneField(SomalierVCFExtract, on_delete=CASCADE)
     batch = models.ForeignKey(SomalierAncestryBatch, null=True, on_delete=CASCADE)  # null = never ran somalier
 
     def get_samples(self) -> Iterable[Sample]:
         return self.vcf_extract.get_samples()
-
-    @property
-    def url(self) -> Optional[str]:
-        if self.batch is None:
-            return None
-        return self.batch.url
 
 
 class SomalierAncestry(TimeStampedModel):
@@ -487,9 +477,9 @@ class SomalierConfig:
         return self._annotation_dir(sites)
 
     def get_relate_sites_args(self, genome_build: 'GenomeBuild') -> list[str]:
-        """ Without our compensation, v0.3.5's relate needs the sites VCF to report per-sample
-            hom-ref/hom-alt the right way round (brentp/somalier#163) - it doesn't fix the pairs, so
-            @see snpdb.variants_to_vcf.somalier_alleles_flipped. Older ones have no --sites at all. """
+        """ Without our compensation, relate needs the sites VCF to read hom-ref/hom-alt the right way
+            round (brentp/somalier#163) - v0.3.5 only for the per-sample counts, edf6c917 for the pairs
+            too, @see snpdb.variants_to_vcf.somalier_alleles_flipped. Older ones have no --sites at all. """
         if self.settings["compensate_allele_order"]:
             return []
         sites = self.get_sites(genome_build)

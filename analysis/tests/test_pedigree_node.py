@@ -9,7 +9,8 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, PedigreeNode
 from annotation.fake_data import get_fake_annotation_version
-from pedigree.models import CohortSamplePedFileRecord, PedFileRecord, PedigreeInheritance
+from pedigree.enums import PedigreeInheritance
+from pedigree.models import CohortSamplePedFileRecord, PedFileRecord
 from snpdb.fake_data import create_fake_pedigree, make_cohort_genotype
 from snpdb.models import GenomeBuild, Variant
 from snpdb.models.models_cohort import CohortGenotypeCollection

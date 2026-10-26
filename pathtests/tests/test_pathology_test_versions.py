@@ -6,15 +6,16 @@ from django.utils import timezone
 from genes.models import GeneList, GeneListGeneSymbol, GeneSymbol
 from library.enums import ModificationOperation
 from library.guardian_utils import assign_permission_to_user_and_groups
+from pathtests.enums import PathologyTestGeneModificationOutcome
 from pathtests.models import (
     Case,
     PathologyTest,
-    PathologyTestGeneModificationOutcome,
     PathologyTestGeneModificationRequest,
     PathologyTestVersion,
 )
 from patients.models import Patient
-from snpdb.models import ImportStatus
+from seqauto.models.models_sequencing import EnrichmentKit
+from snpdb.enums import ImportStatus
 
 
 def _gene_list(user, name, *symbols) -> GeneList:
@@ -134,3 +135,12 @@ class PathologyTestVersionTest(TestCase):
         self.assertEqual(400, self.client.post(url, {**data, "operation": "X"}).status_code)
         self.assertEqual(200, self.client.post(url, {**data, "operation": ModificationOperation.ADD}).status_code)
 
+
+    def test_confirmed_version_is_not_changed(self):
+        ptv = _confirmed_test(self.curator, "immutable_test", "GATA2")
+        kit = EnrichmentKit.objects.create(name="immutable_test_kit")
+        url = ptv.get_absolute_url()
+        self.assertEqual(200, self.client.post(url, {"pathology-test-version-enrichment_kit": kit.pk}).status_code)
+        self.assertEqual(200, self.client.post(url, {"confirm_test": "true"}).status_code)
+        ptv.refresh_from_db()
+        self.assertIsNone(ptv.enrichment_kit)

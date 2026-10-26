@@ -13,11 +13,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from analysis import forms
+from analysis.enums import AnalysisTemplateType
 from analysis.models import AnalysisLock
-from analysis.models.enums import AnalysisTemplateType
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeVersion
 from analysis.models.nodes.node_counts import get_node_counts_mine_and_available
+from analysis.models.nodes.node_version import NodeVersion
 from analysis.views.analysis_permissions import get_analysis_or_404
 from analysis.views.views import get_analysis_settings
 from classification.models import ClassificationModification
@@ -35,6 +35,7 @@ def view_analysis_settings(request, analysis_id):
                "new_analysis_settings": analysis_settings,
                "has_write_permission": analysis.can_write(request.user),
                "can_unlock": analysis.can_unlock(request.user),
+               "can_take_ownership": analysis.can_take_ownership(request.user),
                "hidden_badge": _get_hidden_badge(analysis)}
     return render(request, 'analysis/analysis_settings.html', context)
 
@@ -237,6 +238,16 @@ def analysis_settings_lock(request, analysis_id):
     analysis.version += 1
     analysis.save()
     return redirect(analysis)  # Reload
+
+
+@require_POST
+def analysis_take_ownership(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    if not analysis.can_take_ownership(request.user):
+        raise PermissionDenied(f"You can't take ownership of analysis {analysis.pk}")
+    analysis.change_owner(request.user)
+    node_utils.reload_analysis_nodes(analysis.pk)
+    return redirect(analysis)
 
 
 def analysis_input_samples(request, analysis_id):

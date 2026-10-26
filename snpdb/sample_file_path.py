@@ -13,7 +13,7 @@ from typing import Optional
 from django.db.models import QuerySet
 
 from library.common_dir import get_common_prefix_dirs
-from snpdb.models.models_enums import SampleFileType
+from snpdb.enums import SampleFileType
 from snpdb.models.models_user_settings import UserDataPrefix
 from snpdb.models.models_vcf import VCF, Sample, SampleFilePath
 

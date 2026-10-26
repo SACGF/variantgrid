@@ -22,6 +22,7 @@ from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analys
 from analysis.related_analyses import get_related_analysis_details_for_samples
 from annotation.models import AnnotationVersion
 from genes.models import ActiveSampleGeneList
+from library.django_utils.database_utils import advisory_lock
 from library.guardian_utils import add_public_group_read_permission
 from snpdb.models import Cohort, GenomeBuild, Sample
 
@@ -97,19 +98,21 @@ def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate
     if annotation_version is None:
         annotation_version = AnnotationVersion.latest(obj.genome_build)
 
-    satr = klass.objects.filter(analysis_template_run__template_version=template_version,
-                                analysis_template_run__analysis__annotation_version=annotation_version,
-                                **kwargs).order_by("-pk").first()
-    if satr:
-        return satr.analysis_template_run.analysis
+    # Concurrent requests (a page and an export) would each create a run - the second waits and finds the first's
+    with advisory_lock(klass._meta.db_table, obj.pk):
+        satr = klass.objects.filter(analysis_template_run__template_version=template_version,
+                                    analysis_template_run__analysis__annotation_version=annotation_version,
+                                    **kwargs).order_by("-pk").first()
+        if satr:
+            return satr.analysis_template_run.analysis
 
-    at_run = run_analysis_template(analysis_template, obj.genome_build, template_version=template_version,
-                                   annotation_version=annotation_version, **kwargs)
-    at_run.analysis.visible = False
-    at_run.analysis.save()
-    add_public_group_read_permission(at_run.analysis)
-    klass.objects.create(analysis_template_run=at_run, **kwargs)
-    return at_run.analysis
+        at_run = run_analysis_template(analysis_template, obj.genome_build, template_version=template_version,
+                                       annotation_version=annotation_version, **kwargs)
+        at_run.analysis.visible = False
+        at_run.analysis.save()
+        add_public_group_read_permission(at_run.analysis)
+        klass.objects.create(analysis_template_run=at_run, **kwargs)
+        return at_run.analysis
 
 
 def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate,

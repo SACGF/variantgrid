@@ -12,7 +12,8 @@ from django.utils import timezone
 from library.constants import MINUTE_SECS
 from library.django_utils import get_url_from_view_path
 from library.log_utils import AdminNotificationBuilder
-from mme.models import MMEMatchResult, MMESubmissionStatus
+from mme.enums import MMESubmissionStatus
+from mme.models import MMEMatchResult
 from mme.notifications import notify_match
 from mme.serializers.patient_profile import build_patient_profile
 
@@ -58,7 +59,7 @@ class MMEClient:
 
 def submit(submission) -> None:
     """ Build profile, POST, persist results. Notifies admins on failure
-        (mirrors the Alissa upload failure-reporting pattern, no sync dep). """
+        (mirrors the sync upload failure-reporting pattern, no sync dep). """
     try:
         # Re-asserts eligibility - the record may have been downgraded, withdrawn or
         # unshared between the curator clicking submit and this worker running.

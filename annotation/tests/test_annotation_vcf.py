@@ -8,19 +8,18 @@ from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     get_or_create_variant_annotation_version_from_current_vep,
 )
-from annotation.fake_data import get_fake_annotation_settings_dict
-from annotation.models import VariantAnnotation
-from annotation.models.damage_enums import (
+from annotation.enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
+    NMDEscapeStatus,
     PathogenicityImpact,
+    VariantAnnotationPipelineType,
 )
-from annotation.models.models import (
-    AnnotationRun,
-    VariantAnnotationVersion,
-    VariantTranscriptAnnotation,
-)
-from annotation.models.models_enums import NMDEscapeStatus, VariantAnnotationPipelineType
+from annotation.fake_data import get_fake_annotation_settings_dict
+from annotation.models import VariantAnnotation
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import (
@@ -31,7 +30,7 @@ from annotation.vep_annotation import (
     vep_parse_version_line,
 )
 from annotation.vep_field_formatters import EMPTY_VALUES, get_clean_and_pick_single_value_func
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 

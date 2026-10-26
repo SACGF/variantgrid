@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import ALL_FIELDS, ModelForm
 from django.forms.widgets import TextInput
@@ -27,8 +28,15 @@ class PedigreeForm(ModelForm, ROFormMixin):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
-        self.fields['cohort'].queryset = Cohort.filter_for_user(user)
-        self.fields['ped_file_family'].queryset = PedFileFamily.filter_for_user(user)
+        cohort_qs = Cohort.filter_for_user(user)
+        ped_file_family_qs = PedFileFamily.filter_for_user(user)
+        if self.instance.pk:
+            # Sharing a pedigree doesn't share its cohort or PED file, so keep the current ones selectable
+            cohort_qs = Cohort.objects.filter(Q(pk__in=cohort_qs.values("pk")) | Q(pk=self.instance.cohort_id))
+            ped_file_family_qs = PedFileFamily.objects.filter(Q(pk__in=ped_file_family_qs.values("pk"))
+                                                              | Q(pk=self.instance.ped_file_family_id))
+        self.fields['cohort'].queryset = cohort_qs
+        self.fields['ped_file_family'].queryset = ped_file_family_qs
 
 
 class UserCohortandPedFileFamilyForm(forms.Form):

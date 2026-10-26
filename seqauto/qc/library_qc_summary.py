@@ -9,8 +9,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Optional
 
+from patients.enums import NucleicAcid
 from patients.models import Specimen
-from patients.models_enums import NucleicAcid
 from seqauto.models import LibraryQC, SequencingRun
 
 

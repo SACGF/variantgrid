@@ -1,3 +1,23 @@
+/* Grid client renderers, createdCell hooks, row expand renderers and ajax data hooks arrive as dotted
+   function names ('TableFormat.timestamp', 'renderOptionalLink'), their settings as data (a column's
+   renderKwargs reach the renderer as ctx.kwargs), and are looked up on window here rather than eval'd.
+   A top level function declaration is on window by itself; a namespace declared with const is not, so
+   its file puts it there (window.TableFormat = TableFormat). A function is returned as it is. */
+function resolveFunctionName(name) {
+    if (typeof name === 'function') {
+        return name;
+    }
+    let value = window;
+    for (const part of String(name).split('.')) {
+        value = value == null ? undefined : value[part];
+    }
+    if (typeof value !== 'function') {
+        throw new Error(`"${name}" is not the name of a function on window - a grid renderer is a dotted ` +
+                        `function name, with its settings in render kwargs`);
+    }
+    return value;
+}
+
 const oldExportAction = function (self, e, dt, button, config) {
     if (button[0].className.indexOf('buttons-csv') >= 0) {
         if ($.fn.dataTable.ext.buttons.csvHtml5.available(dt, config)) {
@@ -134,7 +154,7 @@ const DataTableDefinition = (function() {
            (@see NodeGridHandler). `draw` varies per request, so it is stripped here and put back on
            the response by dataSrc. */
         buildAjaxData: function() {
-            const userDataFn = this.data ? eval(this.data) : null;
+            const userDataFn = this.data ? resolveFunctionName(this.data) : null;
             if (!this.serverParams.cacheStableParams) {
                 return userDataFn;
             }
@@ -315,7 +335,7 @@ const DataTableDefinition = (function() {
                 columnDef.targets = target;
                 columnDefs.push(columnDef);
                 if (col.render) {
-                    const rawRenderer = eval(col.render);
+                    const rawRenderer = resolveFunctionName(col.render);
                     // Grid wide metadata + this column's own renderer settings, closed over at
                     // table build time (@see RichColumn client_renderer_kwargs)
                     const renderContext = {extra: defn.extra || {}, kwargs: col.renderKwargs || null};
@@ -332,7 +352,7 @@ const DataTableDefinition = (function() {
                     }
                 }
                 if (col.createdCell) {
-                    columnDef.createdCell = eval(col.createdCell);
+                    columnDef.createdCell = resolveFunctionName(col.createdCell);
                 }
                 if (target === 0 && defn.expandClientRenderer) {
                     // if we're expanding rows with ajax, make first column have the toggle
@@ -444,7 +464,10 @@ const DataTableDefinition = (function() {
                                        html: '<i class="fas fa-download"></i> CSV'}).appendTo(toolbar);
                 const joiner = downloadUrl.indexOf('?') === -1 ? '?' : '&';
                 dataTable.on('draw', function() {
-                    link.attr('href', downloadUrl + joiner + $.param(dataTable.ajax.params() || {}));
+                    // The server never reads columns[i][...], and on a wide grid they push the URL past
+                    // nginx's header limit (414)
+                    const {columns, ...params} = dataTable.ajax.params() || {};
+                    link.attr('href', downloadUrl + joiner + $.param(params));
                 });
             }
         },
@@ -507,8 +530,15 @@ const DataTableDefinition = (function() {
             dom.addClass('expandable');
 
             const dataTable = this.dataTable;
-            const expandFn = eval(this.serverParams.expandClientRenderer);
+            const expandRenderer = resolveFunctionName(this.serverParams.expandClientRenderer);
+            // As a column renderer's ctx - the grid's extra, and expand_client_renderer_kwargs
+            const expandContext = {extra: this.serverParams.extra || {},
+                                   kwargs: this.serverParams.expandClientRendererKwargs || null};
+            const expandFn = (rowData) => expandRenderer(rowData, expandContext);
             const expandData = this.expandData;
+            // Only DataTables' own data rows - not the "No data available" / "Loading..." placeholder, headers or
+            // expanded child rows. Stripe classes (odd/even) can't tell them apart: the placeholder row is tr.odd
+            const isDataRow = (tr) => dataTable.row(tr).data() !== undefined;
 
             dom.on('click', 'tr', function(event) {
                 // A click on a link or control belongs to it (the variant grids have a details link, a
@@ -517,8 +547,7 @@ const DataTableDefinition = (function() {
                     return;
                 }
                 const tr = $(this); //.closest('tr');
-                if (!tr.hasClass('odd') && !tr.hasClass('even')) {
-                    // not a regular row
+                if (!isDataRow(tr)) {
                     return;
                 }
                 const row = dataTable.row( tr );
@@ -560,8 +589,8 @@ const DataTableDefinition = (function() {
             // if hovering over a single row for 500ms, pre-fetch the client data ready to display
             dom.on('mouseenter', 'tr', function() {
                 const tr = $(this);
-                if (!tr.hasClass('odd') && !tr.hasClass('even') || tr.hasClass('loaded')) {
-                    return; // either not an odd or even row, or already
+                if (!isDataRow(tr) || tr.hasClass('loaded')) {
+                    return;
                 }
                 window.clearTimeout(expandData.hoverTimeout);
                 expandData.hoverTimeout = window.setTimeout(() => {
@@ -751,6 +780,9 @@ const TableFormat = (function() {
     TableFormat.prototype = {};
     return TableFormat;
 })();
+window.TableFormat = TableFormat;  // @see resolveFunctionName
+
+/* The renderers below that take settings read them from ctx.kwargs (RichColumn client_renderer_kwargs) */
 
 TableFormat.timestamp = (data, type, row) => {
     if (data) {
@@ -831,7 +863,9 @@ TableFormat.timeAgo = (data, type, row) => {
     }
 };
 
-TableFormat.choices = (choices, data, type, row) => {
+// kwargs: {choices: {value: label}} - @see RichColumn.choices_client_renderer
+TableFormat.choices = (data, type, row, ctx) => {
+    const choices = ctx.kwargs.choices;
     return $('<span>', {class:`val-${data}`, text:choices[data] || data}).prop('outerHTML');
 };
 
@@ -849,7 +883,9 @@ TableFormat.flags = (data, type, row) => {
     }
 };
 
-TableFormat.limit = (limit, data, type, row) => {
+// kwargs: {limit: max characters shown}
+TableFormat.limit = (data, type, row, ctx) => {
+    const limit = ctx.kwargs.limit;
     if (typeof(data) === 'string' && data.length > limit) {
         return $('<span>', {class:'hover-detail', text:data.substring(0, limit) + '...', title:data}).prop('outerHTML');
     }
@@ -894,7 +930,9 @@ TableFormat.linkUrl = (data, type, row) => {
     return aDom.prop('outerHTML');
 };
 
-TableFormat.preview = (columns, data, type, row) => {
+// kwargs: {columns: the members of data (or of row) to show}
+TableFormat.preview = (data, type, row, ctx) => {
+    const columns = ctx.kwargs.columns;
     let dom = $('<div>');
     let hasValue = false;
     for (const col of columns) {
@@ -913,7 +951,9 @@ TableFormat.preview = (columns, data, type, row) => {
     return dom.prop('outerHTML');
 };
 
-TableFormat.boolean = function(style, data, type, columns) {
+// kwargs (optional): {style: 'warning' | 'false_is_error'}
+TableFormat.boolean = function(data, type, row, ctx) {
+    const style = ctx && ctx.kwargs ? ctx.kwargs.style : null;
     if (style === 'warning') {
         if (data) {
             return '<i class="fas fa-exclamation-circle"></i>';
@@ -926,7 +966,9 @@ TableFormat.boolean = function(style, data, type, columns) {
     return null;
 };
 
-TableFormat.severeNumber = function(severity, data, type, columns) {
+// kwargs: {severity: the text-* css suffix for a non zero number}
+TableFormat.severeNumber = function(data, type, row, ctx) {
+    const severity = ctx.kwargs.severity;
     if (data === 0) {
         return '<span class="no-value mono font-weight-bold">0</span>';
     } else {
@@ -934,43 +976,20 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     }
 };
 
-TableFormat.combine = function(formatters, settings, data, type, columns) {
-    if (settings === null) {
-        settings = {};
-    }
-    const dom = $('<div>');
-    formatters.forEach((formatter, index) => {
-        let part;
-        if (settings.dataMode === "combined") {
-            part = eval(formatter)(data, type, columns);
-        } else {
-            part = eval(formatter)(data[index], type, columns);
-        }
-        if (settings.separator) {
-            dom.append($(settings.separator));
-            dom.append(part);
-        } else {
-            dom.append($('<div>', {'html': part}));
-        }
-    });
-    return dom;
-};
-
-TableFormat.repeat = function(settings, data, type, columns) {
-    if (settings === null) {
-        settings = {};
-    }
+// kwargs: {formatter: dotted name of the renderer for each item, groupCSS} - @see RichColumn.client_renderer_repeat
+TableFormat.repeat = function(data, type, row, ctx) {
+    const settings = ctx.kwargs;
     if (data === null) {
         return "";
     }
-    const subFormatter = eval(settings.formatter);
+    const subFormatter = resolveFunctionName(settings.formatter);
     let cssClass = "repeat";
     if (settings.groupCSS) {
         cssClass = settings.groupCSS;
     }
     const dom = $('<div>', {"class": cssClass});
     data.forEach((subData, index) => {
-        const subDom = subFormatter(subData, type, columns);
+        const subDom = subFormatter(subData, type, row);
         dom.append(subDom);
     });
     return dom;
@@ -981,7 +1000,10 @@ TableFormat.json = function(data, type, columns) {
     return data === undefined ? data : escapeHtml(JSON.stringify(data));
 };
 
-TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
+/* Row expand renderer - kwargs: {view, idField, height} @see DatatableConfig.set_expand_ajax
+   view is a URL name (Urls) or a function on window, either taking the row's idField value */
+TableFormat.expandAjax = function(data, ctx) {
+    const {view: url_or_method, idField: param, height} = ctx.kwargs;
     if (data) {
         let dataId = data[param];
         if (typeof(dataId) === "object") {
@@ -1004,15 +1026,10 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
 
         const ajaxDom =
             $('<div>', {html:[
-                $('<div>', {style:`text-align: center;color: #888; min-height:${expectedHeight}`, text:'Loading...'})
+                $('<div>', {style:`text-align: center;color: #888; min-height:${height || 50}px`, text:'Loading...'})
             ]});
 
         loadAjaxBlock(ajaxDom, reverseUrl);
-
-        if (!expectedHeight) {
-            // put a small div in the row to show that we're thinking
-            expectedHeight = "50px";
-        }
         return ajaxDom;
     } else {
         return '';

@@ -18,12 +18,13 @@ from dataclasses import dataclass
 
 from django.conf import settings
 
-from annotation.models import AnnotationVersion, CachedWebResource, InvalidAnnotationVersionError
+from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from genes.models import TranscriptVersion
 from manual.models import ManualGateSatisfied, ManualMigrationOutstanding, ManualMigrationTask
 from ontology.models import OntologyVersion
+from snpdb.enums import ImportStatus
 from snpdb.models import GenomeBuild
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_cached_web_resource import CachedWebResource
 
 AFTER_PREFIX = "after:"
 

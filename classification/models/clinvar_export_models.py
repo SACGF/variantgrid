@@ -4,22 +4,29 @@ from functools import cached_property
 from typing import Optional
 
 from django.db import models, transaction
-from django.db.models import QuerySet, TextChoices
+from django.db.models import QuerySet
 from django.urls import reverse
 from django.utils.timezone import now
 from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 
-from classification.enums import AlleleOriginBucket
+from classification.enums import (
+    ClinVarExportBatchStatus,
+    ClinVarExportRequestType,
+    ClinVarExportSubmissionStatus,
+)
 from classification.enums.clinvar_export_enums import ClinVarExportStatus
-from classification.models.classification import ClassificationModification, ConditionResolved
+from classification.models.classification import ClassificationModification
 from classification.models.clinvar_export_convertor import (
     CLINVAR_EXPORT_CONVERSION_VERSION,
     ClinVarExportConverter,
 )
+from classification.models.clinvar_key_models import ClinVarKey
+from classification.models.condition_resolved import ConditionResolved
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import JsonObjType, first, invalidate_cached_property
-from snpdb.models import Allele, ClinVarKey
+from snpdb.enums import AlleleOriginBucket
+from snpdb.models import Allele
 from uicore.json.validated_json import JsonMessages, ValidatedJson
 
 
@@ -226,16 +233,6 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
                                       category=self.preview_category())
 
 
-class ClinVarExportBatchStatus(models.TextChoices):
-    """
-    Overall status of a submission batch, talking to ClinVar takes a few steps
-    """
-    AWAITING_UPLOAD = "W", "Awaiting Upload"  # new submission and changes pending often work the same, but might be useful to see at a glance, useful if we do approvals
-    UPLOADING = "P", "Processing"
-    SUBMITTED = "S", "Submitted"
-    REJECTED = "R", "Rejected"
-
-
 def acmg_citation():
     return {
         "db": "PubMed",
@@ -353,12 +350,6 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
                                       category=self.preview_category())
 
 
-class ClinVarExportSubmissionStatus(TextChoices):
-    WAITING = "W", "Waiting"
-    SUCCESS = "S", "Success"
-    ERROR = "E", "Error"
-
-
 class ClinVarExportSubmission(TimeStampedModel):
     """
     Represents the content of a single ClinVarExport at a given point in time (within a submission batch)
@@ -387,12 +378,6 @@ class ClinVarExportSubmission(TimeStampedModel):
     status = models.CharField(max_length=1, choices=ClinVarExportSubmissionStatus.choices, default=ClinVarExportSubmissionStatus.WAITING)
     scv = models.TextField(null=True, blank=True)
     response_json = models.JSONField(null=True, blank=True)
-
-
-class ClinVarExportRequestType(TextChoices):
-    INITIAL_SUBMISSION = "S", "Initial Submission"
-    POLLING_SUBMISSION = "P", "Polling"
-    RESPONSE_FILES = "F", "Response Files"
 
 
 class ClinVarExportRequest(TimeStampedModel):

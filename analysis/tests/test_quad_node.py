@@ -3,8 +3,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import QuadInheritance
 from analysis.models import Analysis, QuadNode
-from analysis.models.enums import QuadInheritance
 from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin
 from annotation.fake_data import get_fake_annotation_version
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_quad, make_cohort_genotype
@@ -325,9 +325,11 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
 
     # ── Zygosity table ────────────────────────────────────────────────────────
 
-    def test_zygosity_table_all_recessive_sibling_two_line_cell(self):
-        data = QuadNode.get_zygosity_table_data()
-        self.assertIn('AR:', data[QuadInheritance.ALL_RECESSIVE]['sibling'])
+    def test_zygosity_table_all_recessive_sibling_varies_with_affected_status(self):
+        """ Both branches read the sibling's affected status, so the cell is split like the modes it ORs """
+        entry = QuadNode.get_zygosity_table_data()[QuadInheritance.ALL_RECESSIVE]
+        self.assertEqual(entry['sibling_unaffected'], "AR: HET, REF\nXLR: HET, REF")
+        self.assertEqual(entry['sibling_affected'], "AR: HET, HOM_ALT\nXLR: HOM_ALT")
 
     def test_zygosity_table_mosaic_sibling_varies_with_affected_status(self):
         entry = QuadNode.get_zygosity_table_data()[QuadInheritance.MOSAIC_PARENT]

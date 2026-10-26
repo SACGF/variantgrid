@@ -6,8 +6,8 @@ and ontology genes inside a node, the audit log and candidate search runs. Grid
 plumbing is snpdb/views/datatable_view.py; columns come from the user's CustomColumnsCollection.
 """
 import operator
-from collections import defaultdict
-from collections.abc import Callable, Iterator
+from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Iterator
 from functools import reduce
 from typing import Any, Optional
 
@@ -22,27 +22,29 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
+from analysis.enums import (
+    AnalysisType,
+    CandidateSearchType,
+    CandidateStatus,
+    GroupOperation,
+    NodeStatus,
+)
 from analysis.forms.forms import AnalysisNodeIssuesFilterForm
 from analysis.models import (
     Analysis,
     AnalysisNode,
     AnalysisTemplate,
-    AnalysisType,
     Candidate,
     CandidateSearchRun,
-    CandidateSearchType,
-    CandidateStatus,
-    GroupOperation,
-    NodeStatus,
     VariantTag,
 )
-from analysis.models.nodes.analysis_node import NodeColumnSummaryCacheCollection
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
     get_node_extra_filters_q,
     is_extra_filter,
 )
 from analysis.models.nodes.node_types import get_node_class_choices, get_node_class_name_expression
+from analysis.models.nodes.node_version import NodeColumnSummaryCacheCollection
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
@@ -56,10 +58,15 @@ from library.utils import (
     iter_fixed_chunks,
     sha256sum_str,
 )
+from ontology.enums import GeneDiseaseClassification
 from ontology.grids import AbstractOntologyGenesConfig
-from ontology.models import GeneDiseaseClassification, OntologyTermRelation, OntologyVersion
-from patients.models_enums import Zygosity
-from snpdb.grid_columns.custom_columns import get_all_variant_grid_columns, get_variantgrid_extra_annotate
+from ontology.models import OntologyTermRelation, OntologyVersion
+from patients.enums import Zygosity
+from snpdb.enums import ProcessingStatus, SequenceRole
+from snpdb.grid_columns.custom_columns import (
+    get_all_variant_grid_columns,
+    get_variantgrid_extra_annotate,
+)
 from snpdb.grid_columns.grid_sample_columns import (
     COPY_NUMBER_COLUMN,
     SAMPLE_COMPOSITE_COLUMNS,
@@ -69,15 +76,7 @@ from snpdb.grid_columns.grid_sample_columns import (
     get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import (
-    CohortGenotype,
-    ProcessingStatus,
-    Sample,
-    UserGridConfig,
-    VariantGridColumn,
-    VCFFilter,
-)
-from snpdb.models.models_enums import SequenceRole
+from snpdb.models import CohortGenotype, Sample, UserGridConfig, VariantGridColumn, VCFFilter
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_dataframe import DataFrameDatatableConfig
 from snpdb.views.datatable_view import CellData, DatatableConfig, NullOrder, RichColumn, SortOrder
@@ -343,6 +342,24 @@ class VariantGrid(AbstractVariantGrid):
                           renderer=source_renderer, csv_rendered=True, include_in_csv=True,
                           extra_columns=sorted({pc for _vcf, pc, _i in vcf_packed_columns}))
 
+    @staticmethod
+    def _get_sample_labels(samples: Iterable[Sample], sample_formatter: Optional[Callable] = None) -> dict:
+        """ sample -> the name its genotype columns are labelled with. Samples sharing a name (one specimen
+            in a small variant and a CNV VCF) get their VCF's name too, so each CSV header is unique #2209 """
+        sample_labels = {}
+        for sample in samples:
+            label = None
+            if sample_formatter:
+                try:
+                    label = sample_formatter(sample)
+                except Exception:
+                    pass
+            sample_labels[sample] = label or str(sample.name)
+
+        label_counts = Counter(sample_labels.values())
+        return {sample: f"{label} ({sample.vcf})" if label_counts[label] > 1 else label
+                for sample, label in sample_labels.items()}
+
     def _get_grid_genotype_columns(self, sample_formatter: Optional[Callable] = None) -> list[RichColumn]:
         available_format_columns = get_available_format_columns(self.cohorts)
         sample_columns = {
@@ -363,21 +380,15 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace.update(dict.fromkeys(MISSING_VALUES, VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE))
 
         # We now have separate aliases for packed data, so each cohort handled separately
+        sample_cohort_index = self._get_sample_cohort_index()
+        sample_labels = self._get_sample_labels(sample_cohort_index, sample_formatter)
         rich_columns = []
-        for sample, (cohort, cohort_index) in self._get_sample_cohort_index().items():
+        for sample, (cohort, cohort_index) in sample_cohort_index.items():
+            sample_formatted_str = sample_labels[sample]
             for column, (column_label, label_format, width) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
                 name = f"sample_{sample.pk}_{column}"
-                sample_formatted_str = None
-                if sample_formatter:
-                    try:
-                        sample_formatted_str = sample_formatter(sample)
-                    except Exception:
-                        pass
-                if sample_formatted_str is None or len(sample_formatted_str) == 0:
-                    sample_formatted_str = str(sample.name)
-
                 cgc = cohort.cohort_genotype_collection
                 if column == COPY_NUMBER_COLUMN:
                     if not sample.vcf.copy_number_field:
@@ -519,7 +530,7 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True,
                        enabled=len(self.genome_builds) > 1),
             RichColumn(key="analysis_type", label="Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(AnalysisType.choices)),
+                       **RichColumn.choices_client_renderer(AnalysisType.choices)),
             RichColumn(key="description", label="Description", orderable=True),
             self.user_column(label="Created by"),
             RichColumn(key="tags", label="Tags", search=False, client_renderer='renderAnalysisTags'),
@@ -732,9 +743,9 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
                        renderer=self.render_node_link,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='node_class', label='Node Class', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(get_node_class_choices())),
+                       **RichColumn.choices_client_renderer(get_node_class_choices())),
             RichColumn(key='status', orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(NodeStatus.choices)),
+                       **RichColumn.choices_client_renderer(NodeStatus.choices)),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
             RichColumn(key='errors', orderable=False),

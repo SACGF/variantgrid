@@ -6,7 +6,7 @@ from django.template import Context, Template
 from django.test import TestCase
 from django.utils import timezone
 
-from classification.enums import AlleleOriginBucket
+from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Tag
 from snpdb.tests.utils.tag_testing_utils import create_classify_queue_tag
 

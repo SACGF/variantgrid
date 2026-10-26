@@ -2,7 +2,7 @@ from collections import Counter
 
 import celery
 
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.models import VCF, SampleLocusCount
 
 

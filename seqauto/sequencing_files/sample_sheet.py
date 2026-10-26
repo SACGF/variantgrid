@@ -3,19 +3,19 @@
 
     These were extracted from the old filesystem-scanning create_resource_models.py - see
     https://github.com/SACGF/variantgrid/issues/1643 - keeping only what the API-populated data needs.
+
+    Entry points: current_sample_sheet_changed (a different sheet became current - move the run's data onto it)
+    and current_sample_sheet_data_changed (a re-post changed the rows of the sheet already current). Both send
+    sequencing_run_current_sample_sheet_changed_signal, which SA Pathology uses to match patients, and record
+    what they did with api_request_note (#2349).
 """
 import logging
 import os
+from collections import Counter
 
-from django.db.models.query_utils import Q
-
-from library.log_utils import log_traceback
-from seqauto.models import (
-    IlluminaFlowcellQC,
-    JointCalledVCF,
-    SampleFromSequencingSample,
-    get_samples_by_sequencing_sample,
-)
+from eventlog.models import api_request_note
+from library.django_utils.change_tracking import active_collector
+from seqauto.models import IlluminaFlowcellQC, JointCalledVCF
 from seqauto.signals.signals_list import sequencing_run_current_sample_sheet_changed_signal
 from upload.models import BackendVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
@@ -42,37 +42,36 @@ def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
             diff_barcodes.append(f"{sequencing_sample_name} ({ss1.barcode}/{ss2.barcode})")
 
     if diff_barcodes:
-        return True, ','.join(diff_barcodes)
+        return True, "Barcodes changed: " + ', '.join(diff_barcodes)
 
     return False, None
 
 
-def _reassign_sequencing_data_to_current_samples(old_samples_by_name, current_samples_by_name):
-    """ Reassign the existing Fastq / UnalignedReads / AlignmentFile / SingleSampleVCF / QC records onto the
-        current sheet's SequencingSample with the same sample name (match by name).
-        Used when a newer SampleSheet replaces an old one. """
+def _move_to_sequencing_sample(queryset, current_sequencing_sample) -> int:
+    """ QuerySet.update sends no post_save, so the API log's change collector is told directly """
+    if num_moved := queryset.update(sequencing_sample=current_sequencing_sample):
+        if collector := active_collector():
+            collector.record(queryset.model, updated=num_moved, fields=["sequencing_sample"])
+    return num_moved
+
+
+def _reassign_sequencing_data_to_current_samples(old_samples_by_name, current_samples_by_name) -> Counter:
+    """ Reassign the existing Fastq / UnalignedReads / AlignmentFile / SingleSampleVCF / QC records, and the
+        links to VCF samples, onto the current sheet's SequencingSample with the same sample name.
+        Returns the number moved, by what they are """
+    moved = Counter()
     for sequencing_sample_name, old_sequencing_sample in old_samples_by_name.items():
         current_ss = current_samples_by_name.get(sequencing_sample_name)
         if current_ss is None:
             continue
 
-        for fastq in old_sequencing_sample.fastq_set.all():
-            logging.info("Updating FastQ with current sequencing sample")
-            fastq.sequencing_sample = current_ss
-            fastq.save()
-
-        for unaligned_reads in old_sequencing_sample.unalignedreads_set.all():
-            logging.info("Updating Unaligned reads with current sequencing sample")
-            unaligned_reads.sequencing_sample = current_ss
-            unaligned_reads.save()
-
-        for alignment_file in old_sequencing_sample.alignmentfile_set.all():
-            logging.info("Updating BAM file with current sequencing sample")
-            alignment_file.sequencing_sample = current_ss
-            alignment_file.save()
-
-        old_sequencing_sample.singlesamplevcf_set.update(sequencing_sample=current_ss)
-        old_sequencing_sample.qc_set.update(sequencing_sample=current_ss)
+        moved["fastqs"] += _move_to_sequencing_sample(old_sequencing_sample.fastq_set.all(), current_ss)
+        moved["unaligned reads"] += _move_to_sequencing_sample(old_sequencing_sample.unalignedreads_set.all(), current_ss)
+        moved["alignment files"] += _move_to_sequencing_sample(old_sequencing_sample.alignmentfile_set.all(), current_ss)
+        moved["single sample VCFs"] += _move_to_sequencing_sample(old_sequencing_sample.singlesamplevcf_set.all(), current_ss)
+        moved["QC"] += _move_to_sequencing_sample(old_sequencing_sample.qc_set.all(), current_ss)
+        moved["sample links"] += _move_to_sequencing_sample(old_sequencing_sample.samplefromsequencingsample_set.all(), current_ss)
+    return moved
 
 
 def _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, new_sample_sheet) -> bool:
@@ -96,108 +95,62 @@ def _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, new_sampl
 
 
 def current_sample_sheet_changed(sequencing_run_current_sample_sheet, new_sample_sheet):
-    logging.info("current_sample_sheet_changed - SS changed: %s", new_sample_sheet.path)
-
+    """ Points the run at new_sample_sheet, moves the data stored against its older sheets onto it, then sends
+        sequencing_run_current_sample_sheet_changed_signal - after the move, so a receiver matching patients
+        finds the new sheet's samples linked to theirs """
     old_sample_sheet = sequencing_run_current_sample_sheet.sample_sheet
     sequencing_run_current_sample_sheet.sample_sheet = new_sample_sheet
     sequencing_run_current_sample_sheet.save()
-
     sequencing_run = sequencing_run_current_sample_sheet.sequencing_run
 
-    old_version = old_sample_sheet.get_version_string()
-    new_version = new_sample_sheet.get_version_string()
-    message = f"Updated CurrentSampleSheet: {old_sample_sheet.path}. Was: {old_version}, now: {new_version}"
     meaningfully_changed, reason = sample_sheet_meaningfully_changed(old_sample_sheet, new_sample_sheet)
-    if meaningfully_changed:
-        logging.warning("%s SampleSheets CHANGED: %s", message, reason)
-    else:
-        logging.info("%s SampleSheets not meaningfully changed", message)
+    api_request_note(f"Current sample sheet changed {old_sample_sheet.hash} -> {new_sample_sheet.hash}: "
+                     f"{reason or 'not meaningfully changed'}")
+    new_sample_names = set(new_sample_sheet.get_sequencing_samples_by_name())
+    if unmatched := sorted(set(old_sample_sheet.get_sequencing_samples_by_name()) - new_sample_names):
+        api_request_note(f"Not on the new sheet, their data stays on {old_sample_sheet.hash}: {', '.join(unmatched)}")
 
-    if not meaningfully_changed:
-        # Can go through and update models etc...
-        # Update samples from sequencing sample
-        # A cross-run joint call is owned by another run, so also pick up ones holding members on the old sheet
-        joint_called_vcfs = JointCalledVCF.objects.filter(
-            Q(sequencing_run=sequencing_run) | Q(sequencing_samples__sample_sheet=old_sample_sheet)
-        ).distinct()
-        for joint_called_vcf in joint_called_vcfs:
-            if vcf := joint_called_vcf.vcf:
-                # TODO: Raise some kind of manual task here to fix things???
-
-                def _get_samples_by_sequencing_sample_id(sample_sheet):
-                    sequencing_samples = sample_sheet.sequencingsample_set.all()
-                    return {ss.sample_id: s
-                            for ss, s in get_samples_by_sequencing_sample(sequencing_samples, vcf).items()}
-
-                old_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(old_sample_sheet)
-                new_samples_by_sequencing_sample_id = _get_samples_by_sequencing_sample_id(new_sample_sheet)
-
-                for sequencing_sample_id, sample in old_samples_by_sequencing_sample_id.items():
-                    new_sample = new_samples_by_sequencing_sample_id.get(sequencing_sample_id)
-                    if new_sample is None:
-                        logging.info("Sequencing sample %s is on %s and not %s - leaving its link alone",
-                                     sequencing_sample_id, old_sample_sheet, new_sample_sheet)
-                        continue
-
-                    try:
-                        new_ss = new_sample.samplefromsequencingsample.sequencing_sample
-                    except SampleFromSequencingSample.DoesNotExist:
-                        # Does this matter? maybe vcf wasn't imported etc...
-                        logging.info("There was no SampleFromSequencingSample for sample %s", new_sample)
-                        continue
-
-                    try:
-                        sfss = sample.samplefromsequencingsample
-                        sfss.sequencing_sample = new_ss
-                        sfss.save()
-                        logging.info("Updated SampleFromSequencingSample with %s", new_ss)
-                    except SampleFromSequencingSample.DoesNotExist:
-                        # Does this matter? maybe vcf wasn't imported etc...
-                        logging.info("There was no SampleFromSequencingSample for sample %s", sample)
-
-            _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, new_sample_sheet)
-
-        # Update downstream models - reassign Fastq / UnalignedReads / AlignmentFile to the current sequencing samples
-        _reassign_sequencing_data_to_current_samples(old_sample_sheet.get_sequencing_samples_by_name(),
-                                                     new_sample_sheet.get_sequencing_samples_by_name())
-
+    assign_old_sample_sheet_data_to_current_sample_sheet(sequencing_run)
     sequencing_run_current_sample_sheet_changed_signal.send(sender=os.path.basename(__file__),
                                                             sequencing_run=sequencing_run,
                                                             meaningfully_changed=meaningfully_changed)
 
-    sequencing_run.save()  # Re-validate ready based on errors
+
+def current_sample_sheet_data_changed(sequencing_run):
+    """ A re-post changed the rows of the sheet that is already current - eg a SAPOrderNumber column that
+        arrived late - so receivers re-match patients as they would for a new sheet """
+    api_request_note("Sample sheet data changed, patient matching re-run")
+    sequencing_run_current_sample_sheet_changed_signal.send(sender=os.path.basename(__file__),
+                                                            sequencing_run=sequencing_run,
+                                                            meaningfully_changed=False)
 
 
-def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
+def _plural_counts(counts: Counter) -> str:
+    return ", ".join(f"{count} {name}" for name, count in counts.items() if count)
+
+
+def assign_old_sample_sheet_data_to_current_sample_sheet(sequencing_run):
     """ Reassign the data the API already stored against older SampleSheets onto the current one.
 
         Operates purely on model data (the API sends records for the files; there is no filesystem
-        to scan): relink old IlluminaFlowcellQC / JointCalledVCF and reassign the existing
-        Fastq / UnalignedReads / AlignmentFile records by sample name. """
+        to scan): relink old IlluminaFlowcellQC / JointCalledVCF, reassign the existing
+        Fastq / UnalignedReads / AlignmentFile / VCF / QC records by sample name, and relink the joint
+        calls' samples. """
     current_sample_sheet = sequencing_run.get_current_sample_sheet()
     old_sample_sheets = sequencing_run.get_old_sample_sheets()
+    moved = Counter()
 
-    # Relink old IlluminaFlowcellQC to the current sample sheet
-    try:
-        current_sample_sheet.illuminaflowcellqc
-    except Exception:  # not linked to current
+    if not IlluminaFlowcellQC.objects.filter(sample_sheet=current_sample_sheet).exists():
         illumina_qc = IlluminaFlowcellQC.objects.filter(sample_sheet__in=old_sample_sheets).order_by("-pk").first()
         if illumina_qc:
-            logging.info("Assigning IlluminaQC to latest sample sheet")
             illumina_qc.sample_sheet = current_sample_sheet
             illumina_qc.save()
+            moved["IlluminaFlowcellQC"] += 1
 
-    # Relink old JointCalledVCFs to the current sample sheet
-    old_joint_called_vcfs = JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets)
-    relink_samples = False
-    for joint_called_vcf in old_joint_called_vcfs:
-        try:
-            logging.info("Assigning JointCalledVCF %s to latest sample sheet", joint_called_vcf)
-            joint_called_vcf.sample_sheet = current_sample_sheet
-            joint_called_vcf.save()
-            relink_samples = True
-        except Exception:
-            log_traceback()
+    for joint_called_vcf in JointCalledVCF.objects.filter(sample_sheet__in=old_sample_sheets):
+        joint_called_vcf.sample_sheet = current_sample_sheet
+        joint_called_vcf.save()
+        moved["joint called VCFs"] += 1
 
     # Cross-run joint calls are owned by another run, so move their members over by sample_id
     member_joint_called_vcfs = JointCalledVCF.objects.filter(
@@ -205,12 +158,21 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
     for joint_called_vcf in member_joint_called_vcfs:
         for old_sample_sheet in old_sample_sheets:
             if _move_joint_called_vcf_members(joint_called_vcf, old_sample_sheet, current_sample_sheet):
-                relink_samples = True
+                moved["joint call memberships"] += 1
 
+    current_samples_by_name = current_sample_sheet.get_sequencing_samples_by_name()
+    for old_sample_sheet in old_sample_sheets:
+        moved += _reassign_sequencing_data_to_current_samples(old_sample_sheet.get_sequencing_samples_by_name(),
+                                                              current_samples_by_name)
+    if moved:
+        api_request_note(f"Moved onto sample sheet {current_sample_sheet.hash}: {_plural_counts(moved)}")
+
+    relink_samples = bool(moved["joint called VCFs"] or moved["joint call memberships"])
     if not relink_samples:
         missing_linked_sequencing_samples = current_sample_sheet.sequencingsample_set.filter(samplefromsequencingsample__isnull=True)
         relink_samples = missing_linked_sequencing_samples.exists()
 
+    relinked_vcfs = []
     for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
         try:
             backend_vcf = joint_called_vcf.backendvcf
@@ -218,15 +180,13 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(user, sequencing_run):
             continue
 
         if relink_samples or joint_called_vcf.needs_to_be_linked():
-            link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
-
-    # Reassign the existing Fastq / UnalignedReads / AlignmentFile records from the old sample sheets'
-    # sequencing samples onto the current sheet's matching sequencing samples (match by sample name).
-    current_samples_by_name = current_sample_sheet.get_sequencing_samples_by_name()
-    for old_sample_sheet in old_sample_sheets:
-        _reassign_sequencing_data_to_current_samples(old_sample_sheet.get_sequencing_samples_by_name(),
-                                                     current_samples_by_name)
+            try:
+                link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
+                relinked_vcfs.append(str(backend_vcf.vcf))
+            except ValueError as e:
+                api_request_note(f"Could not relink samples of {backend_vcf.vcf}: {e}")
+    if relinked_vcfs:
+        api_request_note(f"Relinked VCF samples to sequencing samples: {', '.join(relinked_vcfs)}")
 
     logging.info("Assigned old data to current sample sheet %s", current_sample_sheet)
-
     sequencing_run.save()  # Re-validate "ready"

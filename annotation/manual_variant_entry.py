@@ -4,27 +4,27 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 
 from annotation.models import ManualVariantEntryType
-from annotation.models.models import ManualVariantEntry, ManualVariantEntryCollection
+from annotation.models.models_manual_variant import ManualVariantEntry, ManualVariantEntryCollection
 from annotation.tasks.process_manual_variants_task import (
     ManualVariantsPostInsertTask,
     get_manual_variant_coordinates,
 )
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
-from snpdb.models.models_enums import ImportSource
+from snpdb.enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.vcf_utils import write_vcf_from_variant_coordinates
+from upload.enums import (
+    UploadedFileTypes,
+    UploadStepOrigin,
+    UploadStepTaskType,
+    VCFPipelineStage,
+)
 from upload.models import (
     FileUpload,
     UploadedManualVariantEntryCollection,
     UploadPipeline,
     UploadStep,
-)
-from upload.models.models_enums import (
-    UploadedFileTypes,
-    UploadStepOrigin,
-    UploadStepTaskType,
-    VCFPipelineStage,
 )
 from upload.upload_processing import process_upload_pipeline
 

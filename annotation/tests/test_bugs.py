@@ -6,8 +6,10 @@ from types import SimpleNamespace
 
 from django.test import TestCase
 
-from annotation.models.models import ClinVar, VariantAnnotation, VariantAnnotationVersion
-from annotation.models.models_enums import ClinVarReviewStatus
+from annotation.enums import ClinVarReviewStatus
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_clinvar import ClinVar
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from library.genomics import Range, overlap_fraction
 
@@ -63,6 +65,20 @@ class TestMergeCosmicIds(TestCase):
         data = {"cosmic_id": "COSV100"}
         BulkVEPVCFAnnotationInserter._merge_cosmic_ids(data, "COSV200&COSV300")
         self.assertEqual(sorted(data["cosmic_id"].split("&")), ["COSV100", "COSV200", "COSV300"])
+
+
+class TestFixMultipleGnomadValues(TestCase):
+    """ '&'-joined gnomAD duplicates (T2T liftover) keep the entry with the highest AF, compared as numbers #2438 """
+
+    def test_scientific_notation_compared_numerically(self):
+        data = {"gnomad_af": "0.25&9.1e-06&0.0012", "gnomad_ac": "500&1&20", "symbol": "BRCA1"}
+        BulkVEPVCFAnnotationInserter._fix_multiple_values(data)
+        self.assertEqual(data, {"gnomad_af": "0.25", "gnomad_ac": "500", "symbol": "BRCA1"})
+
+    def test_missing_af_sorts_lowest(self):
+        data = {"gnomad_af": ".&1e-05", "gnomad_ac": ".&3"}
+        BulkVEPVCFAnnotationInserter._fix_multiple_values(data)
+        self.assertEqual(data, {"gnomad_af": "1e-05", "gnomad_ac": "3"})
 
 
 # ---------------------------------------------------------------------------

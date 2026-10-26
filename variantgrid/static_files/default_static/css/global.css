@@ -848,6 +848,9 @@ table.as_table td {
 
 .btn.new-classification-button {
   margin-left: 6px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .rv-gene {
@@ -2954,13 +2957,6 @@ body.dt-col-resizing {
 
 .variant-select {
   float: left;
-}
-
-a.clinical-context {
-  display: inline-block;
-  padding: 2px 4px 2px 4px;
-  border: 1px solid gray;
-  border-radius: 4px;
 }
 
 #gene-grid-link {

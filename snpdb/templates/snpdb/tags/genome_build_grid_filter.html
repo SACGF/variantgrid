@@ -1,15 +1,32 @@
+{% load ui_utils %}
+{% if show %}
 <style>
 .genome-build-radio label {
     white-space: nowrap;
 }
 </style>
-<div class="btn-group btn-group-toggle genome-build-radio" data-toggle="buttons">
-    <label class="btn btn-outline-primary active">
-        <input class="table-filter" type="radio" name="genome_build_filter" value="" autocomplete="off" checked> All
-    </label>
-    {% for genome_build in genome_builds %}
-        <label class="btn btn-outline-primary">
-            <input class="table-filter" type="radio" name="genome_build_filter" value="{{ genome_build.name }}" autocomplete="off"> {{ genome_build.name }}
-        </label>
-    {% endfor %}
+{% if table_id %}
+<div id="{{ table_id }}-genome-build-filter" class="form-inline">
+    {% labelled label="Genome Build" hint="inline" %}{% include "snpdb/tags/genome_build_radio.html" %}{% endlabelled %}
 </div>
+<script>
+// The DataTables ajax `data` hook - data-datatable-data="genomeBuildGridFilter" on the table
+function genomeBuildGridFilter(data, settings) {
+    const genomeBuildName = $("#" + settings.sTableId).data("genomeBuildName");
+    if (genomeBuildName) {
+        data["genome_build_name"] = genomeBuildName;
+    }
+}
+
+$(document).ready(function() {
+    $("#{{ table_id }}-genome-build-filter input[name=genome_build_filter]").change(function() {
+        const grid = $("#{{ table_id }}");
+        grid.data("genomeBuildName", $(this).val());
+        grid.DataTable().ajax.reload();
+    });
+});
+</script>
+{% else %}
+    {% include "snpdb/tags/genome_build_radio.html" %}
+{% endif %}
+{% endif %}

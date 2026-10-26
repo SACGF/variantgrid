@@ -30,7 +30,6 @@ from library.django_utils.admin_utils import (
 from snpdb.admin_partition_archive_mixin import ArchivePartitionDataAdminMixin
 
 admin.site.register(models.AnnotationVersion)
-admin.site.register(models.CachedWebResource)
 
 
 @admin.register(models.ClinVarVersion)

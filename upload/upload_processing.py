@@ -3,17 +3,12 @@ import logging
 from celery.result import AsyncResult
 
 from eventlog.models import create_event
+from upload.enums import UploadedFileTypes, UploadStepOrigin
 from upload.import_task_factories.import_task_factory import (
     get_import_task_factories,
     get_import_task_factory_from_extension,
 )
-from upload.models import (
-    FileUpload,
-    ProcessingStatus,
-    UploadedFileTypes,
-    UploadPipeline,
-    UploadStepOrigin,
-)
+from upload.models import FileUpload, ProcessingStatus, UploadPipeline
 from upload.upload_metadata import get_metadata_keys_for_file_type, validate_upload_metadata
 
 

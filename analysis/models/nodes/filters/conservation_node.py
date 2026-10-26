@@ -119,7 +119,7 @@ class ConservationNode(AnalysisNode):
                 "Structural variant conservation scores on this VariantAnnotationVersion were taken "
                 "over a window one base too wide, and any run whose scoring stage failed left them "
                 "null - so SVs here may be filtered on the wrong score, or dropped for having none. "
-                "Run `manage.py backfill_sv_conservation` to correct them."
+                "Set the analysis to the latest annotation version to filter on corrected scores."
             )
         return warnings
 

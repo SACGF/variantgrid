@@ -3,7 +3,7 @@ Tests for pedigree.ped.ped_file_utils — pure functions, no DB required.
 """
 import unittest
 
-from patients.models_enums import Sex
+from patients.enums import Sex
 from pedigree.ped.ped_file_utils import get_affection, get_parent_id, get_sex
 
 

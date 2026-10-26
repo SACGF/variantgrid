@@ -5,14 +5,16 @@ Owns: template tags (labelled/modal/tabs/menus/help), js_tags JSON-for-JS filter
 Start with: templatetags/ui_utils.py (labelled, modal, preview, if_user_can_edit, embed), templatetags/js_tags.py
   (jsonify, format_value, timestamp, code_json), templatetags/ui_tabs_builder.py (ui_register_tab, ui_render_tabs),
   views/ajax_form_view.py (LazyRender, AjaxFormView), json/validated_json.py (ValidatedJson, JsonMessages),
-  variantgrid/static_files/default_static/js/global.js (the processors list that wires behaviour to markup).
+  variantgrid/static_files/default_static/js/global.js (the DOM processor registry that wires behaviour to markup).
 Patterns here:
-- Behaviour is attached to markup, not called: global.js keeps a `processors` list of {test: selector, func} that
-  runs on document ready and again for every node the MutationObserver sees added
-  (variantgrid/static_files/default_static/js/global.js:checkNode). Render the attribute/class
+- Behaviour is attached to markup, not called: `registerDomProcessor(selector, func)` adds a processor that runs on
+  document ready and again for every node the MutationObserver sees added
+  (variantgrid/static_files/default_static/js/global.js:processDomNode). Render the attribute/class
   (`table[data-datatable-url]`, `.format-json`, `[data-preview-db]`, `[data-toggle="ajax-modal"]`, `[data-replace]`,
-  `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike; add a behaviour as
-  a new processor entry.
+  `input[type=checkbox][data-cookie]`) and it works in a page, an AJAX tab and a modal alike. Generic behaviours
+  register in global.js; a feature's register from its own file (`[data-citation-id]` in citations.js,
+  `[data-preview-db]` in vc_form.js), which must load before `globalSetup()` runs on ready - registration order
+  is the order processors run.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
   it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
@@ -51,9 +53,9 @@ Gotchas:
 - `{% load %}` names matter: labelled/modal/preview/badge/boolean live in `ui_utils`;
   jsonify/format_value/timestamp/code_json/duration/get_item live in `js_tags` (uicore/templatetags/js_tags.py:format_value).
   The wrong library fails `uicore/tests/test_templates_compile.py`, which compiles every project template.
-- The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `ignoreSelectors` (third
-  party widgets) - a processor that never fires on injected HTML is usually inside one
-  (variantgrid/static_files/default_static/js/global.js:checkNode).
+- The MutationObserver marks processed top-level nodes `data-p` and skips subtrees under `domIgnoreMutationsWithin`
+  (third party widgets) and nodes matching a `registerDomIgnore` selector - a processor that never fires on injected
+  HTML is usually inside one (variantgrid/static_files/default_static/js/global.js:processDomNode).
 - Preview handlers run under send_robust: an exception becomes a report_message and the card shows nothing
   (library/preview_request.py:PreviewRequest.preview_data).
 - `var()` does not work in an SVG presentation attribute (`fill="var(--x, none)"` is silently dropped) - the
@@ -91,9 +93,16 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   from it. `data-datatable-data` names a JS function whose return object is merged into every request.
 - RichColumn: `key` is a `.values()` path and the sort/search key; `name` is the JSON field (no dots); `renderer`
   is a server callable taking snpdb/views/datatable_view.py:CellData (list `extra_columns` it reads);
-  `client_renderer` is a JS expression, usually `TableFormat.*`
+  `client_renderer` is the dotted name of a JS function, usually `TableFormat.*`
   (variantgrid/static_files/default_static/js/datatable_definition.js:TableFormat) or a function in
-  datatables_client_renderers.js; `visible=False` sends data without a column; `detail=True` moves it to the expand row.
+  datatables_client_renderers.js, called as `(data, type, row, ctx)`; `visible=False` sends data without a column;
+  `detail=True` moves it to the expand row.
+- Client renderers are looked up by name on `window` (`resolveFunctionName` in datatable_definition.js), never
+  eval'd, and RichColumn raises on anything but a dotted name: a renderer's settings go in `client_renderer_kwargs`
+  and arrive as `ctx.kwargs` (`RichColumn.choices_client_renderer` returns both, spread with `**`). A namespace
+  declared with top-level `const` isn't on `window` by itself, so its file assigns it (`window.TableFormat = TableFormat`).
+  Row expansion is the same: `expand_client_renderer` + `expand_client_renderer_kwargs`, called as `(rowData, ctx)`;
+  `set_expand_ajax(view, ...)` (snpdb/views/datatable_view.py:DatatableConfig.set_expand_ajax) loads a view per row.
 - Cells and labels go into the page as HTML, so they're escaped by default: a string cell with no `client_renderer` is
   escaped in snpdb/views/datatable_view.py:escape_cell (the CSV stays raw), and labels in `rich_column_json`. A server
   renderer or label that means HTML returns a `SafeString` (`format_html`, `render_to_string`, `mark_safe` on a constant).
@@ -113,8 +122,9 @@ Deep reference: __uicore_readme.md · claude/research/uicore.md
   are class flags; the definition JSON from snpdb/views/datatable_view.py:datatable_definition is all the client reads.
 - CSV follows the config: `server_csv_download = True` streams `csv_columns()` over `iter_export_rows()`
   (snpdb/views/datatable_view.py:DatatableConfig.export_columns) with the grid's filters and ordering; set `csv_rendered=True`
-  where the server renderer changes the value, `include_in_csv=False` on action columns. The client CSV button only
-  exports rows already fetched.
+  where the server renderer changes the value, `include_in_csv=False` on action columns; a keyless (renderer only) column needs
+  `include_in_csv=True, csv_rendered=True`, and a hidden column with a key is exported. Datetimes go out as dates, not
+  the epoch seconds the JSON carries. The client CSV button only exports rows already fetched.
 - COUNTs cost: `count_unfiltered = False` skips the unfiltered one; `known_count()` / `approximate_count_enabled`
   supply a stored or estimated total (snpdb/views/datatable_view.py:datatable_response).
 - The Variant cell's kind badge (`VariantGridFormat.variantKindBadge` in

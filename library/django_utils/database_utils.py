@@ -5,7 +5,7 @@ cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dange
 postgres_arrays formats array literals, long_running_sql / get_active_backend_pids / signal_backends /
 wait_for_backends_to_stop find and cancel other connections' running queries, query_was_cancelled tells a
 cancel or statement_timeout apart from other OperationalErrors, pg_settings / get_pg_setting set
-and read this connection's run-time settings, and get_table_row_estimates / get_queryset_row_estimate give planner
+and read this connection's run-time settings, advisory_lock serialises work across connections, and get_table_row_estimates / get_queryset_row_estimate give planner
 row counts without scanning.
 """
 import contextlib
@@ -15,12 +15,12 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, TypeVar, Generic, Type, Callable
+from typing import Any, Optional, TypeVar, Generic, Type
 
 import psycopg
 import sqlparse
-from dataclasses_json import DataClassJsonMixin
 from django.db import connection, transaction, models
+from django.db.backends.postgresql.psycopg_any import mogrify
 from django.db.utils import OperationalError
 
 # 970: Added transaction wrapper due to Postgres hanging query
@@ -28,7 +28,6 @@ from django.db.models import QuerySet
 from django.db.models.lookups import In
 from django.db.models.sql.where import NothingNode
 from django.db.models.enums import TextChoices, IntegerChoices
-from django_json_widget.widgets import JSONEditorWidget
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
@@ -142,6 +141,20 @@ def pg_settings(local: bool = False, **values):
             _set_pg_settings(previous, local=False)
 
 
+@contextlib.contextmanager
+def advisory_lock(name: str, key: int):
+    """ Session-level Postgres advisory lock on (name, key), waiting for it if another connection holds it.
+        Not tied to a transaction, so it can be held across work that commits as it goes; a connection that
+        dies releases it, so a lost worker never leaves it held """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_lock(hashtext(%s), %s)", [name, key])
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_unlock(hashtext(%s), %s)", [name, key])
+
+
 def query_was_cancelled(e: OperationalError) -> bool:
     """ pg_cancel_backend and statement_timeout both surface as OperationalError wrapping QueryCanceled """
     return isinstance(e.__cause__, psycopg.errors.QueryCanceled)
@@ -211,19 +224,12 @@ def render_empty_result_set_sql():
 
 
 def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
-    """ str(queryset.query) doesn't quote variables properly....
-
-        From: https://stackoverflow.com/a/47542953
-        qs.query returns something that isn't valid SQL, this returns the actual
-        valid SQL that's executed: https://code.djangoproject.com/ticket/17741  """
+    """ The SQL a queryset runs, with its params bound - str(queryset.query) leaves them unquoted,
+        so isn't valid SQL: https://code.djangoproject.com/ticket/17741  """
 
     query, params = queryset.query.sql_with_params()
-    PREFIX = 'select 1 -- '
-    with connection.cursor() as cursor:
-        cursor.execute(PREFIX + query, params)
-        res = str(cursor.db.ops.last_executed_query(cursor, query, params))
-    assert res.startswith(PREFIX)
-    query_sql = res[len(PREFIX):]
+    # Binds the params client side without running anything
+    query_sql = mogrify(query, params, connection)
 
     if pretty:
         query_sql = sqlparse.format(query_sql, reindent=True, keyword_case='upper')
@@ -296,7 +302,7 @@ def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
     else:
         limit = ""
 
-    sql = f"DELETE FROM {meta.db_table} where {meta.pk.name} in ({pk_qs.query} {limit})"
+    sql = f"DELETE FROM {meta.db_table} where {meta.pk.name} in ({queryset_to_sql(pk_qs)} {limit})"
     total_rowcount = 0
     rowcount = True
     while rowcount:
@@ -307,85 +313,6 @@ def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
 
 def postgres_arrays(array):
     return "{%s}" % ','.join([str(s) if s is not None else "NULL" for s in array])
-
-
-T1 = TypeVar('T1', bound=DataClassJsonMixin)
-
-
-class JSONDataclassField(models.JSONField, Generic[T1]):  # pylint: disable=inconsistent-mro
-    """
-    DO NOT USE - doesn't work well with auditlog which double encodes, likely a problem with serialize as well
-    """
-
-    """
-    A field type that will return and expect a DataClassJsonMixin type.
-    e.g.
-    @dataclass
-    class Coordinate(DataClassJsonMixin):
-        x: int
-        y: int
-    Will be serialized into the database, and referring to this field will deserialize so you don't have to convert
-    from JSONB into your dataclass objects in custom code, it'll just be handled in ORM
-
-    PyCharm isn't smart enough to work out the execpted type, so just add the type hint after declaring using this in a model
-    """
-
-
-    def __init__(self,
-                 dataclass_type: Type[T1],
-                 illegal_value_result: Any = None,
-                 *args,
-                 **kwargs):
-        """
-        :param dataclass_type: The class to convert to/from JSON, should be @dataclass_json or DataClassJsonMixin
-        :param illegal_value_result: If we can't convert the JSONB from the database into dataclass_type, return this instead
-        """
-        self.dataclass_type = dataclass_type
-        self.illegal_value_result = illegal_value_result
-        super().__init__(*args, **kwargs)
-
-    @property
-    def non_db_attrs(self):
-        return super().non_db_attrs + ("dataclass_type", "illegal_value_result",)
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        kwargs["dataclass_type"] = self.dataclass_type
-        kwargs["illegal_value_result"] = self.illegal_value_result
-        return name, path, args, kwargs
-
-    def get_fallback_value(self):
-        fallback_value = self.illegal_value_result
-        if fallback_value is None:
-            fallback_value = self.default
-        if isinstance(fallback_value, Callable):
-            fallback_value = fallback_value()
-        if isinstance(fallback_value, dict):
-            fallback_value = self.dataclass_type.from_dict(fallback_value)
-        return fallback_value
-
-    def from_db_value(self, value, expression, connection):
-        """Converts database JSON string/object to a dataclass instance."""
-        if value is None:
-            return None
-        try:
-            if isinstance(value, dict):
-                return self.dataclass_type.from_dict(value)
-            if isinstance(value, str):
-                return self.dataclass_type.from_json(value)
-        except:
-            print(f"Could not convert value from DB {value.__class__} \"{value}\" to {self.dataclass_type}")
-        return value
-
-    def get_prep_value(self, value: Optional[T1]):
-        if value is None:
-            return None
-        if hasattr(value, 'to_dict'):
-            return value.to_dict()
-        if not isinstance(value, dict):
-            # print(f"WARNING - prep value doesn't have to_dict or isn't a dict, it's {value.__class__}")
-            raise ValueError(f"WARNING - prep value doesn't have to_dict or isn't a dict, it's {value.__class__}")
-        return value
 
 
 TX = TypeVar('TX')
@@ -430,28 +357,8 @@ class TextFieldChoices(ChoicesMixin[T2], models.TextField):
     pass
 
 
-T3 = TypeVar('T3', bound=TextChoices)
-
-
-class CharFieldChoices(ChoicesMixin[T3], models.CharField):
-    pass
-
-
 T4 = TypeVar('T4', bound=IntegerChoices)
 
 
 class IntegerFieldChoices(ChoicesMixin[T4], models.IntegerField):
     pass
-
-
-class JSONDataClassAdminWidget(JSONEditorWidget):
-
-    def format_value(self, value):
-        if not isinstance(value, (dict, list)):
-            value = json.loads(value)
-            if isinstance(value, str):
-                # TODO, why would these values be double escaped anyway?
-                value = json.loads(value)
-            return value
-        else:
-            return value

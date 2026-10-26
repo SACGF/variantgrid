@@ -3,7 +3,7 @@ import os
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from annotation.vep_annotation import VEPConfig
+from annotation.vep_annotation import get_missing_vep_files
 from snpdb.models import GenomeBuild
 
 
@@ -13,20 +13,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
 
         for genome_build in GenomeBuild.builds_with_annotation():
-            check_files = {}
-            for key in ["reference_fasta", "cytoband"]:
-                check_files[key] = genome_build.settings[key]
+            for key, filename in get_missing_vep_files(genome_build).items():
+                print(f"{genome_build} {key}: {filename} MISSING")
 
-            vep_config = VEPConfig(genome_build)
-            for key, rel_path in vep_config.vep_data.items():
-                if rel_path is not None:
-                    check_files[key] = vep_config[key]
-
-            for key, filename in check_files.items():
-                if not os.path.exists(filename):
-                    print(f"{key}: {filename} MISSING")
-
-        for build_name, data in settings.VCF_IMPORT_COMMON_FILTERS.items():
+        for data in settings.VCF_IMPORT_COMMON_FILTERS.values():
             key = "gnomad_af_filename"
             if filename := data.get(key):
                 if not filename.startswith("/"):

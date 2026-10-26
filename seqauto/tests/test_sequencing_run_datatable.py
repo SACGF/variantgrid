@@ -4,9 +4,9 @@ from django.urls.base import resolve, reverse
 from django.utils.timezone import now
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from seqauto.enums import DataGeneration
 from seqauto.grids.sequencing_data_grids import SequencingRunColumns
 from seqauto.models import (
-    DataGeneration,
     EnrichmentKit,
     SampleSheet,
     Sequencer,
@@ -17,7 +17,8 @@ from seqauto.models import (
     VariantCaller,
     VCFFromSequencingRun,
 )
-from snpdb.models import VCF, GenomeBuild, ImportStatus, UserGridConfig
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, UserGridConfig
 from snpdb.views.datatable_view import DatabaseTableView
 
 

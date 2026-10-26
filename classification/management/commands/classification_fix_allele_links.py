@@ -1,8 +1,6 @@
 """
 Re-home classifications whose clinical context or grouping sits under a different Allele than the
 classification does - what an allele merge or the #1361 VariantAllele dedupe leaves behind.
-
-Registered as a ManualOperation by snpdb/migrations/0259_variantallele_unique_variant_build.py
 """
 from django.core.management import BaseCommand
 

@@ -4,8 +4,7 @@ Sweeps settings.IMPORT_PROCESSING_DIR of scratch directories whose owner has fin
 Everything under that directory is disposable working space written by an import, but until #928 several
 paths never removed theirs, so an existing deployment has years of them. Each owner now cleans up as it
 finishes (UploadPipeline.success and its post_delete, the annotation run reset, the SQL COPY commands),
-so this is mostly a one-off catch-up - registered as a ManualOperation in
-upload/migrations/0042_one_off_import_processing_cleanup.py - but it is worth keeping: a deployment
+so this is mostly a one-off catch-up - but it is worth keeping: a deployment
 running with IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS off still accumulates them.
 
 An entry is only removed when its owner says it is done with it. Anything still owned (a PROCESSING
@@ -19,14 +18,14 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from annotation.enums import AnnotationStatus
 from annotation.models import (
     AnnotationRun,
     GeneAnnotationVersion,
     HumanProteinAtlasAnnotationVersion,
 )
-from annotation.models.models_enums import AnnotationStatus
+from snpdb.enums import ProcessingStatus
 from snpdb.models import SomalierVCFExtract
-from snpdb.models.models_enums import ProcessingStatus
 from upload.models import (
     UploadedClassificationImport,
     UploadedLiftover,

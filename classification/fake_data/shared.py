@@ -10,7 +10,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import QuerySet
 from guardian.models import GroupObjectPermission
 
-from annotation.models.models import VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
+from classification.enums import ImportedAlleleInfoStatus
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_grouping import (
     AlleleOriginGrouping,
@@ -19,7 +21,6 @@ from classification.models.classification_grouping import (
 from classification.models.classification_reclassification_models import ReclassificationEvent
 from classification.models.classification_variant_info_models import (
     ImportedAlleleInfo,
-    ImportedAlleleInfoStatus,
     ResolvedVariantInfo,
 )
 from classification.models.overlaps_model import OverlapContribution
@@ -116,7 +117,8 @@ def delete_fake_classifications(classifications_qs: QuerySet[Classification]) ->
 
 @contextmanager
 def keeping_our_timestamps(klass):
-    """ created/modified are auto_now_add/auto_now, which would stamp years of curation as happening now """
+    """ Django's auto_now_add/auto_now would stamp years of curation as happening now (a model_utils
+        TimeStampedModel keeps values set on insert without this) """
     created = klass._meta.get_field("created")
     modified = klass._meta.get_field("modified")
     created.auto_now_add = False

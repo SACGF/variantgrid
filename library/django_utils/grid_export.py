@@ -22,6 +22,19 @@ def csv_streaming_response(basename: str, csv_iterator: Iterator[str]) -> Stream
     return response
 
 
+SPREADSHEET_FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+
+
+def spreadsheet_safe(value):
+    """ Text Excel would evaluate as a formula gets a leading quote (numbers like "-1.5" are left alone) """
+    if isinstance(value, str) and len(value) > 1 and value.startswith(SPREADSHEET_FORMULA_PREFIXES):
+        try:
+            float(value)
+        except ValueError:
+            return "'" + value
+    return value
+
+
 def grid_export_csv(csv_columns, items, label_overrides: Optional[dict] = None) -> Iterator[str]:
     pseudo_buffer = StashFile()
     header, labels = csv_header_labels(csv_columns, label_overrides=label_overrides)
@@ -36,7 +49,7 @@ def grid_export_csv(csv_columns, items, label_overrides: Optional[dict] = None) 
     yield pseudo_buffer.value
     for i, obj in enumerate(items, start=1):
         # labels dict is in same sorted order as header
-        row = [obj.get(k) for k in labels]
+        row = [spreadsheet_safe(obj.get(k)) for k in labels]
         writer.writerow(row)
         if i % EXPORT_ROWS_PER_CHUNK == 0:
             yield pseudo_buffer.value

@@ -18,47 +18,15 @@ from django.db.models.deletion import SET_NULL
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
+from analysis.enums import CandidateSearchType, CandidateStatus
 from analysis.models.models_analysis import Analysis
 from annotation.models import AnnotationVersion, ClinVar
 from classification.models import Classification
 from library.django_utils import count_values_qs
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from patients.models_enums import Zygosity
-from snpdb.models import ProcessingStatus, Sample, Variant
-
-
-class CandidateSearchType(models.TextChoices):
-    REANALYSIS_NEW_ANNOTATION = 'R', 'Reanalysis - new annotation'
-    CROSS_SAMPLE_CLASSIFICATION = 'S', 'Cross Sample Classification'
-    CLASSIFICATION_EVIDENCE_UPDATE = 'E', 'Classification Evidence Update'
-
-    def get_methods(self) -> str:
-        """ This is the description of the latest methods, which will be saved to the DB at execution time
-            So you can update it over time and it'll keep historical methods """
-        if self is CandidateSearchType.REANALYSIS_NEW_ANNOTATION:
-            methods = """Find analyses for P/LP ClinVar variants in latest version that are not in analysis version."""
-        elif self is CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION:
-            methods = """Find samples that have a variant classified in another sample, but not themselves"""
-        elif self is CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE:
-            methods = """Find Classifications that have new annotation information (gnomAD and pathogenicity predictions)"""
-        else:
-            raise ValueError(f"Method not defined for {self}")
-        return methods
-
-    @property
-    def is_analysis_type(self):
-        return self in (CandidateSearchType.REANALYSIS_NEW_ANNOTATION, )
-
-    @property
-    def is_classification_type(self):
-        return self in (CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION, CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE)
-
-
-class CandidateStatus(models.TextChoices):
-    OPEN = 'O', 'OPEN'
-    RESOLVED = 'R', 'RESOLVED'
-    HIDDEN = 'D', 'HIDDEN'
-    HIGHLIGHTED = 'L', 'HIGHLIGHTED'
+from patients.enums import Zygosity
+from snpdb.enums import ProcessingStatus
+from snpdb.models import Sample, Variant
 
 
 class CandidateSearchVersion(TimeStampedModel):

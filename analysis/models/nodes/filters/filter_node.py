@@ -6,7 +6,8 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE
 
-from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon
 from library.django_utils.filter_rules import format_operation, rules_to_q
 from snpdb.models import VariantGridColumn

@@ -4,9 +4,9 @@ from django.test import TestCase
 
 from analysis.models import VariantTag
 from annotation.fake_data import get_fake_annotation_version
+from snpdb.enums import AlleleOrigin
 from snpdb.models import (
     Allele,
-    AlleleOrigin,
     GenomeBuild,
     Tag,
     VariantAllele,

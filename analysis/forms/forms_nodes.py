@@ -4,20 +4,19 @@ import re
 from dal import forward
 from django import forms
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.forms.models import fields_for_model
 from django.forms.widgets import HiddenInput, RadioSelect, TextInput
 from django.http import Http404
 from django.utils.text import slugify
 
 from analysis import models
-from analysis.models import Analysis, AnalysisNode, AnalysisTemplateType, MOINode
-from analysis.models.enums import NodeMatchInput
-from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter, NodeVCFFilter
+from analysis.enums import AnalysisTemplateType, NodeMatchInput, StructuralFilter
+from analysis.models import Analysis, AnalysisNode, MOINode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
-from analysis.models.nodes.filters.damage_node import DamageNode, StructuralFilter
+from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -27,6 +26,8 @@ from analysis.models.nodes.filters.selected_in_parent_node import SelectedInPare
 from analysis.models.nodes.filters.tag_node import TagNode
 from analysis.models.nodes.filters.tissue_node import TissueNode
 from analysis.models.nodes.filters.venn_node import VennNode
+from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.cohort_node import (
     CohortNode,
@@ -48,12 +49,12 @@ from library.forms import NumberInput, StarsWidget
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
+from patients.enums import GnomADPopulation, SampleSourceLevel
 from patients.models import Patient
-from patients.models_enums import GnomADPopulation, SampleSourceLevel
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_for_source
+from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Cohort, Lab, Sample, Tag, VCFFilter
-from snpdb.models.models_enums import AlleleOriginFilterDefault
 from snpdb.models.models_genome import Contig
 from uicore.widgets.date_widget import NativeDateInput
 
@@ -193,12 +194,43 @@ class AncestorSampleSourceMixin(forms.Form):
 
 
 class BaseNodeForm(forms.ModelForm):
+    editor = None  # the user saving the node, when NodeView has set it
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._restrict_choices_to_analysis_user()
         if ignorable_fields := self.instance.get_ignorable_error_fields():
             label = f"Ignore {', '.join(ignorable_fields)} errors"
             self.fields["ignore_field_errors"] = forms.BooleanField(required=False, label=label,
                                                                     initial=self.instance.ignore_field_errors)
+
+    def _restrict_choices_to_analysis_user(self):
+        """ Everything in an analysis is read as its owner, so a picked cohort, gene list etc has to be
+            one the owner can see - the autocompletes only narrow what's offered, not what's posted """
+        self._restrict_choices_to(self.instance.analysis.user)
+
+    def restrict_choices_to_editor(self, user):
+        """ Someone else with write access can only pick what they can view as well, or sharing an analysis
+            would share everything its owner can see. What the node already has stays valid, so they can still
+            save the node's other fields """
+        self.editor = user
+        if user != self.instance.analysis.user:
+            self._restrict_choices_to(user, keep_current=True)
+
+    def _restrict_choices_to(self, user, keep_current=False):
+        for name, field in self.fields.items():
+            if isinstance(field, forms.ModelChoiceField):
+                model = field.queryset.model
+                if filter_for_user := getattr(model, "filter_for_user", None):
+                    allowed = Q(pk__in=filter_for_user(user).values("pk"))
+                    if keep_current and (current := self._current_pks(name)):
+                        allowed |= Q(pk__in=current)
+                    field.queryset = field.queryset.filter(allowed)
+
+    def _current_pks(self, field_name) -> list:
+        value = self.initial.get(field_name)
+        values = value if isinstance(value, (list, tuple, QuerySet)) else [value]
+        return [getattr(v, "pk", v) for v in values if v is not None]
 
     def _post_clean(self):
         """ The instance now carries the submitted values, so the node's own field checks can run """
@@ -1152,8 +1184,15 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
         if source_level is None or level not in SampleNode.implemented_source_levels():
             raise forms.ValidationError(f"Unknown source level: '{level}'")
         model = source_level.model
+        current_source = self.instance.get_source_object()
+        is_current = current_source is not None and value == f"{self.instance.source_level}:{current_source.pk}"
+        users = [self.instance.analysis.user]
+        if self.editor and not is_current:
+            users.append(self.editor)
         try:
-            return level, model.get_for_user(self.instance.analysis.user, pk)
+            for user in users:
+                source = model.get_for_user(user, pk)
+            return level, source
         except (Http404, PermissionDenied, ValueError) as e:
             raise forms.ValidationError(f"Could not use {model._meta.verbose_name} '{pk}'") from e
 
@@ -1236,16 +1275,16 @@ class TissueNodeForm(BaseNodeForm):
                    'accordion_panel': HiddenInput()}
 
 
-class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
-    genome_build_fields = ["trio"]
-    exclude_archived = True
+def _family_node_form(node_class) -> type[VCFSourceNodeForm]:
+    """ The Duo/Trio/Quad editor forms differ only in the family they pick """
+    source_field = node_class.FAMILY_SHAPE.source_field
 
     class Meta:
-        model = TrioNode
+        model = node_class
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
-            "trio": ModelSelect2(url='trio_autocomplete',
-                                 attrs={'data-placeholder': 'Trio...'}),
+            source_field: ModelSelect2(url=f'{source_field}_autocomplete',
+                                       attrs={'data-placeholder': f'{source_field.title()}...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -1254,43 +1293,18 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
         }
 
-
-class QuadNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
-    genome_build_fields = ["quad"]
-    exclude_archived = True
-
-    class Meta:
-        model = QuadNode
-        exclude = ANALYSIS_NODE_FIELDS
-        widgets = {
-            "quad": ModelSelect2(url='quad_autocomplete',
-                                 attrs={'data-placeholder': 'Quad...'}),
-            "min_ad": WIDGET_INTEGER_MIN_0,
-            "min_dp": WIDGET_INTEGER_MIN_0,
-            "min_gq": WIDGET_INTEGER_MIN_0,
-            "max_pl": WIDGET_INTEGER_MIN_0,
-            "mosaic_max_af": WIDGET_UNIT_INTERVAL_SLIDER,
-            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
-        }
+    attrs = {
+        "__module__": __name__,
+        "genome_build_fields": [source_field],
+        "exclude_archived": True,
+        "Meta": Meta,
+    }
+    return type(f"{node_class.__name__}Form", (GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm), attrs)
 
 
-class DuoNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
-    genome_build_fields = ["duo"]
-    exclude_archived = True
-
-    class Meta:
-        model = DuoNode
-        exclude = ANALYSIS_NODE_FIELDS
-        widgets = {
-            "duo": ModelSelect2(url='duo_autocomplete',
-                                attrs={'data-placeholder': 'Duo...'}),
-            "min_ad": WIDGET_INTEGER_MIN_0,
-            "min_dp": WIDGET_INTEGER_MIN_0,
-            "min_gq": WIDGET_INTEGER_MIN_0,
-            "max_pl": WIDGET_INTEGER_MIN_0,
-            "mosaic_max_af": WIDGET_UNIT_INTERVAL_SLIDER,
-            "mosaic_min_alt_reads": WIDGET_INTEGER_MIN_1,
-        }
+TrioNodeForm = _family_node_form(TrioNode)
+QuadNodeForm = _family_node_form(QuadNode)
+DuoNodeForm = _family_node_form(DuoNode)
 
 
 class ZygosityNodeForm(AncestorSampleSourceMixin, BaseNodeForm):

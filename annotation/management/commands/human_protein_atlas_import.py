@@ -10,8 +10,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from annotation.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
+from genes.enums import AnnotationConsortium
 from genes.models import Gene, GeneSymbol
-from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_file_utils import (
     get_import_processing_filename,
     remove_import_processing_dir,

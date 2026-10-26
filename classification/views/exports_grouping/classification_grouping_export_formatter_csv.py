@@ -9,7 +9,7 @@ from classification.views.exports.classification_export_formatter_csv import CSV
 from classification.views.exports.classification_export_utils import CitationCounter
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
-    ClassificationGroupingExportFilter
+    ClassificationGroupingExportFilter, OverlapStatusSummary
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, ExportRow, export_column, ExportTweak
 from snpdb.models import GenomeBuild
@@ -25,6 +25,7 @@ class CSVFormatDetails:
 @dataclass(frozen=True)
 class CSVNonEvidence(ExportRow):
     classification_grouping: ClassificationGrouping
+    overlap_status_summary: OverlapStatusSummary
     date_str: str
     formatter: CSVFormatDetails
 
@@ -74,7 +75,20 @@ class CSVNonEvidence(ExportRow):
     def record_count(self):
         return self.classification_grouping.classification_count
 
-    @export_column(label="Onc-Path Triage")
+    @export_column(label="All Records Agree")
+    def all_records_agree(self):
+        return not (bool(self.classification_grouping.somatic_difference) or bool(self.classification_grouping.pathogenic_difference))
+
+    @export_column(label="Onco-Path Discordance")
+    def oncopath_discordance(self):
+        if overlap_status := self.overlap_status_summary.oncopath_status:
+            if self.classification_grouping.allele_origin_grouping.testing_context_bucket_obj.should_have_subdivide:
+                return overlap_status.label_with_difference
+            else:
+                return overlap_status.label
+        return None
+
+    @export_column(label="Onco-Path Triage")
     def classification(self):
         contribution: OverlapContribution
         if contribution := self.classification_grouping.onc_path_contribution:
@@ -83,7 +97,13 @@ class CSVNonEvidence(ExportRow):
                     return str(triage)
         return None
 
-    @export_column(label="Somatic Clin Sig Triage")
+    @export_column(label="Somatic Clinical Significance Discordance")
+    def clinsig_discordance(self):
+        if overlap_status := self.overlap_status_summary.somatic_clinsig_status:
+            return overlap_status.label_with_difference
+        return None
+
+    @export_column(label="Somatic Clinical Significance Triage")
     def somatic_clin_sig(self):
         contribution: OverlapContribution
         if contribution := self.classification_grouping.somatic_clin_sig_contribution:
@@ -113,7 +133,6 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
                  csv_format_details: CSVFormatDetails = CSVFormatDetails()):
         self.csv_format_details = csv_format_details
         super().__init__(classification_grouping_filter)
-
     @cached_property
     def export_tweak(self):
         return ExportTweak(
@@ -158,6 +177,12 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
         for row in queryset.iterator(chunk_size=4000):
             cm = row.latest_classification_modification
             row_data = []
-            row_data.extend(CSVNonEvidence(row, date_str=self.classification_grouping_filter.date_str, formatter=self.csv_format_details).to_csv(export_tweak=self.export_tweak))
+            row_data.extend(CSVNonEvidence(
+                classification_grouping=row,
+                overlap_status_summary=self.classification_grouping_filter.check_discordance(row.pk),
+                date_str=self.classification_grouping_filter.date_str,
+                formatter=self.csv_format_details
+            ).to_csv(export_tweak=self.export_tweak))
+
             row_data.extend(self.used_keys.row(cm, formatter=self.csv_format_details.html_handling.format))
             yield delimited_row(row_data, include_new_line=False)

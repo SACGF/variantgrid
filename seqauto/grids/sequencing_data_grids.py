@@ -1,4 +1,3 @@
-import json
 from typing import Any
 
 from django.conf import settings
@@ -9,25 +8,26 @@ from django.http import HttpRequest
 from django.urls.base import reverse
 
 from library.utils import JsonDataType
+from seqauto.enums import EnrichmentKitType
 from seqauto.models import (
     QC,
     AlignmentFile,
     EnrichmentKit,
-    EnrichmentKitType,
     Experiment,
     SequencingRun,
     SingleSampleVCF,
     UnalignedReads,
 )
+from snpdb.enums import SampleFileType
 from snpdb.models import UserGridConfig
-from snpdb.models.models_enums import SampleFileType
 from snpdb.models.models_vcf import VCF
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
-def _icon_flag_renderer(css_class: str, title: str) -> str:
-    """ Client renderer that only draws an icon when the flag is set, so the grid stays sparse """
-    return f'renderIconFlag.bind(null, {json.dumps({"cssClass": css_class, "title": title})})'
+def _icon_flag_renderer(css_class: str, title: str) -> dict:
+    """ RichColumn kwargs for a client renderer that only draws an icon when the flag is set, so the grid stays sparse """
+    return {"client_renderer": "renderIconFlag",
+            "client_renderer_kwargs": {"cssClass": css_class, "title": title}}
 
 
 class ExperimentColumns(DatatableConfig[Experiment]):
@@ -68,14 +68,13 @@ class SequencingRunColumns(DatatableConfig[SequencingRun]):
             RichColumn(key="enrichment_kit__name", label="EnrichmentKit", orderable=True),
             RichColumn(key="enrichment_kit__version", label="Kit version", orderable=True, search=False),
             RichColumn(key="gold_standard", label="Gold", orderable=True, search=False,
-                       client_renderer=_icon_flag_renderer("grid-link-icon gold-standard-icon", "Gold Standard")),
+                       **_icon_flag_renderer("grid-link-icon gold-standard-icon", "Gold Standard")),
             RichColumn(key="legacy", label="Legacy", orderable=True, search=False,
-                       client_renderer='TableFormat.boolean.bind(null, "standard")'),
+                       client_renderer='TableFormat.boolean'),
             RichColumn(key="hidden", label="Hidden", orderable=True, search=False,
-                       client_renderer=_icon_flag_renderer("grid-link-icon hidden-eye-icon", "Hidden")),
+                       **_icon_flag_renderer("grid-link-icon hidden-eye-icon", "Hidden")),
             RichColumn(key="bad", label="Bad", orderable=True, search=False,
-                       client_renderer=_icon_flag_renderer("fas fa-times-circle text-danger",
-                                                           "Run marked as bad")),
+                       **_icon_flag_renderer("fas fa-times-circle text-danger", "Run marked as bad")),
             RichColumn(key="vcf_ids", label="VCF", search=False,
                        extra_columns=["vcf_variant_caller", "vcf_import_status"],
                        renderer=self._render_vcfs, client_renderer='renderSequencingRunVCFs'),
@@ -164,7 +163,7 @@ class AlignmentFileColumns(DatatableConfig[AlignmentFile]):
                        label="Sequencing Run", orderable=True),
             RichColumn(key="sequencing_sample__sample_id", label="Sample", orderable=True),
             RichColumn(key="file_type", label="Type", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(SampleFileType.choices)),
+                       **RichColumn.choices_client_renderer(SampleFileType.choices)),
             RichColumn(key="path", label="Path", orderable=True),
             # Hidden as it's always "Fake Aligner" currently
             RichColumn(key="aligner__name", label="Aligner", orderable=True, visible=False),

@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
 
-from analysis.models.enums import ZygosityNodeZygosity
+from analysis.enums import ZygosityNodeZygosity
 from analysis.models.gene_counts import NodeGenesCountCollection
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import (

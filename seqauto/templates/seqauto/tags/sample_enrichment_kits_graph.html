@@ -14,6 +14,6 @@ $(document).ready(function() {
     showStackedBar(container, title, width, $(`#${container}`).height(), enrichment_kits_over_time, enrichment_kit_labels, series_colors)
 });
 </script>
-<!-- Plotly sets height:100% on its inner .plot-container, so the div needs the graph's size -->
+<!-- The script sizes the graph from this div's height -->
 <div id='enrichment_kits-by-time-{{ uuid }}' style="height: 500px"></div>
 {% if collapsed_help %}<div class="text-muted small text-center">{{ collapsed_help }}</div>{% endif %}

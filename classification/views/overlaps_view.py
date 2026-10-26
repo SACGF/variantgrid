@@ -10,9 +10,9 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from classification.enums import SpecialEKeys, OverlapStatus, OverlapType, OverlapContributionStatus, \
-    OverlapOverrideStatus
+    OverlapOverrideStatus, TriageNextStep
 from classification.models import ClassificationResultValue, \
-    EvidenceKey, EvidenceKeyMap, OverlapContribution, Overlap, TriageNextStep, OverlapContributionNextStep
+    EvidenceKeyMap, OverlapContribution, Overlap, OverlapContributionNextStep
 from classification.enums.overlaps_enums import TriageDecision, TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 from classification.services.overlaps_services import OverlapServices, OverlapPageDetails
@@ -152,14 +152,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
 
         saved = False
 
-        value_e_key: EvidenceKey
-        if value_type == ClassificationResultValue.ONC_PATH:
-            value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.ONC_PATH)
-        elif value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
-            value_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        else:
-            raise ValueError(f"Unexpected ValueType {value_type}")
-
         # if request.GET.get("edit") == "true":
         initial_data = {
             "triage_status": triage.triage_state_obj.status,
@@ -182,7 +174,6 @@ class TriageView(AjaxFormView[OverlapContribution]):
             "triage": triage,
             "classification_grouping": classification_grouping,
             "value_type": value_type,
-            "evidence_key": value_e_key,
         }
 
         if form.is_valid() and request.method == "POST":

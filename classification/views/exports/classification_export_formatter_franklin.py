@@ -2,22 +2,32 @@ import csv
 from enum import StrEnum
 from functools import cached_property
 from typing import Optional
+
 from django.conf import settings
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+
+from classification.enums import SpecialEKeys
 from classification.models import EvidenceKeyMap
 from classification.models.evidence_mixin import SomaticClinicalSignificanceValue
-from classification.views.classification_export_view import InvalidExportParameter
-from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_decorator import (
+    register_classification_exporter,
+)
+from classification.views.exports.classification_export_filter import (
+    AlleleData,
+    ClassificationFilter,
+    InvalidExportParameter,
+)
+from classification.views.exports.classification_export_formatter import (
+    ClassificationExportFormatter,
+)
 from classification.views.exports.classification_export_utils import CHGVSData
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
 from ontology.models import OntologyTerm
-from snpdb.models import GenomeBuild, AlleleOriginFilterDefault
+from snpdb.enums import AlleleOriginBucket, AlleleOriginFilterDefault
+from snpdb.models import GenomeBuild
 
 
 class TestingContextMode(StrEnum):

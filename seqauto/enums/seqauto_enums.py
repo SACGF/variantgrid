@@ -1,0 +1,82 @@
+"""
+Enums for sequencing data: DataGeneration (sequencer platform), EnrichmentKitType, PairedEnd /
+SequencerRead (which read a FASTQ holds), the QC graph choices (QCGraphTypes2, QCCompareType) and
+LibraryQCCategory, plus the report-context keys for library QC sections and DragenTSO500CombinedVariantOutput
+measures (LIBRARY_QC_CONTEXT_KEYS, CVO_MEASURE_CONTEXT_KEYS). Stored codes: add values, never change one.
+"""
+from django.db import models
+
+from library.utils import Constant
+
+
+class QCGraphTypes2(models.TextChoices):
+    BOX_PLOT = 'B', 'Box Plot'
+    BAR_CHART = 'A', 'Bar Chart'
+
+
+class QCCompareType(models.TextChoices):
+    GOLD_ENRICHMENT_KIT_RUNS = 'G', 'Gold Enrichment Kit Runs'
+    ENRICHMENT_KIT = 'P', 'Enrichment Kit'
+    SEQUENCER = 'S', 'Sequencer'
+    ALL_RUNS = 'A', 'All Runs'
+    SEQUENCING_RUN = 'R', 'SequencingRun'
+
+    ENRICHMENT_KIT_TYPES = Constant((GOLD_ENRICHMENT_KIT_RUNS[0], ENRICHMENT_KIT[0]))
+
+
+class DataGeneration(models.TextChoices):
+    HISEQ = 'H', 'HiSeq'
+    MISEQ = 'M', 'MiSeq'
+
+
+class PairedEnd(models.TextChoices):
+    R1 = "R1"
+    R2 = "R2"
+
+
+class SequencerRead(models.TextChoices):
+    R1 = "R1"
+    R2 = "R2"
+    I1 = "I1"
+    I2 = "I2"
+
+
+class EnrichmentKitType(models.TextChoices):
+    AMPLICON = 'A', 'Amplicon'
+    CAPTURE = 'C', 'Capture'
+    VIRTUAL = 'V', 'Virtual'
+
+
+class LibraryQCCategory(models.TextChoices):
+    """ What a caller's library QC section vouches for. These are DRAGEN TSO500's MetricsOutput sections today
+        (upload/tso500/dragen_metrics_output_parser.py maps the headings), named for what they vouch for so another
+        caller's QC can land in the same rows """
+    DNA = 'D', 'DNA library'                      # contamination
+    SMALL_VARIANT_TMB = 'V', 'Small variants and TMB'
+    MSI = 'M', 'MSI'
+    CNV = 'C', 'CNV'
+    GIS = 'G', 'GIS'
+    RNA = 'R', 'RNA library'                      # fusions and splice variants
+
+
+# The key a report template's case_fields names a category by, as CVO_MEASURE_CONTEXT_KEYS does for measures
+LIBRARY_QC_CONTEXT_KEYS = {
+    LibraryQCCategory.DNA: "dna",
+    LibraryQCCategory.SMALL_VARIANT_TMB: "small_variant_tmb",
+    LibraryQCCategory.MSI: "msi",
+    LibraryQCCategory.CNV: "cnv",
+    LibraryQCCategory.GIS: "gis",
+    LibraryQCCategory.RNA: "rna",
+}
+
+
+# What each of a DragenTSO500CombinedVariantOutput's numbers is called outside the database - the key a report
+# context and a report template's case_fields name it by - with its column and unit. 'tumour_fraction' is the
+# pathologist's estimate (patients.enums.MEASURE_CONTEXT_KEYS), so the caller's is its own key
+CVO_MEASURE_CONTEXT_KEYS = {
+    "tmb": ("total_tmb", "mut/Mb"),
+    "msi": ("percent_unstable_msi_sites", "%"),
+    "gis": ("genomic_instability_score", None),
+    "ploidy": ("ploidy", None),
+    "tumour_fraction_sequencing": ("tumor_fraction", "fraction"),
+}

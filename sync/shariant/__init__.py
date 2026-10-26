@@ -1,3 +1,3 @@
-# to register the alissa & shariant upload/downloads
+# to register the shariant upload/downloads
 from sync.shariant.variant_grid_download import *
 from sync.shariant.variant_grid_upload import *

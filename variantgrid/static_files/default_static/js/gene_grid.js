@@ -385,7 +385,7 @@ function createRowColumns(tr, headerRow) {
                 let matchedGene = tr.attr("matched_gene");
                 let matchInfo = tr.attr("match_info");
                 let aliasLink = $("<a />").attr("href", "#gene-row-" + matchedGene).text(matchedGene);
-                let aliasMessage = $("<span />").append("Matched ").append(aliasLink).append(": " + matchInfo);
+                let aliasMessage = $("<span />").append("Matched ").append(aliasLink).append(document.createTextNode(": " + matchInfo));
                 cell.append(aliasMessage);
             };
         }
@@ -659,12 +659,6 @@ function setCell(tr, geneListClass, value) {
 
     col.replaceWith(value);
 }
-
-function setCellText(tr, geneListClass, value) {
-    let col = $("." + geneListClass, tr);
-    col.text(value);
-}
-
 
 function addGeneHtmlContentForGeneList(geneListId, geneSymbol, geneContainer) {
     let htmlByGene = geneListDataById[geneListId]["gene_html"];
@@ -1344,7 +1338,7 @@ function geneDiseaseRelationshipCellInit(cell, gene_symbol) {
 
                         let classificationSummary = $("<span />").attr("title", src["evaluated_date"]);
                         classificationSummary.append(classification);
-                        classificationSummary.append(" (" + src["gencc_classification"] + ") by " + src["submitter"]);
+                        classificationSummary.append(document.createTextNode(" (" + src["gencc_classification"] + ") by " + src["submitter"]));
 
                         if (src["public_report_url"]) {
                             let reportLink = $("<a />").attr("href", src["public_report_url"]);

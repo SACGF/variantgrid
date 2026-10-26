@@ -11,7 +11,7 @@ class GnomADGeneConstraint(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, on_delete=CASCADE)
     transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=CASCADE)
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
 
     # Boolean indicator for MANE Select transcript
     mane_select = models.BooleanField(null=True, blank=True)

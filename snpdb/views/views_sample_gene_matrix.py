@@ -7,29 +7,28 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.shortcuts import render
 from django.urls.base import reverse
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from guardian.shortcuts import get_objects_for_group
 
-from annotation.models.models import VariantAnnotationVersion
+from annotation.gene_count_variants import gene_count_classification_qs, gene_count_variant_queryset
 from annotation.models.models_gene_counts import (
     GeneCountType,
     GeneValueCountCollection,
     SampleAnnotationVersionVariantSource,
 )
+from annotation.models.models_version import VariantAnnotationVersion
 from genes.models import GeneList
 from library.constants import HOUR_SECS
 from library.guardian_utils import DjangoPermission
 from library.utils import rgb_invert
 from ontology.models import OntologyTerm
 from patients.models import Patient
+from snpdb.enums import ImportStatus
 from snpdb.models import (
     GenomeBuild,
     Sample,
-)
-from snpdb.models.models_enums import (
-    ImportStatus,
 )
 
 
@@ -48,7 +47,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
         # variant classifications)
         genes = []
         gene_symbols = []
-        qs = gene_count_type.get_variant_queryset(variant_annotation_version)
+        qs = gene_count_variant_queryset(gene_count_type, variant_annotation_version)
         GS_PATH = "variantannotation__transcript_version__gene_version__gene_symbol"
         qs = qs.filter(**{GS_PATH + "__isnull": False})
         for gene, gene_symbol in qs.values_list("variantannotation__gene", GS_PATH).distinct():
@@ -77,9 +76,9 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
         if request.user.is_authenticated:  # Only display links to logged in users
             url = reverse('view_gene_symbol', kwargs={"gene_symbol": gene_symbol})
-            gene_symbol_text = f'<a class="{gene_classes}" href="{url}">{gene_symbol}</a>'
+            gene_symbol_text = format_html('<a class="{}" href="{}">{}</a>', gene_classes, url, gene_symbol)
         else:
-            gene_symbol_text = f"<span class='{gene_classes}'>{gene_symbol}</span>"
+            gene_symbol_text = format_html("<span class='{}'>{}</span>", gene_classes, gene_symbol)
 
         if highlight:
             highlight_gene_labels.append(gene_symbol_text)
@@ -147,7 +146,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
                     terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(patient.get_ontology_term_ids())
 
                     def format_ontology(ontology_term):
-                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
+                        return format_html("<div title='{}'>{}</div>", ontology_term, ontology_term.name)
 
                     for ontology_name, terms_qs in terms_dict.items():
                         ontology_text = " ".join(map(format_ontology, terms_qs))
@@ -217,7 +216,7 @@ def global_sample_gene_matrix(request):
         sample_qs = get_objects_for_group(public, read_perm, Sample)
 
     if gene_count_type.uses_classifications:
-        vc_qs = gene_count_type.get_classification_qs()
+        vc_qs = gene_count_classification_qs(gene_count_type)
         sample_qs = sample_qs.filter(classification__in=vc_qs)
 
     genome_build_name = settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD

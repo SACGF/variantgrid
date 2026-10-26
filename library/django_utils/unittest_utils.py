@@ -39,6 +39,8 @@ PRODUCTION_CACHED_TABLES = (
     "snpdb_allele",
     "snpdb_organization",
     "snpdb_lab",
+    "classification_organizationclassificationsettings",
+    "classification_labclassificationsettings",
 )
 
 

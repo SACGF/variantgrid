@@ -56,8 +56,8 @@ distinct users with an `Event` or `ViewEvent` in the window, admins on their own
 
 `Event` is an in-database audit trail; Rollbar and the Slack and email paths in `library/log_utils.py` cover
 alerting. `ViewEvent` exists for Shariant's usage reporting, which is why it is opt-in per
-deployment and skips the noisy paths. `IntegrationActivity` exists because outbound and inbound integrations (Alissa,
-the SA Pathology Mocha API) otherwise leave nothing behind but the records they write, so "when did this last run" has no
+deployment and skips the noisy paths. `IntegrationActivity` exists because outbound and inbound integrations (Shariant
+sync, the SA Pathology Mocha API) otherwise leave nothing behind but the records they write, so "when did this last run" has no
 answer; one mutable row per integration keeps the table bounded however chatty the integration is.
 
 ## Traps

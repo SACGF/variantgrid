@@ -347,7 +347,7 @@ allow-any-import-level=
 allow-wildcard-with-all=no
 
 # Deprecated modules which should not be used, separated by a comma.
-deprecated-modules=
+deprecated-modules=django_extensions.db.models
 
 # Output a graph (.gv or any supported image format) of external dependencies
 # to the given file (report RP0402 must not be disabled).

@@ -1,7 +1,8 @@
 """
 Records what a block of code wrote, per model: rows created, updated, unchanged and deleted, and the
-names of the fields an update changed (#1413). IntegrationApiMiddleware wraps each tracked API call in
-collect_changes() and stores the result on its ApiRequestLog row.
+names of the fields an update changed (#1413), plus free-text notes about what it did (#2349).
+IntegrationApiMiddleware wraps each tracked API call in collect_changes() and stores the result on its
+ApiRequestLog row.
 
 Entry points:
 - collect_changes(): context manager that installs a fresh ChangeCollector for the block and yields it
@@ -25,6 +26,7 @@ from typing import Any, Optional
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models, router, transaction
 from django.db.models.signals import post_delete, post_save
+from model_utils.fields import AutoLastModifiedField
 
 IGNORED_APP_LABELS = {"eventlog"}  # the API log never counts its own rows
 
@@ -59,6 +61,7 @@ class ModelChanges:
 @dataclass
 class ChangeCollector:
     by_model: dict[str, ModelChanges] = field(default_factory=dict)  # key "app_label.model"
+    notes: list[str] = field(default_factory=list)
 
     def record(self, model: type[models.Model], created: int = 0, updated: int = 0, unchanged: int = 0,
                deleted: int = 0, fields: Iterable[str] = ()):
@@ -106,7 +109,9 @@ def _tracked_collector(model: type[models.Model]) -> Optional[ChangeCollector]:
 
 
 def _auto_now_field_names(model: type[models.Model]) -> set[str]:
-    return {f.name for f in model._meta.concrete_fields if getattr(f, "auto_now", False)}
+    """ model_utils' TimeStampedModel.modified is an AutoLastModifiedField, which stamps without auto_now """
+    return {f.name for f in model._meta.concrete_fields
+            if getattr(f, "auto_now", False) or isinstance(f, AutoLastModifiedField)}
 
 
 def _record_save(sender, instance, created, update_fields=None, raw=False, **kwargs):  # pylint: disable=unused-argument

@@ -146,7 +146,6 @@ grouping's first record and otherwise waits for `classification/signals/classifi
 which does nothing while an import run is ongoing and lets `classification_imports_complete` do one sweep instead.
 `classification/models/classification_grouping.py:ClassificationGroupingSearchTerm` rows (gene symbol, condition terms,
 SCV) are fed by `classification_grouping_search_term_signal` so the grid's search never touches evidence JSON.
-`settings.CLASSIFICATION_NEW_GROUPING` (on for Shariant) switches the listing pages to these groupings.
 
 ### Discordance
 
@@ -180,7 +179,7 @@ differences below the line, tier-1-vs-tier-2, major and medically significant ab
 `classification/services/overlaps_services.py:OverlapServices.send_prepared_discordance_notifications`.
 
 Each lab's position on an overlap is the `triage_state` on its `OverlapContribution` (pending, will fix, confident, with
-an optional amend value), and `classification/models/overlaps_model.py:TriageNextStep` turns the set of triages into the
+an optional amend value), and `classification/enums/overlaps_enums.py:TriageNextStep` turns the set of triages into the
 "waiting on you / waiting on them / to discuss" prompt the overlap page shows. The discussion is a `review` (see
 `claude/research/review.md`) - `Overlap` is a `ReviewableModelMixin`.
 `classification/signals/classification_hooks_significant_change.py:clinical_significance_change_check` closes the loop
@@ -207,7 +206,7 @@ result into `Classification.condition_resolution`, raises the condition-resoluti
 only what `classification/models/condition_text_matching.py:ConditionMatchingSuggestion.is_auto_assignable` is certain
 of - an embedded id such as `MONDO:0005021` at the root, or a single leaf term with a known gene relationship at gene
 level; everything else waits for a curator on the condition matching page. Multiple terms carry a
-`classification/models/condition_text_matching.py:MultiCondition` of uncertain or co-occurring.
+`classification/enums/classification_enums.py:MultiCondition` of uncertain or co-occurring.
 
 ### ClinVar export
 
@@ -252,7 +251,7 @@ classification is what makes "you can see what was published, not what is being 
 of every view. The cost is that `Classification.evidence` is a denormalised copy that must be kept in step, which is why
 the app insists on `patch_value`.
 
-**Buckets come from key metadata, not the enum.** `classification/enums/classification_enums.py:ClinicalSignificance`
+**Buckets come from key metadata, not the enum.** `snpdb/enums/snpdb_enums.py:ClinicalSignificance`
 only knows B/LB/VUS/LP/P, but deployments add VUS-A/B/C, oncogenic tiers, risk alleles and "other" as options on the
 `clinical_significance` key, and which of those count as the same bucket is a policy each deployment sets in the option's
 `bucket` attribute. Reading the bucket from `EvidenceKeyMap` means a new option is a data change, not code, and the
@@ -261,7 +260,7 @@ uses to split germline from somatic contexts.
 
 **Allele resolution is shared and asynchronous.** Thousands of records cite the same HGVS; resolving once per distinct
 input (`ImportedAlleleInfo`) rather than per classification makes re-matching after a transcript or cdot upgrade tractable
-(`classification_re_matching`, `fix_variant_matching` in `claude/maps/commands.md`). Matching goes through
+(`classification_re_matching` in `claude/maps/commands.md`). Matching goes through
 the VCF pipeline because that is the only path allowed to create Variants, and liftover is a separate task chain because
 it can take hours on a big import - so a classification has a nullable `variant` and `allele` for as long as that takes.
 
@@ -279,10 +278,14 @@ tumour type category + value type (the unique constraint on `Overlap`).
 - `Classification.variant` and `.allele` are nullable and are being retired in favour of `allele_object` (which reads
   `allele_info.allele`). Queries such as `ClassificationModification.latest_for_user(allele=...)` still go through
   `classification__variant__in`, so a record whose allele info resolved but whose `variant` column was never copied is
-  invisible to them; `fix_allele_info` and `classification_ensure_alleles_and_liftover` repair that.
-- `latest_for_user` without `published=True` and without a single `classification` filters on `is_last_edited`, which
-  drops records that have an unpublished edit the caller could not see anyway; the FIXME in the method is real.
-- `ClinicalContext.classifications_qs` excludes research labs unless `settings.DISCORDANCE_RESEARCH_ENABLED`, so a
+  invisible to them; `classification_ensure_alleles_and_liftover` repairs that.
+- `latest_for_user` without `published=True` and without a single `classification` returns each record's
+  `is_last_edited` version where the caller can read it, otherwise its `is_last_published` one - so another lab's record
+  with an unpublished edit still appears, at its published version.
+- `ClassificationModification.as_json` / `populate_classification_json` does not check read permission - it only hides
+  keys above `EvidenceKey.max_share_level`. Every caller must first narrow to what the user may see
+  (`latest_for_user`, `ClassificationRef.check_security`, `ClassificationGrouping.filter_for_user`, or the Guardian check
+  at the end of `classification/views/exports/classification_export_filter.py:ClassificationFilter.cms_qs`).- `ClinicalContext.classifications_qs` excludes research labs unless `settings.DISCORDANCE_RESEARCH_ENABLED`, so a
   research lab's record can be in a context yet not counted - `lab_count_all` vs `lab_count` on `DiscordanceStatus`.
 - `DiscordanceStatus._calculate_rows` silently ignores a clinical significance with no bucket (`has_ignored_clin_sigs`);
   a new option added without a `bucket` attribute makes records vanish from discordance rather than fail.

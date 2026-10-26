@@ -21,10 +21,11 @@ import pyBigWig
 from django.conf import settings
 
 from annotation import vep_columns
-from annotation.models.models_enums import VEPCustom
+from annotation.enums import VEPCustom
 from annotation.vep_config import VEPConfig
 from library.utils.file_utils import open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_variant import Sequence
 
 # The 4-per-build conservation bigWig tracks whose _max columns VEP computes via --custom.
 # 100way applies to both builds; 30way is GRCh38-only, 46way is GRCh37-only (see vep_columns).
@@ -113,7 +114,8 @@ def get_sv_conservation_tracks(genome_build: GenomeBuild, columns_version: Optio
 
 
 def read_sv_vcf_variants(vcf_filename: str) -> list[tuple[int, str, int, Optional[int], Optional[int]]]:
-    """ Read (variant_id, chrom, pos, end, svlen) for each record in a dumped/annotated SV VCF.
+    """ Read (variant_id, chrom, pos, end, svlen) for each record in a dumped/annotated SV VCF, in the form
+        sv_conservation_window takes - pos is the base before the footprint, as a symbolic ALT's anchor.
         variant_id / END / SVLEN come from the INFO column (written by snpdb.variants_to_vcf). """
     variants = []
     with open_handle_gzip(vcf_filename, "rt") as f:
@@ -121,13 +123,19 @@ def read_sv_vcf_variants(vcf_filename: str) -> list[tuple[int, str, int, Optiona
             if line.startswith("#"):
                 continue
             cols = line.rstrip("\n").split("\t")
-            chrom, pos, info = cols[0], int(cols[1]), cols[7]
+            chrom, pos, ref, alt, info = cols[0], int(cols[1]), cols[3], cols[4], cols[7]
             kv = dict(x.split("=", 1) for x in info.split(";") if "=" in x)
             variant_id = kv.get("variant_id")
             if variant_id is None:
                 continue
             end = int(kv["END"]) if "END" in kv else None
             svlen = int(kv["SVLEN"]) if "SVLEN" in kv else None
+            if not Sequence.allele_is_symbolic(alt):
+                # A long explicit variant (#1708) as a symbolic one's anchor + END. VEP trims a shared
+                # first base, otherwise the footprint starts at POS
+                end = pos + len(ref) - 1
+                if ref[0] != alt[0]:
+                    pos -= 1
             variants.append((int(variant_id), chrom, pos, end, svlen))
     return variants
 

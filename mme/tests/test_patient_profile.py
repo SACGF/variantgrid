@@ -14,7 +14,7 @@ from mme.tests.fakes import (
     FakeVariant,
     make_term,
 )
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
 
 
 @override_settings(MME_ONTOLOGY_SNAKE_EXACT=True, MME_ONTOLOGY_PHENOTYPE_EXPANSION=False,

@@ -8,18 +8,15 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.timesince import timesince
 
+from annotation.enums import NMDEscapeStatus
 from annotation.models import AnnotationStatus, VEPSkippedReason
-from annotation.models.models import (
-    AnnotationRun,
-    AnnotationVersion,
-    InvalidAnnotationVersionError,
-    VariantAnnotation,
-    VariantTranscriptAnnotation,
-)
-from annotation.models.models_enums import NMDEscapeStatus
+from annotation.models.models import VariantAnnotation, VariantTranscriptAnnotation
+from annotation.models.models_annotation_run import AnnotationRun
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_version import InvalidAnnotationVersionError
+from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSException, HGVSMatcher
 from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
-from genes.models_enums import AnnotationConsortium
 from library.genomics import format_bp
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -302,7 +299,9 @@ class VariantTranscriptSelections:
         if variant_coordinate.symbolic_hgvs_interval is None and variant_coordinate.can_be_made_explicit:
             variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         has_other_annotation_consortium_transcripts = False
-        transcript_version_qs = TranscriptVersion.objects.filter(**kwargs).select_related("gene_version")
+        # Everything the HGVS conversion below reads off each transcript
+        transcript_version_qs = TranscriptVersion.objects.filter(**kwargs).select_related(
+            "transcript", "genome_build", "contig", "gene_version__gene_symbol", "gene_version__hgnc__gene_symbol")
         for transcript_version in transcript_version_qs.order_by("-version"):
             # Don't duplicate ones already available via RefSeq/Ensembl equivalence
             # and only take the highest version we have
@@ -328,8 +327,8 @@ class VariantTranscriptSelections:
                     pass
 
                 try:
-                    hgvs_variant = hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
-                                                                                   transcript_version.accession)
+                    hgvs_variant = hgvs_matcher.variant_coordinate_to_hgvs_variant_for_transcript_version(variant_coordinate,
+                                                                                                          transcript_version)
                     t_data["hgvs_c"] = hgvs_variant.format()
                 except (HGVSException, KeyError):
                     pass

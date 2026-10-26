@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.template.library import Library
 
+from classification.lab_classification_stats import LabClassificationStats
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
@@ -13,6 +14,7 @@ def lab_card(context, lab: Lab, lab_link=True, org_link=True):
     return {
         "user": user,
         "lab": lab,
+        "stats": LabClassificationStats(lab),
         "org": lab.organization,
         "lab_link": lab_link,
         "org_link": org_link,

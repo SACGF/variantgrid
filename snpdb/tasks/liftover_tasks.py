@@ -7,8 +7,11 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
+from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.enums import AlleleConversionTool, ImportSource
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Allele, GenomeBuild, ImportSource
+from snpdb.models import Allele, GenomeBuild
+from snpdb.models.models_variant import Variant
 
 
 @celery.shared_task
@@ -37,7 +40,8 @@ def _alleles_to_liftover(genome_build: GenomeBuild, retry_conversion_tool: str =
 
 
 def _allele_id_batches(allele_qs: QuerySet) -> Iterable[tuple[int, int]]:
-    """ Inclusive (min, max) allele id ranges, each covering LIFTOVER_BATCH_SIZE alleles """
+    """ Splits work into one celery task per inclusive (min, max) allele id range, each covering
+        LIFTOVER_BATCH_SIZE alleles. Batching within a task is snpdb/liftover.py:_batch_alleles """
     batch_size = settings.LIFTOVER_BATCH_SIZE
     allele_id_qs = allele_qs.order_by("pk").values_list("pk", flat=True)
     for allele_ids in itertools.batched(allele_id_qs.iterator(chunk_size=batch_size), batch_size):
@@ -58,3 +62,28 @@ def liftover_allele_batch(username, genome_build_name, other_build_name, min_all
                  other_build, genome_build, min_allele_id, max_allele_id)
     create_liftover_pipelines(user, alleles, ImportSource.WEB, other_build, [genome_build],
                               retry_conversion_tools=retry_conversion_tools)
+
+
+def queue_liftover_selected_alleles(user: User, allele_qs: QuerySet[Allele]) -> int:
+    """ Queues a liftover_selected_allele_batch task per LIFTOVER_BATCH_SIZE of the chosen alleles, returning how
+        many were queued. Selected ids needn't be contiguous, so tasks get the ids rather than a pk range """
+    batch_size = settings.LIFTOVER_BATCH_SIZE
+    allele_ids = allele_qs.order_by("pk").values_list("pk", flat=True)
+    num_batches = 0
+    for allele_id_batch in itertools.batched(allele_ids.iterator(chunk_size=batch_size), batch_size):
+        liftover_selected_allele_batch.si(user.username, list(allele_id_batch)).apply_async()
+        num_batches += 1
+    return num_batches
+
+
+@celery.shared_task
+def liftover_selected_allele_batch(username, allele_ids: list[int]):
+    """ Explicitly chosen alleles (the Allele admin action): links ClinGen alleles, then lifts over from every
+        annotated build to the others. Retries tools that have already failed on them, as they were picked """
+    user = User.objects.get(username=username)
+    allele_qs = Allele.objects.filter(pk__in=allele_ids)
+    variants_qs = Variant.objects.filter(variantallele__allele__in=allele_qs)
+    for genome_build in GenomeBuild.builds_with_annotation():
+        populate_clingen_alleles_for_variants(genome_build, variants_qs)
+        create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build,
+                                  retry_conversion_tools=list(AlleleConversionTool))

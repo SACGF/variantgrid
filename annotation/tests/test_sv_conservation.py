@@ -7,12 +7,14 @@ within tolerance. Requires the real conservation bigWig data files - skipped if 
 """
 import os
 import re
+import tempfile
 import unittest
 
 from django.test import TestCase
 
 from annotation.sv_conservation import (
     get_sv_conservation_tracks,
+    read_sv_vcf_variants,
     score_sv_vcf,
     sv_conservation_window,
 )
@@ -63,6 +65,19 @@ class SVConservationWindowTests(TestCase):
     def test_window_ins_uses_svlen_over_small_end(self):
         # INS: tiny END (POS+1) but large SVLEN -> footprint is POS+|SVLEN|
         self.assertEqual(sv_conservation_window(pos=1000, end=1001, svlen=800), (1000, 1800))
+
+    def test_explicit_variant_footprint(self):
+        """ #1708 - a long explicit variant in the SV dump: VEP trims only a shared first base """
+        records = [("1", 1000, "A" * 10, "ATT", 1), ("1", 2000, "G" * 10, "TT", 2)]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            vcf_filename = os.path.join(tmp_dir, "sv.vcf")
+            with open(vcf_filename, "w", encoding="utf-8") as f:
+                for chrom, pos, ref, alt, variant_id in records:
+                    f.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t.\t.\tvariant_id={variant_id}\n")
+            windows = {variant_id: sv_conservation_window(pos, end, svlen)
+                       for variant_id, _chrom, pos, end, svlen in read_sv_vcf_variants(vcf_filename)}
+        # 0-based half-open: anchored skips POS, unanchored starts at it
+        self.assertEqual({1: (1000, 1009), 2: (1999, 2009)}, windows)
 
 
 class SVConservationScoringTests(TestCase):

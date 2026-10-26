@@ -42,6 +42,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid, PatientRecordOriginType
 from patients.external_references import (
     ExternalReference,
     ResolvedReference,
@@ -51,10 +52,8 @@ from patients.models import (
     Extraction,
     Patient,
     PatientModification,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import MatchStatus, NucleicAcid
 from seqauto.models import (
     DragenTSO500CombinedVariantOutput,
     SequencingRun,
@@ -124,11 +123,6 @@ class ResolvedPair:
     patient: Patient
     specimen: Specimen
     extractions: dict[str, Extraction]  # by sample id, so a Sample is reached by name alone
-
-    def arm_extraction(self, arm: Optional[ArmIdentifiers]) -> Optional[Extraction]:
-        if arm:
-            return self.extractions.get(arm.sample_id)
-        return None
 
 
 def parse_patient_code(pair_id: str) -> str:
@@ -327,15 +321,14 @@ def combined_variant_output_values(sections: dict[str, CombinedVariantOutputSect
 
 
 def write_combined_variant_output(sections: dict[str, CombinedVariantOutputSection], pair_id: str,
-                                  sequencing_run: Optional[SequencingRun], sequencing_run_name: str,
-                                  user: User, resolved: Optional[ResolvedPair] = None,
+                                  sequencing_run: SequencingRun, user: User, resolved: Optional[ResolvedPair] = None,
                                   specimen_reference: Optional[str] = None,
                                   parked_error: Optional[str] = None,
                                   file_upload=None) -> DragenTSO500CombinedVariantOutput:
     """ The pair's analysis on this run - a re-analysis of the run replaces it. It claims the specimen
         resolve_pair made, or parks the claim with why there is none """
     cvo, _ = DragenTSO500CombinedVariantOutput.objects.update_or_create(
-        sequencing_run_name=sequencing_run_name, pair_id=pair_id,
+        sequencing_run_name=sequencing_run.name, pair_id=pair_id,
         defaults={
             **combined_variant_output_values(sections),
             "sequencing_run": sequencing_run,

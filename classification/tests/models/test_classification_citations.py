@@ -1,6 +1,7 @@
 from django.test import TestCase
 
-from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from annotation.enums import CitationSource
+from annotation.models.models_citations import CitationIdNormalized
 from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
 from classification.tasks.classification_citation_tasks import classification_citation_ids

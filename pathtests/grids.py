@@ -5,8 +5,8 @@ from django.http import HttpRequest
 from django.urls import reverse
 
 from library.utils import JsonDataType
+from pathtests.enums import CaseState, CaseWorkflowStatus, InvestigationType
 from pathtests.models import Case, PathologyTest, PathologyTestOrder
-from pathtests.models_enums import CaseState, CaseWorkflowStatus, InvestigationType
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -57,11 +57,11 @@ class CasesColumns(DatatableConfig[Case]):
             RichColumn(key="report_date", client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn(key="details", label="Details", orderable=True),
             RichColumn(key="status", label="Status", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(CaseState.choices)),
+                       **RichColumn.choices_client_renderer(CaseState.choices)),
             RichColumn(key="workflow_status", label="Workflow Status", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(CaseWorkflowStatus.choices)),
+                       **RichColumn.choices_client_renderer(CaseWorkflowStatus.choices)),
             RichColumn(key="investigation_type", label="Investigation Type", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(InvestigationType.choices)),
+                       **RichColumn.choices_client_renderer(InvestigationType.choices)),
         ]
 
     def get_initial_queryset(self) -> QuerySet[Case]:

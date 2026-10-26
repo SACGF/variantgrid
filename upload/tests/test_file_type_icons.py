@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase
 
+from upload.enums import UploadedFileTypes
 from upload.file_type_icons import file_type_icon_html
-from upload.models.models_enums import UploadedFileTypes
 
 
 class FileTypeIconsTest(SimpleTestCase):

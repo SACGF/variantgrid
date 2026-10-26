@@ -22,14 +22,16 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationPipelineVersion, AnnotationRangeLock, AnnotationVersion
-from annotation.signals.manual_signals import annotation_run_discarded_signal
+from annotation.models.models_annotation_run import AnnotationPipelineVersion, AnnotationRangeLock
+from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
+from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from library.constants import HOUR_SECS, MINUTE_SECS
 from library.log_utils import log_traceback, report_message
 from library.utils.file_utils import DiskUsage, get_disk_usage_for_directory
-from snpdb.models import VCF, GenomeBuild, ImportStatus, JobsControl, Sample, Variant
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF, GenomeBuild, JobsControl, Sample, Variant
 
 # #1646: batch size for the count lane - how many uncounted runs one count_annotation_runs task takes.
 # _dispatch_counts leases the batch, so a burst of dispatch cycles can't hand the same work out twice;
@@ -214,7 +216,7 @@ def count_annotation_runs(annotation_run_ids, lease_token):
                 try:
                     runner.handle_empty_dump(annotation_run)
                 except Exception:
-                    # Not worth stalling the count lane over - fix_annotation_vep_too_long writes what's missing
+                    # Not worth stalling the count lane over
                     log_traceback()
                     report_message(f"AnnotationRun {annotation_run_id}: handle_empty_dump failed", level="error")
                 # Empty - finish without a dump. dump_count=0 keeps get_status() consistent (-> FINISHED).

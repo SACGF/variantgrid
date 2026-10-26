@@ -5,13 +5,13 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models import (
     AnnotationRun,
     InvalidAnnotationVersionError,
     VariantAnnotationVersion,
 )
-from annotation.models.models import AnnotationPipelineVersion
-from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types
 from annotation.tasks.annotate_variants import annotation_run_retry, recheck_vep_version
 from annotation.tasks.annotation_scheduler_task import (
