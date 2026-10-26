@@ -37,6 +37,7 @@ from library.utils.color_utils import rgb_contrasting_text, rgb_relative_luminan
 from library.utils.date_utils import calculate_age, parse_yymm, utc_from_timestamp
 from library.utils.file_utils import IteratorFile, file_to_array
 from library.utils.hash_utils import file_sha256sum
+from library.utils.html_utils import sanitize_html
 from library.utils.json_utils import (
     JsonDiffs,
     json_dumps_nan_as_null,
@@ -593,6 +594,30 @@ class TestFileSha256sum(TestCase):
                              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
         finally:
             os.unlink(f.name)
+
+
+class TestSanitizeHtml(TestCase):
+    """ Expected strings are what bleach produced, so swapping it for nh3 (#2449) kept stored messages displaying the same """
+
+    def test_matches_bleach(self):
+        cases = {
+            "<b>bold</b> and <i>it</i>": "<b>bold</b> and <i>it</i>",
+            "<p>c.123<DEL></p>": "<p>c.123&lt;DEL&gt;</p>",
+            "<p>Gene <BRCA1> variant <DUP> &amp; stuff</p>": "<p>Gene &lt;BRCA1&gt; variant &lt;DUP&gt; &amp; stuff</p>",
+            "<script>alert(1)</script>": "&lt;script&gt;alert(1)&lt;/script&gt;",
+            "<p><img src=x onerror=alert(1)></p>": "<p>&lt;img src=x onerror=alert(1)&gt;</p>",
+            '<a href="https://x.org/?b=1&c=2" title="t" onclick="evil()">link</a>': '<a href="https://x.org/?b=1&amp;c=2" title="t">link</a>',
+            '<a href="javascript:alert(1)">bad</a>': "<a>bad</a>",
+            '<span style="color:red" class="x">s</span>': "<span>s</span>",
+            "a < b > c & d": "a &lt; b &gt; c &amp; d",
+            "x <!-- comment --> y": "x  y",
+            "<DIV>upper</DIV>": "<div>upper</div>",
+            "unclosed <b>bold": "unclosed <b>bold</b>",
+            "<DEL": "&lt;DEL",
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(str(sanitize_html(text)), expected)
 
 
 class TestRetrieveHttpContentRetries(TestCase):

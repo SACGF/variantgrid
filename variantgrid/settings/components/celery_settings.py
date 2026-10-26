@@ -168,7 +168,7 @@ CELERY_IMPORTS = (
     'classification.tasks.classification_reclassification_tasks',
     'classification.tasks.condition_text_automatch_task',
     'classification.tasks.resolved_variant_info_p_hgvs_task',
-    'classification.views.classification_email_view',
+    'classification.tasks.classification_summary_email_tasks',
     'genes.tasks.gene_coverage_tasks',
     'patients.tasks.extraction_matching_tasks',
     'pedigree.models',

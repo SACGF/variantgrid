@@ -10,6 +10,8 @@ import logging
 import os
 import socket
 
+from django.core.exceptions import ImproperlyConfigured
+
 DEFAULT_DJANGO_SETTINGS = "variantgrid.settings"
 
 django_settings_module = os.environ.get("DJANGO_SETTINGS_MODULE")
@@ -42,6 +44,7 @@ if django_settings_module == DEFAULT_DJANGO_SETTINGS:
             flattened_hostname_module = f"variantgrid.settings.env.{flattened_hostname}"
             exec(f"from {flattened_hostname_module} import *")
         else:
-            logging.error("Settings file doesn't exist %s", flattened_hostname_path)
+            raise ImproperlyConfigured(f"No settings file for host '{socket.gethostname()}': create "
+                                       f"{flattened_hostname_path} or set DJANGO_SETTINGS_MODULE")
 else:
     exec(f"from {django_settings_module} import *")

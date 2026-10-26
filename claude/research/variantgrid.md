@@ -114,8 +114,8 @@ feature checks so one codebase can present the full VariantGrid, locked-down Sha
 wrapping instead of dropping keeps `{% url %}` reversible everywhere, so templates don't break when a page is hidden.
 
 The beat schedule is code, not `django_celery_beat` rows, so which periodic jobs run is decided by the same settings
-that enable the feature. Several comments note `crontab` misbehaving with the timezone, which is why most sweeps use raw
-seconds.
+that enable the feature. A `crontab` entry fires at that hour in `TIME_ZONE` (`app.conf.timezone`); sweeps that run
+every few minutes or hours use raw seconds.
 
 ## Traps
 

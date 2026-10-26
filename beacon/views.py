@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
 from beacon.client import query_nodes
@@ -25,7 +25,7 @@ def external_beacons(request, variant_id: int, genome_build_name: str):
     if not settings.BEACON_OUTBOUND_ENABLED:
         return HttpResponse("")
 
-    variant = Variant.objects.get(pk=variant_id)
+    variant = get_object_or_404(Variant, pk=variant_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
 
     evaluations = evaluate_queries(variant, genome_build, settings.BEACON_QUERY_NODES)

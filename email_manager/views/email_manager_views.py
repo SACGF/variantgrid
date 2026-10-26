@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 
 from email_manager.models import EmailLog
 from library.django_utils import require_superuser
@@ -17,7 +17,7 @@ def email_manager_view(request):
 
 @require_superuser
 def email_detail(request, email_id: int):
-    email_log = EmailLog.objects.get(pk=email_id)
+    email_log = get_object_or_404(EmailLog, pk=email_id)
     recipients = [address.strip() for address in email_log.recipient_list.split(";")]
     recipients = [address for address in recipients if address]
     users: list[User] = list(User.objects.filter(email__in=recipients).order_by('email').all())
@@ -36,7 +36,7 @@ def email_detail(request, email_id: int):
 
 @require_superuser
 def email_pure(request, email_id: int):
-    email_log = EmailLog.objects.get(pk=email_id)
+    email_log = get_object_or_404(EmailLog, pk=email_id)
     return render(request, 'email_pure.html', context={"email": email_log})
 
 

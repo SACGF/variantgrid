@@ -22,7 +22,7 @@ The callers are the notification builders and the account flows. `library/log_ut
 emails every superuser (batch mode) when `is_communication` and `settings.ADMIN_EMAIL_NOTIFICATION` are set;
 `snpdb/utils.py:LabNotificationBuilder` emails a lab's address, or the lab's members whose `UserSettings` opted into
 discordance or weekly updates, from `settings.DISCORDANCE_EMAIL`; the Monday `discordance-emails-weekly` beat entry in
-`variantgrid/celery.py` runs `classification/views/classification_email_view.py:send_summary_emails`, which calls
+`variantgrid/celery.py` runs `classification/tasks/classification_summary_email_tasks.py:send_summary_emails`, which calls
 `send_summary_email_to_user` per opted-in user and skips anyone without an active lab; `user_messages/signal_handlers.py:email_new_message_handler`
 emails a new inbox message; `variantgrid/views.py:keycloak_admin` sends the welcome email as the `pre_password_reset`
 callback of `snpdb/keycloak.py:Keycloak.add_user`; and MME match notifications go through the same path

@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.forms import BoundField, DateField, Form
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from library.django_utils.view_utils import render_ajax_view
@@ -149,8 +149,8 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
 
 
 def new_review(request, reviewed_object_id: int, topic_id: str):
-    reviewed_object = ReviewedObject.objects.get(pk=reviewed_object_id)
-    topic = ReviewTopic.objects.get(pk=topic_id)
+    reviewed_object = get_object_or_404(ReviewedObject, pk=reviewed_object_id)
+    topic = get_object_or_404(ReviewTopic, pk=topic_id)
     review = reviewed_object.new_review(topic=topic, user=request.user)
     review.check_can_view(request.user)
     review.check_can_write(request.user)
@@ -159,7 +159,7 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
 
 
 def edit_review(request, review_id: int):
-    review = Review.objects.get(pk=review_id)
+    review = get_object_or_404(Review, pk=review_id)
     review.check_can_view(request.user)
 
     if review.is_complete or review.reviewing.source_object.is_review_locked or not review.can_write(request.user):
@@ -169,7 +169,7 @@ def edit_review(request, review_id: int):
 
 
 def view_discussion_detail(request, review_id: int):
-    review = Review.objects.get(pk=review_id)
+    review = get_object_or_404(Review, pk=review_id)
     review.check_can_view(request.user)
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,

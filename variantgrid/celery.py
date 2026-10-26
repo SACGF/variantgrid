@@ -31,8 +31,6 @@ app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 
 app.conf.timezone = settings.TIME_ZONE
 
-# Note: I'm having timezone issues, crontab doesn't work but schedule seconds does
-
 app.conf.beat_schedule = {}
 
 # Runs Sync as declared in the Sync table
@@ -80,7 +78,6 @@ app.conf.beat_schedule['notify-server-status'] = {
 # Analysis node backlog drain + scheduler safety-net (issue #346): reclaims leases abandoned by
 # dead workers and dispatches DIRTY nodes nobody has kicked off, throttled to whatever capacity
 # the analyses people are actively using leave spare.
-# Note (see comment above): crontab has timezone issues here, raw seconds works.
 app.conf.beat_schedule['dispatch-analysis-backlog'] = {
     'task': 'analysis.tasks.analysis_update_tasks.dispatch_analysis_backlog',
     'schedule': MINUTE_SECS,
@@ -130,17 +127,17 @@ app.conf.beat_schedule['clear-old-node-export-cached-generated-files'] = {
     'schedule': crontab(hour=3, minute=15),
 }
 
-# User awards (#1819). Raw seconds rather than crontab - see the timezone note above.
+# User awards (#1819)
 if settings.USER_AWARDS_ENABLED and settings.USER_AWARDS_BADGES_ENABLED:
     app.conf.beat_schedule['user-awards-nightly'] = {
         'task': 'snpdb.tasks.user_award_tasks.update_user_awards',
         'schedule': HOUR_SECS * 24,
     }
 
-# send update emails once a day (if there has been activity)
+# Weekly classification summary emails, to users who opted in
 if settings.DISCORDANCE_EMAIL:
     app.conf.beat_schedule['discordance-emails-weekly'] = {
-        'task': 'classification.views.classification_email_view.send_summary_emails',
+        'task': 'classification.tasks.classification_summary_email_tasks.send_summary_emails',
         'schedule': crontab(hour=10, minute=0, day_of_week='mon')
     }
 

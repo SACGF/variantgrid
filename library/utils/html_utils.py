@@ -1,8 +1,9 @@
+import html
 import re
 import uuid
 from typing import Optional
 
-import bleach
+import nh3
 from bs4 import BeautifulSoup
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
@@ -27,7 +28,7 @@ def html_id_safe(text: str) -> str:
 EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em', 'sup', 'sub'}
 
 
-def cautious_attempt_html_to_text(text: str, whitelist: set[str] = None) -> str:
+def cautious_attempt_html_to_text(text: str, whitelist: Optional[set[str]] = None) -> str:
     """
     Given some text, and an expected whitelist of tags, will convert the text from possible HTML content to plain text.
     Converts things like &#039; to ' and will strip out expected tags, if a tag is found that's not in the whitelist
@@ -52,8 +53,23 @@ def cautious_attempt_html_to_text(text: str, whitelist: set[str] = None) -> str:
 # (e.g. user-to-user inbox messages). Keeps basic formatting and links, escapes everything else.
 SANITIZE_HTML_ALLOWED_TAGS = {'a', 'b', 'i', 'u', 'strong', 'em', 'sup', 'sub', 'br', 'p',
                               'ul', 'ol', 'li', 'span', 'div'}
-SANITIZE_HTML_ALLOWED_ATTRIBUTES = {'a': ['href', 'title']}
-SANITIZE_HTML_ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
+SANITIZE_HTML_ALLOWED_ATTRIBUTES = {'a': {'href', 'title'}}
+SANITIZE_HTML_ALLOWED_PROTOCOLS = {'http', 'https', 'mailto'}
+
+# A comment, a start/end tag (quoted attribute values may contain '<' or '>'), or a stray '<' / '>'
+_ANGLE_BRACKET_RE = re.compile(r"<!--.*?-->|</?([a-zA-Z][a-zA-Z0-9-]*)(?:[^<>\"']|\"[^\"]*\"|'[^']*')*>|[<>]", re.DOTALL)
+
+
+def _escape_disallowed_tags(text: str) -> str:
+    """ nh3 drops a disallowed tag, so text like "c.123<DEL>" would lose "<DEL>". Escape anything that isn't
+        an allowed tag (or a comment, which nh3 strips) so it displays as text. """
+    def escape_unless_allowed(m: re.Match) -> str:
+        token = m.group(0)
+        if token.startswith("<!--") or (m.group(1) and m.group(1).lower() in SANITIZE_HTML_ALLOWED_TAGS):
+            return token
+        return html.escape(token, quote=False)
+
+    return _ANGLE_BRACKET_RE.sub(escape_unless_allowed, text)
 
 
 def sanitize_html(text: str) -> SafeString:
@@ -66,10 +82,11 @@ def sanitize_html(text: str) -> SafeString:
     """
     if not text:
         return SafeString("")
-    cleaned = bleach.clean(text,
-                           tags=SANITIZE_HTML_ALLOWED_TAGS,
-                           attributes=SANITIZE_HTML_ALLOWED_ATTRIBUTES,
-                           protocols=SANITIZE_HTML_ALLOWED_PROTOCOLS)
+    cleaned = nh3.clean(_escape_disallowed_tags(text),
+                        tags=SANITIZE_HTML_ALLOWED_TAGS,
+                        attributes=SANITIZE_HTML_ALLOWED_ATTRIBUTES,
+                        url_schemes=SANITIZE_HTML_ALLOWED_PROTOCOLS,
+                        link_rel=None)
     return SafeString(cleaned)
 
 

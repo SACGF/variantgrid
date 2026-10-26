@@ -2,7 +2,6 @@ stream-zip
 more-itertools
 beautifulsoup4
 bgzip>=0.5.0
-bleach
 biopython>=1.81
 cdot>=0.2.31
 celery
@@ -20,7 +19,6 @@ django-axes[ipware]
 django_cache_memoize
 django-compressor
 django_crispy_forms
-django_datetime_utc
 django-guardian
 django-js-reverse
 django_json_widget
@@ -46,6 +44,7 @@ Markdown
 matplotlib
 mozilla_django_oidc
 nameparser
+nh3
 nltk>=3.10.0
 numpy
 oauthlib>=4.0.0
