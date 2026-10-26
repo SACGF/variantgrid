@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -148,6 +149,23 @@ class UpgradeStep:
             return f"waiting on: {', '.join(self.blocked_by)} (selecting it here still runs it)"
         return None
 
+    def note_summaries(self) -> list[str]:
+        """ Each note's first line, cut to the terminal width - a note can hold a page of commands, printed in full
+            by print_notes when the step is selected """
+        width = shutil.get_terminal_size().columns - 4
+        summaries = []
+        for note in self.notes or []:
+            first_line, *rest = note.strip().splitlines() or [""]
+            if rest or len(first_line) > width:
+                more = " … (full note when selected)"
+                first_line = first_line[:max(width - len(more), 20)] + more
+            summaries.append(first_line)
+        return summaries
+
+    def print_notes(self):
+        for note in self.notes or []:
+            print_yellow(note)
+
     def run(self) -> StepResult:
         return StepResult.skip()
 
@@ -178,6 +196,7 @@ class ManualStep(UpgradeStep):
     def run(self):
         while True:
             print(self)
+            self.print_notes()
             print("y: record success")
             print("n: record failure")
             print("x: back")
@@ -252,6 +271,7 @@ class ManageStep(UpgradeStep):
 
     def run(self) -> StepResult:
         print_cyan(str(self))
+        self.print_notes()
         print_purple("-----------")
         try:
             call_command(*self.args, skip_checks=not self.run_checks)
@@ -597,6 +617,6 @@ class Upgrader:
             print(f"{step.key}: {prefix}{step!s}")
             if status := step.status_line():
                 print_yellow(f"    ⧗ {status}")
-            for note in step.notes or []:
-                print(f"    {note}")
+            for summary in step.note_summaries():
+                print(f"    {summary}")
         print("q: exit")
