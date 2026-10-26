@@ -61,6 +61,16 @@ Use `manage.py manual_gate` to list gate status.
 A `manage` task whose command has since been deleted is never auto-run (it would just crash) — it's
 reported as obsolete for review, where selecting it offers to mark it complete.
 
+## One-off commands
+
+Every few years the migrations are squashed at a checkpoint (below), and the fix and backfill commands their
+`ManualOperation`s ran are deleted along with them. A command written to run once is named `one_off_<what_it_fixes>`
+and declares `category = "one-off"` (`library/vg/maps/commands.py`; `vg health` counts them), so it is easy to find
+at the next checkpoint. All its code lives in the command module and its test. It may call core functions, private
+ones included. It adds no helpers or parameters to core modules unless the code would keep them anyway, so deleting
+the command and its test removes the fix completely. `snpdb/management/commands/one_off_dedupe_cohort_genotypes.py`
+is an example: it reuses the zygosity count SQL and restricts it to the variants it repairs.
+
 ## The migration squash
 
 Every app's migrations were squashed into fresh initials and a `seed_data` migration (#736); an older database

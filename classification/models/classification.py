@@ -934,6 +934,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         source = source or SubmissionSource.API
 
+        if save and self.pk:
+            # concurrent patches of one record (web autosave + API) apply one after another, each on top of the
+            # evidence the last one committed rather than the evidence this instance was loaded with
+            self.evidence = self.lock_row()
+
         patch_response = ClassificationPatchResponse()
 
         key_dict: EvidenceKeyMap = self.evidence_keys
@@ -1255,6 +1260,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 pending_modification.save()
                 assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
 
+    def lock_row(self) -> dict:
+        """ Locks this record's row until the end of the transaction, returning its evidence as last committed """
+        return Classification.objects.select_for_update().values_list("evidence", flat=True).get(pk=self.pk)
+
     def publish_latest(self, user: User, share_level=None) -> bool:
         if not share_level:
             share_level = self.share_level_enum
@@ -1442,9 +1451,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def get_other_classifications_summary_for_variant(self, user: User) -> str:
         other_classifications_summary = None
-        if self.variant and self.variant.allele:
+        if allele := self.allele_object:
             latest_others_for_variant = ClassificationModification.latest_for_user(user=user,
-                                                                                   allele=self.variant.allele,
+                                                                                   allele=allele,
                                                                                    published=True)
             latest_others_for_variant = latest_others_for_variant.exclude(classification__id=self.id)
             other_classifications_summary = Classification.clinical_significance_counts_summary(latest_others_for_variant)
@@ -1671,6 +1680,14 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
     # Code that wrote this modification - to find what a bug affected (#1977). Null for those written before then
     code_version = models.ForeignKey(CodeVersion, null=True, blank=True, on_delete=PROTECT)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["classification"], condition=Q(is_last_edited=True),
+                                    name="classificationmodification_one_last_edited"),
+            models.UniqueConstraint(fields=["classification"], condition=Q(is_last_published=True),
+                                    name="classificationmodification_one_last_published"),
+        ]
+
     def __str__(self) -> str:
         return self.id_str
 
@@ -1758,7 +1775,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
             else:
                 qs = qs.filter(classification__variant__in=variant)
         if allele:
-            qs = qs.filter(classification__variant__in=allele.variants)
+            qs = qs.filter(classification__allele_info__allele=allele)
         if clinical_context:
             qs = qs.filter(classification__clinical_context=clinical_context)
         if exclude_withdrawn:
@@ -1826,6 +1843,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, CodeVe
             # nothing to do, do not re-publish
             return False
 
+        vc.lock_row()  # so a concurrent publish can't also find previously_published still marked last published
         lab = self.classification.lab
         vc.share_level_enum = share_level
 

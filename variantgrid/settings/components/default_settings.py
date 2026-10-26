@@ -1386,7 +1386,9 @@ def get_keycloak_sync_secrets() -> dict:
     """
     KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
     """
-    return get_secrets("KEYCLOAK", ["username", "password", "host", "oauth_url", "client_id"])
+    keycloak_secrets = get_secrets("KEYCLOAK", ["username", "password", "host", "oauth_url", "client_id"])
+    keycloak_secrets["allow_http"] = get_secret("KEYCLOAK.allow_http", mandatory=False)
+    return keycloak_secrets
 
 
 def get_shariant_sync_secrets() -> dict:
@@ -1400,7 +1402,8 @@ def get_shariant_sync_secrets() -> dict:
     if set(sync.keys()) == set(sync_fields):
         raise ValueError("Old secret 'SYNC' detected - need to use SyncDestination.config['sync_details'] as keys")
 
-    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password"]
+    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password",
+                       "allow_http"]
     return {sd: get_secrets(f"SYNC.{sd}", sync_all_fields, False) for sd in sync}
 
 

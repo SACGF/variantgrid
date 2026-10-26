@@ -11,6 +11,7 @@ from ontology.enums import OntologyService
 from ontology.models import OntologyTerm
 
 MONARCH_SEARCH_URL = 'https://api.monarchinitiative.org/v3/api/search'
+MONARCH_INTERACTIVE_TIMEOUT_SECS = 10  # someone is waiting on the page
 
 # Monarch intermittently returns a gateway error, so retry once before letting the failure through
 # (raise_on_status=False so the caller's raise_for_status reports the actual status, not a RetryError)

@@ -27,6 +27,7 @@ from model_utils.models import TimeStampedModel
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.guardian_utils import user_in_group
 from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import rgb_contrasting_text
 from snpdb.enums import (
@@ -356,7 +357,7 @@ class UserSettingsOverride(SettingsOverride):
 
             # if user no longer belongs to the group associated to the lab
             # remove their default lab record
-            if not user.groups.filter(name=group_name).exists():
+            if not user_in_group(user, group_name):
                 self.default_lab = None
 
         if not self.default_lab:

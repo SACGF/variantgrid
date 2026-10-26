@@ -592,7 +592,7 @@ function gridLoadError(jqXHR, textStatus, errorThrown) {
 
     const ec = $("#error-container");
     ec.empty();
-    ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + errorMessage + "</li></ul>");
+    ec.html("<ul class='messages'><li class='error'>Grid failed to load due to: " + escapeHtml(errorMessage) + "</li></ul>");
     $("#node-data-container").empty();
     hideLoadingOverlay();
     if (typeof hideGridLoadingOverlay === 'function') {

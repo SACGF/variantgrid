@@ -29,7 +29,9 @@ class GenomeBuildManager:
         # See if we've set a request variable already with the genome build
         # after we calculate the genome build we cache it as a request variable
         genome_build: Optional[GenomeBuild] = None
-        if genome_build := get_request_variable("building_manager_genome_build"):
+        # The cached build is the request user's - another user's default may differ
+        use_cache = user is None or user == get_current_user()
+        if use_cache and (genome_build := get_request_variable("building_manager_genome_build")):
             return genome_build
 
         # Now try to get the genome build, try fetching it from the following in priority order
@@ -60,7 +62,8 @@ class GenomeBuildManager:
         if genome_build is None:
             genome_build = GenomeBuild.builds_with_annotation()[0]
 
-        GenomeBuildManager.set_current_genome_build(genome_build)
+        if use_cache:
+            GenomeBuildManager.set_current_genome_build(genome_build)
         return genome_build
 
     @staticmethod
