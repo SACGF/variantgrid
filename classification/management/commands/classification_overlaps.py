@@ -43,7 +43,7 @@ from classification.models import (
 from classification.services.overlap_calculator import overlap_calculator_for_value_type
 from classification.services.overlaps_services import OverlapPageDetails, OverlapServices
 from flags.enums import FlagStatus
-from flags.models import Flag
+from flags.models import Flag, FlagType
 from library.django_utils import chunked_queryset
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
@@ -136,19 +136,21 @@ class Command(BaseCommand):
         Overlap.objects.filter(overlap_max_ever_status__lt=F('overlap_status')).update(overlap_max_ever_status=F('overlap_status'))
 
     def check_pending_change_flags(self):
-        for flag in Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes):
-            if flag.resolution.status == FlagStatus.OPEN:
-                if pending_value := (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY):
-                    if classification := Classification.objects.filter(flag_collection=flag.collection).first():
-                        if grouping := ClassificationGroupingEntry.grouping_for(classification):
-                            # TODO see if we can use audit log to time this as part of the original
-                            triage: OverlapContribution = grouping.contribution_for(ClassificationResultValue.ONC_PATH)
-                            new_triage_state = TriageDecision(TriageStatus.REVIEWED_WILL_FIX, pending_value)
-                            if triage.triage_state_obj != new_triage_state:
-                                print("Updating triage with pending value")
-                                with disable_auditlog():
-                                    triage.triage_state_obj = new_triage_state
-                                    triage.save()
+        # NOTE this code is no longer does anything after the pending_changes flag is removed
+        if pending_change_flag := FlagType.objects.filter(id="classification_pending_changes").first():
+            for flag in Flag.objects.filter(flag_type=pending_change_flag):
+                if flag.resolution.status == FlagStatus.OPEN:
+                    if pending_value := (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY):
+                        if classification := Classification.objects.filter(flag_collection=flag.collection).first():
+                            if grouping := ClassificationGroupingEntry.grouping_for(classification):
+                                # TODO see if we can use audit log to time this as part of the original
+                                triage: OverlapContribution = grouping.contribution_for(ClassificationResultValue.ONC_PATH)
+                                new_triage_state = TriageDecision(TriageStatus.REVIEWED_WILL_FIX, pending_value)
+                                if triage.triage_state_obj != new_triage_state:
+                                    print("Updating triage with pending value")
+                                    with disable_auditlog():
+                                        triage.triage_state_obj = new_triage_state
+                                        triage.save()
 
 
     def migrate_discordance_reports(self, *args, **options):

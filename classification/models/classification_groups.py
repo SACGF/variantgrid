@@ -132,22 +132,22 @@ class ClassificationGroupUtils:
         self.calculate_pending = calculate_pending
 
     # TODO: remove this code after removing old flags
-    @cached_property
-    def _pending_changes_flag_map(self) -> dict[int, str]:
-        mod_id_to_clin_sig: dict[int, str] = {}
-
-        flags_qs = Flag.objects.filter(
-            flag_type=classification_flag_types.classification_pending_changes,
-            resolution__status=FlagStatus.OPEN)
-
-        if self._modifications:
-            flag_collections_ids = {mod.classification.flag_collection_id for mod in self._modifications}
-            flags_qs = flags_qs.filter(collection_id__in=flag_collections_ids)
-
-        for flag in flags_qs:
-            mod_id_to_clin_sig[flag.collection_id] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
-
-        return mod_id_to_clin_sig
+    # @cached_property
+    # def _pending_changes_flag_map(self) -> dict[int, str]:
+    #     mod_id_to_clin_sig: dict[int, str] = {}
+    #
+    #     flags_qs = Flag.objects.filter(
+    #         flag_type=classification_flag_types.classification_pending_changes,
+    #         resolution__status=FlagStatus.OPEN)
+    #
+    #     if self._modifications:
+    #         flag_collections_ids = {mod.classification.flag_collection_id for mod in self._modifications}
+    #         flags_qs = flags_qs.filter(collection_id__in=flag_collections_ids)
+    #
+    #     for flag in flags_qs:
+    #         mod_id_to_clin_sig[flag.collection_id] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
+    #
+    #     return mod_id_to_clin_sig
 
     @cached_property
     def _classification_to_old_clin_sig(self) -> dict[int, str]:
@@ -157,16 +157,20 @@ class ClassificationGroupUtils:
                 old_ids[om.classification_id] = om.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         return old_ids
 
+    # def pending_changes_for(self, modification: ClassificationModification) -> Optional[str]:
+    #     if not self.calculate_pending:
+    #         return None
+    #     return self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
+
     def pending_changes_for(self, modification: ClassificationModification) -> Optional[str]:
-        if not self.calculate_pending:
-            return None
-        return self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
+        return None
 
     @property
     def any_pending_changes(self) -> bool:
-        if not self.calculate_pending:
-            return False
-        return bool(self._pending_changes_flag_map)
+        # if not self.calculate_pending:
+        #     return False
+        # return bool(self._pending_changes_flag_map)
+        return False
 
     def map(self, modification: ClassificationModification, genome_build: GenomeBuild) -> ClassificationGroupEntry:
         clinical_significance_old = self._classification_to_old_clin_sig.get(modification.classification_id)
