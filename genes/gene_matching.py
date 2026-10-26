@@ -11,6 +11,7 @@ import re
 from collections import defaultdict, namedtuple
 from collections.abc import Iterable
 from functools import cached_property
+from itertools import batched
 from typing import Optional
 
 from django.db import transaction
@@ -27,7 +28,7 @@ from genes.models import (
     ReleaseGeneSymbolGene,
 )
 from genes.models.models_gene import GeneNameResult
-from library.utils import clean_string, iter_fixed_chunks
+from library.utils import clean_string
 
 TokenizeResult = namedtuple("TokenizeResult", ["valid", "oversized"])
 
@@ -237,7 +238,7 @@ class ReleaseGeneMatcher:
     def match_gene_symbols(self, gene_symbols: Iterable[str]):
         """ gene_symbols must not have been matched  """
         # Two gene lists created at once can both find a symbol unmatched - read the rows back for their PKs
-        for chunk in iter_fixed_chunks(gene_symbols, 2000):
+        for chunk in batched(gene_symbols, 2000):
             ReleaseGeneSymbol.objects.bulk_create([ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
                                                    for gene_symbol_id in chunk], ignore_conflicts=True)
             release_gene_symbols = ReleaseGeneSymbol.objects.filter(release=self.release, gene_symbol_id__in=chunk)
