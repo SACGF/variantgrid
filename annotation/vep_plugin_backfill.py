@@ -102,15 +102,18 @@ def vep_mismatch_fix(vav, vep_vav_kwargs: dict) -> str:
 
 def stamp_plugin_pins(variant_annotation_version_model, annotation_range_lock_model,
                       genome_build_name: Optional[str] = None, dry_run: bool = False) -> list[PinStamp]:
-    """ Sets each NEW/ACTIVE version's pins to what live settings pass VEP. A pin that changes to a file whose
-        columns cover the version, on a version with annotated variants, sets the backfill flag False - those
-        variants were annotated without it. An unchanged pin leaves the flag alone, so a re-run is a no-op. """
+    """ Sets each NEW/ACTIVE version's pins to what live settings pass VEP, so none fails the version check. A pin
+        that changes to a file whose columns cover the version, on the build's newest version with annotated
+        variants, sets the backfill flag False - those variants were annotated without it. Older versions are on
+        their way out, so aren't worth a backfill. An unchanged pin leaves the flag alone, so a re-run is a no-op. """
     qs = variant_annotation_version_model.objects.filter(status__in=ACTIVE_STATUSES)
     if genome_build_name:
         qs = qs.filter(genome_build_id=genome_build_name)
+    vavs = list(qs.order_by("genome_build_id", "annotation_date", "pk"))
+    newest_pk_by_build = {vav.genome_build_id: vav.pk for vav in vavs}
 
     stamps = []
-    for vav in qs.order_by("genome_build_id", "pk"):
+    for vav in vavs:
         if vav.genome_build_id not in settings.ANNOTATION:
             continue  # Build no longer configured on this deployment
         stamp = PinStamp(variant_annotation_version=vav, changed_pins=settings_pin_changes(vav))
@@ -118,7 +121,8 @@ def stamp_plugin_pins(variant_annotation_version_model, annotation_range_lock_mo
         for pin_field, (_old, new) in stamp.changed_pins.items():
             setattr(vav, pin_field, new)
             newly_covered |= bool(new and source_columns(vav, SOURCE_PINS[pin_field]))
-        if newly_covered and annotation_range_lock_model.objects.filter(version=vav).exists():
+        is_newest = vav.pk == newest_pk_by_build[vav.genome_build_id]
+        if newly_covered and is_newest and annotation_range_lock_model.objects.filter(version=vav).exists():
             setattr(vav, BACKFILL_FLAG, False)
         if stamp.changed_pins and not dry_run:
             vav.save(update_fields=[*stamp.changed_pins, BACKFILL_FLAG])

@@ -190,24 +190,32 @@ class PluginPinStampTests(TestCase):
         vav.refresh_from_db()
         self.assertIsNotNone(vav.avi)
 
-    def test_command_stamps_and_flags_new_and_active_only(self):
-        active = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+    def test_command_stamps_new_and_active_and_flags_only_the_newest(self):
+        older = self._vav(self.grch38, VariantAnnotationVersion.Status.NEW)
         historical = self._vav(self.grch38, VariantAnnotationVersion.Status.HISTORICAL)
-        unannotated = self._vav(self.grch38, VariantAnnotationVersion.Status.NEW, annotated=False)
+        active = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
         output = self._enable("--genome-build", "GRCh38")
-        for vav in (active, historical, unannotated):
+        for vav in (older, historical, active):
             vav.refresh_from_db()
         self.assertEqual(active.splicevault, "SpliceVault_data_GRCh38.refseq_mane.tsv.gz")
         self.assertFalse(active.backfilled_utr_avi_splicevault)
         self.assertIsNone(historical.splicevault)
         self.assertTrue(historical.backfilled_utr_avi_splicevault)
-        self.assertEqual(unannotated.avi, "alphagenome_variant_impact_score_snvs.tsv.gz")
-        self.assertTrue(unannotated.backfilled_utr_avi_splicevault)  # No variants to backfill
+        self.assertEqual(older.avi, "alphagenome_variant_impact_score_snvs.tsv.gz")
+        self.assertTrue(older.backfilled_utr_avi_splicevault)
         self.assertIn("Start annotation_workers", output)
         self.assertIn(f"--variant-annotation-version {active.pk} ", output)
+        self.assertNotIn(f"--variant-annotation-version {older.pk} ", output)
         self.assertIn("--csq avi_phred=AVI_PHRED", output)
         self.assertEqual(active.alphagenome_splicing, "alphagenome_splicing_snvs.GRCh38.vcf.gz")
         self.assertIn("--csq alphagenome_splicing=AlphaGenome_splicing_score", output)
+
+    def test_unannotated_version_stamped_but_not_flagged(self):
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.NEW, annotated=False)
+        self._enable("--genome-build", "GRCh38")
+        vav.refresh_from_db()
+        self.assertEqual(vav.avi, "alphagenome_variant_impact_score_snvs.tsv.gz")
+        self.assertTrue(vav.backfilled_utr_avi_splicevault)
 
     def test_command_rerun_after_backfill_changes_nothing(self):
         vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)

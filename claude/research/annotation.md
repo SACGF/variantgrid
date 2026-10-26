@@ -221,7 +221,8 @@ pin to its plugin or custom source, and only stamps the pins the model it is giv
 historical model still works. They are off (None) in the package defaults, so the release changes nothing until a
 deployment turns them on. `annotation/vep_plugin_backfill.py:stamp_plugin_pins` stamps the pins on a build's
 NEW/ACTIVE versions from live settings and sets the flag False where a pin changed to a file whose columns cover the
-version and the version has range locks; an unchanged pin leaves the flag alone, so it is idempotent.
+version, the version has range locks and it is the build's newest by `annotation_date` (an older one is on its way out,
+so isn't worth a backfill); an unchanged pin leaves the flag alone, so it is idempotent.
 `annotation/migrations/0004_utr_annotator_avi_splicevault.py` calls it for a deployment that set the files before
 migrating, whose ManualOperation (`annotation/migrations/0005_utr_annotator_avi_splicevault_manual_backfill.py`)
 carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the same for AlphaGenome splicing. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
