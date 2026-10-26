@@ -1,22 +1,19 @@
 #
 import logging
 import re
-from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import connection, transaction
-from django.db.models import F, Max, Q
+from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from eventlog.models import create_event
 from library.django_utils.database_utils import run_sql
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
-from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.models import (
     VCF,
-    CohortGenotypeCollection,
     Sample,
     Variant,
     VariantZygosityCount,
@@ -59,8 +56,7 @@ def check_valid_count_ops(operation):
         raise ValueError(msg)
 
 
-def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: VCF, operation, sample=None,
-                               variant_ids: Optional[list[int]] = None) -> tuple[str, list]:
+def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: VCF, operation, sample=None) -> tuple[str, list]:
     extra_where_sql = ""
     cgc = vcf.cohort.cohort_genotype_collection
     if sample:
@@ -104,11 +100,7 @@ def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: 
         AND snpdb_cohortgenotype.collection_id = %(cohort_genotype_collection_id)d
     """
     sql = (update_sql + from_sql + extra_where_sql) % update_params
-    params = []
-    if variant_ids is not None:
-        sql += " AND snpdb_cohortgenotype.variant_id = ANY(%s)"
-        params.append(variant_ids)
-    return sql, params
+    return sql, []
 
 
 def update_all_variant_zygosity_counts_for_vcf(vcf: VCF, operation, skip_if_cannot_delete=False):
@@ -245,43 +237,3 @@ def update_variant_zygosity_count_for_sample(collection: VariantZygosityCountCol
         create_event(None, 'update_variant_zygosity_count_for_sample', details=details, severity=LogLevel.ERROR)
         logging.error(details)
         raise
-
-
-def _vcf_ids_with_variants(variant_ids: list[int]) -> set[int]:
-    """ VCFs whose current genotype collection (Cohort.cohort_genotype_collection - what the count SQL reads)
-        has a row for any of these variants """
-    sql = "SELECT DISTINCT collection_id FROM snpdb_cohortgenotype WHERE variant_id = ANY(%s)"
-    with connection.cursor() as cursor:
-        cursor.execute(sql, [variant_ids])
-        cgc_ids = [row[0] for row in cursor.fetchall()]
-    cgc_qs = CohortGenotypeCollection.objects.filter(pk__in=cgc_ids,
-                                                     collection_type=CohortGenotypeCollectionType.UNCOMMON,
-                                                     cohort_version=F("cohort__version"),
-                                                     data_archived_date__isnull=True,
-                                                     cohort__vcf__isnull=False,
-                                                     cohort__vcf__data_archived_date__isnull=True)
-    return set(cgc_qs.values_list("cohort__vcf_id", flat=True))
-
-
-def recount_variant_zygosity_counts(variant_ids: list[int]):
-    """ Recalculate these variants' counts from scratch: zero them, then re-add every VCF and sample counted in
-        each collection, restricted to these variants. For repairing counts made from bad CohortGenotype rows
-        (#2443), where what was added can't be subtracted. Like the other count updates, nothing else should be
-        counting at the same time. """
-    vcf_ids = _vcf_ids_with_variants(variant_ids)
-    for collection in VariantZygosityCountCollection.objects.filter(data_archived_date__isnull=True):
-        counted = Q(collection=collection, count_complete__isnull=False, deleted__isnull=True)
-        counted_vcfs = VariantZygosityCountForVCF.objects.filter(counted, vcf__in=vcf_ids,
-                                                                 is_split_to_sample_counts=False)
-        counted_samples = VariantZygosityCountForSample.objects.filter(counted, sample__vcf__in=vcf_ids)
-        with transaction.atomic():
-            run_sql(f'UPDATE "{collection.get_partition_table()}" SET ref_count = 0, het_count = 0, hom_count = 0 '
-                    'WHERE variant_id = ANY(%s)', [variant_ids])
-            for vzc_vcf in counted_vcfs.select_related("vcf"):
-                run_sql(*_get_update_sql_and_params(collection, vzc_vcf.vcf, '+', variant_ids=variant_ids))
-            for vzc_sample in counted_samples.select_related("sample__vcf"):
-                sample = vzc_sample.sample
-                if not _sample_excluded_from_variant_zygosity_count(sample):
-                    run_sql(*_get_update_sql_and_params(collection, sample.vcf, '+', sample=sample,
-                                                        variant_ids=variant_ids))
-            collection.bump_data_version()
