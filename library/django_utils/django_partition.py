@@ -13,10 +13,10 @@ from django.conf import settings
 from django.db import connection, models, transaction
 from django.db.utils import ProgrammingError
 from django.utils.text import slugify
+from psycopg.sql import SQL, Identifier, Literal
 
 from library.django_utils.database_utils import run_sql
 from library.log_utils import log_traceback
-from library.utils import double_quote, single_quote
 
 
 def _get_id_sequence(base_table_name: str) -> str:
@@ -83,30 +83,27 @@ class RelatedModelsPartitionModel(models.Model):
             self.create_partition_for_base_table(base_table_name)
 
     def create_partition_for_base_table(self, base_table_name):
-        sql_template = """
-    CREATE TABLE "%(table_name)s" (
-        LIKE %(base_table_name)s including indexes,
-        CHECK (%(records_fk_field)s = %(pk)s)
-    ) INHERITS (%(base_table_name)s);
+        sql_template = SQL("""
+    CREATE TABLE {table_name} (
+        LIKE {base_table_name} including indexes,
+        CHECK ({records_fk_field} = {pk})
+    ) INHERITS ({base_table_name});
 
     -- If a column in the parent table is an identity column, that property is not inherited
     -- @see https://www.postgresql.org/docs/current/sql-createtable.html
 
-    ALTER TABLE "%(table_name)s"
-    ALTER COLUMN id SET DEFAULT nextval('%(id_sequence)s');
-    """
+    ALTER TABLE {table_name}
+    ALTER COLUMN id SET DEFAULT nextval({id_sequence});
+    """)
 
         table_name = self.get_partition_table(base_table_name=base_table_name)
         logging.info("Creating Partition '%s'", table_name)
-        pk = self.pk
-        if isinstance(pk, str):
-            pk = single_quote(pk)
-        sql = sql_template % {"base_table_name": base_table_name,
-                              "table_name": table_name,
-                              "records_fk_field": self.RECORDS_FK_FIELD_TO_THIS_MODEL,
-                              "pk": pk,
-                              "id_sequence": _get_id_sequence(base_table_name)}
-        run_sql(sql)
+        sql = sql_template.format(base_table_name=Identifier(base_table_name),
+                                  table_name=Identifier(table_name),
+                                  records_fk_field=Identifier(self.RECORDS_FK_FIELD_TO_THIS_MODEL),
+                                  pk=Literal(self.pk),
+                                  id_sequence=Literal(_get_id_sequence(base_table_name)))
+        run_sql(sql.as_string())
 
     def get_partition_table(self, base_table_name=None):
         if self.pk is None:
@@ -133,8 +130,8 @@ class RelatedModelsPartitionModel(models.Model):
 
         for base_table_name in self.RECORDS_BASE_TABLE_NAMES:
             # Quote them, otherwise things can get replaced multiple times
-            quoted_base_table_name = double_quote(base_table_name)
-            quoted_partition_table_name = double_quote(self.get_partition_table(base_table_name=base_table_name))
+            quoted_base_table_name = connection.ops.quote_name(base_table_name)
+            quoted_partition_table_name = connection.ops.quote_name(self.get_partition_table(base_table_name=base_table_name))
             sql = sql.replace(quoted_base_table_name, quoted_partition_table_name)
         return sql
 

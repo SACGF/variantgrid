@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from django.conf import settings
 from django.db.models import Manager, QuerySet
+from django.db.models.query import ModelIterable
 from frozendict import frozendict
 
 from library.request_context import get_request_variable, set_request_variable
@@ -33,17 +34,32 @@ class QuerySetCachingBase(QuerySet, ABC):
     def retrieve_from_cache(self, cq: CachedQuery):
         pass
 
+    def _is_bare_queryset(self) -> bool:
+        """ The cache key is only the get() arguments, so anything that changes which rows or what kind of
+            result the queryset returns (filters, related managers, locking, values(), another db) bypasses it """
+        query = self.query
+        return (self._iterable_class is ModelIterable
+                and self._db is None
+                and not query.where
+                and not query.select_for_update
+                and not query.annotations
+                and not query.extra
+                and not query.combinator
+                and not query.is_sliced
+                and query.deferred_loading == (frozenset(), True))
+
     def get(self, *args, **kwargs):
         cq: Optional[CachedQuery] = None
-        kwargs_fd = None
-        if kwargs:
-            # turn into a frozen dict so we can hash it
-            kwargs_fd = frozendict(kwargs)
-        try:
-            cq = CachedQuery(model=self.model, args=args, kwargs=kwargs_fd)
-        except TypeError:
-            # un-hashable argument
-            pass
+        if self._is_bare_queryset():
+            kwargs_fd = None
+            if kwargs:
+                # turn into a frozen dict so we can hash it
+                kwargs_fd = frozendict(kwargs)
+            try:
+                cq = CachedQuery(model=self.model, args=args, kwargs=kwargs_fd)
+            except TypeError:
+                # un-hashable argument
+                pass
 
         if cq:
             existing = self.retrieve_from_cache(cq)

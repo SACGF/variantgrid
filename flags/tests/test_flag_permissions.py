@@ -4,6 +4,7 @@ from django.test import TestCase
 from flags.enums import FlagStatus
 from flags.models.models import (
     FlagCollection,
+    FlagPermissionLevel,
     FlagResolution,
     FlagType,
     FlagTypeContext,
@@ -25,6 +26,13 @@ class FlagPermissionTest(TestCase):
         cls.collection = FlagCollection.objects.create(context=context)
         cls.user = User.objects.create_user(username='test_flag_permissions_user')
         cls.superuser = User.objects.create_superuser(username='test_flag_permissions_superuser')
+
+    def test_permission_level_ordering(self):
+        """ Levels compare by rank, not by their single-letter values ('A' SYSTEM sorts before 'U' USERS) """
+        self.assertTrue(FlagPermissionLevel.SYSTEM > FlagPermissionLevel.USERS)
+        self.assertTrue(FlagPermissionLevel.SYSTEM >= FlagPermissionLevel.ADMIN)
+        self.assertTrue(FlagPermissionLevel.USERS <= FlagPermissionLevel.OWNER)
+        self.assertFalse(FlagPermissionLevel.SYSTEM < FlagPermissionLevel.USERS)
 
     def test_add_flag_permission_check(self):
         with self.assertRaises(PermissionError):

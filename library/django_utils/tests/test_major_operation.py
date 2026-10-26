@@ -8,14 +8,25 @@ from unittest import mock
 
 from django.core.cache import cache
 from django.db import connection
-from django.test import TestCase, override_settings
+from django.http import StreamingHttpResponse
+from django.test import RequestFactory, TestCase, override_settings
+from django.views import View
 
 from library.django_utils.database_utils import get_pg_setting
 from library.django_utils.major_operation import (
+    MajorOperationViewMixin,
     TooManyMajorOperationsError,
     major_operation,
     planner_join_collapse_limit,
 )
+
+
+class _StreamingView(MajorOperationViewMixin, View):
+    major_operation_name = "csv"
+
+    def get(self, request):
+        return StreamingHttpResponse(iter(["a", "b"]))
+
 
 LOCMEM_CACHE = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
@@ -92,6 +103,27 @@ class MajorOperationTests(TestCase):
                 cache.clear()
                 raise ValueError("boom")
         self.assertEqual("boom", str(cm.exception))
+
+    def _assert_stream_holds_the_last_slot(self, finish_response):
+        request = RequestFactory().get("/")
+        request.user = self.USER
+        with ExitStack() as stack:
+            for _ in range(2):
+                stack.enter_context(major_operation(self.USER, "grid"))
+            response = _StreamingView.as_view()(request)
+            with self.assertRaises(TooManyMajorOperationsError):
+                with major_operation(self.USER, "grid"):
+                    pass
+            finish_response(response)
+            with major_operation(self.USER, "grid"):
+                pass
+
+    def test_streamed_response_holds_slot_until_consumed(self, _mock_timeout):
+        """ A streamed CSV runs its query while the response is iterated, after dispatch has returned """
+        self._assert_stream_holds_the_last_slot(lambda response: b"".join(response.streaming_content))
+
+    def test_streamed_response_closed_unread_releases_slot(self, _mock_timeout):
+        self._assert_stream_holds_the_last_slot(lambda response: response.close())
 
     @override_settings(MAJOR_OPERATION_LIMITS_ENABLED=False)
     def test_disabled_does_not_limit(self, _mock_timeout):

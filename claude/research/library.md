@@ -131,7 +131,9 @@ and coverage restore legitimately drop without archiving because the source file
 the manager's queryset class for one whose `get()` consults a cache first: the immutable one keeps results in a
 module-level dict for the life of the process (GenomeBuild, FlagType), the request one stores them as a
 `library/request_context.py` request variable that dies with the request (Allele, Lab, Organization, GeneSymbol, ResolvedVariantInfo). Keys are
-`(model, args, frozendict(kwargs))`, so an unhashable argument silently bypasses the cache. Both constructors check
+`(model, args, frozendict(kwargs))` and only a `get()` on the bare manager queryset uses them
+(`QuerySetCachingBase._is_bare_queryset`: no filters, annotations, `values()`, locking or `using()`), so an unhashable
+argument or a filtered queryset silently bypasses the cache. Both constructors check
 `settings.UNIT_TEST` and leave the plain `QuerySet` in place when it is set, because a cached instance
 outlives the test transaction that created it - the same reason `admin_bot` skips its `lru_cache` under `UNIT_TEST`. The consequence for query counting is that a test sees reads production never issues, which is what
 `library/django_utils/unittest_utils.py:production_query_count` subtracts: savepoints and any `SELECT ... FROM` one of
@@ -236,7 +238,7 @@ the base table twice gets both occurrences rewritten, which is usually right and
 restarts; `Meta.base_manager_name = 'objects'` is needed for the cache to cover related-object access too. The request
 cache needs `RequestContextMiddleware`; in a celery task there is no request and every `get` hits the database, which is
 correct but surprising in a query count. `timed_cache`'s `cache_clear` only clears the calling process, and keys
-on the positional arguments plus the keyword arguments in call order, so `f(1)` and `f(x=1)` are cached separately.
+on the positional arguments plus the sorted keyword arguments, so `f(1)` and `f(x=1)` are cached separately.
 
 `major_operation` counts against a single per-user key shared by every operation type; a user with twenty grids open
 in twenty tabs is at the limit for the analysis grid too. The shorter `statement_timeout` goes through

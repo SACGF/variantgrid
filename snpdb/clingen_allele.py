@@ -21,7 +21,6 @@ from typing import Optional
 from django.conf import settings
 from django.db import IntegrityError, transaction
 
-from library.django_utils import thread_safe_unique_together_get_or_create
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import get_single_element
 from snpdb.clingen_allele_api import (
@@ -314,7 +313,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
         kwargs = {"pk": clingen_allele_id,
                   "defaults": {"api_response": api_response}}
-        clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, **kwargs)
+        clingen_allele, _ = ClinGenAllele.objects.get_or_create(**kwargs)
         if existing_variant_allele:
             # Link existing_variant_allele.allele to ClinGen (merging if already exists)
             try:
@@ -395,8 +394,8 @@ def get_clingen_allele(code: str, clingen_api: ClinGenAlleleRegistryAPI = None) 
             clingen_api = ClinGenAlleleRegistryAPI.instance()
         api_response = clingen_api.get_code(code)
         clingen_api.check_api_response(api_response)
-        clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, pk=clingen_allele_id,
-                                                                      defaults={"api_response": api_response})
+        clingen_allele, _ = ClinGenAllele.objects.get_or_create(pk=clingen_allele_id,
+                                                                defaults={"api_response": api_response})
 
     allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)

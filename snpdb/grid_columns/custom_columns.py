@@ -14,7 +14,7 @@ from annotation.enums import VEPPlugin
 from annotation.models import AnnotationVersion
 from classification.models import ClassificationModification
 from library.django_utils import resolve_field_path
-from library.utils import JsonDataType, add_exception_note
+from library.utils import JsonDataType
 from snpdb.enums import ColumnAnnotationLevel
 from snpdb.models import CustomColumn, CustomColumnsCollection, Variant, VariantGridColumn
 from snpdb.views.datatable_view import CellData, FilterField, NullOrder, RichColumn
@@ -120,7 +120,7 @@ def variant_column_rich_column(path: str, model_field: bool = True, queryset_fie
     try:
         return RichColumn(**kwargs)
     except ValueError as ve:
-        add_exception_note(ve, f"Building variant grid column '{path}'")
+        ve.add_note(f"Building variant grid column '{path}'")
         raise
 
 

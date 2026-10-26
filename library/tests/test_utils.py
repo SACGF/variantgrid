@@ -11,10 +11,13 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest import mock
 
+from django.db.models import Q
 from django.test import TestCase
 from requests import HTTPError, Response
 
 from library.cache import timed_cache
+from library.django_utils import single_string_to_first_last_name_q
+from library.genomics import format_chrom
 from library.genomics.bed_file import BedFileReader
 from library.log_utils import NotificationBuilder
 from library.unit_percent import (
@@ -481,6 +484,18 @@ class TestTimedCache(TestCase):
         second = fn()
         self.assertNotEqual(first, second, "After TTL expiry, function should be re-called")
 
+    def test_kwargs_order_shares_a_key(self):
+        call_count = 0
+
+        @timed_cache()
+        def fn(a=None, b=None):
+            nonlocal call_count
+            call_count += 1
+
+        fn(a=1, b=2)
+        fn(b=2, a=1)
+        self.assertEqual(call_count, 1)
+
     def test_size_limit_evicts_oldest(self):
         call_tracker = []
 
@@ -494,6 +509,30 @@ class TestTimedCache(TestCase):
         fn(3)  # evicts key=1
         fn(1)  # 1 was evicted, must recalculate
         self.assertEqual(call_tracker.count(1), 2)
+
+
+class TestFormatChrom(TestCase):
+    def test_standard_chromosomes(self):
+        self.assertEqual("chrX", format_chrom("x", True))
+        self.assertEqual("MT", format_chrom("chrMT", False))
+        self.assertEqual("chr1", format_chrom("CHR1", True))
+
+    def test_alt_contig_keeps_its_case(self):
+        self.assertEqual("chrUn_KI270302v1", format_chrom("chrUn_KI270302v1", True))
+        self.assertEqual("Un_KI270302v1", format_chrom("chrUn_KI270302v1", False))
+
+
+class TestSingleStringToFirstLastNameQ(TestCase):
+    def test_title_and_last_name_only(self):
+        self.assertEqual(Q(last_name__iexact="Smith"), single_string_to_first_last_name_q("Dr Smith"))
+
+    def test_first_name_or_initial(self):
+        expected = Q(last_name__iexact="Smith") & (Q(first_name__iexact="Jo") | Q(first_name__istartswith="J"))
+        self.assertEqual(expected, single_string_to_first_last_name_q("Jo Smith"))
+
+    def test_empty_raises(self):
+        with self.assertRaises(ValueError):
+            single_string_to_first_last_name_q("")
 
 
 class TestRgbContrastingText(TestCase):
