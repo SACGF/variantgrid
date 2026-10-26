@@ -3,7 +3,8 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
 from django.test import RequestFactory, TestCase
 
-from snpdb.models import Cohort, GenomeBuild, ImportStatus
+from snpdb.enums import ImportStatus
+from snpdb.models import Cohort, GenomeBuild
 from snpdb.views.datatable_view import DatabaseTableView, DatatableConfig, RichColumn, SortOrder
 
 

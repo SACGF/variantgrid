@@ -49,6 +49,18 @@ class LabMembershipModelTest(TestCase):
         set_thread_variable('request', None)
         self.lab.refresh_from_db()
 
+    def test_get_only_head_for_member(self):
+        self.assertEqual(Lab.get_only_head_for_member(self.member), self.head)
+        self.assertIsNone(Lab.get_only_head_for_member(self.head))  # the only head is themselves
+        self.assertIsNone(Lab.get_only_head_for_member(self.outsider))
+
+        self.other_lab.group.user_set.add(self.member)
+        LabHead.objects.create(lab=self.other_lab, user=self.org_user)
+        self.assertIsNone(Lab.get_only_head_for_member(self.member))  # a choice to make
+
+        User.objects.filter(pk=self.org_user.pk).update(is_active=False)
+        self.assertEqual(Lab.get_only_head_for_member(self.member), self.head)
+
     @override_settings(USER_CREATE_ORG_MESSAGE=ORG_MESSAGE)
     def test_organization_add_member_grants_no_lab(self):
         user = User.objects.create_user("lab_members_new_org_user")

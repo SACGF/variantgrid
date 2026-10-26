@@ -21,7 +21,8 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from model_utils.models import TimeStampedModel
 
 from library.constants import DAY_SECS
-from ontology.models import OntologyService, OntologyTerm, OntologyVersion
+from ontology.enums import OntologyService
+from ontology.models import OntologyTerm, OntologyVersion
 from patients.models.has_phenotype_description_mixin import PHENOTYPE_DESCRIPTION
 from patients.models.models_patient import Patient
 from patients.phenotype_matcher import PHENOTYPE_MATCHER_VERSION, get_ambiguous_acronym_denylist

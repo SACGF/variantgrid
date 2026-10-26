@@ -5,13 +5,11 @@ from django.db.models import Count
 from django.db.models.query_utils import Q
 
 from analysis.exceptions import NonFatalNodeError
+from annotation.enums import ClinVarOncogenicity, Pathogenicity, PathogenicityImpact
 from annotation.models import AnnotationVersion, GeneAnnotation
-from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models_enums import ClinVarOncogenicity, Pathogenicity
-from classification.enums import ClinicalSignificance, SomaticClinicalSignificance
 from classification.models import Classification
+from snpdb.enums import BuiltInFilters, ClinicalSignificance, SomaticClinicalSignificance, TagFilter
 from snpdb.models import Tag, Variant
-from snpdb.models.models_enums import BuiltInFilters, TagFilter
 from snpdb.models.models_user_settings import AbstractNodeCountSettings
 from snpdb.utils import get_tag_styles_and_colors
 
@@ -63,8 +61,8 @@ def get_extra_filters_q(analysis, extra_filters) -> Q:
             clinical_significance_list = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
         elif extra_filters == BuiltInFilters.CLASSIFIED_TIER_1_2:
             somatic_clinical_significance_list = SomaticClinicalSignificance.TIER_1_AND_2_VALUES
-        q = Classification.get_variant_q(user, annotation_version.genome_build, clinical_significance_list,
-                                         somatic_clinical_significance_list=somatic_clinical_significance_list)
+        q = Classification.objects.published_variant_q(user, annotation_version.genome_build, clinical_significance_list,
+                                                         somatic_clinical_significance_list=somatic_clinical_significance_list)
     elif extra_filters == BuiltInFilters.IMPACT_HIGH_OR_MODERATE:
         q = Q(variantannotation__impact__in=(PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE))
     elif extra_filters == BuiltInFilters.COSMIC:

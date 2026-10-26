@@ -3,11 +3,14 @@ Owns: Classification / ClassificationModification, EvidenceKey + EvidenceKeyMap,
 DiscordanceReport, ConditionText matching, ClassificationGrouping, ClinVarExport, the classification API and import pipeline.
 Start with:
 - models/classification.py — Classification, ClassificationModification, the app's signals (top of file), patch_value / publish.
+- models/classification_evidence_normalise.py — normalise_evidence_cell: how each submitted evidence value is normalised and validated (VALUE_TYPE_NORMALISERS per value type).
+- models/condition_resolved.py (ConditionResolved), models/classification_consensus.py (copying content between records).
 - models/evidence_key.py — EvidenceKey (schema of the evidence JSON), EvidenceKeyMap (cached lookup + lab overrides), VCDataCell.
-- enums/classification_enums.py — ShareLevel, SpecialEKeys, ClinicalSignificance, SubmissionSource, CriteriaEvaluation.
+- enums/classification_enums.py — ShareLevel, SpecialEKeys, SubmissionSource, CriteriaEvaluation. AlleleOriginBucket, ClinicalSignificance and SomaticClinicalSignificance are used below classification, so live in snpdb/enums/snpdb_enums.py (re-exported by classification.enums; import them from snpdb).
 - models/classification_variant_info_models.py — ImportedAlleleInfo, ResolvedVariantInfo (HGVS to Allele, per-build `resolved_hgvs` cache: a c.HGVS when `transcript_version` is set, otherwise a g.HGVS - test `transcript_version_id`, not the string).
   Its `p_hgvs` is the canonical p.HGVS of that c.HGVS on the source's protein accession (VEP, else computed, else cached ClinGen, else evidence - `p_hgvs_source` says which),
-  not tied to an annotation version: rerun `one_off_backfill_resolved_variant_info_p_hgvs` after a new VEP version or transcript sequences land.
+  not tied to an annotation version: rerun `recalc_resolved_variant_info_p_hgvs` after a new VEP version becomes the latest or transcript sequences land.
+  Matching runs before VEP annotates a new variant, so a completed VEP annotation run of the latest version recomputes the non-VEP rows on its range lock's variants (`classification/signals/classification_hooks_p_hgvs.py`, #2421).
   Pages and grids show it, never the `p_hgvs` evidence, by passing it to `HGVSDisplay(p_hgvs=...)` from the same build as the c.HGVS (an imported c.HGVS takes the imported build's: `ImportedAlleleInfo.imported_hgvs_display`); `to_json` and the `p_hgvs` template tag put it inline after the c. nomen, short with the full form as tooltip, gated on `CLASSIFICATION_GRID_SHOW_PHGVS` (#19).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
@@ -41,6 +44,8 @@ Patterns here:
   services/overlap_calculator.py onto the enums/classification_enums.py:OverlapStatus ladder
   (enums/classification_enums.py:OverlapStatus.is_discordant is the threshold), and only records at a
   ShareLevel.is_discordant_level (logged_in_users, public) count.
+- Sample names on records shared by other labs are de-identified, so showing them across labs is fine - don't hide them
+  as patient data.
 - ClinicalContext, DiscordanceStatus and DiscordanceReport are a legacy path: rendered for existing rows
   and behind the VUS overlaps page, but nothing live assigns a ClinicalContext or opens a new DiscordanceReport.
   Bucketing on that legacy path comes from the
@@ -51,7 +56,8 @@ Patterns here:
   classification_revalidate_signal, variants_classification_changed_signal). Receivers live in signals/ and are imported by
   apps.py:ClassificationConfig.ready; annotation/apps.py and snpdb/signals/common_variants_classification_changed.py subscribe
   from outside the app.
-- A lab's `classification_config` can give an evidence key a `default_value`, which a record created from the web
+- A lab's `classification_config` (`models/classification_settings_models.py:LabClassificationSettings`, applied over
+  its organization's) can give an evidence key a `default_value`, which a record created from the web
   form starts that key with (`models/classification.py:Classification.create_with_response` with
   `populate_with_defaults=True` - the API, file imports and sync never see one). `$user` and `$today` resolve at create
   time through `models/evidence_key.py:resolve_default_value`, so a lab that makes `curated_by` / `curation_date`
@@ -88,7 +94,7 @@ Gotchas:
   the attribute and models/evidence_mixin.py:EvidenceMixin.__getitem__ answers any evidence key. Resolve model fields in
   the view or tag (templatetags/classification_tags.py:classification_quick passes `sample` / `username`).
 - Legacy (VG3-era) records can hold a select key's option label or a comma separated string of labels ("Autosomal
-  recessive") instead of the list of option keys every write now stores (models/classification.py:Classification.option_value_parts).
+  recessive") instead of the list of option keys every write now stores (models/classification_evidence_normalise.py:evidence_option_value_parts).
   management/commands/classification_normalise_option_values.py converts them; compare on normalised values until it has run.
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
@@ -98,7 +104,8 @@ Gotchas:
   a live calculation, never stored.
 - Bulk-import guard: while a ClassificationImportRun is ONGOING, per-classification work (grouping, common-variant filters,
   clinical-context recalc) is skipped and caught up on classification_imports_complete_signal
-  (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). An abandoned ONGOING run silently stalls all of it.
+  (models/classification_import_run.py:ClassificationImportRun.ongoing_imports). A run not added to for MAX_IMPORT_AGE (5 minutes) is closed as UNFINISHED by the next import or the
+  `close_abandoned_classification_import_runs_task` beat, so an abandoned run stalls that work for minutes, not until the next import.
 - /classification/api/* holds DRF views (views/classification_view.py:ClassificationView is the model), which the login
   middleware skips so token and basic auth reach DRF's IsAuthenticated. A plain Django view under that prefix still needs a
   session login - the path exempts nothing.
@@ -106,15 +113,15 @@ Gotchas:
   EvidenceKeyMap.instance caches for 60s. Tests that need a key create it with EvidenceKey.objects.create in setUp
   (tests/views/test_classification_view.py).
 - What copying from a previous classification brings across is EvidenceKey.copy_scope (NONE / ALLELE / GENE) filtered by
-  copy_allele_origin (models/classification.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
+  copy_allele_origin (models/classification_consensus.py:ClassificationConsensus.consensus_patch). Scope is how far a value travels, so
   a GENE key also copies at allele level; copy_allele_origin=GERMLINE keeps segregation and de novo data out of somatic records.
-  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification.py:ClassificationConsensus.apply_to to
+  Pass copy_scopes=COPY_SCOPES_GENE for a gene-only copy, and models/classification_consensus.py:ClassificationConsensus.apply_to to
   write one into a record (fills empty fields only, as SubmissionSource.CONSENSUS).
 - The target allele origin bucket is decided before the candidates are listed, never after: nothing germline is ever offered
   as the source for a somatic record. The create page takes it from the user's allele_origin_focus (flippable), the Classify
   & Report dialog from Tag.allele_origin_bucket, the in-form box from the record's own bucket. External labs' records are
   shown for context with no copy control - their evidence was assembled under a config reviewed elsewhere.
-- Gene level candidates come from models/classification.py:ClassificationConsensus.gene_consensus_groups - one row per
+- Gene level candidates come from models/classification_consensus.py:ClassificationConsensus.gene_consensus_groups - one row per
   distinct set of GENE-scope values, most used first then newest, capped at ten, each later row naming the fields it
   differs from the first in. Most records in a gene carry identical gene content because they were copied from each
   other. The pick is always a human's: AMP tiering and therapy content are gene *and* tumour type, so the row leads with
@@ -122,7 +129,7 @@ Gotchas:
   The three surfaces that offer it (create page, Classify & Report dialog, the form's Gene Content card in
   views/views_gene_consensus.py) all call that one function and render templates/classification/tags/gene_consensus_group.html.
 - The allele level pick (create page "Copy values from", the Classify & Report dialog's previous classifications) is the
-  same grouping over every copied key (models/classification.py:ClassificationConsensus.consensus_groups): one column
+  same grouping over every copied key (models/classification_consensus.py:ClassificationConsensus.consensus_groups): one column
   per distinct set of copied values, rendered side by side by templates/classification/tags/consensus_comparison.html
   with the fields the choices differ in first and the shared ones folded away (ConsensusComparison.of). Record
   identity (lab id, curator) is provenance, not the choice - the diff page (`?cids=...&copied_only=1`) is the full view.
@@ -173,8 +180,7 @@ Gotchas:
 - A gene-level classification target is named rather than given as HGVS: `models/classification_variant_info_models.py:ImportedAlleleInfo.resolve_gene_level`
   runs the fusion, whole-gene copy number and splice string resolvers through `genes/gene_level_strings.py:resolve_gene_level_string`
   before any HGVS conversion. A gene-level value keeps its spaces - `tidy_hgvs_whitespace` strips them from an HGVS
-  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes; a stored record holding
-  `EGFRamplification` is put right by `gene_level_strings_respace`. What takes that path is the *shape* of the
+  only, so `EGFR amplification` reads the same in c.HGVS as in the g.HGVS annotation writes. What takes that path is the *shape* of the
   value (`genes/gene_level_strings.py:looks_gene_level`), so one whose gene turned out to be a typo fails as a
   gene-level record - `gene_level_unresolved`, with the resolver's reason as its message - rather than as a broken
   HGVS. A splice label shape has to be in `genes/gene_splice.py:SPLICE_STRING_PATTERN` to be recognised at all;
@@ -210,7 +216,7 @@ Gotchas:
   the `TSO500_*_CALL_BANDS` settings - the policy is on the form so a scientist who disagrees can ask for it to change.
   A case with no such measure falls back to `default`, and a draft's own answer wins over both. The keys are hand
   written in admin, so `validate_case_fields` fails the save on an unknown measure or rule.
-- A bool `case_field` carries `qc` (a `seqauto/models/models_enums.py:LIBRARY_QC_CONTEXT_KEYS` value) instead of `measure`
+- A bool `case_field` carries `qc` (a `seqauto/enums/seqauto_enums.py:LIBRARY_QC_CONTEXT_KEYS` value) instead of `measure`
   where the flag means "did the caller's library QC pass for that category" - the Amplifications / Variants / Fusions
   flags. Its `tick_when` rules are `{"passed": true|false}` and `{"completed": false}` against the category's
   `seqauto/models/models_seqauto.py:LibraryQC` row (`classification/models/classification_report_models.py:library_qc_tick`;

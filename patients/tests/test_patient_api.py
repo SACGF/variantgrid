@@ -6,12 +6,13 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import override_settings
 from django.urls import reverse
+from guardian.shortcuts import assign_perm
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from library.guardian_utils import assign_permission_to_user_and_groups
+from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, TissueStatus
 from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
-from patients.models_enums import NucleicAcid, TissueStatus
 from patients.tests.test_external_references import DASHED_ACCESSION_NORMALIZER
 
 RECONCILE_TASK = "patients.views_rest.reconcile_pending_extractions.delay"
@@ -237,3 +238,13 @@ class PatientAPIPermissionTest(APITestCase):
         self.client.force_authenticate(user=self.other_user)
         response = self.client.get(reverse("api_specimen-detail", kwargs={"pk": self.specimen.pk}))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_read_only_user_cannot_delete(self):
+        assign_perm(DjangoPermission.perm(Patient, DjangoPermission.READ), self.other_user, self.patient)
+        self.client.force_authenticate(user=self.other_user)
+        for url_name, obj in (("api_extraction-detail", self.extraction),
+                              ("api_specimen-detail", self.specimen),
+                              ("api_patient-detail", self.patient)):
+            response = self.client.delete(reverse(url_name, kwargs={"pk": obj.pk}))
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, url_name)
+            self.assertTrue(type(obj).objects.filter(pk=obj.pk).exists(), url_name)

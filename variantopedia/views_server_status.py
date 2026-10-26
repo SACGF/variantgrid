@@ -119,7 +119,7 @@ def _highest_variant_annotation_status() -> dict:
     try:
         q = reduce(operator.and_, VariantAnnotation.get_variant_annotation_q_list())
         highest_variant = Variant.objects.filter(q).order_by("pk").last()
-        genome_build = next(iter(highest_variant.genome_builds))  # Just pick one if spans multiple
+        genome_build = highest_variant.any_genome_build
         vav = VariantAnnotationVersion.latest(genome_build)
         if highest_variant.variantannotation_set.filter(version=vav).exists():
             return {"status": "info", "message": "OK"}

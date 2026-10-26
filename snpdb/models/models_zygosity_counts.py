@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import F, FilteredRelation, Q, QuerySet
 from django.db.models.deletion import CASCADE
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
@@ -142,9 +142,8 @@ class VariantZygosityCountForVCF(AbstractVariantZygosityCountRecord):
         logging.info(msg)
 
         for sample in self.vcf.sample_set.all():
-            VariantZygosityCountForSample.objects.create(sample=sample,
-                                                         count_complete=self.count_complete,
-                                                         deleted=self.deleted)
+            VariantZygosityCountForSample.objects.create(collection=self.collection, sample=sample,
+                                                         count_complete=self.count_complete, deleted=self.deleted)
 
         self.is_split_to_sample_counts = True
         self.save()

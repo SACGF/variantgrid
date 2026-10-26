@@ -10,28 +10,24 @@ from django.db.models import F, OuterRef, Subquery
 from django.db.utils import IntegrityError, OperationalError
 from django.utils import timezone
 
+from analysis.enums import NodeStatus
 from analysis.exceptions import (
-    CeleryTasksObsoleteException,
     NodeConfigurationException,
     NodeOutOfDateException,
     NodeOutOfMemoryException,
     NodeParentErrorsException,
 )
-from analysis.models.nodes.analysis_node import (
-    AnalysisNode,
-    NodeCache,
-    NodeStatus,
-    NodeTask,
-    NodeVersion,
-    node_query_planner_settings,
-)
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.models.nodes.node_utils import cancel_node_tasks
+from analysis.models.nodes.node_version import NodeCache, NodeTask, NodeVersion
 from eventlog.models import create_event
 from library.constants import MINUTE_SECS
 from library.django_utils.database_utils import query_was_cancelled
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback
-from snpdb.models import ProcessingStatus
+from snpdb.enums import ProcessingStatus
+from snpdb.models.models_variant import VariantCollection
 
 CREATE_AND_LAUNCH_TASK = "analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks"
 
@@ -177,27 +173,6 @@ def update_node_task(node_id, version):
         raise NodeOutOfMemoryException(analysis_id, node_id, version)
 
 
-@celery.shared_task(bind=True)
-def wait_for_cache_task(self, node_cache_id):
-    """ Kept for backwards-compatibility (in-flight messages at deploy time); no longer added to
-        scheduling chains - an in-flight cache is now a dependency gate (issue #346). """
-    MAX_CHECKS = 60
-    try:
-        node_cache = NodeCache.objects.get(pk=node_cache_id)
-    except NodeCache.DoesNotExist:
-        raise CeleryTasksObsoleteException()  # Kills dependent tasks w/o reporting in Rollbar
-
-    status = node_cache.variant_collection.status
-    if status in ProcessingStatus.FINISHED_STATES:
-        return
-    if status not in (ProcessingStatus.CREATED, ProcessingStatus.PROCESSING):
-        raise ValueError(f"{node_cache} collection status={status}")
-    if self.request.retries >= MAX_CHECKS:
-        raise ValueError(f"Timed out after {self.request.retries} checks waiting for {node_cache}")
-    logging.debug(f"Waiting on {node_cache}")
-    raise self.retry(countdown=1, max_retries=MAX_CHECKS)
-
-
 @celery.shared_task
 def node_cache_task(node_id, version):
     """ Builds a node's NodeCache, then re-triggers the dispatcher so nodes blocked only on this
@@ -224,8 +199,12 @@ def node_cache_task(node_id, version):
             variant_collection.save()
             return
 
+        # Claim the build - a second task for this node/version that read CREATED too leaves it to us
+        claimed = VariantCollection.objects.filter(pk=variant_collection.pk, status=ProcessingStatus.CREATED) \
+            .update(status=ProcessingStatus.PROCESSING)
+        if not claimed:
+            return
         variant_collection.status = ProcessingStatus.PROCESSING
-        variant_collection.save()
 
         # Node could be READY, we're just generating cache afterwards (node doesn't need but children do)
         if node.status != NodeStatus.READY:

@@ -17,7 +17,7 @@ function setupExampleCell(table, exampleExtra) {
 
     let html = row[col.data];
     if (col.render) {
-        html = eval(col.render)(row[col.data], "display", row, {extra: exampleExtra, kwargs: col.renderKwargs || null});
+        html = resolveFunctionName(col.render)(row[col.data], "display", row, {extra: exampleExtra, kwargs: col.renderKwargs || null});
         if (html instanceof jQuery) {
             html = html.prop("outerHTML");
         }

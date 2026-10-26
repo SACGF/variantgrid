@@ -7,13 +7,13 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import MatchStatus, NucleicAcid
 from patients.external_references import (
     ExternalReference,
     ExternalReferenceError,
     resolve_reference,
 )
 from patients.models import ExternalModelManager, ExternalPK, Extraction, Patient, Specimen
-from patients.models_enums import MatchStatus, NucleicAcid
 
 
 def dashed_accession(reference_id: str) -> str:

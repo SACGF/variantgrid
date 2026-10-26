@@ -7,13 +7,13 @@ from django.urls import reverse
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
-from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
 )
 from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
+    InvalidExportParameter,
 )
 from classification.views.exports.classification_export_formatter import (
     ClassificationExportFormatter,

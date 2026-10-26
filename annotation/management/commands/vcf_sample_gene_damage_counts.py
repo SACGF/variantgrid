@@ -4,12 +4,13 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from annotation.models.models import VariantAnnotationVersion
 from annotation.models.models_gene_counts import CohortGeneCounts
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.tasks.cohort_sample_gene_damage_counts import (
     get_or_create_gene_count_type_and_values,
 )
-from snpdb.models import VCF, ImportStatus
+from snpdb.enums import ImportStatus
+from snpdb.models import VCF
 
 
 def launch_task_for_vcf(gene_count_type, vcf):

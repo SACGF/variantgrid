@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -6,6 +8,7 @@ from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import admin_bot
 from snpdb.bcftools_liftover import check_bcftools_destination_has_chrom
 from snpdb.clingen_allele import get_clingen_allele
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.liftover import (
     _batch_alleles,
     _check_vcf_contig_is_standard,
@@ -18,16 +21,13 @@ from snpdb.liftover import (
 )
 from snpdb.models import (
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
-    AlleleOrigin,
     GenomeBuild,
     LiftoverRun,
-    ProcessingStatus,
     VariantAllele,
     VariantCoordinate,
 )
-from snpdb.tasks.liftover_tasks import _allele_id_batches
+from snpdb.tasks.liftover_tasks import _allele_id_batches, queue_liftover_selected_alleles
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
@@ -173,6 +173,17 @@ class TestLiftoverBatching(TestCase):
         pks = sorted(a.pk for a in self.alleles)
         expected = [(pks[0], pks[1]), (pks[2], pks[3]), (pks[4], pks[4])]
         self.assertEqual(list(_allele_id_batches(allele_qs)), expected)
+
+    @override_settings(LIFTOVER_BATCH_SIZE=2)
+    def test_queue_liftover_selected_alleles_sends_ids(self):
+        # A selection isn't contiguous, so each task gets ids - a pk range would pick up the unselected alleles
+        selected_pks = sorted(a.pk for a in self.alleles)[::2]
+        allele_qs = Allele.objects.filter(pk__in=selected_pks)
+        with patch("snpdb.tasks.liftover_tasks.liftover_selected_allele_batch.si") as mock_si:
+            num_batches = queue_liftover_selected_alleles(admin_bot(), allele_qs)
+        self.assertEqual(num_batches, 2)
+        sent_ids = [call.args[1] for call in mock_si.call_args_list]
+        self.assertEqual(sent_ids, [selected_pks[:2], selected_pks[2:]])
 
 
 class TestFailedLiftoverAlleles(TestCase):

@@ -4,16 +4,24 @@ from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, IntegerField, OuterRef, QuerySet, StringAgg, Subquery, TextField, Value
+from django.db.models import (
+    Count,
+    IntegerField,
+    OuterRef,
+    QuerySet,
+    StringAgg,
+    Subquery,
+    TextField,
+    Value,
+)
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from analysis.models import VariantTag
-from annotation.models.models import (
-    AnnotationVersion,
-    GeneAnnotationVersion,
-    InvalidAnnotationVersionError,
-)
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_gene_annotation import GeneAnnotationVersion
+from annotation.models.models_version import InvalidAnnotationVersionError, VariantAnnotationVersion
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     CanonicalTranscript,
     CanonicalTranscriptCollection,
@@ -27,11 +35,11 @@ from genes.models import (
     ReleaseGeneVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.utils import pretty_label
+from snpdb.enums import ImportStatus
 from snpdb.grids import AbstractVariantGrid, get_standard_overrides
-from snpdb.models import ImportStatus, Q, VariantGridColumn
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models import Q, VariantGridColumn
+from snpdb.models.models_genome import Contig, GenomeBuild
 from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
     variant_qs_filter_has_internal_data,
@@ -94,7 +102,7 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
             self.rich_columns.append(RichColumn(field_name, label=str(release), orderable=True))
 
     def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
-        return GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
+        return VariantAnnotationVersion.latest_gene_annotation_releases()
 
     def _get_gene_list(self):
         """ Default is to get list, doing security check against request.user """
@@ -249,6 +257,13 @@ class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
         return ReleaseGeneVersion.objects.filter(
             release_id=gene_annotation_release_id,
             gene_version__gene__geneannotation__version=gene_annotation_version)
+
+    def get_csv_name(self) -> str:
+        """ Server CSV downloads carry the page's filter params, so a contig page's export is named after it """
+        name_parts = ["genes", self.get_query_param("genome_build_name")]
+        if contig_id := self.get_query_param("contig_id"):
+            name_parts.append(get_object_or_404(Contig, pk=contig_id).name)
+        return "_".join(name_parts)
 
     def filter_queryset(self, qs: QuerySet[ReleaseGeneVersion]) -> QuerySet[ReleaseGeneVersion]:
         if contig_id := self.get_query_param("contig_id"):

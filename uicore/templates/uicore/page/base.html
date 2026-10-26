@@ -2,6 +2,7 @@
 {% load js_tags %}
 {% load compress %}
 {% load settings_tags %}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -115,9 +116,8 @@
 
     <script src="{% static 'js/lib/chosen-1.8.7/chosen-1.8.7.jquery.js' %}"></script>
 
-    <!-- Used to show time as time ago, handy to use JavaScript for dates as we get timezone sorted -->
+    <!-- Formats timestamps in the browser's timezone, and "time ago" text (fromNow) -->
     <script src="{% static 'js/lib/moment-2.30.1/moment-2.30.1.min.js' %}"></script>
-    <script src="{% static 'js/lib/jquery.timeago-1.6.7/jquery.timeago-1.6.7.js' %}"></script>
 
     <!-- Used by flag dialogs to show loading -->
     <script src="{% static 'js/lib/loadingoverlay-2.1.6/loadingoverlay-2.1.6.min.js' %}"></script>
@@ -139,9 +139,8 @@
         <script src="{% static 'js/variantgrid_formats.js' %}"></script>
         <script src="{% static 'js/variantgrid_filter_builder.js' %}"></script>
         <script src="{% static 'js/vc_links.js' %}"></script>
-        <script src="{% static 'js/vc_form.js' %}"></script>
+        <script src="{% static 'js/classification/vc_table.js' %}"></script>
         <script src="{% static 'js/flags.js' %}"></script>
-        <script src="{% static 'js/vc_diff.js' %}"></script>
         <script src="{% static 'js/age_widget.js' %}"></script>
         <script src="{% static 'js/scientific_number_widget.js' %}"></script>
         <script src="{% static 'js/tips.js' %}"></script>
@@ -181,7 +180,6 @@
     <div>
         <div class="nav-side-bar no-gutters">
             <nav class="nav navbar-light" aria-orientation="vertical">
-                <div id="global-debug-message"></div>
                 <div id="current-record-spot-fallback"></div>
                 <div id="menu-bar-sub"></div>
                 <div id="site-messages"></div>

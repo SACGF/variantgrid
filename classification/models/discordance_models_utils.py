@@ -9,14 +9,13 @@ from django.utils import timezone
 from frozendict import frozendict
 from more_itertools import first
 
+from classification.enums import DiscordanceReportNextStep, DiscordanceReportTriageStatus
 from classification.models import (
     ClassificationLabSummary,
     ClassificationModification,
     DiscordanceReport,
     DiscordanceReportClassification,
-    DiscordanceReportNextStep,
     DiscordanceReportTriage,
-    DiscordanceReportTriageStatus,
 )
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from genes.hgvs import HGVSDisplay

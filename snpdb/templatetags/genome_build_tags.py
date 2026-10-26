@@ -9,14 +9,19 @@ register = Library()
 
 
 @register.inclusion_tag("snpdb/tags/genome_build_grid_filter.html")
-def genome_build_grid_filter(genome_builds=None):
-    """ Radio toggle that filters a datatable to one build. The page owns the change handler - it
-        sets 'genome_build_name' in its own grid params (@see vcf_grid_filter, analyses.html)
+def genome_build_grid_filter(genome_builds=None, table_id=None):
+    """ Radio toggle that filters a datatable to one build, sent as 'genome_build_name' in the grid params.
+
+        With table_id the tag wires it up itself - the table needs data-datatable-data="genomeBuildGridFilter" -
+        and renders nothing when there is only one build. Without it the page owns the change handler
+        (@see vcf_grid_filter, analyses.html)
 
         Pass genome_builds to offer only the builds the page's data is actually in """
     if genome_builds is None:
         genome_builds = GenomeBuild.builds_with_annotation()
-    return {"genome_builds": genome_builds}
+    return {"genome_builds": genome_builds,
+            "table_id": table_id,
+            "show": table_id is None or len(genome_builds) > 1}
 
 
 @register.inclusion_tag("snpdb/tags/genome_build_url_arg.html")

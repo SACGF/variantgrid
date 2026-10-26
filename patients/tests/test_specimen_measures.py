@@ -7,10 +7,10 @@ from django.test import TestCase
 from django.urls import reverse
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import NucleicAcid, SpecimenMeasureType
 from patients.models import Patient, Specimen, SpecimenMeasure
-from patients.models_enums import NucleicAcid, SpecimenMeasureType
+from seqauto.enums import LibraryQCCategory
 from seqauto.models import DragenTSO500CombinedVariantOutput, LibraryQC
-from seqauto.models.models_enums import LibraryQCCategory
 
 
 class SpecimenPageMeasuresTest(TestCase):

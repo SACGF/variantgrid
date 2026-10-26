@@ -11,6 +11,7 @@ import os
 
 from django.core.management.base import BaseCommand, CommandError
 
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.external_annotation import (
     DEFAULT_MIN_EXTERNAL_VARIANTS,
     _require_sv_offload_supported,
@@ -18,8 +19,7 @@ from annotation.external_annotation import (
     dump_external_annotation_runs,
     import_external_annotation_runs,
 )
-from annotation.models.models import VariantAnnotationVersion
-from annotation.models.models_enums import VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from snpdb.models.models_genome import GenomeBuild
 
 

@@ -10,17 +10,19 @@ from django.shortcuts import render
 from django.urls import reverse
 from termsandconditions.decorators import terms_required
 
-from classification.enums import ShareLevel, TriageStatus
+from classification.enums import ShareLevel, TriageNextStep, TriageStatus
 from classification.models import (
     ClinVarExport,
     ConditionText,
     ConditionTextMatch,
     DiscordanceReport,
     DiscordanceReportClassification,
-    classification_flag_types, OverlapContribution,
+    OverlapContribution,
+    classification_flag_types,
 )
 from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.discordance_models_utils import (
     DiscordanceReportCategories,
     DiscordanceReportRowData,
@@ -32,10 +34,10 @@ from classification.views.classification_accumulation_graph import (
 )
 from classification.views.exports import ClassificationExportFormatterFlags
 from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.overlaps_datatables import OverlapColumns
 from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -77,7 +79,8 @@ class ClassificationDashboard:
 
     @property
     def clinvar_keys(self) -> list[ClinVarKey]:
-        return sorted(set(lab.clinvar_key for lab in self.lab_picker.selected_labs if lab.clinvar_key))
+        lab_clinvar_keys = (lab.classification_settings.clinvar_key for lab in self.lab_picker.selected_labs)
+        return sorted({clinvar_key for clinvar_key in lab_clinvar_keys if clinvar_key})
 
     @cached_property
     def uploads_to_clinvar_qs(self) -> QuerySet[ClinVarExport]:
@@ -202,10 +205,21 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
         return redirect_response
 
     dlab = ClassificationDashboard(lab_picker=lab_picker)
+    overlap_counts: dict[TriageNextStep, int] = {}
+    # TT for pending and pending and other labs have triaged
+    # S for solved
+    # V for VUS
+    for skew_status in [
+        TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED,
+        TriageNextStep.AWAITING_YOUR_TRIAGE]:
+        overlap_counts[skew_status] = OverlapColumns(request, {"skew_status": str(skew_status), "lab_selection": lab_id}).get_initial_queryset().count()
+
 
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
         "clinvar_export_enabled": clinvar_export_sync.is_enabled,
+        "overlap_counts_waiting_triage": overlap_counts[TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED] + overlap_counts[TriageNextStep.AWAITING_YOUR_TRIAGE],
+        "overlap_counts_others_triaged": overlap_counts[TriageNextStep.AWAITING_YOUR_TRIAGE_OTHERS_TRIAGED],
         "genome_build": GenomeBuildManager.get_current_genome_build(),
     })
 

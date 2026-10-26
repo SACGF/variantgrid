@@ -1,31 +1,41 @@
 """
 Backfilling VariantAnnotation columns from an annotated VCF (#1675).
 """
+import io
 import os
 import tempfile
 
+from django.core.management import CommandError, call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 
 from annotation.backfill_columns import (
     BackfillColumnError,
+    check_annotated_vcf_complete,
     dump_annotated_variants,
     import_backfill_vcf,
     normalise_source_value,
     resolve_backfill_columns,
 )
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_vep_version,
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
-from annotation.models.models import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
+from annotation.vep_annotation import get_vep_skipped_variants_filename
 from annotation.vep_field_formatters import format_pick_highest_int
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
+from genes.fake_data import create_gene_level_variant
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.models.models_variant import VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 
 COSMIC_V99 = 99
 COSMIC_V101_SAMPLE_COUNT = "GENOME_SCREEN_SAMPLE_COUNT"
@@ -118,6 +128,11 @@ class BackfillColumnRoundTripTests(TestCase):
         cls.variants = [
             slowly_create_test_variant("1", 100 + i, "A", "G", cls.genome_build) for i in range(3)
         ]
+        # Annotated too, but never in a dump the STANDARD VEP command reads (a gene-level variant in none)
+        cls.structural_variant = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="1", position=1000, ref="A", alt="<DEL>", svlen=-100_000), cls.genome_build)
+        gene_level_variant = create_gene_level_variant(
+            VariantCoordinate.from_string("GENE_LEVEL:3236-3236 <SPLICE:HGNC:3236:V_III>", None))
         annotation_range_lock = AnnotationRangeLock.objects.create(version=cls.vav,
                                                                    min_variant=cls.variants[0],
                                                                    max_variant=cls.variants[-1],
@@ -132,6 +147,8 @@ class BackfillColumnRoundTripTests(TestCase):
                 VariantAnnotation.objects.create(version=cls.vav, variant=variant,
                                                  annotation_run=annotation_run,
                                                  symbol="RUNX1", cosmic_legacy_id="COSM1")
+            for variant in (cls.structural_variant, gene_level_variant):
+                VariantAnnotation.objects.create(version=cls.vav, variant=variant, annotation_run=annotation_run)
         # An existing value the file has nothing to say about - what --clear-missing decides the fate of
         VariantAnnotation.objects.filter(version=cls.vav, variant=cls.variants[2]).update(cosmic_count=3)
 
@@ -140,7 +157,7 @@ class BackfillColumnRoundTripTests(TestCase):
                                                 info_overrides={"cosmic_count": COSMIC_V101_SAMPLE_COUNT})
 
     def _cosmic_counts(self) -> list:
-        qs = VariantAnnotation.objects.filter(version=self.vav).order_by("variant_id")
+        qs = VariantAnnotation.objects.filter(version=self.vav, variant__in=self.variants).order_by("variant_id")
         return list(qs.values_list("cosmic_count", flat=True))
 
     @staticmethod
@@ -165,7 +182,7 @@ class BackfillColumnRoundTripTests(TestCase):
         dump_filename = os.path.join(tmp_dir, "dump.vcf")
         count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
                                         only_missing=only_missing)
-        self.assertEqual(count, 2 if only_missing else 3)
+        self.assertEqual(count, 3 if only_missing else 4)
         annotated_filename = os.path.join(tmp_dir, "annotated.vcf")
         self._annotate_dump(dump_filename, annotated_filename, counts)
         return annotated_filename
@@ -177,7 +194,8 @@ class BackfillColumnRoundTripTests(TestCase):
             annotated_filename = self._dump_and_annotate(tmp_dir, counts)
             report = import_backfill_vcf(self.vav, annotated_filename, self.targets)
 
-        self.assertEqual(report["records_read"], 3)
+        # The structural variant was dumped too, and the file says nothing about it
+        self.assertEqual(report["records_read"], 4)
         # Third variant keeps its existing value - the file said nothing about it
         self.assertEqual(self._cosmic_counts(), [12, 5, 3])
         # Neighbouring columns untouched
@@ -220,6 +238,53 @@ class BackfillColumnRoundTripTests(TestCase):
                                             only_missing=True, not_null_columns=["cosmic_legacy_id"])
         self.assertEqual(count, 1)
 
+    def test_consequence_dumps_matching_representative_transcripts(self):
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[0]) \
+                                 .update(consequence="intron_variant&5_prime_UTR_variant")
+        # Not the SO term itself - consequence is matched term by term
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[1]) \
+                                 .update(consequence="5_prime_UTR_variant_lookalike")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                            consequence="5_prime_UTR_variant")
+        self.assertEqual(count, 1)
+
+    def test_pipeline_type_dumps_only_the_variants_it_annotates(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
+                                            pipeline_type=VariantAnnotationPipelineType.STANDARD)
+        self.assertEqual(count, len(self.variants))
+
+    def _import_command(self, annotated_filename: str, *args):
+        call_command("annotation_backfill_columns", "--import", "--genome-build", "GRCh37",
+                     "--variant-annotation-version", str(self.vav.pk), "--columns", "cosmic_count",
+                     "--info", f"cosmic_count={COSMIC_V101_SAMPLE_COUNT}", "--vcf", annotated_filename, *args,
+                     stdout=io.StringIO())
+
+    def test_mark_backfilled_sets_flag_after_import(self):
+        VariantAnnotationVersion.objects.filter(pk=self.vav.pk).update(backfilled_utr_avi_splicevault=False)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._dump_and_annotate(tmp_dir, {self.variants[0].pk: "12"})
+            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_avi_splicevault", "--dry-run")
+            self.vav.refresh_from_db()
+            self.assertFalse(self.vav.backfilled_utr_avi_splicevault)
+
+            self._import_command(annotated_filename, "--mark-backfilled", "backfilled_utr_avi_splicevault")
+        self.vav.refresh_from_db()
+        self.assertTrue(self.vav.backfilled_utr_avi_splicevault)
+        self.assertEqual(self._cosmic_counts(), [12, None, 3])
+
+    def test_mark_backfilled_refuses_a_field_that_is_not_a_backfill_flag(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._dump_and_annotate(tmp_dir, {self.variants[0].pk: "12"})
+            for field in ("columns_version", "backfilled_nothing"):
+                with self.subTest(field), self.assertRaises(CommandError):
+                    self._import_command(annotated_filename, "--mark-backfilled", field)
+        # Refused before anything was imported
+        self.assertEqual(self._cosmic_counts(), [None, None, 3])
+
     def test_not_null_rejects_a_column_that_is_not_a_field(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             dump_filename = os.path.join(tmp_dir, "dump.vcf")
@@ -250,3 +315,20 @@ class BackfillColumnRoundTripTests(TestCase):
 
             with self.assertRaises(BackfillColumnError):
                 import_backfill_vcf(self.vav, stripped_filename, self.targets)
+
+    def test_annotated_vcf_must_account_for_every_dumped_record(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._dump_and_annotate(tmp_dir, {})
+            dump_filename = os.path.join(tmp_dir, "dump.vcf")
+            with open(annotated_filename, encoding="utf-8") as f:
+                lines = f.readlines()
+            with open(annotated_filename, "w", encoding="utf-8") as f:
+                f.writelines(lines[:-1])
+
+            with self.assertRaises(BackfillColumnError):
+                check_annotated_vcf_complete(dump_filename, annotated_filename)
+
+            with open(get_vep_skipped_variants_filename(annotated_filename), "w", encoding="utf-8") as f:
+                f.write(f"[VEP skipped the following variants from {dump_filename}]\n"
+                        f"Line 4    \t{lines[-1][:40]}\tInvalid allele\n")
+            self.assertEqual(check_annotated_vcf_complete(dump_filename, annotated_filename), 4)

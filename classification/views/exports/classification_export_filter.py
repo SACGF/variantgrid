@@ -7,9 +7,10 @@ AlleleData - all the visible modifications for one allele - that a formatter
 the output.
 """
 import operator
+import re
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import cached_property, reduce
 from typing import Any, Optional, Union
@@ -18,14 +19,15 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
+from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.exceptions import ParseError
+from typing_extensions import deprecated
 
 from annotation.annotation_version_querysets import (
     get_variant_queryset_for_latest_annotation_version,
 )
-from classification.enums import AlleleOriginBucket, ClinicalContextStatus, ShareLevel
-from classification.enums.discordance_enums import DiscordanceReportResolution
+from classification.enums import ClinicalContextStatus, DiscordanceReportResolution, ShareLevel
 from classification.models import (
     Classification,
     ClassificationModification,
@@ -39,13 +41,18 @@ from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
-from library.utils import batch_iterator, http_header_date_now, local_date_string
+from library.utils import (
+    batch_iterator,
+    http_header_date_now,
+    local_date_string,
+    utc_from_timestamp,
+)
 from snpdb.clingen_allele import get_clingen_allele
+from snpdb.enums import AlleleOriginBucket, AlleleOriginFilterDefault
 from snpdb.models import (
     VARIANT_PATTERN,
     VARIANT_SYMBOLIC_PATTERN,
     Allele,
-    AlleleOriginFilterDefault,
     ClinGenAllele,
     GenomeBuild,
     Lab,
@@ -53,7 +60,7 @@ from snpdb.models import (
     Variant,
     VariantCoordinate,
 )
-from snpdb.signals.variant_search import get_results_from_variant_coordinate
+from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
 
 
 @dataclass
@@ -203,14 +210,46 @@ def flag_ids_to(model: type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[Flag
     return set(model.objects.filter(flag_collection_id__in=qs).values_list('pk', flat=True))
 
 
-class TranscriptStrategy(str, Enum):
-    """
-    What transcripts are going to be included
-    :cvar ALL: Include all transcripts
-    :cvar REFSEQ: More accurately only include transcripts that Alissa supports NM/NR
-    """
-    ALL = "all"
-    REFSEQ = "refseq"
+class InvalidExportParameter(Exception):
+    pass
+
+
+def parse_since(since_str: str) -> datetime:
+    try:
+        since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
+        since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
+        return since_date
+    except BaseException:
+        pass
+
+    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
+        amount = int(m.group(1))
+        unit = m.group(2)
+        if unit:
+            unit = unit.strip().lower()
+
+        if amount > 100000 and not unit:
+            return utc_from_timestamp(float(since_str))
+
+        since = timezone.now()
+        if not unit or unit == 'd':
+            since -= timedelta(days=amount)
+        elif unit == 'm':
+            since -= timedelta(minutes=amount)
+        elif unit == 'w':
+            since -= timedelta(weeks=amount)
+        elif unit == 's':
+            since -= timedelta(seconds=amount)
+        else:
+            raise ValueError(f"Cannot parse {since_str} don't know time unit {unit}")
+        return since
+
+    try:
+        return utc_from_timestamp(float(since_str))
+    except BaseException:
+        pass
+
+    raise ValueError(f"Could not parse since string {since_str}")
 
 
 class DiscordanceReportStatus(str, Enum):
@@ -320,35 +359,6 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
         return Q(pk=None)
 
 
-# def classification_export_user_string_to_q(user_input: str, genome_build: GenomeBuild) -> Q:
-#     if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(user_input):
-#         clingen_allele = get_clingen_allele(user_input)
-#         return Q(classification__allele_info__allele__clingen_allele=clingen_allele)
-#     elif GENE_SYMBOL_PATTERN.match(user_input):
-#         gene_symbol = user_input
-#         if gene_symbol_alias := GeneSymbolAlias.objects.filter(alias=user_input).first():
-#             gene_symbol = gene_symbol_alias.gene_symbol
-#         if gene_match := classification_gene_symbol_filter(gene_symbol):
-#             return gene_match
-#     if vc := VariantCoordinate.from_string(user_input, genome_build):
-#         variant_qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-#         variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
-#
-#         variant_coordinate = vc.as_internal_symbolic(genome_build)
-#         variants = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)
-#         all_alleles: set[Allele] = set()
-#         for v in variants:
-#             if allele := v.allele:
-#                 all_alleles.add(allele)
-#         if all_alleles:
-#             return Q(classification__allele_info__allele__in=all_alleles)
-#         else:
-#             return Q(pk=None)
-#             # no variants match this search, return a Q that will result in no records being returned, so we can complain
-#             # that there are no matches for this user string
-#     raise ValueError(f"Can't match \"{user_input}\" to ClinGen Allele, Gene Symbol or Variant Coordinate")
-
-
 @dataclass
 class ClassificationFilter:
     """
@@ -359,7 +369,6 @@ class ClassificationFilter:
         include_sources: If provided Labs/Orgs that should only be included
         since: Try to optimise data so we only include alleles that have been modified since this date
         min_share_level: Minimum share level of classifications to include
-        transcript_strategy: Which classification transcripts should be considered
         rows_per_file: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
         starting_query: If this is provided then instead of using all of the above filters, just this
         TODO rename row_limit to indicate that it's the max per file, not
@@ -374,7 +383,6 @@ class ClassificationFilter:
     include_sources: Optional[set[Lab]] = None
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.LAB
-    transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
     rows_per_file: Optional[int] = None
     allele: Optional[int] = None
     file_prefix: str = "classifications"
@@ -483,10 +491,8 @@ class ClassificationFilter:
 
         share_level = ShareLevel(share_level_str)
         genome_build = GenomeBuild.get_name_or_alias(build_name)
-        transcript_strategy = TranscriptStrategy(request.query_params.get('transcript_strategy', 'all'))
         since: Optional[datetime] = None
         if since_str := request.query_params.get('since'):
-            from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
         # just for debugging purposes allows us to download a single allele
@@ -530,7 +536,6 @@ class ClassificationFilter:
             genome_build=genome_build,
             allele_origin_filter=allele_origin_filter,
             min_share_level=share_level,
-            transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
             benchmarking=benchmarking,
@@ -573,6 +578,7 @@ class ClassificationFilter:
 
         return discordance_status
 
+    @deprecated("Need to get status from an overlap")
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
         if settings.DISCORDANCE_ENABLED:
             return self._discordant_classification_ids.get(cm.classification_id)
@@ -728,13 +734,6 @@ class ClassificationFilter:
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
         # can't filter out transcript versions (due to 37!=38) easily here, do that later
-
-        if self.transcript_strategy == TranscriptStrategy.REFSEQ:
-            from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
-            acceptable_transcripts: list[Q] = [
-                Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
-            ]
-            cms = cms.filter(reduce(operator.or_, acceptable_transcripts))
 
         return cms
 

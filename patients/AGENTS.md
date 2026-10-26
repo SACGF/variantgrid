@@ -8,6 +8,8 @@ Start with:
 - models/has_phenotype_description_mixin.py — what a Patient or Cohort gets for having phenotype text
 - phenotype_matching.py — splitting text into sentences, matching and bulk matching; phenotype_matcher.py — the lookups
 Patterns here:
+- A patient is identified by patient code alone (sometimes all a row has), or by last name plus first name or date of
+  birth - never last name alone (patients/models/models_patient.py:Patient.match, used by the CSV import).
 - A PhenotypeDescription is owned through the one-to-one on the description, named after the owner's model
   (`patient`, `cohort`), so deleting the owner deletes it and its sentences. New text deletes the description and makes
   another, and the approval (`approved_by`) goes with it. An unowned description is a live preview

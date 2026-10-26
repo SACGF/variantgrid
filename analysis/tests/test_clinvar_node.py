@@ -1,13 +1,12 @@
 from django.db.models import Q
 from django.test import TestCase
 
+from analysis.enums import NodeMatchInput
 from analysis.forms.forms_nodes import ClinVarNodeForm
-from analysis.models.enums import NodeMatchInput
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.models.models_enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
-from classification.enums import SomaticClinicalSignificance
-from snpdb.models.models_enums import AlleleOriginFilterDefault
+from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
+from snpdb.enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
 
 
 class ClinVarNodeInputTest(AnalysisSetupMixin, TestCase):

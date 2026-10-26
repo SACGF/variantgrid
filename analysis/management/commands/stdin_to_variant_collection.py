@@ -5,7 +5,7 @@ import logging
 import cyvcf2
 from django.core.management.base import BaseCommand
 
-from analysis.models.enums import NodeStatus
+from analysis.enums import NodeStatus
 from analysis.vcf_files.bulk_vcf_count_inserter import BulkVCFCountInserter
 from eventlog.models import create_event
 from library.log_utils import get_traceback

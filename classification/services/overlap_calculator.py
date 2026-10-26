@@ -167,7 +167,7 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
         overlap_state = super().calculate_entries(entries)
         # do the normal calculation but also do a check for ALL VUS
         # as that gets its own property on OverlapSnapshot for quick lookup
-        if OverlapStatus.SINGLE_SUBMITTER <= overlap_state.status <= OverlapStatus.RESOLUTION_DIFFERENCES:
+        if OverlapStatus.SINGLE_SUBMITTER <= overlap_state.status <= OverlapStatus.MINOR_DIFFERENCES:
             all_vus = True
             for entry in entries:
                 match entry.contribution_status:

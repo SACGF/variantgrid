@@ -9,7 +9,7 @@ from analysis.models.models_karyomapping import GenomeKaryomappingCounts, Karyot
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_fake_transcript_version
-from patients.models_enums import Zygosity
+from patients.enums import Zygosity
 from snpdb.fake_data import create_fake_trio, make_cohort_genotype
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -72,3 +72,14 @@ class TrioKaryomappingViewTest(TestCase):
 
         response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
         self.assertContains(response, "karyomapping-qc-graph")
+
+    def test_trio_page_queues_missing_counts(self):
+        GenomeKaryomappingCounts.objects.filter(trio=self.trio).delete()
+        with self.captureOnCommitCallbacks() as callbacks:
+            response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        self.assertContains(response, "reload the page once they have been calculated")
+        self.assertEqual(len(callbacks), 1)
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        self.assertEqual(callbacks, [])  # already queued

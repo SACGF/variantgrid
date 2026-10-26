@@ -2,6 +2,7 @@ from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render
 from django.urls import reverse
 
+from classification.lab_classification_stats import labs_with_classifications_qs
 from classification.views.exports.classification_export_formatter_vcf import VCFTargetSystem
 from classification.views.exports_grouping.classification_grouping_export_filter import \
     ClassificationGroupingExportFilter, ClassificationGroupingExportFileSettings, ClassificationGroupingExportFormat
@@ -17,7 +18,7 @@ from classification.views.exports_grouping.classification_grouping_export_format
     ClassificationGroupingExportFormatterFranklin, FranklinFormatDetails
 from library.django_utils import get_url_from_view_path
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import GenomeBuild, Lab, Organization
+from snpdb.models import GenomeBuild, Lab
 
 
 def view_classification_grouping_export(request: HttpRequest) -> HttpResponseBase:
@@ -27,7 +28,8 @@ def view_classification_grouping_export(request: HttpRequest) -> HttpResponseBas
         "genome_builds": genome_builds,
         "default_genome_build": GenomeBuildManager.get_current_genome_build(),
         "user_labs": user_labs,
-        "all_orgs": list(Organization.objects.filter(active=True).order_by("name")),
+        "sharing_labs": list(labs_with_classifications_qs(shared_only=True).filter(organization__active=True)
+                             .select_related("organization").order_by("organization__name", "name")),
         "base_url": get_url_from_view_path(reverse('classification_grouping_export')),
     })
 

@@ -10,6 +10,7 @@ Read-only: nothing here writes to the database, the broker or the filesystem.
 import shutil
 import socket
 import subprocess
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,8 +19,12 @@ from django.db import connection
 from django.db.models import Count
 from django.utils import timezone
 
-from annotation.models import AnnotationRun, VariantAnnotationVersion
-from annotation.models.models_enums import AnnotationStatus
+from annotation.abandoned_annotation_runs import (
+    abandoned_annotation_runs_by_reason,
+    incomplete_annotation_runs_qs,
+)
+from annotation.enums import AnnotationStatus
+from annotation.models import VariantAnnotationVersion
 from eventlog.models import Event
 from library.django_utils.database_utils import get_table_row_estimates
 from library.enums.log_level import LogLevel
@@ -35,6 +40,8 @@ from variantgrid.celery import app as celery_app
 SCALE_TABLES = ("snpdb_variant", "snpdb_allele", "snpdb_locus", "snpdb_sample", "snpdb_vcf",
                 "classification_classification", "analysis_analysis", "analysis_varianttag", "annotation_annotationrun")
 RECENT_ERRORS = 10
+QUEUE_CONSUMER_WAIT_SECONDS = 30
+QUEUE_CONSUMER_POLL_SECONDS = 2
 
 
 @dataclass
@@ -67,7 +74,7 @@ def gather_status() -> Status:
     _section(status, "db", _db)
     _section(status, "builds", _builds)
     _section(status, "services", _services)
-    _section(status, "queues", lambda: broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES]))
+    _section(status, "queues", lambda: _queues(status.services))
     _section(status, "annotation_runs", _annotation_runs)
     _section(status, "annotation_runs_abandoned", _annotation_runs_abandoned)
     _section(status, "manual_outstanding", _manual_outstanding)
@@ -135,13 +142,31 @@ def broker_queue_depths(queue_names) -> dict[str, dict]:
     return queues
 
 
-def _incomplete_runs():
-    return AnnotationRun.objects.exclude(status__in=AnnotationStatus.get_completed_states())
+def task_queue_name(task_name: str) -> str:
+    """ The queue a task is routed to: its CELERY_TASK_ROUTES entry, else the default queue """
+    route = settings.CELERY_TASK_ROUTES.get(task_name) or {}
+    return route.get("queue", settings.CELERY_TASK_DEFAULT_QUEUE)
+
+
+def _queues(services: dict[str, str]) -> dict[str, dict]:
+    """ A worker restarted moments ago is still loading Django and has not registered as a consumer yet, so a queue
+        whose unit is active but shows none is re-read for up to QUEUE_CONSUMER_WAIT_SECONDS before it is reported. """
+    queues = broker_queue_depths([queue.name for queue in settings.CELERY_TASK_QUEUES])
+    deadline = time.monotonic() + QUEUE_CONSUMER_WAIT_SECONDS
+    while (awaiting := _awaiting_consumer(queues, services)) and time.monotonic() < deadline:
+        time.sleep(QUEUE_CONSUMER_POLL_SECONDS)
+        queues.update(broker_queue_depths(awaiting))
+    return queues
+
+
+def _awaiting_consumer(queues: dict[str, dict], services: dict[str, str]) -> list[str]:
+    return [name for name, info in queues.items()
+            if info.get("consumers") == 0 and services.get(f"celeryd_{name}") == "active"]
 
 
 def _annotation_runs() -> dict[str, int]:
     historical = VariantAnnotationVersion.Status.HISTORICAL
-    in_flight = _incomplete_runs().filter(annotation_range_lock__isnull=False).exclude(
+    in_flight = incomplete_annotation_runs_qs().filter(annotation_range_lock__isnull=False).exclude(
         annotation_range_lock__version__status=historical)
     by_status = {}
     for run_status, count in in_flight.values_list("status").annotate(n=Count("pk")).order_by("status"):
@@ -150,15 +175,10 @@ def _annotation_runs() -> dict[str, int]:
 
 
 def _annotation_runs_abandoned() -> dict[str, int]:
-    """ Incomplete runs nothing will ever pick up: no range lock (#1654), or on a HISTORICAL
-        version. They need deleting, not waiting for. """
-    incomplete = _incomplete_runs()
-    abandoned = {
-        "no range lock": incomplete.filter(annotation_range_lock__isnull=True).count(),
-        "historical version": incomplete.filter(
-            annotation_range_lock__version__status=VariantAnnotationVersion.Status.HISTORICAL).count(),
-    }
-    return {k: v for k, v in abandoned.items() if v}
+    """ Incomplete runs nothing will ever pick up: `manage.py clean_up_abandoned_annotation_runs` removes them. """
+    abandoned = abandoned_annotation_runs_by_reason(incomplete_annotation_runs_qs())
+    counts = {reason: qs.count() for reason, qs in abandoned.items()}
+    return {k: v for k, v in counts.items() if v}
 
 
 def _manual_outstanding() -> list[str]:
@@ -207,7 +227,8 @@ def render_status(status: Status) -> str:
                      + (f"  DOWN: {', '.join(down)}" if down else ""))
     if status.queues:
         lines.append("queues: " + ", ".join(
-            f"{name} {info['messages']}q/{info['consumers']}c" if "messages" in info else f"{name} {info['error']}"
+            f"{name} {info['messages']}q/{info['consumers']}c" + (" NO CONSUMER" if info["consumers"] == 0 else "")
+            if "messages" in info else f"{name} {info['error']}"
             for name, info in status.queues.items()))
     lines.append("annotation runs in flight: " + (", ".join(f"{k} {v}" for k, v in status.annotation_runs.items()) or "none"))
     if status.annotation_runs_abandoned:

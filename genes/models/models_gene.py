@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 from collections import Counter, defaultdict
@@ -19,10 +18,10 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Collate, Upper
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 from requests import RequestException
 
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource, HGNCStatus, MANEStatus
 
 # Re-exported: callers have long imported these from genes.models
 from genes.transcript_errors import BadTranscript, MissingTranscript, NoTranscript
@@ -124,7 +123,7 @@ class HGNC(models.Model):
 class UniProt(models.Model):
     # accession = Primary (citable) accession number (1st element in SwissProt record)
     accession = models.TextField(primary_key=True)
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     function = models.TextField(null=True, blank=True)
     pathway = models.TextField(null=True, blank=True)
     pathway_interaction_db = models.TextField(null=True, blank=True)
@@ -368,8 +367,8 @@ class GeneSymbol(models.Model, PreviewModelMixin):
 class GeneSymbolAlias(TimeStampedModel):
     """ Gene Aliases record keep track of "source" and are from:
         NCBI:
-         * Source: ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-         * Code: python3 manage.py import_ncbi_gene_info <file>
+         * Source: cdot RefSeq JSON gene "aliases" (NCBI gene esummary OtherAliases)
+         * Code: python3 manage.py import_cdot_latest (import_gene_annotation)
 
         HGNC:
          * Source: https://www.genenames.org/cgi-bin/download
@@ -589,14 +588,6 @@ class Gene(PreviewModelMixin, models.Model):
         if annotation_consortium:
             qs = qs.filter(annotation_consortium=annotation_consortium)
         return set(qs.values_list("identifier", flat=True))
-
-    @staticmethod
-    def delete_orphaned_fake_genes():
-        used_genes = TranscriptVersion.objects.filter(gene_version__gene__identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).values_list("gene_version__gene")
-        qs = Gene.objects.filter(identifier__startswith=Gene.FAKE_GENE_ID_PREFIX).exclude(identifier__in=used_genes)
-        ret = qs.delete()
-        if ret:
-            logging.info("Deleted orphaned %s records: %s", Gene.FAKE_GENE_ID_PREFIX, ret)
 
     def get_vep_canonical_transcript(self, variant_annotation_version: 'VariantAnnotationVersion') -> Optional['Transcript']:
         """ This may be slow. It requires an annotated (non-ref) variant in the gene """
@@ -1194,10 +1185,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def coding_length(self) -> int:
         return self._sum_intervals(self.cds)
 
-    @cached_property
-    def threep_utr_length(self) -> int:
-        return self._sum_intervals(self.threep_utr)
-
     @property
     def num_codons(self) -> int:
         return self.coding_length // 3
@@ -1268,10 +1255,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def canonical_score(self) -> int:
         """ This is so you can sort multiple transcripts and find 'most canonical' """
         return self.CANONICAL_SCORES.get(self.canonical_tag, 0)
-
-    @property
-    def is_canonical(self) -> bool:
-        return bool(self.canonical_score)
 
     def get_contigs(self) -> set[Contig]:
         contigs = {self.genome_build_data["contig"]}
@@ -1417,21 +1400,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def get_external_url(self):
         return self.transcript.get_external_url(self.genome_build) + f".{self.version}"
 
-    @staticmethod
-    def update_accessions(accessions: Iterable[str], genome_build=None, **update_kwargs):
-        """ A way to quickly update lots of accessions, relying on the fact that there aren't that many versions """
-
-        tv_by_version = defaultdict(set)
-        for transcript_accession in accessions:
-            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-            tv_by_version[version].add(transcript_id)
-
-        for version, transcripts in tv_by_version.items():
-            filter_kwargs = {"version": version, "transcript_id__in": transcripts}
-            if genome_build:
-                filter_kwargs["genome_build"] = genome_build
-            TranscriptVersion.objects.filter(**filter_kwargs).update(**update_kwargs)
-
     def __str__(self):
         return f"{self.accession} ({self.gene_version.gene_symbol}/{self.genome_build_id})"
 
@@ -1487,7 +1455,13 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                                f"no RNA accession - there is no transcript sequence")
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():
+        tvi_qs = TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id)
+        if version is None:
+            # An unversioned accession resolves to the latest version, as the APIs do
+            tvi_qs = tvi_qs.order_by("-version")
+        else:
+            tvi_qs = tvi_qs.filter(version=version)
+        if tvi := tvi_qs.first():
             tvi.raise_any_errors()
             return tvi
 
@@ -1554,7 +1528,7 @@ class LRGRefSeqGene(models.Model):
         These map to RefSeq, see https://www.ncbi.nlm.nih.gov/refseq/rsg/lrg/
 
         We don't link directly to TranscriptVersion as they are per-build """
-    cached_web_resource = models.ForeignKey('annotation.CachedWebResource', on_delete=CASCADE)
+    cached_web_resource = models.ForeignKey('snpdb.CachedWebResource', on_delete=CASCADE)
     lrg = models.TextField()
     rna = models.TextField()  # RefSeq transcript accession
     t = models.TextField(null=True)
@@ -1584,28 +1558,12 @@ class LRGRefSeqGene(models.Model):
 
 
 class GeneSymbolWiki(Wiki):
+    """ Saving one links the citations in its markdown to the gene symbol
+        (annotation/signals/gene_symbol_wiki_citations.py) """
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.update_citations()
-
-    def update_citations(self):
-        existing_citations = {}
-        for gc in self.gene_symbol.genesymbolcitation_set.all():
-            existing_citations[gc.citation.pk] = gc
-
-        gene_citation_ids_to_keep = []
-        from annotation.models import CitationFetchRequest
-        for citation in CitationFetchRequest.get_unfetched_citations(self.markdown):
-            gene_citation = existing_citations.get(citation.pk)
-            if not gene_citation:
-                gene_citation = self.gene_symbol.genesymbolcitation_set.create(citation=citation)
-            gene_citation_ids_to_keep.append(gene_citation.pk)
-
-        # Delete any non-used ones
-        num_deleted = self.gene_symbol.genesymbolcitation_set.exclude(pk__in=gene_citation_ids_to_keep).delete()[0]
-        logging.info("Kept %s, deleted %d", gene_citation_ids_to_keep, num_deleted)
+    def citation_ids(self) -> list[str]:
+        return sorted(self.gene_symbol.genesymbolcitation_set.values_list("citation_id", flat=True))
 
 
 class ProteinDomain(models.Model):

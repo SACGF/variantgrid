@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib.sites.models import Site
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import TestCase, override_settings
 
 from snpdb.checks import OIDC_BACKEND
 from variantgrid.deployment_validation.settings_check import (
@@ -9,7 +9,7 @@ from variantgrid.deployment_validation.settings_check import (
 )
 
 
-class SystemChecksAsDeploymentCheckTest(SimpleTestCase):
+class SystemChecksAsDeploymentCheckTest(TestCase):
 
     def test_current_settings_pass(self):
         for name, result in check_system_checks().items():

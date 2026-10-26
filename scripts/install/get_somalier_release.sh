@@ -3,14 +3,15 @@
 # Downloads somalier and the data it needs into the current directory - run it in whatever
 # SOMALIER["annotation_base_dir"] points at, then check it with 'manage.py deployment_check'
 #
-# v0.3.5 fixed the allele order bug (brentp/somalier#163) by taking the sites VCF at relate time, so a
-# deployment on it wants SOMALIER["compensate_allele_order"] = False and its extracts rebuilt with
-# 'manage.py somalier_existing_vcfs --clear'
+# The binary is brentp/somalier master at edf6c917, built statically and hosted on variantgrid.com until
+# a release includes that fix for the allele order bug (brentp/somalier#163) - it matches
+# SOMALIER["compensate_allele_order"] = False. 'manage.py download_annotation_data' fetches the same file
 
 set -eu
 
-SOMALIER_VERSION="0.3.5"
-SOMALIER_BINARY="somalier-${SOMALIER_VERSION}"
+SOMALIER_VERSION="0.3.5+edf6c91"
+# settings.SOMALIER["annotation"]["command"]
+SOMALIER_BINARY="somalier-0.3.5-edf6c91"
 
 command -v wget > /dev/null || { echo "wget is required" >&2; exit 1; }
 
@@ -26,14 +27,12 @@ download() {
     fi
 }
 
-download "https://github.com/brentp/somalier/releases/download/v${SOMALIER_VERSION}/somalier" "${SOMALIER_BINARY}"
+download "https://variantgrid.com/download/annotation/somalier/${SOMALIER_BINARY}" "${SOMALIER_BINARY}"
 chmod a+x "${SOMALIER_BINARY}"
 if ! "./${SOMALIER_BINARY}" 2>&1 | head -1 | grep -q "${SOMALIER_VERSION}"; then
     echo "'${SOMALIER_BINARY}' doesn't run and report version ${SOMALIER_VERSION}" >&2
     exit 1
 fi
-# settings.SOMALIER["annotation"]["command"] is 'somalier', so an upgrade is re-running this script
-ln -sfn "${SOMALIER_BINARY}" somalier
 
 # Sites files - build specific, and the filenames have to match settings.SOMALIER["annotation"]["sites"]
 download "https://github.com/brentp/somalier/files/3412454/sites.hg38.nochr.vcf.gz" "sites.hg38.nochr.vcf.gz"
@@ -53,4 +52,4 @@ else
     chmod -R a+r 1kg-somalier
 fi
 
-echo "Installed $(./somalier 2>&1 | head -1) in $(pwd)"
+echo "Installed $("./${SOMALIER_BINARY}" 2>&1 | head -1) in $(pwd)"

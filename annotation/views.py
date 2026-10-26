@@ -8,24 +8,24 @@ from django.views.decorators.http import require_POST
 
 from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
+from annotation.enums import VariantAnnotationPipelineType
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
-from annotation.models.models import (
-    CachedWebResource,
+from annotation.models.models_gene_annotation import (
     DBNSFPGeneAnnotationVersion,
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasAnnotationVersion,
 )
-from annotation.models.models_enums import VariantAnnotationPipelineType
-from annotation.pipelines import vep_pipeline_types
 from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
+from annotation.pipelines import vep_pipeline_types
 from annotation.vep_annotation import (
     get_vep_command,
     get_vep_variant_annotation_version_kwargs,
 )
+from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
 from genes.models import (
     CdotDataVersion,
     GeneAnnotationImport,
@@ -34,15 +34,16 @@ from genes.models import (
     GeneVersion,
     TranscriptVersion,
 )
-from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils import get_field_counts, require_superuser
-from ontology.models import OntologyImport, OntologyService, OntologyTerm, OntologyVersion
+from ontology.enums import OntologyService
+from ontology.models import OntologyImport, OntologyTerm, OntologyVersion
 from snpdb.models import (
     VCF,
     GenomeBuild,
     SomalierConfig,
     VariantGridColumn,
 )
+from snpdb.models.models_cached_web_resource import CachedWebResource
 from variantgrid.deployment_validation.somalier_check import verify_somalier_config
 
 
@@ -285,6 +286,13 @@ def load_cached_web_resource(request, pk):
     # this will call post_save signal handlers - which populate things appropriately
     CachedWebResource.objects.create(name=pk)
     return HttpResponse()
+
+
+def view_cached_web_resource(request, pk):
+    """ One CachedWebResource's status block on the annotation page, polled while it imports """
+    cwr = get_object_or_404(CachedWebResource, pk=pk)
+    cwr.disabled_url = settings.DISABLED_CACHED_WEB_RESOURCES.get(cwr.name)
+    return render(request, "annotation/cached_web_resource.html", {"cwr": cwr})
 
 
 def annotation_versions(request):

@@ -41,7 +41,9 @@ gene accession starting with `_` (a fake from UTA data) is renamed with `Gene.FA
 URL in the file becomes a `genes/models/models_gene.py:GeneAnnotationImport`
 (`genes/management/commands/import_gene_annotation.py:GeneAnnotationImportManager`), and a version row keeps the
 `import_source` that first created it - many versions are shared between GFF releases, so a version is created once
-and re-linked afterwards. The `hgnc` FK is only set when the HGNC row exists, so HGNC should be loaded first. A
+and re-linked afterwards. The `hgnc` FK is only set when the HGNC row exists, so HGNC should be loaded first.
+`Gene.summary` and the NCBI `GeneSymbolAlias` rows also come from the file - cdot takes them from NCBI's gene esummary
+(#2431) - and a summary or alias cdot drops is kept rather than cleared. A
 transcript's whole geometry lives in `TranscriptVersion.data["genome_builds"][build]`; pre-cdot rows lack
 `genome_builds`, which `genes/models/models_gene.py:TranscriptVersion.data_is_current_cdot_format` detects.
 
@@ -60,7 +62,7 @@ The command is driven from the VariantAnnotationVersion, not from a filename.
 the VAV's `refseq` / `vep_cache` / `genebuild` pins (`RS_2025_08`, `110`, `2022_06`),
 `genes/cdot_data_release.py:find_latest_release_asset` finds the per-GFF asset with that token, and
 `genes/management/commands/import_cdot_gene_annotation_release.py:Command._ensure_release` downloads, creates and
-links it. Before downloading anything it tries `annotation/models/models.py:VariantAnnotationVersion.link_gene_annotation_release`,
+links it. Before downloading anything it tries `annotation/models/models_version.py:VariantAnnotationVersion.link_gene_annotation_release`,
 which matches existing releases by the GFF URL in their import
 (`annotation/gene_annotation_release_matching.py:match_gene_annotation_release`) - a build's gene set usually does
 not change between VEP versions, so the previous VAV's release is normally the right one. An already-linked release
@@ -73,7 +75,8 @@ release without a GeneAnnotationVersion makes `AnnotationVersion.validate` raise
 ### Symbols, aliases and per-release matching
 
 `genes/models/models_gene.py:GeneSymbol` is keyed on the symbol string under a case-insensitive collation, with
-`genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI gene_info, legacy UCSC and manual entry. Most
+`genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI (cdot's RefSeq gene `aliases`, synced by
+`genes/management/commands/import_gene_annotation.py:Command._update_ncbi_gene_symbol_aliases`), legacy UCSC and manual entry. Most
 come from `genes/cached_web_resource/hgnc.py:save_hgnc_records`, which upserts a GeneSymbol per approved symbol and
 an alias per `prev_symbol` / `alias_symbol`; `genes/cached_web_resource/hgnc.py:store_hgnc_from_web` then re-matches
 every release. Resolving one exact string is
@@ -98,7 +101,7 @@ bridge them (an MT-TS2 gene list matching PDCD2 via "RP8", #1669), and HGNC list
 so renames never need more than one. Readers never touch the
 matcher: `genes/models/models_gene_annotation_release.py:GeneAnnotationRelease.genes_for_symbols` and
 `genes/models/models_gene_list.py:GeneList.get_genes` read the cached rows, and the release always comes from the
-VAV (`GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds`). Matching is triggered whenever symbols
+VAV (`annotation/models/models_version.py:VariantAnnotationVersion.latest_gene_annotation_releases`). Matching is triggered whenever symbols
 appear: `genes/gene_matching.py:GeneSymbolMatcher.create_gene_list_gene_symbols` runs
 `ReleaseGeneMatcher.match_unmatched_in_hgnc_and_gene_lists` for every release after a bulk create, and the HGNC
 download and release creation do the same, so every symbol in a gene list or HGNC has rows in every release.
@@ -141,9 +144,10 @@ without biocommons (`HGVSMatcher._fast_variant_coordinate_to_g_hgvs`). Symbolic 
 `AssemblyMapper` with reference replacement and normalisation off, so a 2 Mb deletion never reads 2 Mb of reference
 (#1571). Parsing without the database is `genes/hgvs/hgvs.py:HGVSComponents` (with `HGVSComponents.diff` for comparing
 two) and `genes/hgvs/hgvs.py:HGVSDisplay` for the view layer; the matcher is only for coordinates. A c.HGVS with a gene symbol and no transcript raises in the matcher - the search app owns that
-feature: `snpdb/signals/variant_search.py:_search_hgvs` catches the error, ranks the symbol's transcripts through
+feature: `variantopedia/signals/hgvs_search.py:_search_hgvs` catches the error and hands it to
+`variantopedia/signals/hgvs_search.py:_search_hgvs_without_transcript`, which ranks the symbol's transcripts through
 `HGVSMatcher.rank_gene_symbol_transcripts` (cdot, MANE first) and searches each under the `SEARCH_HGVS_GENE_SYMBOL*`
-settings (`snpdb/signals/variant_search.py:_search_hgvs_using_gene_symbol`).
+settings (`variantopedia/signals/hgvs_search.py:_search_hgvs_using_gene_symbol`).
 
 ### Canonical transcripts and MANE
 
@@ -169,8 +173,8 @@ rather than dropped. Typed text goes through `genes/custom_text_gene_list.py:cre
 hashes the text so an unchanged edit is a no-op and otherwise replaces the list, tokenising with
 `genes/gene_matching.py:tokenize_gene_symbols`; tokens over `genes/gene_matching.py:MAX_GENE_SYMBOL_LENGTH` are
 skipped with a recorded warning because they cannot fit the unique index on `(gene_list, original_name)`. Analyses
-read a list per release: `genes/models/models_gene_list.py:GeneList.get_q` resolves symbols to that release's genes
-and delegates to `annotation/models/models.py:VariantTranscriptAnnotation.get_overlapping_genes_q`, and the gene
+read a list per release: `genes/models/models_gene_list.py:GeneList.get_genes` resolves symbols to that release's genes
+for `annotation/models/models.py:VariantTranscriptAnnotation.get_overlapping_genes_q`, and the gene
 list node merges several lists with `GeneList.get_gene_ids_for_gene_lists`, routing symbols through a subquery so
 Postgres uses the `(release, gene_symbol)` unique index instead of hash-joining every ReleaseGeneSymbol. Categories
 (`genes/models/models_gene_list.py:GeneListCategory`) are a table rather than choices so forms can chain on them,
@@ -202,8 +206,8 @@ canonical match than do - the symptom of the wrong collection on a kit. Collecti
 (`DataArchiveMixin`); `genes/models/models_gene_coverage.py:gene_coverage_collection_pre_delete_handler` drops the
 partitions.
 
-HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt, RefSeq gene summaries and the PanelApp listings all load through
-`annotation.CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
+HGNC, MANE, LRG, gnomAD constraint, Pfam, UniProt and the PanelApp listings all load through
+`snpdb/models/models_cached_web_resource.py:CachedWebResource` tasks (`genes/tasks/cached_web_resource_tasks.py`, wired by
 `genes/signals/manual_signals.py:hgnc_post_save_handler` and siblings): saving the named resource row runs the
 download on a worker and the row's description records what arrived. Pfam domains are the exception:
 `genes/interpro.py:store_domains_for_transcripts` fetches them per gene from InterPro the first time a gene page
@@ -231,9 +235,9 @@ and classification import want the nearest. Keeping `HGVSConverterInfo` on every
 
 ## Traps
 
-`genes/models/models_gene.py:TranscriptVersion.get_transcript_version` defaults to `best_attempt=True` and returns
-the nearest higher (or highest) version when the requested one is missing, then raises `MissingTranscript` if the
-row has no valid data; `genes/models/models_gene.py:TranscriptVersion.raise_bad_or_missing_transcript` tells
+`genes/models/models_gene.py:TranscriptVersion.get_transcript_version` raises `MissingTranscript` when the requested
+version is missing, unless called with `best_attempt=True` (the LRG path), which returns the nearest higher (or
+highest) version instead; either way it raises `MissingTranscript` if the row has no valid data; `genes/models/models_gene.py:TranscriptVersion.raise_bad_or_missing_transcript` tells
 `genes/transcript_errors.py:BadTranscript` (their typo) from `NoTranscript` (our gap) by asking NCBI/Ensembl, and
 caches both answers for a week (the `UNIT_TEST` settings swap in
 `genes/tests/utils/mock_transcript_sequence_retrieval.py:MockTranscriptSequenceFetcher` so tests never make them).
@@ -252,12 +256,8 @@ release - it inserts, updates `match_info` and deletes matches the current rules
 never does (`match_symbols_to_genes` only inserts), so rows left behind by an alias re-import or an older matcher need
 it. Run it `--dry-run` first.
 
-Genes prefixed `unknown_` are legacy placeholders from pre-GFF imports; `genes/management/commands/fix_fake_genes.py:Command`
-re-points their transcripts where another version names the gene and `Gene.delete_orphaned_fake_genes` removes the
-rest. `LRGRefSeqGene.get_transcript_version` requires the `t` part (`LRG_199t1`); a bare `LRG_199` raises.
-`genes/models/models_gene_list.py:GeneList.get_q` and
-`genes/models/models_gene_annotation_release.py:GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds`
-import from annotation inside the method: the genes/annotation cycle is real, and new cross-imports belong at the
-call site, not module level. `PanelAppPanel.cache_valid` is time-based, so a test that touches a stale panel makes a
+`LRGRefSeqGene.get_transcript_version` requires the `t` part (`LRG_199t1`); a bare `LRG_199` raises.
+genes models don't import annotation (annotation.models imports genes.models at module level): code needing both
+lives in annotation or at the call site. `PanelAppPanel.cache_valid` is time-based, so a test that touches a stale panel makes a
 network call; `MANE` is GRCh38-only and `MANE.get_mane_and_aliases_list_from_symbol` raises when the table is empty,
 so gene-symbol HGVS search errors on a deployment that has not loaded MANE.

@@ -7,15 +7,10 @@ from django.urls import reverse
 
 from genes.models import CanonicalTranscriptCollection, GeneList
 from library.preview_request import PreviewModelMixin
+from seqauto.enums import DataGeneration, EnrichmentKitType
 from seqauto.illumina import illumina_sequencers
-from seqauto.models.models_enums import DataGeneration, EnrichmentKitType
-from snpdb.models import (
-    SET_NULL,
-    GenomicIntervalsCollection,
-    LabProject,
-    Manufacturer,
-    VariantOrigin,
-)
+from snpdb.enums import VariantOrigin
+from snpdb.models import SET_NULL, GenomicIntervalsCollection, LabProject, Manufacturer
 
 
 class SequencerModel(models.Model):

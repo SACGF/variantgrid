@@ -21,16 +21,18 @@ from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
+from classification.enums.classification_enums import MultiCondition
 from classification.models import flag_types
 from classification.models.classification import (
     Classification,
     ClassificationModification,
+    classification_post_publish_signal,
+)
+from classification.models.condition_resolved import (
     ConditionReference,
     ConditionResolved,
     ConditionResolvedDict,
-    classification_post_publish_signal,
 )
-from classification.models.condition_text_search import monarch_condition_text_search
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagComment, FlagResolution, flag_comment_action
@@ -42,13 +44,9 @@ from library.django_utils.model_utils import ArrayLength
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from library.utils import get_timer
-from ontology.models import (
-    OntologyRelation,
-    OntologyService,
-    OntologySnake,
-    OntologyTerm,
-    OntologyTermRelation,
-)
+from ontology.enums import OntologyService
+from ontology.models import OntologyRelation, OntologySnake, OntologyTerm, OntologyTermRelation
+from ontology.monarch_search import monarch_condition_text_search
 from ontology.ontology_matching import (
     IGNORE_TERMS,
     NON_PR_TERMS,
@@ -135,20 +133,6 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
 
     def get_absolute_url(self):
         return reverse("condition_matching", kwargs={"pk": self.pk})
-
-
-class MultiCondition(models.TextChoices):
-    """
-    For when multiple terms exist, are we uncertain which one it is, or are we curating for multiple.
-    NOT_DECIDED means a choice is still required
-    """
-    NOT_DECIDED = 'N', 'Not decided'
-    UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
-    CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
-
-    @property
-    def clinvar_label(self):
-        return self.label
 
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
@@ -1248,7 +1232,8 @@ def apply_condition_resolution(classification: Classification, new_condition_res
                 data=new_condition_resolution,
                 flag_type=classification_flag_types.condition_resolution,
             )
-            classification.save(update_fields=['condition_resolution'])
+            Classification.objects.filter(pk=classification.pk).update(
+                condition_resolution=classification.condition_resolution)
 
             condition_set_signal.send(sender=Classification, classification=classification,
                                       condition=new_condition)

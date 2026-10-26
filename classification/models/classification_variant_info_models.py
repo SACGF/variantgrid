@@ -28,14 +28,15 @@ from django.db.models import (
     ForeignKey,
     JSONField,
     OneToOneField,
-    TextChoices,
     TextField,
 )
 from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from annotation.models.models import VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.models.models import VariantTranscriptAnnotation
+from annotation.models.models_version import VariantAnnotationVersion
+from classification.enums import ImportedAlleleInfoStatus, PHGVSSource
 from genes.gene_level_strings import looks_gene_level, resolve_gene_level_string
 from genes.gene_splice import SpliceEventVariant, get_splice_event_variant
 from genes.hgvs import (
@@ -137,13 +138,6 @@ class HGVSResolution:
     """ cdot data version or ClinGen date used during this resolution """
     transcript_version: Optional[str]
     gene_symbol: Optional[str]
-
-
-class PHGVSSource(TextChoices):
-    VEP = "V", "VEP"  # VariantTranscriptAnnotation.hgvs_p, exact transcript version, latest VariantAnnotationVersion
-    COMPUTED = "C", "Computed"  # biocommons c_to_p from resolved_hgvs
-    CLINGEN = "G", "ClinGen"  # cached ClinGenAllele proteinEffect
-    EVIDENCE = "E", "Evidence"  # a classification's p_hgvs evidence value, parsed
 
 
 @dataclass(frozen=True)
@@ -455,19 +449,6 @@ class ResolvedVariantInfo(TimeStampedModel):
         return variant_info
 
 
-class ImportedAlleleInfoStatus(TextChoices):
-    PROCESSING = "P", "Processing"
-    """ The initial status for an ImportedAlleleInfo """
-
-    MATCHED_IMPORTED_BUILD = "I", "Matched Imported Variant"
-    """ We have a variant for the imported build, but not yet lifted it over """
-
-    MATCHED_ALL_BUILDS = "M", "Complete"
-    """ There's a 37 and 38 variant linked (or at least there was an attempted liftover) """
-
-    FAILED = "F", "Failed"
-
-
 ALLELE_INFO_VALIDATION_SEVERITY = Literal["W", "E"]
 """
 Used in validation tag JSON to indicate if the error type is fatal or not.
@@ -769,8 +750,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     transcript_genome_ref_differ = BooleanField(null=True, blank=True)
     """ The transcript sequence and the imported build's genome differ over the variant's reference.
-        None means it couldn't be checked: resolved via ClinGen, intronic, no stored sequence for the transcript, or
-        matched before the check existed (one_off_backfill_transcript_genome_ref_differ fills those in) """
+        None means it couldn't be checked: resolved via ClinGen, intronic, or no stored sequence for the transcript """
 
     status = CharField(max_length=1, choices=ImportedAlleleInfoStatus.choices, default=ImportedAlleleInfoStatus.PROCESSING)
     """ If true, indicates that this is not matchable, see the message for details """
@@ -995,13 +975,13 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if (preferred := self[genome_build]) and (hgvs_obj := preferred.resolved_hgvs_obj):
             return HGVSDisplay(dna_hgvs=hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
-        for alt_build in GenomeBuild.builds_with_annotation_cached():
-            if alternative := self[alt_build]:
+        for annotated_build in GenomeBuild.builds_with_annotation_cached():
+            if alternative := self[annotated_build]:
                 if hgvs_obj := alternative.resolved_hgvs_obj:
                     return HGVSDisplay(
                         dna_hgvs=hgvs_obj,
                         is_desired_build=False,
-                        genome_build=alt_build,
+                        genome_build=annotated_build,
                         p_hgvs=alternative.p_hgvs
                     )
 

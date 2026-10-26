@@ -2,7 +2,8 @@ from django.template import Library, loader
 from django.urls import reverse
 
 from library.django_utils.data_archive_mixin import DataArchivedError
-from snpdb.models import CohortGenotypeCollection, ImportStatus
+from snpdb.enums import ImportStatus
+from snpdb.models import CohortGenotypeCollection
 
 register = Library()
 

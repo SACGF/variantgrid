@@ -82,7 +82,10 @@ def wiki_save(request, class_name, unique_keyword, unique_value):
     wiki.markdown = markdown
     wiki.last_edited_by = request.user
     wiki.save()
-    return JsonResponse({})
+    data = {}
+    if (citation_ids := wiki.citation_ids()) is not None:
+        data["citation_ids"] = citation_ids
+    return JsonResponse(data)
 
 
 def view_genome_build(request, genome_build_name):
@@ -110,12 +113,9 @@ def view_contig(request, contig_accession):
         # If multiple builds (eg MT), we'll use user default if they have it, doesn't really matter
         genome_build = builds[0]
         if len(builds) > 1:
-            try:
-                user_settings = UserSettings.get_for_user(request.user)
-                if user_settings.default_genome_build in builds:
-                    genome_build = user_settings.default_genome_build
-            except:
-                pass
+            user_settings = UserSettings.get_for_user(request.user)
+            if user_settings.default_genome_build in builds:
+                genome_build = user_settings.default_genome_build
     else:
         genome_build = None
 

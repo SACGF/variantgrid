@@ -9,11 +9,8 @@ import ijson
 from celery import Task
 from django.conf import settings
 
-from classification.enums import SubmissionSource
-from classification.models import (
-    UploadedClassificationsUnmapped,
-    UploadedClassificationsUnmappedStatus,
-)
+from classification.enums import SubmissionSource, UploadedClassificationsUnmappedStatus
+from classification.models import UploadedClassificationsUnmapped
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.log_utils import NotificationBuilder, report_message
@@ -204,7 +201,7 @@ class ClassificationImportMapInsertTask(Task):
                         for row in batch:
                             response = bci.insert(data=row, submission_source=SubmissionSource.API, import_run=import_run)
                             response.notify_if_required()
-                            import_run.increment_status(response.status)
+                            import_run.increment_status(response)
                         import_run.save()
                         bci.finish()
 

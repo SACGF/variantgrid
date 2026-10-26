@@ -21,7 +21,7 @@ import pydantic
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError, models, transaction
-from django.db.models import Exists, F, OuterRef, QuerySet, Value
+from django.db.models import Exists, OuterRef, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions.text import Concat
@@ -29,9 +29,9 @@ from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.text import slugify
-from django_extensions.db.models import TimeStampedModel
 from hgvs.extras.babelfish import VCFCoordinate
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 from pydantic import field_validator
 
 from flags.models import FlagCollection, FlagInfos, flag_collection_extra_info_signal
@@ -50,15 +50,10 @@ from library.guardian_utils import admin_bot
 from library.preview_request import PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.babelfish import get_genome_babelfish
+from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_enums import (
-    AlleleConversionTool,
-    AlleleOrigin,
-    ProcessingStatus,
-    SequenceRole,
-)
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 # VCF spec's reference alt (our Variant.REFERENCE_ALT is "=")
@@ -563,12 +558,29 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_internal_canonical_form(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Make sure we only have 1 representation for a variant - symbolic only at or beyond
-            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be """
+            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be, and a
+            symbolic svlen with its canonical sign (canonical_svlen) """
         if not self.is_symbolic:
             return self.as_internal_symbolic(genome_build)
         if self.can_be_made_explicit and abs(self.svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
             return self.as_external_explicit(genome_build)
+        canonical_svlen = self.canonical_svlen(self.alt, self.svlen)
+        if canonical_svlen != self.svlen:
+            return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=self.alt,
+                                     svlen=canonical_svlen)
         return self
+
+    @staticmethod
+    def canonical_svlen(alt: str, svlen: Optional[int]) -> Optional[int]:
+        """ A <DEL>'s svlen is stored negative (VCF 4.3) unless VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE, when
+            every svlen is positive. A <DEL> imported with END but no SVLEN used to come out positive (#1340) """
+        if svlen is None:
+            return None
+        if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+            return abs(svlen)
+        if alt == VCFSymbolicAllele.DEL:
+            return -abs(svlen)
+        return svlen
 
     def as_vcf_coordinate(self, genome_build: GenomeBuild) -> VCFCoordinate:
         """ hgvs's VCF-spec form, for Babelfish, on the contig's RefSeq accession rather than our chrom name.
@@ -905,8 +917,20 @@ class Variant(PreviewModelMixin, models.Model):
         return self.genome_builds
 
     @property
+    def ordered_genome_builds(self) -> list['GenomeBuild']:
+        """ genome_builds by name - iterating the set itself gives a different order in each process """
+        return sorted(self.genome_builds, key=lambda gb: gb.name)
+
+    @property
     def any_genome_build(self) -> GenomeBuild:
-        return next(iter(self.genome_builds))
+        """ Variants on a contig builds share (MT) are in several builds - the same one every time """
+        return self.ordered_genome_builds[0]
+
+    def preferred_genome_build(self, genome_build: Optional[GenomeBuild]) -> GenomeBuild:
+        """ genome_build (e.g. the user's) if this variant is in it, otherwise any_genome_build """
+        if genome_build in self.genome_builds:
+            return genome_build
+        return self.any_genome_build
 
     @cached_property
     def coordinate(self) -> VariantCoordinate:
@@ -923,13 +947,6 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
-
-    @cached_property
-    def vcf_alt(self) -> str:
-        """ Return the base as a string (not as our special REFERENCE_ALT) """
-        if self.is_reference:
-            return self.locus.ref.seq
-        return self.alt.seq
 
     @property
     def is_standard_variant(self) -> bool:
@@ -1042,33 +1059,6 @@ class Variant(PreviewModelMixin, models.Model):
             return [self]
         return Variant.objects.filter(variantallele__allele=allele)
 
-    def get_canonical_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        from annotation.models import VariantAnnotationVersion
-        vav = VariantAnnotationVersion.latest(genome_build)
-        return self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first()
-
-    def get_best_variant_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        from annotation.models import VariantAnnotationVersion
-        vav = VariantAnnotationVersion.latest(genome_build)
-        # canonical is nullable, so nulls_last keeps a canonical=True row ahead of the rest
-        canonical_first = F("canonical").desc(nulls_last=True)
-        if version := self.varianttranscriptannotation_set.filter(version=vav).order_by(canonical_first).first():
-            return version
-        if any_at_all := self.varianttranscriptannotation_set.first():
-            return any_at_all
-
-    def get_canonical_c_hgvs(self, genome_build):
-        from annotation.models import VariantAnnotationVersion
-        if cta := self.get_canonical_transcript_annotation(genome_build):
-            return cta.get_hgvs_c_with_symbol()
-        if self.is_gene_level:
-            # Sits on no transcript, so the representative annotation is the only one there is - it
-            # carries the VICC gene-level nomenclature. @see snpdb.gene_level_variants
-            vav = VariantAnnotationVersion.latest(genome_build)
-            if va := self.variantannotation_set.filter(version=vav).first():
-                return va.get_hgvs_c_with_symbol()
-        return None
-
     @property
     def start(self):
         return self.locus.position
@@ -1114,10 +1104,6 @@ class VariantAllele(TimeStampedModel):
 
     class Meta:
         unique_together = ("variant", "genome_build")
-
-    @property
-    def canonical_c_hgvs(self):
-        return self.variant.get_canonical_c_hgvs(self.genome_build)
 
     def needs_clingen_call(self):
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:
@@ -1247,7 +1233,6 @@ class LiftoverRun(TimeStampedModel):
             "genome_build": genome_build,
             "conversion_tool": AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
         }
-        # There should have been 1 created in 'one_off_legacy_populate_allele_liftover'
         lr = LiftoverRun.objects.filter(**kwargs).order_by("pk").first()
         if not lr:
             # Otherwise create it

@@ -134,8 +134,8 @@ class TestDamageNodeBackfillFlagWarnings(_BackfillFlagMixin, TestCase):
             f"expected damage_predictions_min warning, got: {warnings}",
         )
         self.assertTrue(
-            any("fix_columns_version" in w for w in warnings),
-            f"expected fix_columns_version pointer, got: {warnings}",
+            any("latest annotation version" in w for w in warnings),
+            f"expected latest annotation version pointer, got: {warnings}",
         )
 
     def test_damage_predictions_warning_silent_without_filter(self):
@@ -188,8 +188,8 @@ class TestDamageNodePTCBackfillFlag(_BackfillFlagMixin, TestCase):
             f"expected ptc_nmd_escaping warning, got: {warnings}",
         )
         self.assertTrue(
-            any("backfill_ptc_annotation" in w for w in warnings),
-            f"expected backfill_ptc_annotation pointer, got: {warnings}",
+            any("latest annotation version" in w for w in warnings),
+            f"expected latest annotation version pointer, got: {warnings}",
         )
 
     def test_no_ptc_warning_when_backfilled(self):
@@ -212,16 +212,16 @@ class TestConservationNodeSVBackfillFlag(_BackfillFlagMixin, TestCase):
         node = ConservationNode(analysis=self.analysis, any_scaled_min=0.5)
         warnings = node.get_warnings()
         self.assertTrue(
-            any("backfill_sv_conservation" in w for w in warnings),
-            f"expected backfill_sv_conservation pointer, got: {warnings}",
+            any("latest annotation version" in w for w in warnings),
+            f"expected latest annotation version pointer, got: {warnings}",
         )
 
     def test_no_warning_when_backfilled(self):
         self._set_vav_flag(backfilled_sv_conservation=True)
         node = ConservationNode(analysis=self.analysis, any_scaled_min=0.5)
-        self.assertEqual([], [w for w in node.get_warnings() if "backfill_sv_conservation" in w])
+        self.assertEqual([], [w for w in node.get_warnings() if "conservation scores" in w])
 
     def test_no_warning_when_not_filtering(self):
         self._set_vav_flag(backfilled_sv_conservation=False)
         node = ConservationNode(analysis=self.analysis)  # sliders at default - filters nothing
-        self.assertEqual([], [w for w in node.get_warnings() if "backfill_sv_conservation" in w])
+        self.assertEqual([], [w for w in node.get_warnings() if "conservation scores" in w])

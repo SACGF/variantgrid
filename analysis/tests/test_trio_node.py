@@ -3,12 +3,13 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import TrioInheritance
 from analysis.models import Analysis, TrioNode
-from analysis.models.enums import TrioInheritance
 from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin
 from annotation.fake_data import get_fake_annotation_version
+from snpdb.enums import BuiltInFilters
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_trio, make_cohort_genotype
-from snpdb.models import BuiltInFilters, GenomeBuild
+from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -256,6 +257,16 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
                 return_value=999999) as m:
             self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
             m.assert_not_called()
+
+    def test_cache_miss_recomputes_the_trio_not_the_cohort(self):
+        """ Trio buckets are written by calculate_trio_stats, so a miss has to enqueue that - a cohort
+            recompute is fresh without them and would never write them """
+        node = self._make_node(TrioInheritance.DENOVO)
+        with (mock.patch("analysis.models.nodes.sources.trio_node.enqueue_trio_stats_recompute") as trio_enqueue,
+              mock.patch("analysis.models.nodes.stats_cache.enqueue_cohort_stats_recompute") as cohort_enqueue):
+            self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
+        trio_enqueue.assert_called_once_with(self.trio, self.analysis.annotation_version)
+        cohort_enqueue.assert_not_called()
 
     # ── Zygosity table ────────────────────────────────────────────────────────
 

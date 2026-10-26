@@ -2,7 +2,11 @@
 Owns: Analysis (a DAG of AnalysisNode subclasses filtering Variants), AnalysisEdge, NodeVersion/NodeCache/NodeTask,
 the lease-based node scheduler, templates (AnalysisTemplate/Version/Run, AnalysisVariable), VariantTag, node editors, node grid + export.
 Start with:
-- models/nodes/analysis_node.py — AnalysisNode base (Q composition, versioning, load/counts, save cascade) + NodeVersion/Cache/Task
+- models/nodes/analysis_node.py — AnalysisNode base (fields, versioning, load/counts, save cascade) + AnalysisEdge/Dag;
+  node_samples_mixin / node_query_mixin (Q composition) / node_display_mixin / node_errors_mixin hold the rest,
+  each docstring listing the hooks a node overrides
+- models/nodes/node_version.py — NodeVersion and what cascades from it (NodeTask, NodeCache, column summaries);
+  node_vcf_filter.py / node_allele_frequency.py — the VCF and allele frequency filters several nodes share
 - models/nodes/sources/*.py, models/nodes/filters/*.py — one module per concrete node
 - models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run
 - tasks/analysis_update_tasks.py + tasks/node_update_tasks.py — dispatcher and the per-node celery tasks
@@ -10,9 +14,9 @@ Start with:
 - views/nodes/node_view.py + forms/forms_nodes.py — node editors; grids.py + grid_export.py — node grid/export
 Patterns here:
 - A node is a filter, not a result set. Override `_get_node_q` (or `_get_node_arg_q_dict` when the Q needs an annotation
-  alias such as a cohort genotype join); leave `get_queryset` alone. `analysis/models/nodes/analysis_node.py:AnalysisNode.get_arg_q_dict`
+  alias such as a cohort genotype join); leave `get_queryset` alone. `analysis/models/nodes/node_query_mixin.py:NodeQueryMixin.get_arg_q_dict`
   merges parent dicts with the node's own via `AnalysisNode.merge_arg_q_dicts`, and
-  `analysis/models/nodes/analysis_node.py:annotate_and_filter_queryset` annotates once per alias then filters — a chain
+  `analysis/models/nodes/node_query_mixin.py:annotate_and_filter_queryset` annotates once per alias then filters — a chain
   of nodes is one SQL query.
 - Declare `min_inputs`/`max_inputs` on the subclass (0/0 = source, `AnalysisNode.PARENT_CAP_NOT_SET` = unbounded,
   `analysis/models/nodes/filters/merge_node.py:MergeNode`). Set `uses_parent_queryset = False` and override
@@ -28,7 +32,7 @@ Patterns here:
   copying edges in a clone) sets `node.valid = node.is_valid` itself. Move/connect edits go through `analysis/views/views_json.py:NodeUpdate`.
 - Scheduling is state-driven, not a prebuilt chain: `analysis/tasks/analysis_update_tasks.py:create_and_launch_analysis_tasks`
   (on `scheduling_single_worker`) calls `analysis/tasks/analysis_update_tasks.py:lease_ready_nodes`, which claims DIRTY
-  nodes whose parents are all in `analysis/models/enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
+  nodes whose parents are all in `analysis/enums/analysis_enums.py:NodeStatus.READY_STATUSES` (error parents count — the child
   fails fast with ERROR_WITH_PARENT); each `analysis/tasks/node_update_tasks.py:update_node_task` re-triggers the
   dispatcher when it finishes. `analysis/tasks/analysis_update_tasks.py:dispatch_analysis_backlog` is the periodic sweep.
 - `analysis/scheduler_status.py` is the operator's view of the lease state (the superuser Analysis Status page):
@@ -47,6 +51,11 @@ Patterns here:
   `analysis/templates/analysis/family_wizard.html`, driven by the subclass's `family_*`/`role_*` attributes. A sample's
   role says which family member it is (Mother/Father/Proband/Sibling), and the sample's sex narrows the roles on offer
   (`analysis/forms/forms.py:FamilyWizardForm`) - a Duo stores its relative's role as the Duo's relationship.
+- Duo/Trio/Quad differ only in their family: each node's `FAMILY_SHAPE`
+  (`analysis/models/nodes/family_inheritance.py:FamilyShape` - the FK to the family and its members in order, each with
+  its affected and require-zygosity fields). The modes, the node methods, the editor's zygosity table and the editor
+  form/view (`analysis/views/nodes/node_views.py:FamilyNodeView`) are written once against it; a family's own module
+  holds only its zygosity tuples where they differ (a recessive sibling, a Duo's relationship) and its inheritance errors.
 - A Duo's second member is a *relative*, not necessarily a parent: `relationship` is Mother, Father or Sibling (#1861).
   A sibling pair carries no transmission, so the parent-only modes ('Absent in parent', 'Dominant (mosaic parent)') raise
   an inheritance error; the recessive modes ask the sibling for the proband's own genotype when they're affected and
@@ -67,7 +76,7 @@ Patterns here:
   `patients/sample_grouping.py:get_sample_group` resolves, so a TSO 500 case's DNA and RNA arms are one case reported
   from the specimen its measures hang off (`analysis/classify_report.py:ClassifyReportCase._for_source`).
   A tagging is in a case's queue when `Tag.requires_classification` and it belongs to one of the case's samples: its own `VariantTag.sample` (the study's proband, from
-  `analysis/models/nodes/analysis_node.py:AnalysisNode.get_proband_sample` at tag time), else its `VariantTag.patient`
+  `analysis/models/nodes/node_samples_mixin.py:NodeSamplesMixin.get_proband_sample` at tag time), else its `VariantTag.patient`
   (`AnalysisNode.get_proband_patient` - a node above sample level names the person while leaving which of their VCFs
   open, so the tagging is on the patient's tab and on each of that patient's sample tabs), else the analysis it was made
   in contains the sample. Carrying the variant is only a display filter for a tagging with no sample - a relative who is
@@ -159,12 +168,21 @@ Patterns here:
 - Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
   in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
+- The request user decides who may open an analysis; everything inside it is permission-checked as the analysis owner
+  (`analysis.user`): the grid (`analysis/grids.py:VariantGrid._get_permission_user`), the source pickers
+  (`analysis/forms/forms_nodes.py:SampleNodeForm.clean_source`), tag / classification / phenotype nodes, template runs.
+  So every viewer sees the same analysis, and adding a sample or VCF to it shares it with everyone who can see the
+  analysis. Someone else with write access can only add sources they can view as well
+  (`analysis/forms/forms_nodes.py:BaseNodeForm.restrict_choices_to_editor`), keeping what the node already has. For a deactivated owner, object checks (`has_perm`, `get_for_user`) always fail while guardian's queryset
+  filters still pass, so the analysis keeps showing but can't take new inputs: someone with write access takes it over
+  (`analysis/models/models_analysis.py:Analysis.change_owner`, from Analysis Settings or the user admin's lab head
+  action), then the nodes reload as the new owner (#2325).
 Gotchas:
 - Walk ancestors / descendants / roots with `analysis/models/nodes/analysis_node.py:AnalysisDag` (one edge query, pks),
   not recursive `parents()` calls. `parents()` returns base `AnalysisNode` rows, which never `==` a subclass instance -
   compare by pk (#2060). `AnalysisEdge.save()` rejects an edge that would make a cycle.
 - Several subqueries combine as `pk = ANY(ARRAY(<a> UNION <b>))`
-  (`analysis/models/nodes/analysis_node.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
+  (`analysis/models/nodes/node_query_mixin.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
   can't index an OR of IN-subqueries and walks all of snpdb_variant (#1894). Plain `pk IN (<union>)` fixes count() but
   the planner misestimates the union and sorted grid pages get slower.
 - Never call `node.save()` inside a celery task — use `analysis/models/nodes/analysis_node.py:AnalysisNode.update`, a
@@ -181,7 +199,10 @@ Gotchas:
   branch would re-queue the load that was just cancelled.
 - `AnalysisNode.save` locks the Analysis row first (`select_for_update`) so concurrent subtree cascades take NodeVersion
   locks in one order; copy `analysis/signals/source_data_invalidation.py:_bump_nodes` or
-  `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump.
+  `analysis/models/nodes/node_utils.py:reload_analysis_nodes` when writing a new bulk bump. Under that lock a bump counts on
+  from the stored version, not the one the request loaded (`AnalysisNode.bump_version`). An edit that doesn't bump (move,
+  name/notes) saves with `update_fields`: a whole-row save writes back the status and count read at request start over
+  the worker's load result (#2444).
 - The Q-object cache is on by default (`ANALYSIS_NODE_CACHE_Q`) and keyed only on NodeVersion pk. A test that changes a
   node and expects a different queryset without saving needs `@override_settings(ANALYSIS_NODE_CACHE_Q=False)`.
 - A small node answers `get_arg_q_dict` with `Q(pk__in=[...])` from `NodeVersion.variant_ids` (issue #546) - for its
@@ -189,7 +210,7 @@ Gotchas:
   filter the load ran. A node with no stored pks falls back to its filter chain - a count mismatch
   between the two paths is a real bug.
 - Anything that evaluates a node's Variant queryset runs under
-  `analysis/models/nodes/analysis_node.py:node_query_planner_settings` (grid handler, export task, `update_node_task`,
+  `analysis/models/nodes/node_query_mixin.py:node_query_planner_settings` (grid handler, export task, `update_node_task`,
   tag recounts, Venn cache). With the grid's columns selected the query joins 50+ relations, past Postgres's
   `join_collapse_limit` of 8, and the planner keeps the SQL's join order - whole variant table first, the node's
   selective filter last. It is per operation rather than server-wide because the extra planning time slows
@@ -214,7 +235,7 @@ Gotchas:
   is what `_raise_or_warn_count_mismatch` raises on. Anything reading a threshold - query, cache check, method summary -
   goes through there.
 - The Duo/Trio/Quad editors' zygosity table is built once per page from a stub node
-  (`analysis/models/nodes/sources/trio_node.py:TrioNode.get_zygosity_table_data`), so it cannot see a field's live
+  (`analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin.get_zygosity_table_data`), so it cannot see a field's live
   value - anything that depends on one ships as a `{placeholder}` the editor's `updateZygosityTable()` substitutes
   (the mosaic thresholds, #1830). A member with no `other_filters_<member>` key renders a blank cell.
 - Tag colours, sort order, 1-click tags and staleness in an analysis come from its own
@@ -232,13 +253,13 @@ Gotchas:
 - Templates run by cloning the snapshot then setting AnalysisVariable-bound fields in toposort order
   (`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments`); a source node's editor gets the variable
   widget only when `analysis.template_type == TEMPLATE` (`analysis/views/nodes/node_view.py:NodeView.get_form`).
-- Cache keys are pks (`analysis/models/nodes/analysis_node.py` keys node Q dicts on `node_version.pk`), so cached
+- Cache keys are pks (`analysis/models/nodes/node_query_mixin.py` keys node Q dicts on `node_version.pk`), so cached
   entries survive a deploy. One whose pickled class was since renamed, moved or removed is a miss
   (`library/django_utils/redis_cache.py:UnpickleTolerantRedisCache`); a change that leaves old entries unpickling but
   wrong needs a `CACHE_VERSION` bump in `variantgrid/settings/components/default_settings.py`.
 - A node mixin is listed before `AnalysisNode`, so a `def` on the mixin wins the MRO ahead of the node's
   implementation. State what the mixin only reads from the node as a class-level annotation
-  (`get_warnings: Callable[[], list[str]]` on `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin`),
+  (`get_filter_description: Callable[[], str]` on `analysis/models/nodes/family_inheritance.py:FamilyInheritanceNodeMixin`),
   and keep a `raise NotImplementedError()` body for what each subclass provides
   (`analysis/models/nodes/cohort_mixin.py:CohortMixin._get_cohort`) - a subclass is ahead of the mixin either way.
 Tests:

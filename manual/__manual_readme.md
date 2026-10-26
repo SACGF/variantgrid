@@ -59,5 +59,31 @@ Use `manage.py manual_gate` to list gate status.
 ## Obsolete tasks
 
 A `manage` task whose command has since been deleted is never auto-run (it would just crash) — it's
-reported as obsolete for review. `migrations/0004_complete_obsolete_manual_tasks.py` marks the known
-obsolete task ids complete so they drop out of the upgrade flow.
+reported as obsolete for review, where selecting it offers to mark it complete.
+
+## One-off commands
+
+Every few years the migrations are squashed at a checkpoint (below), and the fix and backfill commands their
+`ManualOperation`s ran are deleted along with them. A command written to run once is named `one_off_<what_it_fixes>`
+and declares `category = "one-off"` (`library/vg/maps/commands.py`; `vg health` counts them), so it is easy to find
+at the next checkpoint. All its code lives in the command module and its test. It may call core functions, private
+ones included. It adds no helpers or parameters to core modules unless the code would keep them anyway, so deleting
+the command and its test removes the fix completely. `snpdb/management/commands/one_off_dedupe_cohort_genotypes.py`
+is an example: it reuses the zygosity count SQL and restricts it to the variants it repairs.
+
+## The migration squash
+
+Every app's migrations were squashed into fresh initials and a `seed_data` migration (#736); an older database
+upgrades through branch `migration_checkpoint` first. `squashed_history.py` holds the guard and the reset - see the
+paragraph in `claude/guides/operations.md#deploy-and-upgrade`.
+
+When something breaks in a way the squash could explain - a seed row or index a deployment lacks, a data fix that
+never ran there, a schema that differs from a fresh build - start from #736. Everything the squash removed is still
+in git at tag `pre_squash_checkpoint` (the tip of branch `migration_checkpoint`, kept forever - a GitHub ruleset
+blocks deleting or moving it): the old per-app migrations (with their `RunPython` data fixes and `RunSQL`),
+the `ManualOperation`s they registered, and the one-off management commands those ran (deleted from master in
+593edc560 and 652c2fc3d). Read one with `git show pre_squash_checkpoint:<path>`, list an app's old migrations with
+`git ls-tree --name-only pre_squash_checkpoint snpdb/migrations/`, and find which migration registered a command with
+`git grep <command> pre_squash_checkpoint -- '*/migrations/*'`. To re-run a deleted command, bring it back as a new
+command (or a new migration's `ManualOperation`) on master rather than checking the tag out, since the
+checkpoint's system check stops every command there once its last migration is applied.

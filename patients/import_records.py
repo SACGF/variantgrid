@@ -26,9 +26,17 @@ from dateutil import parser
 from django.db import transaction
 from django.utils import timezone
 
+from library.django_utils import ensure_timezone_aware
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import report_exc_info
 from library.pandas_utils import df_nan_to_none
+from patients.enums import (
+    NucleicAcid,
+    PatientRecordMatchType,
+    PatientRecordOriginType,
+    Sex,
+    TissueStatus,
+)
 from patients.models import (
     AmbiguousExtraction,
     Extraction,
@@ -36,15 +44,15 @@ from patients.models import (
     PatientColumns,
     PatientModification,
     PatientRecord,
-    PatientRecordOriginType,
     Specimen,
 )
-from patients.models_enums import NucleicAcid, PatientRecordMatchType, Sex, TissueStatus
 from patients.phenotype_matching import bulk_patient_phenotype_matching
 from patients.tasks.extraction_matching_tasks import reconcile_pending_extractions
 from snpdb.models import Sample
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
+LEGACY_COLUMNS = {'Specimen Nucleic acid source (DNA/RNA)': PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE}
+OPTIONAL_COLUMNS = [PatientColumns.EXTRACTION_REFERENCE_ID, PatientColumns.EXTRACTION_DATE]
 
 
 class InvalidPatientRecord(ValueError):
@@ -198,23 +206,23 @@ def match_sample(user, sample_id, sample_name, validation_messages):
             else:
                 sample_without_permission = Sample.objects.filter(name=sample_name)
 
-            if sample_without_permission.exists():
+            if Sample.filter_for_user(user, queryset=sample_without_permission).exists():
                 msg += ". Samples exists with that name, but you don't have write access."
 
         if msg:
-            logging.warning(msg)
             validation_messages.append(f"Match Sample({kwargs}): {msg}")
 
     return sample
 
 
-def create_patient(patient_import, first_name, last_name, sex, date_of_birth, user):
+def create_patient(patient_import, first_name, last_name, sex, date_of_birth, user, patient_code=None):
     if first_name:
         first_name = first_name.upper()
     if last_name:
         last_name = last_name.upper()
 
-    patient = Patient.objects.create(last_name=last_name,
+    patient = Patient.objects.create(patient_code=patient_code,
+                                     last_name=last_name,
                                      first_name=first_name,
                                      date_of_birth=date_of_birth,
                                      sex=sex or Sex.UNKNOWN)
@@ -274,17 +282,16 @@ def process_record(patient_records, record_id, row):
     patient_to_check_for_phenotype_match = None
     user = patient_records.user
 
-    logging.info("row:")
-    logging.info(row)
-
     validation_messages = []
     family_code = row[PatientColumns.PATIENT_FAMILY_CODE]
     patient_code = row[PatientColumns.PATIENT_CODE]
     first_name = row[PatientColumns.PATIENT_FIRST_NAME]
     last_name = row[PatientColumns.PATIENT_LAST_NAME]
-    if not last_name:
-        raise InvalidPatientRecord(f"{PatientColumns.PATIENT_LAST_NAME}: is blank, it is needed to match or create a patient")
     date_of_birth = parse_date(row, PatientColumns.DATE_OF_BIRTH, validation_messages)
+    if not (patient_code or (last_name and (first_name or date_of_birth))):
+        raise InvalidPatientRecord(f"Needs {PatientColumns.PATIENT_CODE}, or {PatientColumns.PATIENT_LAST_NAME} with "
+                                   f"{PatientColumns.PATIENT_FIRST_NAME} or {PatientColumns.DATE_OF_BIRTH}, "
+                                   "to match or create a patient")
     date_of_death = parse_date(row, PatientColumns.DATE_OF_DEATH, validation_messages)
     sex = parse_choice(Sex.choices, row, PatientColumns.SEX, validation_messages)
     affected = parse_boolean(row, PatientColumns.AFFECTED, validation_messages)
@@ -314,12 +321,17 @@ def process_record(patient_records, record_id, row):
 
     sample = match_sample(user, sample_id, sample_name, validation_messages)
     try:
-        patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user)
-    except Patient.MultipleObjectsReturned as e:
+        patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user,
+                                                    patient_code=patient_code)
+    except (Patient.MultipleObjectsReturned, ValueError) as e:
         raise InvalidPatientRecord(str(e)) from e
     if patient is None:
-        patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user)
+        patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user,
+                                 patient_code=patient_code)
         patient_match_type = PatientRecordMatchType.CREATED
+    elif user and not patient.can_write(user):
+        raise InvalidPatientRecord(f"Matched patient {_patient_details(patient)}, which you don't have write "
+                                   "access to, so it can't be updated from this row")
 
     # update date of death if not already set
     # set _deceased back to False if DOD is being set
@@ -346,13 +358,6 @@ def process_record(patient_records, record_id, row):
             patient._deceased = patient_deceased
             patient.save(check_patient_text_phenotype=False)
             description = "Updated patient as deceased = False"
-        else:
-            # only clear date_of_death and _deceased if they are not currently NULL
-            if patient.date_of_death is not None or patient._deceased is not None:
-                patient.date_of_death = None
-                patient._deceased = None
-                patient.save(check_patient_text_phenotype=False)
-                description = "Updated patient deceased and date_of_death to NULL values"
 
     # if patient has been modified, create a PatientModification record
     if description is not None:
@@ -370,7 +375,7 @@ def process_record(patient_records, record_id, row):
 
     patient_modified = False
     for patient_field, field_value in PATIENT_FIELDS.items():
-        if field_value:
+        if field_value is not None:
             old_value = getattr(patient, patient_field)
             setattr(patient, patient_field, field_value)
             description = f"Set {patient_field} to {field_value}"
@@ -425,8 +430,8 @@ def process_record(patient_records, record_id, row):
         field_values = {
             "description": specimen_description,
             "collected_by": specimen_collected_by,
-            "collection_date": specimen_collection_date,
-            "received_date": specimen_received_date,
+            "collection_date": ensure_timezone_aware(specimen_collection_date),
+            "received_date": ensure_timezone_aware(specimen_received_date),
             "tissue_status": specimen_tissue_status,
             "_age_at_collection_date": specimen_age_at_collection
         }
@@ -437,7 +442,7 @@ def process_record(patient_records, record_id, row):
         try:
             extraction = specimen.get_or_create_extraction(extraction_nucleic_acid_source, sample=sample,
                                                            reference_id=extraction_reference_id,
-                                                           extraction_date=extraction_date)
+                                                           extraction_date=ensure_timezone_aware(extraction_date))
         except AmbiguousExtraction as e:
             validation_messages.append(str(e))
         else:
@@ -535,8 +540,14 @@ def pandas_read_encoded_csv(*args, **kwargs):
 
 
 def get_patient_record_imports_dataframe(f):
+    """ A file written before #1870 (one extraction per specimen) has the nucleic acid column under its old
+        Specimen name and no extraction reference / date - blank ones match the sample's extraction as before """
     df = pandas_read_encoded_csv(f, index_col=None, dtype=str)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.rename(columns=LEGACY_COLUMNS)
+    for column in OPTIONAL_COLUMNS:
+        if column not in df.columns:
+            df[column] = None
     return df_nan_to_none(df)
 
 

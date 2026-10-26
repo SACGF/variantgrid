@@ -30,3 +30,12 @@ class TestNodeWritePermission(AnalysisSetupMixin, TestCase):
                 response = self.client.post(reverse(url_name, kwargs=kwargs), data)
                 self.assertEqual(response.status_code, 403)
         self.assertEqual(AnalysisNode.objects.filter(analysis=self.analysis).count(), num_nodes)
+
+    def test_read_only_user_cannot_save_node_editor(self):
+        self.client.force_login(self.viewer)
+        node = AllVariantsNode.objects.get(pk=self.node.pk)
+        url = reverse("node_view", kwargs={"analysis_id": self.analysis.pk, "analysis_version": self.analysis.version,
+                                           "node_id": node.pk, "node_version": node.version, "extra_filters": "default"})
+        response = self.client.post(url, {})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(AllVariantsNode.objects.get(pk=node.pk).version, node.version)

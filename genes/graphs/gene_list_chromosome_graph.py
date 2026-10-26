@@ -6,8 +6,8 @@ from matplotlib.patches import Rectangle
 from genes.models import GeneList
 from library.graphs.chromosomes_graph import centromere_mid, read_cytoband
 from library.utils import sha256sum_str
+from snpdb.enums import AssemblyMoleculeType
 from snpdb.graphs.graphcache import CacheableGraph
-from snpdb.models.models_enums import AssemblyMoleculeType
 from snpdb.models.models_genome import GenomeBuild
 
 CHROMOSOME_WIDTH = 0.07      # data units – fraction of spacing slot

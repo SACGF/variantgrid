@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from mme.client import MMEClient
 from mme.serializers.patient_profile import classification_ontology_slots
 from mme.tests.fakes import FakeClassification, make_term
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
 
 
 @override_settings(MME_CONTACT={"name": "Test", "href": "mailto:t@t.org"})

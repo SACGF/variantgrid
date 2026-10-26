@@ -2,7 +2,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from snpdb.models import AlleleOrigin, GenomeBuild, VariantAllele
+from snpdb.enums import AlleleOrigin
+from snpdb.models import GenomeBuild, VariantAllele
 from snpdb.serializers import AlleleSerializer
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 

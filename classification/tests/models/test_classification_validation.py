@@ -73,3 +73,22 @@ class ClassificationTestValidation(TestCase):
         # there should be no validation on external lab data
         self.assertEqual(bp2, {'value': 'BA'})
         self.assertEqual(clinical_significance, {'value': 'WEIRD_VALUE'})
+
+    def test_cleaned_value_stored_for_types_without_normaliser(self):
+        """ age, date and unmatched user values keep the API cleanup (entities, nbsp, single item lists) """
+        lab, user = ClassificationTestUtils.lab_and_user()
+        vc = Classification.create(
+            user=user,
+            lab=lab,
+            lab_record_id=None,
+            data={
+                'age': '&gt;80',
+                'curation_date': ['2020-01-01'],
+                'owner': 'not\u00a0a user',
+            },
+            save=True,
+            source=SubmissionSource.API,
+            make_fields_immutable=False
+        )
+        stored = {key: vc.get(key) for key in ('age', 'curation_date', 'owner')}
+        self.assertEqual(stored, {'age': '>80', 'curation_date': '2020-01-01', 'owner': 'not a user'})

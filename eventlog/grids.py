@@ -25,14 +25,14 @@ class EventColumns(DatatableConfig[Event]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        self.set_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('date', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('severity', client_renderer='severityRenderer', orderable=True),
             RichColumn('user__username', name='user', orderable=True),
             RichColumn('app_name', label='App name', orderable=True),
             RichColumn('name', orderable=True),
-            RichColumn(name='data', extra_columns=["details", "filename"], renderer=self.render_data, client_renderer='TableFormat.limit.bind(null, 75)'),
+            RichColumn(name='data', extra_columns=["details", "filename"], renderer=self.render_data, client_renderer='TableFormat.limit', client_renderer_kwargs={"limit": 75}),
             RichColumn('id', visible=False)
         ]
 
@@ -71,7 +71,7 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('api_request_log_detail', expected_height=200)
+        self.set_expand_ajax('api_request_log_detail', expected_height=200)
         self.rich_columns = [
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),
             self.user_column(),
@@ -81,7 +81,8 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             RichColumn('duration_ms', label='ms', orderable=True),
             RichColumn('num_changes', label='Changes', orderable=True, extra_columns=['changes'],
                        renderer=self.render_changes, client_renderer='renderApiRequestLogChanges'),
-            RichColumn('path', search=['path', 'request_body'], client_renderer='TableFormat.limit.bind(null, 75)'),
+            RichColumn('path', search=['path', 'request_body'], client_renderer='TableFormat.limit', client_renderer_kwargs={"limit": 75}),
+            RichColumn('notes', renderer=self.render_notes, client_renderer='TableFormat.limit', client_renderer_kwargs={"limit": 75}),
             RichColumn('id', visible=False)
         ]
 
@@ -93,6 +94,10 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
             "num_changes": row['num_changes'],
             "summary": ApiRequestLog.changes_summary(changes),
         }
+
+    @staticmethod
+    def render_notes(row: CellData) -> str:
+        return "\n".join(row['notes'])
 
     def get_initial_queryset(self) -> QuerySet[ApiRequestLog]:
         if not self.user.is_superuser:

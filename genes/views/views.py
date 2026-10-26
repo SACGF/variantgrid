@@ -10,12 +10,13 @@ from django.http import Http404
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from requests import RequestException
 
-from annotation.models.models import AnnotationVersion
+from annotation.models.models_annotation_version import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -26,6 +27,7 @@ from genes.forms import (
     NamedCustomGeneListForm,
     UserGeneListForm,
 )
+from genes.gene_matching import GeneSymbolMatcher
 from genes.gene_symbol_view_info import GeneSymbolViewInfo
 from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
@@ -368,8 +370,13 @@ def gene_symbol_info_tab(request, gene_symbol, tool_tips):
 
 
 def gene_lists(request):
+    create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user)
+    if request.method == "POST" and create_gene_list_form.is_valid():
+        custom_text_gene_list = create_gene_list_form.save()
+        return redirect(reverse('view_gene_list', kwargs={'gene_list_id': custom_text_gene_list.gene_list.pk}))
+
     context = {
-        "create_gene_list_form": NamedCustomGeneListForm(username=request.user),
+        "create_gene_list_form": create_gene_list_form,
         "gene_list_form": UserGeneListForm(),
     }
     return render(request, 'genes/gene_lists.html', context=context)
@@ -387,7 +394,7 @@ def add_gene_list_unmatched_genes_message(request, gene_list, instructions=None)
 
 def view_gene_list(request, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id, success_only=False)
-    gl_form = GeneListForm(request.POST or None, instance=gene_list)
+    gl_form = GeneListForm(request.POST or None, user=request.user, instance=gene_list)
     if request.method == "POST":
         gene_list.check_can_write(request.user)
         valid = gl_form.is_valid()
@@ -398,7 +405,9 @@ def view_gene_list(request, gene_list_id):
 
     add_gene_list_unmatched_genes_message(request, gene_list)
 
-    gene_symbols = sorted(gene_list.get_gene_names())
+    # Unmatched symbols are shown by the name entered, so they can be removed by editing the text
+    symbol_or_name = gene_list.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name")
+    gene_symbols = sorted({gene_symbol or original_name for gene_symbol, original_name in symbol_or_name})
     context = {'gene_list': gene_list,
                'gene_list_form': gl_form,
                'gene_symbols_text': "\n".join(gene_symbols),
@@ -408,15 +417,25 @@ def view_gene_list(request, gene_list_id):
 
 
 @require_POST
-def create_custom_gene_list(request):
-    form = NamedCustomGeneListForm(request.POST, username=request.user)
-    if form.is_valid():
-        custom_text_gene_list = form.save()
-        gene_list_id = custom_text_gene_list.gene_list.pk
+def set_gene_list_genes_from_text(request, gene_list_id):
+    gene_list = GeneList.get_for_user(request.user, gene_list_id)
+    gene_list.check_can_write(request.user)
+    modification_info = f"Added manually by {request.user} on {timezone.now()}"
+    added, removed = GeneSymbolMatcher().set_gene_list_gene_symbols_from_text(gene_list, request.POST["gene_text"],
+                                                                              modification_info=modification_info)
+    if added or removed:
+        messages.add_message(request, messages.INFO, f"Added {len(added)}, removed {len(removed)} genes")
     else:
-        gene_list_id = None
+        messages.add_message(request, messages.INFO, "No changes to genes")
+    return redirect(reverse('view_gene_list', kwargs={'gene_list_id': gene_list.pk}))
 
-    return JsonResponse({"gene_list_id": gene_list_id})
+
+@require_POST
+def copy_gene_list(request, gene_list_id):
+    gene_list = GeneList.get_for_user(request.user, gene_list_id)
+    copy = gene_list.copy_for_user(request.user)
+    messages.add_message(request, messages.INFO, f"Copied from '{gene_list.name}'")
+    return redirect(reverse('view_gene_list', kwargs={'gene_list_id': copy.pk}))
 
 
 def view_canonical_transcript_collection(request, pk):
@@ -467,6 +486,7 @@ def sample_gene_lists_tab(request, sample_id):
     create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user,
                                                     initial={"name": "Sample Gene List"})
     if request.method == "POST":
+        sample.check_can_write(request.user)
         if create_gene_list_form.is_valid():
             custom_text_gene_list = create_gene_list_form.save()
             category = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)

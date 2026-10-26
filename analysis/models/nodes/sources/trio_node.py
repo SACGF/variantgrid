@@ -1,177 +1,65 @@
-import operator
-from abc import abstractmethod
-from functools import reduce
-from types import SimpleNamespace
+from functools import partial
 from typing import Optional
 
 from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL
-from django.db.models.query_utils import Q
 
-from analysis.models.enums import TrioInheritance
+from analysis.enums import TrioInheritance
 from analysis.models.nodes.family_inheritance import (
-    MOSAIC_EVIDENCE_TEMPLATE,
-    MOSAIC_PARENT_ROW_TEMPLATE,
+    FATHER,
+    MOTHER,
+    PROBAND,
     AbstractCompHetInheritance,
-    AbstractFamilyInheritance,
+    AllRecessiveInheritance,
+    AnyAffectedInheritance,
+    DenovoInheritance,
+    DominantInheritance,
     FamilyInheritanceNodeMixin,
-    _build_family_zyg_q,
+    FamilyMember,
+    FamilyShape,
+    MosaicEitherParentInheritance,
+    SimpleFamilyInheritance,
+    XLinkedRecessiveInheritance,
     _dominant_requires_affected_parent_error,
     _pedigree_sex,
     _xlinked_recessive_errors,
-    mosaic_absent_q,
-    mosaic_evidence_description,
-    mosaic_evidence_q,
-    mosaic_parent_warnings,
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from patients.models_enums import Zygosity
-from snpdb.models import Contig, Sample, Trio
+from annotation.tasks.calculate_trio_stats import enqueue_trio_stats_recompute
+from patients.enums import Zygosity
+from snpdb.models import Trio
 
 
-class AbstractTrioInheritance(AbstractFamilyInheritance):
-    def _get_zyg_q(self, cohort_genotype_collection, trio_zyg_data) -> Q:
-        """ trio_zyg_data = tuple of mum_zyg_set, dad_zyg_set, proband_zyg_set """
-        trio = self.node.trio
-        return _build_family_zyg_q(cohort_genotype_collection, [
-            (trio.mother.sample, trio_zyg_data[0], self.node.require_zygosity),
-            (trio.father.sample, trio_zyg_data[1], self.node.require_zygosity),
-            (trio.proband.sample, trio_zyg_data[2], True),  # 947 - Always require zygosity for Proband
-        ])
-
-    def get_zygosities_method(self, mum_z: set, dad_z: set, proband_z: set):
-        proband = self._zygosity_options(proband_z)
-        mum = self._zygosity_options(mum_z, not self.node.require_zygosity)
-        dad = self._zygosity_options(dad_z, not self.node.require_zygosity)
-        filters = {"Proband": proband, "Mother": mum, "Father": dad}
-        return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
-
-
-class SimpleTrioInheritance(AbstractTrioInheritance):
-    @abstractmethod
-    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
-        pass
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cgc = self.node.trio.cohort.cohort_genotype_collection
-        alias = cgc.cohortgenotype_alias
-        q = self._get_zyg_q(cgc, self._get_mum_dad_proband_zygosities())
-        return {alias: {str(q): q}}
-
-    def get_method(self) -> str:
-        return self.get_zygosities_method(*self._get_mum_dad_proband_zygosities())
-
-
-class Recessive(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
+class Recessive(SimpleFamilyInheritance):
+    def _get_member_zygosities(self) -> tuple[set, set, set]:
         return {Zygosity.HET}, {Zygosity.HET}, {Zygosity.HOM_ALT}
 
 
-class Dominant(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
-        mother_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.mother_affected)]
-        father_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.father_affected)]
-        return mother_zyg, father_zyg, self.HAS_VARIANT
+class Dominant(DominantInheritance):
+    pass
 
 
-class MosaicParent(AbstractTrioInheritance):
-    """ Dominant where a parent is mosaic - the proband is a constitutional HET and one parent
-        carries the variant in a fraction of cells, called either HOM_REF with a handful of alt
-        reads or HET at a low VAF. Either parent can be the mosaic one, so this is an OR of the two
-        sides, with the other parent required clean. @see issue #1830 """
-
-    def _side_q(self, cgc, zyg_data, mosaic_sample, other_sample) -> Q:
-        node = self.node
-        q = self._get_zyg_q(cgc, zyg_data)
-        q &= mosaic_evidence_q(cgc, mosaic_sample, node.mosaic_max_af, node.mosaic_min_alt_reads)
-        q &= mosaic_absent_q(cgc, other_sample, node.mosaic_min_alt_reads)
-        return q
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        trio = self.node.trio
-        cgc = trio.cohort.cohort_genotype_collection
-        mother_mosaic = self._side_q(cgc, (self.MOSAIC_ZYGOSITIES, self.NO_VARIANT, self.HAS_VARIANT),
-                                     trio.mother.sample, trio.father.sample)
-        father_mosaic = self._side_q(cgc, (self.NO_VARIANT, self.MOSAIC_ZYGOSITIES, self.HAS_VARIANT),
-                                     trio.father.sample, trio.mother.sample)
-        combined = mother_mosaic | father_mosaic
-        return {cgc.cohortgenotype_alias: {str(combined): combined}}
-
-    def _evidence_description(self) -> str:
-        return mosaic_evidence_description(self.node.mosaic_max_af, self.node.mosaic_min_alt_reads)
-
-    def get_method(self) -> str:
-        allow_unknown = not self.node.require_zygosity
-        proband = self._zygosity_options(self.HAS_VARIANT)
-        mosaic = self._zygosity_options(self.MOSAIC_ZYGOSITIES, allow_unknown)
-        other = self._zygosity_options(self.NO_VARIANT, allow_unknown)
-        return (f"Proband: {proband}, and either parent ({mosaic}) with {self._evidence_description()} "
-                f"while the other ({other}) has <{self.node.mosaic_min_alt_reads} alt reads")
-
-    def get_other_filters_description(self) -> str:
-        return MOSAIC_EVIDENCE_TEMPLATE
+class MosaicParent(MosaicEitherParentInheritance):
+    pass
 
 
-class Denovo(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
-        return self.NO_VARIANT, self.NO_VARIANT, self.HAS_VARIANT
+class Denovo(DenovoInheritance):
+    pass
 
 
-class XLinkedRecessive(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
+class XLinkedRecessive(XLinkedRecessiveInheritance):
+    def _get_member_zygosities(self) -> tuple[set, set, set]:
         return {Zygosity.HET}, set(), {Zygosity.HOM_ALT}
 
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        arg_q_dict = super().get_arg_q_dict()
-        q = Q(locus__contig__name='X')  # will work for hg19 and GRCh38
-        arg_q_dict[None] = {str(q): q}
-        return arg_q_dict
 
-    def get_method(self) -> str:
-        return super().get_method() + " and contig name = 'X'"
-
-    def get_contigs(self) -> Optional[set[Contig]]:
-        return set(self.node.trio.genome_build.contigs.filter(name='X'))
-
-    def get_other_filters_description(self) -> str:
-        return "Chr X only"
+class TrioAllRecessive(AllRecessiveInheritance):
+    RECESSIVE = Recessive
+    XLINKED_RECESSIVE = XLinkedRecessive
 
 
-class TrioAllRecessive(AbstractTrioInheritance):
-    """OR of autosomal recessive and X-linked recessive for trios.
-
-    Chr-X restriction lives inside the OR so the AR branch covers the whole
-    genome and only the XLR branch is restricted to chr X.
-    """
-
-    def _recessive_zyg(self) -> tuple[set, set, set]:
-        return Recessive(self.node)._get_mum_dad_proband_zygosities()
-
-    def _xlinked_zyg(self) -> tuple[set, set, set]:
-        return XLinkedRecessive(self.node)._get_mum_dad_proband_zygosities()
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cgc = self.node.trio.cohort.cohort_genotype_collection
-        ar_q = self._get_zyg_q(cgc, self._recessive_zyg())
-        xlr_q = self._get_zyg_q(cgc, self._xlinked_zyg()) & Q(locus__contig__name='X')
-        combined = ar_q | xlr_q
-        return {cgc.cohortgenotype_alias: {str(combined): combined}}
-
-    def get_method(self) -> str:
-        ar_mum, ar_dad, ar_prob = self._recessive_zyg()
-        x_mum, _, x_prob = self._xlinked_zyg()
-        return (
-            f"AR (Mother:{ar_mum} Father:{ar_dad} Proband:{ar_prob}) "
-            f"OR XLR (Mother:{x_mum} Father:- Proband:{x_prob} chrX only)"
-        )
-
-    def get_other_filters_description(self) -> str:
-        return "XLR branch: Chr X only"
-
-
-class CompHet(AbstractCompHetInheritance, AbstractTrioInheritance):
+class CompHet(AbstractCompHetInheritance):
     def _mum_but_not_dad(self):
         return {Zygosity.HET}, self.NO_VARIANT, {Zygosity.HET}
 
@@ -186,38 +74,17 @@ class CompHet(AbstractCompHetInheritance, AbstractTrioInheritance):
         return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
 
 
-class TrioAnyAffected(AbstractTrioInheritance):
-    """Variant present in any affected family member.
-
-    Permissive upstream pre-filter. No parent constraint. Unaffected members
-    are unconstrained — they may have or not have the variant. Proband is
-    always treated as affected.
-    """
-
-    def _get_affected_samples(self) -> list:
-        trio = self.node.trio
-        members = [
-            (trio.mother.sample, trio.mother_affected),
-            (trio.father.sample, trio.father_affected),
-            (trio.proband.sample, True),
-        ]
-        return [s for s, affected in members if affected]
-
-    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cgc = self.node.trio.cohort.cohort_genotype_collection
-        per_member_qs = [
-            cgc.get_zygosity_q({s: self.HAS_VARIANT}, {s: True})
-            for s in self._get_affected_samples()
-        ]
-        combined = reduce(operator.or_, per_member_qs)
-        return {cgc.cohortgenotype_alias: {str(combined): combined}}
-
-    def get_method(self) -> str:
-        names = [s.name for s in self._get_affected_samples()]
-        return f"Variant present in at least one affected family member ({', '.join(names)})"
+class TrioAnyAffected(AnyAffectedInheritance):
+    pass
 
 
 class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
+    FAMILY_SHAPE = FamilyShape(source_field="trio", members=(
+        FamilyMember(MOTHER, "Mother", affected_field="mother_affected", require_zygosity_field="require_zygosity"),
+        FamilyMember(FATHER, "Father", affected_field="father_affected", require_zygosity_field="require_zygosity"),
+        FamilyMember(PROBAND, "Proband"),
+    ))
+    INHERITANCE = TrioInheritance
     INHERITANCE_CLASSES = {
         TrioInheritance.COMPOUND_HET: CompHet,
         TrioInheritance.RECESSIVE: Recessive,
@@ -228,7 +95,7 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
         TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive,
         TrioInheritance.ANY_AFFECTED: TrioAnyAffected,
     }
-    # Modes calculate_cohort_stats precomputes counts for, as named in Trio.STATS_INHERITANCE_MODES
+    # Modes calculate_trio_stats precomputes counts for, as named in Trio.STATS_INHERITANCE_MODES
     STATS_INHERITANCE_MODES = {
         TrioInheritance.DENOVO: "denovo",
         TrioInheritance.RECESSIVE: "autosomal_recessive",
@@ -244,16 +111,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     mosaic_max_af = models.FloatField(default=0.35)
     mosaic_min_alt_reads = models.IntegerField(default=2)
 
-    @property
-    def min_inputs(self):
-        return self.max_inputs
-
-    @property
-    def max_inputs(self):
-        if self.inheritance == TrioInheritance.COMPOUND_HET:
-            return 1
-        return 0
-
     @staticmethod
     def get_trio_inheritance_errors(trio: Trio, inheritance) -> list[str]:
         errors = []
@@ -268,19 +125,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     def _get_inheritance_errors(self) -> list[str]:
         return self.get_trio_inheritance_errors(self.trio, self.inheritance)
-
-    def get_warnings(self) -> list[str]:
-        """ Mosaic detection depends on the data as much as the filter - say so every time """
-        warnings = super().get_warnings()
-        if self.trio and self.inheritance == TrioInheritance.MOSAIC_PARENT:
-            warnings.extend(mosaic_parent_warnings(self.trio.cohort))
-        return warnings
-
-    def _get_cohort(self):
-        cohort = None
-        if self.trio:
-            cohort = self.trio.cohort
-        return cohort
 
     def _has_filters_that_affect_label_counts(self) -> bool:
         # Inheritance is a CACHE DIMENSION (precomputed via filter_key), not a
@@ -299,6 +143,9 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     def get_stats_filter_key(self) -> str:
         return self.trio.get_stats_filter_key(self._stats_inheritance_mode())
 
+    def _get_stats_enqueue_recompute(self):
+        return partial(enqueue_trio_stats_recompute, self.trio, self.analysis.annotation_version)
+
     def _get_cached_label_count(self, label):
         # Compound het is the only trio mode that takes a parent (max_inputs=1), and its queryset
         # is intersected with that parent (uses_parent_queryset). The cohort-wide stats cache
@@ -310,48 +157,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             return None
         return super()._get_cached_label_count(label)
 
-    def modifies_parents(self):
-        return self.trio is not None
-
-    def _inheritance_factory(self):
-        klass = self.INHERITANCE_CLASSES[TrioInheritance(self.inheritance)]
-        return klass(self)
-
-    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
-        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
-        if cohort:
-            inheritance = self._inheritance_factory()
-            self.merge_arg_q_dicts(arg_q_dict, inheritance.get_arg_q_dict())
-            self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
-        return arg_q_dict
-
-    def _get_node_contigs(self) -> Optional[set[Contig]]:
-        node_contigs = None
-        if self.trio:
-            inheritance = self._inheritance_factory()
-            node_contigs = inheritance.get_contigs()
-        return node_contigs
-
-    def _get_method_summary(self):
-        if self._get_cohort():
-            inheritance = self._inheritance_factory()
-            method = inheritance.get_method()
-        else:
-            method = "No cohort selected"
-        return method
-
-    def get_node_name(self):
-        label = TrioInheritance(self.inheritance).label
-        if not self.require_zygosity:
-            label += "?"
-        name_parts = [label]
-
-        filter_description = self.get_filter_description()
-        if filter_description:
-            name_parts.append(f"({filter_description})")
-
-        return "\n".join(name_parts)
-
     @staticmethod
     def get_help_text() -> str:
         return (
@@ -361,91 +166,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             "'Dominant (mosaic parent)' looks for parental alt reads at a low allele frequency, "
             "so it catches a mosaic parent the germline caller wrote off as 0/0."
         )
-
-    @staticmethod
-    def get_zygosity_table_data() -> dict:
-        """Build zygosity display data for all inheritance modes, for the node editor UI.
-
-        Instantiates each inheritance class and calls its zygosity methods directly,
-        so the table always matches the actual filtering logic.
-        For modes where affected status matters, includes both affected/unaffected variants.
-        """
-        fmt = AbstractFamilyInheritance._zygosity_options
-        members = ['mother', 'father', 'proband']
-        stub_node = SimpleNamespace(trio=SimpleNamespace())
-
-        # Members whose zygosity varies with affected status per mode
-        affected_members = {
-            TrioInheritance.DOMINANT: ['mother', 'father'],
-            TrioInheritance.ANY_AFFECTED: ['mother', 'father'],
-        }
-
-        data = {}
-        for mode, klass in TrioNode.INHERITANCE_CLASSES.items():
-            if issubclass(klass, SimpleTrioInheritance):
-                varies = affected_members.get(mode, [])
-                if varies:
-                    entry = {}
-                    for affected_val in (False, True):
-                        stub_node.trio.mother_affected = affected_val
-                        stub_node.trio.father_affected = affected_val
-                        handler = klass(stub_node)
-                        zyg = handler._get_mum_dad_proband_zygosities()
-                        suffix = '_affected' if affected_val else '_unaffected'
-                        for member, zyg_set in zip(members, zyg):
-                            if member in varies:
-                                entry[member + suffix] = fmt(zyg_set)
-                            elif not affected_val:
-                                entry[member] = fmt(zyg_set)
-                    data[mode] = entry
-                else:
-                    handler = klass(stub_node)
-                    zyg = handler._get_mum_dad_proband_zygosities()
-                    data[mode] = {member: fmt(z) for member, z in zip(members, zyg)}
-            elif klass is TrioAllRecessive:
-                handler = klass(stub_node)
-                ar_zyg = handler._recessive_zyg()
-                xlr_zyg = handler._xlinked_zyg()
-                data[mode] = {
-                    'mother':  f"AR: {fmt(ar_zyg[0])}\nXLR: {fmt(xlr_zyg[0])}",
-                    'father':  f"AR: {fmt(ar_zyg[1])}\nXLR: --",
-                    'proband': f"AR: {fmt(ar_zyg[2])}\nXLR: {fmt(xlr_zyg[2])}",
-                }
-            elif klass is MosaicParent:
-                # Only the parents are filtered on read support, so the proband row stays blank
-                data[mode] = {
-                    'mother': fmt(klass.MOSAIC_ZYGOSITIES),
-                    'father': fmt(klass.MOSAIC_ZYGOSITIES),
-                    'proband': fmt(klass.HAS_VARIANT),
-                    'other_filters_mother': MOSAIC_PARENT_ROW_TEMPLATE,
-                    'other_filters_father': MOSAIC_PARENT_ROW_TEMPLATE,
-                }
-                continue
-            elif klass is TrioAnyAffected:
-                handler = klass(stub_node)
-                has_variant = fmt(TrioAnyAffected.HAS_VARIANT)
-                entry = {'proband': has_variant}
-                for affected_val in (False, True):
-                    suffix = '_affected' if affected_val else '_unaffected'
-                    for member in ('mother', 'father'):
-                        entry[member + suffix] = has_variant if affected_val else '—'
-                data[mode] = entry
-            else:
-                # CompHet
-                handler = klass(stub_node)
-                _, _, proband1 = handler._mum_but_not_dad()
-                data[mode] = {
-                    'mother': '',
-                    'father': '',
-                    'proband': fmt(proband1),
-                }
-
-            description = handler.get_other_filters_description()
-            if description:
-                for member in members:
-                    data[mode]['other_filters_' + member] = description
-
-        return data
 
     def get_rendering_args(self):
         if not self.trio:
@@ -457,12 +177,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
             "proband_sex": proband_sex,
         }
 
-    def get_css_classes(self):
-        css_classes = super().get_css_classes()
-        if self.trio:
-            css_classes.extend(self.trio.get_preview_icon_css_class().split())
-        return css_classes
-
     @staticmethod
     def get_node_class_label():
         return 'Trio'
@@ -470,32 +184,6 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(symbol="node-icon-trio")
-
-    def _get_configuration_errors(self) -> list:
-        errors = super()._get_configuration_errors()
-        if not self.trio:
-            errors.append("No trio selected")
-        else:
-            errors.extend(self._get_genome_build_errors("trio", self.trio.genome_build))
-        return errors
-
-    def _get_cohorts_and_sample_visibility_for_node(self):
-        cohorts = []
-        visibility = {}
-        if self.trio:
-            cohort = self.trio.cohort
-            cohorts = [cohort]
-            visibility = dict.fromkeys(self.trio.get_samples(), cohort.has_sample_columns)
-        return cohorts, visibility
-
-    def _get_proband_sample_for_node(self) -> Optional[Sample]:
-        proband_sample = None
-        if self.trio:
-            proband_sample = self.trio.proband.sample
-        return proband_sample
-
-    def __str__(self):
-        return f"TrioNode: {self.pk}"
 
 
 auditlog.register(TrioNode)

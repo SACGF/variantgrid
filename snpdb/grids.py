@@ -25,14 +25,23 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
+from annotation.enums import ClinVarReviewStatus
 from annotation.models import AnnotationVersion, ManualVariantEntryCollection, VariantAnnotation
-from annotation.models.models_enums import ClinVarReviewStatus
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import JsonDataType, JsonObjType, calculate_age
-from ontology.models import OntologyService
+from ontology.enums import OntologyService
+from patients.enums import GnomADPopulation, Sex
 from patients.models.models_patient import PATIENT_ONTOLOGY_TERM_PATH
-from patients.models_enums import GnomADPopulation, Sex
+from snpdb.enums import (
+    AlleleConversionTool,
+    DuoRelationship,
+    ImportSource,
+    ImportStatus,
+    ProcessingStatus,
+    SuperPopulationCode,
+    VariantOrigin,
+)
 from snpdb.grid_columns.custom_columns import (
     get_variant_grid_columns,
     get_variantgrid_extra_annotate,
@@ -40,30 +49,23 @@ from snpdb.grid_columns.custom_columns import (
 from snpdb.models import (
     VCF,
     Allele,
-    AlleleConversionTool,
     AlleleLiftover,
     ClinGenAllele,
     Cohort,
     CohortGenotypeStats,
     CustomColumnsCollection,
     Duo,
-    DuoRelationship,
     GenomeBuild,
     GenomicIntervalsCollection,
-    ImportSource,
-    ImportStatus,
     LiftoverRun,
-    ProcessingStatus,
     Quad,
     Sample,
-    SuperPopulationCode,
     TagConfigCollection,
     Trio,
     UserGridConfig,
     UserSettings,
     Variant,
     VariantAllele,
-    VariantOrigin,
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
@@ -111,7 +113,7 @@ class VCFListColumns(DatatableConfig[VCF]):
             RichColumn(key="source", label="VCF source", orderable=True),
             RichColumn(key="uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
                        search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
+                       **RichColumn.choices_client_renderer(ImportSource.choices)),
             RichColumn(key="genotype_samples", label="Genotype Samples", orderable=True, search=False),
             RichColumn(key="project__name", label="Project", orderable=True),
             RichColumn(key="uploadedvcf__vcf_importer__name", label="VCF Importer", orderable=True,
@@ -174,7 +176,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        renderer=render_import_status, client_renderer='TableFormat.importStatus'),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(VariantOrigin.choices)),
+                       **RichColumn.choices_client_renderer(VariantOrigin.choices)),
             self.user_column("vcf__user", label="Uploaded by"),
             RichColumn(key="vcf__source", label="VCF source", orderable=True),
             RichColumn(key="vcf__name", label="VCF Name", orderable=True, extra_columns=["vcf__id"],
@@ -182,7 +184,7 @@ class SamplesListColumns(DatatableConfig[Sample]):
             RichColumn(key="vcf__project__name", label="Project", orderable=True),
             RichColumn(key="vcf__uploadedvcf__file_upload__import_source", label="Import Source", orderable=True,
                        search=False,
-                       client_renderer=RichColumn.choices_client_renderer(ImportSource.choices)),
+                       **RichColumn.choices_client_renderer(ImportSource.choices)),
             RichColumn(key="sample_gene_list_count", label="# Sample GeneLists", orderable=True, search=False,
                        extra_columns=["activesamplegenelist__id"], enabled=has_sample_gene_lists,
                        renderer=self._render_sample_gene_list_count,
@@ -194,12 +196,12 @@ class SamplesListColumns(DatatableConfig[Sample]):
             RichColumn(key="somaliersampleextract__somalierancestry__predicted_ancestry",
                        label="Predicted Ancestry", orderable=True, search=False,
                        enabled=has_somalier_ancestry,
-                       client_renderer=RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
+                       **RichColumn.choices_client_renderer(SuperPopulationCode.choices)),
             RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
             RichColumn(key="patient__first_name", label="First Name", orderable=True),
             RichColumn(key="patient__last_name", label="Last Name", orderable=True),
             RichColumn(key="patient__sex", label="Sex", orderable=True, search=False,
-                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
+                       **RichColumn.choices_client_renderer(Sex.choices)),
             RichColumn(key="patient__date_of_birth", label=dob_label, orderable=True, search=False,
                        renderer=dob_renderer, client_renderer=dob_client_renderer),
             RichColumn(key="extraction__specimen__reference_id", label="Specimen", orderable=True,
@@ -336,45 +338,6 @@ class VCFSkippedAnnotationColumns(AbstractSkippedAnnotationColumns):
         return vcf, vcf.genome_build
 
 
-class CohortSampleListColumns(DatatableConfig[Sample]):
-    """ Sample picker on the cohort page - either the cohort's samples, or the ones it could add """
-    grid_name = "Cohort Samples"
-    SHOW_COHORT = "show_cohort"
-    EXCLUDE_COHORT = "exclude_cohort"
-
-    def __init__(self, request: HttpRequest):
-        super().__init__(request)
-        self.rich_columns = [
-            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC,
-                       renderer=self.view_primary_key, client_renderer='renderCohortSampleCheckbox'),
-            RichColumn(key="name", label="Name", orderable=True),
-            RichColumn(key="vcf__name", label="VCF", orderable=True),
-            RichColumn(key="patient__family_code", label="Family Code", orderable=True),
-            RichColumn(key="patient__patient_code", label="Patient Code", orderable=True),
-            RichColumn(key="patient__first_name", label="First Name", orderable=True),
-            RichColumn(key="patient__last_name", label="Last Name", orderable=True),
-            RichColumn(key="patient__sex", label="Sex", orderable=True,
-                       client_renderer=RichColumn.choices_client_renderer(Sex.choices)),
-            RichColumn(key="patient__date_of_birth", label="D.O.B.", orderable=True,
-                       client_renderer='TableFormat.timestamp'),
-        ]
-
-    def get_initial_queryset(self) -> QuerySet[Sample]:
-        cohort = Cohort.get_for_user(self.user, self.get_query_param("cohort_id"))
-        qs = Sample.filter_for_user(self.user)
-        qs = qs.filter(vcf__genome_build=cohort.genome_build, import_status=ImportStatus.SUCCESS)
-
-        cohort_op = self.get_query_param("cohort_op") or self.EXCLUDE_COHORT
-        cohort_q = Q(cohortsample__cohort=cohort)
-        if cohort_op == self.SHOW_COHORT:
-            pass
-        elif cohort_op == self.EXCLUDE_COHORT:
-            cohort_q = ~cohort_q
-        else:
-            raise ValueError(f"Unknown cohort_op: '{cohort_op}'")
-        return qs.filter(cohort_q)
-
-
 class CohortListColumns(DatatableConfig[Cohort]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
@@ -385,6 +348,7 @@ class CohortListColumns(DatatableConfig[Cohort]):
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key='import_status', label='Status', orderable=True,
                        renderer=render_import_status, client_renderer='TableFormat.importStatus'),
+            RichColumn(key='genome_build__name', label='Genome Build', orderable=True),
             self.user_column(label='User'),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -401,6 +365,8 @@ class CohortListColumns(DatatableConfig[Cohort]):
         user_grid_config = UserGridConfig.get(self.user, 'Cohorts')
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
         return qs
 
 
@@ -424,6 +390,7 @@ class FamilyGroupListColumns(DatatableConfig[DC]):
             RichColumn(key='name', label='Name', orderable=True,
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
+            RichColumn(key='cohort__genome_build__name', label='Genome Build', orderable=True),
             self.user_column(label='User'),
             RichColumn(key='modified', client_renderer='TableFormat.timestamp', orderable=True,
                        default_sort=SortOrder.DESC),
@@ -440,6 +407,8 @@ class FamilyGroupListColumns(DatatableConfig[DC]):
         user_grid_config = UserGridConfig.get(self.user, self.GRID_NAME)
         if not user_grid_config.show_group_data:
             qs = qs.filter(user=self.user)
+        if genome_build_name := self.get_query_param("genome_build_name"):
+            qs = qs.filter(cohort__genome_build=GenomeBuild.get_name_or_alias(genome_build_name))
         return qs
 
 
@@ -462,7 +431,7 @@ class DuosListColumns(FamilyGroupListColumns[Duo]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         relationship_column = RichColumn(key='relationship', label='Relationship', orderable=True,
-                                         client_renderer=RichColumn.choices_client_renderer(DuoRelationship.choices))
+                                         **RichColumn.choices_client_renderer(DuoRelationship.choices))
         relative_affected = next(i for i, rc in enumerate(self.rich_columns) if rc.key == 'relative_affected')
         self.rich_columns.insert(relative_affected + 1, relationship_column)
 
@@ -726,8 +695,8 @@ class AbstractVariantGrid(DatatableConfig[Variant]):
         self.rich_columns = self._get_rich_columns()
         # Row expansion (@see DataTableDefinition.setupClientExpend) - variantGridRowDetail in grid.js
         # fetches variant_grid_row_detail for the annotation version this grid is showing
-        self.expand_client_renderer = \
-            f"variantGridRowDetail.bind(null, {self._get_annotation_version().pk})"
+        self.expand_client_renderer = "variantGridRowDetail"
+        self.expand_client_renderer_kwargs = {"annotationVersionId": self._get_annotation_version().pk}
 
     def _get_rich_columns(self) -> list[RichColumn]:
         rich_columns, _sample_columns_position = self._build_variant_grid_columns()
@@ -982,7 +951,7 @@ class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryColl
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('manual_variant_entry_collection_detail', expected_height=120)
+        self.set_expand_ajax('manual_variant_entry_collection_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('id', orderable=True, default_sort=SortOrder.DESC),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),

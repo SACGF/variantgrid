@@ -4,9 +4,10 @@ import requests
 from cdot.data_release import _get_version_from_tag_name, get_latest_data_release_tag_name
 from django.conf import settings
 
-from annotation.vep_annotation import VEPConfig
+from annotation.vep_annotation import VEPConfig, get_vep_plugin_files, get_vep_plugin_url
 from genes.models import CdotDataVersion, TranscriptVersion
 from snpdb.models import GenomeBuild
+from snpdb.models.models_somalier import SomalierConfig
 
 _VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
 
@@ -49,6 +50,10 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
                     key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
                     check_files[key] = chain_filename
 
+        if settings.SOMALIER["enabled"]:
+            # Not build specific - unique_filenames reports it under the first build only
+            check_files["somalier"] = SomalierConfig().get_annotation("command")
+
         vep_config = VEPConfig(genome_build)
         for key, rel_path in vep_config.vep_data.items():
             if rel_path is not None:
@@ -70,6 +75,16 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
                     "valid": os.path.exists(filename),
                     "fix": _get_fix_instructions(filename),
                 }
+
+        # A plugin can be newer than the VEP_plugins checkout (AVI.pm, #2426), so comes from Ensembl rather than us
+        for plugin_name, filename in get_vep_plugin_files(genome_build).items():
+            if filename in unique_filenames:
+                continue
+            unique_filenames.add(filename)
+            file_data[f"plugin_{plugin_name}"] = {
+                "valid": os.path.exists(filename),
+                "fix": f"cd {os.path.dirname(filename)};wget {get_vep_plugin_url(plugin_name)}",
+            }
         all_build_data[genome_build.name] = file_data
 
     if flat:

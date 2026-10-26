@@ -15,9 +15,11 @@ from django.core.checks import Error, Tags, Warning, register
 from django.urls import get_resolver
 from django.utils.module_loading import import_string
 
-from classification.enums.classification_enums import AlleleOriginBucket, ShareLevel
-from genes.models_enums import AnnotationConsortium
-from patients.models_enums import SampleSourceLevel
+from classification.enums.classification_enums import ShareLevel
+from genes.enums import AnnotationConsortium
+from library.oauth import url_scheme_problem
+from patients.enums import SampleSourceLevel
+from snpdb.enums import AlleleOriginBucket
 
 OIDC_BACKEND = 'oidc_auth.backend.VariantGridOIDCAuthenticationBackend'
 OIDC_LOGIN_URL = '/oidc_login/'
@@ -27,7 +29,7 @@ BEACON_PLACEHOLDER_ID = "org.variantgrid.beacon"
 VEP_FASTA_RENAME_FIXED_VERSION = 112  # below this VEP renamed contigs against an NCBI fasta, dropping plugin output
 VEP_PLUGIN_COLUMNS_VERSION = 5  # columns_version that added the VEP 116 plugins (#1638)
 VEP_PLUGIN_MIN_VERSION = 116
-VEP_116_PLUGINS = ("eve", "popeve", "promoter_ai")
+VEP_116_PLUGINS = ("eve", "popeve", "promoter_ai", "avi", "alphagenome_splicing")
 GENCODE_VALUES = ("primary", "basic", None)
 SV_OVERLAP_METHODS = ("greatest_overlap", "lowest_af", "exact_or_lowest_af")
 MME_GENE_ID_PREFERENCES = ("ensembl", "symbol")
@@ -388,4 +390,19 @@ def check_served_configuration(app_configs, **kwargs):
                               f"after every other middleware has run",
                               hint="An env file adding middleware should insert before it, as shariantcommon.py does.",
                               id="variantgrid.E027"))
+    return messages
+
+
+@register(Tags.security)
+def check_sync_urls(app_configs, **kwargs):
+    """ Sync and Keycloak admin connections send credentials, which library/oauth.py:ServerAuth refuses to send over
+        plain http - caught at deploy rather than on the first sync run """
+    named_details = {f"SYNC_DETAILS[{key!r}]": details for key, details in settings.SYNC_DETAILS.items()}
+    if settings.KEYCLOAK_SYNC_DETAILS:
+        named_details["KEYCLOAK_SYNC_DETAILS"] = settings.KEYCLOAK_SYNC_DETAILS
+    messages = []
+    for name, details in named_details.items():
+        for field in ("host", "oauth_url"):
+            if (url := details.get(field)) and (problem := url_scheme_problem(url, details.get("allow_http", False))):
+                messages.append(Error(f"{name} {field} {problem}", id="variantgrid.E028"))
     return messages

@@ -1,5 +1,6 @@
 """upload/test_data/patient_upload.csv through file type detection and the import pipeline (#1745)"""
 import os
+import tempfile
 from datetime import date
 from unittest.mock import patch
 
@@ -9,10 +10,13 @@ from django.test import TestCase
 from django.utils import timezone
 
 from library.guardian_utils import assign_permission_to_user_and_groups
-from patients.models import Extraction, Patient, PatientRecord, Specimen
-from patients.models_enums import NucleicAcid, Sex, TissueStatus
-from snpdb.models import VCF, GenomeBuild, ImportSource, ImportStatus, ProcessingStatus, Sample
-from upload.models import FileUpload, UploadedFileTypes, UploadPipeline
+from patients.enums import NucleicAcid, Sex, TissueStatus
+from patients.import_records import get_patient_record_imports_dataframe
+from patients.models import Extraction, Patient, PatientColumns, PatientRecord, Specimen
+from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
+from snpdb.models import VCF, GenomeBuild, Sample
+from upload.enums import UploadedFileTypes
+from upload.models import FileUpload, UploadPipeline
 from upload.upload_processing import process_uploaded_file
 from upload.uploaded_file_type import get_uploaded_file_type
 
@@ -33,6 +37,20 @@ class TestPatientUploadCSV(TestCase):
         """ The csv extension is shared with gene lists, which claim any csv by default """
         self.assertEqual(UploadedFileTypes.PATIENT_RECORDS,
                          get_uploaded_file_type(self.file_upload, self.file_upload.name))
+
+    def test_legacy_columns(self):
+        """ A pre-#1870 file: nucleic acid under its Specimen name, no extraction reference or date """
+        df = get_patient_record_imports_dataframe(PATIENT_UPLOAD_CSV)
+        legacy_df = df.drop(columns=[PatientColumns.EXTRACTION_REFERENCE_ID, PatientColumns.EXTRACTION_DATE])
+        legacy_df = legacy_df.rename(columns={PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE:
+                                              'Specimen Nucleic acid source (DNA/RNA)'})
+        with tempfile.NamedTemporaryFile(suffix=".csv") as legacy_csv:
+            legacy_df.to_csv(legacy_csv.name, index=False)
+            imported_df = get_patient_record_imports_dataframe(legacy_csv.name)
+        self.assertEqual(set(PatientColumns.COLUMNS), set(imported_df.columns))
+        self.assertEqual(list(df[PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE]),
+                         list(imported_df[PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE]))
+        self.assertTrue(imported_df[PatientColumns.EXTRACTION_REFERENCE_ID].isna().all())
 
 
 class TestPatientUploadImport(TestCase):

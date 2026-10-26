@@ -4,12 +4,12 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.analysis_templates import populate_analysis_from_template_run
+from analysis.enums import AnalysisTemplateType
 from analysis.forms.forms_nodes import PhenotypeNodeForm
 from analysis.models import (
     Analysis,
     AnalysisTemplate,
     AnalysisTemplateRun,
-    AnalysisTemplateType,
     AnalysisVariable,
     CohortNode,
     PhenotypeNode,

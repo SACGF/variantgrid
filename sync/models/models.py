@@ -4,9 +4,9 @@ from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.utils.timesince import timesince
-from django_extensions.db.models import TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from sync.models.enums import SyncStatus
+from sync.enums import SyncStatus
 
 
 class SyncDestination(models.Model):
@@ -15,7 +15,6 @@ class SyncDestination(models.Model):
     Examples
     - syncing records up to shariant
     - syncing records down from shariant
-    - syncing records to alissa (in future)
     """
 
     name = models.TextField(null=False, unique=True)

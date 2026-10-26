@@ -4,7 +4,7 @@ import subprocess
 
 from django.conf import settings
 
-from genes.models_enums import AnnotationConsortium
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 
 
