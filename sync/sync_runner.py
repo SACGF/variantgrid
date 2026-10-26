@@ -27,7 +27,9 @@ class SyncRunInstance:
         self.full_sync = full_sync
         self.max_rows = max_rows
 
+    @cached_property
     def server_auth(self) -> ServerAuth:
+        """ One login for the whole run, refreshed as it expires """
         return ServerAuth.for_sync_details(self.sync_destination.sync_details)
 
     def last_success(self) -> Optional[SyncRun]:

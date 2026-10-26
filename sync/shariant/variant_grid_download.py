@@ -136,7 +136,7 @@ class VariantGridDownloadSyncer(SyncRunner):
         sync_destination = sync_run_instance.sync_destination
 
         config = sync_destination.config
-        other_variant_grid = ServerAuth.for_sync_details(sync_destination.sync_details)
+        other_variant_grid = sync_run_instance.server_auth
 
         required_build = config.get('genome_build', 'GRCh37')
         params = {'share_level': 'public',

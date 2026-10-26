@@ -5,9 +5,10 @@ from django.test import TestCase, override_settings
 from classification.enums import ShareLevel, SubmissionSource
 from classification.models.classification import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
+from library.oauth import ServerAuth
 from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
-from sync.shariant.variant_grid_upload import VariantGridUploadSyncer
+from sync.shariant.variant_grid_upload import VariantGridUploadSyncer, batch_iterator_end
 from sync.sync_runner import SyncRunInstance
 
 SYNC_DETAILS = {"test_shariant": {"host": "https://shariant.org.au"}}
@@ -58,7 +59,7 @@ class VariantGridUploadSyncerTestCase(TestCase):
             return response
 
         server_auth.post.side_effect = post
-        with patch.object(SyncRunInstance, "server_auth", return_value=server_auth):
+        with patch.object(SyncRunInstance, "server_auth", server_auth):
             VariantGridUploadSyncer().sync(SyncRunInstance(self.sync_destination))
         return sent_records
 
@@ -85,3 +86,20 @@ class VariantGridUploadSyncerTestCase(TestCase):
 
         # the remote has answered for the withdrawal, so it isn't sent again
         self.assertEqual(self._delta_records(), [])
+
+    def test_one_server_auth_for_all_batches(self):
+        """ each ServerAuth logs in, so a run's batches must share one """
+        other = Classification.create(user=self.user, lab=self.lab, lab_record_id=None,
+                                      data={"allele_origin": "germline", "clinical_significance": "VUS"},
+                                      save=True, source=SubmissionSource.API)
+        other.publish_latest(self.user, share_level=ShareLevel.ALL_USERS)
+
+        server_auth = MagicMock()
+        server_auth.post.return_value.json.return_value = {"results": [{"meta": {"id": 1234}}]}
+        with (patch.object(ServerAuth, "for_sync_details", return_value=server_auth) as for_sync_details,
+              patch("sync.shariant.variant_grid_upload.batch_iterator_end",
+                    lambda qs, batch_size: batch_iterator_end(qs, batch_size=1))):
+            VariantGridUploadSyncer().sync(SyncRunInstance(self.sync_destination))
+
+        self.assertEqual(server_auth.post.call_count, 2)
+        for_sync_details.assert_called_once()
