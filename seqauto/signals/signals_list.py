@@ -5,3 +5,4 @@ backend_vcf_import_success_signal = django.dispatch.Signal()  # args: "backend_v
 sequencing_run_created_signal = django.dispatch.Signal()  # args: "sequencing_run"
 sequencing_run_sample_sheet_created_signal = django.dispatch.Signal()  # args: "sample_sheet"
 sequencing_run_current_sample_sheet_changed_signal = django.dispatch.Signal()  # args: "sequencing_run", "meaningfully_changed"
+current_sample_sheet_data_moved_signal = django.dispatch.Signal()  # args: "sample_sheet", "relink_samples"

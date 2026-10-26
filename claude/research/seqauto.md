@@ -65,6 +65,8 @@ A second sheet for a run becomes current, and `seqauto/sequencing_files/sample_s
 always moves the run's data onto it (`assign_old_sample_sheet_data_to_current_sample_sheet`, the API client being
 authoritative): IlluminaFlowcellQC, joint calls and cross-run joint-call members, then FastQs / UnalignedReads /
 alignment files / single-sample VCFs / QC and the `SampleFromSequencingSample` links by sample name, then
+`current_sample_sheet_data_moved_signal`, whose upload receiver
+(`upload/signals/signal_handlers.py:current_sample_sheet_data_moved_handler`) runs
 `link_samples_and_vcfs_to_sequencing(replace_existing=True)` for the joint calls. Only after that does it send
 `sequencing_run_current_sample_sheet_changed_signal`, with `meaningfully_changed` from
 `sample_sheet_meaningfully_changed` (sample names or barcodes differ), so a receiver finds the new rows linked. A

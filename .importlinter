@@ -90,3 +90,17 @@ ignore_imports =
     ; inside a function to break a cycle: genes.models imports snpdb.models
     snpdb.models.models -> genes.models
     snpdb.models.models_clingen_allele -> genes.hgvs
+
+[importlinter:contract:seqauto-below-upload]
+name = seqauto does not import upload
+type = forbidden
+source_modules =
+    seqauto
+forbidden_modules =
+    upload
+allow_indirect_imports = True
+ignore_imports =
+    ; the run page lists and retries the run's upload pipelines
+    seqauto.views -> upload.**
+    ; tests build uploads to link against
+    seqauto.tests.** -> **

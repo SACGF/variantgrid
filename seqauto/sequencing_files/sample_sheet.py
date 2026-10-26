@@ -16,9 +16,10 @@ from collections import Counter
 from eventlog.models import api_request_note
 from library.django_utils.change_tracking import active_collector
 from seqauto.models import IlluminaFlowcellQC, JointCalledVCF
-from seqauto.signals.signals_list import sequencing_run_current_sample_sheet_changed_signal
-from upload.models import BackendVCF
-from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
+from seqauto.signals.signals_list import (
+    current_sample_sheet_data_moved_signal,
+    sequencing_run_current_sample_sheet_changed_signal,
+)
 
 
 def sample_sheet_meaningfully_changed(sample_sheet_1, sample_sheet_2):
@@ -134,8 +135,8 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(sequencing_run):
 
         Operates purely on model data (the API sends records for the files; there is no filesystem
         to scan): relink old IlluminaFlowcellQC / JointCalledVCF, reassign the existing
-        Fastq / UnalignedReads / AlignmentFile / VCF / QC records by sample name, and relink the joint
-        calls' samples. """
+        Fastq / UnalignedReads / AlignmentFile / VCF / QC records by sample name, then send
+        current_sample_sheet_data_moved_signal so the joint calls' samples are relinked. """
     current_sample_sheet = sequencing_run.get_current_sample_sheet()
     old_sample_sheets = sequencing_run.get_old_sample_sheets()
     moved = Counter()
@@ -171,22 +172,10 @@ def assign_old_sample_sheet_data_to_current_sample_sheet(sequencing_run):
     if not relink_samples:
         missing_linked_sequencing_samples = current_sample_sheet.sequencingsample_set.filter(samplefromsequencingsample__isnull=True)
         relink_samples = missing_linked_sequencing_samples.exists()
-
-    relinked_vcfs = []
-    for joint_called_vcf in current_sample_sheet.get_joint_called_vcfs():
-        try:
-            backend_vcf = joint_called_vcf.backendvcf
-        except BackendVCF.DoesNotExist:
-            continue
-
-        if relink_samples or joint_called_vcf.needs_to_be_linked():
-            try:
-                link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=True)
-                relinked_vcfs.append(str(backend_vcf.vcf))
-            except ValueError as e:
-                api_request_note(f"Could not relink samples of {backend_vcf.vcf}: {e}")
-    if relinked_vcfs:
-        api_request_note(f"Relinked VCF samples to sequencing samples: {', '.join(relinked_vcfs)}")
+    # upload relinks the joint called VCFs it imported (upload/signals/signal_handlers.py)
+    current_sample_sheet_data_moved_signal.send(sender=os.path.basename(__file__),
+                                                sample_sheet=current_sample_sheet,
+                                                relink_samples=relink_samples)
 
     logging.info("Assigned old data to current sample sheet %s", current_sample_sheet)
     sequencing_run.save()  # Re-validate "ready"

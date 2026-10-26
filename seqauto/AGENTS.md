@@ -1,6 +1,9 @@
 # seqauto — agent notes
 Owns: SequencingRun, SampleSheet/SequencingSample, the sequencing file records (UnalignedReads, AlignmentFile, SingleSampleVCF,
 JointCalledVCF), QC models, EnrichmentKit and gold coverage, and the seqauto REST API.
+- upload sits above seqauto: it owns `BackendVCF` and links imported files to these records. seqauto imports upload only
+  in views and tests (`.importlinter`); to have upload act on a seqauto event, send a signal from
+  `seqauto/signals/signals_list.py` and connect it in `upload/apps.py`.
 - `LibraryQC` is per-library caller QC that arrives by upload (DRAGEN TSO500 MetricsOutput today), keyed on
   (run name, pair, category) with a nullable SequencingRun and a claimed Specimen - not a SeqAutoRecord, no path.
   Each row is one arm (`nucleic_acid`) and links that arm's `SequencingSample` through the sheet's `Pair_ID` /
