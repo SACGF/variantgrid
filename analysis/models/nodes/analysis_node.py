@@ -156,7 +156,7 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
             if parent := self.get_unmodified_single_parent_node():
                 return parent.get_cache_task_args_set(force_cache=force_cache)
 
-            node_cache, created = NodeCache.get_or_create_for_node(self)
+            _node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
                 task_args_set.add((self.NODE_CACHE_TASK, (self.pk, self.version)))
             # else: cache is already being built by another node. The scheduler's dependency gate
@@ -316,6 +316,11 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
         return NodeStatus.is_ready(self.status)
 
     def bump_version(self):
+        """ Called by save() under the Analysis lock. A node loaded before the lock was taken may be behind
+            the stored version (another save or reload_analysis_nodes bumped it), so count on from the
+            stored one - reusing a version would reuse its NodeVersion, and the Q cache/counts of the old config """
+        if not (self._saved_by_parent or self._state.adding or self.pk is None):
+            self.version = AnalysisNode.objects.filter(pk=self.pk).values_list("version", flat=True).get()
         self.version += 1
         self.status = NodeStatus.DIRTY
         self.count = None
@@ -717,6 +722,8 @@ class AnalysisEdge(NodeAuditLogMixin, models.Model):
         return f"{self.parent_id} -> {self.child_id}"
 
     def save(self, *args, **kwargs):
+        if self.parent.analysis_id != self.child.analysis_id:
+            raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - they are in different analyses")
         dag = AnalysisDag.for_node(self.parent_id)
         if self.parent_id == self.child_id or self.child_id in dag.ancestor_ids(self.parent_id):
             raise NonFatalNodeError(f"Not connecting node {self.parent_id} to {self.child_id} - it would create a cycle")

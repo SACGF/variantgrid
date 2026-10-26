@@ -122,7 +122,7 @@ class PatientContactForm(forms.ModelForm):
         widgets = {'street_address': TextInput(attrs={'placeholder': 'Number, Street'}),
                    'suburb': TextInput(attrs={'placeholder': 'Suburb'}),
                    'postcode': TextInput(attrs={'placeholder': 'Postcode'}),
-                   'telephone': TextInput(attrs={'placeholder': 'Numbers only'})}
+                   'telephone': TextInput(attrs={'placeholder': 'Telephone'})}
 
 
 class PatientSearchForm(forms.Form):

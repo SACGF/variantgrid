@@ -321,15 +321,14 @@ def combined_variant_output_values(sections: dict[str, CombinedVariantOutputSect
 
 
 def write_combined_variant_output(sections: dict[str, CombinedVariantOutputSection], pair_id: str,
-                                  sequencing_run: Optional[SequencingRun], sequencing_run_name: str,
-                                  user: User, resolved: Optional[ResolvedPair] = None,
+                                  sequencing_run: SequencingRun, user: User, resolved: Optional[ResolvedPair] = None,
                                   specimen_reference: Optional[str] = None,
                                   parked_error: Optional[str] = None,
                                   file_upload=None) -> DragenTSO500CombinedVariantOutput:
     """ The pair's analysis on this run - a re-analysis of the run replaces it. It claims the specimen
         resolve_pair made, or parks the claim with why there is none """
     cvo, _ = DragenTSO500CombinedVariantOutput.objects.update_or_create(
-        sequencing_run_name=sequencing_run_name, pair_id=pair_id,
+        sequencing_run_name=sequencing_run.name, pair_id=pair_id,
         defaults={
             **combined_variant_output_values(sections),
             "sequencing_run": sequencing_run,

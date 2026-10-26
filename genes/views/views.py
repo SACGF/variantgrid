@@ -394,7 +394,7 @@ def add_gene_list_unmatched_genes_message(request, gene_list, instructions=None)
 
 def view_gene_list(request, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id, success_only=False)
-    gl_form = GeneListForm(request.POST or None, instance=gene_list)
+    gl_form = GeneListForm(request.POST or None, user=request.user, instance=gene_list)
     if request.method == "POST":
         gene_list.check_can_write(request.user)
         valid = gl_form.is_valid()
@@ -486,6 +486,7 @@ def sample_gene_lists_tab(request, sample_id):
     create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user,
                                                     initial={"name": "Sample Gene List"})
     if request.method == "POST":
+        sample.check_can_write(request.user)
         if create_gene_list_form.is_valid():
             custom_text_gene_list = create_gene_list_form.save()
             category = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)

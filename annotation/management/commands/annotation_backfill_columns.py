@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from annotation.backfill_columns import (
     DEFAULT_BATCH_SIZE,
     BackfillColumnError,
+    check_annotated_vcf_complete,
     dump_annotated_variants,
     import_backfill_vcf,
     mark_backfilled,
@@ -65,6 +66,9 @@ class Command(BaseCommand):
                             help="--dump: only the variants this pipeline annotates, eg STANDARD for a VEP "
                                  "plugin column, which the STANDARD VEP command fills")
         parser.add_argument("--vcf", help="--import: the externally annotated VCF")
+        parser.add_argument("--dump-vcf",
+                            help="--import: the --dump output that --vcf was annotated from. Refuses to import "
+                                 "unless every record came back annotated or in VEP's skipped variants file")
         parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE,
                             help="--import: records per COPY/UPDATE cycle (default %(default)s)")
         parser.add_argument("--clear-missing", action="store_true",
@@ -162,6 +166,12 @@ class Command(BaseCommand):
             raise CommandError("--import requires --vcf")
         if not os.path.exists(vcf_filename):
             raise CommandError(f"--vcf '{vcf_filename}' does not exist")
+        if dump_vcf_filename := options.get("dump_vcf"):
+            try:
+                dump_count = check_annotated_vcf_complete(dump_vcf_filename, vcf_filename)
+            except BackfillColumnError as e:
+                raise CommandError(str(e)) from e
+            self.stdout.write(f"'{vcf_filename}' accounts for all {dump_count} records of '{dump_vcf_filename}'")
 
         def emit(message):
             self.stdout.write(message)

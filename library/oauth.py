@@ -92,7 +92,7 @@ class ServerAuth:
         # it, requests_oauthlib fabricates a Basic auth header with an empty client_secret,
         # which Keycloak rejects with invalid_client
         session.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password,
-                            auth=self._app_auth, include_client_id=True)
+                            auth=self._app_auth, include_client_id=True, timeout=MINUTE_SECS)
 
     @cached_property
     def _oauth_session(self) -> OAuth2Session:
@@ -112,7 +112,7 @@ class ServerAuth:
             return
         if session.token.get("refresh_token"):
             try:
-                session.refresh_token(self.oauth_url, auth=self._app_auth)
+                session.refresh_token(self.oauth_url, auth=self._app_auth, timeout=MINUTE_SECS)
                 return
             except OAuth2Error:
                 pass  # refresh token expired or revoked

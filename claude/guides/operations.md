@@ -148,7 +148,7 @@ instead of plain collectstatic on a dev box.
 |---|---|---|
 | `PRIVATE_DATA_ROOT` | `/opt/variantgrid/data` | uploads (`UPLOAD_DIR`), per-deployment private files; gitignored |
 | `ANNOTATION_BASE_DIR` | `/data/annotation` | VEP code + caches (`ANNOTATION_VEP_BASE_DIR`), fastas, chain files, scratch, somalier |
-| `MEDIA_ROOT` | `/opt/variantgrid/media_root` | user media |
+| `MEDIA_ROOT` | `/opt/variantgrid/media_root` | generated media, served by nginx with no login check: only files behind a `SECRET_KEY`-salted name (graph PNGs, pedigree charts) belong here, which keeps that load off gunicorn; anything that needs a permission check goes in `UPLOAD_DIR` and is served by a view |
 | partition dumps | `/data/database/partition_dumps/<db>/` | pg_dump archives written before a partition is dropped (#1537) |
 
 `vg status` reports free space on each. The root filesystem on vg-test2 is small (about 30 GB) and usually above 85 %;
