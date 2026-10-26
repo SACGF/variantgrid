@@ -1,0 +1,12 @@
+{% load ui_utils %}
+{% load js_tags %}
+{% load classification_tags %}
+{% if step.diff_from_previous %}
+    {% labelled label=step.diffs_label label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ step.diff_from_previous|separator:', ' }}{% endlabelled %}
+{% endif %}
+{% labelled label=step.label value_css="text-monospace" %}{{ step.html }}{% p_hgvs step.p_hgvs %}{% endlabelled %}
+{% if step.error %}
+    {% labelled label="c.HGVS Error" value_css="text-danger" %}{{ step.error }}{% endlabelled %}
+{% endif %}
+{% labelled admin_only=True label=step.hgvs_converter_label value_css="text-monospace" row_css="debug-footnote" %}{{ step.hgvs_converter_version | enrich }}{% endlabelled %}
+{% labelled admin_only=True label=step.hgvs_converter_data_version_label value_css="text-monospace" row_css="debug-footnote" %}{{ step.hgvs_converter_data_version | dash_if_empty }}{% endlabelled %}
