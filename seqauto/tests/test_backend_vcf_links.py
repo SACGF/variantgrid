@@ -6,17 +6,17 @@ from seqauto.enums import DataGeneration
 from seqauto.models.models_seqauto import JointCalledVCF, SampleSheet, SequencingRun
 from seqauto.models.models_sequencing import Sequencer, SequencerModel
 from seqauto.models.models_software import VariantCaller
+from seqauto.models.models_upload import BackendVCF
+from seqauto.upload_links import create_backend_vcf_links
 from snpdb.enums import ImportSource
 from upload.enums import UploadedFileTypes
 from upload.models import (
-    BackendVCF,
     FileUpload,
     ProcessingStatus,
     UploadedVCF,
     UploadPipeline,
 )
 from upload.models.models import UploadUserError
-from upload.vcf.vcf_import import create_backend_vcf_links
 
 
 class BackendVCFLinksTest(TestCase):

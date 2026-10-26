@@ -1,8 +1,8 @@
 """
 Reader for Illumina DRAGEN TSO 500's MetricsOutput.tsv - the file only, no database work.
 
-What becomes of it is upload.tasks.import_dragen_tso500_metrics_output_task, via
-upload.tso500.dragen_metrics_output_records. The file is written once per run beside the
+What becomes of it is seqauto.tasks.import_dragen_tso500_metrics_output_task, via
+seqauto.tso500.dragen_metrics_output_records. The file is written once per run beside the
 CombinedVariantOutputs and is that file's layout - a banner, then one '[Section]' of key/values or a
 table - so the CVO's section reader reads it whole (read_sections).
 

@@ -894,6 +894,7 @@ WSGI_APPLICATION = 'variantgrid.wsgi.application'
 # The following will be imported, and looked for ImportTaskFactory.__subclasses__()
 IMPORT_TASK_FACTORY_IMPORTS = (
     'annotation.import_task_factories',
+    'seqauto.import_task_factories',
     'upload.import_task_factories.import_task_factories',
 )
 

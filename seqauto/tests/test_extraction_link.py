@@ -28,10 +28,11 @@ from seqauto.models import (
     VariantCaller,
     VCFFromSequencingRun,
 )
+from seqauto.models.models_upload import BackendVCF
 from seqauto.serializers.sequencing_serializers import SampleSheetSerializer
+from seqauto.upload_links import link_samples_and_vcfs_to_sequencing
 from snpdb.models import VCF, Sample
-from upload.models import BackendVCF, FileUpload, UploadedVCF
-from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing
+from upload.models import FileUpload, UploadedVCF
 
 DNA_SAMPLE_NAME = "ExampleSample_DNA_2600000001C"
 DNA_VCF_SUFFIXES = ["hard-filtered", "cnv", "DragenExonCNV"]

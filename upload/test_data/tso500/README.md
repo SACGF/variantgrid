@@ -75,7 +75,7 @@ replaced, so:
   Illumina's rule for the section is passing calls on EGFR, MET and
   AR only - a gene filter over `FILTER=PASS`, not a junction whitelist - so a `PASS` call in any other
   gene would be in the VCF and not here; this file has none, so it cannot tell the two rules apart
-  (source cited in `upload/tasks/import_dragen_tso500_combined_variant_output_task.py`).
+  (source cited in `seqauto/tasks/import_dragen_tso500_combined_variant_output_task.py`).
 - `[Fusions]` is every `KeepFusion = True` row of `AllFusions.csv`: gene pair joined with `-` where
   the caller knew the direction, supporting reads as `upload/tso500/dragen_all_fusions_parser.py`
   sums them, and `Ref A Dedup` / `Ref B Dedup` as the two reference counts.

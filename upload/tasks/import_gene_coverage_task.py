@@ -1,8 +1,8 @@
 import logging
+import os
 import re
 
 import pandas as pd
-from django.conf import settings
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.enums import AnnotationConsortium
@@ -10,10 +10,10 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, TranscriptVersion
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
-from seqauto.models.models_seqauto import QCGeneCoverage
 from snpdb.enums import DataState
 from snpdb.models import GenomeBuild, Sample
 from upload.models import UploadedGeneCoverage
+from upload.signals.signals import gene_coverage_upload_signal
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app
 
@@ -57,18 +57,14 @@ class ImportGeneCoverageTask(ImportTask):
         genome_build = GenomeBuild.legacy_build()
         enrichment_kit = None
 
-        # But now we want to use it to upload sequencing files via API
-        # In which case you NEED to have created the QCGeneCoverage files
-        # So that we can get the right canonical transcripts etc
-        qc_gene_coverage = None
-        if settings.SEQAUTO_ENABLED:
-            # Only API or seqauto sets path - but seqauto won't call this method it just directly calls
-            # GeneCoverageCollection.load_from_file
-            if file_upload.path:
-                qc_gene_coverage = file_upload.get_sequencing_record_for_path(QCGeneCoverage)
-                logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
-                genome_build = qc_gene_coverage.qc.genome_build
-                enrichment_kit = qc_gene_coverage.qc.sequencing_sample.enrichment_kit
+        # A file sent for a sequencing record (seqauto's QCGeneCoverage) takes its build and kit from there,
+        # so that we can get the right canonical transcripts etc
+        source = None
+        for _, response in gene_coverage_upload_signal.send(sender=os.path.basename(__file__), file_upload=file_upload):
+            if response:
+                source = response
+                genome_build = source.genome_build
+                enrichment_kit = source.enrichment_kit
 
         filename = file_upload.get_filename()
 
@@ -79,7 +75,7 @@ class ImportGeneCoverageTask(ImportTask):
 
         # Linking this way was done for RUNX1
         auto_match_samples = False
-        if not qc_gene_coverage and auto_match_samples:
+        if not source and auto_match_samples:
             uploaded_gene_coverage.sample = self.match_sample(file_upload.user, filename)
             uploaded_gene_coverage.save()
 
@@ -91,9 +87,8 @@ class ImportGeneCoverageTask(ImportTask):
         uploaded_gene_coverage.gene_coverage_collection = gene_coverage_collection
         uploaded_gene_coverage.save()
 
-        if qc_gene_coverage:
-            qc_gene_coverage.gene_coverage_collection = gene_coverage_collection
-            qc_gene_coverage.save()
+        if source:
+            source.link_collection(gene_coverage_collection)
 
         gene_matcher = GeneSymbolMatcher()
         canonical_transcript_manager = CanonicalTranscriptManager()

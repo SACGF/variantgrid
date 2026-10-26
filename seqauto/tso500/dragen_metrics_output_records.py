@@ -1,7 +1,7 @@
 """
 The database side of a TSO 500 run's MetricsOutput - the LibraryQC rows it writes. The file itself
-is read by upload.tso500.dragen_metrics_output_parser and the import step is
-upload.tasks.import_dragen_tso500_metrics_output_task.
+is read by seqauto.tso500.dragen_metrics_output_parser and the import step is
+seqauto.tasks.import_dragen_tso500_metrics_output_task.
 
 Entry point is write_library_qc: one row per (run, pair, QC category). The file is written per
 sequencing run and names that run nowhere, so the run comes off the upload's 'sequencing_run'
@@ -39,21 +39,21 @@ from seqauto.models import (
     SequencingSample,
     sequencing_sample_for_pair,
 )
-from upload.tso500.dragen_combined_variant_output_parser import (
-    OUTPUT_DATE,
-    OUTPUT_TIME,
-)
-from upload.tso500.dragen_combined_variant_output_records import (
+from seqauto.tso500.dragen_combined_variant_output_records import (
     SAMPLE_ID_ACCESSION_PATTERN,
     CombinedVariantOutputIdentityError,
     parse_output_datetime,
     parse_patient_code,
 )
-from upload.tso500.dragen_metrics_output_parser import (
+from seqauto.tso500.dragen_metrics_output_parser import (
     CATEGORY_NUCLEIC_ACID,
     HEADER,
     LibraryQCMetrics,
     get_workflow_version,
+)
+from upload.tso500.dragen_combined_variant_output_parser import (
+    OUTPUT_DATE,
+    OUTPUT_TIME,
 )
 
 METHOD = "DRAGEN TSO500 MetricsOutput"

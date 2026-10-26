@@ -37,15 +37,6 @@ from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message
 from library.utils import file_sha256sum
 from library.utils.file_utils import mk_path
-from seqauto.models import (
-    JointCalledVCF,
-    SequencingRun,
-    SingleSampleVCF,
-    VariantCaller,
-    get_samples_by_sequencing_sample,
-)
-from seqauto.models.models_seqauto import SeqAutoRecord
-from seqauto.seqauto_permissions import can_write_seqauto
 from snpdb.enums import ImportSource, ImportStatus, ProcessingStatus
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, GenomeBuild, SoftwareVersion, Variant, VariantCoordinate
@@ -60,6 +51,7 @@ from upload.enums import (
     VCFImportInfoSeverity,
     VCFPipelineStage,
 )
+from upload.upload_data import UploadData
 from variantgrid.celery import app
 
 
@@ -114,39 +106,6 @@ class FileUpload(TimeStampedModel):
             msg = f"You do not have permission to access FileUpload pk={self.pk}"
             raise PermissionDenied(msg)
 
-    def check_may_link_to_sequencing_data(self, sequencing_data: str):
-        """ Linking an upload to a seqauto record writes onto sequencing data, so a file sent through the upload page
-            or API needs the seqauto API's write access - command line and SeqAuto imports are run by the server.
-            Raises UploadUserError naming sequencing_data where the upload may not link to it """
-        if self.import_source == ImportSource.WEB_UPLOAD and not can_write_seqauto(self.user):
-            raise UploadUserError(f"You don't have permission to link uploads to {sequencing_data}",
-                                  summary="No permission to link to sequencing data")
-
-    def get_sequencing_record_for_path(self, *seqauto_record_classes: type[SeqAutoRecord]) -> SeqAutoRecord:
-        """ The first record of seqauto_record_classes (in order) for this upload's path - the sequencing file the
-            upload is linked to and writes onto. Raises UploadUserError where there is no such record or the upload
-            may not link to it """
-        for seqauto_record_class in seqauto_record_classes:
-            if record := seqauto_record_class.objects.filter(path=self.path).first():
-                if record.sequencing_run_id:
-                    sequencing_data = f"sequencing run '{record.sequencing_run_id}'"
-                else:
-                    sequencing_data = str(record)
-                self.check_may_link_to_sequencing_data(sequencing_data)
-                return record
-        raise UploadUserError(f"No sequencing data has the path '{self.path}'",
-                              summary="No sequencing data at path")
-
-    def get_sequencing_run_to_link(self, sequencing_run_name: str) -> SequencingRun:
-        """ The registered run a run-level file (TSO500 MetricsOutput / CombinedVariantOutput) names in its
-            metadata - such a file has no path to link it by. Raises UploadUserError where the upload may not
-            link to it or there is no such run """
-        self.check_may_link_to_sequencing_data(f"sequencing run '{sequencing_run_name}'")
-        if sequencing_run := SequencingRun.objects.filter(name=sequencing_run_name).first():
-            return sequencing_run
-        raise UploadUserError(f"No sequencing run named '{sequencing_run_name}'",
-                              summary="No such sequencing run")
-
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
         if isinstance(user_or_group, User):
             return user_or_group.is_superuser or self.user == user_or_group
@@ -183,40 +142,6 @@ class FileUpload(TimeStampedModel):
     def __str__(self):
         description = f"{self.name} ({self.created.astimezone(UserSettingsManager.get_user_timezone())})"
         return description
-
-
-class UploadData(models.Model):
-    """ Data created by processing a FileUpload - one per FileUpload/file_type """
-
-    # Retry-import deletes UploadData so the pipeline re-creates it from the file. Set False where the record
-    # links to data created before the pipeline started, as the pipeline can't make it again
-    created_by_pipeline = True
-
-    class Meta:
-        abstract = True
-
-    def get_data(self):
-        raise NotImplementedError()
-
-    @property
-    def genome_build(self) -> Optional[GenomeBuild]:
-        return None
-
-    def get_upload_context(self) -> dict:
-        """ Dict for displaying upload widget """
-        return {}
-
-    @property
-    def requires_user_input(self) -> bool:
-        """ The import is waiting for the user to set something the file didn't declare (eg the genome build)
-            on the data's page (get_data_url), which finishes the import """
-        return False
-
-    def get_data_url(self) -> Optional[str]:
-        if data := self.get_data():
-            if get_absolute_url := getattr(data, "get_absolute_url", None):
-                return get_absolute_url()
-        return None
 
 
 class UploadUserError(Exception):
@@ -723,49 +648,6 @@ class UploadedVCFPendingAnnotation(models.Model):
             self.save()
         else:
             logging.info("UploadedVCF %s still waiting for annotation", self.uploaded_vcf)
-
-
-class BackendVCF(models.Model):
-    """ Link between UploadedVCF (upload) and Filesystem VCF (SeqAuto) """
-    uploaded_vcf = models.OneToOneField(UploadedVCF, on_delete=CASCADE)
-    single_sample_vcf = models.OneToOneField(SingleSampleVCF, null=True, on_delete=CASCADE)
-    joint_called_vcf = models.OneToOneField(JointCalledVCF, null=True, on_delete=CASCADE)
-
-    @property
-    def filesystem_vcf(self):
-        vcfs = [self.joint_called_vcf, self.single_sample_vcf]
-        if all(vcfs):
-            msg = f"{self} has both single_sample_vcf and joint_called_vcf set"
-            raise ValueError(msg)
-        if self.single_sample_vcf:
-            return self.single_sample_vcf
-        if self.joint_called_vcf:
-            return self.joint_called_vcf
-        raise ValueError(f"{self} has neither 'single_sample_vcf' or 'joint_called_vcf' set")
-
-    @property
-    def sample_sheet(self):
-        return self.filesystem_vcf.sample_sheet
-
-    @property
-    def user(self):
-        return self.uploaded_vcf.file_upload.user
-
-    @property
-    def vcf(self):
-        return self.uploaded_vcf.vcf
-
-    @property
-    def variant_caller(self) -> VariantCaller:
-        record = self.single_sample_vcf or self.joint_called_vcf
-        return record.variant_caller
-
-    def get_samples_by_sequencing_sample(self):
-        return get_samples_by_sequencing_sample(self.filesystem_vcf.get_sequencing_samples(), self.vcf)
-
-    def __str__(self):
-        backend = self.single_sample_vcf or self.joint_called_vcf or 'None'
-        return f"BackendVCF: backend: {backend}, uploaded_vcf: {self.uploaded_vcf}"
 
 
 class VCFImportInfo(models.Model):

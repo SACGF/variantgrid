@@ -87,3 +87,12 @@ ignore_imports =
     ; inside a function to break a cycle: genes.models imports snpdb.models
     snpdb.models.models -> genes.models
     snpdb.models.models_clingen_allele -> genes.hgvs
+
+[importlinter:contract:upload-below-seqauto]
+name = upload does not import seqauto
+type = forbidden
+source_modules =
+    upload
+forbidden_modules =
+    seqauto
+allow_indirect_imports = True

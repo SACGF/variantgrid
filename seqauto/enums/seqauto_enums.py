@@ -49,7 +49,7 @@ class EnrichmentKitType(models.TextChoices):
 
 class LibraryQCCategory(models.TextChoices):
     """ What a caller's library QC section vouches for. These are DRAGEN TSO500's MetricsOutput sections today
-        (upload/tso500/dragen_metrics_output_parser.py maps the headings), named for what they vouch for so another
+        (seqauto/tso500/dragen_metrics_output_parser.py maps the headings), named for what they vouch for so another
         caller's QC can land in the same rows """
     DNA = 'D', 'DNA library'                      # contamination
     SMALL_VARIANT_TMB = 'V', 'Small variants and TMB'
