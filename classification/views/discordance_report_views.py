@@ -245,10 +245,11 @@ class DiscordanceReportTemplateData:
             lab = cm.classification.lab
             clin_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             pending_clin_sig = clin_sig
-            if pending_change := cm.classification.flag_collection.get_open_flag_of_type(
-                    classification_flag_types.classification_pending_changes):
-                pending_clin_sig = pending_change.data.get(
-                    ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
+            ### No longer supporting classification_pending_changes flag, and not backporting OverlapContribution back to legacy discordances
+            # if pending_change := cm.classification.flag_collection.get_open_flag_of_type(
+            #         classification_flag_types.classification_pending_changes):
+            #     pending_clin_sig = pending_change.data.get(
+            #         ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
             lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
             clin_sig_keys_to_pending[lab_clin_sig_key][pending_clin_sig] += 1
 

@@ -593,9 +593,10 @@ class ClassificationFilter:
         return flag_ids_to(Classification, FlagComment.objects.filter(
             flag__flag_type__in={
                 classification_flag_types.classification_withdrawn,
+                ## the following flags are no longer supported
                 # classification_flag_types.transcript_version_change_flag,
                 # classification_flag_types.matching_variant_warning_flag,
-                classification_flag_types.classification_pending_changes
+                # classification_flag_types.classification_pending_changes
             },
             created__gte=self.since
         ))

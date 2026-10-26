@@ -141,30 +141,35 @@ class DiscordanceStatus:
             return base_status
 
         if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            pass
+
             # we should only be able to get here if we're GERMLINE anyway, as somatic should never be discordnt
             # but wanted to highlight the below is
 
             # we're discordant, check to see if there are pending changes AND if those pending changes would bring us into discordance
             # if so, just mark "pending_concordance" as true
-            flag_collections = {mod.classification.flag_collection_id: mod for mod in modifications}
-            if pending_flags := Flag.objects.filter(collection__in=flag_collections.keys(),
-                                                    flag_type=classification_flag_types.classification_pending_changes,
-                                                    resolution__status=FlagStatus.OPEN):
 
-                clin_sig_overrides: dict[int, str] = {}
-                for flag in pending_flags:
-                    clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
-                        ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
+            ### No longer supporting classification_pending_changes flag, and not backporting OverlapContribution back to legacy discordances
 
-                override_status = DiscordanceStatus._calculate_rows([
-                    _DiscordanceCalculationRow(
-                        lab=vcm.classification.lab,
-                        clinical_significance=clin_sig_overrides.get(vcm.pk) if vcm.pk in clin_sig_overrides else vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-                        shared=vcm.share_level_enum.is_discordant_level
-                    ) for vcm in modifications
-                ])
-                if not override_status.is_discordant:
-                    base_status.pending_concordance = True
+            # flag_collections = {mod.classification.flag_collection_id: mod for mod in modifications}
+            # if pending_flags := Flag.objects.filter(collection__in=flag_collections.keys(),
+            #                                         flag_type=classification_flag_types.classification_pending_changes,
+            #                                         resolution__status=FlagStatus.OPEN):
+            #
+            #     clin_sig_overrides: dict[int, str] = {}
+            #     for flag in pending_flags:
+            #         clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
+            #             ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
+            #
+            #     override_status = DiscordanceStatus._calculate_rows([
+            #         _DiscordanceCalculationRow(
+            #             lab=vcm.classification.lab,
+            #             clinical_significance=clin_sig_overrides.get(vcm.pk) if vcm.pk in clin_sig_overrides else vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+            #             shared=vcm.share_level_enum.is_discordant_level
+            #         ) for vcm in modifications
+            #     ])
+            #     if not override_status.is_discordant:
+            #         base_status.pending_concordance = True
 
         base_status.discordance_report = discordance_report
         return base_status

@@ -48,12 +48,18 @@ class DiscordanceLabSummary(ClassificationLabSummary):
                 clinical_significance_to = 'withdrawn'
             else:
                 if discordance_report.is_latest:
+                    pass
+
                     # classification is still outstanding, check to see if there pending changes
-                    if flag := drc.classification_original.classification.flag_collection.get_open_flag_of_type(
-                            classification_flag_types.classification_pending_changes):
-                        clinical_significance_to = flag.data.get(
-                            ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
-                        pending = True
+
+                    # TODO: we could check for pending using the triage state
+                    # but using the new Overlap work to fix some issues in the legacy work is not worth it
+
+                    # if flag := drc.classification_original.classification.flag_collection.get_open_flag_of_type(
+                    #         classification_flag_types.classification_pending_changes):
+                    #     clinical_significance_to = flag.data.get(
+                    #         ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
+                    #     pending = True
 
                 if not clinical_significance_to:
                     clinical_significance_to = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)

@@ -125,7 +125,8 @@ def clinical_significance_change_check(
         user: User,
         **kwargs):  # pylint: disable=unused-argument
     """
-    Raises a clinical significance change flag if the clinical significance has changed after publishing
+    Closes unshared flag
+    Used to handle pending changes, but that is now done with triage states isntead of flags on individual classifications
     """
 
     # TODO move this into classification_hooks_share_flags
@@ -133,49 +134,3 @@ def clinical_significance_change_check(
         classification.flag_collection_safe.close_open_flags_of_type(
             flag_type=classification_flag_types.unshared_flag
         )
-
-    if previously_published and previously_published.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
-
-        if somatic_clin_sig_change := _SignificanceChange(
-            previously_published=previously_published,
-            newly_published=newly_published,
-            evidence_key=EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-        ):
-            somatic_clin_sig_change.raise_flag(classification)
-
-        if classification_change := _SignificanceChange(
-            previously_published=previously_published,
-            newly_published=newly_published,
-            evidence_key=EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        ):
-            classification_change.raise_flag(classification)
-            close_message = f"Classification was changed to {classification_change.new_label}"
-
-            if pending_change_flag := classification.flag_collection_safe.get_flag_of_type(classification_flag_types.classification_pending_changes):
-                if pending_change_value := pending_change_flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY):
-
-                    class_url = get_url_from_view_path(
-                        reverse('view_classification', kwargs={'classification_id': classification.id}),
-                    )
-
-                    pending_change_label = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(pending_change_value)
-                    if classification_change.new_value != pending_change_value:
-                        close_message += f", expected {pending_change_label}"
-
-                    # is_agreed_change = newly_published != pending_change_value
-                    nb = NotificationBuilder("Pending Change")
-                    nb.add_markdown(
-                        f"Classification <{class_url}|{classification.friendly_label}> had a pending change and has now been updated:\n"
-                        f"*{classification_change.previous_label}* - old clinical significance\n"
-                        f"*{pending_change_label}* - pending change\n"
-                        f"*{classification_change.new_label}* - new clinical significance")
-                    nb.send()
-
-            # note we don't care if the clin sig was changed to agreed upon value per the flag
-            # just that it was changed
-            classification.flag_collection_safe.close_open_flags_of_type(
-                flag_type=classification_flag_types.classification_pending_changes,
-                comment=close_message
-            )
-
-    get_timer().tick("Update share flags")

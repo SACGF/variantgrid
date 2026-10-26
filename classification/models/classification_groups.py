@@ -131,6 +131,7 @@ class ClassificationGroupUtils:
         self._old_modifications = old_modifications
         self.calculate_pending = calculate_pending
 
+    # TODO: remove this code after removing old flags
     @cached_property
     def _pending_changes_flag_map(self) -> dict[int, str]:
         mod_id_to_clin_sig: dict[int, str] = {}

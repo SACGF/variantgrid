@@ -91,28 +91,12 @@ PatientCount.ZERO = PatientCount(counts={})
 
 class OverlapsCalculatorState:
     """
-    Details used to help overlap calculations
+    Class used to provide pending values to legacy classes.
+    Has no use now (class remains to reduce refactoring of legacy code that can be deleted soon)
     """
 
     def __init__(self, perspective: LabPickerData):
         self.perspective = perspective
-
-    @cached_property
-    def _collection_to_flag(self):
-        # The number of open clinical significance change flags should be limited, so fetch them all to check later
-        all_open_pending_changes = Flag.objects.filter(
-            flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
-        collection_clin_sig = {}
-        for flag in all_open_pending_changes:
-            collection_clin_sig[flag.collection_id] = (flag.data or {}).get(
-                ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
-        return collection_clin_sig
-
-    def pending_change_clin_sig(self, cms: ClassificationModification) -> Optional[str]:
-        """
-        If there's a pending change for this classification modification, what is it to
-        """
-        return self._collection_to_flag.get(cms.classification.flag_collection_id)
 
 
 class LegacyOverlapState(ABC):
@@ -148,7 +132,8 @@ class ClassificationLabSummaryExtra(ClassificationLabSummary):
 
 class ClinicalGroupingOverlap:
     """
-    Overlaps detail for a clinical grouping within an allele
+    Overlaps detail for a clinical grouping within an allele.
+    LEGACY
     """
 
     def __init__(self, state: LegacyOverlapState, clinical_context: Optional[ClinicalContext]):
@@ -180,15 +165,15 @@ class ClinicalGroupingOverlap:
 
     def add_classification(self, cm: ClassificationModification):
         clinical_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        pending_clin_sig = self.calculator_state.pending_change_clin_sig(cm)
+        # pending_clin_sig = self.calculator_state.pending_change_clin_sig(cm)
         group = ClassificationLabSummaryEntry(
             lab=cm.classification.lab,
             allele_origin_bucket=cm.classification.allele_origin_bucket,
             clinical_significance_from=clinical_sig,
-            clinical_significance_to=pending_clin_sig or clinical_sig,
+            clinical_significance_to=clinical_sig,  # pending_clin_sig or clinical_sig
             somatic_clinical_significance=cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),
             amp_level=cm.amp_level,
-            pending=bool(pending_clin_sig)
+            pending=False  # bool(pending_clin_sig)
         )
         self.groups[group].append(cm)
         self.labs.add(cm.classification.lab)
