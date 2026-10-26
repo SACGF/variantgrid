@@ -1,0 +1,9 @@
+FAM_A proband_a father_a mother_a 1 2
+FAM_A father_a 0 0 1 1
+FAM_A mother_a 0 0 2 1
+FAM_A sister_a father_a mother_a 2 1
+FAM_B proband_b father_b mother_b 2 2
+FAM_B father_b 0 0 1 1
+FAM_B mother_b 0 0 2 2
+FAM_C proband_c 0 mother_c 1 2
+FAM_C mother_c 0 0 2 1
