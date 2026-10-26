@@ -1,5 +1,6 @@
 import operator
 import re
+from dataclasses import dataclass
 from functools import reduce
 from typing import Optional
 
@@ -7,17 +8,22 @@ from django.conf import settings
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 from requests import Response
 
 from classification.enums import ImportedAlleleInfoStatus
 from classification.models import Classification, ClassificationModification, ImportedAlleleInfo
-from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
-from genes.hgvs import HGVSDiff, HGVSDisplay, hgvs_diff_description
+from classification.models.classification_variant_info_models import (
+    HGVSConverterVersion,
+    ImportedAlleleInfoValidation,
+    ResolvedVariantInfo,
+)
+from genes.hgvs import HGVSComponents, HGVSDisplay, hgvs_diff_description
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.admin_utils import get_admin_url
 from library.django_utils.view_utils import render_ajax_view
-from library.utils import ExportRow, MultiDiff, MultiDiffInput, export_column
+from library.utils import ExportRow, export_column
+from library.utils.diff_utils import MultiDiff, MultiDiffInput, MultiDiffOutput
 from snpdb.models import GenomeBuild, Lab
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
@@ -199,10 +205,57 @@ def view_imported_allele_info(request: HttpRequest) -> Response:
     })
 
 
-def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
-    allele_info = get_object_or_404(ImportedAlleleInfo, pk=allele_info_id)
-    # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
+@dataclass(frozen=True)
+class HGVSResolutionStep:
+    """ One c.HGVS row of the imported allele info detail: the text as imported, its resolution in the imported build
+        (normalised) or the liftover to the other build. The MultiDiffOutput highlights where it differs from the
+        normalised one; variant_info is None for the imported text and for a build that has not resolved """
+    origin: str
+    diff: MultiDiffOutput
+    variant_info: Optional[ResolvedVariantInfo] = None
+    diff_from_previous: Optional[list[str]] = None
+    """ hgvs_diff_description of this c.HGVS against the step before it (imported -> normalised -> liftover) """
 
+    @property
+    def label(self) -> str:
+        return self.diff.identifier
+
+    @property
+    def diffs_label(self) -> str:
+        return f"{self.origin} Diffs"
+
+    @property
+    def html(self) -> SafeString:
+        return self.diff.html()
+
+    @property
+    def hgvs_converter_label(self) -> str:
+        return f"{self.label} c.HGVS by"
+
+    @property
+    def hgvs_converter_version(self) -> Optional[HGVSConverterVersion]:
+        return self.variant_info.hgvs_converter_version if self.variant_info else None
+
+    @property
+    def hgvs_converter_data_version_label(self) -> str:
+        return f"{self.label} c.HGVS data version"
+
+    @property
+    def hgvs_converter_data_version(self) -> Optional[str]:
+        return self.variant_info.hgvs_converter_data_version if self.variant_info else None
+
+    @property
+    def p_hgvs(self) -> Optional[str]:
+        return self.variant_info.p_hgvs if self.variant_info else None
+
+    @property
+    def error(self) -> Optional[str]:
+        return self.variant_info.error if self.variant_info else None
+
+
+def _hgvs_resolution_steps(allele_info: ImportedAlleleInfo) -> tuple[Optional[HGVSResolutionStep], HGVSResolutionStep, HGVSResolutionStep]:
+    """ (imported, normalised, liftover) - imported is None when the record was imported as a g.HGVS """
+    # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
     HGVS_BASE_REGEX_STR = r'^(?P<transcript>[^.]+?)(?P<transcript_version>\.[0-9]+)?(?P<gene_symbol>[(].*[)])?(?P<c_dot>:[cng]\.)'
 
     HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_full>.*?)$')
@@ -211,83 +264,58 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
 
     FALLBACK_HGVS = re.compile("(?P<all>.*)")
-    use_texts = [text for text in [allele_info.imported_c_hgvs, allele_info.grch37.resolved_hgvs if allele_info.grch37 else None, allele_info.grch38.resolved_hgvs if allele_info.grch38 else None] if text]
+
+    normalised_info = allele_info.variant_info_for_imported_genome_build
+    liftover_info = allele_info.variant_info_for_lifted_over_genome_build
+
+    def resolved_input(origin: str, variant_info: Optional[ResolvedVariantInfo], is_reference: bool) -> MultiDiffInput:
+        label = f"{origin} ({variant_info.genome_build})" if variant_info else origin
+        return MultiDiffInput(label, variant_info.resolved_hgvs if variant_info else None, is_reference=is_reference)
+
+    imported_input: Optional[MultiDiffInput] = None
+    if allele_info.imported_c_hgvs:
+        imported_input = MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)
+    normalised_input = resolved_input("Normalised", normalised_info, is_reference=True)
+    liftover_input = resolved_input("Liftover", liftover_info, is_reference=False)
+    inputs = [inp for inp in [imported_input, normalised_input, liftover_input] if inp]
 
     use_regex = FALLBACK_HGVS
-    if use_texts:
-        regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]
-        for regex in regex_attempt_order:
-            is_a_match = True
-            for use_text in use_texts:
-                if not regex.match(use_text):
-                    is_a_match = False
-                    break
-
-            if is_a_match:
+    if use_texts := [inp.text for inp in inputs if inp.text]:
+        for regex in [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]:
+            if all(regex.match(use_text) for use_text in use_texts):
                 use_regex = regex
                 break
 
-    multi_diff = MultiDiff(use_regex)
-    # 'parts' and 'resolved_variant_info' are kept in sync
-    parts = []
-    resolved_variant_info = []
+    diff_by_input = {output.input: output for output in MultiDiff(use_regex).diffs(inputs)}
 
-    if allele_info.imported_c_hgvs:
-        parts += [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
-        resolved_variant_info.append(None)
+    def diff_description(a: Optional[HGVSComponents], b: Optional[HGVSComponents]) -> Optional[list[str]]:
+        if a and b and (hgvs_diff := a.diff(b)):
+            return hgvs_diff_description(hgvs_diff)
+        return None
 
-    if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
-        resolved_variant_info_is_reference = [
-            (allele_info.grch37, True),
-            (allele_info.grch38, False),
-        ]
-    else:
-        resolved_variant_info_is_reference = [
-            (allele_info.grch38, True),
-            (allele_info.grch37, False),
-        ]
+    imported_c_hgvs = allele_info.imported_c_hgvs_obj.dna_hgvs if allele_info.imported_c_hgvs_obj else None
+    normalised_c_hgvs = normalised_info.resolved_hgvs_obj if normalised_info else None
+    liftover_c_hgvs = liftover_info.resolved_hgvs_obj if liftover_info else None
 
-    for rvi, is_reference in resolved_variant_info_is_reference:
-        if is_reference:
-            origin = "Normalised"
-        else:
-            origin = "Liftover"
-        if rvi:
-            label = f"{origin} ({rvi.genome_build})"
-        else:
-            label = origin
+    imported_step = HGVSResolutionStep("Imported", diff_by_input[imported_input]) if imported_input else None
+    normalised_step = HGVSResolutionStep("Normalised", diff_by_input[normalised_input], normalised_info,
+                                         diff_from_previous=diff_description(imported_c_hgvs, normalised_c_hgvs))
+    liftover_step = HGVSResolutionStep("Liftover", diff_by_input[liftover_input], liftover_info,
+                                       diff_from_previous=diff_description(normalised_c_hgvs, liftover_c_hgvs))
+    return imported_step, normalised_step, liftover_step
 
-        parts.append(MultiDiffInput(label, rvi.resolved_hgvs if rvi else None,
-                                    is_reference=is_reference))
-        resolved_variant_info.append((label + " c.HGVS by", rvi.hgvs_converter_version if rvi else "",
-                                              label + " c.HGVS data version", rvi.hgvs_converter_data_version if rvi else "",
-                                              rvi.p_hgvs if rvi else None,
-                                              rvi.error if rvi else None))
 
-    diff_output = multi_diff.diffs(parts)
-    if not allele_info.imported_c_hgvs:
-        diff_output = [None] + diff_output
-        resolved_variant_info = [None, *resolved_variant_info]
-
-    normalized_diff: Optional[HGVSDiff] = None
-    liftover_diff: Optional[HGVSDiff] = None
-    if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
-        if normalized := allele_info.variant_info_for_imported_genome_build:
-            if c_hgvs := normalized.resolved_hgvs_obj:
-                normalized_diff = imported_c_hgvs.dna_hgvs.diff(c_hgvs)
-    if (c37 := allele_info.grch37) and (c38 := allele_info.grch38):
-        if (c37c := c37.resolved_hgvs_obj) and (c38c := c38.resolved_hgvs_obj):
-            liftover_diff = c37c.diff(c38c)
-
+def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
+    allele_info = get_object_or_404(ImportedAlleleInfo, pk=allele_info_id)
+    imported_step, normalised_step, liftover_step = _hgvs_resolution_steps(allele_info)
     classifications = ClassificationModification.latest_for_user(user=request.user, published=True).filter(classification__in=allele_info.classification_set.all())
 
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": allele_info,
         "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
-        "c_hgvses": diff_output,
-        "resolved_variant_info": resolved_variant_info,
-        "normalized_diff": hgvs_diff_description(normalized_diff) if normalized_diff else None,
-        "liftover_diff": hgvs_diff_description(liftover_diff) if liftover_diff else None,
+        "imported_step": imported_step,
+        "normalised_step": normalised_step,
+        "liftover_step": liftover_step,
         "variant_coordinate_label": f"Variant Coordinate (from HGVS resolution) ({allele_info.imported_genome_build_patch_version})",
         "variant_coordinate_normalized_label": f"Variant Coordinate Normalized ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
