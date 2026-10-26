@@ -194,6 +194,18 @@ const DataTableDefinition = (function() {
             };
         },
 
+        /* The server answers 429 rather than holding a worker while the same query (or too many of
+           the user's) is already running (@see NodeGridHandler). The processing indicator stays up
+           and the same page is asked for again, unless the table has gone from the page meanwhile */
+        retryLater: function(jqXHR) {
+            const retryAfterSecs = parseInt(jqXHR.getResponseHeader('Retry-After')) || 2;
+            setTimeout(() => {
+                if (this.dataTable && $.contains(document.documentElement, this.dom[0])) {
+                    this.dataTable.ajax.reload(null, false);
+                }
+            }, retryAfterSecs * 1000);
+        },
+
         convertDefinition: function() {
             const self = this;
             const defn = this.serverParams;
@@ -229,7 +241,13 @@ const DataTableDefinition = (function() {
                     // DataTables defaults to cache: false, which appends _=timestamp to a GET and
                     // gives a @cache_page endpoint a fresh key every request
                     cache: Boolean(defn.cacheStableParams),
+                    // Read by the global ajaxError handlers, which leave a 429 to the retry below
+                    retriesTooManyRequests: true,
                     error: function(jqXHR, textStatus, errorThrown) {
+                        if (jqXHR.status === 429) {
+                            self.retryLater(jqXHR);
+                            return;
+                        }
                         if (self.onLoadError) {
                             self.onLoadError(jqXHR, textStatus, errorThrown);
                         }

@@ -1,8 +1,8 @@
 import logging
-import time
 from urllib.parse import urlencode
 
 from django.core.cache import cache
+from django.http import JsonResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -35,6 +35,7 @@ from snpdb.models import CachedGeneratedFile, Cohort, Sample
 from snpdb.views.datatable_view import datatable_definition, datatable_response
 
 EXPORT_TYPES = {"csv", "vcf"}
+NODE_GRID_RETRY_AFTER_SECS = 2
 
 # What a node grid request may carry, so the cache key and the export params hash are built off a
 # known set - node_grid_export builds its params from this list too, and the export path reads them
@@ -64,13 +65,21 @@ def _add_allowed_node_grid_params(url: str, params: dict) -> str:
     return f"{url}?" + urlencode(cleaned_params)
 
 
+def _retry_node_grid_later(message: str) -> JsonResponse:
+    """ cache_page only stores 200s, so the retry runs the query (or finds the finished one cached) """
+    response = JsonResponse({"message": message}, status=429)
+    response["Retry-After"] = str(NODE_GRID_RETRY_AFTER_SECS)
+    return response
+
+
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
 class NodeGridHandler(NodeJSONViewMixin):
     def get(self, request, *args, **kwargs):
         """ This can be a really expensive operation (ie a few mins)
             And users can sometimes click multiple times, causing the DB to get slow running the same query
-            multiple times, interfering with itself - so make a per-user lock, and redirect any further calls
-            which should hopefully hit the cache next time
+            multiple times, interfering with itself - so make a per-user lock. A request that can't run yet
+            gets a 429 straight away and the browser retries it (@see DataTableDefinition), which should
+            hopefully hit the cache next time - a gunicorn worker never waits on another request's query
         """
         LOCK_EXPIRE = 60 * 10  # 10 mins
         try:
@@ -81,23 +90,18 @@ class NodeGridHandler(NodeJSONViewMixin):
         url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
         url = _add_allowed_node_grid_params(url, request.GET.dict())
         lock_id = sha256sum_str(f"{url}_{request.user}")
-        if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
-            try:
-                logging.info("Got the lock...")
-                # Cap concurrent expensive queries per-user (distinct nodes bypass the per-node lock above)
-                with major_operation(request.user, "node_grid"), node_query_planner_settings():
-                    response = self.get_response(request, *args, **kwargs)
-            except TooManyMajorOperationsError:
-                logging.info("Too many major operations - going to sleep then retry...")
-                time.sleep(2)
-                response = HttpResponseRedirect(url)
-            finally:
-                cache.delete(lock_id)  # release lock
-        else:
-            logging.info("Don't have lock - going to sleep then retry...")
-            time.sleep(2)
-            response = HttpResponseRedirect(url)
-        return response
+        if not cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
+            logging.info("Don't have lock - asking the client to retry")
+            return _retry_node_grid_later("This grid is already loading")
+        try:
+            # Cap concurrent expensive queries per-user (distinct nodes bypass the per-node lock above)
+            with major_operation(request.user, "node_grid"), node_query_planner_settings():
+                return self.get_response(request, *args, **kwargs)
+        except TooManyMajorOperationsError:
+            logging.info("Too many major operations - asking the client to retry")
+            return _retry_node_grid_later("Waiting for your other grids to finish loading")
+        finally:
+            cache.delete(lock_id)  # release lock
 
     def _get_node(self, request, **kwargs) -> AnalysisNode:
         return _node_from_request(request)
