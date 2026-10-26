@@ -2,15 +2,16 @@ import logging
 import os
 import subprocess
 import time
+import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 
 import cyvcf2
 import redis
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 
 from library.utils.file_utils import mk_path, name_from_filename
-from snpdb import variant_collection
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
@@ -38,6 +39,14 @@ def handle_unknown_variants(upload_pipeline, unknown_variants, unknown_variants_
     upload_step.launch_task(InsertUnknownVariantsTask)
 
 
+def _handle_unknown_variants_in_thread(*args):
+    """ The thread opens its own DB connection, which nothing else will close """
+    try:
+        handle_unknown_variants(*args)
+    finally:
+        connection.close()
+
+
 class BulkUnknownVariantInserter:
 
     def __init__(self, upload_step):
@@ -56,6 +65,7 @@ class BulkUnknownVariantInserter:
                                                                     old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         self.variant_pk_lookup.add(variant_coordinate)
+        self.rows_processed += 1
         self.batch_process_check()
 
     def finish(self):
@@ -64,6 +74,7 @@ class BulkUnknownVariantInserter:
         # Make sure all child threads returned ok
         for f in self.child_futures:
             f.result()
+        self.executor.shutdown()
 
     def batch_process_check(self, insert_all=False):
         if insert_all:
@@ -82,7 +93,7 @@ class BulkUnknownVariantInserter:
                         unknown_variants_filename)
 
             if USE_THREADS:
-                future = self.executor.submit(handle_unknown_variants, *huv_args)
+                future = self.executor.submit(_handle_unknown_variants_in_thread, *huv_args)
                 self.child_futures.append(future)
             else:
                 handle_unknown_variants(*huv_args)
@@ -108,7 +119,6 @@ class SeparateUnknownVariantsTask(ImportVCFStepTask):
                 raise
 
         bulk_inserter.finish()  # Any leftovers
-        variant_collection.count = bulk_inserter.rows_processed
         return bulk_inserter.rows_processed
 
 
@@ -149,26 +159,35 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
         if not settings.UPLOAD_ENABLED:
             raise ValueError("Uploads disabled, this should not have been called!")
 
-        self._acquire_lock()
+        lock_token = self._acquire_lock()
         try:
             return InsertUnknownVariantsTask.process_items_in_lock(upload_step)
         finally:
-            logging.info("Releasing %s", self.LOCK_ID)
-            cache.delete(self.LOCK_ID)
+            self._release_lock(lock_token)
 
-    def _acquire_lock(self):
-        """ Never skip the insert: the step would report success with its unknown variants missing """
+    def _acquire_lock(self) -> str:
+        """ Never skip the insert: the step would report success with its unknown variants missing.
+            Returns the token to release with """
+        lock_token = uuid.uuid4().hex
         deadline = time.monotonic() + self.LOCK_WAIT
         while True:
             try:
-                if cache.add(self.LOCK_ID, "true", self.LOCK_EXPIRE):  # fails if already exists
-                    return
+                if cache.add(self.LOCK_ID, lock_token, self.LOCK_EXPIRE):  # fails if already exists
+                    return lock_token
                 logging.info("%s is held, waiting", self.LOCK_ID)
             except redis.exceptions.ConnectionError as e:  # includes BusyLoadingError
                 logging.warning("Redis unavailable acquiring %s: %s", self.LOCK_ID, e)
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Could not acquire '{self.LOCK_ID}' within {self.LOCK_WAIT} seconds")
             time.sleep(self.LOCK_POLL_SECONDS)
+
+    def _release_lock(self, lock_token: str):
+        """ Past LOCK_EXPIRE the lock may have been taken by another task - leave theirs alone """
+        if cache.get(self.LOCK_ID) == lock_token:
+            logging.info("Releasing %s", self.LOCK_ID)
+            cache.delete(self.LOCK_ID)
+        else:
+            logging.warning("%s expired while held", self.LOCK_ID)
 
     @staticmethod
     def process_items_in_lock(upload_step):

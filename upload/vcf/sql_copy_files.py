@@ -6,6 +6,8 @@ positional and must match the writer in upload/vcf/.
 import csv
 import logging
 import os
+from collections.abc import Sequence
+from typing import Optional
 
 from django.db import connection
 from psycopg.sql import SQL, Identifier, Literal
@@ -19,6 +21,10 @@ COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters",
                           'samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
                           'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters',
                           'format', 'info']
+# What a sample's call is - two rows for one variant that differ here disagree about the genotype
+COHORT_GENOTYPE_GENOTYPE_COLUMNS = ['ref_count', 'het_count', 'hom_count', 'unk_count', 'samples_zygosity',
+                                    'samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
+                                    'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters']
 MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id', 'operation',
                                     'old_multiallelic', 'old_variant', 'old_variant_formatted',
                                     'operation_detail']
@@ -73,6 +79,47 @@ def variants_sql_copy_csv(input_filename):
 
 def cohort_genotype_sql_copy_csv(input_filename, table_name):
     return sql_copy_csv(input_filename, table_name, COHORT_GENOTYPE_HEADER)
+
+
+def genotype_conflict_detail(kept_genotype: Sequence[Optional[str]],
+                             removed_genotype: Sequence[Optional[str]]) -> Optional[str]:
+    """ The COHORT_GENOTYPE_GENOTYPE_COLUMNS where a removed duplicate row differs from the kept one
+        (values in COPY text format), or None when they are the same call """
+    differences = [f"{column}: kept {kept}, removed {removed}"
+                   for column, kept, removed in zip(COHORT_GENOTYPE_GENOTYPE_COLUMNS, kept_genotype, removed_genotype,
+                                                    strict=True)
+                   if kept != removed]
+    return "; ".join(differences) or None
+
+
+def delete_duplicate_cohort_genotypes(input_filename, table_name) -> list[tuple[int, Optional[str]]]:
+    """ The importer drops repeated variants within a batch, but two records can normalise to the same
+        variant on either side of a split file boundary, and the partition tables have no
+        unique(collection, variant) to stop the second copy. Run after each COPY has committed: whichever
+        of two overlapping batches commits last sees the other's rows here, and the lowest id is kept.
+        Returns (variant_id, genotype_conflict_detail) per removed row """
+    collection_ids = set()
+    variant_ids = []
+    with open(input_filename) as f:
+        for line in f:
+            collection_id, variant_id, _ = line.split(",", 2)  # Leading integer columns, never escaped
+            collection_ids.add(int(collection_id))
+            variant_ids.append(int(variant_id))
+
+    # As text so they compare and read the same as the importer's COPY values
+    genotype_columns = ", ".join(f"kept.{c}::text, dup.{c}::text" for c in COHORT_GENOTYPE_GENOTYPE_COLUMNS)
+    sql = f"""DELETE FROM {table_name} dup USING {table_name} kept
+        WHERE dup.collection_id = ANY(%s) AND dup.variant_id = ANY(%s)
+        AND kept.collection_id = dup.collection_id AND kept.variant_id = dup.variant_id
+        AND kept.id = (SELECT min(earliest.id) FROM {table_name} earliest
+                       WHERE earliest.collection_id = dup.collection_id AND earliest.variant_id = dup.variant_id)
+        AND kept.id < dup.id
+        RETURNING dup.variant_id, {genotype_columns}"""
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [list(collection_ids), variant_ids])
+        rows = cursor.fetchall()
+    return [(variant_id, genotype_conflict_detail(genotype[0::2], genotype[1::2]))
+            for variant_id, *genotype in rows]
 
 
 def modified_imported_variant_sql_copy_csv(input_filename):

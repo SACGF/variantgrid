@@ -69,5 +69,6 @@ class UploadStepOrigin(models.TextChoices):
 class ModifiedImportedVariantOperation(models.TextChoices):
     NORMALIZATION = 'N', "Normalisation"
     RMDUP = 'R', "Removed Duplicate"
+    CONFLICTING_DUPLICATE = 'C', "Removed Duplicate - genotype differed from the kept record"
     SHARED_LOCUS = 'L', "Shared Locus - allele depths summed"
     MERGED_RECORDS = 'M', "Merged Records - multiple VCF records became one variant"

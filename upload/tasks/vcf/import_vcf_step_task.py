@@ -244,10 +244,15 @@ def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
             # chord_task = chord(parallel_tasks, pipeline_success_task.si(upload_pipeline_id))
             # So using chain to run in sequence not parallel
 
-            # Add on pipeline success task at the end of FINISH jobs
-            parallel_tasks.append(pipeline_success_task.si(upload_pipeline_id))
-            chain_task = chain(parallel_tasks)
-            chain_task.apply_async()
+            # A repeat call finds the FINISH steps already claimed - a lone success task would close the
+            # pipeline under the first chain, whose steps would then be SKIPPED
+            finish_steps_already_claimed = not parallel_tasks and upload_pipeline.uploadstep_set.filter(
+                pipeline_stage_dependency=VCFPipelineStage.FINISH).exists()
+            if not finish_steps_already_claimed:
+                # Add on pipeline success task at the end of FINISH jobs
+                parallel_tasks.append(pipeline_success_task.si(upload_pipeline_id))
+                chain_task = chain(parallel_tasks)
+                chain_task.apply_async()
         else:
             for task in parallel_tasks:
                 task.apply_async()
@@ -274,8 +279,8 @@ def pipeline_success_task(upload_pipeline_id):
         The PROCESSING guard makes a repeat run a no-op: FINISH can legitimately be scheduled more than
         once (two DATA_INSERTION steps finishing together each call check_pipeline_stage), and while
         schedule_pipeline_stage_steps de-duplicates the steps on start_date it appends this task
-        unconditionally. #928: a FINISH step that set SUCCESS itself made the guard swallow the real
-        close, so none of the above ran. """
+        only when it claimed some (or the pipeline has none). #928: a FINISH step that set SUCCESS
+        itself made the guard swallow the real close, so none of the above ran. """
     upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     if upload_pipeline.status == ProcessingStatus.PROCESSING:
         steps = upload_pipeline.uploadstep_set.all()

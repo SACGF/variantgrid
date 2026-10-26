@@ -30,13 +30,19 @@ from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, V
 from upload.models import (
     ModifiedImportedVariant,
     PipelineFailedJobTerminateEarlyException,
+    SimpleVCFImportInfo,
     UploadPipeline,
     UploadStep,
     VCFImporter,
 )
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
-from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER, write_sql_copy_csv
+from upload.vcf.sql_copy_files import (
+    COHORT_GENOTYPE_GENOTYPE_COLUMNS,
+    COHORT_GENOTYPE_HEADER,
+    genotype_conflict_detail,
+    write_sql_copy_csv,
+)
 
 # BCFTOOLS_OLD_VARIANT ends in the 1-based alt index where the row was a multi-allelic, eg
 # 'NC_000001.10|145016034|A|AA,AC|2' - strip it to get back to the row all the alts came from
@@ -542,19 +548,26 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             if len(array) != num_variants:
                 raise ValueError(f"Number of variant ids ({num_variants}) != num {name} ({len(array)})")
 
-        seen_variant_ids = set()
+        num_genotype_columns = len(COHORT_GENOTYPE_GENOTYPE_COLUMNS)
+        genotype_by_variant_id = {}
+        num_conflicting = 0
         for variant_hash, variant_id, filters, cohort_gt, gnomad_af in zip(variant_hashes, variant_ids,
                                                                            self.variant_filters,
                                                                            self.cohort_genotypes, self.variant_gnomad_af):
             # Remove duplicates and add ModifiedImportedVariant
             # dupes may not be on subsequent lines due to normalization/multi-allelic so need check all in hash
-            if variant_id in seen_variant_ids:
+            genotype = cohort_gt[:num_genotype_columns]
+            if kept_genotype := genotype_by_variant_id.get(variant_id):
+                if conflict_detail := genotype_conflict_detail(kept_genotype, genotype):
+                    operation = ModifiedImportedVariantOperation.CONFLICTING_DUPLICATE
+                    num_conflicting += 1
+                else:
+                    operation = ModifiedImportedVariantOperation.RMDUP
                 self.modified_imported_variant_hashes.append(variant_hash)
-                self.modified_imported_variants.append((ModifiedImportedVariantOperation.RMDUP,
-                                                        None, None, None, None))
+                self.modified_imported_variants.append((operation, None, None, None, conflict_detail))
                 continue
 
-            seen_variant_ids.add(variant_id)
+            genotype_by_variant_id[variant_id] = genotype
             common = gnomad_af and variant_id not in self.uncommon_variant_ids
             if common:
                 cgc_id = self.cohort_genotype_collection.common_collection_id
@@ -564,6 +577,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 cohort_genotypes = cohort_genotypes_rare
             # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
             cohort_genotypes.append([cgc_id, variant_id, filters] + cohort_gt)
+
+        if num_conflicting:
+            SimpleVCFImportInfo.add_conflicting_genotypes(num_conflicting, self.upload_step)
 
         cg_destinations = {
             "common": (cohort_genotypes_common, {"base_table_name": "common"}),
@@ -584,6 +600,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
             self.cohort_genotype_file_id += 1
 
+        self.variant_filters = []
         self.cohort_genotypes = []
         self.variant_gnomad_af = []
         self.check_pipeline_for_failures()  # Need to do this every so often

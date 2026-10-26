@@ -23,7 +23,11 @@ from library.log_utils import report_exc_info
 from snpdb.enums import ImportStatus
 from snpdb.models import CachedGeneratedFile, Cohort
 from upload.models import FileUpload
-from upload.upload_metadata import UploadMetadataError
+from upload.upload_metadata import (
+    UploadMetadataError,
+    get_metadata_keys_for_file_type,
+    validate_upload_metadata,
+)
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 from upload.views.views_json import EmptyUploadError, get_upload_status_dict, handle_file_upload
 
@@ -77,7 +81,7 @@ class APIFileUploadView(APIView):
         try:
             django_uploaded_file = request.FILES['file']
             path = request.query_params.get("path")
-            force = request.query_params.get("force", False)
+            force = request.query_params.get("force", "").lower() in {"1", "true", "yes"}
             metadata = {k: v for k, v in request.query_params.items()
                         if k not in self.RESERVED_QUERY_PARAMS}
 
@@ -85,7 +89,7 @@ class APIFileUploadView(APIView):
             existing_file_upload: Optional[FileUpload] = None
             if not force:
                 sha256_hash = self._django_file_sha256(django_uploaded_file)
-                existing_file_upload = self._get_existing_file_upload(request.user, sha256_hash, path)
+                existing_file_upload = self._get_existing_file_upload(request.user, sha256_hash, path, metadata)
 
             if existing_file_upload:
                 response_data["message"] = "Existing uploaded file with matching hash found"
@@ -107,12 +111,16 @@ class APIFileUploadView(APIView):
             return JsonResponse({"error": "Upload failed"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     @classmethod
-    def _get_existing_file_upload(cls, user, sha256_hash, path=None) -> Optional[FileUpload]:
-        """ Most-recent successfully-processed upload with the same content the user can view.
-            Prefers a matching 'path' when supplied. """
+    def _get_existing_file_upload(cls, user, sha256_hash, path=None, metadata=None) -> Optional[FileUpload]:
+        """ Most-recent successfully-processed upload with the same content and metadata the user can view.
+            Prefers a matching 'path' when supplied. Different metadata (eg a corrected genome_build) is a
+            new upload, not the old one. """
         matches = []
         for existing_uf in FileUpload.objects.filter(sha256_hash=sha256_hash).order_by("-pk"):
             if not existing_uf.can_view(user):
+                continue
+            metadata_keys = get_metadata_keys_for_file_type(existing_uf.file_type)
+            if validate_upload_metadata(metadata, metadata_keys) != (existing_uf.metadata or {}):
                 continue
             # Only re-use uploaded files that have been successfully processed
             upload_data = get_upload_data_for_uploaded_file(existing_uf)
