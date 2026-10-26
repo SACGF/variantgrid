@@ -50,27 +50,9 @@ class ClassificationFlagTypes:
         return FlagType.objects.get(pk='classification_internal_review')
 
     @property
-    def discordant(self) -> FlagType:
-        return FlagType.objects.get(pk='classification_discordant')
-
-    @property
     def classification_not_public(self) -> FlagType:
         return FlagType.objects.get(pk='classification_not_public')
 
-    @property
-    def classification_pending_changes(self) -> FlagType:
-        return FlagType.objects.get(pk='classification_pending_changes')
-
-    CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY = "to_clin_sig"
-    """
-    This is the key that appears in the flag JSON data for a pending change, e.g. {"to_clin_sig": "VUS"}
-    """
-
-    # Technically a clinical_context_discordance FlagType
-
-    @cached_property
-    def clinical_context_discordance(self) -> FlagType:
-        return FlagType.objects.get(pk='clinical_context_discordance')
 
 
 classification_flag_types = ClassificationFlagTypes()
