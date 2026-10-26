@@ -33,7 +33,6 @@ from analysis.models.nodes.node_counts import (
 from analysis.models.nodes.node_query_mixin import node_query_planner_settings
 from analysis.models.nodes.node_version import NodeTask, NodeVersion
 from library.django_utils.database_utils import signal_backends, wait_for_backends_to_stop
-from library.utils import add_exception_note
 from library.utils.collection_utils import toposort_groups
 from snpdb.enums import TagFilter
 from variantgrid.celery import app
@@ -288,7 +287,7 @@ def get_rendering_dict(node):
         node_class_label = node.get_node_class_label()
         # This has happened a few times, help debug problem
     except NotImplementedError as e:
-        add_exception_note(e, f"Node {node_id=}: {e}")
+        e.add_note(f"Node {node_id=}: {e}")
         raise e
 
     style = f"left: {node.x}px; top: {node.y}px"

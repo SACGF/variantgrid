@@ -17,7 +17,6 @@ from annotation.models.models_gene_counts import (
 from annotation.models.models_version import VariantAnnotationVersion
 from eventlog.models import create_event
 from genes.models import Gene, GeneVersion
-from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
 from patients.enums import Zygosity
@@ -32,10 +31,9 @@ def get_or_create_gene_count_type_and_values(gene_count_type_name: str, show_oth
                                                                 defaults={"enabled": True})
     gene_values = {}
     for label, rgb in MolecularConsequenceColors.ONCOPLOT_COLORS:
-        gv, _ = thread_safe_unique_together_get_or_create(GeneValue,
-                                                          gene_count_type=gene_count_type,
-                                                          label=label,
-                                                          defaults={"rgb": rgb})
+        gv, _ = GeneValue.objects.get_or_create(gene_count_type=gene_count_type,
+                                                label=label,
+                                                defaults={"rgb": rgb})
         gene_values[gv.label] = gv
 
     other = gene_values[MolecularConsequenceColors.OTHER]

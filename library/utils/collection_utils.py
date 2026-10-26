@@ -6,7 +6,6 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from graphlib import TopologicalSorter
-from itertools import islice
 from typing import Any, Generic, Optional, TypeVar, Union
 
 from django.utils.functional import SimpleLazyObject
@@ -96,12 +95,6 @@ def nest_dict(flat_dict: dict[DictKey, DictVal]) -> dict[DictKey, DictVal]:
     return nested
 
 
-def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[tuple[T]]:
-    """ https://stackoverflow.com/a/22045226 """
-    it = iter(iterable)
-    return iter(lambda: tuple(islice(it, chunk_size)), ())
-
-
 def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> Iterator[list[T]]:
     batch: list[T] = []
     for record in iterable:
@@ -167,12 +160,6 @@ def group_by_key(qs: Iterable, key: Callable) -> Iterator[tuple[Any, list]]:
         records.append(record)
     if records:
         yield last_value, records
-
-
-def all_equal(iterable):
-    it = iter(iterable)
-    start = next(it, None)
-    return all(start == x for x in it)
 
 
 TransformInput = TypeVar("TransformInput")

@@ -19,7 +19,6 @@ from django.utils.module_loading import import_string
 
 from library.constants import MINUTE_SECS
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.utils import iter_fixed_chunks
 from snpdb.enums import ClinGenAlleleExternalRecordType
 from snpdb.models import ClinGenAllele
 
@@ -227,7 +226,7 @@ class ClinGenAlleleRegistryAPI:
         url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/alleles?file={file_type}"
         chunk_size = settings.CLINGEN_ALLELE_REGISTRY_BATCH_SIZE
 
-        for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
+        for hgvs_chunk in itertools.batched(hgvs_iter, chunk_size):
             data = "\n".join(hgvs_chunk)
             yield self._put(url, data, chunk_size=chunk_size)
 

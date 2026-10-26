@@ -197,11 +197,3 @@ def retrieve_ftp_content(host, path, attempts=5, backoff=2) -> bytes:
             time.sleep(backoff * 2**n)
 
 
-def add_exception_note(exc: BaseException, note: str) -> BaseException:
-    """ Make equivalent helper for pre-3.11 add_note """
-    if hasattr(exc, 'add_note'):  # Py>=3.11
-        exc.add_note(note)
-    else:                         # Py<=3.10
-        head = exc.args[0] if exc.args else ''
-        exc.args = (f'{head}\nnote: {note}',) + exc.args[1:]
-    return exc

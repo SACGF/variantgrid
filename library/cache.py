@@ -28,7 +28,7 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
 
         def wrapper(*args, **kwargs):
             # Generate a key based on arguments being passed
-            key = (*args,) + tuple(kwargs.items())
+            key = (*args,) + tuple(sorted(kwargs.items()))
 
             # Check if the return value is already known and not expired
             if key in storage and not (ttl != 0 and ttls[key] < _now()):
@@ -37,7 +37,7 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                 if key in storage:
                     # Present but expired — evict before recalculating
                     del storage[key]
-                    del ttls[key]
+                    ttls.pop(key, None)
                     if quick_key_access and key in keys:
                         keys.remove(key)
                 # If not, get the result
@@ -58,8 +58,9 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                         oldest_key = keys[0]
                         del keys[0]
                     else:
-                        oldest_key = list(storage.keys())[0]
+                        oldest_key = next(iter(storage))
                     del storage[oldest_key]
+                    ttls.pop(oldest_key, None)
 
             # Check ttls if it is enabled
             if ttl != 0:
@@ -71,8 +72,8 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                             oldest_key = keys[0]
                             found_key = True
                     else:
-                        if storage.keys():
-                            oldest_key = list(storage.keys())[0]
+                        if storage:
+                            oldest_key = next(iter(storage))
                             found_key = True
                     if not found_key:
                         break
@@ -80,6 +81,7 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
                     # If they key has expired, remove the entry and it's quick access key if quick_key_access=True
                     if ttls[oldest_key] < _now():
                         del storage[oldest_key]
+                        del ttls[oldest_key]
                         if quick_key_access:
                             del keys[0]
                     else:
