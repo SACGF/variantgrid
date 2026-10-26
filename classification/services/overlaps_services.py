@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from functools import cached_property, partial
 from json import JSONDecodeError
 from collections.abc import Iterable
-from typing import Optional, Any, Self
+from typing import Optional, Any, Self, TYPE_CHECKING
 
 from auditlog.context import set_extra_data
 from auditlog.models import LogEntry
@@ -19,7 +19,7 @@ from django.utils.timezone import now
 
 from annotation.models import ClinVarRecordCollection, ClinVarRecord
 from classification.enums import TestingContextBucket, OverlapStatus, OverlapSnapshot, TriageNextStep
-from classification.models import ClassificationGrouping, ClassificationResultValue, OverlapContributionStatus, \
+from classification.models import ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
     TriageDecision, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
     DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
@@ -34,6 +34,9 @@ from review.models import Review, ReviewableModelMixin
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, LabLike, UserSettings
 from snpdb.utils import LabNotificationBuilder
+
+if TYPE_CHECKING:
+    from classification.models.classification_grouping import ClassificationGrouping
 
 _discordance_notifications_suppressed: ContextVar[bool] = ContextVar("discordance_notifications_suppressed", default=False)
 _deferred_overlap_recalc_ids: ContextVar[Optional[set[int]]] = ContextVar("deferred_overlap_recalc_ids", default=None)
@@ -80,7 +83,7 @@ class OverlapServices:
 
     @staticmethod
     def update_classification_grouping_overlap_contribution(
-            classification_grouping: ClassificationGrouping,
+            classification_grouping: 'ClassificationGrouping',
             migration: bool = False,
             recalc_overlaps: bool = True):
         """

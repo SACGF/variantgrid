@@ -138,24 +138,11 @@
         
     {% endif %}
 
-    {% comment %}
-    {% if 'discordance_report'|is_view_enabled %}
-        {% page_help_embedded title="Discordance Reports Awaiting Triage" %}
-            <p>Below is a sample of discordances where your lab has a triage pending.</p>
-        {% end_page_help_embedded %}
-        <div data-toggle="ajax" href="{% url 'classification_dashboard_discordance_detail' dlab.lab_picker.selection %}">
-            <div class="loading-message" style="height:381px">Loading...</div>
-        </div>
-    {% endif %}
-    {% endcomment %}
-
     {% page_help_embedded title="Flagged Classification Records" %}
         <p>
             This section show you how many classifications belonging to your lab(s) that have flags raised against them.<br/>
             Click "Show details" to see the specific classifications.<br/>
             Clicking on each flag will give you instructions on what needs to be done to resolve it.
-        </p><p>
-            Flags range from issues with variant matching, to discordances or suggestions.
         </p>
     {% end_page_help_embedded %}
 

@@ -31,6 +31,7 @@ from classification.enums.overlaps_enums import (
     TriageComment,
     TriageDecision,
 )
+from classification.models.classification import Classification
 from classification.models.classification_grouping import ClassificationGrouping
 from classification.models.condition_resolved import ConditionResolved
 from classification.models.evidence_key import EvidenceKeyMap
@@ -257,6 +258,17 @@ class OverlapContribution(TimeStampedModel):
         else:
             raise ValueError(f"Unsupported ValueType {value_type}")
 
+    @classmethod
+    def contributions_for_classification(cls, classification: Classification) -> dict[ClassificationResultValue, Self]:
+        """
+        The OverlapContributions of the classification's grouping, keyed by value_type
+        (a grouping has one OverlapContribution per value_type)
+        """
+        contribution_qs = cls.objects.filter(
+            classification_grouping__classificationgroupingentry__classification=classification
+        )
+        return {ClassificationResultValue(contribution.value_type): contribution for contribution in contribution_qs}
+
 
 auditlog.register(OverlapContribution)
 
@@ -322,6 +334,19 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             override_status=self.overlap_override_status,
             lab_groups=list(sorted(cont.classification_grouping.lab.group_name for cont in self.contributions_list if cont.classification_grouping is not None))
         )
+
+    @classmethod
+    def single_context_overlaps_for_classification(cls, classification: Classification) -> dict[ClassificationResultValue, Self]:
+        """
+        The valid SINGLE_CONTEXT Overlaps the classification's grouping contributes to, keyed by value_type
+        (a grouping has one testing context, so at most one Overlap per value_type)
+        """
+        overlap_qs = cls.objects.filter(
+            overlap_type=OverlapType.SINGLE_CONTEXT,
+            valid=True,
+            overlapcontributionnextstep__contribution__classification_grouping__classificationgroupingentry__classification=classification
+        )
+        return {ClassificationResultValue(overlap.value_type): overlap for overlap in overlap_qs}
 
     @classmethod
     def preview_category(cls) -> str:

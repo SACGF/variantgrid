@@ -8,10 +8,14 @@ from annotation.enums import CitationSource
 from annotation.models import CitationFetchRequest
 from annotation.regexes import db_citation_regexes
 from classification.enums import (
+    ClassificationResultValue,
     ClinVarCitationsModes,
     EvidenceKeyValueType,
+    OverlapOverrideStatus,
+    OverlapStatus,
     ShareLevel,
     SpecialEKeys,
+    TriageStatus,
 )
 from classification.enums.classification_enums import MultiCondition
 from classification.enums.clinvar_export_enums import ClinVarExportStatus
@@ -19,6 +23,7 @@ from classification.models.classification import Classification, ClassificationM
 from classification.models.clinvar_key_models import ClinVarKey
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.models.overlaps_model import Overlap, OverlapContribution
 from flags.models.models import FlagType
 from genes.hgvs import HGVSComponents
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
@@ -296,10 +301,12 @@ class ClinVarExportConverter:
             # these flags are now handled by AlleleInfo
             # classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
             # classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
-            classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
+
+            # classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"), - now handled by Overlap
+            # classification_flag_types.classification_pending_changes: JsonMessages.error("Classification has pending changes"), - now handled by triage
+
             classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
             classification_flag_types.classification_outstanding_edits: JsonMessages.error("Classification has un-submitted changes"),
-            classification_flag_types.classification_pending_changes: JsonMessages.error("Classification has pending changes"),
             # classification_flag_types.classification_not_public - this has special handling to include a comment
         }
 
@@ -466,11 +473,28 @@ class ClinVarExportConverter:
                 elif message := ClinVarExportConverter.flag_types_to_messages().get(flag.flag_type):
                     messages += message
 
+            classification = self.classification_based_on.classification
+            if overlap := Overlap.single_context_overlaps_for_classification(classification).get(ClassificationResultValue.ONC_PATH):
+                if overlap.overlap_status >= OverlapStatus.MAJOR_DIFFERENCES:
+                    match overlap.overlap_override_status:
+                        case OverlapOverrideStatus.IGNORING_OLD_CLINVAR:
+                            messages += JsonMessages.warning("This record is in discordance with a ClinVar Expert Panel, but this record is newer")
+                        case OverlapOverrideStatus.CONFIDENT_VS_CLINVAR:
+                            messages += JsonMessages.warning("This record is in discordance with a ClinVar Expert Panel, but has been triaged as confident in its value")
+                        case _:
+                            messages += JsonMessages.error("This record is in discordance")
+
+            if triage := OverlapContribution.contributions_for_classification(classification).get(ClassificationResultValue.ONC_PATH):
+                if triage.triage_state_obj.status == TriageStatus.PENDING:
+                    messages += JsonMessages.error("This record has pending changes that have not yet been applied")
+
             if not self.classification_based_on.classification.allele_info.latest_validation.include:
                 messages += JsonMessages.error("There are outstanding variant matching warnings for this record")
 
             if self.clinvar_export_record.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
                 messages += JsonMessages.error("Somatic support is under development, only Germline can be exported to ClinVar currently")
+
+
 
             # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
             # but only if they don't have an open don't share flag

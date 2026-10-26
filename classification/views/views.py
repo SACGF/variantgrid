@@ -980,11 +980,12 @@ def lab_gene_classification_counts(request):
 
 @require_superuser
 def clin_sig_change_data(request):
+    # TODO rather than work on individual classification histories, work over Overlap and OverlapContribution.history
 
     def yield_data():
 
         genome_build = GenomeBuildManager.get_current_genome_build()
-        yield delimited_row(['Classification First Submitted (UTC)', 'Date Changed (UTC)', 'Org', 'Lab', f'c.hgvs {genome_build}', 'URL', 'From', 'To', 'Status', 'Comments', 'Discordance(s)', 'Other Labs for Allele at Time'], '\t')
+        yield delimited_row(['Classification First Submitted (UTC)', 'Date Changed (UTC)', 'Org', 'Lab', f'c.hgvs {genome_build}', 'URL', 'From', 'To', 'Status', 'Comments', 'Other Labs for Allele at Time'], '\t')
 
         flag_changed_re = re.compile(r"^Classification (has )?changed from (?P<from>.*?) to (?P<to>.*?)$")
         de_number_re = re.compile(r"(.*?) [(].*?[)]")
@@ -1014,7 +1015,7 @@ def clin_sig_change_data(request):
             resolution: Optional[str] = 'In Progress'
             classification_created: datetime
             date_raised: datetime = flag.created
-            discordance_dates: list[datetime] = []
+            # discordance_dates: list[datetime] = []
             other_labs: set[Lab] = set()
 
             c_hgvs = source.get_resolved_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
@@ -1024,11 +1025,11 @@ def clin_sig_change_data(request):
             classification_created = source.created
 
             # get earliest discordance
-            first_discordance: Flag
-            for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
-                                                   flag_type=classification_flag_types.discordant).order_by(
-                    'created'):
-                discordance_dates.append(discordance.created)
+            # first_discordance: Flag
+            # for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
+            #                                        flag_type=classification_flag_types.discordant).order_by(
+            #         'created'):
+            #     discordance_dates.append(discordance.created)
 
             if allele := source.allele:
                 # Only lab and created are read, so avoid pulling the wide evidence JSONB per classification
@@ -1056,7 +1057,7 @@ def clin_sig_change_data(request):
             other_lab_list = list(other_labs)
             other_lab_list.sort()
             other_lab_str = ", ".join(other_lab.name for other_lab in other_lab_list)
-            discordance_date_str = " ".join([dd.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
+            #discordance_date_str = " ".join([dd.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
             yield delimited_row([classification_created.strftime('%Y-%m-%d %H:%M:%S'), date_raised.strftime('%Y-%m-%d %H:%M:%S'), org, lab, c_hgvs, url, cs_from, cs_to, resolution, '\n'.join(comments), discordance_date_str, other_lab_str], '\t')
 
     response = StreamingHttpResponse(yield_data(), content_type='text/tsv')
