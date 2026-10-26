@@ -43,7 +43,8 @@ URL in the file becomes a `genes/models/models_gene.py:GeneAnnotationImport`
 `import_source` that first created it - many versions are shared between GFF releases, so a version is created once
 and re-linked afterwards. The `hgnc` FK is only set when the HGNC row exists, so HGNC should be loaded first.
 `Gene.summary` and the NCBI `GeneSymbolAlias` rows also come from the file - cdot takes them from NCBI's gene esummary
-(#2431) - and a summary or alias cdot drops is kept rather than cleared. A
+(#2431). A summary cdot drops is kept rather than cleared, and aliases are only ever added: an alias NCBI
+once listed may still be in use. A
 transcript's whole geometry lives in `TranscriptVersion.data["genome_builds"][build]`; pre-cdot rows lack
 `genome_builds`, which `genes/models/models_gene.py:TranscriptVersion.data_is_current_cdot_format` detects.
 
@@ -75,8 +76,8 @@ release without a GeneAnnotationVersion makes `AnnotationVersion.validate` raise
 ### Symbols, aliases and per-release matching
 
 `genes/models/models_gene.py:GeneSymbol` is keyed on the symbol string under a case-insensitive collation, with
-`genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI (cdot's RefSeq gene `aliases`, synced by
-`genes/management/commands/import_gene_annotation.py:Command._update_ncbi_gene_symbol_aliases`), legacy UCSC and manual entry. Most
+`genes/models/models_gene.py:GeneSymbolAlias` rows from HGNC, NCBI (cdot's RefSeq gene `aliases`, added by
+`genes/management/commands/import_gene_annotation.py:Command._add_ncbi_gene_symbol_aliases`), legacy UCSC and manual entry. Most
 come from `genes/cached_web_resource/hgnc.py:save_hgnc_records`, which upserts a GeneSymbol per approved symbol and
 an alias per `prev_symbol` / `alias_symbol`; `genes/cached_web_resource/hgnc.py:store_hgnc_from_web` then re-matches
 every release. Resolving one exact string is

@@ -2,7 +2,6 @@ import gzip
 import io
 import json
 
-from django.contrib.auth.models import User
 from django.test import TestCase
 
 from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
@@ -10,8 +9,6 @@ from genes.management.commands.import_gene_annotation import Command as GeneAnno
 from genes.models import (
     CdotDataVersion,
     Gene,
-    GeneList,
-    GeneListGeneSymbol,
     GeneSymbol,
     GeneSymbolAlias,
     TranscriptVersion,
@@ -102,23 +99,17 @@ class ImportCdotDataTest(TestCase):
         return set(GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI).values_list("alias", "gene_symbol_id"))
 
     def test_gene_summaries_and_ncbi_aliases(self):
-        """ Summaries update on existing genes; NCBI aliases skip gene symbols and HGNC aliases, and one cdot drops is
-            deleted unless a gene list matched through it. A gene without "aliases" leaves its aliases alone """
+        """ Summaries update on existing genes; NCBI aliases skip gene symbols and HGNC aliases, and one cdot drops
+            is kept """
         GeneSymbol.objects.create(symbol="GATA2")
         GeneSymbolAlias.objects.create(alias="CBFA2", gene_symbol_id="GATA2", source=GeneSymbolAliasSource.HGNC)
-        GeneSymbolAlias.objects.create(alias="NRSF", gene_symbol_id="GATA2", source=GeneSymbolAliasSource.NCBI)
         cdot_data = json.loads(gzip.decompress(self._cdot_file("0.2.34").getvalue()))
-        cdot_data["genes"]["861"] |= {"summary": "old", "aliases": "AML1, CBFA2, GATA2, PEBP2aB, AMLCR1"}
+        cdot_data["genes"]["861"] |= {"summary": "old", "aliases": "AML1, CBFA2, GATA2, PEBP2aB"}
         self._import(io.BytesIO(gzip.compress(json.dumps(cdot_data).encode())))
-        expected = {("AML1", "RUNX1"), ("PEBP2aB", "RUNX1"), ("AMLCR1", "RUNX1"), ("NRSF", "GATA2")}
-        self.assertEqual(expected, self._ncbi_aliases())
+        self.assertEqual({("AML1", "RUNX1"), ("PEBP2aB", "RUNX1")}, self._ncbi_aliases())
 
-        user = User.objects.create_user("gene_list_user")
-        gene_list = GeneList.objects.create(name="aml1_list", user=user)
-        GeneListGeneSymbol.objects.create(gene_list=gene_list, original_name="AML1", gene_symbol_id="RUNX1",
-                                          gene_symbol_alias=GeneSymbolAlias.objects.get(alias="AML1"))
         cdot_data["genes"]["861"] |= {"summary": "new", "aliases": "PEBP2AB, CBF2alpha"}
         self._import(io.BytesIO(gzip.compress(json.dumps(cdot_data).encode())))
-        expected = {("AML1", "RUNX1"), ("PEBP2aB", "RUNX1"), ("CBF2alpha", "RUNX1"), ("NRSF", "GATA2")}
+        expected = {("AML1", "RUNX1"), ("PEBP2aB", "RUNX1"), ("CBF2alpha", "RUNX1")}
         self.assertEqual(expected, self._ncbi_aliases())
         self.assertEqual("new", Gene.objects.get(pk="861").summary)

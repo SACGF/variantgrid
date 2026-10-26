@@ -3,7 +3,6 @@ import time
 
 import ijson
 from django.core.management.base import BaseCommand
-from django.db import transaction
 from django.db.models.functions import Upper
 
 from genes.enums import AnnotationConsortium, GeneSymbolAliasSource
@@ -191,8 +190,7 @@ class Command(BaseCommand):
                 if uc_symbol not in known_uc_gene_symbols:
                     new_gene_symbols.add(symbol)
                     known_uc_gene_symbols.add(uc_symbol)
-                # A gene with no "aliases" key has no NCBI gene info in cdot, so leaves what we have
-                if (aliases := gv_data.get("aliases")) is not None:
+                if aliases := gv_data.get("aliases"):
                     aliases_by_symbol.setdefault(symbol, set()).update(a.strip() for a in aliases.split(",") if a.strip())
 
             hgnc_id = None  # Foreign Key - only set if we have it (ie not withdrawn)
@@ -235,7 +233,7 @@ class Command(BaseCommand):
         del modified_gene_summaries, summary_by_gene_id
 
         if annotation_consortium == AnnotationConsortium.REFSEQ:
-            cls._update_ncbi_gene_symbol_aliases(aliases_by_symbol, known_uc_gene_symbols)
+            cls._add_ncbi_gene_symbol_aliases(aliases_by_symbol, known_uc_gene_symbols)
         del aliases_by_symbol
 
         if new_gene_versions:
@@ -324,28 +322,24 @@ class Command(BaseCommand):
                      totals["modified_transcript_versions"], totals["existing_transcript_versions"])
 
     @classmethod
-    def _update_ncbi_gene_symbol_aliases(cls, aliases_by_symbol: dict[str, set[str]], known_uc_gene_symbols: set[str]):
-        """ Sync the NCBI aliases of each symbol in the file. An alias that is a gene symbol, or already comes
-            from another source (eg HGNC), is skipped. One NCBI no longer lists is kept while a gene list matched
-            through it, as deleting it would cascade to the GeneListGeneSymbol """
+    def _add_ncbi_gene_symbol_aliases(cls, aliases_by_symbol: dict[str, set[str]], known_uc_gene_symbols: set[str]):
+        """ Add the NCBI aliases of each symbol in the file. An alias that is a gene symbol, or already comes from
+            another source (eg HGNC), is skipped. One NCBI no longer lists is kept: people and historical records
+            may still use it, and a gene list that matched through it would lose the row (GeneListGeneSymbol cascades) """
         other_source_qs = GeneSymbolAlias.objects.exclude(source=GeneSymbolAliasSource.NCBI)
         other_source_uc_aliases = set(other_source_qs.annotate(uc_alias=Upper("alias")).values_list("uc_alias", flat=True))
         skip_uc_aliases = known_uc_gene_symbols | other_source_uc_aliases
-        cdot_aliases = {(alias.upper(), symbol.upper()): (alias, symbol)
-                        for symbol, aliases in aliases_by_symbol.items()
-                        for alias in aliases if alias.upper() not in skip_uc_aliases}
-
         ncbi_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.NCBI, gene_symbol__in=aliases_by_symbol)
-        stored_pk_by_alias = {(alias.upper(), symbol.upper()): pk
-                              for pk, alias, symbol in ncbi_qs.values_list("pk", "alias", "gene_symbol_id")}
-        new_aliases = [GeneSymbolAlias(alias=alias, gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
-                       for key, (alias, symbol) in cdot_aliases.items() if key not in stored_pk_by_alias]
-        removed_pks = [pk for key, pk in stored_pk_by_alias.items() if key not in cdot_aliases]
-        with transaction.atomic():
-            unused_qs = GeneSymbolAlias.objects.filter(pk__in=removed_pks, genelistgenesymbol__isnull=True)
-            num_deleted, _ = unused_qs.delete()
-            GeneSymbolAlias.objects.bulk_create(new_aliases, batch_size=cls.BATCH_SIZE, ignore_conflicts=True)
-        logging.info("NCBI gene symbol aliases: %d created, %d deleted", len(new_aliases), num_deleted)
+        stored_aliases = {(alias.upper(), symbol.upper()) for alias, symbol in ncbi_qs.values_list("alias", "gene_symbol_id")}
+
+        new_aliases = {}
+        for symbol, aliases in aliases_by_symbol.items():
+            for alias in aliases:
+                key = (alias.upper(), symbol.upper())
+                if alias.upper() not in skip_uc_aliases and key not in stored_aliases:
+                    new_aliases[key] = GeneSymbolAlias(alias=alias, gene_symbol_id=symbol, source=GeneSymbolAliasSource.NCBI)
+        GeneSymbolAlias.objects.bulk_create(new_aliases.values(), batch_size=cls.BATCH_SIZE, ignore_conflicts=True)
+        logging.info("Created %d NCBI gene symbol aliases", len(new_aliases))
 
     @classmethod
     def _update_changed_transcript_versions(cls, transcript_versions: list[TranscriptVersion]) -> int:
