@@ -74,9 +74,6 @@ def upper(text: str) -> str:
     return text
 
 
-def double_quote(s: Any) -> str:
-    return f'"{s}"'
-
 def format_percent(number, is_unit=False) -> str:
     if is_unit:
         number *= 100
