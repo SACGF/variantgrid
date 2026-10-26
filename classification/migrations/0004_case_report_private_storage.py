@@ -36,7 +36,7 @@ def _move_case_report_files(apps, _schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('classification', '0002_seed_data'),
+        ('classification', '0003_classificationmodification_one_last'),
     ]
 
     operations = [

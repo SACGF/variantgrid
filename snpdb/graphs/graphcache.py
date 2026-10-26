@@ -8,9 +8,10 @@ import os
 
 from celery import signature
 from django.conf import settings
+from django.utils.crypto import salted_hmac
 
 from library.graphs import graph_base
-from library.utils import import_class, sha256sum_str
+from library.utils import import_class
 from snpdb.models import CachedGeneratedFile
 from snpdb.tasks.graph_generation_task import generate_graph
 
@@ -26,8 +27,8 @@ class CacheableGraph(graph_base.GraphBase, metaclass=abc.ABCMeta):
         pass
 
     def get_filename(self):
-        """ Salted so the media URL of a graph can't be worked out from the ids in its params """
-        filename_hash = sha256sum_str(f"{settings.SECRET_KEY}:{self.get_params_hash()}")
+        """ Keyed on SECRET_KEY so the media URL of a graph can't be worked out from the ids in its params """
+        filename_hash = salted_hmac("CacheableGraph.get_filename", self.get_params_hash(), algorithm="sha256").hexdigest()
         return os.path.join(settings.GENERATED_DIR, self.get_name(), filename_hash + ".png")
 
     def get_name(self):
