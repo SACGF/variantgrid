@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from genes.forms import GeneListForm
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory, GeneSymbol
 from snpdb.enums import ImportStatus
 
@@ -48,6 +49,14 @@ class TestAnnotationVCF(TestCase):
         self.assertFalse(copy.can_view(owner))
         self.assertEqual(["RUNX1"], list(copy.get_gene_names()))
 
+    def test_form_url_must_be_http(self):
+        user = User.objects.get_or_create(username='test_user')[0]
+        gl = GeneList.objects.create(name="test", user=user)
+        data = {"name": "test", "user": user.pk}
+        for url, valid in [("https://example.com/panel", True), ("javascript:alert(1)", False), ("", True)]:
+            form = GeneListForm(data={**data, "url": url}, instance=gl, user=user)
+            self.assertEqual(valid, form.is_valid(), (url, form.errors))
+        self.assertIsNone(form.cleaned_data["url"])
 
 class TestGeneListAPI(TestCase):
     @classmethod

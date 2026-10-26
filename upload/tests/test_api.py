@@ -364,6 +364,21 @@ class UploadStatusAPITest(UploadAPITestBase):
                                            kwargs={"file_upload_id": file_upload.pk}))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_status_by_sha256_only_finds_the_users_own_upload(self):
+        """ Someone else's newer upload of the same content neither hides the user's own nor answers for it """
+        own_upload = self._create_vcf_upload("status_shared_content")
+        others_upload = self._create_vcf_upload("status_shared_content")
+        others_upload.user = self.other_user
+        others_upload.save()
+        url = reverse("api_upload_status_sha256", kwargs={"sha256_hash": own_upload.sha256_hash})
+
+        self.client.force_authenticate(user=self.owner)
+        self.assertEqual(self.client.get(url).json()["file_upload_id"], own_upload.pk)
+
+        third_user = User.objects.create_user(username="api_third", password="x")
+        self.client.force_authenticate(user=third_user)
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+
 
 class AnnotatedDownloadAPITest(UploadAPITestBase):
     def _make_export_template(self):

@@ -90,18 +90,15 @@ def reconcile_pending_extractions() -> dict:
 def link_library_qc_to_sequencing_samples() -> int:
     """ A MetricsOutput can land before its run's sample sheet, and a re-sent sheet builds new
         SequencingSample rows: rows with no arm, or an arm off a superseded sheet, are looked up again
-        on every run whose current sheet carries the Pair_ID column. The run link is filled in at the
-        same time where the file arrived before the run was registered """
+        on every run whose current sheet carries the Pair_ID column """
     runs_with_pairs = SequencingRun.objects.filter(
         sequencingruncurrentsamplesheet__sample_sheet__sequencingsample__sequencingsampledata__column=SAMPLE_SHEET_PAIR_ID_COLUMN,
     ).distinct()
-    stale = LibraryQC.objects.filter(sequencing_run_name__in=runs_with_pairs.values("name")).filter(
+    stale = LibraryQC.objects.filter(sequencing_run__in=runs_with_pairs).filter(
         Q(sequencing_sample__isnull=True) |
         Q(sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=True))
     linked = 0
     for row in stale.iterator():
-        if row.sequencing_run_id is None:
-            row.sequencing_run = SequencingRun.objects.get(name=row.sequencing_run_name)
         sequencing_sample = sequencing_sample_for_pair(row.sequencing_run, row.pair_id, row.nucleic_acid)
         if sequencing_sample is None:
             continue
@@ -121,19 +118,14 @@ def _unlinked_arm_q(sample_name_field: str, sequencing_sample_field: str, sample
 
 
 def link_combined_variant_outputs() -> int:
-    """ A CombinedVariantOutput can land before its run is registered, before its run's sheet, and before
-        its arms' VCFs: rows missing any of those links are looked up again """
+    """ A CombinedVariantOutput can land before its run's sheet and before its arms' VCFs: rows missing
+        either link are looked up again """
     unlinked = DragenTSO500CombinedVariantOutput.objects.filter(
-        Q(sequencing_run__isnull=True, sequencing_run_name__in=SequencingRun.objects.values("name")) |
         _unlinked_arm_q("dna_sample_name", "dna_sequencing_sample", "dna_sample") |
         _unlinked_arm_q("rna_sample_name", "rna_sequencing_sample", "rna_sample"))
     linked = 0
     for row in unlinked.iterator():
-        changed = False
-        if row.sequencing_run_id is None:
-            row.sequencing_run = SequencingRun.objects.filter(name=row.sequencing_run_name).first()
-            changed = row.sequencing_run is not None
-        changed |= row.link_sequencing_samples()
+        changed = row.link_sequencing_samples()
         changed |= row.link_samples()
         if changed:
             row.save()

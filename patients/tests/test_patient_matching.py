@@ -19,6 +19,8 @@ class TestPatientMatching(TestCase):
             Patient(first_name="BOB", last_name="DOBALINA", date_of_birth=None),
             Patient(first_name="DAVID", last_name="LAWRENCE", date_of_birth='1980-03-05'),
             Patient(first_name="DAVID", last_name="LAWRENCE", date_of_birth='2020-01-01'),
+            # Patient code
+            Patient(patient_code="CODE1", first_name="CODY", last_name="CODER", date_of_birth='1990-01-01'),
         ]
 
         Patient.objects.bulk_create(patients)
@@ -84,3 +86,25 @@ class TestPatientMatching(TestCase):
                      (dl_me, PatientRecordMatchType.EXACT))
         self.assertEqual(Patient.match(first_name="DAVID", last_name="LAWRENCE", date_of_birth='2020-01-01'),
                          (dl_other, PatientRecordMatchType.EXACT))
+
+    def test_match_without_first_name_needs_date_of_birth(self):
+        dl_me = Patient.objects.get(first_name="DAVID", last_name="LAWRENCE", date_of_birth='1980-03-05')
+        with self.assertRaises(ValueError):
+            Patient.match(first_name=None, last_name="JEAN", sex=Sex.FEMALE)
+        self.assertEqual(Patient.match(first_name=None, last_name="LAWRENCE", date_of_birth='1980-03-05'),
+                         (dl_me, PatientRecordMatchType.EXACT))
+        # Bob's date of birth is unknown, so last name and date of birth don't identify him
+        self.assertEqual(Patient.match(first_name=None, last_name="DOBALINA", date_of_birth='2025-01-01'),
+                         (None, None))
+
+    def test_match_by_patient_code(self):
+        cody = Patient.objects.get(patient_code="CODE1")
+        self.assertEqual(Patient.match(first_name=None, last_name=None, patient_code="CODE1"),
+                         (cody, PatientRecordMatchType.EXACT))
+        self.assertEqual(Patient.match(first_name=None, last_name=None, patient_code="CODE2"), (None, None))
+        # A code no patient has doesn't take over a patient who has a different code
+        self.assertEqual(Patient.match(first_name="CODY", last_name="CODER", patient_code="CODE2"), (None, None))
+        with self.assertRaises(ValueError):
+            Patient.match(first_name="SOMEONE", last_name="ELSE", patient_code="CODE1")
+        with self.assertRaises(ValueError):
+            Patient.match(first_name=None, last_name="CODER", date_of_birth='1991-01-01', patient_code="CODE1")

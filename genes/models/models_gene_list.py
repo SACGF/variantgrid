@@ -267,10 +267,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"
 
     def get_absolute_url(self):
-        url = self.url
-        if url is None:
-            url = reverse('view_gene_list', args=[str(self.id)])
-        return url
+        return reverse('view_gene_list', args=[str(self.id)])
 
     @classmethod
     def get_listing_url(cls):
@@ -344,6 +341,10 @@ class SampleGeneList(TimeStampedModel):
     class Meta:
         unique_together = ('sample', 'gene_list')
         ordering = ['created']
+
+    @staticmethod
+    def filter_for_user(user):
+        return SampleGeneList.objects.filter(sample__in=Sample.filter_for_user(user))
 
     def __str__(self):
         s = f"{self.sample}: {localtime(self.modified)}"

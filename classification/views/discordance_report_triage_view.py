@@ -3,6 +3,7 @@ from typing import Optional
 
 from django import forms
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 
 from classification.enums import DiscordanceReportTriageStatus
@@ -83,7 +84,7 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
 
         if request.GET.get("edit") == "true":
             if not triage.can_write(request.user):
-                raise PermissionError("User does not have permission to edit this triage")
+                raise PermissionDenied("User does not have permission to edit this triage")
 
             form = DiscordanceReportTriageForm(
                 data=request.POST or None,

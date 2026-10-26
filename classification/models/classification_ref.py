@@ -18,6 +18,7 @@ from classification.models.classification_utils import (
     ClassificationJsonParams,
     ClassificationPatchResponse,
 )
+from library.guardian_utils import user_in_group_or_superuser
 from library.utils import empty_to_none, utc_from_timestamp
 from snpdb.models import Lab
 
@@ -193,7 +194,7 @@ class ClassificationRef:
         # don't have access to this group
         lab = None
         if lab_id:
-            if not (user.is_superuser or user.groups.filter(name=lab_id).exists()):
+            if not user_in_group_or_superuser(user, lab_id):
                 raise ClassificationProcessError('Submitting user does not have access to lab ' + lab_id)
             lab = Lab.objects.filter(group_name=lab_id).first()
             if not lab:
