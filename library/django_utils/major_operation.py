@@ -117,7 +117,9 @@ class MajorOperationViewMixin:
             try:
                 stack.enter_context(major_operation(request.user, self.major_operation_name))
             except TooManyMajorOperationsError as e:
-                return JsonResponse({"error": str(e)}, status=503)
+                logging.warning("Major operation limit exceeded for user '%s' (operation '%s')",
+                                request.user, self.major_operation_name, exc_info=True)
+                return JsonResponse({"error": "Service temporarily unavailable. Please try again shortly."}, status=503)
             response = super().dispatch(request, *args, **kwargs)
             if response.streaming:
                 # A streamed CSV runs its query as the response is iterated, after dispatch returns
