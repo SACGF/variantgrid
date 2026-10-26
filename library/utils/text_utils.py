@@ -74,10 +74,6 @@ def upper(text: str) -> str:
     return text
 
 
-def single_quote(s: Any) -> str:
-    return f"'{s}'"
-
-
 def double_quote(s: Any) -> str:
     return f'"{s}"'
 
