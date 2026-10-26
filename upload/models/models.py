@@ -758,6 +758,8 @@ class SimpleVCFImportInfo(VCFImportInfo):
     ANNOTATION_SKIPPED = "annotation_skipped"
     SVLEN_MODIFIED = "svlen_modified"
     CONFLICTING_GENOTYPES = "conflicting_genotypes"
+    CONFLICTING_GENOTYPES_MESSAGE = ("VCF records that normalise to the same variant had different genotypes (eg a "
+                                     "caller writing an indel at two positions) - kept the first, removed the later")
 
     type = models.TextField()
     has_more_details = models.BooleanField(default=False)
@@ -785,6 +787,11 @@ class SimpleVCFImportInfo(VCFImportInfo):
                                                upload_step=upload_step,
                                                count=count,
                                                **kwargs)
+
+    @staticmethod
+    def add_conflicting_genotypes(count: int, upload_step: UploadStep):
+        SimpleVCFImportInfo.add_message_count(count, SimpleVCFImportInfo.CONFLICTING_GENOTYPES_MESSAGE, upload_step,
+                                              type=SimpleVCFImportInfo.CONFLICTING_GENOTYPES)
 
 
 class ModifiedImportedVariants(VCFImportInfo):
@@ -833,6 +840,9 @@ class ModifiedImportedVariants(VCFImportInfo):
         if num_rmdup := miv_qs.filter(operation=ModifiedImportedVariantOperation.RMDUP).count():
             messages.append(f"{num_rmdup} duplicates removed")
 
+        if num_conflicting := miv_qs.filter(operation=ModifiedImportedVariantOperation.CONFLICTING_DUPLICATE).count():
+            messages.append(f"{num_conflicting} duplicates with a different genotype removed")
+
         if num_shared_locus := miv_qs.filter(operation=ModifiedImportedVariantOperation.SHARED_LOCUS).count():
             messages.append(f"{num_shared_locus} allele frequencies summed across a shared locus")
 
@@ -862,8 +872,9 @@ class ModifiedImportedVariant(models.Model):
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
     # What the operation did, where the old_* fields (which are bcftools-shaped) can't say it. Used by
-    # SHARED_LOCUS to record the depths that were summed (so the per-record VAF stays reconstructable)
-    # and by MERGED_RECORDS to list the records that were merged
+    # SHARED_LOCUS to record the depths that were summed (so the per-record VAF stays reconstructable),
+    # by MERGED_RECORDS to list the records that were merged and by CONFLICTING_DUPLICATE for the genotype
+    # columns where the removed record differed from the kept one
     operation_detail = models.TextField(null=True)
 
     class Meta:

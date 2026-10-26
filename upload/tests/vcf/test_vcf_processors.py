@@ -15,6 +15,7 @@ from upload.enums import ModifiedImportedVariantOperation, UploadedFileTypes
 from upload.models import (
     FileUpload,
     ModifiedImportedVariants,
+    SimpleVCFImportInfo,
     UploadedVCF,
     UploadPipeline,
     UploadStep,
@@ -124,6 +125,30 @@ class TestVCFProcessors(TestCase):
             for v in vcf_reader:
                 processor.process_entry(v)
         self.assertGreater(create_cohort_genotype_job.call_count, 1)
+
+    def test_duplicate_in_batch_with_different_genotype(self):
+        """ Three records normalised to one variant: the identical repeat is RMDUP, the one with another call is
+            CONFLICTING_DUPLICATE with the differing columns recorded, and the upload is warned """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "t2t_brca2.vcf")
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, cyvcf2.VCF(vcf_filename))
+        processor = BulkGenotypeVCFProcessor(upload_step, uploaded_vcf.vcf.cohort.cohort_genotype_collection,
+                                             uploaded_vcf, None)
+        array = "{20,30}"
+        het_ref = ["1", "1", "0", "0", "ER", array, array, array, array, array, "", "{}", "{}"]
+        ref_het = ["1", "1", "0", "0", "RE", array, array, array, array, array, "", "{}", "{}"]
+        processor.cohort_genotypes = [het_ref, list(het_ref), ref_het]
+        processor.variant_filters = [None] * 3
+        processor.variant_gnomad_af = [None] * 3
+        with patch.object(processor, "create_cohort_genotype_job"):
+            processor.process_cohort_genotypes(["a", "b", "c"], [1, 1, 1])
+
+        self.assertEqual(["b", "c"], processor.modified_imported_variant_hashes)
+        (rmdup_op, *_, rmdup_detail), (conflict_op, *_, conflict_detail) = processor.modified_imported_variants
+        self.assertEqual((ModifiedImportedVariantOperation.RMDUP, None), (rmdup_op, rmdup_detail))
+        self.assertEqual(ModifiedImportedVariantOperation.CONFLICTING_DUPLICATE, conflict_op)
+        self.assertEqual("samples_zygosity: kept ER, removed RE", conflict_detail)
+        info = SimpleVCFImportInfo.objects.get(type=SimpleVCFImportInfo.CONFLICTING_GENOTYPES)
+        self.assertEqual(1, info.count)
 
     def _create_vcf_with_metadata(self, vcf_filename, metadata):
         upload_step = self._create_fake_upload_step(vcf_filename, metadata)

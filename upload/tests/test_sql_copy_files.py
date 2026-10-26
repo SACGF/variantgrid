@@ -115,9 +115,10 @@ class ImportCohortGenotypeSQLCopyTaskTest(TestCase):
         with connection.cursor() as cursor:
             cursor.execute("SELECT variant_id, samples_zygosity FROM cg_dedup_test ORDER BY id")
             self.assertEqual(cursor.fetchall(), [(self.variant_ids[0], "ER"), (self.variant_ids[1], "ER")])
-        rmdup = ModifiedImportedVariant.objects.filter(operation=ModifiedImportedVariantOperation.RMDUP)
-        self.assertEqual({(self.variant_ids[0], None),
-                          (self.variant_ids[1], ImportCohortGenotypeSQLCopyTask.CONFLICTING_GENOTYPES_DETAIL)},
-                         set(rmdup.values_list("variant_id", "operation_detail")))
+        operations = ModifiedImportedVariant.objects.values_list("variant_id", "operation", "operation_detail")
+        self.assertEqual({(self.variant_ids[0], ModifiedImportedVariantOperation.RMDUP, None),
+                          (self.variant_ids[1], ModifiedImportedVariantOperation.CONFLICTING_DUPLICATE,
+                           "ref_count: kept 1, removed 0; hom_count: kept 0, removed 1; samples_zygosity: kept ER, removed OE")},
+                         set(operations))
         info = SimpleVCFImportInfo.objects.get(type=SimpleVCFImportInfo.CONFLICTING_GENOTYPES)
         self.assertEqual(1, info.count)
